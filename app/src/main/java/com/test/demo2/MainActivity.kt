@@ -63,26 +63,10 @@ class MainActivity : WKBaseActivity<ActivityMainBinding>() {
      * 等你创建了 MyLoginActivity 后，会自动跳过去。
      */
     private fun openCustomLogin() {
-        try {
-            val clazz = Class.forName("${packageName}.MyLoginActivity")
-            val intent = Intent(this@MainActivity, clazz)
-            intent.putExtra("from", getIntent().getIntExtra("from", 0))
-            startActivity(intent)
-        } catch (e: ClassNotFoundException) {
-            Toast.makeText(
-                this,
-                "请先创建 MyLoginActivity",
-                Toast.LENGTH_LONG
-            ).show()
-        } catch (e: Exception) {
-            Toast.makeText(
-                this,
-                "打开自定义登录页失败: ${e.message}",
-                Toast.LENGTH_LONG
-            ).show()
-        }
+    val intent = Intent(this@MainActivity, MyLoginActivity::class.java)
+    intent.putExtra("from", getIntent().getIntExtra("from", 0))
+    startActivity(intent)
     }
-
     private fun showDialog() {
         val content = getString(R.string.dialog_content)
         val linkSpan = SpannableStringBuilder()
