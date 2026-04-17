@@ -37,11 +37,34 @@ jobs:
           EOF
           echo "local.properties created"
 
+      # ========== 新增步骤：全局替换源码中的包名 ==========
+      - name: Replace old package name in all source files
+        env:
+          OLD_PACKAGE: "com.test.demo2"
+          NEW_PACKAGE: ${{ github.event.inputs.application_id }}
+        run: |
+          echo "Replacing '$OLD_PACKAGE' with '$NEW_PACKAGE' in all Kotlin/Java files"
+          # 替换所有 .kt 文件中的包名
+          find app/src -name "*.kt" -exec sed -i "s/${OLD_PACKAGE//./\\.}/${NEW_PACKAGE//./\\.}/g" {} \;
+          # 替换所有 .java 文件中的包名
+          find app/src -name "*.java" -exec sed -i "s/${OLD_PACKAGE//./\\.}/${NEW_PACKAGE//./\\.}/g" {} \;
+          # 替换 AndroidManifest.xml 中的包名（如果存在）
+          if [ -f "app/src/main/AndroidManifest.xml" ]; then
+            sed -i "s/${OLD_PACKAGE//./\\.}/${NEW_PACKAGE//./\\.}/g" app/src/main/AndroidManifest.xml
+          fi
+          # 替换 app/build.gradle 中的 namespace（如果存在）
+          if grep -q "^namespace " app/build.gradle; then
+            sed -i "s/^namespace .*/namespace \"${NEW_PACKAGE}\"/g" app/build.gradle
+          fi
+          echo "Package name replacement completed."
+
       - name: Patch default API base URL in TSApplication.kt
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path('app/src/main/java/com/test/demo2/TSApplication.kt')
+          # 注意：因为上一步已经替换了包名，源文件路径可能变了，但Python脚本执行时文件路径还是旧的物理路径（Git checkout 出来的），
+          # 所以这里直接使用原始路径即可，文件内容已被 sed 修改。
           text = p.read_text(encoding='utf-8')
           old = 'apiURL = "https://api.botgate.cn"'
           new = 'apiURL = "${{ github.event.inputs.api_base_url }}"'
