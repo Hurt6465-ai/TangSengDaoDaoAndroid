@@ -5,16 +5,18 @@ plugins {
     id 'com.google.gms.google-services'
 }
 
-// 读取 local.properties 中的 applicationId
+// ==================== 读取包名 ====================
+// 优先从环境变量 APP_PACKAGE_NAME 读取（适用于 GitHub Actions）
+// 其次从 local.properties 读取（适用于本地开发）
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
     localProperties.load(new FileInputStream(localPropertiesFile))
 }
 
-def appId = localProperties.getProperty('applicationId')
+def appId = System.getenv('APP_PACKAGE_NAME') ?: localProperties.getProperty('applicationId')
 if (appId == null || appId.isEmpty()) {
-    throw new GradleException("❌ 错误：请在 local.properties 中设置 applicationId=你的包名，并在MainActivity和TSApplication文件中导包设置的包名")
+    throw new GradleException("❌ 错误：请设置环境变量 APP_PACKAGE_NAME 或在 local.properties 中设置 applicationId")
 }
 
 // 自动更新 google-services.json 中的 package_name
@@ -32,25 +34,11 @@ if (googleServicesFile.exists()) {
 }
 
 android {
-//    signingConfigs {
-//        debug {
-//            storeFile file('../demo.jks')
-//            storePassword 'demo1365'
-//            keyAlias = 'demo'
-//            keyPassword 'demo1365'
-//        }
-//        release {
-//            storeFile file('../demo.jks')
-//            storePassword 'demo1365'
-//            keyAlias = 'demo'
-//            keyPassword 'demo1365'
-//        }
-//    }
     namespace appId
     compileSdk rootProject.ext.compileSdkVersion
+
     aaptOptions.cruncherEnabled = false
     aaptOptions.useNewCruncher = false
-
 
     defaultConfig {
         applicationId appId
@@ -59,6 +47,10 @@ android {
         versionCode 1
         versionName "1.0"
 
+        // ========== 从环境变量读取 API 地址 ==========
+        // 默认值：http://107.172.79.50:8090
+        buildConfigField "String", "API_BASE_URL", "\"${System.getenv('API_BASE_URL') ?: 'http://107.172.79.50:8090'}\""
+
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary true
@@ -66,31 +58,23 @@ android {
         vectorDrawables.useSupportLibrary = true
         multiDexEnabled true
         ndk {
-            //根据需要 自行选择添加的对应cpu类型的.so库。
             abiFilters "armeabi-v7a", "arm64-v8a"
-//            abiFilters 'armeabi', 'armeabi-v7a', 'arm64-v8a', 'x86'
         }
-
     }
 
     buildTypes {
         release {
             jniDebuggable true
-            //  zipAlignEnabled true   //Zipalign优化
-            minifyEnabled true  // 是否混淆
-            shrinkResources true  // 是否去除无效的资源文件
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-           // signingConfig signingConfigs.release
+            // signingConfig signingConfigs.release  // 如需签名请取消注释并配置
         }
         debug {
-//            jniDebuggable true
-//            zipAlignEnabled true   //Zipalign优化
-//            minifyEnabled true  // 是否混淆
-//            shrinkResources true  // 是否去除无效的资源文件
-//            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-           // signingConfig signingConfigs.release
+            // 可根据需要配置 debug 签名
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
