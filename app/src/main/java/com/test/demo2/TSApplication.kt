@@ -107,11 +107,12 @@ class TSApplication : MultiDexApplication() {
     }
 
     private fun initApi() {
+        // 默认使用你部署的唐僧叨叨业务 API 地址。
+        // 注意：这里不要加 /v1，WKApiConfig 会自动拼接 /v1/ 和 /web/。
+        val defaultApiURL = "http://107.172.79.50:8090"
         val apiURL = WKSharedPreferencesUtil.getInstance().getSP("api_base_url")
         if (TextUtils.isEmpty(apiURL)) {
-//            apiURL = ""
-//            WKApiConfig.initBaseURL(apiURL)
-            throw IllegalStateException("http://107.172.79.50:8090")
+            WKApiConfig.initBaseURLIncludeIP(defaultApiURL)
         } else {
             WKApiConfig.initBaseURLIncludeIP(apiURL)
         }
