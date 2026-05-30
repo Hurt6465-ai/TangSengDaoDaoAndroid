@@ -35,7 +35,7 @@ jobs:
 
       - name: Create local.properties
         run: |
-          echo "applicationId=com.tanwei.tangseng" > local.properties
+          echo "applicationId=com.test.ts" > local.properties
 
       - name: Make Gradle executable
         run: chmod +x ./gradlew
