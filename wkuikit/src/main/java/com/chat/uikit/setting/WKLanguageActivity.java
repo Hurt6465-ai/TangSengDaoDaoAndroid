@@ -14,12 +14,16 @@ import com.chat.uikit.databinding.ActLanguageLayoutBinding;
 /**
  * 多语言
  */
-public class WKLanguageActivity extends WKBaseActivity<ActLanguageLayoutBinding> {
-    int selectedLanguage = 0;
+public class WKLanguageActivity extends WKBaseActivity {
+    private static final int LANGUAGE_MYANMAR = 4;
+
+    private ActLanguageLayoutBinding binding;
+    private int selectedLanguage = 0;
 
     @Override
     protected ActLanguageLayoutBinding getViewBinding() {
-        return ActLanguageLayoutBinding.inflate(getLayoutInflater());
+        binding = ActLanguageLayoutBinding.inflate(getLayoutInflater());
+        return binding;
     }
 
     @Override
@@ -48,28 +52,28 @@ public class WKLanguageActivity extends WKBaseActivity<ActLanguageLayoutBinding>
 
     @Override
     protected void initListener() {
-        wkVBinding.autoLayout.setOnClickListener(v -> {
+        binding.autoLayout.setOnClickListener(v -> {
             selectedLanguage = WKLanguageType.LANGUAGE_FOLLOW_SYSTEM;
             setSelectedLanguage();
         });
-        wkVBinding.simplifiedChineseLayout.setOnClickListener(v -> {
+        binding.simplifiedChineseLayout.setOnClickListener(v -> {
             selectedLanguage = WKLanguageType.LANGUAGE_CHINESE_SIMPLIFIED;
             setSelectedLanguage();
         });
-        wkVBinding.englishLayout.setOnClickListener(v -> {
+        binding.englishLayout.setOnClickListener(v -> {
             selectedLanguage = WKLanguageType.LANGUAGE_EN;
             setSelectedLanguage();
         });
-        wkVBinding.burmeseLayout.setOnClickListener(v -> {
-            selectedLanguage = WKLanguageType.LANGUAGE_MYANMAR;
+        binding.burmeseLayout.setOnClickListener(v -> {
+            selectedLanguage = LANGUAGE_MYANMAR;
             setSelectedLanguage();
         });
     }
 
     private void setSelectedLanguage() {
-        wkVBinding.autoIv.setVisibility(selectedLanguage == WKLanguageType.LANGUAGE_FOLLOW_SYSTEM ? View.VISIBLE : View.INVISIBLE);
-        wkVBinding.englishIv.setVisibility(selectedLanguage == WKLanguageType.LANGUAGE_EN ? View.VISIBLE : View.INVISIBLE);
-        wkVBinding.simplifiedChineseIv.setVisibility(selectedLanguage == WKLanguageType.LANGUAGE_CHINESE_SIMPLIFIED ? View.VISIBLE : View.INVISIBLE);
-        wkVBinding.burmeseIv.setVisibility(selectedLanguage == WKLanguageType.LANGUAGE_MYANMAR ? View.VISIBLE : View.INVISIBLE);
+        binding.autoIv.setVisibility(selectedLanguage == WKLanguageType.LANGUAGE_FOLLOW_SYSTEM ? View.VISIBLE : View.INVISIBLE);
+        binding.englishIv.setVisibility(selectedLanguage == WKLanguageType.LANGUAGE_EN ? View.VISIBLE : View.INVISIBLE);
+        binding.simplifiedChineseIv.setVisibility(selectedLanguage == WKLanguageType.LANGUAGE_CHINESE_SIMPLIFIED ? View.VISIBLE : View.INVISIBLE);
+        binding.burmeseIv.setVisibility(selectedLanguage == LANGUAGE_MYANMAR ? View.VISIBLE : View.INVISIBLE);
     }
 }
