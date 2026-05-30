@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_placeholder_partner_desc">语伴功能正在准备中</string>
+    <string name="tab_placeholder_discover_desc">发现功能正在准备中</string>
+</resources>
