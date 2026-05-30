@@ -4,10 +4,10 @@ apply plugin: 'kotlin-parcelize'
 
 android {
     compileSdk rootProject.ext.compileSdkVersion
+
     defaultConfig {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles 'consumer-rules.pro'
         ndk {
@@ -21,22 +21,26 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
     buildFeatures {
         viewBinding true
         dataBinding true
     }
+
     namespace 'com.chat.uikit'
-//    kotlin {
-//        experimental {
-//            coroutines 'enable'
-//        }
-//    }
 }
+
 dependencies {
     api project(':wkbase')
-//    implementation "androidx.work:work-runtime:2.8.1"
+
+    // FontAwesome icons for bottom navigation.
+    implementation "com.mikepenz:iconics-core:5.5.0"
+    implementation "com.mikepenz:fontawesome-typeface:5.9.0.3-kotlin@aar"
+
+    // implementation "androidx.work:work-runtime:2.8.1"
 }
