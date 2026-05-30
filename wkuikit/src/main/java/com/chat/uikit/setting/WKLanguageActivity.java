@@ -12,11 +12,9 @@ import com.chat.uikit.R;
 import com.chat.uikit.databinding.ActLanguageLayoutBinding;
 
 /**
- * 2020-12-09 15:31
  * 多语言
  */
 public class WKLanguageActivity extends WKBaseActivity<ActLanguageLayoutBinding> {
-
     int selectedLanguage = 0;
 
     @Override
@@ -38,7 +36,7 @@ public class WKLanguageActivity extends WKBaseActivity<ActLanguageLayoutBinding>
     protected void rightButtonClick() {
         super.rightButtonClick();
         WKMultiLanguageUtil.getInstance().updateLanguage(selectedLanguage);
-        EndpointManager.getInstance().invoke("main_show_home_view",0);
+        EndpointManager.getInstance().invoke("main_show_home_view", 0);
         finish();
     }
 
@@ -62,22 +60,16 @@ public class WKLanguageActivity extends WKBaseActivity<ActLanguageLayoutBinding>
             selectedLanguage = WKLanguageType.LANGUAGE_EN;
             setSelectedLanguage();
         });
+        wkVBinding.burmeseLayout.setOnClickListener(v -> {
+            selectedLanguage = WKLanguageType.LANGUAGE_MYANMAR;
+            setSelectedLanguage();
+        });
     }
 
-
     private void setSelectedLanguage() {
-        if (selectedLanguage == WKLanguageType.LANGUAGE_FOLLOW_SYSTEM) {
-            wkVBinding.autoIv.setVisibility(View.VISIBLE);
-            wkVBinding.englishIv.setVisibility(View.INVISIBLE);
-            wkVBinding.simplifiedChineseIv.setVisibility(View.INVISIBLE);
-        } else if (selectedLanguage == WKLanguageType.LANGUAGE_EN) {
-            wkVBinding.autoIv.setVisibility(View.INVISIBLE);
-            wkVBinding.englishIv.setVisibility(View.VISIBLE);
-            wkVBinding.simplifiedChineseIv.setVisibility(View.INVISIBLE);
-        } else if (selectedLanguage == WKLanguageType.LANGUAGE_CHINESE_SIMPLIFIED) {
-            wkVBinding.autoIv.setVisibility(View.INVISIBLE);
-            wkVBinding.englishIv.setVisibility(View.INVISIBLE);
-            wkVBinding.simplifiedChineseIv.setVisibility(View.VISIBLE);
-        }
+        wkVBinding.autoIv.setVisibility(selectedLanguage == WKLanguageType.LANGUAGE_FOLLOW_SYSTEM ? View.VISIBLE : View.INVISIBLE);
+        wkVBinding.englishIv.setVisibility(selectedLanguage == WKLanguageType.LANGUAGE_EN ? View.VISIBLE : View.INVISIBLE);
+        wkVBinding.simplifiedChineseIv.setVisibility(selectedLanguage == WKLanguageType.LANGUAGE_CHINESE_SIMPLIFIED ? View.VISIBLE : View.INVISIBLE);
+        wkVBinding.burmeseIv.setVisibility(selectedLanguage == WKLanguageType.LANGUAGE_MYANMAR ? View.VISIBLE : View.INVISIBLE);
     }
 }
