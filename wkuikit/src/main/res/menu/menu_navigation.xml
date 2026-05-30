@@ -6,15 +6,18 @@
         android:title="" />
 
     <item
-        android:id="@+id/i_contacts"
+        android:id="@+id/i_partner"
         android:title="" />
-
-<!--    <item-->
-<!--        android:id="@+id/i_workplace"-->
-<!--        android:title="" />-->
 
     <item
-        android:id="@+id/i_my"
+        android:id="@+id/i_discover"
         android:title="" />
 
+    <item
+        android:id="@+id/i_community"
+        android:title="" />
+
+    <item
+        android:id="@+id/i_study"
+        android:title="" />
 </menu>
