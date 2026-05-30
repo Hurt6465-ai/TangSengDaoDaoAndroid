@@ -1,48 +1,45 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-buildscript {
-    ext.kotlin_version = '2.2.0'
-    ext.camerax_version = '1.5.3'
-    repositories {
-        google()
-        mavenCentral()
-        maven { url "https://jitpack.io" }
-        maven { url "https://mvnrepository.com" }
-        // 华为推送
-        maven { url 'https://developer.huawei.com/repo/' }
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.13.0'
-        classpath 'com.neenbedankt.gradle.plugins:android-apt:1.8'
-        // 华为推送
-        classpath 'com.huawei.agconnect:agcp:1.6.0.300'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        // classpath 'com.google.gms.google-services:4.4.1'
-        classpath 'com.google.gms:google-services:4.4.2'
-    }
-}
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-parcelize'
 
-allprojects {
-    configurations.configureEach {
-        resolutionStrategy {
-            force "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
-            force "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
+android {
+    compileSdk rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles 'consumer-rules.pro'
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
         }
-        resolutionStrategy.force "androidx.camera:camera-core:$camerax_version"
-        resolutionStrategy.force "androidx.camera:camera-camera2:$camerax_version"
-        resolutionStrategy.force "androidx.camera:camera-lifecycle:$camerax_version"
-        resolutionStrategy.force "androidx.camera:camera-view:$camerax_version"
     }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        viewBinding true
+        dataBinding true
+    }
+
+    namespace 'com.chat.uikit'
 }
 
-project.ext {
-    minSdkVersion = 24
-    targetSdkVersion = 34
-    compileSdkVersion = 36
-    buildToolsVersion = "35.0.0"
-}
+dependencies {
+    api project(':wkbase')
 
-tasks.register('clean', Delete) {
-    delete rootProject.buildDir
+    implementation "com.mikepenz:iconics-core:5.5.0"
+    implementation "com.mikepenz:fontawesome-typeface:5.13.3.1-kotlin"
+
+    // implementation "androidx.work:work-runtime:2.8.1"
 }
