@@ -111,7 +111,7 @@ class TSApplication : MultiDexApplication() {
         if (TextUtils.isEmpty(apiURL)) {
 //            apiURL = ""
 //            WKApiConfig.initBaseURL(apiURL)
-            throw IllegalStateException("api_base_url 未设置，请先配置接口地址")
+            throw IllegalStateException("http://107.172.79.50:8090")
         } else {
             WKApiConfig.initBaseURLIncludeIP(apiURL)
         }
