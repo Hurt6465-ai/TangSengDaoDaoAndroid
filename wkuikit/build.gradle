@@ -38,9 +38,9 @@ android {
 dependencies {
     api project(':wkbase')
 
-    // FontAwesome icons for bottom navigation.
+    // FontAwesome icons via Android-Iconics.
     implementation "com.mikepenz:iconics-core:5.5.0"
-    implementation "com.mikepenz:fontawesome-typeface:5.9.0.3-kotlin@aar"
+    implementation "com.mikepenz:fontawesome-typeface:5.13.3.1-kotlin"
 
     // implementation "androidx.work:work-runtime:2.8.1"
 }
