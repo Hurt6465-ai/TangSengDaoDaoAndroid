@@ -66,5 +66,23 @@
                 android:tint="@color/colorAccent"
                 android:visibility="invisible" />
         </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/burmeseLayout"
+            style="@style/layoutBg">
+
+            <TextView
+                style="@style/leftTextView"
+                android:text="@string/setting_language_myanmar" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/burmeseIv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:src="@mipmap/msg_check"
+                android:tint="@color/colorAccent"
+                android:visibility="invisible" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>
