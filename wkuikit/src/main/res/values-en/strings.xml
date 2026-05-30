@@ -298,5 +298,10 @@
     <string name="uikit_search_for_date">Date</string>
     <string name="uikit_go_to_chat_item">Go to chat</string>
     <string name="uikit_search_for_image">Image</string>
+    <string name="tab_text_chat">Chats</string>
+    <string name="tab_text_partner">Partner</string>
+    <string name="tab_text_discover">Discover</string>
+    <string name="tab_text_community">Community</string>
+    <string name="tab_text_study">Study</string>
 </resources>
 
