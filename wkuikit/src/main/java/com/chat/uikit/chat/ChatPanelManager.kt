@@ -155,12 +155,21 @@ class ChatPanelManager(
     private val keyAiSendTranslate = "chat_ai_send_translate"
     private val keyWingmanEnabled = "chat_ai_wingman_enabled"
     private val langNames = arrayOf("自动检测", "中文", "မြန်မာစာ", "English", "日本語", "한국어", "ภาษาไทย", "Tiếng Việt", "Русский")
-    private var voiceDownY = 0f
+    private var voiceDownX = 0f
     private var voiceCanceling = false
     private var voiceHolding = false
     private var voiceForwardTarget: View? = null
     private var voiceLastMoveEvent: MotionEvent? = null
     private val voiceCancelDistance = AndroidUtilities.dp(70f).toFloat()
+    private var voiceRecordOverlay: LinearLayout? = null
+    private var voiceRecordDotTv: AppCompatTextView? = null
+    private var voiceRecordTimeTv: AppCompatTextView? = null
+    private var voiceRecordWaveTv: AppCompatTextView? = null
+    private var voiceRecordTipTv: AppCompatTextView? = null
+    private val voiceUiHandler = Handler(Looper.getMainLooper())
+    private var voiceUiRunnable: Runnable? = null
+    private var voiceRecordStartMs = 0L
+    private val voiceWaveFrames = arrayOf("▁▂▃▄▅▃▂", "▂▃▅▆▃▂▁", "▃▅▆▄▂▁▂", "▂▄▆▅▃▁▂")
 
     private class LocalOriginalTextContent(remoteText: String, private val localText: String) : WKTextContent(remoteText) {
         override fun getDisplayContent(): String {
@@ -1644,18 +1653,156 @@ ${content}"""
         return current
     }
 
+    private fun ensureVoiceRecordOverlay(): LinearLayout {
+        voiceRecordOverlay?.let { return it }
+        val overlay = LinearLayout(iConversationContext.chatActivity)
+        overlay.orientation = LinearLayout.HORIZONTAL
+        overlay.gravity = Gravity.CENTER_VERTICAL
+        overlay.isClickable = true
+        overlay.isFocusable = false
+        overlay.setPadding(
+            AndroidUtilities.dp(14f),
+            AndroidUtilities.dp(6f),
+            AndroidUtilities.dp(14f),
+            AndroidUtilities.dp(6f)
+        )
+        overlay.elevation = AndroidUtilities.dp(12f).toFloat()
+        overlay.visibility = View.GONE
+        overlay.background = GradientDrawable(
+            GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(Color.parseColor("#F9FFFFFF"), Color.parseColor("#EEF7FBFF"))
+        ).apply {
+            cornerRadius = AndroidUtilities.dp(999f).toFloat()
+            setStroke(AndroidUtilities.dp(1f), Color.parseColor("#EFFFFFFF"))
+        }
+
+        val dotTv = AppCompatTextView(iConversationContext.chatActivity)
+        dotTv.text = "●"
+        dotTv.setTextColor(Color.parseColor("#EF4444"))
+        dotTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        dotTv.gravity = Gravity.CENTER
+        overlay.addView(dotTv, LinearLayout.LayoutParams(AndroidUtilities.dp(18f), LinearLayout.LayoutParams.WRAP_CONTENT))
+
+        val timeTv = AppCompatTextView(iConversationContext.chatActivity)
+        timeTv.text = "00:00"
+        timeTv.setTextColor(Color.parseColor("#111827"))
+        timeTv.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        timeTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        overlay.addView(timeTv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+        val waveTv = AppCompatTextView(iConversationContext.chatActivity)
+        waveTv.text = voiceWaveFrames[0]
+        waveTv.setTextColor(Theme.colorAccount)
+        waveTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+        waveTv.gravity = Gravity.CENTER
+        val waveLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        waveLp.leftMargin = AndroidUtilities.dp(14f)
+        waveLp.rightMargin = AndroidUtilities.dp(12f)
+        overlay.addView(waveTv, waveLp)
+
+        val tipTv = AppCompatTextView(iConversationContext.chatActivity)
+        tipTv.text = "松开发送，左滑取消"
+        tipTv.setTextColor(Color.parseColor("#64748B"))
+        tipTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        tipTv.gravity = Gravity.CENTER_VERTICAL
+        overlay.addView(tipTv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+        val lp = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            AndroidUtilities.dp(46f),
+            Gravity.CENTER_VERTICAL
+        )
+        lp.leftMargin = AndroidUtilities.dp(8f)
+        lp.rightMargin = AndroidUtilities.dp(8f)
+        panelView.addView(overlay, lp)
+
+        voiceRecordOverlay = overlay
+        voiceRecordDotTv = dotTv
+        voiceRecordTimeTv = timeTv
+        voiceRecordWaveTv = waveTv
+        voiceRecordTipTv = tipTv
+        return overlay
+    }
+
+    private fun showVoiceRecordUi() {
+        voiceRecordStartMs = System.currentTimeMillis()
+        voiceCanceling = false
+        ensureVoiceRecordOverlay().visibility = View.VISIBLE
+        updateVoiceRecordUi(false)
+        startVoiceUiTimer()
+    }
+
+    private fun hideVoiceRecordUi() {
+        stopVoiceUiTimer()
+        voiceRecordOverlay?.visibility = View.GONE
+        voiceRecordStartMs = 0L
+    }
+
+    private fun startVoiceUiTimer() {
+        stopVoiceUiTimer()
+        val runnable = object : Runnable {
+            override fun run() {
+                if (voiceHolding && voiceRecordOverlay?.visibility == View.VISIBLE) {
+                    updateVoiceRecordUi(voiceCanceling)
+                    voiceUiHandler.postDelayed(this, 220L)
+                }
+            }
+        }
+        voiceUiRunnable = runnable
+        voiceUiHandler.post(runnable)
+    }
+
+    private fun stopVoiceUiTimer() {
+        voiceUiRunnable?.let { voiceUiHandler.removeCallbacks(it) }
+        voiceUiRunnable = null
+    }
+
+    private fun updateVoiceRecordUi(canceling: Boolean) {
+        val elapsed = if (voiceRecordStartMs > 0) System.currentTimeMillis() - voiceRecordStartMs else 0L
+        val totalSeconds = (elapsed / 1000L).coerceAtLeast(0L)
+        val minutes = totalSeconds / 60L
+        val seconds = totalSeconds % 60L
+        voiceRecordTimeTv?.text = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+        val frameIndex = ((elapsed / 220L) % voiceWaveFrames.size).toInt()
+        voiceRecordWaveTv?.text = voiceWaveFrames[frameIndex]
+        if (canceling) {
+            voiceRecordDotTv?.setTextColor(Color.parseColor("#EF4444"))
+            voiceRecordWaveTv?.setTextColor(Color.parseColor("#EF4444"))
+            voiceRecordTipTv?.text = "松手取消"
+            voiceRecordTipTv?.setTextColor(Color.parseColor("#EF4444"))
+            voiceRecordOverlay?.background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.parseColor("#FFFFF1F2"), Color.parseColor("#FFFEE2E2"))
+            ).apply {
+                cornerRadius = AndroidUtilities.dp(999f).toFloat()
+                setStroke(AndroidUtilities.dp(1f), Color.parseColor("#FFFCA5A5"))
+            }
+        } else {
+            voiceRecordDotTv?.setTextColor(Color.parseColor("#EF4444"))
+            voiceRecordWaveTv?.setTextColor(Theme.colorAccount)
+            voiceRecordTipTv?.text = "松开发送，左滑取消"
+            voiceRecordTipTv?.setTextColor(Color.parseColor("#64748B"))
+            voiceRecordOverlay?.background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.parseColor("#F9FFFFFF"), Color.parseColor("#EEF7FBFF"))
+            ).apply {
+                cornerRadius = AndroidUtilities.dp(999f).toFloat()
+                setStroke(AndroidUtilities.dp(1f), Color.parseColor("#EFFFFFFF"))
+            }
+        }
+    }
+
     private fun handleVoiceTouch(event: MotionEvent): Boolean {
         if (hasInputText()) return false
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                voiceDownY = event.rawY
+                voiceDownX = event.rawX
                 voiceCanceling = false
                 voiceHolding = true
                 voiceForwardTarget = null
                 voiceLastMoveEvent?.recycle()
                 voiceLastMoveEvent = null
                 sendIV.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                showCenterToast(iConversationContext.chatActivity.getString(R.string.chat_voice_hold_tips))
                 val desc = String.format(
                     iConversationContext.chatActivity.getString(R.string.microphone_permissions_des),
                     iConversationContext.chatActivity.getString(R.string.app_name)
@@ -1663,27 +1810,30 @@ ${content}"""
                 WKPermissions.getInstance().checkPermissions(object : WKPermissions.IPermissionResult {
                     override fun onResult(result: Boolean) {
                         if (result && voiceHolding) {
+                            showVoiceRecordUi()
                             WKVoiceViewManager.getInstance().startDirectRecord(iConversationContext)
                         } else if (!result) {
                             voiceHolding = false
+                            hideVoiceRecordUi()
                         }
                     }
 
                     override fun clickResult(isCancel: Boolean) {
-                        if (isCancel) voiceHolding = false
+                        if (isCancel) {
+                            voiceHolding = false
+                            hideVoiceRecordUi()
+                        }
                     }
                 }, iConversationContext.chatActivity, desc, Manifest.permission.RECORD_AUDIO)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 if (!voiceHolding) return true
-                val cancelNow = voiceDownY - event.rawY > voiceCancelDistance
-                if (cancelNow && !voiceCanceling) {
-                    voiceCanceling = true
-                    showCenterToast(iConversationContext.chatActivity.getString(R.string.chat_voice_release_cancel))
-                } else if (!cancelNow && voiceCanceling) {
-                    voiceCanceling = false
-                    showCenterToast(iConversationContext.chatActivity.getString(R.string.chat_voice_hold_tips))
+                val cancelNow = voiceDownX - event.rawX > voiceCancelDistance
+                if (cancelNow != voiceCanceling) {
+                    voiceCanceling = cancelNow
+                    updateVoiceRecordUi(voiceCanceling)
+                    sendIV.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 }
                 return true
             }
@@ -1697,6 +1847,7 @@ ${content}"""
                 voiceLastMoveEvent?.recycle()
                 voiceLastMoveEvent = null
                 voiceCanceling = false
+                hideVoiceRecordUi()
                 return true
             }
         }
@@ -1726,7 +1877,7 @@ ${content}"""
         target.getLocationOnScreen(loc)
         val x = (target.width / 2f).coerceAtLeast(1f)
         val y = if (action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_CANCEL) {
-            (target.height / 2f) - (voiceDownY - source.rawY)
+            target.height / 2f
         } else {
             target.height / 2f
         }
