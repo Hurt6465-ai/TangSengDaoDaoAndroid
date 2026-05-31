@@ -2,8 +2,9 @@ package com.chat.uikit.chat.provider
 
 import android.Manifest
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
@@ -25,6 +26,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.ContextCompat
@@ -33,6 +35,7 @@ import androidx.emoji2.widget.EmojiTextView
 import com.chat.base.WKBaseApplication
 import com.chat.base.act.WKWebViewActivity
 import com.chat.base.config.WKApiConfig
+import com.chat.base.config.WKSharedPreferencesUtil
 import com.chat.base.emoji.EmojiManager
 import com.chat.base.emoji.MoonUtil
 import com.chat.base.endpoint.EndpointManager
@@ -73,12 +76,27 @@ import com.xinbida.wukongim.entity.WKMsgSetting
 import com.xinbida.wukongim.entity.WKSendOptions
 import com.xinbida.wukongim.msgmodel.WKImageContent
 import com.xinbida.wukongim.msgmodel.WKTextContent
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Objects
 import kotlin.math.abs
 
 
 open class WKTextProvider : WKChatBaseProvider() {
+    private val keyAiEndpoint = "chat_ai_endpoint"
+    private val keyAiKey = "chat_ai_key"
+    private val keyAiModel = "chat_ai_model"
+    private val keyAiSourceLang = "chat_ai_source_lang"
+    private val keyAiTargetLang = "chat_ai_target_lang"
+    private val translateCachePrefix = "chat_msg_translate_cache_"
+    private val translateCacheExpireMs = 7L * 24L * 60L * 60L * 1000L
+
     override fun getChatViewItem(parentView: ViewGroup, from: WKChatIteMsgFromType): View? {
         return LayoutInflater.from(context).inflate(R.layout.chat_item_text, parentView, false)
     }
@@ -191,18 +209,12 @@ open class WKTextProvider : WKChatBaseProvider() {
             .setPopDelay(100)// 弹窗延迟时间 default 100毫秒
             .setFlame(uiChatMsgItemEntity.wkMsg.flame)
             .setIsShowPinnedMessage(if (uiChatMsgItemEntity.isShowPinnedMessage) 1 else 0)
-            .addItem(R.mipmap.msg_copy,
-                R.string.copy,
+            .addItem(R.drawable.ic_chat_translate_wa,
+                R.string.chat_menu_translate,
                 object : SelectTextHelper.Builder.onSeparateItemClickListener {
                     override fun onClick() {
                         EndpointManager.getInstance().invoke("chat_activity_touch", null)
-                        // mSelectableTextHelper?.reset()
-                        val cm =
-                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val mClipData = ClipData.newPlainText("Label", selectText)
-                        cm.setPrimaryClip(mClipData)
-                        WKToastUtils.getInstance()
-                            .showToastNormal(context.getString(R.string.copyed))
+                        translateSelectedText(selectText, uiChatMsgItemEntity.wkMsg)
                     }
                 }).addItem(
                 R.mipmap.msg_forward,
@@ -329,21 +341,6 @@ open class WKTextProvider : WKChatBaseProvider() {
                         val list = ArrayList<BottomSheetItem>()
                         list.add(
                             BottomSheetItem(
-                                context.getString(R.string.copy),
-                                R.mipmap.msg_copy,
-                                object : BottomSheetItem.IBottomSheetClick {
-                                    override fun onClick() {
-                                        val cm =
-                                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        val mClipData = ClipData.newPlainText("Label", content)
-                                        cm.setPrimaryClip(mClipData)
-                                        WKToastUtils.getInstance()
-                                            .showToastNormal(context.getString(R.string.copyed))
-                                    }
-                                })
-                        )
-                        list.add(
-                            BottomSheetItem(
                                 context.getString(R.string.call),
                                 R.mipmap.msg_calls,
                                 object : BottomSheetItem.IBottomSheetClick {
@@ -453,21 +450,6 @@ open class WKTextProvider : WKChatBaseProvider() {
                         val list = ArrayList<BottomSheetItem>()
                         list.add(
                             BottomSheetItem(
-                                context.getString(R.string.copy),
-                                R.mipmap.msg_copy,
-                                object : BottomSheetItem.IBottomSheetClick {
-                                    override fun onClick() {
-                                        val cm =
-                                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        val mClipData = ClipData.newPlainText("Label", content)
-                                        cm.setPrimaryClip(mClipData)
-                                        WKToastUtils.getInstance()
-                                            .showToastNormal(context.getString(R.string.copyed))
-                                    }
-                                })
-                        )
-                        list.add(
-                            BottomSheetItem(
                                 context.getString(R.string.send_email),
                                 R.mipmap.msg2_email,
                                 object : BottomSheetItem.IBottomSheetClick {
@@ -532,6 +514,197 @@ open class WKTextProvider : WKChatBaseProvider() {
 
 
     }
+
+    private fun translateSelectedText(rawText: String?, wkMsg: WKMsg?) {
+        val fallback = wkMsg?.baseContentMsgModel?.displayContent ?: ""
+        val text = if (TextUtils.isEmpty(rawText)) fallback else rawText ?: ""
+        if (TextUtils.isEmpty(text.trim())) {
+            WKToastUtils.getInstance().showToastNormal(context.getString(R.string.chat_translate_empty))
+            return
+        }
+
+        val cacheKey = getTranslateCacheKey(wkMsg, text)
+        val cached = getCachedTranslation(cacheKey)
+        if (!TextUtils.isEmpty(cached)) {
+            showTranslationDialog(cached!!)
+            return
+        }
+
+        WKToastUtils.getInstance().showToastNormal(context.getString(R.string.chat_translate_working))
+        requestAiTranslation(
+            buildTranslatePrompt(text),
+            onSuccess = { translated ->
+                val result = extractTranslation(translated)
+                if (TextUtils.isEmpty(result)) {
+                    WKToastUtils.getInstance().showToastNormal(context.getString(R.string.chat_translate_failed))
+                    return@requestAiTranslation
+                }
+                saveTranslationCache(cacheKey, result)
+                showTranslationDialog(result)
+            },
+            onError = {
+                WKToastUtils.getInstance().showToastNormal(context.getString(R.string.chat_translate_failed))
+            }
+        )
+    }
+
+    private fun getTranslateCacheKey(wkMsg: WKMsg?, text: String): String {
+        val msgKey = when {
+            wkMsg != null && !TextUtils.isEmpty(wkMsg.messageID) -> wkMsg.messageID
+            wkMsg != null && !TextUtils.isEmpty(wkMsg.clientMsgNO) -> wkMsg.clientMsgNO
+            else -> text.hashCode().toString()
+        }
+        return translateCachePrefix + msgKey.replace(Regex("[^A-Za-z0-9_\\-]"), "_")
+    }
+
+    private fun getCachedTranslation(cacheKey: String): String? {
+        return try {
+            val raw = WKSharedPreferencesUtil.getInstance().getSP(cacheKey)
+            if (TextUtils.isEmpty(raw)) return null
+            val json = JSONObject(raw)
+            val ts = json.optLong("ts", 0L)
+            if (System.currentTimeMillis() - ts > translateCacheExpireMs) return null
+            json.optString("translation", "")
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun saveTranslationCache(cacheKey: String, translation: String) {
+        try {
+            val json = JSONObject()
+            json.put("ts", System.currentTimeMillis())
+            json.put("translation", translation)
+            WKSharedPreferencesUtil.getInstance().putSP(cacheKey, json.toString())
+        } catch (e: Exception) {
+            Log.e("WKTextProvider", "save translation cache failed", e)
+        }
+    }
+
+    private fun showTranslationDialog(translation: String) {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                AlertDialog.Builder(context)
+                    .setTitle(R.string.chat_translate_result)
+                    .setMessage(translation)
+                    .setPositiveButton(R.string.chat_translate_close, null)
+                    .show()
+            } catch (e: Exception) {
+                WKToastUtils.getInstance().showToastNormal(translation)
+            }
+        }
+    }
+
+    private fun getAiSetting(key: String, defaultValue: String): String {
+        val value = WKSharedPreferencesUtil.getInstance().getSP(key)
+        return if (TextUtils.isEmpty(value)) defaultValue else value
+    }
+
+    private fun buildTranslatePrompt(content: String): String {
+        val sourceLang = getAiSetting(keyAiSourceLang, "自动检测")
+        val targetLang = getAiSetting(keyAiTargetLang, "中文")
+        return """
+将以下消息从 $sourceLang 翻译成 $targetLang。
+
+要求：
+- 采用自然直译风格：保留原文结构、语气、表情符号和换行，译文读起来像 $targetLang 原生聊天消息，不生硬。
+- 若原文带有暧昧、调侃、冷淡、敷衍、撒娇、抱怨等语气，译文必须保留这种聊天感觉。
+- 保留链接、用户名、代码块、Markdown、列表和表情。
+- 只输出 JSON：{"translation":"译文"}
+- 不要添加任何解释或额外文字。
+
+待翻译消息：
+"$content"
+""".trimIndent()
+    }
+
+    private fun requestAiTranslation(prompt: String, onSuccess: (String) -> Unit, onError: () -> Unit) {
+        val endpoint = getAiSetting(keyAiEndpoint, "https://api.deepseek.com/v1/chat/completions")
+        val apiKey = getAiSetting(keyAiKey, "")
+        val model = getAiSetting(keyAiModel, "deepseek-chat")
+        if (TextUtils.isEmpty(apiKey)) {
+            WKToastUtils.getInstance().showToastNormal(context.getString(R.string.chat_translate_key_empty))
+            onError()
+            return
+        }
+
+        Thread {
+            var connection: HttpURLConnection? = null
+            try {
+                val body = JSONObject()
+                body.put("model", model)
+                body.put("temperature", 0.25)
+
+                val messages = JSONArray()
+                val system = JSONObject()
+                system.put("role", "system")
+                system.put("content", "你是移动聊天应用内的翻译助手，只返回 JSON。")
+                val user = JSONObject()
+                user.put("role", "user")
+                user.put("content", prompt)
+                messages.put(system)
+                messages.put(user)
+                body.put("messages", messages)
+
+                connection = URL(endpoint).openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.connectTimeout = 20000
+                connection.readTimeout = 30000
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                connection.setRequestProperty("Accept", "application/json")
+                connection.setRequestProperty("Authorization", "Bearer $apiKey")
+
+                OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { it.write(body.toString()) }
+                val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
+                val responseText = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
+                val responseJson = JSONObject(responseText)
+                val result = responseJson.optJSONArray("choices")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("message")
+                    ?.optString("content")
+                    ?.trim()
+                    ?: ""
+
+                Handler(Looper.getMainLooper()).post {
+                    if (result.isNotEmpty()) onSuccess(result) else onError()
+                }
+            } catch (e: Exception) {
+                Log.e("WKTextProvider", "translate request failed", e)
+                Handler(Looper.getMainLooper()).post { onError() }
+            } finally {
+                try {
+                    connection?.disconnect()
+                } catch (_: Exception) {
+                }
+            }
+        }.start()
+    }
+
+    private fun extractTranslation(raw: String): String {
+        var text = raw.trim()
+        if (text.startsWith("```")) {
+            text = text.replace(Regex("^```[a-zA-Z]*\\s*"), "").replace(Regex("\\s*```$"), "").trim()
+        }
+        try {
+            val json = JSONObject(text)
+            val translation = json.optString("translation", "")
+            if (!TextUtils.isEmpty(translation)) return translation
+        } catch (_: Exception) {
+        }
+        try {
+            val start = text.indexOf('{')
+            val end = text.lastIndexOf('}')
+            if (start >= 0 && end > start) {
+                val json = JSONObject(text.substring(start, end + 1))
+                val translation = json.optString("translation", "")
+                if (!TextUtils.isEmpty(translation)) return translation
+            }
+        } catch (_: Exception) {
+        }
+        return text
+    }
+
 
     private fun showPopup(uiChatMsgItemEntity: WKUIChatMsgItemEntity, v: View, local: FloatArray) {
         val mMsgConfig: MsgConfig = getMsgConfig(uiChatMsgItemEntity.wkMsg.type)
