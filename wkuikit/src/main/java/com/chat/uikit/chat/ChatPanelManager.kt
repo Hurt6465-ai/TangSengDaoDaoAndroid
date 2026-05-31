@@ -19,12 +19,15 @@ import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.View
+import android.view.MotionEvent
+import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
+import android.widget.TextView
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.ContextCompat
@@ -146,13 +149,27 @@ class ChatPanelManager(
     private val keyAiSourceLang = "chat_ai_source_lang"
     private val keyAiTargetLang = "chat_ai_target_lang"
     private val keyAiSendTranslate = "chat_ai_send_translate"
-    private val keyImageCompress = "chat_image_compress"
+    private val keyWingmanEnabled = "chat_ai_wingman_enabled"
+    private val langNames = arrayOf("自动检测", "中文", "မြန်မာစာ", "English", "日本語", "한국어", "ภาษาไทย", "Tiếng Việt", "Русский")
+    private var voiceDownY = 0f
+    private val voiceCancelDistance = AndroidUtilities.dp(70f).toFloat()
+
+    private class LocalOriginalTextContent(remoteText: String, private val localText: String) : WKTextContent(remoteText) {
+        override fun getDisplayContent(): String {
+            return localText
+        }
+
+        override fun getSearchableWord(): String {
+            return localText
+        }
+    }
+
 
     private val menuView: View = parentView.findViewById(R.id.menuView)
     private val menuLayout: View = parentView.findViewById(R.id.menuLayout)
     private val editText: ContactEditText = parentView.findViewById(R.id.editText)
     private val hitTv: AppCompatTextView = parentView.findViewById(R.id.hitTv)
-    private val plusIV: AppCompatImageView = parentView.findViewById(R.id.plusIV)
+    private val plusBtn: AppCompatTextView = parentView.findViewById(R.id.plusBtn)
     private val sendIV: AppCompatImageView = parentView.findViewById(R.id.sendIV)
     private val markdownIv: AppCompatImageView = parentView.findViewById(R.id.markdownIv)
     private val flameIV: AppCompatImageView = parentView.findViewById(R.id.flameIV)
@@ -160,11 +177,10 @@ class ChatPanelManager(
     private val panelView: FrameLayout = parentView.findViewById(R.id.panelView)
     private val chatView: LinearLayout = parentView.findViewById(R.id.chatView)
     private val chatTopLayout: FrameLayout = parentView.findViewById(R.id.chatTopLayout)
-
-    private val translateBtn: AppCompatTextView = parentView.findViewById(R.id.translateBtn)
-    private val wingmanBtn: AppCompatTextView = parentView.findViewById(R.id.wingmanBtn)
+    private val sourceLangBtn: AppCompatTextView = parentView.findViewById(R.id.sourceLangBtn)
+    private val swapLangBtn: AppCompatTextView = parentView.findViewById(R.id.swapLangBtn)
+    private val targetLangBtn: AppCompatTextView = parentView.findViewById(R.id.targetLangBtn)
     private val aiSendToggle: AppCompatTextView = parentView.findViewById(R.id.aiSendToggle)
-    private val compressToggle: AppCompatTextView = parentView.findViewById(R.id.compressToggle)
     private var flameLayout: LinearLayout? = null
 
     // 相册有新图
@@ -368,7 +384,7 @@ class ChatPanelManager(
         if (forbiddenView?.visibility == View.GONE) return
         forbiddenView?.visibility = View.GONE
         chatView.visibility = View.VISIBLE
-        toolbarRecyclerView.visibility = View.VISIBLE
+        toolbarRecyclerView.visibility = View.GONE
         val forbiddenTV =
             forbiddenView?.findViewWithTag<AppCompatTextView>("forbiddenTV")
         forbiddenTV?.text = iConversationContext.chatActivity.getString(R.string.fullStaffing)
@@ -911,7 +927,7 @@ class ChatPanelManager(
         val toolBarList = EndpointManager.getInstance()
             .invokes<ChatToolBarMenu>(EndpointCategory.wkChatToolBar, iConversationContext)
         val tempToolBarList: MutableList<ChatToolBarMenu> = ArrayList()
-        var isAddEmojiLayout = true
+        var isAddEmojiLayout = false
         for (menu in toolBarList) {
             if (menu != null) {
                 if (menu.sid.equals("chat_toolbar_sticker")) {
@@ -920,10 +936,17 @@ class ChatPanelManager(
                 tempToolBarList.add(menu)
             }
         }
-        // 简洁输入框：不再自动添加表情入口，避免底部面板复杂化。
+        if (isAddEmojiLayout) {
+            val emojiToolBar = ChatToolBarMenu(
+                "emojiToolBar",
+                R.mipmap.icon_chat_toolbar_emoji,
+                R.mipmap.icon_chat_toolbar_emoji,
+                getEmojiLayout()
+            ) { _, _ -> }
+            tempToolBarList.add(0, emojiToolBar)
+        }
         toolBarAdapter?.setList(tempToolBarList)
         toolbarRecyclerView.visibility = View.GONE
-        plusIV.visibility = View.VISIBLE
         toolBarAdapter?.addChildClickViewIds(R.id.imageView)
         toolBarAdapter?.setOnItemChildClickListener { adapter1: BaseQuickAdapter<*, *>, view: View, position: Int ->
             if (view.id == R.id.imageView) {
@@ -1257,6 +1280,28 @@ class ChatPanelManager(
     }
 
 
+    private fun hasInputText(): Boolean {
+        return !TextUtils.isEmpty(StringUtils.replaceBlank(editText.text.toString()))
+    }
+
+    private fun updateSendButtonMode() {
+        if (hasInputText()) {
+            sendIV.setImageResource(R.mipmap.icon_chat_send)
+            sendIV.colorFilter = PorterDuffColorFilter(Theme.colorAccount, PorterDuff.Mode.MULTIPLY)
+        } else {
+            sendIV.setImageResource(android.R.drawable.ic_btn_speak_now)
+            sendIV.colorFilter = PorterDuffColorFilter(
+                ContextCompat.getColor(iConversationContext.chatActivity, R.color.color999),
+                PorterDuff.Mode.MULTIPLY
+            )
+        }
+    }
+
+    private fun getSetting(key: String, defaultValue: String): String {
+        val value = WKSharedPreferencesUtil.getInstance().getSP(key)
+        return if (TextUtils.isEmpty(value)) defaultValue else value
+    }
+
     private fun getFlag(key: String, defaultValue: Boolean): Boolean {
         val value = WKSharedPreferencesUtil.getInstance().getSP(key)
         if (TextUtils.isEmpty(value)) return defaultValue
@@ -1267,185 +1312,105 @@ class ChatPanelManager(
         WKSharedPreferencesUtil.getInstance().putSP(key, if (value) "1" else "0")
     }
 
-    private fun getSetting(key: String, defaultValue: String): String {
-        val value = WKSharedPreferencesUtil.getInstance().getSP(key)
-        return if (TextUtils.isEmpty(value)) defaultValue else value
-    }
-
-    private fun hasInputText(): Boolean {
-        return !TextUtils.isEmpty(StringUtils.replaceBlank(editText.text?.toString() ?: ""))
-    }
-
-    private fun updateSendButtonMode() {
-        if (hasInputText()) {
-            sendIV.setImageResource(R.mipmap.icon_chat_send)
-            sendIV.colorFilter = PorterDuffColorFilter(Theme.colorAccount, PorterDuff.Mode.MULTIPLY)
-        } else {
-            sendIV.setImageResource(R.drawable.ic_chat_mic_simple)
-            sendIV.colorFilter = PorterDuffColorFilter(
-                ContextCompat.getColor(iConversationContext.chatActivity, R.color.color999),
-                PorterDuff.Mode.MULTIPLY
-            )
-        }
-        markdownIv.visibility = View.GONE
-    }
-
-    private fun findToolBarPosition(sid: String): Int {
-        val adapter = toolBarAdapter ?: return -1
-        for (index in adapter.data.indices) {
-            if (adapter.data[index].sid == sid) return index
-        }
-        return -1
-    }
-
-    private fun triggerToolBarBySid(sid: String) {
-        val adapter = toolBarAdapter ?: return
-        val position = findToolBarPosition(sid)
-        if (position < 0 || position >= adapter.data.size) return
-        val menu = adapter.getItem(position) ?: return
-        if (menu.isDisable) return
-        if (sid == "wk_chat_toolbar_more") {
-            val path = ImageUtils.getInstance().newestPhoto
-            val oldPath = WKSharedPreferencesUtil.getInstance().getSP("new_img_path")
-            if ((!TextUtils.isEmpty(path) && TextUtils.isEmpty(oldPath)) ||
-                (!TextUtils.isEmpty(path) && !TextUtils.isEmpty(oldPath) && oldPath != path)
-            ) {
-                Handler(Looper.myLooper()!!).postDelayed({ showNewImgDialog(path) }, 300)
-            }
-        }
-        if (sid == "wk_chat_toolbar_voice") {
-            checkPermission(iConversationContext.chatActivity, menu, position, adapter)
-            return
-        }
-        toolBarClick(menu, position, adapter)
-    }
-
     fun refreshAiAssistBar() {
         val sendTranslate = getFlag(keyAiSendTranslate, false)
-        val compress = getFlag(keyImageCompress, true)
-        translateBtn.text = "🇲🇲 " + getSetting(keyAiTargetLang, "缅甸语")
-        wingmanBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_wingman_short)
-        aiSendToggle.text = "🇨🇳 " + getSetting(keyAiSourceLang, "中文") + if (sendTranslate) " · 发译" else ""
-        compressToggle.text = if (compress) " · 压缩" else " · 原图"
+        sourceLangBtn.text = langLabel(getSetting(keyAiSourceLang, "မြန်မာစာ"))
+        targetLangBtn.text = langLabel(getSetting(keyAiTargetLang, "中文"))
+        aiSendToggle.text = "文A"
+        aiSendToggle.rotation = -12f
         aiSendToggle.setTextColor(
-            ContextCompat.getColor(
-                iConversationContext.chatActivity,
-                if (sendTranslate) R.color.colorDark else R.color.color999
-            )
+            if (sendTranslate) Theme.colorAccount else ContextCompat.getColor(iConversationContext.chatActivity, R.color.color999)
         )
-        compressToggle.setTextColor(
-            ContextCompat.getColor(
-                iConversationContext.chatActivity,
-                if (compress) R.color.color999 else R.color.colorDark
-            )
-        )
+        aiSendToggle.alpha = if (sendTranslate) 1f else 0.65f
+    }
+
+    private fun langLabel(name: String): String {
+        return when (name) {
+            "自动检测" -> "🌐 自动"
+            "中文" -> "🇨🇳 中文"
+            "မြန်မာစာ", "缅甸语" -> "🇲🇲 မြန်မာ"
+            "English" -> "🇺🇸 English"
+            "日本語" -> "🇯🇵 日本語"
+            "한국어" -> "🇰🇷 한국어"
+            "ภาษาไทย" -> "🇹🇭 ไทย"
+            "Tiếng Việt" -> "🇻🇳 Việt"
+            "Русский" -> "🇷🇺 Русский"
+            else -> name
+        }
+    }
+
+    private fun showLanguagePicker(isSource: Boolean) {
+        val key = if (isSource) keyAiSourceLang else keyAiTargetLang
+        val current = getSetting(key, if (isSource) "မြန်မာစာ" else "中文")
+        var checked = langNames.indexOf(current)
+        if (checked < 0) checked = 0
+        AlertDialog.Builder(iConversationContext.chatActivity)
+            .setTitle(if (isSource) R.string.chat_ai_source_lang else R.string.chat_ai_target_lang)
+            .setSingleChoiceItems(langNames, checked) { dialog, which ->
+                WKSharedPreferencesUtil.getInstance().putSP(key, langNames[which])
+                refreshAiAssistBar()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.chat_ai_cancel, null)
+            .show()
     }
 
     private fun initAiAssistBar() {
         markdownIv.visibility = View.GONE
+        toolbarRecyclerView.visibility = View.GONE
         updateSendButtonMode()
         refreshAiAssistBar()
-        plusIV.setOnClickListener {
-            triggerToolBarBySid("wk_chat_toolbar_more")
+        plusBtn.setOnClickListener {
+            triggerMediaPickerDirect()
         }
-        translateBtn.setOnClickListener {
-            val content = editText.text?.toString() ?: ""
-            if (TextUtils.isEmpty(StringUtils.replaceBlank(content))) {
-                WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.input))
-                return@setOnClickListener
-            }
-            translateBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_translating)
-            requestAi(
-                buildTranslatePrompt(content),
-                onSuccess = { result ->
-                    translateBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_translate)
-                    editText.setText(result)
-                    editText.setSelection(editText.text?.length ?: 0)
-                },
-                onError = {
-                    translateBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_translate)
-                    WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_failed))
-                }
-            )
-        }
-
-        wingmanBtn.setOnClickListener {
-            val content = editText.text?.toString() ?: ""
-            wingmanBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_wingman_loading)
-            requestAi(
-                buildWingmanPrompt(content),
-                onSuccess = { result ->
-                    wingmanBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_wingman)
-                    showWingmanResult(result)
-                },
-                onError = {
-                    wingmanBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_wingman)
-                    WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_failed))
-                }
-            )
-        }
-
-        aiSendToggle.setOnClickListener {
-            putFlag(keyAiSendTranslate, !getFlag(keyAiSendTranslate, false))
+        sourceLangBtn.setOnClickListener { showLanguagePicker(true) }
+        targetLangBtn.setOnClickListener { showLanguagePicker(false) }
+        swapLangBtn.setOnClickListener {
+            val source = getSetting(keyAiSourceLang, "မြန်မာစာ")
+            val target = getSetting(keyAiTargetLang, "中文")
+            WKSharedPreferencesUtil.getInstance().putSP(keyAiSourceLang, target)
+            WKSharedPreferencesUtil.getInstance().putSP(keyAiTargetLang, source)
             refreshAiAssistBar()
         }
-
-        compressToggle.setOnClickListener {
-            putFlag(keyImageCompress, !getFlag(keyImageCompress, true))
+        aiSendToggle.setOnClickListener {
+            putFlag(keyAiSendTranslate, !getFlag(keyAiSendTranslate, false))
             refreshAiAssistBar()
         }
     }
 
     private fun buildTranslatePrompt(content: String): String {
-        val source = getSetting(keyAiSourceLang, "中文")
-        val target = getSetting(keyAiTargetLang, "မြန်မာစာ")
-        return "把下面这条聊天消息从${source}翻译成${target}。要求：自然、口语化、保留表情和换行，只输出译文，不要解释。\\n\\n${content}"
-    }
-
-    private fun buildWingmanPrompt(content: String): String {
+        val source = getSetting(keyAiSourceLang, "မြန်မာစာ")
         val target = getSetting(keyAiTargetLang, "中文")
-        val current = if (TextUtils.isEmpty(content)) "用户还没输入内容，请根据聊天场景给 3 条万能开场/接话建议。" else content
-        return "你是聊天僚机。根据下面用户准备发送或想回复的内容，给出 3-5 条可以直接发送的短回复建议。每条 20 字以内，语言使用${target}，口语自然，不要长篇解释。\\n\\n当前内容：${current}"
+        return "把下面这条聊天消息从${source}翻译成${target}。要求：自然、口语化、保留表情和换行，只输出译文，不要解释。\n\n${content}"
     }
 
     private fun sendInputText() {
         var content = StringUtils.replaceBlank(editText.text.toString())
         if (TextUtils.isEmpty(content)) return
         content = editText.text.toString()
-        sendIV.colorFilter = PorterDuffColorFilter(
-            ContextCompat.getColor(
-                iConversationContext.chatActivity, R.color.popupTextColor
-            ), PorterDuff.Mode.MULTIPLY
-        )
-        val drawable = EmojiManager.getInstance()
-            .getDrawable(iConversationContext.chatActivity, content)
-        if (drawable != null && iConversationContext.replyMsg == null) {
-            val resultObject =
-                EndpointManager.getInstance().invoke(
-                    "text_to_emoji_sticker",
-                    SendTextMenu(
-                        content,
-                        iConversationContext
-                    )
-                )
 
-            if (resultObject != null) {
-                val result = resultObject as Boolean
-                if (result) {
-                    editText.text = null
-                    lastInputTime = 0
-                    return
-                }
+        val drawable = EmojiManager.getInstance().getDrawable(iConversationContext.chatActivity, content)
+        if (!getFlag(keyAiSendTranslate, false) && drawable != null && iConversationContext.replyMsg == null) {
+            val resultObject = EndpointManager.getInstance().invoke(
+                "text_to_emoji_sticker",
+                SendTextMenu(content, iConversationContext)
+            )
+            if (resultObject is Boolean && resultObject) {
+                editText.text = null
+                lastInputTime = 0
+                updateSendButtonMode()
+                return
             }
         }
 
         if (getFlag(keyAiSendTranslate, false)) {
+            val originalText = content
             sendIV.isEnabled = false
             requestAi(
-                buildTranslatePrompt(content),
+                buildTranslatePrompt(originalText),
                 onSuccess = { translated ->
                     sendIV.isEnabled = true
-                    sendTextNow(translated)
+                    sendTextNow(translated, originalText)
                 },
                 onError = {
                     sendIV.isEnabled = true
@@ -1453,12 +1418,16 @@ class ChatPanelManager(
                 }
             )
         } else {
-            sendTextNow(content)
+            sendTextNow(content, null)
         }
     }
 
-    private fun sendTextNow(content: String) {
-        val textMsgModel = WKTextContent(content)
+    private fun sendTextNow(remoteContent: String, localDisplayContent: String?) {
+        val textMsgModel = if (!TextUtils.isEmpty(localDisplayContent) && localDisplayContent != remoteContent) {
+            LocalOriginalTextContent(remoteContent, localDisplayContent!!)
+        } else {
+            WKTextContent(remoteContent)
+        }
 
         val list = editText.allUIDs
         if (list != null && list.isNotEmpty()) {
@@ -1488,19 +1457,6 @@ class ChatPanelManager(
         }
     }
 
-    private fun showWingmanResult(result: String) {
-        AlertDialog.Builder(iConversationContext.chatActivity)
-            .setTitle(iConversationContext.chatActivity.getString(R.string.chat_ai_wingman))
-            .setMessage(result)
-            .setNegativeButton(iConversationContext.chatActivity.getString(R.string.cancel), null)
-            .setPositiveButton(iConversationContext.chatActivity.getString(R.string.complete)) { _, _ ->
-                editText.setText(result)
-                editText.setSelection(editText.text?.length ?: 0)
-                helper.toKeyboardState()
-            }
-            .show()
-    }
-
     private fun requestAi(prompt: String, onSuccess: (String) -> Unit, onError: () -> Unit) {
         val endpoint = getSetting(keyAiEndpoint, "https://api.deepseek.com/v1/chat/completions")
         val apiKey = getSetting(keyAiKey, "")
@@ -1519,7 +1475,7 @@ class ChatPanelManager(
                 val messages = JSONArray()
                 val system = JSONObject()
                 system.put("role", "system")
-                system.put("content", "你是移动聊天应用内的翻译和回复助手。")
+                system.put("content", "你是移动聊天应用内的翻译助手。")
                 val user = JSONObject()
                 user.put("role", "user")
                 user.put("content", prompt)
@@ -1536,10 +1492,7 @@ class ChatPanelManager(
                 connection.setRequestProperty("Accept", "application/json")
                 connection.setRequestProperty("Authorization", "Bearer $apiKey")
 
-                OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use {
-                    it.write(body.toString())
-                }
-
+                OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { it.write(body.toString()) }
                 val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
                 val text = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
                 val json = JSONObject(text)
@@ -1560,6 +1513,111 @@ class ChatPanelManager(
         }.start()
     }
 
+    private fun triggerMediaPickerDirect() {
+        val adapter = toolBarAdapter ?: return
+        for (index in adapter.data.indices) {
+            val menu = adapter.getItem(index) ?: continue
+            val sid = menu.sid ?: ""
+            val lowerSid = sid.lowercase(Locale.getDefault())
+            if ((lowerSid.contains("album") || lowerSid.contains("image") || lowerSid.contains("photo") || lowerSid.contains("media") || lowerSid.contains("video")) &&
+                !lowerSid.contains("card") && !menu.isDisable
+            ) {
+                toolBarClick(menu, index, adapter)
+                return
+            }
+        }
+        triggerMorePanelAndAutoOpenMedia()
+    }
+
+    private fun findToolBarPosition(sid: String): Int {
+        val adapter = toolBarAdapter ?: return -1
+        for (index in adapter.data.indices) {
+            if (adapter.getItem(index)?.sid == sid) return index
+        }
+        return -1
+    }
+
+    private fun triggerToolBarBySid(sid: String): Boolean {
+        val adapter = toolBarAdapter ?: return false
+        val position = findToolBarPosition(sid)
+        if (position < 0 || position >= adapter.data.size) return false
+        val menu = adapter.getItem(position) ?: return false
+        if (menu.isDisable) return false
+        if (sid == "wk_chat_toolbar_voice") {
+            checkPermission(iConversationContext.chatActivity, menu, position, adapter)
+        } else {
+            toolBarClick(menu, position, adapter)
+        }
+        return true
+    }
+
+    private fun triggerMorePanelAndAutoOpenMedia() {
+        val adapter = toolBarAdapter ?: return
+        val position = findToolBarPosition("wk_chat_toolbar_more")
+        if (position < 0 || position >= adapter.data.size) return
+        val menu = adapter.getItem(position) ?: return
+        if (menu.isDisable) return
+        toolBarClick(menu, position, adapter)
+        parentView.postDelayed({
+            if (!autoClickMediaAction(moreLayout)) {
+                WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_media_not_found))
+            }
+        }, 120)
+    }
+
+    private fun autoClickMediaAction(root: View?): Boolean {
+        if (root == null || root.visibility != View.VISIBLE) return false
+        val text = when (root) {
+            is TextView -> root.text?.toString() ?: ""
+            else -> root.contentDescription?.toString() ?: ""
+        }.lowercase(Locale.getDefault())
+        val isMedia = text.contains("相册") || text.contains("图片") || text.contains("照片") ||
+            text.contains("视频") || text.contains("拍摄") || text.contains("album") ||
+            text.contains("photo") || text.contains("image") || text.contains("video")
+        val isBlocked = text.contains("名片") || text.contains("联系人") || text.contains("card") || text.contains("contact")
+        if (isMedia && !isBlocked) {
+            findClickableParent(root).performClick()
+            return true
+        }
+        if (root is ViewGroup) {
+            for (i in 0 until root.childCount) {
+                if (autoClickMediaAction(root.getChildAt(i))) return true
+            }
+        }
+        return false
+    }
+
+    private fun findClickableParent(view: View): View {
+        var current: View = view
+        var parent = current.parent
+        while (parent is View && !current.isClickable) {
+            current = parent
+            parent = current.parent
+        }
+        return current
+    }
+
+    private fun handleVoiceTouch(event: MotionEvent): Boolean {
+        if (hasInputText()) return false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                voiceDownY = event.rawY
+                WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_voice_hold_tips))
+                triggerToolBarBySid("wk_chat_toolbar_voice")
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (voiceDownY - event.rawY > voiceCancelDistance) {
+                    WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_voice_release_cancel))
+                }
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                return true
+            }
+        }
+        return true
+    }
 
     private fun initListener() {
         panelView.setOnClickListener {
@@ -1596,14 +1654,17 @@ class ChatPanelManager(
             null
         }
         SingleClickUtil.onSingleClick(markdownIv) {
-            // 富文本入口已隐藏，保留空监听避免旧布局引用异常。
+            // 富文本入口已隐藏。
         }
         sendIV.setOnClickListener {
             if (hasInputText()) {
                 sendInputText()
             } else {
-                triggerToolBarBySid("wk_chat_toolbar_voice")
+                WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_voice_long_press_hint))
             }
+        }
+        sendIV.setOnTouchListener { _, event ->
+            if (hasInputText()) false else handleVoiceTouch(event)
         }
         editText.addTextChangedListener(object : TextWatcher {
 //            var linesCount = 0
@@ -1614,6 +1675,7 @@ class ChatPanelManager(
             override fun onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) {
                 this.start = start
                 this.count = count
+                updateSendButtonMode()
                 if (!TextUtils.isEmpty(s.toString())) {
                     val content = StringUtils.replaceBlank(s.toString())
 //                    val content = s.toString().replace("\\s*|\r|\n|\t", "")
@@ -1621,17 +1683,32 @@ class ChatPanelManager(
                         CommonAnim.getInstance().animImageView(sendIV)
                     }
                     isShowSendBtn = true
-                    updateSendButtonMode()
+                    if (TextUtils.isEmpty(content)) {
+                        sendIV.colorFilter = PorterDuffColorFilter(
+                            ContextCompat.getColor(
+                                iConversationContext.chatActivity, R.color.popupTextColor
+                            ), PorterDuff.Mode.MULTIPLY
+                        )
+                    } else {
+                        sendIV.colorFilter = PorterDuffColorFilter(
+                            Theme.colorAccount, PorterDuff.Mode.MULTIPLY
+                        )
+                    }
+                    CommonAnim.getInstance().showOrHide(markdownIv, false, true)
                     if (flame == 1) {
                         CommonAnim.getInstance().showOrHide(flameIV, false, true)
                     }
                 } else {
-                    markdownIv.visibility = View.GONE
+                    CommonAnim.getInstance().showOrHide(markdownIv, false, true)
                     if (flame == 1) {
                         CommonAnim.getInstance().showOrHide(flameIV, true, true)
                     }
                     isShowSendBtn = false
-                    updateSendButtonMode()
+                    sendIV.colorFilter = PorterDuffColorFilter(
+                        ContextCompat.getColor(
+                            iConversationContext.chatActivity, R.color.popupTextColor
+                        ), PorterDuff.Mode.MULTIPLY
+                    )
                 }
                 val selectionStart = editText.selectionStart
                 val selectionEnd = editText.selectionEnd
@@ -2502,7 +2579,7 @@ class ChatPanelManager(
                         MsgModel.getInstance().deleteMsg(list, null)
                         resetTitleViewListener()
                         multipleChoiceView?.visibility = View.GONE
-                        toolbarRecyclerView.visibility = View.VISIBLE
+                        toolbarRecyclerView.visibility = View.GONE
                         CommonAnim.getInstance().showBottom2Top(chatView)
                         var i = 0
                         val itemCount: Int = chatAdapter.itemCount
