@@ -152,6 +152,7 @@ class ChatPanelManager(
     private val menuLayout: View = parentView.findViewById(R.id.menuLayout)
     private val editText: ContactEditText = parentView.findViewById(R.id.editText)
     private val hitTv: AppCompatTextView = parentView.findViewById(R.id.hitTv)
+    private val plusIV: AppCompatImageView = parentView.findViewById(R.id.plusIV)
     private val sendIV: AppCompatImageView = parentView.findViewById(R.id.sendIV)
     private val markdownIv: AppCompatImageView = parentView.findViewById(R.id.markdownIv)
     private val flameIV: AppCompatImageView = parentView.findViewById(R.id.flameIV)
@@ -502,7 +503,7 @@ class ChatPanelManager(
                 }
                 flame = mChannel.flame
                 CommonAnim.getInstance().showOrHide(flameIV, flame == 1, true)
-                markdownIv.visibility = if (flame == 1) View.GONE else View.VISIBLE
+                markdownIv.visibility = View.GONE
                 showFlame(mChannel.flameSecond)
             }
         }
@@ -760,7 +761,7 @@ class ChatPanelManager(
             CommonAnim.getInstance().showOrHide(flameIV, true, true)
             markdownIv.visibility = View.GONE
         } else
-            markdownIv.visibility = View.VISIBLE
+            markdownIv.visibility = View.GONE
         seekBarView?.setDelegate(object : SeekBarView.SeekBarViewDelegate {
             override fun onSeekBarDrag(stop: Boolean, progress: Float) {
                 if (stop)
@@ -922,6 +923,7 @@ class ChatPanelManager(
         // 简洁输入框：不再自动添加表情入口，避免底部面板复杂化。
         toolBarAdapter?.setList(tempToolBarList)
         toolbarRecyclerView.visibility = View.GONE
+        plusIV.visibility = View.VISIBLE
         toolBarAdapter?.addChildClickViewIds(R.id.imageView)
         toolBarAdapter?.setOnItemChildClickListener { adapter1: BaseQuickAdapter<*, *>, view: View, position: Int ->
             if (view.id == R.id.imageView) {
@@ -1270,15 +1272,61 @@ class ChatPanelManager(
         return if (TextUtils.isEmpty(value)) defaultValue else value
     }
 
+    private fun hasInputText(): Boolean {
+        return !TextUtils.isEmpty(StringUtils.replaceBlank(editText.text?.toString() ?: ""))
+    }
+
+    private fun updateSendButtonMode() {
+        if (hasInputText()) {
+            sendIV.setImageResource(R.mipmap.icon_chat_send)
+            sendIV.colorFilter = PorterDuffColorFilter(Theme.colorAccount, PorterDuff.Mode.MULTIPLY)
+        } else {
+            sendIV.setImageResource(R.drawable.ic_chat_mic_simple)
+            sendIV.colorFilter = PorterDuffColorFilter(
+                ContextCompat.getColor(iConversationContext.chatActivity, R.color.color999),
+                PorterDuff.Mode.MULTIPLY
+            )
+        }
+        markdownIv.visibility = View.GONE
+    }
+
+    private fun findToolBarPosition(sid: String): Int {
+        val adapter = toolBarAdapter ?: return -1
+        for (index in adapter.data.indices) {
+            if (adapter.data[index].sid == sid) return index
+        }
+        return -1
+    }
+
+    private fun triggerToolBarBySid(sid: String) {
+        val adapter = toolBarAdapter ?: return
+        val position = findToolBarPosition(sid)
+        if (position < 0 || position >= adapter.data.size) return
+        val menu = adapter.getItem(position) ?: return
+        if (menu.isDisable) return
+        if (sid == "wk_chat_toolbar_more") {
+            val path = ImageUtils.getInstance().newestPhoto
+            val oldPath = WKSharedPreferencesUtil.getInstance().getSP("new_img_path")
+            if ((!TextUtils.isEmpty(path) && TextUtils.isEmpty(oldPath)) ||
+                (!TextUtils.isEmpty(path) && !TextUtils.isEmpty(oldPath) && oldPath != path)
+            ) {
+                Handler(Looper.myLooper()!!).postDelayed({ showNewImgDialog(path) }, 300)
+            }
+        }
+        if (sid == "wk_chat_toolbar_voice") {
+            checkPermission(iConversationContext.chatActivity, menu, position, adapter)
+            return
+        }
+        toolBarClick(menu, position, adapter)
+    }
+
     fun refreshAiAssistBar() {
         val sendTranslate = getFlag(keyAiSendTranslate, false)
         val compress = getFlag(keyImageCompress, true)
-        aiSendToggle.text = iConversationContext.chatActivity.getString(
-            if (sendTranslate) R.string.chat_ai_send_translate_on else R.string.chat_ai_send_translate_off
-        )
-        compressToggle.text = iConversationContext.chatActivity.getString(
-            if (compress) R.string.chat_img_compress_on else R.string.chat_img_compress_off
-        )
+        translateBtn.text = "🇲🇲 " + getSetting(keyAiTargetLang, "缅甸语")
+        wingmanBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_wingman_short)
+        aiSendToggle.text = "🇨🇳 " + getSetting(keyAiSourceLang, "中文") + if (sendTranslate) " · 发译" else ""
+        compressToggle.text = if (compress) " · 压缩" else " · 原图"
         aiSendToggle.setTextColor(
             ContextCompat.getColor(
                 iConversationContext.chatActivity,
@@ -1288,13 +1336,18 @@ class ChatPanelManager(
         compressToggle.setTextColor(
             ContextCompat.getColor(
                 iConversationContext.chatActivity,
-                if (compress) R.color.colorDark else R.color.color999
+                if (compress) R.color.color999 else R.color.colorDark
             )
         )
     }
 
     private fun initAiAssistBar() {
+        markdownIv.visibility = View.GONE
+        updateSendButtonMode()
         refreshAiAssistBar()
+        plusIV.setOnClickListener {
+            triggerToolBarBySid("wk_chat_toolbar_more")
+        }
         translateBtn.setOnClickListener {
             val content = editText.text?.toString() ?: ""
             if (TextUtils.isEmpty(StringUtils.replaceBlank(content))) {
@@ -1428,6 +1481,7 @@ class ChatPanelManager(
 
         iConversationContext.sendMessage(textMsgModel)
         editText.text = null
+        updateSendButtonMode()
         lastInputTime = 0
         if (chatTopView?.visibility == View.VISIBLE) {
             CommonAnim.getInstance().animateClose(chatTopView)
@@ -1542,10 +1596,14 @@ class ChatPanelManager(
             null
         }
         SingleClickUtil.onSingleClick(markdownIv) {
-            EndpointManager.getInstance().invoke("show_rich_edit", iConversationContext)
+            // 富文本入口已隐藏，保留空监听避免旧布局引用异常。
         }
         sendIV.setOnClickListener {
-            sendInputText()
+            if (hasInputText()) {
+                sendInputText()
+            } else {
+                triggerToolBarBySid("wk_chat_toolbar_voice")
+            }
         }
         editText.addTextChangedListener(object : TextWatcher {
 //            var linesCount = 0
@@ -1563,32 +1621,17 @@ class ChatPanelManager(
                         CommonAnim.getInstance().animImageView(sendIV)
                     }
                     isShowSendBtn = true
-                    if (TextUtils.isEmpty(content)) {
-                        sendIV.colorFilter = PorterDuffColorFilter(
-                            ContextCompat.getColor(
-                                iConversationContext.chatActivity, R.color.popupTextColor
-                            ), PorterDuff.Mode.MULTIPLY
-                        )
-                    } else {
-                        sendIV.colorFilter = PorterDuffColorFilter(
-                            Theme.colorAccount, PorterDuff.Mode.MULTIPLY
-                        )
-                    }
-                    CommonAnim.getInstance().showOrHide(markdownIv, false, true)
+                    updateSendButtonMode()
                     if (flame == 1) {
                         CommonAnim.getInstance().showOrHide(flameIV, false, true)
                     }
                 } else {
-                    CommonAnim.getInstance().showOrHide(markdownIv, true, true)
+                    markdownIv.visibility = View.GONE
                     if (flame == 1) {
                         CommonAnim.getInstance().showOrHide(flameIV, true, true)
                     }
                     isShowSendBtn = false
-                    sendIV.colorFilter = PorterDuffColorFilter(
-                        ContextCompat.getColor(
-                            iConversationContext.chatActivity, R.color.popupTextColor
-                        ), PorterDuff.Mode.MULTIPLY
-                    )
+                    updateSendButtonMode()
                 }
                 val selectionStart = editText.selectionStart
                 val selectionEnd = editText.selectionEnd
