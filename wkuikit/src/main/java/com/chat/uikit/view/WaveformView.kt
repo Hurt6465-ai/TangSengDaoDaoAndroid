@@ -2,8 +2,8 @@ package com.chat.uikit.view
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
 import androidx.core.content.ContextCompat
@@ -29,17 +29,36 @@ class WaveformView : View {
 
     fun setWaveform(waveform: ByteArray) {
         waveformBytes = waveform
+        invalidate()
     }
 
     private var waveformBytes: ByteArray? = null
 
-    private var innerColor = ContextCompat.getColor(context,R.color.color999)
-    private var outerColor = ContextCompat.getColor(context,R.color.colorAccent)
+    private var innerColor = ContextCompat.getColor(context, R.color.color999)
+    private var outerColor = ContextCompat.getColor(context, R.color.colorAccent)
     private var freshColor = ContextCompat.getColor(context, R.color.blue)
-    private var paintInner: Paint = Paint()
-    private var paintOuter: Paint = Paint()
+
+    private var paintInner: Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private var paintOuter: Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val barRect = RectF()
     private var thumbX = 0
     var isFresh = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    /**
+     * 兼容旧代码里可能调用 voiceWaveform.setFresh(...)
+     */
+    fun setFresh(fresh: Boolean) {
+        isFresh = fresh
+    }
 
     fun setProgress(progress: Float) {
         if (progress < 0) {
@@ -66,21 +85,21 @@ class WaveformView : View {
     override fun onAttachedToWindow() {
         if (disposable == null) {
             disposable = RxBus.listen(ProgressEvent::class.java)
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe {
-                        if (it.id == mBindId) {
-                            if (it.status == STATUS_PAUSE || it.status == STATUS_PLAY) {
-                                setProgress(it.progress)
-                            }
-                        } else {
-                            if (it.status == STATUS_PAUSE ||
-                                    it.status == STATUS_PLAY ||
-                                    it.status == STATUS_ERROR
-                            ) {
-                                setProgress(0f)
-                            }
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe {
+                    if (it.id == mBindId) {
+                        if (it.status == STATUS_PAUSE || it.status == STATUS_PLAY) {
+                            setProgress(it.progress)
+                        }
+                    } else {
+                        if (it.status == STATUS_PAUSE ||
+                            it.status == STATUS_PLAY ||
+                            it.status == STATUS_ERROR
+                        ) {
+                            setProgress(0f)
                         }
                     }
+                }
         }
         super.onAttachedToWindow()
     }
@@ -98,33 +117,49 @@ class WaveformView : View {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (waveformBytes == null || width == 0) {
+
+        val bytes = waveformBytes ?: return
+        if (width == 0 || height == 0) {
             return
         }
-        val totalBarsCount = (width / AndroidUtilities.dp( 3f)).toFloat()
+
+        val barStep = AndroidUtilities.dp(3f)
+        val barWidth = AndroidUtilities.dp(2f).toFloat()
+        val radius = AndroidUtilities.dp(1f).toFloat()
+
+        val totalBarsCount = (width / barStep).toFloat()
         if (totalBarsCount <= 0.1f) {
             return
         }
-        var value: Byte
-        val samplesCount = waveformBytes!!.size * 8 / 5
+
+        val samplesCount = bytes.size * 8 / 5
         val samplesPerBar = samplesCount / totalBarsCount
-        var barCounter = 0f
-        var nextBarNum = 0
+        if (samplesPerBar <= 0f) {
+            return
+        }
 
         paintInner.color = if (isFresh && thumbX == 0) freshColor else innerColor
         paintOuter.color = outerColor
 
-        val y = height
+        // 重点：不再使用 y = height 做底部对齐，而是以中心线为基准上下展开。
+        val centerY = height / 2f
+
+        // 视觉参数：可按审美微调。
+        val verticalPadding = AndroidUtilities.dp(2f)
+        val maxBarHeight = max(1f, height - verticalPadding * 2f)
+        val minBarHeight = AndroidUtilities.dp(3f).toFloat()
+
+        var barCounter = 0f
+        var nextBarNum = 0
         var barNum = 0
-        var lastBarNum: Int
-        var drawBarCount: Int
 
         for (a in 0 until samplesCount) {
             if (a != nextBarNum) {
                 continue
             }
-            drawBarCount = 0
-            lastBarNum = nextBarNum
+
+            var drawBarCount = 0
+            val lastBarNum = nextBarNum
             while (lastBarNum == nextBarNum) {
                 barCounter += samplesPerBar
                 nextBarNum = barCounter.toInt()
@@ -133,37 +168,56 @@ class WaveformView : View {
 
             val bitPointer = a * 5
             val byteNum = bitPointer / 8
+            if (byteNum >= bytes.size) {
+                break
+            }
+
             val byteBitOffset = bitPointer - byteNum * 8
             val currentByteCount = 8 - byteBitOffset
             val nextByteRest = 5 - currentByteCount
-            value = (waveformBytes!![byteNum].toInt() shr byteBitOffset and (2 shl min(5, currentByteCount) - 1) - 1).toByte()
-            if (nextByteRest > 0) {
+
+            var value = (
+                bytes[byteNum].toInt() shr byteBitOffset and
+                    ((2 shl min(5, currentByteCount)) - 1) - 1
+                ).toByte()
+
+            if (nextByteRest > 0 && byteNum + 1 < bytes.size) {
                 value = (value.toInt() shl nextByteRest).toByte()
-                value = value or (waveformBytes!![byteNum + 1] and ((2 shl nextByteRest - 1) - 1).toByte())
+                value = value or (
+                    bytes[byteNum + 1] and
+                        ((2 shl nextByteRest - 1) - 1).toByte()
+                    )
             }
 
+            val amplitude = value.toInt().coerceIn(0, 31) / 31f
+
+            // 稍微做一点视觉增强：静音段不至于太细，高音段也不顶满。
+            val visualAmplitude = 0.18f + amplitude * 0.82f
+            val barHeight = max(minBarHeight, maxBarHeight * visualAmplitude)
+
             for (b in 0 until drawBarCount) {
-                val x = barNum * AndroidUtilities.dp( 3f)
-                if (x < thumbX && x + AndroidUtilities.dp( 2f) < thumbX) {
-                    canvas.drawRect(
-                            x.toFloat(),
-                            (y - AndroidUtilities.dp( max(1f, 14.0f * value / 31.0f))).toFloat(),
-                            (x + AndroidUtilities.dp( 2f)).toFloat(),
-                            (y).toFloat(),
-                            paintOuter
-                    )
+                val x = barNum * barStep
+                val left = x.toFloat()
+                val right = left + barWidth
+                val top = centerY - barHeight / 2f
+                val bottom = centerY + barHeight / 2f
+
+                barRect.set(left, top, right, bottom)
+
+                if (x + barWidth <= thumbX) {
+                    canvas.drawRoundRect(barRect, radius, radius, paintOuter)
                 } else {
-                    canvas.drawRect(
-                            x.toFloat(),
-                            (y - AndroidUtilities.dp( max(1f, 14.0f * value / 31.0f))).toFloat(),
-                            (x + AndroidUtilities.dp( 2f)).toFloat(),
-                            (y).toFloat(),
-                            paintInner
-                    )
-                    if (x < thumbX) {
-                        canvas.drawRect(x.toFloat(), (y - AndroidUtilities.dp( max(1f, 14.0f * value / 31.0f))).toFloat(), thumbX.toFloat(), (y).toFloat(), paintOuter)
+                    canvas.drawRoundRect(barRect, radius, radius, paintInner)
+
+                    // 播放进度切到某根竖条中间时，只给左半部分上播放色。
+                    if (x < thumbX && thumbX < x + barWidth) {
+                        canvas.save()
+                        canvas.clipRect(left, top, thumbX.toFloat(), bottom)
+                        canvas.drawRoundRect(barRect, radius, radius, paintOuter)
+                        canvas.restore()
                     }
                 }
+
                 barNum++
             }
         }
