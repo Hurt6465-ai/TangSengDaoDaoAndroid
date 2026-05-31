@@ -7,6 +7,10 @@ import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.RectF
@@ -76,9 +80,15 @@ import com.xinbida.wukongim.entity.WKMsg
 import com.xinbida.wukongim.entity.WKSendOptions
 import com.xinbida.wukongim.message.type.WKSendMsgResult
 import com.xinbida.wukongim.msgmodel.WKVoiceContent
+import org.json.JSONArray
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.nio.charset.StandardCharsets
 import org.telegram.ui.Components.RLottieDrawable
 import org.telegram.ui.Components.RLottieImageView
 import java.util.Objects
+import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.math.max
 import androidx.core.view.isVisible
@@ -1054,7 +1064,14 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
 
         if (menus != null && menus.isNotEmpty() && mMsg.flame == 0) {
             for (menu in menus) {
-                val popupMenu =
+                val popupMenu = if (isCopyPopupMenu(menu)) {
+                    PopupMenuItem("翻译", R.drawable.ic_chat_translate_wa,
+                        object : PopupMenuItem.IClick {
+                            override fun onClick() {
+                                translateWholeMessage(mMsg)
+                            }
+                        })
+                } else {
                     PopupMenuItem(menu.text, menu.imageResource,
                         object : PopupMenuItem.IClick {
                             override fun onClick() {
@@ -1066,11 +1083,10 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                                 )
                             }
                         })
+                }
                 popupMenu.subText = menu.subText
-                popupMenu.tag = menu.tag
-                if (menu != null) list.add(
-                    popupMenu
-                )
+                popupMenu.tag = if (isCopyPopupMenu(menu)) "chat_translate" else menu.tag
+                list.add(popupMenu)
             }
         }
         var addIndex = list.size
@@ -1220,6 +1236,185 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             )
         }
         return list
+    }
+
+
+    private fun isCopyPopupMenu(menu: ChatItemPopupMenu): Boolean {
+        val text = menu.text?.trim() ?: ""
+        val tag = menu.tag?.trim() ?: ""
+        return text.equals("复制", true)
+                || text.equals("copy", true)
+                || text.equals("拷贝", true)
+                || tag.equals("copy", true)
+                || tag.equals("msg_copy", true)
+    }
+
+    private fun translateWholeMessage(mMsg: WKMsg) {
+        val content = getTranslatableMessageText(mMsg)
+        if (TextUtils.isEmpty(content)) {
+            WKToastUtils.getInstance().showToastNormal("没有可翻译的文字")
+            return
+        }
+        val stableId = when {
+            !TextUtils.isEmpty(mMsg.messageID) && mMsg.messageID != "0" -> mMsg.messageID
+            !TextUtils.isEmpty(mMsg.clientMsgNO) -> mMsg.clientMsgNO
+            else -> content.hashCode().toString()
+        }
+        translateTextWithCache(content, "bubble_$stableId")
+    }
+
+    private fun getTranslatableMessageText(mMsg: WKMsg): String {
+        var content = ""
+        try {
+            if (mMsg.remoteExtra != null && mMsg.remoteExtra.contentEditMsgModel != null) {
+                content = mMsg.remoteExtra.contentEditMsgModel.displayContent ?: ""
+            }
+            if (TextUtils.isEmpty(content) && mMsg.baseContentMsgModel != null) {
+                content = mMsg.baseContentMsgModel.displayContent ?: ""
+            }
+            if (TextUtils.isEmpty(content)) {
+                content = getShowContent(mMsg.content) ?: ""
+            }
+        } catch (_: Exception) {
+        }
+        return content.trim()
+    }
+
+    private fun translateTextWithCache(text: String, cacheSeed: String) {
+        val cacheKey = "chat_translate_cache_" + cacheSeed.hashCode()
+        val cached = readTranslationCache(cacheKey)
+        if (!TextUtils.isEmpty(cached)) {
+            showTranslationDialog(cached!!)
+            return
+        }
+        val apiKey = readAiSetting("chat_ai_key", "")
+        if (TextUtils.isEmpty(apiKey)) {
+            WKToastUtils.getInstance().showToastNormal("请先在 AI 翻译设置里填写 API Key")
+            return
+        }
+        val endpoint = readAiSetting("chat_ai_endpoint", "https://api.deepseek.com/v1/chat/completions")
+        val model = readAiSetting("chat_ai_model", "deepseek-chat")
+        val sourceLang = readAiSetting("chat_ai_source_lang", "自动检测")
+        val targetLang = readAiSetting("chat_ai_target_lang", "中文")
+        WKToastUtils.getInstance().showToastNormal("正在翻译…")
+        thread {
+            try {
+                val translated = requestAiTranslation(endpoint, apiKey, model, sourceLang, targetLang, text)
+                saveTranslationCache(cacheKey, translated)
+                Handler(Looper.getMainLooper()).post { showTranslationDialog(translated) }
+            } catch (e: Exception) {
+                Handler(Looper.getMainLooper()).post {
+                    WKToastUtils.getInstance().showToastNormal("翻译失败：" + (e.message ?: ""))
+                }
+            }
+        }
+    }
+
+    private fun requestAiTranslation(
+        endpoint: String,
+        apiKey: String,
+        model: String,
+        sourceLang: String,
+        targetLang: String,
+        text: String
+    ): String {
+        val prompt = """
+            将以下聊天消息从$sourceLang 翻译成 $targetLang。
+
+            要求：
+            - 自然直译，保留原文结构、语气、表情符号和换行。
+            - 若原文带有暧昧、调侃、冷淡、敷衍、撒娇、抱怨等语气，译文必须保留这种聊天感觉。
+            - 保留链接、用户名、代码块、Markdown、列表和表情。
+            - 只输出 JSON：{"translation":"译文"}
+            - 不要添加任何解释或额外文字。
+
+            待翻译消息：
+            "$text"
+        """.trimIndent()
+        val payload = JSONObject()
+            .put("model", model)
+            .put("temperature", 0.25)
+            .put(
+                "messages",
+                JSONArray()
+                    .put(JSONObject().put("role", "system").put("content", "你是聊天消息翻译助手，只返回 JSON。"))
+                    .put(JSONObject().put("role", "user").put("content", prompt))
+            )
+        val conn = (URL(endpoint).openConnection() as HttpURLConnection)
+        conn.requestMethod = "POST"
+        conn.connectTimeout = 20000
+        conn.readTimeout = 30000
+        conn.doOutput = true
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+        conn.setRequestProperty("Authorization", "Bearer $apiKey")
+        conn.outputStream.use { it.write(payload.toString().toByteArray(StandardCharsets.UTF_8)) }
+        val response = if (conn.responseCode in 200..299) {
+            conn.inputStream.bufferedReader().use { it.readText() }
+        } else {
+            val err = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: "HTTP ${conn.responseCode}"
+            throw RuntimeException(err.take(160))
+        }
+        val content = JSONObject(response)
+            .optJSONArray("choices")
+            ?.optJSONObject(0)
+            ?.optJSONObject("message")
+            ?.optString("content")
+            ?.trim()
+            ?: ""
+        if (content.isEmpty()) throw RuntimeException("empty response")
+        return try {
+            JSONObject(content).optString("translation", content).trim()
+        } catch (_: Exception) {
+            content.removePrefix("```").removePrefix("json").removeSuffix("```").trim()
+        }
+    }
+
+    private fun readAiSetting(key: String, fallback: String): String {
+        val names = arrayOf(
+            "chat_ai_settings",
+            "chat_ai_config",
+            "wk_chat_ai_settings",
+            context.packageName + "_preferences"
+        )
+        for (name in names) {
+            val value = context.getSharedPreferences(name, Context.MODE_PRIVATE).getString(key, "") ?: ""
+            if (value.isNotBlank()) return value
+        }
+        return fallback
+    }
+
+    private fun readTranslationCache(key: String): String? {
+        return try {
+            val raw = context.getSharedPreferences("chat_translate_cache", Context.MODE_PRIVATE).getString(key, "") ?: ""
+            if (raw.isBlank()) return null
+            val obj = JSONObject(raw)
+            val time = obj.optLong("time", 0L)
+            if (System.currentTimeMillis() - time > 7L * 24L * 60L * 60L * 1000L) return null
+            obj.optString("text", "").takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun saveTranslationCache(key: String, translated: String) {
+        try {
+            val obj = JSONObject().put("time", System.currentTimeMillis()).put("text", translated)
+            context.getSharedPreferences("chat_translate_cache", Context.MODE_PRIVATE)
+                .edit().putString(key, obj.toString()).apply()
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun showTranslationDialog(text: String) {
+        try {
+            AlertDialog.Builder(context)
+                .setTitle("翻译结果")
+                .setMessage(text)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+        } catch (_: Exception) {
+            WKToastUtils.getInstance().showToastNormal(text)
+        }
     }
 
     private val rect = RectF()
