@@ -3009,7 +3009,7 @@ ${content}"""
         val row = LinearLayout(iConversationContext.chatActivity)
         row.orientation = LinearLayout.HORIZONTAL
         row.gravity = Gravity.CENTER_VERTICAL
-        scrollView.addView(row, HorizontalScrollView.LayoutParams(HorizontalScrollView.LayoutParams.WRAP_CONTENT, HorizontalScrollView.LayoutParams.WRAP_CONTENT))
+        scrollView.addView(row, ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
         replies.forEach { reply ->
             val chip = AppCompatTextView(iConversationContext.chatActivity)
