@@ -1,6 +1,7 @@
 package com.chat.uikit.chat
 
 import android.Manifest
+import android.app.AlertDialog
 import android.animation.ValueAnimator
 import android.content.Intent
 import android.graphics.PorterDuff
@@ -106,6 +107,12 @@ import com.xinbida.wukongim.msgmodel.WKMessageContent
 import com.xinbida.wukongim.msgmodel.WKMsgEntity
 import com.xinbida.wukongim.msgmodel.WKTextContent
 import org.json.JSONObject
+import org.json.JSONArray
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Locale
 import java.util.Objects
 import java.util.Timer
@@ -133,6 +140,14 @@ class ChatPanelManager(
     private var username: String = ""
     private val maxLength = 300
 
+    private val keyAiEndpoint = "chat_ai_endpoint"
+    private val keyAiKey = "chat_ai_key"
+    private val keyAiModel = "chat_ai_model"
+    private val keyAiSourceLang = "chat_ai_source_lang"
+    private val keyAiTargetLang = "chat_ai_target_lang"
+    private val keyAiSendTranslate = "chat_ai_send_translate"
+    private val keyImageCompress = "chat_image_compress"
+
     private val menuView: View = parentView.findViewById(R.id.menuView)
     private val menuLayout: View = parentView.findViewById(R.id.menuLayout)
     private val editText: ContactEditText = parentView.findViewById(R.id.editText)
@@ -144,6 +159,11 @@ class ChatPanelManager(
     private val panelView: FrameLayout = parentView.findViewById(R.id.panelView)
     private val chatView: LinearLayout = parentView.findViewById(R.id.chatView)
     private val chatTopLayout: FrameLayout = parentView.findViewById(R.id.chatTopLayout)
+
+    private val translateBtn: AppCompatTextView = parentView.findViewById(R.id.translateBtn)
+    private val wingmanBtn: AppCompatTextView = parentView.findViewById(R.id.wingmanBtn)
+    private val aiSendToggle: AppCompatTextView = parentView.findViewById(R.id.aiSendToggle)
+    private val compressToggle: AppCompatTextView = parentView.findViewById(R.id.compressToggle)
     private var flameLayout: LinearLayout? = null
 
     // 相册有新图
@@ -196,6 +216,7 @@ class ChatPanelManager(
         initRobotGIF()
         initRobotMenu()
         initTool()
+        initAiAssistBar()
         initMultipleChoiceView()
         initBanView()
         initForbiddenView()
@@ -898,16 +919,9 @@ class ChatPanelManager(
                 tempToolBarList.add(menu)
             }
         }
-        if (isAddEmojiLayout) {
-            val emojiToolBar = ChatToolBarMenu(
-                "emojiToolBar",
-                R.mipmap.icon_chat_toolbar_emoji,
-                R.mipmap.icon_chat_toolbar_emoji,
-                getEmojiLayout()
-            ) { _, _ -> }
-            tempToolBarList.add(0, emojiToolBar)
-        }
+        // 简洁输入框：不再自动添加表情入口，避免底部面板复杂化。
         toolBarAdapter?.setList(tempToolBarList)
+        toolbarRecyclerView.visibility = View.GONE
         toolBarAdapter?.addChildClickViewIds(R.id.imageView)
         toolBarAdapter?.setOnItemChildClickListener { adapter1: BaseQuickAdapter<*, *>, view: View, position: Int ->
             if (view.id == R.id.imageView) {
@@ -1240,6 +1254,259 @@ class ChatPanelManager(
         this.robotGifRecyclerView!!.visibility = View.GONE
     }
 
+
+    private fun getFlag(key: String, defaultValue: Boolean): Boolean {
+        val value = WKSharedPreferencesUtil.getInstance().getSP(key)
+        if (TextUtils.isEmpty(value)) return defaultValue
+        return value == "1" || value.equals("true", ignoreCase = true)
+    }
+
+    private fun putFlag(key: String, value: Boolean) {
+        WKSharedPreferencesUtil.getInstance().putSP(key, if (value) "1" else "0")
+    }
+
+    private fun getSetting(key: String, defaultValue: String): String {
+        val value = WKSharedPreferencesUtil.getInstance().getSP(key)
+        return if (TextUtils.isEmpty(value)) defaultValue else value
+    }
+
+    fun refreshAiAssistBar() {
+        val sendTranslate = getFlag(keyAiSendTranslate, false)
+        val compress = getFlag(keyImageCompress, true)
+        aiSendToggle.text = iConversationContext.chatActivity.getString(
+            if (sendTranslate) R.string.chat_ai_send_translate_on else R.string.chat_ai_send_translate_off
+        )
+        compressToggle.text = iConversationContext.chatActivity.getString(
+            if (compress) R.string.chat_img_compress_on else R.string.chat_img_compress_off
+        )
+        aiSendToggle.setTextColor(
+            ContextCompat.getColor(
+                iConversationContext.chatActivity,
+                if (sendTranslate) R.color.colorDark else R.color.color999
+            )
+        )
+        compressToggle.setTextColor(
+            ContextCompat.getColor(
+                iConversationContext.chatActivity,
+                if (compress) R.color.colorDark else R.color.color999
+            )
+        )
+    }
+
+    private fun initAiAssistBar() {
+        refreshAiAssistBar()
+        translateBtn.setOnClickListener {
+            val content = editText.text?.toString() ?: ""
+            if (TextUtils.isEmpty(StringUtils.replaceBlank(content))) {
+                WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.input))
+                return@setOnClickListener
+            }
+            translateBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_translating)
+            requestAi(
+                buildTranslatePrompt(content),
+                onSuccess = { result ->
+                    translateBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_translate)
+                    editText.setText(result)
+                    editText.setSelection(editText.text?.length ?: 0)
+                },
+                onError = {
+                    translateBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_translate)
+                    WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_failed))
+                }
+            )
+        }
+
+        wingmanBtn.setOnClickListener {
+            val content = editText.text?.toString() ?: ""
+            wingmanBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_wingman_loading)
+            requestAi(
+                buildWingmanPrompt(content),
+                onSuccess = { result ->
+                    wingmanBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_wingman)
+                    showWingmanResult(result)
+                },
+                onError = {
+                    wingmanBtn.text = iConversationContext.chatActivity.getString(R.string.chat_ai_wingman)
+                    WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_failed))
+                }
+            )
+        }
+
+        aiSendToggle.setOnClickListener {
+            putFlag(keyAiSendTranslate, !getFlag(keyAiSendTranslate, false))
+            refreshAiAssistBar()
+        }
+
+        compressToggle.setOnClickListener {
+            putFlag(keyImageCompress, !getFlag(keyImageCompress, true))
+            refreshAiAssistBar()
+        }
+    }
+
+    private fun buildTranslatePrompt(content: String): String {
+        val source = getSetting(keyAiSourceLang, "中文")
+        val target = getSetting(keyAiTargetLang, "မြန်မာစာ")
+        return "把下面这条聊天消息从${source}翻译成${target}。要求：自然、口语化、保留表情和换行，只输出译文，不要解释。\\n\\n${content}"
+    }
+
+    private fun buildWingmanPrompt(content: String): String {
+        val target = getSetting(keyAiTargetLang, "中文")
+        val current = if (TextUtils.isEmpty(content)) "用户还没输入内容，请根据聊天场景给 3 条万能开场/接话建议。" else content
+        return "你是聊天僚机。根据下面用户准备发送或想回复的内容，给出 3-5 条可以直接发送的短回复建议。每条 20 字以内，语言使用${target}，口语自然，不要长篇解释。\\n\\n当前内容：${current}"
+    }
+
+    private fun sendInputText() {
+        var content = StringUtils.replaceBlank(editText.text.toString())
+        if (TextUtils.isEmpty(content)) return
+        content = editText.text.toString()
+        sendIV.colorFilter = PorterDuffColorFilter(
+            ContextCompat.getColor(
+                iConversationContext.chatActivity, R.color.popupTextColor
+            ), PorterDuff.Mode.MULTIPLY
+        )
+        val drawable = EmojiManager.getInstance()
+            .getDrawable(iConversationContext.chatActivity, content)
+        if (drawable != null && iConversationContext.replyMsg == null) {
+            val resultObject =
+                EndpointManager.getInstance().invoke(
+                    "text_to_emoji_sticker",
+                    SendTextMenu(
+                        content,
+                        iConversationContext
+                    )
+                )
+
+            if (resultObject != null) {
+                val result = resultObject as Boolean
+                if (result) {
+                    editText.text = null
+                    lastInputTime = 0
+                    return
+                }
+            }
+        }
+
+        if (getFlag(keyAiSendTranslate, false)) {
+            sendIV.isEnabled = false
+            requestAi(
+                buildTranslatePrompt(content),
+                onSuccess = { translated ->
+                    sendIV.isEnabled = true
+                    sendTextNow(translated)
+                },
+                onError = {
+                    sendIV.isEnabled = true
+                    WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_failed))
+                }
+            )
+        } else {
+            sendTextNow(content)
+        }
+    }
+
+    private fun sendTextNow(content: String) {
+        val textMsgModel = WKTextContent(content)
+
+        val list = editText.allUIDs
+        if (list != null && list.isNotEmpty()) {
+            val mMentionInfo = WKMentionInfo()
+            val uidList: MutableList<String> = ArrayList()
+            var i = 0
+            val size = list.size
+            while (i < size) {
+                if (list[i].equals("-1", ignoreCase = true)) {
+                    textMsgModel.mentionAll = 1
+                } else {
+                    uidList.add(list[i])
+                }
+                i++
+            }
+            mMentionInfo.uids = uidList
+            textMsgModel.mentionInfo = mMentionInfo
+        }
+        textMsgModel.entities = editText.allEntity
+
+        iConversationContext.sendMessage(textMsgModel)
+        editText.text = null
+        lastInputTime = 0
+        if (chatTopView?.visibility == View.VISIBLE) {
+            CommonAnim.getInstance().animateClose(chatTopView)
+        }
+    }
+
+    private fun showWingmanResult(result: String) {
+        AlertDialog.Builder(iConversationContext.chatActivity)
+            .setTitle(iConversationContext.chatActivity.getString(R.string.chat_ai_wingman))
+            .setMessage(result)
+            .setNegativeButton(iConversationContext.chatActivity.getString(R.string.cancel), null)
+            .setPositiveButton(iConversationContext.chatActivity.getString(R.string.complete)) { _, _ ->
+                editText.setText(result)
+                editText.setSelection(editText.text?.length ?: 0)
+                helper.toKeyboardState()
+            }
+            .show()
+    }
+
+    private fun requestAi(prompt: String, onSuccess: (String) -> Unit, onError: () -> Unit) {
+        val endpoint = getSetting(keyAiEndpoint, "https://api.deepseek.com/v1/chat/completions")
+        val apiKey = getSetting(keyAiKey, "")
+        val model = getSetting(keyAiModel, "deepseek-chat")
+        if (TextUtils.isEmpty(apiKey)) {
+            WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_key_empty))
+            onError()
+            return
+        }
+
+        Thread {
+            try {
+                val body = JSONObject()
+                body.put("model", model)
+                body.put("temperature", 0.3)
+                val messages = JSONArray()
+                val system = JSONObject()
+                system.put("role", "system")
+                system.put("content", "你是移动聊天应用内的翻译和回复助手。")
+                val user = JSONObject()
+                user.put("role", "user")
+                user.put("content", prompt)
+                messages.put(system)
+                messages.put(user)
+                body.put("messages", messages)
+
+                val connection = URL(endpoint).openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.connectTimeout = 20000
+                connection.readTimeout = 30000
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                connection.setRequestProperty("Accept", "application/json")
+                connection.setRequestProperty("Authorization", "Bearer $apiKey")
+
+                OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use {
+                    it.write(body.toString())
+                }
+
+                val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
+                val text = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
+                val json = JSONObject(text)
+                val result = json.optJSONArray("choices")
+                    ?.optJSONObject(0)
+                    ?.optJSONObject("message")
+                    ?.optString("content")
+                    ?.trim()
+                    ?: ""
+                Handler(Looper.getMainLooper()).post {
+                    if (result.isNotEmpty()) onSuccess(result) else onError()
+                }
+                connection.disconnect()
+            } catch (e: Exception) {
+                Log.e("ChatPanelManager", "AI request failed", e)
+                Handler(Looper.getMainLooper()).post { onError() }
+            }
+        }.start()
+    }
+
+
     private fun initListener() {
         panelView.setOnClickListener {
 
@@ -1278,63 +1545,7 @@ class ChatPanelManager(
             EndpointManager.getInstance().invoke("show_rich_edit", iConversationContext)
         }
         sendIV.setOnClickListener {
-            var content = StringUtils.replaceBlank(editText.text.toString())
-            if (!TextUtils.isEmpty(content)) {
-                content = editText.text.toString()
-                sendIV.colorFilter = PorterDuffColorFilter(
-                    ContextCompat.getColor(
-                        iConversationContext.chatActivity, R.color.popupTextColor
-                    ), PorterDuff.Mode.MULTIPLY
-                )
-                val drawable = EmojiManager.getInstance()
-                    .getDrawable(iConversationContext.chatActivity, content)
-                if (drawable != null && iConversationContext.replyMsg == null) {
-                    val `object` =
-                        EndpointManager.getInstance().invoke(
-                            "text_to_emoji_sticker",
-                            SendTextMenu(
-                                content,
-                                iConversationContext
-                            )
-                        )
-
-                    if (`object` != null) {
-                        val result = `object` as Boolean
-                        if (result) {
-                            editText.text = null
-                            lastInputTime = 0
-                            return@setOnClickListener
-                        }
-                    }
-                }
-                val textMsgModel = WKTextContent(content)
-
-                val list = editText.allUIDs
-                if (list != null && list.isNotEmpty()) {
-                    val mMentionInfo = WKMentionInfo()
-                    val uidList: MutableList<String> = ArrayList()
-                    var i = 0
-                    val size = list.size
-                    while (i < size) {
-                        if (list[i].equals("-1", ignoreCase = true)) {
-                            textMsgModel.mentionAll = 1 //remind all
-                        } else {
-                            uidList.add(list[i])
-                        }
-                        i++
-                    }
-                    mMentionInfo.uids = uidList
-                    textMsgModel.mentionInfo = mMentionInfo
-                }
-                textMsgModel.entities = editText.allEntity
-
-                iConversationContext.sendMessage(textMsgModel)
-                editText.text = null
-                lastInputTime = 0
-                if (chatTopView?.visibility == View.VISIBLE) {
-                    CommonAnim.getInstance().animateClose(chatTopView)
-                }
-            }
+            sendInputText()
         }
         editText.addTextChangedListener(object : TextWatcher {
 //            var linesCount = 0
