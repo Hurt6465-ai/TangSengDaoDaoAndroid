@@ -220,6 +220,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private static final String KEY_AI_SEND_TRANSLATE = "chat_ai_send_translate";
     private static final String KEY_IMAGE_COMPRESS = "chat_image_compress";
 
+    private final ActivityResultLauncher<String> chooseChatBgLauncher =
+            registerForActivityResult(new ActivityResultContracts.GetContent(), this::saveChatBackgroundFromUri);
 
     private String chatBgKey() {
         return "local_chat_bg_" + channelType + "_" + channelId;
