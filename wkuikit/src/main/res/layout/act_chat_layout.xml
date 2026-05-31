@@ -143,7 +143,7 @@
                         android:layout_gravity="center_horizontal"
                         android:layout_marginBottom="6dp"
                         android:background="@drawable/chat_edit_bg"
-                        android:elevation="4dp"
+                        android:elevation="8dp"
                         android:gravity="center"
                         android:minWidth="190dp"
                         android:orientation="horizontal"
@@ -158,7 +158,7 @@
                             android:maxLines="1"
                             android:paddingStart="4dp"
                             android:paddingEnd="6dp"
-                            android:text="馃嚥馃嚥 醼欋�坚�斸�横�欋��"
+                            android:text="🇲🇲 မြန်မာ"
                             android:textColor="@color/colorDark"
                             android:textSize="13sp" />
 
@@ -167,7 +167,7 @@
                             android:layout_width="28dp"
                             android:layout_height="match_parent"
                             android:gravity="center"
-                            android:text="鈬�"
+                            android:text="⇄"
                             android:textColor="@color/color999"
                             android:textSize="18sp" />
 
@@ -179,24 +179,35 @@
                             android:maxLines="1"
                             android:paddingStart="6dp"
                             android:paddingEnd="8dp"
-                            android:text="馃嚚馃嚦 涓枃"
+                            android:text="🇨🇳 中文"
                             android:textColor="@color/colorDark"
                             android:textSize="13sp" />
 
-                        <View
-                            android:layout_width="1dp"
-                            android:layout_height="18dp"
-                            android:background="@color/layoutColorSelected" />
-
-                        <androidx.appcompat.widget.AppCompatTextView
-                            android:id="@+id/aiSendToggle"
-                            android:layout_width="40dp"
+                        <FrameLayout
+                            android:layout_width="46dp"
                             android:layout_height="match_parent"
-                            android:gravity="center"
-                            android:text="鏂嘇"
-                            android:textStyle="bold"
-                            android:textColor="@color/color999"
-                            android:textSize="13sp" />
+                            android:layout_marginStart="4dp">
+
+                            <androidx.appcompat.widget.AppCompatTextView
+                                android:id="@+id/aiSendDot"
+                                android:layout_width="14dp"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:text="•"
+                                android:textColor="@color/color999"
+                                android:textSize="19sp" />
+
+                            <androidx.appcompat.widget.AppCompatTextView
+                                android:id="@+id/aiSendToggle"
+                                android:layout_width="36dp"
+                                android:layout_height="match_parent"
+                                android:layout_gravity="end"
+                                android:gravity="center"
+                                android:text="文A"
+                                android:textStyle="bold"
+                                android:textColor="@color/color999"
+                                android:textSize="13sp" />
+                        </FrameLayout>
                     </LinearLayout>
 
                     <FrameLayout
