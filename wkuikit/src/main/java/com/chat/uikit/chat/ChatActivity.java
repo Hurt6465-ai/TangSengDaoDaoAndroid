@@ -10,6 +10,8 @@ import android.widget.EditText;
 import android.net.Uri;
 import android.graphics.BitmapFactory;
 import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.app.AlertDialog;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -228,6 +230,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         return "local_chat_bg_" + channelType + "_" + channelId;
     }
 
+    private String chatBgModeKey() {
+        return "local_chat_bg_mode_" + channelType + "_" + channelId;
+    }
+
+    private String chatBgBuiltinKey() {
+        return "local_chat_bg_builtin_" + channelType + "_" + channelId;
+    }
+
     private File chatBgFile() {
         File dir = new File(getFilesDir(), "chat_bg");
         if (!dir.exists()) {
@@ -253,17 +263,58 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         return TextUtils.isEmpty(value) ? defaultValue : value;
     }
 
+
+    private int getBuiltinChatBgRes(int index) {
+        switch (index) {
+            case 1: return R.drawable.chat_bg_01;
+            case 2: return R.drawable.chat_bg_02;
+            case 3: return R.drawable.chat_bg_03;
+            case 4: return R.drawable.chat_bg_04;
+            case 5: return R.drawable.chat_bg_05;
+            case 6: return R.drawable.chat_bg_06;
+            case 7: return R.drawable.chat_bg_07;
+            case 8: return R.drawable.chat_bg_08;
+            case 9:
+            default: return R.drawable.chat_bg_09;
+        }
+    }
+
+    private int getBuiltinChatBgIndex() {
+        String value = WKSharedPreferencesUtil.getInstance().getSP(chatBgBuiltinKey());
+        if (TextUtils.isEmpty(value)) return 9;
+        try {
+            int index = Integer.parseInt(value);
+            return index >= 1 && index <= 9 ? index : 9;
+        } catch (Exception ignored) {
+            return 9;
+        }
+    }
+
+    private void applyBuiltinChatBackground(int index) {
+        WKSharedPreferencesUtil.getInstance().putSP(chatBgModeKey(), "builtin");
+        WKSharedPreferencesUtil.getInstance().putSP(chatBgBuiltinKey(), String.valueOf(index));
+        WKSharedPreferencesUtil.getInstance().putSP(chatBgKey(), "");
+        wkVBinding.imageView.setImageResource(getBuiltinChatBgRes(index));
+        wkVBinding.imageView.setVisibility(View.VISIBLE);
+        if (wkVBinding.blurView != null) wkVBinding.blurView.setVisibility(View.GONE);
+    }
+
     private void loadLocalChatBackground() {
+        String mode = WKSharedPreferencesUtil.getInstance().getSP(chatBgModeKey());
         String path = WKSharedPreferencesUtil.getInstance().getSP(chatBgKey());
-        if (TextUtils.isEmpty(path)) {
-            path = chatBgFile().getAbsolutePath();
+        if ("custom".equals(mode) || !TextUtils.isEmpty(path)) {
+            if (TextUtils.isEmpty(path)) {
+                path = chatBgFile().getAbsolutePath();
+            }
+            File file = new File(path);
+            if (file.exists()) {
+                wkVBinding.imageView.setImageURI(Uri.fromFile(file));
+                wkVBinding.imageView.setVisibility(View.VISIBLE);
+                if (wkVBinding.blurView != null) wkVBinding.blurView.setVisibility(View.GONE);
+                return;
+            }
         }
-        File file = new File(path);
-        if (file.exists()) {
-            wkVBinding.imageView.setImageURI(Uri.fromFile(file));
-            wkVBinding.imageView.setVisibility(View.VISIBLE);
-            if (wkVBinding.blurView != null) wkVBinding.blurView.setVisibility(View.GONE);
-        }
+        applyBuiltinChatBackground(getBuiltinChatBgIndex());
     }
 
     private void clearLocalChatBackground() {
@@ -272,10 +323,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             //noinspection ResultOfMethodCallIgnored
             file.delete();
         }
-        WKSharedPreferencesUtil.getInstance().putSP(chatBgKey(), "");
-        wkVBinding.imageView.setImageDrawable(null);
-        EndpointManager.getInstance().invoke("set_chat_bg", new SetChatBgMenu(channelId, channelType, wkVBinding.imageView, wkVBinding.rootView, wkVBinding.blurView));
-        loadLocalChatBackground();
+        applyBuiltinChatBackground(9);
         WKToastUtils.getInstance().showToast(getString(R.string.chat_bg_cleared));
     }
 
@@ -293,6 +341,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             outputStream.flush();
             outputStream.close();
             bitmap.recycle();
+            WKSharedPreferencesUtil.getInstance().putSP(chatBgModeKey(), "custom");
             WKSharedPreferencesUtil.getInstance().putSP(chatBgKey(), file.getAbsolutePath());
             loadLocalChatBackground();
             WKToastUtils.getInstance().showToast(getString(R.string.chat_bg_saved));
@@ -401,18 +450,51 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     private void showChatMoreDialog() {
         String[] items = new String[]{
-                getString(R.string.chat_bg_set),
-                getString(R.string.chat_bg_clear),
+                getString(R.string.chat_bg_menu),
                 getString(R.string.chat_ai_settings)
         };
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.chat_more_menu)
-                .setItems(items, (dialog, which) -> {
-                    if (which == 0) chooseChatBgLauncher.launch("image/*");
-                    else if (which == 1) clearLocalChatBackground();
+                .setItems(items, (d, which) -> {
+                    if (which == 0) showChatBackgroundDialog();
                     else showChatAiSettingsDialog();
                 })
                 .show();
+        applyGlassDialogStyle(dialog);
+    }
+
+    private void showChatBackgroundDialog() {
+        String[] items = new String[11];
+        items[0] = getString(R.string.chat_bg_default);
+        for (int i = 1; i <= 9; i++) {
+            items[i] = getString(R.string.chat_bg_builtin, i);
+        }
+        items[10] = getString(R.string.chat_bg_choose_local);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.chat_bg_menu)
+                .setItems(items, (d, which) -> {
+                    if (which == 0) clearLocalChatBackground();
+                    else if (which >= 1 && which <= 9) {
+                        applyBuiltinChatBackground(which);
+                        WKToastUtils.getInstance().showToast(getString(R.string.chat_bg_saved));
+                    } else {
+                        chooseChatBgLauncher.launch("image/*");
+                    }
+                })
+                .show();
+        applyGlassDialogStyle(dialog);
+    }
+
+    private void applyGlassDialogStyle(AlertDialog dialog) {
+        GradientDrawable bg = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.argb(242, 255, 255, 255), Color.argb(234, 244, 247, 255), Color.argb(237, 239, 246, 255)}
+        );
+        bg.setCornerRadius(AndroidUtilities.dp(22f));
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(bg);
+            dialog.getWindow().setDimAmount(0.28f);
+        }
     }
 
     private EditText createSettingEdit(LinearLayout parent, String label, String value) {
@@ -458,11 +540,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         wingmanEnabled.setChecked(getLocalFlag(KEY_AI_WINGMAN_ENABLED, false));
         root.addView(wingmanEnabled, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.chat_ai_settings)
                 .setView(root)
                 .setNegativeButton(R.string.chat_ai_cancel, null)
-                .setPositiveButton(R.string.chat_ai_save, (dialog, which) -> {
+                .setPositiveButton(R.string.chat_ai_save, (dialogInterface, which) -> {
                     WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_ENDPOINT, endpointEt.getText().toString().trim());
                     WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_KEY, keyEt.getText().toString().trim());
                     WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_MODEL, modelEt.getText().toString().trim());
@@ -474,6 +556,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     if (chatPanelManager != null) chatPanelManager.refreshAiAssistBar();
                 })
                 .show();
+        applyGlassDialogStyle(dialog);
     }
 
 
@@ -686,6 +769,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     protected void initView() {
         EndpointManager.getInstance().invoke("set_chat_bg", new SetChatBgMenu(channelId, channelType, wkVBinding.imageView, wkVBinding.rootView, wkVBinding.blurView));
+        loadLocalChatBackground();
         Object pinnedLayoutView = EndpointManager.getInstance().invoke("get_pinned_message_view", this);
         if (pinnedLayoutView instanceof View) {
             wkVBinding.pinnedLayout.addView((View) pinnedLayoutView);
