@@ -27,6 +27,7 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import android.widget.Toast
@@ -164,12 +165,19 @@ class ChatPanelManager(
     private var voiceRecordOverlay: LinearLayout? = null
     private var voiceRecordDotTv: AppCompatTextView? = null
     private var voiceRecordTimeTv: AppCompatTextView? = null
-    private var voiceRecordWaveTv: AppCompatTextView? = null
-    private var voiceRecordTipTv: AppCompatTextView? = null
+    private var voiceRecordCancelTv: AppCompatTextView? = null
+    private var voiceRecordWaveLayout: LinearLayout? = null
+    private val voiceWaveBars = ArrayList<View>()
     private val voiceUiHandler = Handler(Looper.getMainLooper())
     private var voiceUiRunnable: Runnable? = null
     private var voiceRecordStartMs = 0L
-    private val voiceWaveFrames = arrayOf("▁▂▃▄▅▃▂", "▂▃▅▆▃▂▁", "▃▅▆▄▂▁▂", "▂▄▆▅▃▁▂")
+    private val voiceWaveFrames = arrayOf(
+        intArrayOf(8, 14, 22, 12, 28, 16, 10, 24, 18, 30, 13, 20),
+        intArrayOf(20, 9, 26, 15, 32, 11, 23, 17, 28, 12, 24, 16),
+        intArrayOf(12, 27, 10, 22, 15, 31, 18, 26, 9, 20, 29, 14),
+        intArrayOf(28, 16, 24, 11, 19, 30, 13, 25, 17, 10, 22, 15)
+    )
+    private val wingmanSuggestionTag = "chat_wingman_suggestions"
 
     private class LocalOriginalTextContent(remoteText: String, private val localText: String) : WKTextContent(remoteText) {
         override fun getDisplayContent(): String {
@@ -256,6 +264,7 @@ class ChatPanelManager(
         initBanView()
         initForbiddenView()
         initChatTopView()
+        initWingmanSuggestionsEndpoint()
         initFlame()
         initNewImageView()
         EndpointManager.getInstance().invoke(
@@ -1658,54 +1667,59 @@ ${content}"""
         val overlay = LinearLayout(iConversationContext.chatActivity)
         overlay.orientation = LinearLayout.HORIZONTAL
         overlay.gravity = Gravity.CENTER_VERTICAL
-        overlay.isClickable = true
-        overlay.isFocusable = false
         overlay.setPadding(
             AndroidUtilities.dp(14f),
-            AndroidUtilities.dp(6f),
-            AndroidUtilities.dp(14f),
-            AndroidUtilities.dp(6f)
+            AndroidUtilities.dp(5f),
+            AndroidUtilities.dp(12f),
+            AndroidUtilities.dp(5f)
         )
-        overlay.elevation = AndroidUtilities.dp(12f).toFloat()
         overlay.visibility = View.GONE
-        overlay.background = GradientDrawable(
-            GradientDrawable.Orientation.LEFT_RIGHT,
-            intArrayOf(Color.parseColor("#F9FFFFFF"), Color.parseColor("#EEF7FBFF"))
-        ).apply {
-            cornerRadius = AndroidUtilities.dp(999f).toFloat()
-            setStroke(AndroidUtilities.dp(1f), Color.parseColor("#EFFFFFFF"))
-        }
+        overlay.background = createVoiceOverlayBg(false)
+        overlay.elevation = AndroidUtilities.dp(10f).toFloat()
+
+        val cancelTv = AppCompatTextView(iConversationContext.chatActivity)
+        cancelTv.text = "‹ 左滑取消"
+        cancelTv.setTextColor(Color.parseColor("#64748B"))
+        cancelTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        cancelTv.gravity = Gravity.CENTER_VERTICAL
+        cancelTv.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        val cancelLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT)
+        cancelLp.rightMargin = AndroidUtilities.dp(10f)
+        overlay.addView(cancelTv, cancelLp)
 
         val dotTv = AppCompatTextView(iConversationContext.chatActivity)
         dotTv.text = "●"
         dotTv.setTextColor(Color.parseColor("#EF4444"))
-        dotTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        dotTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
         dotTv.gravity = Gravity.CENTER
-        overlay.addView(dotTv, LinearLayout.LayoutParams(AndroidUtilities.dp(18f), LinearLayout.LayoutParams.WRAP_CONTENT))
+        overlay.addView(dotTv, LinearLayout.LayoutParams(AndroidUtilities.dp(14f), LinearLayout.LayoutParams.MATCH_PARENT))
 
         val timeTv = AppCompatTextView(iConversationContext.chatActivity)
         timeTv.text = "00:00"
         timeTv.setTextColor(Color.parseColor("#111827"))
         timeTv.typeface = android.graphics.Typeface.DEFAULT_BOLD
         timeTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-        overlay.addView(timeTv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        val timeLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT)
+        timeLp.rightMargin = AndroidUtilities.dp(12f)
+        overlay.addView(timeTv, timeLp)
 
-        val waveTv = AppCompatTextView(iConversationContext.chatActivity)
-        waveTv.text = voiceWaveFrames[0]
-        waveTv.setTextColor(Theme.colorAccount)
-        waveTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-        waveTv.gravity = Gravity.CENTER
-        val waveLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        waveLp.leftMargin = AndroidUtilities.dp(14f)
-        waveLp.rightMargin = AndroidUtilities.dp(12f)
-        overlay.addView(waveTv, waveLp)
-
-        val tipTv = AppCompatTextView(iConversationContext.chatActivity)
-        tipTv.text = "松开发送，左滑取消"
-        tipTv.setTextColor(Color.parseColor("#64748B"))
-        tipTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-        tipTv.gravity = Gravity.CENTER_VERTICAL
-        overlay.addView(tipTv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        val waveLayout = LinearLayout(iConversationContext.chatActivity)
+        waveLayout.orientation = LinearLayout.HORIZONTAL
+        waveLayout.gravity = Gravity.CENTER_VERTICAL
+        voiceWaveBars.clear()
+        for (i in 0 until 12) {
+            val bar = View(iConversationContext.chatActivity)
+            bar.background = GradientDrawable().apply {
+                cornerRadius = AndroidUtilities.dp(2f).toFloat()
+                setColor(Theme.colorAccount)
+            }
+            val barLp = LinearLayout.LayoutParams(AndroidUtilities.dp(2f), AndroidUtilities.dp(12f))
+            barLp.leftMargin = AndroidUtilities.dp(2f)
+            barLp.rightMargin = AndroidUtilities.dp(2f)
+            waveLayout.addView(bar, barLp)
+            voiceWaveBars.add(bar)
+        }
+        overlay.addView(waveLayout, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
 
         val lp = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -1717,11 +1731,31 @@ ${content}"""
         panelView.addView(overlay, lp)
 
         voiceRecordOverlay = overlay
+        voiceRecordCancelTv = cancelTv
         voiceRecordDotTv = dotTv
         voiceRecordTimeTv = timeTv
-        voiceRecordWaveTv = waveTv
-        voiceRecordTipTv = tipTv
+        voiceRecordWaveLayout = waveLayout
         return overlay
+    }
+
+    private fun createVoiceOverlayBg(canceling: Boolean): GradientDrawable {
+        return if (canceling) {
+            GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.parseColor("#FFFFF1F2"), Color.parseColor("#FFFEE2E2"))
+            ).apply {
+                cornerRadius = AndroidUtilities.dp(999f).toFloat()
+                setStroke(AndroidUtilities.dp(1f), Color.parseColor("#FFFCA5A5"))
+            }
+        } else {
+            GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.parseColor("#FAFFFFFF"), Color.parseColor("#EEF7FBFF"), Color.parseColor("#F5F3E8FF"))
+            ).apply {
+                cornerRadius = AndroidUtilities.dp(999f).toFloat()
+                setStroke(AndroidUtilities.dp(1f), Color.parseColor("#EFFFFFFF"))
+            }
+        }
     }
 
     private fun showVoiceRecordUi() {
@@ -1744,7 +1778,7 @@ ${content}"""
             override fun run() {
                 if (voiceHolding && voiceRecordOverlay?.visibility == View.VISIBLE) {
                     updateVoiceRecordUi(voiceCanceling)
-                    voiceUiHandler.postDelayed(this, 220L)
+                    voiceUiHandler.postDelayed(this, 180L)
                 }
             }
         }
@@ -1763,32 +1797,23 @@ ${content}"""
         val minutes = totalSeconds / 60L
         val seconds = totalSeconds % 60L
         voiceRecordTimeTv?.text = String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
-        val frameIndex = ((elapsed / 220L) % voiceWaveFrames.size).toInt()
-        voiceRecordWaveTv?.text = voiceWaveFrames[frameIndex]
-        if (canceling) {
-            voiceRecordDotTv?.setTextColor(Color.parseColor("#EF4444"))
-            voiceRecordWaveTv?.setTextColor(Color.parseColor("#EF4444"))
-            voiceRecordTipTv?.text = "松手取消"
-            voiceRecordTipTv?.setTextColor(Color.parseColor("#EF4444"))
-            voiceRecordOverlay?.background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.parseColor("#FFFFF1F2"), Color.parseColor("#FFFEE2E2"))
-            ).apply {
-                cornerRadius = AndroidUtilities.dp(999f).toFloat()
-                setStroke(AndroidUtilities.dp(1f), Color.parseColor("#FFFCA5A5"))
+        val color = if (canceling) Color.parseColor("#EF4444") else Theme.colorAccount
+        val textColor = if (canceling) Color.parseColor("#EF4444") else Color.parseColor("#64748B")
+        voiceRecordDotTv?.setTextColor(Color.parseColor("#EF4444"))
+        voiceRecordCancelTv?.text = if (canceling) "松手取消" else "‹ 左滑取消"
+        voiceRecordCancelTv?.setTextColor(textColor)
+        voiceRecordOverlay?.background = createVoiceOverlayBg(canceling)
+        val frame = voiceWaveFrames[((elapsed / 180L) % voiceWaveFrames.size).toInt()]
+        for (i in voiceWaveBars.indices) {
+            val bar = voiceWaveBars[i]
+            val lp = bar.layoutParams as LinearLayout.LayoutParams
+            lp.height = AndroidUtilities.dp(frame[i % frame.size].toFloat())
+            bar.layoutParams = lp
+            bar.background = GradientDrawable().apply {
+                cornerRadius = AndroidUtilities.dp(2f).toFloat()
+                setColor(color)
             }
-        } else {
-            voiceRecordDotTv?.setTextColor(Color.parseColor("#EF4444"))
-            voiceRecordWaveTv?.setTextColor(Theme.colorAccount)
-            voiceRecordTipTv?.text = "松开发送，左滑取消"
-            voiceRecordTipTv?.setTextColor(Color.parseColor("#64748B"))
-            voiceRecordOverlay?.background = GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.parseColor("#F9FFFFFF"), Color.parseColor("#EEF7FBFF"))
-            ).apply {
-                cornerRadius = AndroidUtilities.dp(999f).toFloat()
-                setStroke(AndroidUtilities.dp(1f), Color.parseColor("#EFFFFFFF"))
-            }
+            bar.alpha = if (canceling) 0.95f else 0.55f + ((i % 4) * 0.12f)
         }
     }
 
@@ -2955,6 +2980,65 @@ ${content}"""
             )
         )
         textView.tag = "forbiddenTV"
+    }
+
+    private fun initWingmanSuggestionsEndpoint() {
+        EndpointManager.getInstance().setMethod("chat_wingman_suggestions") { data ->
+            val replies = ArrayList<String>()
+            when (data) {
+                is List<*> -> data.forEach { if (!it.toString().isBlank()) replies.add(it.toString()) }
+                is Array<String> -> data.forEach { if (it.isNotBlank()) replies.add(it) }
+                is String -> if (data.isNotBlank()) replies.add(data)
+            }
+            showWingmanSuggestions(replies.take(5))
+            null
+        }
+    }
+
+    private fun showWingmanSuggestions(replies: List<String>) {
+        val old = chatTopLayout.findViewWithTag<View>(wingmanSuggestionTag)
+        if (old != null) chatTopLayout.removeView(old)
+        if (replies.isEmpty()) return
+
+        val scrollView = HorizontalScrollView(iConversationContext.chatActivity)
+        scrollView.tag = wingmanSuggestionTag
+        scrollView.isHorizontalScrollBarEnabled = false
+        scrollView.overScrollMode = View.OVER_SCROLL_NEVER
+        scrollView.setPadding(AndroidUtilities.dp(10f), AndroidUtilities.dp(4f), AndroidUtilities.dp(10f), AndroidUtilities.dp(6f))
+
+        val row = LinearLayout(iConversationContext.chatActivity)
+        row.orientation = LinearLayout.HORIZONTAL
+        row.gravity = Gravity.CENTER_VERTICAL
+        scrollView.addView(row, HorizontalScrollView.LayoutParams(HorizontalScrollView.LayoutParams.WRAP_CONTENT, HorizontalScrollView.LayoutParams.WRAP_CONTENT))
+
+        replies.forEach { reply ->
+            val chip = AppCompatTextView(iConversationContext.chatActivity)
+            chip.text = reply
+            chip.maxLines = 1
+            chip.ellipsize = TextUtils.TruncateAt.END
+            chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            chip.setTextColor(Color.parseColor("#374151"))
+            chip.setPadding(AndroidUtilities.dp(12f), AndroidUtilities.dp(7f), AndroidUtilities.dp(12f), AndroidUtilities.dp(7f))
+            chip.background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.parseColor("#FAFFFFFF"), Color.parseColor("#EEF4F7FF"))
+            ).apply {
+                cornerRadius = AndroidUtilities.dp(999f).toFloat()
+                setStroke(AndroidUtilities.dp(1f), Color.parseColor("#E8FFFFFF"))
+            }
+            chip.elevation = AndroidUtilities.dp(3f).toFloat()
+            chip.setOnClickListener {
+                editText.setText(reply)
+                editText.setSelection(editText.text?.length ?: 0)
+            }
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.rightMargin = AndroidUtilities.dp(8f)
+            row.addView(chip, lp)
+        }
+        chatTopLayout.addView(
+            scrollView,
+            LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT.toFloat(), Gravity.CENTER)
+        )
     }
 
     private fun initChatTopView() {
