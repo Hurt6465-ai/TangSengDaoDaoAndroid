@@ -39,6 +39,7 @@ import com.chat.base.R
 import com.chat.base.WKBaseApplication
 import com.chat.base.config.WKConfig
 import com.chat.base.config.WKConstants
+import com.chat.base.config.WKSharedPreferencesUtil
 import com.chat.base.endpoint.EndpointCategory
 import com.chat.base.endpoint.EndpointManager
 import com.chat.base.endpoint.EndpointSID
@@ -1370,17 +1371,10 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
     }
 
     private fun readAiSetting(key: String, fallback: String): String {
-        val names = arrayOf(
-            "chat_ai_settings",
-            "chat_ai_config",
-            "wk_chat_ai_settings",
-            context.packageName + "_preferences"
-        )
-        for (name in names) {
-            val value = context.getSharedPreferences(name, Context.MODE_PRIVATE).getString(key, "") ?: ""
-            if (value.isNotBlank()) return value
-        }
-        return fallback
+        // AI 翻译设置是 ChatActivity / ChatPanelManager 通过 WKSharedPreferencesUtil 保存的。
+        // 这里不能直接读默认 SharedPreferences 文件，否则长按气泡菜单会误以为没有配置 API Key。
+        val value = WKSharedPreferencesUtil.getInstance().getSP(key)
+        return if (!TextUtils.isEmpty(value)) value else fallback
     }
 
     private fun readTranslationCache(key: String): String? {
