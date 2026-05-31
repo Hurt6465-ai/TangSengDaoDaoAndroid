@@ -2987,7 +2987,10 @@ ${content}"""
             val replies = ArrayList<String>()
             when (data) {
                 is List<*> -> data.forEach { if (!it.toString().isBlank()) replies.add(it.toString()) }
-                is Array<String> -> data.forEach { if (it.isNotBlank()) replies.add(it) }
+                is Array<*> -> data.forEach { item ->
+                    val value = item?.toString() ?: ""
+                    if (value.isNotBlank()) replies.add(value)
+                }
                 is String -> if (data.isNotBlank()) replies.add(data)
             }
             showWingmanSuggestions(replies.take(5))
@@ -3037,7 +3040,7 @@ ${content}"""
         }
         chatTopLayout.addView(
             scrollView,
-            LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT.toFloat(), Gravity.CENTER)
+            LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER)
         )
     }
 
