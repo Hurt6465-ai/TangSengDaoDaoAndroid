@@ -7,6 +7,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.chat.base.msg.IConversationContext;
 import com.chat.base.ui.Theme;
@@ -54,6 +55,9 @@ public class WKVoiceViewManager {
     private TextView tvRecordTips;
     private LinearLayout layoutCancelView;
     private LineWaveVoiceView mHorVoiceView;
+    private IConversationContext directConversationContext;
+    private boolean directRecording = false;
+    private boolean directStopping = false;
 
     public View getVoiceView(IConversationContext iConversationContext) {
 
@@ -131,6 +135,93 @@ public class WKVoiceViewManager {
     }
 
     /**
+     * 输入框内麦克风直接录音：长按开始，松开发送，上滑取消。
+     * 不再打开原来的录音面板。
+     */
+    public void startDirectRecord(IConversationContext iConversationContext) {
+        if (directRecording || directStopping) {
+            return;
+        }
+        directConversationContext = iConversationContext;
+        recordTotalTime = 0;
+        audioFileName = WKUIKitApplication.getInstance().getContext().getExternalCacheDir() + File.separator + createAudioName();
+        mainHandler = new Handler(Looper.getMainLooper());
+        initTimer();
+        try {
+            timer.schedule(timerTask, 0, 1000);
+            AudioRecordManager.getInstance().init(audioFileName);
+            AudioRecordManager.getInstance().startRecord();
+            directRecording = true;
+        } catch (Exception e) {
+            directRecording = false;
+            cancelTimer();
+            deleteTempFile();
+            Toast.makeText(iConversationContext.getChatActivity(), "录音启动失败", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public void finishDirectRecord(boolean cancel) {
+        if (!directRecording || directStopping) {
+            return;
+        }
+        directStopping = true;
+        try {
+            if (cancel) {
+                AudioRecordManager.getInstance().cancelRecord();
+                deleteTempFile();
+            } else {
+                AudioRecordManager.getInstance().stopRecord();
+                sendDirectVoiceIfValid();
+            }
+        } catch (Exception e) {
+            try {
+                AudioRecordManager.getInstance().cancelRecord();
+            } catch (Exception ignored) {
+            }
+            deleteTempFile();
+        } finally {
+            cancelTimer();
+            recordTotalTime = 0;
+            directRecording = false;
+            directStopping = false;
+            directConversationContext = null;
+        }
+    }
+
+    private void sendDirectVoiceIfValid() {
+        if (directConversationContext == null || audioFileName == null) {
+            deleteTempFile();
+            return;
+        }
+        if (recordTotalTime < minRecordTime) {
+            deleteTempFile();
+            Toast.makeText(directConversationContext.getChatActivity(), "录音时间太短", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int time = (int) recordTotalTime / 1000;
+        if (time <= 0) {
+            deleteTempFile();
+            Toast.makeText(directConversationContext.getChatActivity(), "录音时间太短", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        WKVoiceContent audioMsgModel = new WKVoiceContent(audioFileName, time);
+        byte[] dbs = AudioRecordManager.getInstance().getDbs();
+        audioMsgModel.waveform = WKCommonUtils.getInstance().base64Encode(dbs);
+        directConversationContext.sendMessage(audioMsgModel);
+    }
+
+    private void cancelTimer() {
+        if (timerTask != null) {
+            timerTask.cancel();
+            timerTask = null;
+        }
+        if (timer != null) {
+            timer.cancel();
+            timer = null;
+        }
+    }
+
+    /**
      * 初始化计时器用来更新倒计时
      */
     private void initTimer() {
@@ -149,11 +240,17 @@ public class WKVoiceViewManager {
 
     private void updateTimerUI() {
         if (recordTotalTime >= maxRecordTime) {
-            recordAudioView.invokeStop();
+            if (directRecording) {
+                finishDirectRecord(false);
+            } else if (recordAudioView != null) {
+                recordAudioView.invokeStop();
+            }
         } else {
-            String content = recordAudioView.getContext().getString(R.string.time_remaining);
-            String string = String.format(" %s %s ", content, StringUtils.formatRecordTime(recordTotalTime, maxRecordTime));
-            mHorVoiceView.setText(string);
+            if (recordAudioView != null && mHorVoiceView != null) {
+                String content = recordAudioView.getContext().getString(R.string.time_remaining);
+                String string = String.format(" %s %s ", content, StringUtils.formatRecordTime(recordTotalTime, maxRecordTime));
+                mHorVoiceView.setText(string);
+            }
         }
     }
 
