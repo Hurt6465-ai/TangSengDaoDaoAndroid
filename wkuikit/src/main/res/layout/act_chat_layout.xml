@@ -10,7 +10,6 @@
         android:background="@color/homeColor"
         android:orientation="vertical">
 
-        <!-- 不需要被框架处理的布局，可自由布置 -->
         <include
             android:id="@+id/topLayout"
             layout="@layout/chat_title_layout" />
@@ -23,10 +22,6 @@
             app:android11KeyboardFeature="true"
             app:animationSpeed="standard">
 
-            <!-- 内容区域 -->
-            <!-- linear_edit_view 指定一个 EditText 用于输入 ，必须项-->
-            <!-- linear_auto_reset_enable 指定是否 LinearContentContainer 是否能够接受 Touch 事件自动隐藏面板-->
-            <!-- linear_auto_reset_area 指定是否 LinearContentContainer 只接受某个 View 区域的 Touch 事件来自定隐藏面板-->
             <com.effective.android.panel.view.content.RelativeContentContainer
                 android:id="@+id/content_view"
                 android:layout_width="match_parent"
@@ -130,86 +125,79 @@
                     android:layout_height="wrap_content"
                     android:layout_alignParentBottom="true"
                     android:background="@color/transparent"
-                    android:orientation="vertical">
+                    android:clipToPadding="false"
+                    android:orientation="vertical"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="8dp">
 
                     <FrameLayout
                         android:id="@+id/chatTopLayout"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content" />
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1px"
-                        android:background="@color/layoutColorSelected" />
+                    <LinearLayout
+                        android:id="@+id/aiAssistBar"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginBottom="6dp"
+                        android:background="@drawable/chat_edit_bg"
+                        android:elevation="4dp"
+                        android:gravity="center"
+                        android:minWidth="190dp"
+                        android:orientation="horizontal"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="8dp">
 
-
-                    <HorizontalScrollView
-                        android:id="@+id/aiAssistScroll"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:fillViewport="false"
-                        android:overScrollMode="never"
-                        android:scrollbars="none"
-                        android:paddingStart="14dp"
-                        android:paddingEnd="14dp"
-                        android:paddingTop="7dp"
-                        android:paddingBottom="2dp">
-
-                        <LinearLayout
-                            android:id="@+id/aiAssistBar"
+                        <androidx.appcompat.widget.AppCompatTextView
+                            android:id="@+id/sourceLangBtn"
                             android:layout_width="wrap_content"
-                            android:layout_height="34dp"
-                            android:layout_gravity="center_horizontal"
-                            android:background="@drawable/chat_edit_bg"
+                            android:layout_height="match_parent"
                             android:gravity="center"
-                            android:minWidth="220dp"
-                            android:orientation="horizontal"
-                            android:paddingStart="12dp"
-                            android:paddingEnd="12dp">
+                            android:maxLines="1"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="6dp"
+                            android:text="馃嚥馃嚥 醼欋�坚�斸�横�欋��"
+                            android:textColor="@color/colorDark"
+                            android:textSize="13sp" />
 
-                            <androidx.appcompat.widget.AppCompatTextView
-                                android:id="@+id/translateBtn"
-                                android:layout_width="wrap_content"
-                                android:layout_height="match_parent"
-                                android:gravity="center"
-                                android:paddingStart="4dp"
-                                android:paddingEnd="8dp"
-                                android:text="🇲🇲 缅甸语"
-                                android:textColor="@color/colorDark"
-                                android:textSize="14sp" />
+                        <androidx.appcompat.widget.AppCompatTextView
+                            android:id="@+id/swapLangBtn"
+                            android:layout_width="28dp"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:text="鈬�"
+                            android:textColor="@color/color999"
+                            android:textSize="18sp" />
 
-                            <androidx.appcompat.widget.AppCompatTextView
-                                android:id="@+id/wingmanBtn"
-                                android:layout_width="32dp"
-                                android:layout_height="match_parent"
-                                android:gravity="center"
-                                android:text="⇄"
-                                android:textColor="@color/color999"
-                                android:textSize="18sp" />
+                        <androidx.appcompat.widget.AppCompatTextView
+                            android:id="@+id/targetLangBtn"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:maxLines="1"
+                            android:paddingStart="6dp"
+                            android:paddingEnd="8dp"
+                            android:text="馃嚚馃嚦 涓枃"
+                            android:textColor="@color/colorDark"
+                            android:textSize="13sp" />
 
-                            <androidx.appcompat.widget.AppCompatTextView
-                                android:id="@+id/aiSendToggle"
-                                android:layout_width="wrap_content"
-                                android:layout_height="match_parent"
-                                android:gravity="center"
-                                android:paddingStart="8dp"
-                                android:paddingEnd="8dp"
-                                android:text="🇨🇳 中文"
-                                android:textColor="@color/colorDark"
-                                android:textSize="14sp" />
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="18dp"
+                            android:background="@color/layoutColorSelected" />
 
-                            <androidx.appcompat.widget.AppCompatTextView
-                                android:id="@+id/compressToggle"
-                                android:layout_width="wrap_content"
-                                android:layout_height="match_parent"
-                                android:gravity="center"
-                                android:paddingStart="8dp"
-                                android:paddingEnd="4dp"
-                                android:text=" · 文A"
-                                android:textColor="@color/color999"
-                                android:textSize="14sp" />
-                        </LinearLayout>
-                    </HorizontalScrollView>
+                        <androidx.appcompat.widget.AppCompatTextView
+                            android:id="@+id/aiSendToggle"
+                            android:layout_width="40dp"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:text="鏂嘇"
+                            android:textStyle="bold"
+                            android:textColor="@color/color999"
+                            android:textSize="13sp" />
+                    </LinearLayout>
 
                     <FrameLayout
                         android:id="@+id/panelView"
@@ -219,73 +207,70 @@
                         <LinearLayout
                             android:id="@+id/chatView"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="bottom"
-                            android:paddingStart="10dp"
-                            android:paddingEnd="10dp"
-                            android:paddingTop="6dp"
-                            android:paddingBottom="10dp">
-
-                            <androidx.appcompat.widget.AppCompatImageView
-                                android:id="@+id/plusIV"
-                                android:layout_width="44dp"
-                                android:layout_height="44dp"
-                                android:layout_gravity="bottom"
-                                android:padding="10dp"
-                                android:src="@drawable/ic_chat_plus_simple"
-                                android:tint="@color/color999" />
+                            android:layout_height="52dp"
+                            android:background="@drawable/chat_edit_bg"
+                            android:elevation="5dp"
+                            android:gravity="center_vertical"
+                            android:minHeight="52dp"
+                            android:orientation="horizontal"
+                            android:paddingStart="8dp"
+                            android:paddingTop="4dp"
+                            android:paddingEnd="8dp"
+                            android:paddingBottom="4dp">
 
                             <LinearLayout
                                 android:id="@+id/menuView"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_gravity="bottom"
-                                android:layout_marginEnd="10dp"
                                 android:visibility="gone">
 
                                 <LinearLayout
                                     android:id="@+id/menuLayout"
-                                    android:layout_width="50dp"
-                                    android:layout_height="30dp"
+                                    android:layout_width="1dp"
+                                    android:layout_height="1dp"
                                     android:gravity="center">
 
                                     <androidx.appcompat.widget.AppCompatImageView
                                         android:id="@+id/menuIv"
-                                        android:layout_width="25dp"
-                                        android:layout_height="25dp"
+                                        android:layout_width="1dp"
+                                        android:layout_height="1dp"
                                         android:src="@mipmap/icon_menu"
                                         tools:ignore="TooDeepLayout" />
                                 </LinearLayout>
                             </LinearLayout>
 
+                            <androidx.appcompat.widget.AppCompatTextView
+                                android:id="@+id/plusBtn"
+                                android:layout_width="42dp"
+                                android:layout_height="42dp"
+                                android:gravity="center"
+                                android:text="+"
+                                android:textColor="@color/color999"
+                                android:textSize="32sp" />
+
                             <RelativeLayout
                                 android:layout_width="0dp"
-                                android:layout_height="wrap_content"
+                                android:layout_height="match_parent"
                                 android:layout_weight="1"
                                 android:animateLayoutChanges="true"
-                                android:background="@drawable/chat_edit_bg"
-                                android:minHeight="48dp"
                                 android:orientation="horizontal">
 
                                 <com.chat.base.ui.components.ContactEditText
                                     android:id="@+id/editText"
                                     android:layout_width="match_parent"
-                                    android:layout_height="wrap_content"
-                                    android:layout_centerVertical="true"
+                                    android:layout_height="match_parent"
                                     android:background="@color/transparent"
                                     android:focusable="true"
                                     android:gravity="center_vertical"
                                     android:hint="@string/chat_input_hint"
-                                    android:maxHeight="110dp"
+                                    android:maxHeight="96dp"
                                     android:maxLines="3"
-                                    android:minHeight="44dp"
-                                    android:paddingStart="16dp"
-                                    android:paddingTop="8dp"
-                                    android:paddingEnd="16dp"
-                                    android:paddingBottom="8dp"
+                                    android:minHeight="42dp"
+                                    android:paddingStart="4dp"
+                                    android:paddingEnd="4dp"
                                     android:textColor="@color/colorDark"
                                     android:textColorHint="@color/color999"
-                                    android:textSize="17sp" />
+                                    android:textSize="16sp" />
 
                                 <TextView
                                     android:id="@+id/hitTv"
@@ -305,14 +290,8 @@
 
                                     <androidx.appcompat.widget.AppCompatImageView
                                         android:id="@+id/flameIV"
-                                        android:layout_width="15dp"
-                                        android:layout_height="20dp"
-                                        android:layout_gravity="center"
-                                        android:layout_marginTop="3dp"
-                                        android:layout_marginEnd="10dp"
-                                        android:layout_marginBottom="3dp"
-                                        android:src="@mipmap/flame_small"
-                                        android:tint="#ff2d51"
+                                        android:layout_width="1dp"
+                                        android:layout_height="1dp"
                                         android:visibility="gone" />
 
                                     <androidx.appcompat.widget.AppCompatImageView
@@ -321,7 +300,6 @@
                                         android:layout_height="1dp"
                                         android:visibility="gone" />
                                 </LinearLayout>
-
                             </RelativeLayout>
 
                             <View
@@ -332,11 +310,10 @@
 
                             <androidx.appcompat.widget.AppCompatImageView
                                 android:id="@+id/sendIV"
-                                android:layout_width="44dp"
-                                android:layout_height="44dp"
-                                android:layout_gravity="bottom"
-                                android:padding="10dp"
-                                android:src="@drawable/ic_chat_mic_simple"
+                                android:layout_width="42dp"
+                                android:layout_height="42dp"
+                                android:padding="8dp"
+                                android:src="@android:drawable/ic_btn_speak_now"
                                 android:tint="@color/color999"
                                 android:visibility="visible" />
                         </LinearLayout>
@@ -350,7 +327,6 @@
                         android:visibility="gone" />
                 </LinearLayout>
             </com.effective.android.panel.view.content.RelativeContentContainer>
-
 
             <com.effective.android.panel.view.panel.PanelContainer
                 android:id="@+id/panel_container"
@@ -366,6 +342,5 @@
                     app:panel_trigger="@id/emotionView" />
             </com.effective.android.panel.view.panel.PanelContainer>
         </com.effective.android.panel.view.PanelSwitchLayout>
-
     </LinearLayout>
 </layout>
