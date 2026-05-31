@@ -325,5 +325,6 @@
     <string name="chat_voice_hold_tips">按住说话，上滑取消</string>
     <string name="chat_voice_release_cancel">松手取消</string>
     <string name="chat_voice_long_press_hint">长按麦克风录音</string>
+    <string name="chat_more_menu">聊天菜单</string>
 </resources>
 
