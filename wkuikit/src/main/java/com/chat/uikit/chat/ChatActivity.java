@@ -218,6 +218,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private static final String KEY_AI_TARGET_LANG = "chat_ai_target_lang";
     private static final String KEY_AI_AUTO_TRANSLATE = "chat_ai_auto_translate";
     private static final String KEY_AI_SEND_TRANSLATE = "chat_ai_send_translate";
+    private static final String KEY_AI_WINGMAN_ENABLED = "chat_ai_wingman_enabled";
     private static final String KEY_IMAGE_COMPRESS = "chat_image_compress";
 
     private final ActivityResultLauncher<String> chooseChatBgLauncher =
@@ -437,10 +438,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         EditText endpointEt = createSettingEdit(root, getString(R.string.chat_ai_endpoint), getLocalString(KEY_AI_ENDPOINT, "https://api.deepseek.com/v1/chat/completions"));
         EditText keyEt = createSettingEdit(root, getString(R.string.chat_ai_key), getLocalString(KEY_AI_KEY, ""));
         EditText modelEt = createSettingEdit(root, getString(R.string.chat_ai_model), getLocalString(KEY_AI_MODEL, "deepseek-chat"));
-        EditText sourceEt = createSettingEdit(root, getString(R.string.chat_ai_source_lang), getLocalString(KEY_AI_SOURCE_LANG, "中文"));
-        EditText targetEt = createSettingEdit(root, getString(R.string.chat_ai_target_lang), getLocalString(KEY_AI_TARGET_LANG, "မြန်မာစာ"));
-        sourceEt.setHint("中文");
-        targetEt.setHint("မြန်မာစာ");
+        EditText sourceEt = createSettingEdit(root, getString(R.string.chat_ai_source_lang), getLocalString(KEY_AI_SOURCE_LANG, "မြန်မာစာ"));
+        EditText targetEt = createSettingEdit(root, getString(R.string.chat_ai_target_lang), getLocalString(KEY_AI_TARGET_LANG, "中文"));
+        sourceEt.setHint("မြန်မာစာ");
+        targetEt.setHint("中文");
 
         Switch autoTranslate = new Switch(this);
         autoTranslate.setText(R.string.chat_ai_auto_translate);
@@ -452,10 +453,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         sendTranslate.setChecked(getLocalFlag(KEY_AI_SEND_TRANSLATE, false));
         root.addView(sendTranslate, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-        Switch imageCompress = new Switch(this);
-        imageCompress.setText(R.string.chat_ai_image_compress);
-        imageCompress.setChecked(getLocalFlag(KEY_IMAGE_COMPRESS, true));
-        root.addView(imageCompress, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        Switch wingmanEnabled = new Switch(this);
+        wingmanEnabled.setText(R.string.chat_ai_wingman_enabled);
+        wingmanEnabled.setChecked(getLocalFlag(KEY_AI_WINGMAN_ENABLED, false));
+        root.addView(wingmanEnabled, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         new AlertDialog.Builder(this)
                 .setTitle(R.string.chat_ai_settings)
@@ -469,7 +470,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_TARGET_LANG, targetEt.getText().toString().trim());
                     putLocalFlag(KEY_AI_AUTO_TRANSLATE, autoTranslate.isChecked());
                     putLocalFlag(KEY_AI_SEND_TRANSLATE, sendTranslate.isChecked());
-                    putLocalFlag(KEY_IMAGE_COMPRESS, imageCompress.isChecked());
+                    putLocalFlag(KEY_AI_WINGMAN_ENABLED, wingmanEnabled.isChecked());
                     if (chatPanelManager != null) chatPanelManager.refreshAiAssistBar();
                 })
                 .show();
