@@ -2,16 +2,13 @@ package com.chat.uikit.fragment;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.content.ActivityNotFoundException;
-import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,7 +17,6 @@ import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -34,19 +30,26 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import com.chat.uikit.TabActivity;
+
 public class WebTabFragment extends Fragment {
     private static final String ARG_URL = "url";
+    private static final String STATE_HAS_LOADED = "web_tab_has_loaded";
+    private static final String STATE_HAS_VISIBLE_CONTENT = "web_tab_has_visible_content";
+    private static final String STATE_LAST_URL = "web_tab_last_url";
 
     private String url;
+    private String lastKnownUrl;
+    private Bundle savedWebViewState;
+
     private FrameLayout cachedRoot;
     private WebView webView;
     private ProgressBar progressBar;
     private View loadingView;
     private View errorView;
-    private TextView errorTextView;
+
     private boolean hasLoaded = false;
-    private boolean hasVisiblePage = false;
-    private String lastVisibleUrl = "";
+    private boolean hasVisibleContent = false;
 
     public static WebTabFragment newInstance(String url) {
         WebTabFragment fragment = new WebTabFragment();
@@ -60,6 +63,13 @@ public class WebTabFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         url = getArguments() == null ? "" : getArguments().getString(ARG_URL, "");
+        lastKnownUrl = url;
+        if (savedInstanceState != null) {
+            hasLoaded = savedInstanceState.getBoolean(STATE_HAS_LOADED, false);
+            hasVisibleContent = savedInstanceState.getBoolean(STATE_HAS_VISIBLE_CONTENT, false);
+            lastKnownUrl = savedInstanceState.getString(STATE_LAST_URL, url);
+            savedWebViewState = savedInstanceState;
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -67,7 +77,11 @@ public class WebTabFragment extends Fragment {
     @Override
     public View onCreateView(@NonNull android.view.LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         if (cachedRoot != null) {
-            detachCachedRoot();
+            ViewGroup parent = (ViewGroup) cachedRoot.getParent();
+            if (parent != null) {
+                parent.removeView(cachedRoot);
+            }
+            syncBottomNavigationWithCurrentUrl();
             return cachedRoot;
         }
 
@@ -75,170 +89,123 @@ public class WebTabFragment extends Fragment {
         cachedRoot.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         cachedRoot.setBackgroundColor(Color.WHITE);
 
-        webView = createWebView(requireContext());
-        cachedRoot.addView(webView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        loadingView = createLoadingView(requireContext());
-        cachedRoot.addView(loadingView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        errorView = createErrorView(requireContext());
-        errorView.setVisibility(View.GONE);
-        cachedRoot.addView(errorView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        webView = new WebView(requireContext());
+        webView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        configureWebView(webView);
 
         progressBar = new ProgressBar(requireContext(), null, android.R.attr.progressBarStyleHorizontal);
         FrameLayout.LayoutParams progressLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(2));
         progressLp.gravity = Gravity.TOP;
         progressBar.setMax(100);
         progressBar.setVisibility(View.GONE);
+
+        loadingView = createLoadingView();
+        errorView = createErrorView();
+        errorView.setVisibility(View.GONE);
+
+        cachedRoot.addView(webView);
+        cachedRoot.addView(loadingView);
+        cachedRoot.addView(errorView);
         cachedRoot.addView(progressBar, progressLp);
 
-        boolean restored = false;
         if (savedInstanceState != null) {
-            try {
-                restored = webView.restoreState(savedInstanceState) != null;
-            } catch (Exception ignored) {
-                restored = false;
-            }
+            savedWebViewState = savedInstanceState;
         }
-
-        if (restored) {
-            hasLoaded = true;
-            hasVisiblePage = true;
-            hideLoadingAndError();
-        } else if (!hasLoaded && url != null && url.length() > 0) {
-            showLoadingIfNoVisiblePage();
-            webView.loadUrl(url);
-            hasLoaded = true;
-        }
+        restoreOrLoadUrl();
+        syncBottomNavigationWithCurrentUrl();
         return cachedRoot;
-    }
-
-    @Override
-    public void onDestroyView() {
-        detachCachedRoot();
-        super.onDestroyView();
-    }
-
-    @Override
-    public void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        if (webView != null) {
-            try {
-                webView.saveState(outState);
-            } catch (Exception ignored) {
-            }
-        }
-    }
-
-    @SuppressLint("SetJavaScriptEnabled")
-    private WebView createWebView(Context context) {
-        WebView targetWebView = new WebView(context.getApplicationContext());
-        targetWebView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        targetWebView.setBackgroundColor(Color.WHITE);
-        targetWebView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        targetWebView.requestFocus(View.FOCUS_DOWN);
-        configureWebView(targetWebView);
-        return targetWebView;
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     private void configureWebView(WebView targetWebView) {
-        CookieManager cookieManager = CookieManager.getInstance();
-        cookieManager.setAcceptCookie(true);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            cookieManager.setAcceptThirdPartyCookies(targetWebView, true);
-        }
-
         WebSettings settings = targetWebView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
-        settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
-        settings.setSupportMultipleWindows(false);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        settings.setAllowFileAccess(false);
-        settings.setAllowContentAccess(true);
         settings.setLoadsImagesAutomatically(true);
+        settings.setMediaPlaybackRequiresUserGesture(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+            CookieManager.getInstance().setAcceptThirdPartyCookies(targetWebView, true);
         }
+        CookieManager.getInstance().setAcceptCookie(true);
+        targetWebView.setBackgroundColor(Color.WHITE);
+        targetWebView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
 
         targetWebView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (request == null || request.getUrl() == null) return false;
-                return handleUrl(view, request.getUrl().toString());
+                return handleUrl(request.getUrl().toString());
             }
 
             @Override
-            public boolean shouldOverrideUrlLoading(WebView view, String pageUrl) {
-                return handleUrl(view, pageUrl);
+            public boolean shouldOverrideUrlLoading(WebView view, String requestUrl) {
+                return handleUrl(requestUrl);
             }
 
             @Override
             public void onPageStarted(WebView view, String pageUrl, Bitmap favicon) {
                 super.onPageStarted(view, pageUrl, favicon);
-                if (progressBar != null) {
-                    progressBar.setVisibility(View.VISIBLE);
-                    progressBar.setProgress(5);
-                }
-                showLoadingIfNoVisiblePage();
+                lastKnownUrl = pageUrl;
+                showLoadingForNavigation();
+                showProgress(5);
+                updateBottomNavigationVisibility(pageUrl);
             }
 
             @Override
             public void onPageCommitVisible(WebView view, String pageUrl) {
                 super.onPageCommitVisible(view, pageUrl);
-                hasVisiblePage = true;
-                lastVisibleUrl = pageUrl == null ? "" : pageUrl;
+                lastKnownUrl = pageUrl;
+                hasVisibleContent = true;
                 hideLoadingAndError();
+                updateBottomNavigationVisibility(pageUrl);
             }
 
             @Override
             public void onPageFinished(WebView view, String pageUrl) {
                 super.onPageFinished(view, pageUrl);
-                hasVisiblePage = true;
-                lastVisibleUrl = pageUrl == null ? "" : pageUrl;
+                lastKnownUrl = pageUrl;
+                hasVisibleContent = true;
                 hideLoadingAndError();
-                if (progressBar != null) {
-                    progressBar.setProgress(100);
-                    progressBar.setVisibility(View.GONE);
-                }
+                hideProgress();
+                updateBottomNavigationVisibility(pageUrl);
+            }
+
+            @Override
+            public void doUpdateVisitedHistory(WebView view, String pageUrl, boolean isReload) {
+                super.doUpdateVisitedHistory(view, pageUrl, isReload);
+                lastKnownUrl = pageUrl;
+                updateBottomNavigationVisibility(pageUrl);
             }
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && request != null && request.isForMainFrame()) {
-                    String message = error == null ? "页面加载失败" : String.valueOf(error.getDescription());
-                    showError(message);
-                }
-            }
-
-            @Override
-            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                super.onReceivedError(view, errorCode, description, failingUrl);
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-                    showError(description == null || description.length() == 0 ? "页面加载失败" : description);
-                }
-            }
-
-            @Override
-            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
-                super.onReceivedHttpError(view, request, errorResponse);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && request != null && request.isForMainFrame()) {
-                    int code = errorResponse == null ? 0 : errorResponse.getStatusCode();
-                    showError(code > 0 ? "页面加载失败，HTTP " + code : "页面加载失败");
+                if (request != null && request.isForMainFrame()) {
+                    hideProgress();
+                    if (!hasVisibleContent) showErrorView();
+                    updateBottomNavigationVisibility(view == null ? lastKnownUrl : view.getUrl());
                 }
             }
 
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
-                recreateWebViewAfterCrash();
+                if (webView != null) {
+                    cachedRoot.removeView(webView);
+                    webView.destroy();
+                    webView = null;
+                }
+                hasLoaded = false;
+                hasVisibleContent = false;
+                showErrorView();
+                syncBottomNavigationWithCurrentUrl();
                 return true;
             }
         });
@@ -247,198 +214,258 @@ public class WebTabFragment extends Fragment {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
                 super.onProgressChanged(view, newProgress);
-                if (progressBar != null) {
-                    progressBar.setProgress(newProgress);
-                    progressBar.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
-                }
-                if (newProgress >= 80 && hasVisiblePage) {
-                    hideLoadingAndError();
-                }
+                if (newProgress >= 100) hideProgress(); else showProgress(newProgress);
             }
         });
     }
 
-    private boolean handleUrl(WebView view, String pageUrl) {
-        if (pageUrl == null || pageUrl.length() == 0) return false;
-        Uri uri = Uri.parse(pageUrl);
+    private boolean handleUrl(String requestUrl) {
+        if (TextUtils.isEmpty(requestUrl)) return false;
+        Uri uri = Uri.parse(requestUrl);
         String scheme = uri.getScheme();
-        if (scheme == null || "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
-            return false;
-        }
+        if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) return false;
         try {
-            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-            startActivity(intent);
-        } catch (ActivityNotFoundException ignored) {
+            startActivity(new Intent(Intent.ACTION_VIEW, uri));
+        } catch (Exception ignored) {
         }
         return true;
     }
 
-    private View createLoadingView(Context context) {
-        LinearLayout root = new LinearLayout(context);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(18), dp(18), dp(18));
-        root.setBackgroundColor(Color.WHITE);
-
-        TextView title = new TextView(context);
-        title.setText("正在加载...");
-        title.setTextColor(Color.parseColor("#1F2937"));
-        title.setTextSize(16);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        root.addView(title, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        for (int i = 0; i < 6; i++) {
-            LinearLayout card = new LinearLayout(context);
-            card.setOrientation(LinearLayout.VERTICAL);
-            card.setPadding(dp(14), dp(12), dp(14), dp(12));
-            card.setBackground(makeRoundRect(Color.parseColor("#F5F7FA"), dp(14)));
-            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(82));
-            cardLp.topMargin = dp(14);
-            root.addView(card, cardLp);
-
-            View line1 = new View(context);
-            line1.setBackground(makeRoundRect(Color.parseColor("#E6EAF0"), dp(8)));
-            LinearLayout.LayoutParams line1Lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(12));
-            card.addView(line1, line1Lp);
-
-            View line2 = new View(context);
-            line2.setBackground(makeRoundRect(Color.parseColor("#EDF1F5"), dp(8)));
-            LinearLayout.LayoutParams line2Lp = new LinearLayout.LayoutParams(dp(210), dp(10));
-            line2Lp.topMargin = dp(12);
-            card.addView(line2, line2Lp);
+    private void restoreOrLoadUrl() {
+        if (webView == null) return;
+        if (savedWebViewState != null && hasLoaded) {
+            try {
+                webView.restoreState(savedWebViewState);
+            } catch (Exception ignored) {
+            }
+            if (hasVisibleContent) hideLoadingAndError(); else showFullLoading();
+            return;
         }
-        return root;
+        if (!hasLoaded && !TextUtils.isEmpty(url)) {
+            showFullLoading();
+            webView.loadUrl(url);
+            hasLoaded = true;
+            lastKnownUrl = url;
+        }
     }
 
-    private View createErrorView(Context context) {
-        LinearLayout root = new LinearLayout(context);
+    private View createLoadingView() {
+        LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER);
-        root.setPadding(dp(24), dp(24), dp(24), dp(24));
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
         root.setBackgroundColor(Color.WHITE);
+        root.setPadding(dp(22), dp(28), dp(22), dp(22));
+        root.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        TextView title = new TextView(context);
-        title.setText("页面加载失败");
-        title.setTextColor(Color.parseColor("#111827"));
-        title.setTextSize(18);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
+        ProgressBar spinner = new ProgressBar(requireContext());
+        LinearLayout.LayoutParams spinnerLp = new LinearLayout.LayoutParams(dp(36), dp(36));
+        spinnerLp.gravity = Gravity.CENTER_HORIZONTAL;
+        spinnerLp.bottomMargin = dp(18);
+        root.addView(spinner, spinnerLp);
+
+        TextView title = new TextView(requireContext());
+        title.setText("正在加载");
+        title.setTextColor(Color.rgb(55, 65, 81));
+        title.setTextSize(16);
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        errorTextView = new TextView(context);
-        errorTextView.setText("网络不稳定或页面暂时不可用");
-        errorTextView.setTextColor(Color.parseColor("#6B7280"));
-        errorTextView.setTextSize(14);
-        errorTextView.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        descLp.topMargin = dp(10);
-        root.addView(errorTextView, descLp);
+        TextView subtitle = new TextView(requireContext());
+        subtitle.setText("请稍候，内容马上回来");
+        subtitle.setTextColor(Color.rgb(156, 163, 175));
+        subtitle.setTextSize(13);
+        subtitle.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subtitleLp.topMargin = dp(6);
+        subtitleLp.bottomMargin = dp(22);
+        root.addView(subtitle, subtitleLp);
 
-        Button retryButton = new Button(context);
-        retryButton.setText("重试");
-        retryButton.setAllCaps(false);
-        retryButton.setTextColor(Color.WHITE);
-        retryButton.setBackground(makeRoundRect(Color.parseColor("#2563EB"), dp(20)));
-        retryButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                retryLoad();
-            }
-        });
-        LinearLayout.LayoutParams buttonLp = new LinearLayout.LayoutParams(dp(132), dp(44));
-        buttonLp.topMargin = dp(20);
-        root.addView(retryButton, buttonLp);
-
+        for (int i = 0; i < 5; i++) {
+            View row = new View(requireContext());
+            row.setBackgroundColor(i % 2 == 0 ? Color.rgb(241, 245, 249) : Color.rgb(248, 250, 252));
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(i == 0 ? 64 : 48));
+            rowLp.topMargin = dp(10);
+            root.addView(row, rowLp);
+        }
         return root;
     }
 
-    private void showLoadingIfNoVisiblePage() {
-        if (loadingView != null && !hasVisiblePage) {
-            loadingView.setVisibility(View.VISIBLE);
+    private View createErrorView() {
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER);
+        root.setPadding(dp(28), dp(28), dp(28), dp(28));
+        root.setBackgroundColor(Color.WHITE);
+        root.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        TextView title = new TextView(requireContext());
+        title.setText("页面加载失败");
+        title.setTextColor(Color.rgb(31, 41, 55));
+        title.setTextSize(18);
+        title.setGravity(Gravity.CENTER);
+        root.addView(title, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView desc = new TextView(requireContext());
+        desc.setText("网络不稳定或页面暂时无法访问");
+        desc.setTextColor(Color.rgb(107, 114, 128));
+        desc.setTextSize(14);
+        desc.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        descLp.topMargin = dp(8);
+        descLp.bottomMargin = dp(18);
+        root.addView(desc, descLp);
+
+        Button retry = new Button(requireContext());
+        retry.setText("重新加载");
+        retry.setAllCaps(false);
+        retry.setOnClickListener(v -> reloadCurrentPage());
+        root.addView(retry, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44)));
+        return root;
+    }
+
+    private void reloadCurrentPage() {
+        if (webView == null) {
+            recreateWebViewAndLoad();
+            return;
         }
-        if (errorView != null) {
-            errorView.setVisibility(View.GONE);
+        showFullLoading();
+        String targetUrl = !TextUtils.isEmpty(lastKnownUrl) ? lastKnownUrl : url;
+        if (!TextUtils.isEmpty(targetUrl)) {
+            webView.loadUrl(targetUrl);
+            hasLoaded = true;
+        } else {
+            webView.reload();
         }
+    }
+
+    private void recreateWebViewAndLoad() {
+        if (cachedRoot == null || getContext() == null) return;
+        webView = new WebView(requireContext());
+        webView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        configureWebView(webView);
+        cachedRoot.addView(webView, 0);
+        hasLoaded = false;
+        hasVisibleContent = false;
+        restoreOrLoadUrl();
+    }
+
+    private void showFullLoading() {
+        if (loadingView != null && !hasVisibleContent) loadingView.setVisibility(View.VISIBLE);
+        if (errorView != null) errorView.setVisibility(View.GONE);
+    }
+
+    private void showLoadingForNavigation() {
+        if (!hasVisibleContent && loadingView != null) loadingView.setVisibility(View.VISIBLE);
+        if (errorView != null) errorView.setVisibility(View.GONE);
     }
 
     private void hideLoadingAndError() {
-        if (loadingView != null) {
-            loadingView.setVisibility(View.GONE);
-        }
-        if (errorView != null) {
-            errorView.setVisibility(View.GONE);
-        }
+        if (loadingView != null) loadingView.setVisibility(View.GONE);
+        if (errorView != null) errorView.setVisibility(View.GONE);
     }
 
-    private void showError(String message) {
-        if (progressBar != null) {
-            progressBar.setVisibility(View.GONE);
-        }
-        if (hasVisiblePage) {
-            if (errorView != null) errorView.setVisibility(View.GONE);
-            if (loadingView != null) loadingView.setVisibility(View.GONE);
-            return;
-        }
+    private void showErrorView() {
         if (loadingView != null) loadingView.setVisibility(View.GONE);
-        if (errorTextView != null) errorTextView.setText(message == null || message.length() == 0 ? "网络不稳定或页面暂时不可用" : message);
         if (errorView != null) errorView.setVisibility(View.VISIBLE);
     }
 
-    private void retryLoad() {
-        if (webView == null) return;
-        showLoadingIfNoVisiblePage();
-        String current = webView.getUrl();
-        if (current != null && current.length() > 0) {
-            webView.reload();
-        } else if (lastVisibleUrl != null && lastVisibleUrl.length() > 0) {
-            webView.loadUrl(lastVisibleUrl);
-        } else if (url != null && url.length() > 0) {
-            webView.loadUrl(url);
+    private void showProgress(int progress) {
+        if (progressBar != null) {
+            progressBar.setVisibility(View.VISIBLE);
+            progressBar.setProgress(Math.max(3, progress));
         }
-        hasLoaded = true;
     }
 
-    private void recreateWebViewAfterCrash() {
-        if (cachedRoot == null) return;
-        String reloadUrl = lastVisibleUrl != null && lastVisibleUrl.length() > 0 ? lastVisibleUrl : url;
+    private void hideProgress() {
+        if (progressBar != null) {
+            progressBar.setProgress(100);
+            progressBar.setVisibility(View.GONE);
+        }
+    }
+
+    public boolean canGoBack() {
+        return webView != null && webView.canGoBack();
+    }
+
+    public void goBack() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            syncBottomNavigationWithCurrentUrl();
+        }
+    }
+
+    public void syncBottomNavigationWithCurrentUrl() {
+        updateBottomNavigationVisibility(getCurrentPageUrl());
+    }
+
+    private String getCurrentPageUrl() {
+        if (webView != null && !TextUtils.isEmpty(webView.getUrl())) return webView.getUrl();
+        if (!TextUtils.isEmpty(lastKnownUrl)) return lastKnownUrl;
+        return url;
+    }
+
+    private void updateBottomNavigationVisibility(String currentUrl) {
+        Activity activity = getActivity();
+        if (activity instanceof TabActivity) {
+            ((TabActivity) activity).setBottomNavigationVisible(isRootPage(currentUrl));
+        }
+    }
+
+    private boolean isRootPage(String currentUrl) {
+        if (TextUtils.isEmpty(currentUrl) || TextUtils.isEmpty(url)) return true;
         try {
-            if (webView != null) {
-                cachedRoot.removeView(webView);
-                webView.destroy();
-            }
-        } catch (Exception ignored) {
-        }
-        webView = createWebView(requireContext());
-        cachedRoot.addView(webView, 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        hasVisiblePage = false;
-        hasLoaded = false;
-        showError("页面进程已重启，请重试");
-        if (reloadUrl != null && reloadUrl.length() > 0) {
-            url = reloadUrl;
+            Uri current = Uri.parse(currentUrl);
+            Uri root = Uri.parse(url);
+            if (!TextUtils.equals(current.getHost(), root.getHost())) return false;
+            if (!TextUtils.equals(normalizePath(current.getPath()), normalizePath(root.getPath()))) return false;
+            String fragment = current.getFragment();
+            return TextUtils.isEmpty(fragment) || "/".equals(fragment);
+        } catch (Exception e) {
+            return true;
         }
     }
 
-    private void detachCachedRoot() {
-        if (cachedRoot == null) return;
-        ViewGroup parent = (ViewGroup) cachedRoot.getParent();
-        if (parent != null) {
-            parent.removeView(cachedRoot);
-        }
+    private String normalizePath(String path) {
+        if (TextUtils.isEmpty(path)) return "/";
+        if (path.length() > 1 && path.endsWith("/")) return path.substring(0, path.length() - 1);
+        return path;
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        if (webView != null) {
-            webView.onPause();
-        }
+        if (webView != null) webView.onPause();
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        if (webView != null) webView.onResume();
+        syncBottomNavigationWithCurrentUrl();
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(STATE_HAS_LOADED, hasLoaded);
+        outState.putBoolean(STATE_HAS_VISIBLE_CONTENT, hasVisibleContent);
+        outState.putString(STATE_LAST_URL, getCurrentPageUrl());
         if (webView != null) {
-            webView.onResume();
+            try {
+                webView.saveState(outState);
+            } catch (Exception ignored) {
+            }
         }
+    }
+
+    @Override
+    public void onDestroyView() {
+        if (cachedRoot != null) {
+            ViewGroup parent = (ViewGroup) cachedRoot.getParent();
+            if (parent != null) parent.removeView(cachedRoot);
+        }
+        super.onDestroyView();
     }
 
     @Override
@@ -456,16 +483,8 @@ public class WebTabFragment extends Fragment {
         progressBar = null;
         loadingView = null;
         errorView = null;
-        errorTextView = null;
         cachedRoot = null;
         super.onDestroy();
-    }
-
-    private GradientDrawable makeRoundRect(int color, int radius) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(radius);
-        return drawable;
     }
 
     private int dp(int value) {
