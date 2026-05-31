@@ -72,6 +72,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private TextView chatTV, partnerTV, discoverTV, communityTV, studyTV;
     private long lastClickChatTabTime = 0L;
     private final boolean isShowTabText = true;
+    private final List<Fragment> fragments = new ArrayList<>(5);
 
     @Override
     protected ActTabMainBinding getViewBinding() {
@@ -110,6 +111,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         WKCommonModel.getInstance().getAppConfig(null);
 
         playAnimation(TAB_CHAT);
+        setBottomNavigationVisible(true);
     }
 
     @SuppressLint("CheckResult")
@@ -191,13 +193,15 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     }
 
     private void initFragments() {
-        List<Fragment> fragments = new ArrayList<>(5);
+        fragments.clear();
         fragments.add(new ChatFragment());
         fragments.add(PlaceholderTabFragment.newInstance(getString(R.string.tab_text_partner), getString(R.string.tab_placeholder_partner_desc)));
         fragments.add(PlaceholderTabFragment.newInstance(getString(R.string.tab_text_discover), getString(R.string.tab_placeholder_discover_desc)));
         fragments.add(WebTabFragment.newInstance("https://bbs.886.best"));
         fragments.add(WebTabFragment.newInstance("https://886.best"));
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
+        // 底部是一级导航，只允许点击切换；横滑手势留给聊天页内部二级导航使用。
+        wkVBinding.vp.setUserInputEnabled(false);
     }
 
     private void initBadgesAndCounters() {
@@ -216,6 +220,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
                 super.onPageSelected(position);
                 playAnimation(position);
                 wkVBinding.bottomNavigation.setSelectedItemId(getMenuIdByIndex(position));
+                syncBottomNavigationForCurrentTab();
             }
         });
 
@@ -250,6 +255,37 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private void switchToTab(int index) {
         wkVBinding.vp.setCurrentItem(index, false);
         playAnimation(index);
+        syncBottomNavigationForCurrentTab();
+    }
+
+    private void syncBottomNavigationForCurrentTab() {
+        Fragment fragment = getCurrentFragment();
+        if (fragment instanceof WebTabFragment) {
+            ((WebTabFragment) fragment).syncBottomNavigationWithCurrentUrl();
+        } else {
+            setBottomNavigationVisible(true);
+        }
+    }
+
+    public void setBottomNavigationVisible(boolean visible) {
+        if (wkVBinding == null || wkVBinding.bottomNavigation == null) {
+            return;
+        }
+        int targetVisibility = visible ? View.VISIBLE : View.GONE;
+        if (wkVBinding.bottomNavigation.getVisibility() != targetVisibility) {
+            wkVBinding.bottomNavigation.setVisibility(targetVisibility);
+        }
+    }
+
+    private Fragment getCurrentFragment() {
+        if (wkVBinding == null || wkVBinding.vp == null) {
+            return null;
+        }
+        int index = wkVBinding.vp.getCurrentItem();
+        if (index < 0 || index >= fragments.size()) {
+            return null;
+        }
+        return fragments.get(index);
     }
 
     private int getMenuIdByIndex(int index) {
@@ -263,6 +299,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     @Override
     protected void onResume() {
         super.onResume();
+        syncBottomNavigationForCurrentTab();
         FriendModel.getInstance().syncFriends((code, msg) -> {
             if (code != HttpResponseCode.success && !TextUtils.isEmpty(msg)) {
                 showToast(msg);
@@ -297,13 +334,35 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     }
 
     @Override
+    public void onBackPressed() {
+        if (handleBackPress()) {
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            moveTaskToBack(true);
-            return true;
-        } else {
-            return super.onKeyDown(keyCode, event);
+            return handleBackPress();
         }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    private boolean handleBackPress() {
+        Fragment fragment = getCurrentFragment();
+        if (fragment instanceof WebTabFragment) {
+            WebTabFragment webTabFragment = (WebTabFragment) fragment;
+            if (webTabFragment.canGoBack()) {
+                webTabFragment.goBack();
+                return true;
+            }
+        }
+
+        // 只有 WebView 已退回一级页，或者当前不是 WebView 二级页时，才退到后台。
+        setBottomNavigationVisible(true);
+        moveTaskToBack(true);
+        return true;
     }
 
     private void playAnimation(int index) {
