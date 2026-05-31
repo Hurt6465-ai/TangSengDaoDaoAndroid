@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="chat_menu_translate">翻译</string>
+    <string name="chat_translate_result">翻译结果</string>
+    <string name="chat_translate_close">关闭</string>
+    <string name="chat_translate_working">翻译中…</string>
+    <string name="chat_translate_empty">没有可翻译的内容</string>
+    <string name="chat_translate_key_empty">请先在聊天右上角 AI 翻译设置里填写 API Key</string>
+    <string name="chat_translate_failed">翻译失败，请稍后重试</string>
+</resources>
