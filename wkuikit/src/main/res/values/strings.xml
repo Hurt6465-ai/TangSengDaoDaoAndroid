@@ -329,5 +329,7 @@
     <string name="chat_bg_saved">聊天背景已保存到本机</string>
     <string name="chat_bg_cleared">聊天背景已清除</string>
     <string name="chat_bg_failed">聊天背景保存失败</string>
+    <string name="chat_input_hint">发送消息...</string>
+    <string name="chat_ai_wingman_short">僚机</string>
 </resources>
 
