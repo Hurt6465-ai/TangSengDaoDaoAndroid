@@ -129,7 +129,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_alignParentBottom="true"
-                    android:background="@color/chat_face_tab_bg"
+                    android:background="@color/transparent"
                     android:orientation="vertical">
 
                     <FrameLayout
@@ -142,6 +142,77 @@
                         android:layout_height="1px"
                         android:background="@color/layoutColorSelected" />
 
+
+                    <HorizontalScrollView
+                        android:id="@+id/aiAssistScroll"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:overScrollMode="never"
+                        android:scrollbars="none"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:paddingTop="6dp"
+                        android:paddingBottom="0dp">
+
+                        <LinearLayout
+                            android:id="@+id/aiAssistBar"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <androidx.appcompat.widget.AppCompatTextView
+                                android:id="@+id/translateBtn"
+                                android:layout_width="wrap_content"
+                                android:layout_height="30dp"
+                                android:gravity="center"
+                                android:paddingStart="13dp"
+                                android:paddingEnd="13dp"
+                                android:layout_marginEnd="8dp"
+                                android:background="@drawable/chat_edit_bg"
+                                android:text="@string/chat_ai_translate"
+                                android:textColor="@color/colorDark"
+                                android:textSize="13sp" />
+
+                            <androidx.appcompat.widget.AppCompatTextView
+                                android:id="@+id/wingmanBtn"
+                                android:layout_width="wrap_content"
+                                android:layout_height="30dp"
+                                android:gravity="center"
+                                android:paddingStart="13dp"
+                                android:paddingEnd="13dp"
+                                android:layout_marginEnd="8dp"
+                                android:background="@drawable/chat_edit_bg"
+                                android:text="@string/chat_ai_wingman"
+                                android:textColor="@color/colorDark"
+                                android:textSize="13sp" />
+
+                            <androidx.appcompat.widget.AppCompatTextView
+                                android:id="@+id/aiSendToggle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="30dp"
+                                android:gravity="center"
+                                android:paddingStart="13dp"
+                                android:paddingEnd="13dp"
+                                android:layout_marginEnd="8dp"
+                                android:background="@drawable/chat_edit_bg"
+                                android:text="@string/chat_ai_send_translate_off"
+                                android:textColor="@color/color999"
+                                android:textSize="13sp" />
+
+                            <androidx.appcompat.widget.AppCompatTextView
+                                android:id="@+id/compressToggle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="30dp"
+                                android:gravity="center"
+                                android:paddingStart="13dp"
+                                android:paddingEnd="13dp"
+                                android:background="@drawable/chat_edit_bg"
+                                android:text="@string/chat_img_compress_on"
+                                android:textColor="@color/color999"
+                                android:textSize="13sp" />
+                        </LinearLayout>
+                    </HorizontalScrollView>
+
                     <FrameLayout
                         android:id="@+id/panelView"
                         android:layout_width="match_parent"
@@ -151,7 +222,11 @@
                             android:id="@+id/chatView"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:padding="10dp">
+                            android:gravity="bottom"
+                            android:paddingStart="10dp"
+                            android:paddingEnd="10dp"
+                            android:paddingTop="6dp"
+                            android:paddingBottom="10dp">
 
                             <LinearLayout
                                 android:id="@+id/menuView"
@@ -193,8 +268,8 @@
                                     android:gravity="center_vertical"
                                     android:maxHeight="200dp"
                                     android:maxLines="3"
-                                    android:minHeight="35dp"
-                                    android:padding="5dp"
+                                    android:minHeight="42dp"
+                                    android:padding="9dp"
                                     android:paddingStart="5dp"
                                     android:paddingEnd="5dp"
                                     android:paddingBottom="3dp"
@@ -239,7 +314,7 @@
                                         android:layout_marginEnd="10dp"
                                         android:layout_marginBottom="3dp"
                                         android:src="@mipmap/ic_a"
-                                        android:visibility="visible" />
+                                        android:visibility="gone" />
                                 </LinearLayout>
 
                             </RelativeLayout>
@@ -261,7 +336,7 @@
                                     android:id="@+id/sendIV"
                                     android:layout_width="35dp"
                                     android:layout_height="35dp"
-                                    android:padding="5dp"
+                                    android:padding="9dp"
                                     android:src="@mipmap/icon_chat_send"
                                     android:tint="@color/popupTextColor"
                                     android:visibility="visible" />
@@ -273,7 +348,8 @@
                         android:id="@+id/toolbarRecyclerView"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="@color/chat_face_tab_bg" />
+                        android:background="@color/transparent"
+                        android:visibility="gone" />
                 </LinearLayout>
             </com.effective.android.panel.view.content.RelativeContentContainer>
 
