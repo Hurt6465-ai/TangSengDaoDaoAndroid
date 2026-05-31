@@ -322,7 +322,13 @@
     <string name="chat_bg_cleared">聊天背景已清除</string>
     <string name="chat_bg_failed">聊天背景设置失败</string>
     <string name="chat_input_hint">发送消息...</string>
-    <string name="chat_voice_hold_tips">按住说话，上滑取消</string>
+    <string name="chat_ai_translate_enabled_tip">已开启对话翻译，对方将会收到翻译后的内容</string>
+    <string name="chat_ai_translate_disabled_tip">已关闭对话翻译</string>
+    <string name="chat_bg_menu">聊天背景</string>
+    <string name="chat_bg_default">默认背景</string>
+    <string name="chat_bg_builtin">内置背景 %1$d</string>
+    <string name="chat_bg_choose_local">从手机相册选择</string>
+    <string name="chat_voice_hold_tips">松开发送，上滑取消</string>
     <string name="chat_voice_release_cancel">松手取消</string>
     <string name="chat_voice_long_press_hint">长按麦克风录音</string>
     <string name="chat_more_menu">聊天菜单</string>
