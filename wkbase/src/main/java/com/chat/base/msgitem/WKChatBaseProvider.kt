@@ -7,7 +7,6 @@ import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -1256,12 +1255,16 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             WKToastUtils.getInstance().showToastNormal("没有可翻译的文字")
             return
         }
-        val stableId = when {
+        val stableId = getStableTranslateId(mMsg, content)
+        translateTextWithCache(content, "bubble_$stableId")
+    }
+
+    private fun getStableTranslateId(mMsg: WKMsg, content: String): String {
+        return when {
             !TextUtils.isEmpty(mMsg.messageID) && mMsg.messageID != "0" -> mMsg.messageID
             !TextUtils.isEmpty(mMsg.clientMsgNO) -> mMsg.clientMsgNO
             else -> content.hashCode().toString()
         }
-        translateTextWithCache(content, "bubble_$stableId")
     }
 
     private fun getTranslatableMessageText(mMsg: WKMsg): String {
@@ -1285,7 +1288,8 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         val cacheKey = "chat_translate_cache_" + cacheSeed.hashCode()
         val cached = readTranslationCache(cacheKey)
         if (!TextUtils.isEmpty(cached)) {
-            showTranslationDialog(cached!!)
+            setTranslationExpanded(cacheKey, true)
+            notifyTranslationChanged()
             return
         }
         val apiKey = readAiSetting("chat_ai_key", "")
@@ -1295,14 +1299,16 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         }
         val endpoint = readAiSetting("chat_ai_endpoint", "https://api.deepseek.com/v1/chat/completions")
         val model = readAiSetting("chat_ai_model", "deepseek-chat")
-        val sourceLang = readAiSetting("chat_ai_source_lang", "自动检测")
-        val targetLang = readAiSetting("chat_ai_target_lang", "中文")
+        val sourceLang = "自动检测"
+        // 注意：输入框上方翻译栏是“我输入原文 -> 对方收到译文”。
+        // 对方消息点翻译时，目标语言应该回到这个“原文语言”，所以读 sourceLang。
+        val targetLang = readAiSetting("chat_ai_source_lang", "中文")
         WKToastUtils.getInstance().showToastNormal("正在翻译…")
         thread {
             try {
                 val translated = requestAiTranslation(endpoint, apiKey, model, sourceLang, targetLang, text)
-                saveTranslationCache(cacheKey, translated)
-                Handler(Looper.getMainLooper()).post { showTranslationDialog(translated) }
+                saveTranslationCache(cacheKey, translated, true)
+                Handler(Looper.getMainLooper()).post { notifyTranslationChanged() }
             } catch (e: Exception) {
                 Handler(Looper.getMainLooper()).post {
                     WKToastUtils.getInstance().showToastNormal("翻译失败：" + (e.message ?: ""))
@@ -1371,8 +1377,6 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
     }
 
     private fun readAiSetting(key: String, fallback: String): String {
-        // AI 翻译设置是 ChatActivity / ChatPanelManager 通过 WKSharedPreferencesUtil 保存的。
-        // 这里不能直接读默认 SharedPreferences 文件，否则长按气泡菜单会误以为没有配置 API Key。
         val value = WKSharedPreferencesUtil.getInstance().getSP(key)
         return if (!TextUtils.isEmpty(value)) value else fallback
     }
@@ -1390,24 +1394,32 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         }
     }
 
-    private fun saveTranslationCache(key: String, translated: String) {
+    private fun saveTranslationCache(key: String, translated: String, expanded: Boolean) {
         try {
-            val obj = JSONObject().put("time", System.currentTimeMillis()).put("text", translated)
+            val obj = JSONObject().put("time", System.currentTimeMillis()).put("text", translated).put("expanded", expanded)
             context.getSharedPreferences("chat_translate_cache", Context.MODE_PRIVATE)
                 .edit().putString(key, obj.toString()).apply()
         } catch (_: Exception) {
         }
     }
 
-    private fun showTranslationDialog(text: String) {
+    private fun setTranslationExpanded(key: String, expanded: Boolean) {
         try {
-            AlertDialog.Builder(context)
-                .setTitle("翻译结果")
-                .setMessage(text)
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
+            val sp = context.getSharedPreferences("chat_translate_cache", Context.MODE_PRIVATE)
+            val raw = sp.getString(key, "") ?: ""
+            if (raw.isBlank()) return
+            val obj = JSONObject(raw).put("expanded", expanded)
+            sp.edit().putString(key, obj.toString()).apply()
         } catch (_: Exception) {
-            WKToastUtils.getInstance().showToastNormal(text)
+        }
+    }
+
+    private fun notifyTranslationChanged() {
+        Handler(Looper.getMainLooper()).post {
+            try {
+                getAdapter()?.notifyDataSetChanged()
+            } catch (_: Exception) {
+            }
         }
     }
 
