@@ -82,6 +82,7 @@ import com.chat.base.views.FullyGridLayoutManager
 import com.chat.base.views.NoEventRecycleView
 import com.chat.uikit.R
 import com.chat.uikit.chat.adapter.WKChatToolBarAdapter
+import com.chat.uikit.chat.face.WKVoiceViewManager
 import com.chat.uikit.chat.manager.SendMsgEntity
 import com.chat.uikit.chat.manager.WKSendMsgUtils
 import com.chat.uikit.chat.msgmodel.WKMultiForwardContent
@@ -1650,25 +1651,32 @@ ${content}"""
                 voiceDownY = event.rawY
                 voiceCanceling = false
                 voiceHolding = true
-                voiceHolding = false
                 voiceForwardTarget = null
                 voiceLastMoveEvent?.recycle()
                 voiceLastMoveEvent = null
+                sendIV.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                 showCenterToast(iConversationContext.chatActivity.getString(R.string.chat_voice_hold_tips))
-                triggerToolBarBySid("wk_chat_toolbar_voice")
-                val downEvent = MotionEvent.obtain(event)
-                parentView.postDelayed({
-                    if (voiceHolding) {
-                        voiceForwardTarget = findVoiceRecordTarget(moreLayout)
-                        voiceForwardTarget?.let { dispatchVoiceEventToTarget(it, downEvent, MotionEvent.ACTION_DOWN) }
+                val desc = String.format(
+                    iConversationContext.chatActivity.getString(R.string.microphone_permissions_des),
+                    iConversationContext.chatActivity.getString(R.string.app_name)
+                )
+                WKPermissions.getInstance().checkPermissions(object : WKPermissions.IPermissionResult {
+                    override fun onResult(result: Boolean) {
+                        if (result && voiceHolding) {
+                            WKVoiceViewManager.getInstance().startDirectRecord(iConversationContext)
+                        } else if (!result) {
+                            voiceHolding = false
+                        }
                     }
-                    downEvent.recycle()
-                }, 90)
+
+                    override fun clickResult(isCancel: Boolean) {
+                        if (isCancel) voiceHolding = false
+                    }
+                }, iConversationContext.chatActivity, desc, Manifest.permission.RECORD_AUDIO)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                voiceLastMoveEvent?.recycle()
-                voiceLastMoveEvent = MotionEvent.obtain(event)
+                if (!voiceHolding) return true
                 val cancelNow = voiceDownY - event.rawY > voiceCancelDistance
                 if (cancelNow && !voiceCanceling) {
                     voiceCanceling = true
@@ -1677,13 +1685,12 @@ ${content}"""
                     voiceCanceling = false
                     showCenterToast(iConversationContext.chatActivity.getString(R.string.chat_voice_hold_tips))
                 }
-                voiceForwardTarget?.let { dispatchVoiceEventToTarget(it, event, MotionEvent.ACTION_MOVE) }
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                val target = voiceForwardTarget
-                if (target != null) {
-                    dispatchVoiceEventToTarget(target, event, if (voiceCanceling || event.actionMasked == MotionEvent.ACTION_CANCEL) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP)
+                if (voiceHolding) {
+                    val shouldCancel = voiceCanceling || event.actionMasked == MotionEvent.ACTION_CANCEL
+                    WKVoiceViewManager.getInstance().finishDirectRecord(shouldCancel)
                 }
                 voiceHolding = false
                 voiceForwardTarget = null
