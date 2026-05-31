@@ -16,6 +16,7 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.Disposable
 import kotlin.experimental.and
 import kotlin.experimental.or
+import kotlin.jvm.JvmName
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
@@ -41,21 +42,28 @@ class WaveformView : View {
     private var paintInner: Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
+
     private var paintOuter: Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
 
     private val barRect = RectF()
     private var thumbX = 0
+
+    /**
+     * 注意：
+     * Boolean 属性 isFresh 默认会在 JVM 生成 setFresh(boolean)。
+     * 为了同时兼容 Kotlin 写法 voiceWaveform.isFresh = xxx
+     * 和可能存在的 Java/旧代码写法 voiceWaveform.setFresh(xxx)，
+     * 这里把属性 setter 的 JVM 名改掉，避免和下面的 setFresh(Boolean) 方法冲突。
+     */
+    @set:JvmName("setFreshValue")
     var isFresh = false
         set(value) {
             field = value
             invalidate()
         }
 
-    /**
-     * 兼容旧代码里可能调用 voiceWaveform.setFresh(...)
-     */
     fun setFresh(fresh: Boolean) {
         isFresh = fresh
     }
@@ -138,14 +146,16 @@ class WaveformView : View {
             return
         }
 
+        paintInner.shader = null
+        paintOuter.shader = null
         paintInner.color = if (isFresh && thumbX == 0) freshColor else innerColor
         paintOuter.color = outerColor
 
-        // 重点：不再使用 y = height 做底部对齐，而是以中心线为基准上下展开。
+        // 不再底部对齐，而是以中心线为基准上下展开。
         val centerY = height / 2f
 
-        // 视觉参数：可按审美微调。
-        val verticalPadding = AndroidUtilities.dp(2f)
+        // 上下留一点空间，避免竖条贴边。
+        val verticalPadding = AndroidUtilities.dp(2f).toFloat()
         val maxBarHeight = max(1f, height - verticalPadding * 2f)
         val minBarHeight = AndroidUtilities.dp(3f).toFloat()
 
@@ -191,7 +201,7 @@ class WaveformView : View {
 
             val amplitude = value.toInt().coerceIn(0, 31) / 31f
 
-            // 稍微做一点视觉增强：静音段不至于太细，高音段也不顶满。
+            // 让小音量也有可见高度，高音量不生硬顶满。
             val visualAmplitude = 0.18f + amplitude * 0.82f
             val barHeight = max(minBarHeight, maxBarHeight * visualAmplitude)
 
@@ -209,7 +219,7 @@ class WaveformView : View {
                 } else {
                     canvas.drawRoundRect(barRect, radius, radius, paintInner)
 
-                    // 播放进度切到某根竖条中间时，只给左半部分上播放色。
+                    // 播放进度切到某根竖条中间时，只给左侧部分上播放色。
                     if (x < thumbX && thumbX < x + barWidth) {
                         canvas.save()
                         canvas.clipRect(left, top, thumbX.toFloat(), bottom)
