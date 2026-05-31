@@ -3,6 +3,8 @@ package com.chat.uikit.chat
 import android.Manifest
 import android.app.AlertDialog
 import android.animation.ValueAnimator
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.content.Intent
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
@@ -27,6 +29,7 @@ import android.view.animation.AnimationUtils
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
+import android.widget.Toast
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
@@ -152,6 +155,10 @@ class ChatPanelManager(
     private val keyWingmanEnabled = "chat_ai_wingman_enabled"
     private val langNames = arrayOf("自动检测", "中文", "မြန်မာစာ", "English", "日本語", "한국어", "ภาษาไทย", "Tiếng Việt", "Русский")
     private var voiceDownY = 0f
+    private var voiceCanceling = false
+    private var voiceHolding = false
+    private var voiceForwardTarget: View? = null
+    private var voiceLastMoveEvent: MotionEvent? = null
     private val voiceCancelDistance = AndroidUtilities.dp(70f).toFloat()
 
     private class LocalOriginalTextContent(remoteText: String, private val localText: String) : WKTextContent(remoteText) {
@@ -181,6 +188,7 @@ class ChatPanelManager(
     private val swapLangBtn: AppCompatTextView = parentView.findViewById(R.id.swapLangBtn)
     private val targetLangBtn: AppCompatTextView = parentView.findViewById(R.id.targetLangBtn)
     private val aiSendToggle: AppCompatTextView = parentView.findViewById(R.id.aiSendToggle)
+    private val aiSendDot: AppCompatTextView = parentView.findViewById(R.id.aiSendDot)
     private var flameLayout: LinearLayout? = null
 
     // 相册有新图
@@ -1322,6 +1330,10 @@ class ChatPanelManager(
             if (sendTranslate) Theme.colorAccount else ContextCompat.getColor(iConversationContext.chatActivity, R.color.color999)
         )
         aiSendToggle.alpha = if (sendTranslate) 1f else 0.65f
+        aiSendDot.setTextColor(
+            if (sendTranslate) Color.rgb(34, 197, 94) else ContextCompat.getColor(iConversationContext.chatActivity, R.color.color999)
+        )
+        aiSendDot.alpha = if (sendTranslate) 1f else 0.7f
     }
 
     private fun langLabel(name: String): String {
@@ -1344,15 +1356,33 @@ class ChatPanelManager(
         val current = getSetting(key, if (isSource) "မြန်မာစာ" else "中文")
         var checked = langNames.indexOf(current)
         if (checked < 0) checked = 0
-        AlertDialog.Builder(iConversationContext.chatActivity)
+        val dialog = AlertDialog.Builder(iConversationContext.chatActivity)
             .setTitle(if (isSource) R.string.chat_ai_source_lang else R.string.chat_ai_target_lang)
-            .setSingleChoiceItems(langNames, checked) { dialog, which ->
+            .setSingleChoiceItems(langNames, checked) { dialogInterface, which ->
                 WKSharedPreferencesUtil.getInstance().putSP(key, langNames[which])
                 refreshAiAssistBar()
-                dialog.dismiss()
+                dialogInterface.dismiss()
             }
             .setNegativeButton(R.string.chat_ai_cancel, null)
             .show()
+        applyGlassDialogStyle(dialog)
+    }
+
+
+    private fun applyGlassDialogStyle(dialog: AlertDialog) {
+        val bg = GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            intArrayOf(0xF2FFFFFF.toInt(), 0xEAF4F7FF.toInt(), 0xEDEFF6FF.toInt())
+        )
+        bg.cornerRadius = AndroidUtilities.dp(22f).toFloat()
+        dialog.window?.setBackgroundDrawable(bg)
+        dialog.window?.setDimAmount(0.28f)
+    }
+
+    private fun showCenterToast(text: String) {
+        val toast = Toast.makeText(iConversationContext.chatActivity, text, Toast.LENGTH_LONG)
+        toast.setGravity(Gravity.CENTER, 0, 0)
+        toast.show()
     }
 
     private fun initAiAssistBar() {
@@ -1373,15 +1403,31 @@ class ChatPanelManager(
             refreshAiAssistBar()
         }
         aiSendToggle.setOnClickListener {
-            putFlag(keyAiSendTranslate, !getFlag(keyAiSendTranslate, false))
+            val enable = !getFlag(keyAiSendTranslate, false)
+            putFlag(keyAiSendTranslate, enable)
             refreshAiAssistBar()
+            showCenterToast(
+                iConversationContext.chatActivity.getString(
+                    if (enable) R.string.chat_ai_translate_enabled_tip else R.string.chat_ai_translate_disabled_tip
+                )
+            )
         }
+        aiSendDot.setOnClickListener { aiSendToggle.performClick() }
     }
 
     private fun buildTranslatePrompt(content: String): String {
         val source = getSetting(keyAiSourceLang, "မြန်မာစာ")
         val target = getSetting(keyAiTargetLang, "中文")
-        return "把下面这条聊天消息从${source}翻译成${target}。要求：自然、口语化、保留表情和换行，只输出译文，不要解释。\n\n${content}"
+        return """将以下聊天消息从${source}翻译成${target}。
+
+要求：
+- 采用自然直译风格，保留原文结构、语气、表情符号和换行。
+- 如果原文有暧昧、调侃、冷淡、敷衍、撒娇、抱怨等语气，译文必须保留聊天感觉。
+- 保留链接、用户名、代码块、Markdown、列表和表情。
+- 只输出译文，不要添加解释、引号、前缀或额外文字。
+
+待翻译消息：
+${content}"""
     }
 
     private fun sendInputText() {
@@ -1471,7 +1517,7 @@ class ChatPanelManager(
             try {
                 val body = JSONObject()
                 body.put("model", model)
-                body.put("temperature", 0.3)
+                body.put("temperature", 0.25)
                 val messages = JSONArray()
                 val system = JSONObject()
                 system.put("role", "system")
@@ -1602,21 +1648,84 @@ class ChatPanelManager(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 voiceDownY = event.rawY
-                WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_voice_hold_tips))
+                voiceCanceling = false
+                voiceHolding = true
+                voiceHolding = false
+                voiceForwardTarget = null
+                voiceLastMoveEvent?.recycle()
+                voiceLastMoveEvent = null
+                showCenterToast(iConversationContext.chatActivity.getString(R.string.chat_voice_hold_tips))
                 triggerToolBarBySid("wk_chat_toolbar_voice")
+                val downEvent = MotionEvent.obtain(event)
+                parentView.postDelayed({
+                    if (voiceHolding) {
+                        voiceForwardTarget = findVoiceRecordTarget(moreLayout)
+                        voiceForwardTarget?.let { dispatchVoiceEventToTarget(it, downEvent, MotionEvent.ACTION_DOWN) }
+                    }
+                    downEvent.recycle()
+                }, 90)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                if (voiceDownY - event.rawY > voiceCancelDistance) {
-                    WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_voice_release_cancel))
+                voiceLastMoveEvent?.recycle()
+                voiceLastMoveEvent = MotionEvent.obtain(event)
+                val cancelNow = voiceDownY - event.rawY > voiceCancelDistance
+                if (cancelNow && !voiceCanceling) {
+                    voiceCanceling = true
+                    showCenterToast(iConversationContext.chatActivity.getString(R.string.chat_voice_release_cancel))
+                } else if (!cancelNow && voiceCanceling) {
+                    voiceCanceling = false
+                    showCenterToast(iConversationContext.chatActivity.getString(R.string.chat_voice_hold_tips))
                 }
+                voiceForwardTarget?.let { dispatchVoiceEventToTarget(it, event, MotionEvent.ACTION_MOVE) }
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                val target = voiceForwardTarget
+                if (target != null) {
+                    dispatchVoiceEventToTarget(target, event, if (voiceCanceling || event.actionMasked == MotionEvent.ACTION_CANCEL) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP)
+                }
+                voiceHolding = false
+                voiceForwardTarget = null
+                voiceLastMoveEvent?.recycle()
+                voiceLastMoveEvent = null
+                voiceCanceling = false
                 return true
             }
         }
         return true
+    }
+
+    private fun findVoiceRecordTarget(root: View?): View? {
+        if (root == null || root.visibility != View.VISIBLE) return null
+        val label = when (root) {
+            is TextView -> root.text?.toString() ?: ""
+            else -> root.contentDescription?.toString() ?: ""
+        }.lowercase(Locale.getDefault())
+        val looksLikeRecord = label.contains("按住") || label.contains("说话") ||
+            label.contains("录音") || label.contains("hold") || label.contains("record")
+        if (looksLikeRecord && root.isShown) return findClickableParent(root)
+        if (root is ViewGroup) {
+            for (i in 0 until root.childCount) {
+                val found = findVoiceRecordTarget(root.getChildAt(i))
+                if (found != null) return found
+            }
+        }
+        return null
+    }
+
+    private fun dispatchVoiceEventToTarget(target: View, source: MotionEvent, action: Int) {
+        val loc = IntArray(2)
+        target.getLocationOnScreen(loc)
+        val x = (target.width / 2f).coerceAtLeast(1f)
+        val y = if (action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_CANCEL) {
+            (target.height / 2f) - (voiceDownY - source.rawY)
+        } else {
+            target.height / 2f
+        }
+        val ev = MotionEvent.obtain(source.downTime, source.eventTime, action, x, y, source.metaState)
+        target.dispatchTouchEvent(ev)
+        ev.recycle()
     }
 
     private fun initListener() {
