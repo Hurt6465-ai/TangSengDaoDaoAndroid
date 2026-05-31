@@ -3,6 +3,14 @@ package com.chat.uikit.chat;
 import static androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE;
 
 import android.Manifest;
+import android.widget.TextView;
+import android.widget.Switch;
+import android.widget.LinearLayout;
+import android.widget.EditText;
+import android.net.Uri;
+import android.graphics.BitmapFactory;
+import android.graphics.Bitmap;
+import android.app.AlertDialog;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
@@ -130,6 +138,10 @@ import com.xinbida.wukongim.msgmodel.WKReply;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -184,6 +196,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private long browseTo = 0;
     private boolean isUpdateRedDot = true;
     private ImageView callIV;
+    private ImageView moreIV;
     //查询聊天数据偏移量
     private final int limit = 30;
     private boolean isShowPinnedView = false;
@@ -197,6 +210,269 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private final String loginUID = WKConfig.getInstance().getUid();
     private final int callingViewHeight = AndroidUtilities.dp(40f);
     private final int pinnedViewHeight = AndroidUtilities.dp(50f);
+
+    private static final String KEY_AI_ENDPOINT = "chat_ai_endpoint";
+    private static final String KEY_AI_KEY = "chat_ai_key";
+    private static final String KEY_AI_MODEL = "chat_ai_model";
+    private static final String KEY_AI_SOURCE_LANG = "chat_ai_source_lang";
+    private static final String KEY_AI_TARGET_LANG = "chat_ai_target_lang";
+    private static final String KEY_AI_AUTO_TRANSLATE = "chat_ai_auto_translate";
+    private static final String KEY_AI_SEND_TRANSLATE = "chat_ai_send_translate";
+    private static final String KEY_IMAGE_COMPRESS = "chat_image_compress";
+
+
+    private String chatBgKey() {
+        return "local_chat_bg_" + channelType + "_" + channelId;
+    }
+
+    private File chatBgFile() {
+        File dir = new File(getFilesDir(), "chat_bg");
+        if (!dir.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            dir.mkdirs();
+        }
+        String safeId = channelId == null ? "" : channelId.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+        return new File(dir, "bg_" + channelType + "_" + safeId + ".jpg");
+    }
+
+    private boolean getLocalFlag(String key, boolean defaultValue) {
+        String value = WKSharedPreferencesUtil.getInstance().getSP(key);
+        if (TextUtils.isEmpty(value)) return defaultValue;
+        return "1".equals(value) || "true".equalsIgnoreCase(value);
+    }
+
+    private void putLocalFlag(String key, boolean value) {
+        WKSharedPreferencesUtil.getInstance().putSP(key, value ? "1" : "0");
+    }
+
+    private String getLocalString(String key, String defaultValue) {
+        String value = WKSharedPreferencesUtil.getInstance().getSP(key);
+        return TextUtils.isEmpty(value) ? defaultValue : value;
+    }
+
+    private void loadLocalChatBackground() {
+        String path = WKSharedPreferencesUtil.getInstance().getSP(chatBgKey());
+        if (TextUtils.isEmpty(path)) {
+            path = chatBgFile().getAbsolutePath();
+        }
+        File file = new File(path);
+        if (file.exists()) {
+            wkVBinding.imageView.setImageURI(Uri.fromFile(file));
+            wkVBinding.imageView.setVisibility(View.VISIBLE);
+            if (wkVBinding.blurView != null) wkVBinding.blurView.setVisibility(View.GONE);
+        }
+    }
+
+    private void clearLocalChatBackground() {
+        File file = chatBgFile();
+        if (file.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            file.delete();
+        }
+        WKSharedPreferencesUtil.getInstance().putSP(chatBgKey(), "");
+        wkVBinding.imageView.setImageDrawable(null);
+        EndpointManager.getInstance().invoke("set_chat_bg", new SetChatBgMenu(channelId, channelType, wkVBinding.imageView, wkVBinding.rootView, wkVBinding.blurView));
+        loadLocalChatBackground();
+        WKToastUtils.getInstance().showToast(getString(R.string.chat_bg_cleared));
+    }
+
+    private void saveChatBackgroundFromUri(Uri uri) {
+        if (uri == null) return;
+        try {
+            Bitmap bitmap = decodeBitmapFromUri(uri, 1800);
+            if (bitmap == null) {
+                WKToastUtils.getInstance().showToast(getString(R.string.chat_bg_failed));
+                return;
+            }
+            File file = chatBgFile();
+            FileOutputStream outputStream = new FileOutputStream(file);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 86, outputStream);
+            outputStream.flush();
+            outputStream.close();
+            bitmap.recycle();
+            WKSharedPreferencesUtil.getInstance().putSP(chatBgKey(), file.getAbsolutePath());
+            loadLocalChatBackground();
+            WKToastUtils.getInstance().showToast(getString(R.string.chat_bg_saved));
+        } catch (Exception e) {
+            Log.e("ChatActivity", "save chat bg failed", e);
+            WKToastUtils.getInstance().showToast(getString(R.string.chat_bg_failed));
+        }
+    }
+
+    private Bitmap decodeBitmapFromUri(Uri uri, int maxSide) {
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            InputStream boundsStream = getContentResolver().openInputStream(uri);
+            BitmapFactory.decodeStream(boundsStream, null, bounds);
+            if (boundsStream != null) boundsStream.close();
+
+            int sample = 1;
+            int width = bounds.outWidth;
+            int height = bounds.outHeight;
+            while (width / sample > maxSide || height / sample > maxSide) {
+                sample *= 2;
+            }
+
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = Math.max(1, sample);
+            options.inPreferredConfig = Bitmap.Config.RGB_565;
+            InputStream inputStream = getContentResolver().openInputStream(uri);
+            Bitmap bitmap = BitmapFactory.decodeStream(inputStream, null, options);
+            if (inputStream != null) inputStream.close();
+            return bitmap;
+        } catch (Exception e) {
+            Log.e("ChatActivity", "decode bitmap failed", e);
+            return null;
+        }
+    }
+
+    private String compressImagePathIfNeeded(String path) {
+        if (TextUtils.isEmpty(path) || !getLocalFlag(KEY_IMAGE_COMPRESS, true)) return path;
+        try {
+            File source = new File(path);
+            if (!source.exists()) return path;
+            if (source.length() < 180 * 1024) return path;
+
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(path, bounds);
+
+            int sample = 1;
+            while (bounds.outWidth / sample > 1440 || bounds.outHeight / sample > 1440) {
+                sample *= 2;
+            }
+
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = Math.max(1, sample);
+            options.inPreferredConfig = Bitmap.Config.RGB_565;
+            Bitmap bitmap = BitmapFactory.decodeFile(path, options);
+            if (bitmap == null) return path;
+
+            File dir = new File(getCacheDir(), "chat_send_img");
+            if (!dir.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                dir.mkdirs();
+            }
+            File out = new File(dir, "img_" + System.currentTimeMillis() + ".jpg");
+            FileOutputStream outputStream = new FileOutputStream(out);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 76, outputStream);
+            outputStream.flush();
+            outputStream.close();
+            bitmap.recycle();
+            return out.exists() && out.length() > 0 ? out.getAbsolutePath() : path;
+        } catch (Exception e) {
+            Log.e("ChatActivity", "compress image failed", e);
+            return path;
+        }
+    }
+
+    private void compressImageContentIfNeeded(WKMessageContent messageContent) {
+        if (!(messageContent instanceof WKImageContent) || !getLocalFlag(KEY_IMAGE_COMPRESS, true)) return;
+        String[] names = new String[]{"localPath", "path", "filePath", "url"};
+        for (String name : names) {
+            try {
+                Field field = messageContent.getClass().getField(name);
+                Object value = field.get(messageContent);
+                if (value instanceof String && !TextUtils.isEmpty((String) value)) {
+                    String compressed = compressImagePathIfNeeded((String) value);
+                    if (!TextUtils.equals((String) value, compressed)) {
+                        field.set(messageContent, compressed);
+                    }
+                    return;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private void addChatMoreButton() {
+        if (moreIV != null) return;
+        moreIV = new AppCompatImageView(this);
+        moreIV.setImageResource(android.R.drawable.ic_menu_more);
+        moreIV.setColorFilter(new PorterDuffColorFilter(ContextCompat.getColor(this, R.color.popupTextColor), PorterDuff.Mode.MULTIPLY));
+        moreIV.setBackground(Theme.createSelectorDrawable(Theme.getPressedColor()));
+        wkVBinding.topLayout.rightView.addView(moreIV, LayoutHelper.createFrame(42, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 4, 0));
+        moreIV.setOnClickListener(v -> showChatMoreDialog());
+    }
+
+    private void showChatMoreDialog() {
+        String[] items = new String[]{
+                getString(R.string.chat_bg_set),
+                getString(R.string.chat_bg_clear),
+                getString(R.string.chat_ai_settings)
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.chat_more_menu)
+                .setItems(items, (dialog, which) -> {
+                    if (which == 0) chooseChatBgLauncher.launch("image/*");
+                    else if (which == 1) clearLocalChatBackground();
+                    else showChatAiSettingsDialog();
+                })
+                .show();
+    }
+
+    private EditText createSettingEdit(LinearLayout parent, String label, String value) {
+        TextView tv = new TextView(this);
+        tv.setText(label);
+        tv.setTextColor(ContextCompat.getColor(this, R.color.color999));
+        tv.setTextSize(13);
+        parent.addView(tv, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 10, 0, 2));
+        EditText editText = new EditText(this);
+        editText.setSingleLine(true);
+        editText.setText(value);
+        editText.setTextSize(14);
+        parent.addView(editText, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        return editText;
+    }
+
+    private void showChatAiSettingsDialog() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        int padding = AndroidUtilities.dp(18f);
+        root.setPadding(padding, AndroidUtilities.dp(8f), padding, 0);
+
+        EditText endpointEt = createSettingEdit(root, getString(R.string.chat_ai_endpoint), getLocalString(KEY_AI_ENDPOINT, "https://api.deepseek.com/v1/chat/completions"));
+        EditText keyEt = createSettingEdit(root, getString(R.string.chat_ai_key), getLocalString(KEY_AI_KEY, ""));
+        EditText modelEt = createSettingEdit(root, getString(R.string.chat_ai_model), getLocalString(KEY_AI_MODEL, "deepseek-chat"));
+        EditText sourceEt = createSettingEdit(root, getString(R.string.chat_ai_source_lang), getLocalString(KEY_AI_SOURCE_LANG, "中文"));
+        EditText targetEt = createSettingEdit(root, getString(R.string.chat_ai_target_lang), getLocalString(KEY_AI_TARGET_LANG, "မြန်မာစာ"));
+        sourceEt.setHint("中文");
+        targetEt.setHint("မြန်မာစာ");
+
+        Switch autoTranslate = new Switch(this);
+        autoTranslate.setText(R.string.chat_ai_auto_translate);
+        autoTranslate.setChecked(getLocalFlag(KEY_AI_AUTO_TRANSLATE, false));
+        root.addView(autoTranslate, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 8, 0, 0));
+
+        Switch sendTranslate = new Switch(this);
+        sendTranslate.setText(R.string.chat_ai_translate_before_send);
+        sendTranslate.setChecked(getLocalFlag(KEY_AI_SEND_TRANSLATE, false));
+        root.addView(sendTranslate, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        Switch imageCompress = new Switch(this);
+        imageCompress.setText(R.string.chat_ai_image_compress);
+        imageCompress.setChecked(getLocalFlag(KEY_IMAGE_COMPRESS, true));
+        root.addView(imageCompress, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.chat_ai_settings)
+                .setView(root)
+                .setNegativeButton(R.string.chat_ai_cancel, null)
+                .setPositiveButton(R.string.chat_ai_save, (dialog, which) -> {
+                    WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_ENDPOINT, endpointEt.getText().toString().trim());
+                    WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_KEY, keyEt.getText().toString().trim());
+                    WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_MODEL, modelEt.getText().toString().trim());
+                    WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_SOURCE_LANG, sourceEt.getText().toString().trim());
+                    WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_TARGET_LANG, targetEt.getText().toString().trim());
+                    putLocalFlag(KEY_AI_AUTO_TRANSLATE, autoTranslate.isChecked());
+                    putLocalFlag(KEY_AI_SEND_TRANSLATE, sendTranslate.isChecked());
+                    putLocalFlag(KEY_IMAGE_COMPRESS, imageCompress.isChecked());
+                    if (chatPanelManager != null) chatPanelManager.refreshAiAssistBar();
+                })
+                .show();
+    }
+
 
     private int getTopPinViewHeight() {
         int totalHeight = 0;
@@ -427,7 +703,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         numberTextView = new NumberTextView(this);
         numberTextView.setTextSize(18);
         numberTextView.setTextColor(Theme.colorAccount);
-        wkVBinding.topLayout.rightView.addView(numberTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 15, 0));
+        wkVBinding.topLayout.rightView.addView(numberTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 86, 0));
 
         Object isRegisterRTC = EndpointManager.getInstance().invoke("is_register_rtc", null);
 
@@ -436,13 +712,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (isRegisterRTC instanceof Boolean) {
             boolean isRegister = (boolean) isRegisterRTC;
             if (isRegister) {
-                wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 15, 0));
+                wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 46, 0));
             }
         }
         callIV.setColorFilter(new PorterDuffColorFilter(ContextCompat.getColor(this, R.color.popupTextColor), PorterDuff.Mode.MULTIPLY));
         callIV.setBackground(Theme.createSelectorDrawable(Theme.getPressedColor()));
 
         CommonAnim.getInstance().showOrHide(numberTextView, false, false);
+        addChatMoreButton();
 
         //去除刷新条目闪动动画
         ((DefaultItemAnimator) Objects.requireNonNull(wkVBinding.recyclerView.getItemAnimator())).setSupportsChangeAnimations(false);
@@ -662,6 +939,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     }
                 }
                 EndpointManager.getInstance().invoke("set_chat_bg", new SetChatBgMenu(channelId, channelType, wkVBinding.imageView, wkVBinding.rootView, wkVBinding.blurView));
+                loadLocalChatBackground();
             } else {
                 for (int i = 0, size = chatAdapter.getData().size(); i < size; i++) {
                     if (TextUtils.isEmpty(chatAdapter.getData().get(i).wkMsg.fromUID)) continue;
@@ -1829,6 +2107,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     @Override
     public void sendMessage(WKMessageContent messageContent) {
+        compressImageContentIfNeeded(messageContent);
 
         if (messageContent.type == WKContentType.WK_TEXT && editMsg != null) {
             JSONObject jsonObject = messageContent.encodeMsg();
@@ -2312,7 +2591,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (result.getData() != null && result.getResultCode() == Activity.RESULT_OK) {
             String path = result.getData().getStringExtra("path");
             if (!TextUtils.isEmpty(path)) {
-                sendMsg(new WKImageContent(path));
+                sendMsg(new WKImageContent(compressImagePathIfNeeded(path)));
             }
         }
     });
