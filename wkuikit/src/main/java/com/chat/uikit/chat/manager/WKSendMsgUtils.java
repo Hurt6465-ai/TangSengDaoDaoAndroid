@@ -25,6 +25,18 @@ import java.util.UUID;
  * 发送消息管理
  */
 public class WKSendMsgUtils {
+    // 过期时间测试版：60 秒。确认数据库 expire/expire_at 正常后，把这里改成 86400 即 24 小时。
+    private static final int CHAT_EXPIRE_SECONDS = 60;
+
+    private boolean shouldExpireMsg(int type) {
+        return type == WKContentType.WK_TEXT
+                || type == WKContentType.WK_IMAGE
+                || type == WKContentType.WK_VIDEO
+                || type == WKContentType.WK_VOICE
+                || type == WKContentType.WK_GIF
+                || type == WKContentType.WK_FILE;
+    }
+
     private WKSendMsgUtils() {
 
     }
@@ -45,6 +57,9 @@ public class WKSendMsgUtils {
             channel = new WKChannel(wkMsg.channelID, wkMsg.channelType);
         }
         EndpointManager.getInstance().invokes(EndpointSID.sendMessage, new WKSendMsgMenu(channel, options));
+        if (wkMsg != null && options.expire <= 0 && shouldExpireMsg(wkMsg.type)) {
+            options.expire = CHAT_EXPIRE_SECONDS;
+        }
         WKIM.getInstance().getMsgManager().sendWithOptions(wkMsg.baseContentMsgModel, channel, options);
     }
 
