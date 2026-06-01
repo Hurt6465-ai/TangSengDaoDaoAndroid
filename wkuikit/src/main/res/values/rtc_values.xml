@@ -1,0 +1,20 @@
+<resources>
+    <style name="RtcCallTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+
+    <style name="RtcRoundButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">76dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">#EEFFFFFF</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:lines">2</item>
+    </style>
+</resources>
