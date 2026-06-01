@@ -1332,11 +1332,10 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             - 自然直译，保留原文结构、语气、表情符号和换行。
             - 若原文带有暧昧、调侃、冷淡、敷衍、撒娇、抱怨等语气，译文必须保留这种聊天感觉。
             - 保留链接、用户名、代码块、Markdown、列表和表情。
-            - 只输出 JSON：{"translation":"译文"}
-            - 不要添加任何解释或额外文字。
+            - 只输出译文，不要 JSON，不要解释，不要引号，不要前缀。
 
             待翻译消息：
-            "$text"
+            $text
         """.trimIndent()
         val payload = JSONObject()
             .put("model", model)
@@ -1344,7 +1343,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             .put(
                 "messages",
                 JSONArray()
-                    .put(JSONObject().put("role", "system").put("content", "你是聊天消息翻译助手，只返回 JSON。"))
+                    .put(JSONObject().put("role", "system").put("content", "你是聊天消息翻译助手，严格按用户要求输出。"))
                     .put(JSONObject().put("role", "user").put("content", prompt))
             )
         val conn = (URL(endpoint).openConnection() as HttpURLConnection)
@@ -1369,11 +1368,35 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             ?.trim()
             ?: ""
         if (content.isEmpty()) throw RuntimeException("empty response")
-        return try {
-            JSONObject(content).optString("translation", content).trim()
-        } catch (_: Exception) {
-            content.removePrefix("```").removePrefix("json").removeSuffix("```").trim()
+        val cleaned = cleanTranslationText(content)
+        if (TextUtils.isEmpty(cleaned)) throw RuntimeException("翻译结果为空")
+        return cleaned
+    }
+
+    private fun cleanTranslationText(raw: String): String {
+        var text = raw.trim()
+            .removePrefix("```json")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+        if (text.startsWith("{")) {
+            try {
+                val obj = JSONObject(text)
+                val translation = obj.optString("translation", "")
+                if (!TextUtils.isEmpty(translation)) return translation.trim()
+            } catch (_: Exception) {
+                val match = Regex("\"translation\"\\s*:\\s*\"([\\s\\S]*?)\"").find(text)
+                if (match != null) {
+                    return match.groupValues[1]
+                        .replace("\\n", "\n")
+                        .replace("\\\"", "\"")
+                        .replace("\\/", "/")
+                        .trim()
+                }
+                return ""
+            }
         }
+        return text
     }
 
     private fun readAiSetting(key: String, fallback: String): String {
