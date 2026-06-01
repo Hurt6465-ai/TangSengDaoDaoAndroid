@@ -28,6 +28,21 @@
             app:blur_mode="rectangle"
             app:blur_radius="25dp" />
 
+        <TextView
+            android:id="@+id/expiredTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:paddingStart="14dp"
+            android:paddingTop="7dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="7dp"
+            android:text="图片已过期"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
         <FrameLayout
             android:id="@+id/otherLayout"
             android:layout_width="match_parent"
