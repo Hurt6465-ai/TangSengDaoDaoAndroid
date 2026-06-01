@@ -1,6 +1,8 @@
 package com.chat.uikit.chat.provider
 
 import android.app.Activity
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -70,7 +72,9 @@ class WKImageProvider : WKChatBaseProvider() {
         progressView.setProgColor(Theme.colorAccount)
         val imageLayout = parentView.findViewById<View>(R.id.imageLayout)
         val otherLayout = parentView.findViewById<FrameLayout>(R.id.otherLayout)
+        val expiredTv = parentView.findViewById<TextView>(R.id.expiredTv)
         val deleteTimer = SecretDeleteTimer(context)
+        val isExpired = isImageContentExpired(uiChatMsgItemEntity.wkMsg)
 
         otherLayout.removeAllViews()
         otherLayout.addView(deleteTimer, LayoutHelper.createFrame(35, 35, Gravity.CENTER))
@@ -98,8 +102,12 @@ class WKImageProvider : WKChatBaseProvider() {
         } else {
             otherLayout.visibility = View.GONE
         }
-        val showUrl = getShowURL(uiChatMsgItemEntity)
-        GlideUtils.getInstance().showImg(context, showUrl, ints[0], ints[1], imageView)
+        val showUrl = if (isExpired) "" else getShowURL(uiChatMsgItemEntity)
+        if (isExpired) {
+            imageView.setImageResource(R.drawable.default_view_bg)
+        } else {
+            GlideUtils.getInstance().showImg(context, showUrl, ints[0], ints[1], imageView)
+        }
 
         val layoutParams1 = imageLayout.layoutParams as LinearLayout.LayoutParams
         if (uiChatMsgItemEntity.wkMsg.flame == 1) {
@@ -119,6 +127,22 @@ class WKImageProvider : WKChatBaseProvider() {
         }
         imageView.layoutParams = layoutParams
         blurView.layoutParams = blurViewLayoutParams
+
+        setupExpiredView(expiredTv)
+        if (isExpired) {
+            blurView.visibility = View.GONE
+            otherLayout.visibility = View.GONE
+            progressTv.visibility = View.GONE
+            progressView.visibility = View.GONE
+            expiredTv.visibility = View.VISIBLE
+            addLongClick(imageView, uiChatMsgItemEntity)
+            imageView.setOnClickListener {
+                WKToastUtils.getInstance().showToast("图片已过期")
+            }
+            return
+        } else {
+            expiredTv.visibility = View.GONE
+        }
 //        if (uiChatMsgItemEntity.wkMsg.channelType != WKChannelType.PERSONAL && from != WKChatIteMsgFromType.SEND) {
 //            layoutParams1.leftMargin = AndroidUtilities.dp(10f)
 //            layoutParams1.rightMargin = AndroidUtilities.dp(10f)
@@ -194,7 +218,7 @@ class WKImageProvider : WKChatBaseProvider() {
                 var i = 0
                 val size = list.size
                 while (i < size) {
-                    if (list[i].wkMsg != null && list[i].wkMsg.type == WKContentType.WK_IMAGE && list[i].wkMsg.remoteExtra.revoke == 0 && list[i].wkMsg.isDeleted == 0 && list[i].wkMsg.flame == 0
+                    if (list[i].wkMsg != null && list[i].wkMsg.type == WKContentType.WK_IMAGE && list[i].wkMsg.remoteExtra.revoke == 0 && list[i].wkMsg.isDeleted == 0 && list[i].wkMsg.flame == 0 && !isImageContentExpired(list[i].wkMsg)
                     ) {
                         val showUrl: String = getShowURL(list[i])
                         showImgList.add(list[i].wkMsg)
@@ -338,6 +362,10 @@ class WKImageProvider : WKChatBaseProvider() {
         imageView: ImageView,
         tempShowImgUrl: String
     ) {
+        if (isImageContentExpired(uiChatMsgItemEntity.wkMsg)) {
+            WKToastUtils.getInstance().showToast("图片已过期")
+            return
+        }
         if (uiChatMsgItemEntity.wkMsg.flame == 1 && uiChatMsgItemEntity.wkMsg.viewed == 0) {
             for (i in 0 until getAdapter()!!.data.size) {
                 if (getAdapter()!!.data[i].wkMsg.clientMsgNO.equals(uiChatMsgItemEntity.wkMsg.clientMsgNO)) {
@@ -362,6 +390,21 @@ class WKImageProvider : WKChatBaseProvider() {
             imageView
         )
 
+    }
+
+    private fun isImageContentExpired(msg: WKMsg?): Boolean {
+        if (msg == null || msg.type != WKContentType.WK_IMAGE) return false
+        if (msg.timestamp <= 0L) return false
+        val sentAtMs = if (msg.timestamp > 100000000000L) msg.timestamp else msg.timestamp * 1000L
+        return System.currentTimeMillis() - sentAtMs >= IMAGE_FILE_EXPIRE_MILLIS
+    }
+
+    private fun setupExpiredView(expiredTv: TextView) {
+        val bg = GradientDrawable()
+        bg.setColor(Color.argb(178, 17, 24, 39))
+        bg.cornerRadius = AndroidUtilities.dp(18f).toFloat()
+        expiredTv.background = bg
+        expiredTv.text = "图片已过期"
     }
 
     private fun getShowURL(uiChatMsgItemEntity: WKUIChatMsgItemEntity): String {
@@ -478,4 +521,8 @@ class WKImageProvider : WKChatBaseProvider() {
             )
         }
     }
+    companion object {
+        private const val IMAGE_FILE_EXPIRE_MILLIS = 24L * 60L * 60L * 1000L
+    }
+
 }
