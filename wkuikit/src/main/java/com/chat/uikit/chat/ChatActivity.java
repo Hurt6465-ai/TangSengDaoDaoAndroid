@@ -108,11 +108,11 @@ import com.chat.uikit.group.GroupDetailActivity;
 import com.chat.uikit.group.service.GroupModel;
 import com.chat.uikit.message.MsgModel;
 import com.chat.uikit.robot.service.WKRobotModel;
-import com.chat.uikit.user.service.UserModel;
-import com.chat.uikit.view.WKPlayVoiceUtils;
 import com.chat.uikit.rtc.RtcCallManager;
 import com.chat.uikit.rtc.RtcSignalManager;
 import com.chat.uikit.rtc.RtcWukongSignalTransport;
+import com.chat.uikit.user.service.UserModel;
+import com.chat.uikit.view.WKPlayVoiceUtils;
 import com.effective.android.panel.PanelSwitchHelper;
 import com.effective.android.panel.interfaces.ContentScrollMeasurer;
 import com.effective.android.panel.interfaces.listener.OnPanelChangeListener;
@@ -570,25 +570,16 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         RtcCallManager.get().configure(getApplicationContext(), loginUID, new RtcWukongSignalTransport());
     }
 
-    private boolean handleRtcSignalIfNeeded(WKMsg msg) {
-        if (msg == null) return false;
-        String text = "";
-        try {
-            if (msg.baseContentMsgModel != null) {
-                text = msg.baseContentMsgModel.getDisplayContent();
-                if (TextUtils.isEmpty(text)) {
-                    JSONObject jsonObject = msg.baseContentMsgModel.encodeMsg();
-                    if (jsonObject != null) {
-                        text = jsonObject.optString("content", jsonObject.optString("text", ""));
-                    }
-                }
-            }
-            if (TextUtils.isEmpty(text) && !TextUtils.isEmpty(msg.content)) {
-                text = msg.content;
-            }
-        } catch (Exception ignored) {
+    private boolean isRtcSignalMessage(WKMsg msg, boolean dispatch) {
+        if (!RtcSignalManager.isSignalMsg(msg)) return false;
+        if (dispatch) {
+            RtcSignalManager.get().tryHandleIncomingMsg(msg);
         }
-        return RtcSignalManager.get().tryHandleIncomingText(text);
+        return true;
+    }
+
+    private boolean handleRtcSignalIfNeeded(WKMsg msg) {
+        return isRtcSignalMessage(msg, true);
     }
 
     private String getRtcPeerName() {
@@ -931,7 +922,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 @Override
                 public void clickResult(boolean isCancel) {
                 }
-            }, this, desc, Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO);
+            }, this, desc, Manifest.permission.RECORD_AUDIO);
         });
 
         WKDialogUtils.getInstance().setViewLongClickPopup(wkVBinding.chatUnreadLayout.groupApproveLayout, getGroupApprovePopupItems());
@@ -1699,6 +1690,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (WKReader.isNotEmpty(msgList)) {
             long pre_msg_time = chatAdapter.getLastTimeMsg();
             for (int i = 0, size = msgList.size(); i < size; i++) {
+                if (isRtcSignalMessage(msgList.get(i), false)) {
+                    continue;
+                }
                 if (!WKTimeUtils.getInstance().isSameDay(msgList.get(i).timestamp, pre_msg_time) && msgList.get(i).type != WKContentType.emptyView && msgList.get(i).type != WKContentType.spanEmptyView) {
                     //显示聊天时间
                     WKUIChatMsgItemEntity uiChatMsgEntity = new WKUIChatMsgItemEntity(this, new WKMsg(), null);
