@@ -167,7 +167,7 @@ open class WKTextProvider : WKChatBaseProvider() {
         if (uiChatMsgItemEntity.wkMsg.baseContentMsgModel.reply != null && uiChatMsgItemEntity.wkMsg.baseContentMsgModel.reply.payload != null) {
             replyView(contentTvLayout, from, uiChatMsgItemEntity)
         }
-        bindInlineTranslate(adapterPosition, contentTvLayout, uiChatMsgItemEntity, from)
+        bindInlineTranslate(adapterPosition, contentTvLayout, contentLayout, uiChatMsgItemEntity, from)
     }
 
     private val translationViewTag = "chat_inline_translation"
@@ -176,21 +176,24 @@ open class WKTextProvider : WKChatBaseProvider() {
     private fun bindInlineTranslate(
         adapterPosition: Int,
         contentTvLayout: ViewGroup,
+        buttonParent: ViewGroup,
         uiChatMsgItemEntity: WKUIChatMsgItemEntity,
         from: WKChatIteMsgFromType
     ) {
         removeTaggedChild(contentTvLayout, translationViewTag)
         removeTaggedChild(contentTvLayout, translationButtonTag)
+        removeTaggedChild(buttonParent, translationButtonTag)
+
         val content = getMessageText(uiChatMsgItemEntity.wkMsg)
         if (TextUtils.isEmpty(content)) return
         val cacheKey = translationCacheKey(uiChatMsgItemEntity.wkMsg, content)
         val cached = readTranslationCache(cacheKey)
         if (cached != null && cached.expanded) {
             addTranslationView(contentTvLayout, cacheKey, cached.text)
-            return
         }
+
         if (from == WKChatIteMsgFromType.RECEIVED && isLatestReceivedTextMessage(adapterPosition)) {
-            addQuickTranslateButton(contentTvLayout, uiChatMsgItemEntity, content, cacheKey)
+            addQuickTranslateButton(buttonParent, uiChatMsgItemEntity, content, cacheKey, cached)
         }
     }
 
@@ -222,57 +225,76 @@ open class WKTextProvider : WKChatBaseProvider() {
         parent: ViewGroup,
         uiChatMsgItemEntity: WKUIChatMsgItemEntity,
         content: String,
-        cacheKey: String
+        cacheKey: String,
+        cached: TranslationCache?
     ) {
         val btn = AppCompatTextView(context)
         btn.tag = translationButtonTag
-        btn.text = "文A"
-        btn.rotation = -12f
+        btn.text = when {
+            cached == null -> "文A"
+            cached.expanded -> "⌃"
+            else -> "⌄"
+        }
+        btn.rotation = if (cached == null) -12f else 0f
         btn.typeface = Typeface.DEFAULT_BOLD
-        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (cached == null) 12f else 16f)
         btn.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
         btn.gravity = Gravity.CENTER
-        btn.setPadding(dp(8), dp(4), dp(8), dp(4))
         btn.background = GradientDrawable().apply {
-            cornerRadius = dp(999).toFloat()
-            setColor(ColorUtils.setAlphaComponent(ContextCompat.getColor(context, R.color.white), 235))
-            setStroke(dp(1), ColorUtils.setAlphaComponent(ContextCompat.getColor(context, R.color.colorAccent), 60))
+            shape = GradientDrawable.OVAL
+            setColor(ColorUtils.setAlphaComponent(ContextCompat.getColor(context, R.color.white), 240))
+            setStroke(dp(1), ColorUtils.setAlphaComponent(ContextCompat.getColor(context, R.color.colorAccent), 70))
         }
+        btn.elevation = dp(2).toFloat()
         btn.setOnClickListener {
-            val cached = readTranslationCache(cacheKey)
-            if (cached != null) {
-                saveTranslationCache(cacheKey, cached.text, true)
-                notifyMessageChanged()
-            } else {
-                translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
+            val latest = readTranslationCache(cacheKey)
+            when {
+                latest != null -> {
+                    saveTranslationCache(cacheKey, latest.text, !latest.expanded)
+                    notifyMessageChanged()
+                }
+                cached != null -> {
+                    saveTranslationCache(cacheKey, cached.text, !cached.expanded)
+                    notifyMessageChanged()
+                }
+                else -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
             }
         }
-        val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-        lp.gravity = Gravity.END
-        lp.topMargin = dp(6)
+        val lp = LinearLayout.LayoutParams(dp(32), dp(32))
+        lp.gravity = Gravity.START
+        lp.topMargin = dp(5)
         parent.addView(btn, lp)
     }
 
     private fun addTranslationView(parent: ViewGroup, cacheKey: String, text: String) {
+        val box = LinearLayout(context)
+        box.tag = translationViewTag
+        box.orientation = LinearLayout.VERTICAL
+        box.setPadding(0, dp(7), 0, 0)
+
+        val divider = View(context)
+        divider.setBackgroundColor(ColorUtils.setAlphaComponent(ContextCompat.getColor(context, R.color.color999), 95))
+        box.addView(divider, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)))
+
         val tv = AppCompatTextView(context)
-        tv.tag = translationViewTag
         tv.text = text
         tv.setTextColor(ContextCompat.getColor(context, R.color.colorDark))
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
         tv.setLineSpacing(0f, 1.08f)
-        tv.setPadding(dp(10), dp(7), dp(10), dp(7))
-        tv.background = GradientDrawable().apply {
-            cornerRadius = dp(12).toFloat()
-            setColor(ColorUtils.setAlphaComponent(ContextCompat.getColor(context, R.color.white), 188))
-            setStroke(dp(1), ColorUtils.setAlphaComponent(ContextCompat.getColor(context, R.color.color999), 45))
-        }
+        tv.setPadding(0, dp(7), 0, 0)
         tv.setOnClickListener {
             saveTranslationCache(cacheKey, text, false)
             notifyMessageChanged()
         }
+        box.setOnClickListener {
+            saveTranslationCache(cacheKey, text, false)
+            notifyMessageChanged()
+        }
+        box.addView(tv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
         val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-        lp.topMargin = dp(7)
-        parent.addView(tv, lp)
+        lp.topMargin = dp(4)
+        parent.addView(box, lp)
     }
 
     private fun translateSelectedTextToBubble(uiChatMsgItemEntity: WKUIChatMsgItemEntity, text: String) {
@@ -327,18 +349,41 @@ open class WKTextProvider : WKChatBaseProvider() {
             - 自然直译，保留原文结构、语气、表情符号和换行。
             - 若原文带有暧昧、调侃、冷淡、敷衍、撒娇、抱怨等语气，译文必须保留这种聊天感觉。
             - 保留链接、用户名、代码块、Markdown、列表和表情。
-            - 只输出 JSON：{"translation":"译文"}
-            - 不要添加任何解释或额外文字。
+            - 只输出译文，不要 JSON，不要解释，不要引号，不要前缀。
 
             待翻译消息：
-            "$text"
+            $text
         """.trimIndent()
-        val json = requestAi(endpoint, apiKey, model, prompt, 0.25)
-        return try {
-            JSONObject(json).optString("translation", json).trim()
-        } catch (_: Exception) {
-            json.removePrefix("```").removePrefix("json").removeSuffix("```").trim()
+        val raw = requestAi(endpoint, apiKey, model, prompt, 0.25)
+        val cleaned = cleanTranslationText(raw)
+        if (TextUtils.isEmpty(cleaned)) throw RuntimeException("翻译结果为空")
+        return cleaned
+    }
+
+    private fun cleanTranslationText(raw: String): String {
+        var text = raw.trim()
+            .removePrefix("```json")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+        if (text.startsWith("{")) {
+            try {
+                val obj = JSONObject(text)
+                val translation = obj.optString("translation", "")
+                if (!TextUtils.isEmpty(translation)) return translation.trim()
+            } catch (_: Exception) {
+                val match = Regex("\"translation\"\\s*:\\s*\"([\\s\\S]*?)\"").find(text)
+                if (match != null) {
+                    return match.groupValues[1]
+                        .replace("\\n", "\n")
+                        .replace("\\\"", "\"")
+                        .replace("\\/", "/")
+                        .trim()
+                }
+                return ""
+            }
         }
+        return text
     }
 
     private fun requestWingmanSuggestions(endpoint: String, apiKey: String, model: String, original: String, translated: String) {
@@ -372,7 +417,7 @@ open class WKTextProvider : WKChatBaseProvider() {
             .put(
                 "messages",
                 JSONArray()
-                    .put(JSONObject().put("role", "system").put("content", "只返回 JSON，不要 Markdown。"))
+                    .put(JSONObject().put("role", "system").put("content", "你是移动聊天应用内的翻译和回复建议助手，严格按用户要求输出。"))
                     .put(JSONObject().put("role", "user").put("content", prompt))
             )
         val conn = (URL(endpoint).openConnection() as HttpURLConnection)
