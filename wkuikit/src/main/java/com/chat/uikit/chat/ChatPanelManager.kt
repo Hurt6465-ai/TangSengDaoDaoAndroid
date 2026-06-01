@@ -1454,6 +1454,9 @@ ${content}"""
         if (TextUtils.isEmpty(content)) return
         content = editText.text.toString()
 
+        val mentionUids = snapshotMentionUids()
+        val mentionEntities = snapshotEntities()
+
         val drawable = EmojiManager.getInstance().getDrawable(iConversationContext.chatActivity, content)
         if (!getFlag(keyAiSendTranslate, false) && drawable != null && iConversationContext.replyMsg == null) {
             val resultObject = EndpointManager.getInstance().invoke(
@@ -1464,37 +1467,103 @@ ${content}"""
                 editText.text = null
                 lastInputTime = 0
                 updateSendButtonMode()
+                hideWingmanSuggestions()
                 return
             }
         }
 
         if (getFlag(keyAiSendTranslate, false)) {
             val originalText = content
-            sendIV.isEnabled = false
+            // 立即清空输入框，让手机端点击发送后不再卡在输入态。
+            editText.text = null
+            updateSendButtonMode()
+            lastInputTime = 0
+            hideWingmanSuggestions()
+            showCenterToast("正在翻译并发送…")
             requestAi(
                 buildTranslatePrompt(originalText),
                 onSuccess = { translated ->
-                    sendIV.isEnabled = true
-                    sendTextNow(translated, originalText)
+                    val cleanTranslated = cleanAiTranslationText(translated)
+                    if (TextUtils.isEmpty(cleanTranslated)) {
+                        WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_failed))
+                        return@requestAi
+                    }
+                    sendTextNow(cleanTranslated, originalText, mentionUids, mentionEntities)
                 },
                 onError = {
-                    sendIV.isEnabled = true
                     WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_failed))
+                    if (TextUtils.isEmpty(editText.text?.toString())) {
+                        editText.setText(originalText)
+                        editText.setSelection(editText.text?.length ?: 0)
+                        updateSendButtonMode()
+                    }
                 }
             )
         } else {
-            sendTextNow(content, null)
+            hideWingmanSuggestions()
+            sendTextNow(content, null, mentionUids, mentionEntities)
         }
     }
 
-    private fun sendTextNow(remoteContent: String, localDisplayContent: String?) {
+    private fun snapshotMentionUids(): ArrayList<String> {
+        val result = ArrayList<String>()
+        val list = editText.allUIDs
+        if (list != null) {
+            for (uid in list) {
+                if (!TextUtils.isEmpty(uid)) result.add(uid)
+            }
+        }
+        return result
+    }
+
+    private fun snapshotEntities(): ArrayList<WKMsgEntity> {
+        val result = ArrayList<WKMsgEntity>()
+        val list = editText.allEntity
+        if (list != null) {
+            result.addAll(list)
+        }
+        return result
+    }
+
+    private fun cleanAiTranslationText(raw: String): String {
+        var text = raw.trim()
+            .removePrefix("```json")
+            .removePrefix("```")
+            .removeSuffix("```")
+            .trim()
+        if (text.startsWith("{")) {
+            try {
+                val obj = JSONObject(text)
+                val translation = obj.optString("translation", "")
+                if (!TextUtils.isEmpty(translation)) return translation.trim()
+            } catch (_: Exception) {
+                val match = Regex("\"translation\"\\s*:\\s*\"([\\s\\S]*?)\"").find(text)
+                if (match != null) {
+                    return match.groupValues[1]
+                        .replace("\\n", "\n")
+                        .replace("\\\"", "\"")
+                        .replace("\\/", "/")
+                        .trim()
+                }
+                return ""
+            }
+        }
+        return text
+    }
+
+    private fun sendTextNow(
+        remoteContent: String,
+        localDisplayContent: String?,
+        mentionUids: List<String>? = null,
+        mentionEntities: List<WKMsgEntity>? = null
+    ) {
         val textMsgModel = if (!TextUtils.isEmpty(localDisplayContent) && localDisplayContent != remoteContent) {
             LocalOriginalTextContent(remoteContent, localDisplayContent!!)
         } else {
             WKTextContent(remoteContent)
         }
 
-        val list = editText.allUIDs
+        val list = mentionUids ?: editText.allUIDs
         if (list != null && list.isNotEmpty()) {
             val mMentionInfo = WKMentionInfo()
             val uidList: MutableList<String> = ArrayList()
@@ -1511,12 +1580,13 @@ ${content}"""
             mMentionInfo.uids = uidList
             textMsgModel.mentionInfo = mMentionInfo
         }
-        textMsgModel.entities = editText.allEntity
+        textMsgModel.entities = mentionEntities ?: editText.allEntity
 
         iConversationContext.sendMessage(textMsgModel)
         editText.text = null
         updateSendButtonMode()
         lastInputTime = 0
+        hideWingmanSuggestions()
         if (chatTopView?.visibility == View.VISIBLE) {
             CommonAnim.getInstance().animateClose(chatTopView)
         }
@@ -1958,6 +2028,8 @@ ${content}"""
         sendIV.setOnTouchListener { _, event ->
             if (hasInputText()) false else handleVoiceTouch(event)
         }
+        editText.setOnClickListener { hideWingmanSuggestions() }
+        editText.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) hideWingmanSuggestions() }
         editText.addTextChangedListener(object : TextWatcher {
 //            var linesCount = 0
 
@@ -1969,6 +2041,7 @@ ${content}"""
                 this.count = count
                 updateSendButtonMode()
                 if (!TextUtils.isEmpty(s.toString())) {
+                    hideWingmanSuggestions()
                     val content = StringUtils.replaceBlank(s.toString())
 //                    val content = s.toString().replace("\\s*|\r|\n|\t", "")
                     if (!isShowSendBtn && !TextUtils.isEmpty(content)) {
@@ -2998,6 +3071,13 @@ ${content}"""
         }
     }
 
+    private fun hideWingmanSuggestions() {
+        val old = chatTopLayout.findViewWithTag<View>(wingmanSuggestionTag)
+        if (old != null) {
+            chatTopLayout.removeView(old)
+        }
+    }
+
     private fun showWingmanSuggestions(replies: List<String>) {
         val old = chatTopLayout.findViewWithTag<View>(wingmanSuggestionTag)
         if (old != null) chatTopLayout.removeView(old)
@@ -3040,7 +3120,7 @@ ${content}"""
         }
         chatTopLayout.addView(
             scrollView,
-            LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER)
+            LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
         )
     }
 
