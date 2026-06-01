@@ -68,6 +68,8 @@ public class RtcPeerClient {
     private RtpSender videoSender;
     private final List<IceCandidate> queuedRemoteCandidates = new LinkedList<>();
     private boolean remoteSdpSet;
+    private boolean remoteOfferSet;
+    private boolean remoteAnswerSet;
     private boolean closed;
     private boolean videoCall;
 
@@ -113,14 +115,48 @@ public class RtcPeerClient {
 
     public void setRemoteDescription(SessionDescription sdp) {
         rtcHandler.post(() -> {
-            if (pc == null || sdp == null) return;
+            if (pc == null || sdp == null || closed) return;
+
+            PeerConnection.SignalingState state = pc.signalingState();
+
+            // 悟空 IM 可能会因为离线同步、刷新消息、历史同步等原因重复投递同一条
+            // offer/answer。重复 answer 在 WebRTC 中会触发：
+            // Failed to set remote answer sdp: Called in wrong state: stable
+            // 这里按初始通话 MVP 处理：同一通话只接受一次远端 offer 或 answer，
+            // 后续重复 SDP 直接忽略，不再弹错误 Toast。
+            if (sdp.type == SessionDescription.Type.ANSWER) {
+                if (remoteAnswerSet || state != PeerConnection.SignalingState.HAVE_LOCAL_OFFER) {
+                    Log.w(TAG, "ignore remote answer in state=" + state + ", duplicated=" + remoteAnswerSet);
+                    return;
+                }
+            } else if (sdp.type == SessionDescription.Type.OFFER) {
+                if (remoteOfferSet || state != PeerConnection.SignalingState.STABLE) {
+                    Log.w(TAG, "ignore remote offer in state=" + state + ", duplicated=" + remoteOfferSet);
+                    return;
+                }
+            }
+
             pc.setRemoteDescription(new SdpObserverAdapter() {
                 @Override public void onSetSuccess() {
                     remoteSdpSet = true;
+                    if (sdp.type == SessionDescription.Type.OFFER) {
+                        remoteOfferSet = true;
+                    } else if (sdp.type == SessionDescription.Type.ANSWER) {
+                        remoteAnswerSet = true;
+                    }
                     drainCandidates();
                     if (sdp.type == SessionDescription.Type.OFFER) createAnswer();
                 }
-                @Override public void onSetFailure(String error) { report("设置远端 SDP 失败: " + error, null); }
+                @Override public void onSetFailure(String error) {
+                    // 状态已经变成 stable 时，基本就是重复 answer，不应该打断通话。
+                    PeerConnection.SignalingState currentState = pc == null ? null : pc.signalingState();
+                    if (sdp.type == SessionDescription.Type.ANSWER
+                            && currentState == PeerConnection.SignalingState.STABLE) {
+                        Log.w(TAG, "ignore duplicated remote answer failure: " + error);
+                        return;
+                    }
+                    report("设置远端 SDP 失败: " + error, null);
+                }
             }, sdp);
         });
     }
