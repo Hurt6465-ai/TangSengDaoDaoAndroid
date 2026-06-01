@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rtcRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#070B12">
+
+    <org.webrtc.SurfaceViewRenderer
+        android:id="@+id/remoteRenderer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/gradientShade"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#55000000" />
+
+    <LinearLayout
+        android:id="@+id/topInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingLeft="24dp"
+        android:paddingTop="64dp"
+        android:paddingRight="24dp">
+
+        <TextView
+            android:id="@+id/avatarText"
+            android:layout_width="104dp"
+            android:layout_height="104dp"
+            android:background="#334155"
+            android:gravity="center"
+            android:text="友"
+            android:textColor="#FFFFFF"
+            android:textSize="34sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/nameText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center"
+            android:text="好友"
+            android:textColor="#FFFFFF"
+            android:textSize="25sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="连接中…"
+            android:textColor="#CCFFFFFF"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/localContainer"
+        android:layout_width="112dp"
+        android:layout_height="160dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="98dp"
+        android:layout_marginEnd="14dp"
+        android:background="#EE000000"
+        android:elevation="12dp"
+        android:padding="2dp"
+        android:visibility="gone">
+
+        <org.webrtc.SurfaceViewRenderer
+            android:id="@+id/localRenderer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/controlsLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingLeft="10dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="28dp">
+
+        <TextView android:id="@+id/micBtn" style="@style/RtcRoundButton" android:text="🎙\n静音" />
+        <TextView android:id="@+id/speakerBtn" style="@style/RtcRoundButton" android:text="🔊\n扬声器" />
+        <TextView android:id="@+id/endBtn" style="@style/RtcRoundButton" android:text="☎\n挂断" android:textColor="#FFFFFFFF" />
+        <TextView android:id="@+id/camBtn" style="@style/RtcRoundButton" android:text="📷\n摄像头" />
+        <TextView android:id="@+id/flipBtn" style="@style/RtcRoundButton" android:text="🔄\n翻转" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/incomingLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingLeft="18dp"
+        android:paddingRight="18dp"
+        android:paddingBottom="56dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/rejectBtn"
+            android:layout_width="0dp"
+            android:layout_height="54dp"
+            android:layout_marginRight="10dp"
+            android:layout_weight="1"
+            android:background="#33FFFFFF"
+            android:gravity="center"
+            android:text="拒绝"
+            android:textColor="#FFFFFF"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/acceptBtn"
+            android:layout_width="0dp"
+            android:layout_height="54dp"
+            android:layout_marginLeft="10dp"
+            android:layout_weight="1"
+            android:background="#2563EB"
+            android:gravity="center"
+            android:text="接听"
+            android:textColor="#FFFFFF"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</FrameLayout>
