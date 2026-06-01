@@ -110,6 +110,9 @@ import com.chat.uikit.message.MsgModel;
 import com.chat.uikit.robot.service.WKRobotModel;
 import com.chat.uikit.user.service.UserModel;
 import com.chat.uikit.view.WKPlayVoiceUtils;
+import com.chat.uikit.rtc.RtcCallManager;
+import com.chat.uikit.rtc.RtcSignalManager;
+import com.chat.uikit.rtc.RtcWukongSignalTransport;
 import com.effective.android.panel.PanelSwitchHelper;
 import com.effective.android.panel.interfaces.ContentScrollMeasurer;
 import com.effective.android.panel.interfaces.listener.OnPanelChangeListener;
@@ -198,7 +201,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private long browseTo = 0;
     private boolean isUpdateRedDot = true;
     private ImageView callIV;
-    private ImageView moreIV;
+    private TextView moreIV;
     //查询聊天数据偏移量
     private final int limit = 30;
     private boolean isShowPinnedView = false;
@@ -440,9 +443,12 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     private void addChatMoreButton() {
         if (moreIV != null) return;
-        moreIV = new AppCompatImageView(this);
-        moreIV.setImageResource(android.R.drawable.ic_menu_more);
-        moreIV.setColorFilter(new PorterDuffColorFilter(ContextCompat.getColor(this, R.color.popupTextColor), PorterDuff.Mode.MULTIPLY));
+        moreIV = new TextView(this);
+        moreIV.setText("⋮");
+        moreIV.setGravity(Gravity.CENTER);
+        moreIV.setTextSize(28);
+        moreIV.setIncludeFontPadding(false);
+        moreIV.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
         moreIV.setBackground(Theme.createSelectorDrawable(Theme.getPressedColor()));
         wkVBinding.topLayout.rightView.addView(moreIV, LayoutHelper.createFrame(42, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 4, 0));
         moreIV.setOnClickListener(v -> showChatMoreDialog());
@@ -560,6 +566,44 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
 
+    private void initRtcCallModule() {
+        RtcCallManager.get().configure(getApplicationContext(), loginUID, new RtcWukongSignalTransport());
+    }
+
+    private boolean handleRtcSignalIfNeeded(WKMsg msg) {
+        if (msg == null) return false;
+        String text = "";
+        try {
+            if (msg.baseContentMsgModel != null) {
+                text = msg.baseContentMsgModel.getDisplayContent();
+                if (TextUtils.isEmpty(text)) {
+                    JSONObject jsonObject = msg.baseContentMsgModel.encodeMsg();
+                    if (jsonObject != null) {
+                        text = jsonObject.optString("content", jsonObject.optString("text", ""));
+                    }
+                }
+            }
+            if (TextUtils.isEmpty(text) && !TextUtils.isEmpty(msg.content)) {
+                text = msg.content;
+            }
+        } catch (Exception ignored) {
+        }
+        return RtcSignalManager.get().tryHandleIncomingText(text);
+    }
+
+    private String getRtcPeerName() {
+        WKChannel channel = getChatChannelInfo();
+        if (channel == null) return getString(R.string.app_name);
+        String name = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
+        return TextUtils.isEmpty(name) ? getString(R.string.app_name) : name;
+    }
+
+    private String getRtcPeerAvatar() {
+        WKChannel channel = getChatChannelInfo();
+        return channel == null || TextUtils.isEmpty(channel.avatar) ? "" : channel.avatar;
+    }
+
+
     private int getTopPinViewHeight() {
         int totalHeight = 0;
         if (isShowCallingView) {
@@ -572,7 +616,12 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private void p2pCall(int callType) {
-        EndpointManager.getInstance().invoke("wk_p2p_call", new RTCMenu(this, callType));
+        if (TextUtils.isEmpty(channelId)) {
+            WKToastUtils.getInstance().showToast("无法发起通话");
+            return;
+        }
+        initRtcCallModule();
+        RtcCallManager.get().startOutgoing(this, channelId, getRtcPeerName(), getRtcPeerAvatar(), callType);
     }
 
     private void toggleStatusBarMode() {
@@ -628,6 +677,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         wkVBinding = DataBindingUtil.setContentView(this, R.layout.act_chat_layout);
 //        setContentView(R.layout.act_chat_layout1);
         initParam();
+        initRtcCallModule();
         initView();
         initListener();
         //initData();
@@ -792,15 +842,16 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         numberTextView.setTextColor(Theme.colorAccount);
         wkVBinding.topLayout.rightView.addView(numberTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 86, 0));
 
+        boolean isRegister = true;
         Object isRegisterRTC = EndpointManager.getInstance().invoke("is_register_rtc", null);
+        if (isRegisterRTC instanceof Boolean) {
+            isRegister = (boolean) isRegisterRTC;
+        }
 
         callIV = new AppCompatImageView(this);
         callIV.setImageResource(R.mipmap.ic_call);
-        if (isRegisterRTC instanceof Boolean) {
-            boolean isRegister = (boolean) isRegisterRTC;
-            if (isRegister) {
-                wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 46, 0));
-            }
+        if (isRegister) {
+            wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 46, 0));
         }
         callIV.setColorFilter(new PorterDuffColorFilter(ContextCompat.getColor(this, R.color.popupTextColor), PorterDuff.Mode.MULTIPLY));
         callIV.setBackground(Theme.createSelectorDrawable(Theme.getPressedColor()));
@@ -2702,6 +2753,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     });
 
     private synchronized void sendMsgInserted(WKMsg msg) {
+        if (handleRtcSignalIfNeeded(msg)) return;
         if (msg.channelType == channelType && msg.channelID.equals(channelId) && msg.isDeleted == 0 && !msg.header.noPersist) {
             if (msg.orderSeq > maxMsgOrderSeq) {
                 maxMsgOrderSeq = msg.orderSeq;
@@ -2739,6 +2791,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private synchronized void receivedMessages(List<WKMsg> list) {
         if (WKReader.isNotEmpty(list)) {
             for (WKMsg msg : list) {
+                if (handleRtcSignalIfNeeded(msg)) {
+                    continue;
+                }
                 // 命令消息和撤回消息不显示在聊天
                 if (msg.type == WKContentType.WK_INSIDE_MSG || msg.type == WKContentType.withdrawSystemInfo || msg.isDeleted == 1 || msg.header.noPersist)
                     continue;
