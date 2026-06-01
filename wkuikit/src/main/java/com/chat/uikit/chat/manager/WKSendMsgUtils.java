@@ -25,18 +25,6 @@ import java.util.UUID;
  * 发送消息管理
  */
 public class WKSendMsgUtils {
-    // 过期时间测试版：60 秒。确认数据库 expire/expire_at 正常后，把这里改成 86400 即 24 小时。
-    private static final int CHAT_EXPIRE_SECONDS = 60;
-
-    private boolean shouldExpireMsg(int type) {
-        return type == WKContentType.WK_TEXT
-                || type == WKContentType.WK_IMAGE
-                || type == WKContentType.WK_VIDEO
-                || type == WKContentType.WK_VOICE
-                || type == WKContentType.WK_GIF
-                || type == WKContentType.WK_FILE;
-    }
-
     private WKSendMsgUtils() {
 
     }
@@ -49,17 +37,41 @@ public class WKSendMsgUtils {
         return SendMsgUtilsBinder.utils;
     }
 
+    // 消息保留策略：
+    // 文本消息保留 30 天；语音消息保留 3 天；
+    // 图片/视频/GIF/文件的“消息壳”保留 30 天，实际媒体文件建议由 MinIO 生命周期规则 1 天删除。
+    private static final int EXPIRE_TEXT_SECONDS = 30 * 24 * 60 * 60;
+    private static final int EXPIRE_VOICE_SECONDS = 3 * 24 * 60 * 60;
+    private static final int EXPIRE_MEDIA_SHELL_SECONDS = 30 * 24 * 60 * 60;
+
+    private int getMessageExpireSeconds(int type) {
+        if (type == WKContentType.WK_TEXT) {
+            return EXPIRE_TEXT_SECONDS;
+        }
+        if (type == WKContentType.WK_VOICE) {
+            return EXPIRE_VOICE_SECONDS;
+        }
+        if (type == WKContentType.WK_IMAGE
+                || type == WKContentType.WK_VIDEO
+                || type == WKContentType.WK_GIF
+                || type == WKContentType.WK_FILE) {
+            return EXPIRE_MEDIA_SHELL_SECONDS;
+        }
+        return 0;
+    }
+
     public void sendMessage(WKMsg wkMsg) {
         WKSendOptions options = new WKSendOptions();
         options.robotID = wkMsg.robotID;
+        int expireSeconds = getMessageExpireSeconds(wkMsg.type);
+        if (expireSeconds > 0) {
+            options.expire = expireSeconds;
+        }
         WKChannel channel = wkMsg.getChannelInfo();
         if (channel == null) {
             channel = new WKChannel(wkMsg.channelID, wkMsg.channelType);
         }
         EndpointManager.getInstance().invokes(EndpointSID.sendMessage, new WKSendMsgMenu(channel, options));
-        if (wkMsg != null && options.expire <= 0 && shouldExpireMsg(wkMsg.type)) {
-            options.expire = CHAT_EXPIRE_SECONDS;
-        }
         WKIM.getInstance().getMsgManager().sendWithOptions(wkMsg.baseContentMsgModel, channel, options);
     }
 
