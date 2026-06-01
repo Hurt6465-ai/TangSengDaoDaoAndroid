@@ -10,12 +10,17 @@ import org.json.JSONObject;
 import org.webrtc.IceCandidate;
 import org.webrtc.SessionDescription;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+
 public class RtcSignalManager {
     private static final String TAG = "RtcSignalManager";
     private static final RtcSignalManager INSTANCE = new RtcSignalManager();
     private String myUid = "";
     private RtcSignalTransport transport;
     private RtcSignalDelegate delegate;
+    private final Map<String, Long> seenSignals = new HashMap<>();
 
     public static RtcSignalManager get() { return INSTANCE; }
 
@@ -79,12 +84,45 @@ public class RtcSignalManager {
             if (!TextUtils.isEmpty(s.toUid) && !TextUtils.equals(s.toUid, myUid)) return true;
             if (!TextUtils.isEmpty(s.fromUid) && TextUtils.equals(s.fromUid, myUid)) return true;
             if (RtcSignal.INVITE.equals(s.type) && s.isExpired()) return true;
+            if (rememberSignal(s)) return true;
             if (delegate != null) delegate.onRtcSignal(s);
             return true;
         } catch (Exception e) {
             Log.w(TAG, "bad rtc signal", e);
             return false;
         }
+    }
+
+    private synchronized boolean rememberSignal(RtcSignal s) {
+        cleanupSeenSignals();
+        String key = signalKey(s);
+        if (TextUtils.isEmpty(key)) return false;
+        if (seenSignals.containsKey(key)) {
+            Log.w(TAG, "ignore duplicated rtc signal: " + s.type + ", callId=" + s.callId);
+            return true;
+        }
+        seenSignals.put(key, System.currentTimeMillis());
+        return false;
+    }
+
+    private synchronized void cleanupSeenSignals() {
+        long now = System.currentTimeMillis();
+        Iterator<Map.Entry<String, Long>> iterator = seenSignals.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Long> entry = iterator.next();
+            if (now - entry.getValue() > 5 * 60 * 1000L) iterator.remove();
+        }
+    }
+
+    private String signalKey(RtcSignal s) {
+        String body = !TextUtils.isEmpty(s.candidate) ? s.candidate : s.sdp;
+        int bodyHash = TextUtils.isEmpty(body) ? 0 : body.hashCode();
+        return String.valueOf(s.type) + '|'
+                + String.valueOf(s.callId) + '|'
+                + String.valueOf(s.fromUid) + '|'
+                + String.valueOf(s.toUid) + '|'
+                + s.timestamp + '|'
+                + bodyHash;
     }
 
     public void send(RtcSignal signal) throws Exception {
