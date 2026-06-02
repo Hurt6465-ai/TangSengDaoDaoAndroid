@@ -1,162 +1,162 @@
 package com.chat.uikit.rtc;
 
-import android.content.Context;
+import android.text.TextUtils;
 import android.util.Log;
 
-import com.pixpark.gpupixel.FaceDetector;
-import com.pixpark.gpupixel.GPUPixel;
-import com.pixpark.gpupixel.GPUPixelFilter;
-import com.pixpark.gpupixel.GPUPixelSinkRawData;
-import com.pixpark.gpupixel.GPUPixelSourceRawData;
+import com.chat.uikit.rtc.model.RtcSignal;
+import com.xinbida.wukongim.entity.WKMsg;
 
-/**
- * GPUPixel beauty pipeline for local WebRTC frames.
- *
- * The AAR exposes a Source -> Filter -> Sink pipeline. We feed I420 frames from
- * WebRTC into GPUPixel, run beauty + face reshape filters, then read I420 back.
- * If GPUPixel fails on a device, the caller will safely fall back to the original frame.
- */
-public final class RtcBeautyManager {
-    private static final String TAG = "RtcBeautyManager";
-    private static final RtcBeautyManager INSTANCE = new RtcBeautyManager();
+import org.json.JSONObject;
+import org.webrtc.IceCandidate;
+import org.webrtc.SessionDescription;
 
-    public static RtcBeautyManager get() { return INSTANCE; }
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
-    private boolean initialized;
-    private volatile boolean enabled = true;
-    private float smooth = RtcConstants.BEAUTY_SMOOTHING;
-    private float whiten = RtcConstants.BEAUTY_WHITEN;
-    private float filter = RtcConstants.BEAUTY_FILTER;
-    private float thinFace = RtcConstants.BEAUTY_THIN_FACE;
-    private float bigEye = RtcConstants.BEAUTY_BIG_EYE;
+public class RtcSignalManager {
+    private static final String TAG = "RtcSignalManager";
+    private static final RtcSignalManager INSTANCE = new RtcSignalManager();
+    private String myUid = "";
+    private RtcSignalTransport transport;
+    private RtcSignalDelegate delegate;
+    private final Map<String, Long> seenSignals = new HashMap<>();
 
-    private GPUPixelSourceRawData source;
-    private GPUPixelFilter beautyFilter;
-    private GPUPixelFilter reshapeFilter;
-    private GPUPixelSinkRawData sink;
-    private FaceDetector faceDetector;
+    public static RtcSignalManager get() { return INSTANCE; }
 
-    private RtcBeautyManager() {}
-
-    public synchronized void init(Context context) {
-        if (initialized) return;
-        try {
-            GPUPixel.Init(context.getApplicationContext());
-            source = GPUPixelSourceRawData.Create();
-            beautyFilter = GPUPixelFilter.Create(GPUPixelFilter.BEAUTY_FACE_FILTER);
-            reshapeFilter = GPUPixelFilter.Create(GPUPixelFilter.FACE_RESHAPE_FILTER);
-            sink = GPUPixelSinkRawData.Create();
-            faceDetector = FaceDetector.Create();
-
-            if (source != null && beautyFilter != null && reshapeFilter != null && sink != null) {
-                source.AddSink(beautyFilter);
-                beautyFilter.AddSink(reshapeFilter);
-                reshapeFilter.AddSink(sink);
-                applyProperties();
-                initialized = true;
-            } else {
-                releaseInternal();
-                Log.w(TAG, "GPUPixel pipeline create failed");
-            }
-        } catch (Throwable t) {
-            releaseInternal();
-            Log.w(TAG, "GPUPixel init failed", t);
-        }
+    public void configure(String myUid, RtcSignalTransport transport, RtcSignalDelegate delegate) {
+        this.myUid = myUid == null ? "" : myUid;
+        this.transport = transport;
+        this.delegate = delegate;
     }
 
-    public boolean isReady() { return initialized; }
-    public boolean isEnabled() { return enabled && initialized; }
+    public String myUid() { return myUid; }
 
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
-
-    public synchronized void setStrength(float smooth, float whiten, float filter, float thinFace, float bigEye) {
-        this.smooth = clamp(smooth);
-        this.whiten = clamp(whiten);
-        this.filter = clamp(filter);
-        this.thinFace = clamp(thinFace);
-        this.bigEye = clamp(bigEye);
-        applyProperties();
+    public boolean tryHandleIncomingMsg(WKMsg msg) {
+        return tryHandleIncomingText(extractSignalText(msg));
     }
 
-    /**
-     * Process I420 frame. Return null when processing is unavailable or failed.
-     */
-    public synchronized byte[] processI420(byte[] i420, int width, int height, int stride) {
-        if (!isEnabled() || i420 == null || width <= 0 || height <= 0) return null;
+    public static boolean isSignalMsg(WKMsg msg) {
+        String text = extractSignalText(msg);
+        return !TextUtils.isEmpty(text) && text.startsWith(RtcConstants.SIGNAL_PREFIX);
+    }
+
+    public static String extractSignalText(WKMsg msg) {
+        if (msg == null) return "";
         try {
-            if (faceDetector != null && reshapeFilter != null) {
-                float[] points = faceDetector.detect(
-                        i420,
-                        width,
-                        height,
-                        stride,
-                        FaceDetector.GPUPIXEL_FRAME_TYPE_YUVI420,
-                        FaceDetector.GPUPIXEL_MODE_FMT_VIDEO
-                );
-                if (points != null && points.length > 0) {
-                    setProperty(reshapeFilter, "face_landmark", points);
-                    // Some GPUPixel builds use this alias.
-                    setProperty(reshapeFilter, "facePoints", points);
+            if (msg.baseContentMsgModel != null) {
+                String text = safePickSignalText(msg.baseContentMsgModel.getDisplayContent());
+                if (!TextUtils.isEmpty(text)) return text;
+
+                JSONObject jsonObject = msg.baseContentMsgModel.encodeMsg();
+                if (jsonObject != null) {
+                    text = safePickSignalText(jsonObject.optString("content", jsonObject.optString("text", "")));
+                    if (!TextUtils.isEmpty(text)) return text;
                 }
             }
-
-            applyProperties();
-            source.ProcessData(i420, width, height, stride, GPUPixelSourceRawData.FRAME_TYPE_YUVI420);
-
-            byte[] out = sink.GetI420Buffer();
-            if (out == null || out.length < width * height * 3 / 2) return null;
-            return out;
-        } catch (Throwable t) {
-            Log.w(TAG, "process frame failed, fallback raw", t);
-            return null;
+            return safePickSignalText(msg.content);
+        } catch (Exception ignored) {
+            return safePickSignalText(msg.content);
         }
     }
 
-    public synchronized void release() {
-        releaseInternal();
-        initialized = false;
-    }
-
-    private void applyProperties() {
-        if (beautyFilter != null) {
-            setProperty(beautyFilter, "skin_smoothing", smooth);
-            setProperty(beautyFilter, "whiteness", whiten);
-            setProperty(beautyFilter, "whiten", whiten);
-            setProperty(beautyFilter, "brightness_factor", filter * 0.22f);
-            setProperty(beautyFilter, "blend_level", filter);
+    private static String safePickSignalText(String raw) {
+        if (TextUtils.isEmpty(raw)) return "";
+        String text = raw.trim();
+        if (text.startsWith(RtcConstants.SIGNAL_PREFIX)) return text;
+        if (text.startsWith("{") && text.endsWith("}")) {
+            try {
+                JSONObject object = new JSONObject(text);
+                String content = object.optString("content", object.optString("text", ""));
+                if (!TextUtils.isEmpty(content) && content.startsWith(RtcConstants.SIGNAL_PREFIX)) {
+                    return content;
+                }
+            } catch (Exception ignored) {
+            }
         }
-        if (reshapeFilter != null) {
-            setProperty(reshapeFilter, "thin_face", thinFace);
-            setProperty(reshapeFilter, "big_eye", bigEye);
-            setProperty(reshapeFilter, "thinFaceDelta", thinFace);
-            setProperty(reshapeFilter, "bigEyeDelta", bigEye);
+        return "";
+    }
+
+    public boolean tryHandleIncomingText(String text) {
+        try {
+            RtcSignal s = RtcSignal.fromTransportText(text);
+            if (s == null) return false;
+            if (!TextUtils.isEmpty(s.toUid) && !TextUtils.equals(s.toUid, myUid)) return true;
+            if (!TextUtils.isEmpty(s.fromUid) && TextUtils.equals(s.fromUid, myUid)) return true;
+            if (RtcSignal.INVITE.equals(s.type) && s.isExpired()) return true;
+            if (rememberSignal(s)) return true;
+            if (delegate != null) delegate.onRtcSignal(s);
+            return true;
+        } catch (Exception e) {
+            Log.w(TAG, "bad rtc signal", e);
+            return false;
         }
     }
 
-    private void setProperty(GPUPixelFilter f, String name, float value) {
-        try { if (f != null) f.SetProperty(name, value); } catch (Throwable ignored) {}
+    private synchronized boolean rememberSignal(RtcSignal s) {
+        cleanupSeenSignals();
+        String key = signalKey(s);
+        if (TextUtils.isEmpty(key)) return false;
+        if (seenSignals.containsKey(key)) {
+            Log.w(TAG, "ignore duplicated rtc signal: " + s.type + ", callId=" + s.callId);
+            return true;
+        }
+        seenSignals.put(key, System.currentTimeMillis());
+        return false;
     }
 
-    private void setProperty(GPUPixelFilter f, String name, float[] value) {
-        try { if (f != null && value != null) f.SetProperty(name, value); } catch (Throwable ignored) {}
+    private synchronized void cleanupSeenSignals() {
+        long now = System.currentTimeMillis();
+        Iterator<Map.Entry<String, Long>> iterator = seenSignals.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Long> entry = iterator.next();
+            if (now - entry.getValue() > 5 * 60 * 1000L) iterator.remove();
+        }
     }
 
-    private float clamp(float v) {
-        if (v < 0f) return 0f;
-        if (v > 1f) return 1f;
-        return v;
+    private String signalKey(RtcSignal s) {
+        String body = !TextUtils.isEmpty(s.candidate) ? s.candidate : s.sdp;
+        int bodyHash = TextUtils.isEmpty(body) ? 0 : body.hashCode();
+        return String.valueOf(s.type) + '|'
+                + String.valueOf(s.callId) + '|'
+                + String.valueOf(s.fromUid) + '|'
+                + String.valueOf(s.toUid) + '|'
+                + s.timestamp + '|'
+                + bodyHash;
     }
 
-    private void releaseInternal() {
-        try { if (source != null) source.Destroy(); } catch (Throwable ignored) {}
-        try { if (beautyFilter != null) beautyFilter.Destroy(); } catch (Throwable ignored) {}
-        try { if (reshapeFilter != null) reshapeFilter.Destroy(); } catch (Throwable ignored) {}
-        try { if (sink != null) sink.Destroy(); } catch (Throwable ignored) {}
-        try { if (faceDetector != null) faceDetector.destroy(); } catch (Throwable ignored) {}
-        source = null;
-        beautyFilter = null;
-        reshapeFilter = null;
-        sink = null;
-        faceDetector = null;
+    public void send(RtcSignal signal) throws Exception {
+        if (transport == null) throw new IllegalStateException("RtcSignalTransport not configured");
+        if (TextUtils.isEmpty(signal.fromUid)) signal.fromUid = myUid;
+        transport.sendSignal(signal.toUid, signal.toTransportText());
+    }
+
+    public void sendInvite(String callId, String toUid, String name, String avatar, int callType) throws Exception {
+        RtcSignal s = RtcSignal.base(RtcSignal.INVITE, callId, myUid, toUid);
+        s.mode = RtcConstants.modeOf(callType);
+        s.fromName = name;
+        s.fromAvatar = avatar;
+        s.expiresAt = System.currentTimeMillis() + 45_000;
+        send(s);
+    }
+
+    public void sendSimple(String type, String callId, String toUid) throws Exception {
+        send(RtcSignal.base(type, callId, myUid, toUid));
+    }
+
+    public void sendDescription(String callId, String toUid, SessionDescription d) throws Exception {
+        String type = d.type == SessionDescription.Type.OFFER ? RtcSignal.OFFER : RtcSignal.ANSWER;
+        RtcSignal s = RtcSignal.base(type, callId, myUid, toUid);
+        s.sdpType = d.type.canonicalForm();
+        s.sdp = d.description;
+        send(s);
+    }
+
+    public void sendIce(String callId, String toUid, IceCandidate c) throws Exception {
+        RtcSignal s = RtcSignal.base(RtcSignal.ICE, callId, myUid, toUid);
+        s.candidate = c.sdp;
+        s.sdpMid = c.sdpMid;
+        s.sdpMLineIndex = c.sdpMLineIndex;
+        send(s);
     }
 }
