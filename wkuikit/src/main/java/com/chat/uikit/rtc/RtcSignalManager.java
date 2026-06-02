@@ -1,7 +1,6 @@
 package com.chat.uikit.rtc;
 
 import android.text.TextUtils;
-import android.util.Log;
 
 import com.chat.base.msgitem.WKContentType;
 import com.chat.uikit.rtc.model.RtcSignal;
@@ -16,7 +15,6 @@ import java.util.Iterator;
 import java.util.Map;
 
 public class RtcSignalManager {
-    private static final String TAG = "RtcSignalManager";
     private static final RtcSignalManager INSTANCE = new RtcSignalManager();
     private String myUid = "";
     private RtcSignalTransport transport;
@@ -33,62 +31,72 @@ public class RtcSignalManager {
 
     public String myUid() { return myUid; }
 
+    /**
+     * Return true only when this message is a confirmed RTC signal.
+     * Never consume normal cached text/image/video/voice messages.
+     */
     public boolean tryHandleIncomingMsg(WKMsg msg) {
         String text = extractSignalText(msg);
-        boolean handled = tryHandleIncomingText(text);
-        if (handled && msg != null) {
-            Log.i(TAG, "handled rtc signal msg type=" + msg.type
-                    + ", from=" + msg.fromUID
-                    + ", channel=" + msg.channelID
-                    + ", clientMsgNO=" + msg.clientMsgNO);
-        }
-        return handled;
+        return tryHandleIncomingText(text);
     }
 
+    /**
+     * Used by ChatActivity history/cache filtering. Keep it very strict.
+     */
     public static boolean isSignalMsg(WKMsg msg) {
-        // RTC signals are sent as WK_TEXT. Do not inspect image/video/voice payloads,
-        // otherwise a malformed media payload could be filtered by mistake.
-        if (msg == null || msg.type != WKContentType.WK_TEXT) return false;
-        String text = extractSignalText(msg);
-        if (TextUtils.isEmpty(text)) return false;
-        try {
-            return RtcSignal.fromTransportText(text) != null;
-        } catch (Exception e) {
-            Log.w(TAG, "ignore malformed rtc-looking text, clientMsgNO=" + msg.clientMsgNO, e);
-            return false;
-        }
+        return !TextUtils.isEmpty(extractSignalText(msg));
     }
 
     public static String extractSignalText(WKMsg msg) {
-        if (msg == null) return "";
-        if (msg.type != WKContentType.WK_TEXT) return "";
+        if (msg == null || msg.type != WKContentType.WK_TEXT) return "";
+
+        // 1) Prefer raw SDK content. Do not inspect media payloads or generic display text.
+        String text = pickValidSignalText(msg.content);
+        if (!TextUtils.isEmpty(text)) return text;
+
+        // 2) Some WK SDK versions store text in encoded content/text fields.
         try {
             if (msg.baseContentMsgModel != null) {
-                String text = safePickSignalText(msg.baseContentMsgModel.getDisplayContent());
-                if (!TextUtils.isEmpty(text)) return text;
-
                 JSONObject jsonObject = msg.baseContentMsgModel.encodeMsg();
                 if (jsonObject != null) {
-                    text = safePickSignalText(jsonObject.optString("content", jsonObject.optString("text", "")));
+                    text = pickValidSignalText(jsonObject.optString("content", ""));
+                    if (!TextUtils.isEmpty(text)) return text;
+                    text = pickValidSignalText(jsonObject.optString("text", ""));
                     if (!TextUtils.isEmpty(text)) return text;
                 }
             }
-            return safePickSignalText(msg.content);
         } catch (Exception ignored) {
-            return safePickSignalText(msg.content);
         }
+
+        // 3) Last fallback for text messages only. Still requires exact prefix + valid protocol/type/callId.
+        try {
+            if (msg.baseContentMsgModel != null) {
+                text = pickValidSignalText(msg.baseContentMsgModel.getDisplayContent());
+                if (!TextUtils.isEmpty(text)) return text;
+            }
+        } catch (Exception ignored) {
+        }
+        return "";
     }
 
-    private static String safePickSignalText(String raw) {
+    private static String pickValidSignalText(String raw) {
         if (TextUtils.isEmpty(raw)) return "";
         String text = raw.trim();
-        if (text.startsWith(RtcConstants.SIGNAL_PREFIX)) return text;
+
+        if (text.startsWith(RtcConstants.SIGNAL_PREFIX)) {
+            return isValidSignalText(text) ? text : "";
+        }
+
+        // In some local DB/cache formats the text message content is JSON wrapped.
         if (text.startsWith("{") && text.endsWith("}")) {
             try {
                 JSONObject object = new JSONObject(text);
                 String content = object.optString("content", object.optString("text", ""));
-                if (!TextUtils.isEmpty(content) && content.trim().startsWith(RtcConstants.SIGNAL_PREFIX)) {
-                    return content.trim();
+                if (!TextUtils.isEmpty(content)) {
+                    content = content.trim();
+                    if (content.startsWith(RtcConstants.SIGNAL_PREFIX) && isValidSignalText(content)) {
+                        return content;
+                    }
                 }
             } catch (Exception ignored) {
             }
@@ -96,28 +104,45 @@ public class RtcSignalManager {
         return "";
     }
 
+    private static boolean isValidSignalText(String text) {
+        try {
+            RtcSignal s = RtcSignal.fromTransportText(text);
+            return s != null
+                    && RtcConstants.PROTOCOL.equals(s.protocol)
+                    && !TextUtils.isEmpty(s.callId)
+                    && isAllowedType(s.type);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isAllowedType(String type) {
+        return RtcSignal.INVITE.equals(type)
+                || RtcSignal.ACCEPT.equals(type)
+                || RtcSignal.REJECT.equals(type)
+                || RtcSignal.BUSY.equals(type)
+                || RtcSignal.CANCEL.equals(type)
+                || RtcSignal.END.equals(type)
+                || RtcSignal.OFFER.equals(type)
+                || RtcSignal.ANSWER.equals(type)
+                || RtcSignal.ICE.equals(type);
+    }
+
     public boolean tryHandleIncomingText(String text) {
+        if (!isValidSignalText(text)) return false;
         try {
             RtcSignal s = RtcSignal.fromTransportText(text);
             if (s == null) return false;
-            if (!TextUtils.isEmpty(s.toUid) && !TextUtils.equals(s.toUid, myUid)) {
-                Log.i(TAG, "skip rtc signal for other uid, type=" + s.type + ", callId=" + s.callId + ", to=" + s.toUid + ", me=" + myUid);
-                return true;
-            }
-            if (!TextUtils.isEmpty(s.fromUid) && TextUtils.equals(s.fromUid, myUid)) {
-                Log.i(TAG, "skip self rtc signal, type=" + s.type + ", callId=" + s.callId);
-                return true;
-            }
-            if (RtcSignal.INVITE.equals(s.type) && s.isExpired()) {
-                Log.i(TAG, "skip expired invite, callId=" + s.callId);
-                return true;
-            }
+
+            // It is a valid RTC packet, so hide it from chat even if it is for another uid or self.
+            if (!TextUtils.isEmpty(s.toUid) && !TextUtils.equals(s.toUid, myUid)) return true;
+            if (!TextUtils.isEmpty(s.fromUid) && TextUtils.equals(s.fromUid, myUid)) return true;
+            if (RtcSignal.INVITE.equals(s.type) && s.isExpired()) return true;
             if (rememberSignal(s)) return true;
-            Log.i(TAG, "dispatch rtc signal type=" + s.type + ", callId=" + s.callId + ", from=" + s.fromUid + ", to=" + s.toUid);
+
             if (delegate != null) delegate.onRtcSignal(s);
             return true;
-        } catch (Exception e) {
-            Log.w(TAG, "bad rtc signal", e);
+        } catch (Exception ignored) {
             return false;
         }
     }
@@ -126,10 +151,7 @@ public class RtcSignalManager {
         cleanupSeenSignals();
         String key = signalKey(s);
         if (TextUtils.isEmpty(key)) return false;
-        if (seenSignals.containsKey(key)) {
-            Log.w(TAG, "ignore duplicated rtc signal: " + s.type + ", callId=" + s.callId);
-            return true;
-        }
+        if (seenSignals.containsKey(key)) return true;
         seenSignals.put(key, System.currentTimeMillis());
         return false;
     }
@@ -182,6 +204,7 @@ public class RtcSignalManager {
     }
 
     public void sendIce(String callId, String toUid, IceCandidate c) throws Exception {
+        if (c == null) return;
         RtcSignal s = RtcSignal.base(RtcSignal.ICE, callId, myUid, toUid);
         s.candidate = c.sdp;
         s.sdpMid = c.sdpMid;
