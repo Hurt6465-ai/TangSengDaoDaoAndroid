@@ -5,6 +5,9 @@ import android.content.Intent;
 import android.text.TextUtils;
 
 import com.chat.uikit.rtc.model.RtcSignal;
+import com.xinbida.wukongim.WKIM;
+import com.xinbida.wukongim.entity.WKChannel;
+import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -131,10 +134,31 @@ public class RtcCallManager implements RtcSignalDelegate {
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         i.putExtra(RtcConstants.EXTRA_CALL_ID, signal.callId);
         i.putExtra(RtcConstants.EXTRA_PEER_UID, signal.fromUid);
-        i.putExtra(RtcConstants.EXTRA_PEER_NAME, TextUtils.isEmpty(signal.fromName) ? "好友" : signal.fromName);
-        i.putExtra(RtcConstants.EXTRA_PEER_AVATAR, signal.fromAvatar == null ? "" : signal.fromAvatar);
+        i.putExtra(RtcConstants.EXTRA_PEER_NAME, getDisplayName(signal));
+        i.putExtra(RtcConstants.EXTRA_PEER_AVATAR, getDisplayAvatar(signal));
         i.putExtra(RtcConstants.EXTRA_CALL_TYPE, RtcConstants.typeOf(signal.mode));
         i.putExtra(RtcConstants.EXTRA_INCOMING, true);
         appContext.startActivity(i);
+    }
+
+    private String getDisplayName(RtcSignal signal) {
+        try {
+            WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(signal.fromUid, WKChannelType.PERSONAL);
+            if (channel != null) {
+                String name = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
+                if (!TextUtils.isEmpty(name)) return name;
+            }
+        } catch (Exception ignored) {
+        }
+        return TextUtils.isEmpty(signal.fromName) ? "好友" : signal.fromName;
+    }
+
+    private String getDisplayAvatar(RtcSignal signal) {
+        try {
+            WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(signal.fromUid, WKChannelType.PERSONAL);
+            if (channel != null && !TextUtils.isEmpty(channel.avatar)) return channel.avatar;
+        } catch (Exception ignored) {
+        }
+        return signal.fromAvatar == null ? "" : signal.fromAvatar;
     }
 }
