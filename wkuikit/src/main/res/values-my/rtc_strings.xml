@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rtc_friend">သူငယ်ချင်း</string>
+    <string name="rtc_friend_initial">သ</string>
+
+    <string name="rtc_reject">ငြင်းပယ်</string>
+    <string name="rtc_accept">လက်ခံ</string>
+
+    <string name="rtc_mute">အသံပိတ်</string>
+    <string name="rtc_muted">အသံပိတ်ထားသည်</string>
+    <string name="rtc_speaker">စပီကာ</string>
+    <string name="rtc_earpiece">နားကပ်စပီကာ</string>
+
+    <string name="rtc_camera">ကင်မရာ</string>
+    <string name="rtc_camera_off">ပိတ်ထားသည်</string>
+    <string name="rtc_flip">လှည့်ရန်</string>
+    <string name="rtc_hangup">ဖုန်းချရန်</string>
+
+    <string name="rtc_screen_share">မျက်နှာပြင်မျှဝေ</string>
+    <string name="rtc_screen_sharing">မျက်နှာပြင်မျှဝေနေသည်</string>
+    <string name="rtc_screen_share_started">မျက်နှာပြင်မျှဝေမှု စတင်ပြီးပါပြီ</string>
+    <string name="rtc_screen_share_stopped">မျက်နှာပြင်မျှဝေမှု ရပ်ပြီးပါပြီ</string>
+    <string name="rtc_screen_share_cancelled">မျက်နှာပြင်မျှဝေမှု ပယ်ဖျက်ထားသည်</string>
+    <string name="rtc_screen_share_failed">မျက်နှာပြင်မျှဝေမှု မအောင်မြင်ပါ</string>
+
+    <string name="rtc_quality_hd">720P</string>
+    <string name="rtc_quality_fhd">1080P</string>
+    <string name="rtc_quality_fhd_on">1080P သို့ ပြောင်းပြီးပါပြီ</string>
+    <string name="rtc_quality_hd_on">720P သို့ ပြောင်းပြီးပါပြီ</string>
+
+    <string name="rtc_beauty">အလှပြင်</string>
+    <string name="rtc_beauty_on">အလှပြင် ဖွင့်ထားသည်</string>
+    <string name="rtc_beauty_off">အလှပြင် ပိတ်ထားသည်</string>
+
+    <string name="rtc_invite_video">ဗီဒီယိုခေါ်ဆိုမှုသို့ ဖိတ်ခေါ်နေသည်</string>
+    <string name="rtc_invite_audio">အသံခေါ်ဆိုမှုသို့ ဖိတ်ခေါ်နေသည်</string>
+
+    <string name="rtc_prepare_video">ဗီဒီယိုခေါ်ဆိုမှု ပြင်ဆင်နေသည်…</string>
+    <string name="rtc_prepare_audio">အသံခေါ်ဆိုမှု ပြင်ဆင်နေသည်…</string>
+    <string name="rtc_wait_accept_video">တစ်ဖက်မှ လက်ခံရန် စောင့်နေသည်…</string>
+    <string name="rtc_calling_audio">ခေါ်ဆိုနေသည်…</string>
+    <string name="rtc_connecting">ချိတ်ဆက်နေသည်…</string>
+    <string name="rtc_peer_accepted">လက်ခံပြီးပါပြီ၊ ချိတ်ဆက်နေသည်…</string>
+
+    <string name="rtc_no_answer">တုံ့ပြန်မှု မရှိပါ</string>
+    <string name="rtc_call_ended">ခေါ်ဆိုမှု ပြီးဆုံးပါပြီ</string>
+    <string name="rtc_rejected">ငြင်းပယ်ထားသည်</string>
+    <string name="rtc_busy">အလုပ်များနေသည်</string>
+
+    <string name="rtc_network_weak_recovering">ကွန်ရက်မကောင်းပါ၊ ရုပ်ထွက်အရည်အသွေး လျှော့ထားသည်…</string>
+
+    <string name="rtc_send_sdp_failed">SDP ပို့ရန် မအောင်မြင်ပါ</string>
+    <string name="rtc_send_ice_failed">ICE ပို့ရန် မအောင်မြင်ပါ</string>
+    <string name="rtc_call_error">ခေါ်ဆိုမှု အမှား ဖြစ်ပွားသည်</string>
+    <string name="rtc_signal_not_ready">Signal မပြင်ဆင်ရသေးပါ</string>
+    <string name="rtc_need_permissions">မိုက်ခရိုဖုန်း/ကင်မရာ ခွင့်ပြုချက် လိုအပ်သည်</string>
+</resources>
