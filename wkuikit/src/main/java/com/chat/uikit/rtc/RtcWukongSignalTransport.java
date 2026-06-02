@@ -9,24 +9,37 @@ import com.xinbida.wukongim.entity.WKSendOptions;
 import com.xinbida.wukongim.msgmodel.WKTextContent;
 
 import java.lang.reflect.Field;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * WuKong IM transport for WebRTC signaling.
  *
- * This class must balance two requirements:
- * 1) The peer must receive invite/offer/answer/ice in the normal online message listener.
- * 2) Signaling packets must not become chat bubbles, unread badges, or cache pollution.
+ * 关键约束：
+ * 1) 对端必须能通过正常在线消息监听收到 invite/offer/answer/ice。
+ * 2) 信令包绝不能变成聊天气泡、未读红点或缓存污染。
  *
- * Important implementation detail for WuKongIM:
- * - Keep payload as WK_TEXT. Do not change content.type to WK_INSIDE_MSG; some SDK/server
- *   combinations will not deliver those packets through the RTC listener used by the app.
- * - Use WKSendOptions.header.noPersist = true so the packet is an online signaling packet,
- *   not a stored chat message.
- * - Use WKSendOptions.header.redDot = false. WuKongIM uses redDot to decide whether the
- *   peer should show unread/red-dot behavior; there is no noUnread field in the SDK header.
+ * 实现要点：
+ * - payload 保持 WK_TEXT，不改成 WK_INSIDE_MSG（某些 SDK/服务端组合不会通过 RTC 监听投递）。
+ * - header.noPersist = true：在线信令包，不落库为聊天消息。
+ * - header.redDot = false：避免对端产生未读红点。
+ * - 反射兜底使用 getDeclaredField 遍历继承链（getField 只能拿 public 字段，
+ *   会导致混淆或非 public 字段设置失败，从而信令被当普通消息持久化）。
  */
 public class RtcWukongSignalTransport implements RtcSignalTransport {
     private static final int SIGNAL_EXPIRE_SECONDS = 5 * 60;
+
+    // 反射字段缓存：避免每次发信令都全量反射，保证性能。key = "className#fieldName"
+    private static final ConcurrentHashMap<String, Field> FIELD_CACHE = new ConcurrentHashMap<>();
+    private static final Field FIELD_NOT_FOUND;
+
+    static {
+        Field placeholder = null;
+        try {
+            placeholder = RtcWukongSignalTransport.class.getDeclaredField("SIGNAL_EXPIRE_SECONDS");
+        } catch (NoSuchFieldException ignored) {
+        }
+        FIELD_NOT_FOUND = placeholder;
+    }
 
     @Override
     public void sendSignal(String peerUid, String payload) throws Exception {
@@ -45,11 +58,11 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         options.expire = SIGNAL_EXPIRE_SECONDS;
         try {
             if (options.header != null) {
-                // Online delivery, no local/remote chat cache pollution.
+                // 在线投递，不污染本地/远端聊天缓存。
                 options.header.noPersist = true;
-                // This is the real unread/red-dot switch in WKMsgHeader.
+                // WKMsgHeader 中真正的未读/红点开关。
                 options.header.redDot = false;
-                // Do not set syncOnce. Multi-device users should still be able to receive calls.
+                // 不设置 syncOnce，多端用户仍应能收到通话。
             }
         } catch (Exception ignored) {
         }
@@ -61,57 +74,10 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         } catch (Exception ignored) {
         }
 
-        // Reflection fallback for older/newer SDK variants or obfuscated fields.
+        // 反射兜底（适配旧/新 SDK 变体或混淆字段）
         markByReflection(options);
         markByReflection(getFieldValue(options, "header"));
         markByReflection(getFieldValue(options, "setting"));
     }
 
-    private void markByReflection(Object object) {
-        if (object == null) return;
-        setBooleanField(object, "noPersist", true);
-        setBooleanField(object, "no_persist", true);
-        setBooleanField(object, "redDot", false);
-        setBooleanField(object, "red_dot", false);
-        setIntField(object, "receipt", 0);
-        setIntField(object, "stream", 0);
-        setIntField(object, "expire", SIGNAL_EXPIRE_SECONDS);
-    }
-
-    private Object getFieldValue(Object object, String name) {
-        if (object == null) return null;
-        try {
-            Field f = object.getClass().getField(name);
-            f.setAccessible(true);
-            return f.get(object);
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private void setBooleanField(Object object, String name, boolean value) {
-        if (object == null) return;
-        try {
-            Field f = object.getClass().getField(name);
-            f.setAccessible(true);
-            if (f.getType() == boolean.class || f.getType() == Boolean.class) {
-                f.set(object, value);
-            } else if (f.getType() == int.class || f.getType() == Integer.class) {
-                f.set(object, value ? 1 : 0);
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
-    private void setIntField(Object object, String name, int value) {
-        if (object == null) return;
-        try {
-            Field f = object.getClass().getField(name);
-            f.setAccessible(true);
-            if (f.getType() == int.class || f.getType() == Integer.class) {
-                f.set(object, value);
-            }
-        } catch (Exception ignored) {
-        }
-    }
-}
+    private void markByReflection(Object object
