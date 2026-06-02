@@ -31,6 +31,8 @@ import androidx.annotation.Nullable;
 
 import com.chat.uikit.R;
 import com.chat.uikit.rtc.model.RtcSignal;
+import com.chat.base.config.WKApiConfig;
+import com.chat.base.glide.GlideUtils;
 import com.mikepenz.iconics.IconicsDrawable;
 
 import org.webrtc.EglBase;
@@ -199,7 +201,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) avatarImage.setClipToOutline(true);
         nameText.setText(peerName);
         root.setBackground(gradient(0xff101827, 0xff162033, 0xff020617));
-        localContainer.setBackground(round(0xee000000, dp(18)));
+        localContainer.setBackground(round(0x00000000, dp(16)));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) localContainer.setClipToOutline(true);
         findViewById(R.id.controlsCard).setBackgroundColor(Color.TRANSPARENT);
 
         loadAvatar(peerAvatar);
@@ -215,7 +218,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
 
         styleCallButton(micBtn, "faw-microphone", getString(R.string.rtc_mute), false);
         styleCallButton(speakerBtn, "faw-volume-up", getString(R.string.rtc_speaker), false);
-        styleCallButton(endBtn, "faw-phone-slash", getString(R.string.rtc_hangup), true);
+        styleCallButton(endBtn, "faw-phone", getString(R.string.rtc_hangup), true);
         styleCallButton(camBtn, "faw-video", getString(R.string.rtc_camera), false);
         styleCallButton(flipBtn, "faw-sync-alt", getString(R.string.rtc_flip), false);
         styleIncoming(findViewById(R.id.rejectBtn), 0x33ffffff);
@@ -224,7 +227,9 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         boolean video = RtcConstants.isVideo(callType);
         remoteRenderer.setVisibility(video ? View.VISIBLE : View.GONE);
         localContainer.setVisibility(video ? View.VISIBLE : View.GONE);
-        sideControlsLayout.setVisibility(video ? View.VISIBLE : View.GONE);
+        sideControlsLayout.setVisibility(View.GONE);
+        camBtn.setVisibility(video ? View.VISIBLE : View.GONE);
+        flipBtn.setVisibility(video ? View.VISIBLE : View.GONE);
         enableLocalDragAndSwap();
         root.setOnClickListener(v -> { if (connected && video) toggleControlsVisible(); });
 
@@ -240,6 +245,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private void showIncoming() {
         controlsLayout.setVisibility(View.GONE);
         sideControlsLayout.setVisibility(View.GONE);
+        camBtn.setVisibility(View.GONE);
+        flipBtn.setVisibility(View.GONE);
         incomingLayout.setVisibility(View.VISIBLE);
         statusText.setText(RtcConstants.isVideo(callType) ? getString(R.string.rtc_invite_video) : getString(R.string.rtc_invite_audio));
         ringPlayer.playIncoming();
@@ -248,7 +255,9 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private void showOutgoing() {
         incomingLayout.setVisibility(View.GONE);
         controlsLayout.setVisibility(View.VISIBLE);
-        sideControlsLayout.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
+        sideControlsLayout.setVisibility(View.GONE);
+        camBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
+        flipBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
         statusText.setText(RtcConstants.isVideo(callType) ? getString(R.string.rtc_prepare_video) : getString(R.string.rtc_prepare_audio));
     }
 
@@ -273,7 +282,9 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         ringPlayer.stop();
         incomingLayout.setVisibility(View.GONE);
         controlsLayout.setVisibility(View.VISIBLE);
-        sideControlsLayout.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
+        sideControlsLayout.setVisibility(View.GONE);
+        camBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
+        flipBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
         ensurePermissionsThen(() -> {
             try { RtcSignalManager.get().sendSimple(RtcSignal.ACCEPT, callId, peerUid); } catch (Exception ignored) {}
             statusText.setText(getString(R.string.rtc_connecting));
@@ -341,7 +352,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         micOn = !micOn;
         if (peerClient != null) peerClient.setMicEnabled(micOn);
         styleCallButton(micBtn, micOn ? "faw-microphone" : "faw-microphone-slash",
-                micOn ? getString(R.string.rtc_mute) : getString(R.string.rtc_muted), false);
+                micOn ? getString(R.string.rtc_mute) : getString(R.string.rtc_muted), !micOn);
     }
 
     private void toggleSpeaker() { updateSpeakerButton(audioManager.toggleSpeaker()); }
@@ -451,16 +462,16 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         controlsVisible = show;
         float target = show ? 1f : 0f;
         topInfo.animate().alpha(target).setDuration(180).start();
-        controlsLayout.animate().alpha(target).setDuration(180).start();
-        sideControlsLayout.animate().alpha(target).setDuration(180).withEndAction(() -> {
+        controlsLayout.animate().alpha(target).setDuration(180).withEndAction(() -> {
             topInfo.setVisibility(show ? View.VISIBLE : View.INVISIBLE);
             controlsLayout.setVisibility(show ? View.VISIBLE : View.INVISIBLE);
-            sideControlsLayout.setVisibility(show && RtcConstants.isVideo(callType) ? View.VISIBLE : View.INVISIBLE);
         }).start();
+        sideControlsLayout.setVisibility(View.GONE);
         if (show) {
             topInfo.setVisibility(View.VISIBLE);
             controlsLayout.setVisibility(View.VISIBLE);
-            sideControlsLayout.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
+            camBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
+            flipBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
         }
     }
 
@@ -498,29 +509,17 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         avatarText.setVisibility(View.VISIBLE);
         avatarImage.setVisibility(View.GONE);
         if (TextUtils.isEmpty(url)) return;
-        if (url.startsWith("http://") || url.startsWith("https://")) {
-            avatarExecutor.execute(() -> {
-                Bitmap bitmap = null;
-                HttpURLConnection connection = null;
-                try {
-                    connection = (HttpURLConnection) new URL(url).openConnection();
-                    connection.setConnectTimeout(6000);
-                    connection.setReadTimeout(6000);
-                    connection.setInstanceFollowRedirects(true);
-                    try (InputStream inputStream = connection.getInputStream()) {
-                        bitmap = BitmapFactory.decodeStream(inputStream);
-                    }
-                } catch (Exception ignored) {
-                } finally {
-                    if (connection != null) connection.disconnect();
-                }
-                final Bitmap finalBitmap = bitmap;
-                if (finalBitmap != null) handler.post(() -> {
-                    avatarImage.setImageBitmap(finalBitmap);
-                    avatarImage.setVisibility(View.VISIBLE);
-                    avatarText.setVisibility(View.GONE);
-                });
-            });
+        try {
+            String showUrl = url;
+            if (!showUrl.startsWith("http://") && !showUrl.startsWith("https://") && !showUrl.startsWith("file://")) {
+                showUrl = WKApiConfig.getShowUrl(showUrl);
+            }
+            GlideUtils.getInstance().showImg(this, showUrl, dp(108), dp(108), avatarImage);
+            avatarImage.setVisibility(View.VISIBLE);
+            avatarText.setVisibility(View.GONE);
+        } catch (Exception ignored) {
+            avatarImage.setVisibility(View.GONE);
+            avatarText.setVisibility(View.VISIBLE);
         }
     }
 }
