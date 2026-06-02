@@ -11,18 +11,20 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.provider.ContactsContract
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.Spannable
+import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextUtils
 import android.text.method.LinkMovementMethod
 import android.text.style.ForegroundColorSpan
-import android.text.style.StyleSpan
-import android.text.style.RelativeSizeSpan
-import android.text.style.SubscriptSpan
 import android.text.style.SuperscriptSpan
+import android.text.style.SubscriptSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -184,9 +186,10 @@ open class WKTextProvider : WKChatBaseProvider() {
         uiChatMsgItemEntity: WKUIChatMsgItemEntity,
         from: WKChatIteMsgFromType
     ) {
-        removeTaggedChild(contentTvLayout, translationViewTag)
-        removeTaggedChild(contentTvLayout, translationButtonTag)
-        removeTaggedChild(buttonParent, translationButtonTag)
+        // RecyclerView 复用时必须深度清理旧按钮，否则旧 item 的翻译按钮会残留到新 item。
+        removeTaggedChildDeep(contentTvLayout, translationViewTag)
+        removeTaggedChildDeep(contentTvLayout, translationButtonTag)
+        removeTaggedChildDeep(buttonParent, translationButtonTag)
 
         val content = getMessageText(uiChatMsgItemEntity.wkMsg)
         if (TextUtils.isEmpty(content)) return
@@ -196,31 +199,36 @@ open class WKTextProvider : WKChatBaseProvider() {
             addTranslationView(contentTvLayout, cacheKey, cached.text)
         }
 
-        if (from == WKChatIteMsgFromType.RECEIVED && isLatestReceivedTextMessage(adapterPosition, uiChatMsgItemEntity.wkMsg)) {
+        if (from == WKChatIteMsgFromType.RECEIVED && isLatestReceivedTextMessage(uiChatMsgItemEntity.wkMsg)) {
             addQuickTranslateButton(buttonParent, uiChatMsgItemEntity, content, cacheKey, cached)
         }
     }
 
     private data class TranslationCache(val text: String, val expanded: Boolean)
 
-    private fun removeTaggedChild(parent: ViewGroup, tag: String) {
+    private fun removeTaggedChildDeep(parent: ViewGroup, tag: String) {
         for (i in parent.childCount - 1 downTo 0) {
             val child = parent.getChildAt(i)
-            if (child.tag == tag) parent.removeViewAt(i)
+            if (child.tag == tag) {
+                parent.removeViewAt(i)
+            } else if (child is ViewGroup) {
+                removeTaggedChildDeep(child, tag)
+            }
         }
     }
 
-    private fun isLatestReceivedTextMessage(adapterPosition: Int, currentMsg: WKMsg?): Boolean {
+    private fun isLatestReceivedTextMessage(currentMsg: WKMsg?): Boolean {
+        if (!isValidReceivedTextForQuickTranslate(currentMsg)) return false
         return try {
-            if (!isValidReceivedTextForQuickTranslate(currentMsg)) return false
             val chatAdapter = getAdapter() as? ChatAdapter ?: return false
-            for (i in adapterPosition + 1 until chatAdapter.data.size) {
-                val msg = chatAdapter.data[i]?.wkMsg
+            var latest: WKMsg? = null
+            for (item in chatAdapter.data) {
+                val msg = item?.wkMsg ?: continue
                 if (isValidReceivedTextForQuickTranslate(msg)) {
-                    return false
+                    latest = msg
                 }
             }
-            true
+            isSameMessageForTranslate(currentMsg, latest)
         } catch (_: Exception) {
             false
         }
@@ -231,6 +239,7 @@ open class WKTextProvider : WKChatBaseProvider() {
         if (msg.type != WKContentType.WK_TEXT) return false
         if (msg.isDeleted != 0) return false
         if (msg.remoteExtra?.revoke == 1) return false
+        if (TextUtils.isEmpty(msg.fromUID)) return false
         if (TextUtils.equals(msg.fromUID, WKConfig.getInstance().uid)) return false
         val text = getMessageText(msg)
         if (TextUtils.isEmpty(text)) return false
@@ -238,9 +247,19 @@ open class WKTextProvider : WKChatBaseProvider() {
         return true
     }
 
+    private fun isSameMessageForTranslate(a: WKMsg?, b: WKMsg?): Boolean {
+        if (a == null || b == null) return false
+        if (a === b) return true
+        if (!TextUtils.isEmpty(a.messageID) && a.messageID != "0" && TextUtils.equals(a.messageID, b.messageID)) return true
+        if (!TextUtils.isEmpty(a.clientMsgNO) && TextUtils.equals(a.clientMsgNO, b.clientMsgNO)) return true
+        if (a.orderSeq > 0 && a.orderSeq == b.orderSeq) return true
+        return false
+    }
+
     private fun isRtcSignalText(text: String?): Boolean {
         if (TextUtils.isEmpty(text)) return false
-        return text!!.trim().startsWith("__cp_harmony_rtc__:")
+        val trimmed = text!!.trim()
+        return trimmed.startsWith("__cp_harmony_rtc__:")
     }
 
     private fun addQuickTranslateButton(
@@ -253,23 +272,26 @@ open class WKTextProvider : WKChatBaseProvider() {
         val btn = AppCompatTextView(context)
         btn.tag = translationButtonTag
         btn.text = when {
-            cached == null -> buildTranslateIconText()
+            cached == null -> buildTranslateGlyph()
             cached.expanded -> "⌃"
             else -> "⌄"
         }
-        btn.rotation = if (cached == null) -13f else 0f
-        btn.typeface = Typeface.DEFAULT_BOLD
+        btn.rotation = if (cached == null) -10f else 0f
         btn.includeFontPadding = false
+        btn.typeface = Typeface.DEFAULT_BOLD
         btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (cached == null) 10.5f else 14f)
         btn.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
         btn.gravity = Gravity.CENTER
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            btn.letterSpacing = -0.08f
+        }
         btn.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            setColor(Color.rgb(255, 250, 253))
-            setStroke(dp(1), ColorUtils.setAlphaComponent(ContextCompat.getColor(context, R.color.colorAccent), 45))
+            // 浅色系圆底，避免压住气泡内容。
+            setColor(Color.rgb(255, 249, 252))
+            setStroke(dp(1), ColorUtils.setAlphaComponent(ContextCompat.getColor(context, R.color.colorAccent), 55))
         }
         btn.elevation = dp(1).toFloat()
-        btn.translationY = dp(3).toFloat()
         btn.setOnClickListener {
             val latest = readTranslationCache(cacheKey)
             when {
@@ -284,20 +306,20 @@ open class WKTextProvider : WKChatBaseProvider() {
                 else -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
             }
         }
-        val lp = LinearLayout.LayoutParams(dp(26), dp(26))
+        val lp = LinearLayout.LayoutParams(dp(24), dp(24))
         lp.gravity = Gravity.BOTTOM
         lp.leftMargin = dp(4)
         lp.bottomMargin = dp(2)
         parent.addView(btn, lp)
     }
 
-    private fun buildTranslateIconText(): SpannableStringBuilder {
-        val text = SpannableStringBuilder("文A")
-        text.setSpan(SuperscriptSpan(), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        text.setSpan(RelativeSizeSpan(1.08f), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        text.setSpan(SubscriptSpan(), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        text.setSpan(RelativeSizeSpan(0.88f), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        return text
+    private fun buildTranslateGlyph(): SpannableString {
+        val span = SpannableString("文A")
+        span.setSpan(RelativeSizeSpan(1.06f), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        span.setSpan(SuperscriptSpan(), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        span.setSpan(RelativeSizeSpan(0.9f), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        span.setSpan(SubscriptSpan(), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        return span
     }
 
     private fun addTranslationView(parent: ViewGroup, cacheKey: String, text: String) {
@@ -355,8 +377,6 @@ open class WKTextProvider : WKChatBaseProvider() {
         }
         val endpoint = readAiSetting("chat_ai_endpoint", "https://api.deepseek.com/v1/chat/completions")
         val model = readAiSetting("chat_ai_model", "deepseek-chat")
-        // 对方消息点翻译时，目标语言要回到输入框翻译面板的“原文语言”。
-        // 输入框翻译面板负责“我输入原文 -> 翻译成对方语言发送”，所以这里读 source_lang。
         val targetLang = readAiSetting("chat_ai_source_lang", "中文")
         WKToastUtils.getInstance().showToastNormal("正在翻译…")
         thread {
@@ -1204,8 +1224,10 @@ open class WKTextProvider : WKChatBaseProvider() {
     ) {
         val replyLayout = LinearLayout(context)
         replyLayout.orientation = LinearLayout.HORIZONTAL
-        replyLayout.setBackgroundResource(R.drawable.reply_bg)
-        setReplyBubblePinkBackground(replyLayout)
+        replyLayout.background = GradientDrawable().apply {
+            cornerRadius = dp(8).toFloat()
+            setColor(Color.rgb(255, 248, 251))
+        }
         contentLayout.addView(
             replyLayout, 1,
             LayoutHelper.createLinear(
@@ -1339,7 +1361,8 @@ open class WKTextProvider : WKChatBaseProvider() {
             val myShapeDrawable = lineView.background as GradientDrawable
             myShapeDrawable.setColor(colors[index])
             userNameTv.setTextColor(colors[index])
-            setReplyBubblePinkBackground(replyLayout)
+            val bgShapeDrawable = replyLayout.background as GradientDrawable
+            bgShapeDrawable.setColor(Color.rgb(255, 248, 251))
         }
         if (textModel.reply.revoke == 1) {
             replyContentLayout.visibility = View.GONE
@@ -1363,10 +1386,6 @@ open class WKTextProvider : WKChatBaseProvider() {
         replyIV.tag = "replyIV"
         replyTV.tag = "replyTV"
         replyContentLayout.tag = "replyContentLayout"
-    }
-
-    private fun setReplyBubblePinkBackground(replyLayout: LinearLayout) {
-        (replyLayout.background as? GradientDrawable)?.setColor(Color.rgb(255, 247, 250))
     }
 
     private fun showReplyContent(
