@@ -87,7 +87,6 @@
             android:layout_height="match_parent" />
     </FrameLayout>
 
-    <!-- Kept only for compatibility with older RtcCallActivity fields. Actual video controls are in the bottom bar. -->
     <LinearLayout
         android:id="@+id/sideControlsLayout"
         android:layout_width="0dp"
@@ -101,80 +100,106 @@
         android:layout_gravity="bottom"
         android:gravity="center"
         android:orientation="vertical"
-        android:paddingLeft="10dp"
-        android:paddingRight="10dp"
-        android:paddingBottom="24dp">
+        android:paddingLeft="18dp"
+        android:paddingRight="18dp"
+        android:paddingBottom="22dp">
 
         <LinearLayout
             android:id="@+id/controlsCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:orientation="horizontal"
-            android:paddingLeft="2dp"
-            android:paddingTop="4dp"
-            android:paddingRight="2dp"
-            android:paddingBottom="4dp">
+            android:orientation="vertical"
+            android:paddingLeft="6dp"
+            android:paddingTop="2dp"
+            android:paddingRight="6dp"
+            android:paddingBottom="2dp">
 
-            <TextView
-                android:id="@+id/micBtn"
-                android:layout_width="0dp"
-                android:layout_height="62dp"
-                android:layout_weight="1"
+            <LinearLayout
+                android:id="@+id/controlsRowTop"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:gravity="center"
-                android:lines="1"
-                android:paddingTop="4dp"
-                android:paddingBottom="2dp"
-                android:textColor="#EEFFFFFF"
-                android:textSize="10sp" />
+                android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/speakerBtn"
-                android:layout_width="0dp"
-                android:layout_height="62dp"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:lines="1"
-                android:paddingTop="4dp"
-                android:paddingBottom="2dp"
-                android:textColor="#EEFFFFFF"
-                android:textSize="10sp" />
+                <TextView
+                    android:id="@+id/micBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="58dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:lines="1"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="1dp"
+                    android:textColor="#EEFFFFFF"
+                    android:textSize="10sp" />
 
-            <TextView
-                android:id="@+id/camBtn"
-                android:layout_width="0dp"
-                android:layout_height="62dp"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:lines="1"
-                android:paddingTop="4dp"
-                android:paddingBottom="2dp"
-                android:textColor="#EEFFFFFF"
-                android:textSize="10sp" />
+                <TextView
+                    android:id="@+id/speakerBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="58dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:lines="1"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="1dp"
+                    android:textColor="#EEFFFFFF"
+                    android:textSize="10sp" />
 
-            <TextView
-                android:id="@+id/flipBtn"
-                android:layout_width="0dp"
-                android:layout_height="62dp"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:lines="1"
-                android:paddingTop="4dp"
-                android:paddingBottom="2dp"
-                android:textColor="#EEFFFFFF"
-                android:textSize="10sp" />
+                <TextView
+                    android:id="@+id/camBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="58dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:lines="1"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="1dp"
+                    android:textColor="#EEFFFFFF"
+                    android:textSize="10sp" />
+            </LinearLayout>
 
-            <TextView
-                android:id="@+id/endBtn"
-                android:layout_width="0dp"
-                android:layout_height="62dp"
-                android:layout_weight="1"
+            <LinearLayout
+                android:id="@+id/controlsRowBottom"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:gravity="center"
-                android:lines="1"
-                android:paddingTop="4dp"
-                android:paddingBottom="2dp"
-                android:textColor="#FFFF4B55"
-                android:textSize="10sp" />
+                android:orientation="horizontal">
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="0.5" />
+
+                <TextView
+                    android:id="@+id/flipBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="58dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:lines="1"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="1dp"
+                    android:textColor="#EEFFFFFF"
+                    android:textSize="10sp" />
+
+                <TextView
+                    android:id="@+id/endBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="58dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:lines="1"
+                    android:paddingTop="3dp"
+                    android:paddingBottom="1dp"
+                    android:textColor="#FFFF4B55"
+                    android:textSize="10sp" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="0.5" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
