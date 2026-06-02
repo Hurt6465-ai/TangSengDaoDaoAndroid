@@ -529,10 +529,10 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         v.setBackground(circle(danger ? 0xffef4444 : 0x30ffffff));
         v.setCompoundDrawablePadding(dp(6));
         try {
-            Drawable d = new IconicsDrawable(this, icon)
-                    .sizeDp(22);
+            Drawable d = new IconicsDrawable(this, icon);
+            d.setBounds(0, 0, dp(22), dp(22));
             d.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);
-            v.setCompoundDrawablesWithIntrinsicBounds(null, d, null, null);
+            v.setCompoundDrawables(null, d, null, null);
         } catch (Throwable ignored) {
             v.setCompoundDrawables(null, null, null, null);
         }
