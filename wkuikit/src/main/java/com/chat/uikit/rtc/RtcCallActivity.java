@@ -31,7 +31,6 @@ import androidx.annotation.Nullable;
 
 import com.chat.uikit.R;
 import com.chat.uikit.rtc.model.RtcSignal;
-import com.mikepenz.fontawesome_typeface_library.FontAwesome;
 import com.mikepenz.iconics.IconicsDrawable;
 
 import org.webrtc.EglBase;
@@ -214,11 +213,11 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         localRenderer.setEnableHardwareScaler(true);
         localRenderer.setMirror(true);
 
-        styleCallButton(micBtn, FontAwesome.Icon.faw_microphone, getString(R.string.rtc_mute), false);
-        styleCallButton(speakerBtn, FontAwesome.Icon.faw_volume_up, getString(R.string.rtc_speaker), false);
-        styleCallButton(endBtn, FontAwesome.Icon.faw_phone_slash, getString(R.string.rtc_hangup), true);
-        styleCallButton(camBtn, FontAwesome.Icon.faw_video, getString(R.string.rtc_camera), false);
-        styleCallButton(flipBtn, FontAwesome.Icon.faw_sync_alt, getString(R.string.rtc_flip), false);
+        styleCallButton(micBtn, "faw-microphone", getString(R.string.rtc_mute), false);
+        styleCallButton(speakerBtn, "faw-volume-up", getString(R.string.rtc_speaker), false);
+        styleCallButton(endBtn, "faw-phone-slash", getString(R.string.rtc_hangup), true);
+        styleCallButton(camBtn, "faw-video", getString(R.string.rtc_camera), false);
+        styleCallButton(flipBtn, "faw-sync-alt", getString(R.string.rtc_flip), false);
         styleIncoming(findViewById(R.id.rejectBtn), 0x33ffffff);
         styleIncoming(findViewById(R.id.acceptBtn), 0xff22c55e);
 
@@ -341,21 +340,21 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private void toggleMic() {
         micOn = !micOn;
         if (peerClient != null) peerClient.setMicEnabled(micOn);
-        styleCallButton(micBtn, micOn ? FontAwesome.Icon.faw_microphone : FontAwesome.Icon.faw_microphone_slash,
+        styleCallButton(micBtn, micOn ? "faw-microphone" : "faw-microphone-slash",
                 micOn ? getString(R.string.rtc_mute) : getString(R.string.rtc_muted), false);
     }
 
     private void toggleSpeaker() { updateSpeakerButton(audioManager.toggleSpeaker()); }
 
     private void updateSpeakerButton(boolean on) {
-        styleCallButton(speakerBtn, on ? FontAwesome.Icon.faw_volume_up : FontAwesome.Icon.faw_phone,
+        styleCallButton(speakerBtn, on ? "faw-volume-up" : "faw-phone",
                 on ? getString(R.string.rtc_speaker) : getString(R.string.rtc_earpiece), false);
     }
 
     private void toggleCamera() {
         cameraOn = !cameraOn;
         if (peerClient != null) peerClient.setCameraEnabled(cameraOn);
-        styleCallButton(camBtn, cameraOn ? FontAwesome.Icon.faw_video : FontAwesome.Icon.faw_video_slash,
+        styleCallButton(camBtn, cameraOn ? "faw-video" : "faw-video-slash",
                 cameraOn ? getString(R.string.rtc_camera) : getString(R.string.rtc_camera_off), false);
         localContainer.setVisibility(cameraOn ? View.VISIBLE : View.INVISIBLE);
     }
@@ -465,7 +464,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         }
     }
 
-    private void styleCallButton(TextView v, FontAwesome.Icon icon, String label, boolean danger) {
+    private void styleCallButton(TextView v, String icon, String label, boolean danger) {
         v.setText(label);
         v.setTypeface(Typeface.DEFAULT_BOLD);
         v.setTextColor(danger ? 0xffff4b55 : 0xeeffffff);
