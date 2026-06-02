@@ -1,6 +1,8 @@
 package com.chat.uikit.rtc;
 
 import android.content.Context;
+import android.content.Intent;
+import android.media.projection.MediaProjection;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
@@ -24,6 +26,7 @@ import org.webrtc.PeerConnectionFactory;
 import org.webrtc.RtpReceiver;
 import org.webrtc.RtpSender;
 import org.webrtc.RtpTransceiver;
+import org.webrtc.ScreenCapturerAndroid;
 import org.webrtc.SessionDescription;
 import org.webrtc.SurfaceTextureHelper;
 import org.webrtc.SurfaceViewRenderer;
@@ -72,6 +75,11 @@ public class RtcPeerClient {
     private boolean remoteAnswerSet;
     private boolean closed;
     private boolean videoCall;
+    private boolean screenSharing;
+    private boolean lowQuality;
+    private boolean ultraHd;
+    private boolean beautyEnabled = true;
+    private RtcBeautyVideoProcessor beautyProcessor;
 
     private final RtcVideoSinkProxy localProxy = new RtcVideoSinkProxy();
     private final RtcVideoSinkProxy remoteProxy = new RtcVideoSinkProxy();
@@ -95,7 +103,7 @@ public class RtcPeerClient {
 
     public void createOffer() {
         rtcHandler.post(() -> {
-            if (pc == null) return;
+            if (pc == null || closed) return;
             pc.createOffer(new SdpObserverAdapter() {
                 @Override public void onCreateSuccess(SessionDescription sdp) { setLocalDescription(sdp); }
                 @Override public void onCreateFailure(String error) { report("创建 offer 失败: " + error, null); }
@@ -105,7 +113,7 @@ public class RtcPeerClient {
 
     public void createAnswer() {
         rtcHandler.post(() -> {
-            if (pc == null) return;
+            if (pc == null || closed) return;
             pc.createAnswer(new SdpObserverAdapter() {
                 @Override public void onCreateSuccess(SessionDescription sdp) { setLocalDescription(sdp); }
                 @Override public void onCreateFailure(String error) { report("创建 answer 失败: " + error, null); }
@@ -116,14 +124,7 @@ public class RtcPeerClient {
     public void setRemoteDescription(SessionDescription sdp) {
         rtcHandler.post(() -> {
             if (pc == null || sdp == null || closed) return;
-
             PeerConnection.SignalingState state = pc.signalingState();
-
-            // 悟空 IM 可能会因为离线同步、刷新消息、历史同步等原因重复投递同一条
-            // offer/answer。重复 answer 在 WebRTC 中会触发：
-            // Failed to set remote answer sdp: Called in wrong state: stable
-            // 这里按初始通话 MVP 处理：同一通话只接受一次远端 offer 或 answer，
-            // 后续重复 SDP 直接忽略，不再弹错误 Toast。
             if (sdp.type == SessionDescription.Type.ANSWER) {
                 if (remoteAnswerSet || state != PeerConnection.SignalingState.HAVE_LOCAL_OFFER) {
                     Log.w(TAG, "ignore remote answer in state=" + state + ", duplicated=" + remoteAnswerSet);
@@ -135,23 +136,17 @@ public class RtcPeerClient {
                     return;
                 }
             }
-
             pc.setRemoteDescription(new SdpObserverAdapter() {
                 @Override public void onSetSuccess() {
                     remoteSdpSet = true;
-                    if (sdp.type == SessionDescription.Type.OFFER) {
-                        remoteOfferSet = true;
-                    } else if (sdp.type == SessionDescription.Type.ANSWER) {
-                        remoteAnswerSet = true;
-                    }
+                    if (sdp.type == SessionDescription.Type.OFFER) remoteOfferSet = true;
+                    else if (sdp.type == SessionDescription.Type.ANSWER) remoteAnswerSet = true;
                     drainCandidates();
                     if (sdp.type == SessionDescription.Type.OFFER) createAnswer();
                 }
                 @Override public void onSetFailure(String error) {
-                    // 状态已经变成 stable 时，基本就是重复 answer，不应该打断通话。
                     PeerConnection.SignalingState currentState = pc == null ? null : pc.signalingState();
-                    if (sdp.type == SessionDescription.Type.ANSWER
-                            && currentState == PeerConnection.SignalingState.STABLE) {
+                    if (sdp.type == SessionDescription.Type.ANSWER && currentState == PeerConnection.SignalingState.STABLE) {
                         Log.w(TAG, "ignore duplicated remote answer failure: " + error);
                         return;
                     }
@@ -163,7 +158,7 @@ public class RtcPeerClient {
 
     public void addRemoteIce(IceCandidate candidate) {
         rtcHandler.post(() -> {
-            if (pc == null || candidate == null) return;
+            if (pc == null || candidate == null || closed) return;
             if (!remoteSdpSet) queuedRemoteCandidates.add(candidate);
             else pc.addIceCandidate(candidate);
         });
@@ -174,8 +169,114 @@ public class RtcPeerClient {
 
     public void switchCamera() {
         rtcHandler.post(() -> {
+            if (screenSharing) return;
             if (videoCapturer instanceof CameraVideoCapturer) {
                 ((CameraVideoCapturer) videoCapturer).switchCamera(null);
+            }
+        });
+    }
+
+    public void startScreenShare(Intent permissionData) {
+        if (permissionData == null) return;
+        rtcHandler.post(() -> {
+            if (!videoCall || closed || videoSource == null) return;
+            try {
+                ScreenCapturerAndroid screenCapturer = new ScreenCapturerAndroid(permissionData, new MediaProjection.Callback() {
+                    @Override public void onStop() {
+                        stopScreenShare();
+                    }
+                });
+                switchVideoCapturer(screenCapturer, RtcConstants.SCREEN_WIDTH, RtcConstants.SCREEN_HEIGHT, RtcConstants.SCREEN_FPS);
+                screenSharing = true;
+                setVideoMaxBitrate(RtcConstants.SCREEN_MAX_BITRATE_KBPS);
+            } catch (Exception e) {
+                report("屏幕共享失败", e);
+            }
+        });
+    }
+
+    public void stopScreenShare() {
+        rtcHandler.post(() -> {
+            if (!videoCall || closed || !screenSharing) return;
+            try {
+                VideoCapturer camera = createCameraCapturer();
+                if (camera == null) throw new IllegalStateException("没有可用摄像头");
+                switchVideoCapturer(camera, lowQuality ? RtcConstants.VIDEO_LOW_WIDTH : currentVideoWidth(),
+                        lowQuality ? RtcConstants.VIDEO_LOW_HEIGHT : currentVideoHeight(),
+                        lowQuality ? RtcConstants.VIDEO_LOW_FPS : currentVideoFps());
+                screenSharing = false;
+                setVideoMaxBitrate(lowQuality ? RtcConstants.VIDEO_LOW_BITRATE_KBPS : currentVideoBitrateKbps());
+            } catch (Exception e) {
+                report("恢复摄像头失败", e);
+            }
+        });
+    }
+
+
+    public void setBeautyEnabled(boolean enabled) {
+        beautyEnabled = enabled;
+        rtcHandler.post(() -> {
+            try {
+                RtcBeautyManager.get().setEnabled(enabled);
+                if (beautyProcessor != null) beautyProcessor.setEnabled(enabled);
+            } catch (Throwable t) {
+                Log.w(TAG, "set beauty", t);
+            }
+        });
+    }
+
+    public void setUltraHdEnabled(boolean enabled) {
+        ultraHd = enabled;
+        rtcHandler.post(() -> {
+            if (!videoCall || closed || screenSharing || lowQuality) return;
+            setVideoMaxBitrate(currentVideoBitrateKbps());
+            try {
+                if (videoCapturer instanceof CameraVideoCapturer) {
+                    ((CameraVideoCapturer) videoCapturer).changeCaptureFormat(
+                            currentVideoWidth(),
+                            currentVideoHeight(),
+                            currentVideoFps());
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "switch video quality", e);
+            }
+        });
+    }
+
+    public boolean isUltraHdEnabled() { return ultraHd; }
+
+    public void degradeForWeakNetwork() {
+        rtcHandler.post(() -> {
+            if (!videoCall || closed || screenSharing) return;
+            lowQuality = true;
+            setVideoMaxBitrate(RtcConstants.VIDEO_LOW_BITRATE_KBPS);
+            try {
+                if (videoCapturer instanceof CameraVideoCapturer) {
+                    ((CameraVideoCapturer) videoCapturer).changeCaptureFormat(
+                            RtcConstants.VIDEO_LOW_WIDTH,
+                            RtcConstants.VIDEO_LOW_HEIGHT,
+                            RtcConstants.VIDEO_LOW_FPS);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "degrade video quality", e);
+            }
+        });
+    }
+
+    public void restoreVideoQuality() {
+        rtcHandler.post(() -> {
+            if (!videoCall || closed || screenSharing) return;
+            lowQuality = false;
+            setVideoMaxBitrate(currentVideoBitrateKbps());
+            try {
+                if (videoCapturer instanceof CameraVideoCapturer) {
+                    ((CameraVideoCapturer) videoCapturer).changeCaptureFormat(
+                            currentVideoWidth(),
+                            currentVideoHeight(),
+                            currentVideoFps());
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "restore video quality", e);
             }
         });
     }
@@ -236,6 +337,17 @@ public class RtcPeerClient {
         if (pc == null) throw new IllegalStateException("PeerConnection 创建失败");
     }
 
+
+    private void attachBeautyProcessor(RtcBeautyVideoProcessor processor) {
+        if (videoSource == null) return;
+        try {
+            java.lang.reflect.Method method = videoSource.getClass().getMethod("setVideoProcessor", org.webrtc.VideoProcessor.class);
+            method.invoke(videoSource, processor);
+        } catch (Throwable t) {
+            Log.w(TAG, "VideoProcessor API unavailable", t);
+        }
+    }
+
     private void createLocalMedia() throws Exception {
         MediaConstraints audioConstraints = new MediaConstraints();
         audioSource = factory.createAudioSource(audioConstraints);
@@ -244,18 +356,39 @@ public class RtcPeerClient {
         pc.addTrack(localAudioTrack, Collections.singletonList(STREAM_ID));
 
         if (!videoCall) return;
-        videoCapturer = createCameraCapturer();
-        if (videoCapturer == null) throw new IllegalStateException("没有可用摄像头");
-        surfaceTextureHelper = SurfaceTextureHelper.create("cp-camera-thread", eglContext);
         videoSource = factory.createVideoSource(false);
-        videoCapturer.initialize(surfaceTextureHelper, context, videoSource.getCapturerObserver());
-        videoCapturer.startCapture(RtcConstants.VIDEO_WIDTH, RtcConstants.VIDEO_HEIGHT, RtcConstants.VIDEO_FPS);
+        try {
+            RtcBeautyManager.get().init(context);
+            beautyProcessor = new RtcBeautyVideoProcessor(RtcBeautyManager.get());
+            beautyProcessor.setEnabled(beautyEnabled);
+            attachBeautyProcessor(beautyProcessor);
+        } catch (Throwable t) {
+            Log.w(TAG, "GPUPixel beauty processor disabled", t);
+            beautyProcessor = null;
+        }
         localVideoTrack = factory.createVideoTrack("CP_VIDEO", videoSource);
         localVideoTrack.setEnabled(true);
         localProxy.setTarget(localRenderer);
         localVideoTrack.addSink(localProxy);
         videoSender = pc.addTrack(localVideoTrack, Collections.singletonList(STREAM_ID));
-        setVideoMaxBitrate(RtcConstants.VIDEO_MAX_BITRATE_KBPS);
+
+        videoCapturer = createCameraCapturer();
+        if (videoCapturer == null) throw new IllegalStateException("没有可用摄像头");
+        surfaceTextureHelper = SurfaceTextureHelper.create("cp-video-thread", eglContext);
+        videoCapturer.initialize(surfaceTextureHelper, context, videoSource.getCapturerObserver());
+        videoCapturer.startCapture(currentVideoWidth(), currentVideoHeight(), currentVideoFps());
+        setVideoMaxBitrate(currentVideoBitrateKbps());
+    }
+
+    private void switchVideoCapturer(VideoCapturer next, int width, int height, int fps) throws Exception {
+        if (next == null || videoSource == null) return;
+        try { if (videoCapturer != null) videoCapturer.stopCapture(); } catch (Exception ignored) {}
+        try { if (videoCapturer != null) videoCapturer.dispose(); } catch (Exception ignored) {}
+        try { if (surfaceTextureHelper != null) surfaceTextureHelper.dispose(); } catch (Exception ignored) {}
+        videoCapturer = next;
+        surfaceTextureHelper = SurfaceTextureHelper.create(screenSharing ? "cp-screen-thread" : "cp-video-thread", eglContext);
+        videoCapturer.initialize(surfaceTextureHelper, context, videoSource.getCapturerObserver());
+        videoCapturer.startCapture(width, height, fps);
     }
 
     private VideoCapturer createCameraCapturer() {
@@ -284,6 +417,12 @@ public class RtcPeerClient {
         queuedRemoteCandidates.clear();
     }
 
+
+    private int currentVideoWidth() { return ultraHd ? RtcConstants.VIDEO_FHD_WIDTH : RtcConstants.VIDEO_WIDTH; }
+    private int currentVideoHeight() { return ultraHd ? RtcConstants.VIDEO_FHD_HEIGHT : RtcConstants.VIDEO_HEIGHT; }
+    private int currentVideoFps() { return ultraHd ? RtcConstants.VIDEO_FHD_FPS : RtcConstants.VIDEO_FPS; }
+    private int currentVideoBitrateKbps() { return ultraHd ? RtcConstants.VIDEO_FHD_BITRATE_KBPS : RtcConstants.VIDEO_MAX_BITRATE_KBPS; }
+
     private void setVideoMaxBitrate(int kbps) {
         try {
             if (videoSender == null) return;
@@ -294,14 +433,14 @@ public class RtcPeerClient {
         } catch (Exception e) { Log.w(TAG, "bitrate", e); }
     }
 
-    private List<PeerConnection.IceServer> defaultIceServers() {
-        return RtcIceServers.getDefault();
-    }
+    private List<PeerConnection.IceServer> defaultIceServers() { return RtcIceServers.getDefault(); }
 
     private void closeInternal() {
         if (closed) return;
         closed = true;
         try { localProxy.setTarget(null); remoteProxy.setTarget(null); } catch (Exception ignored) {}
+        try { attachBeautyProcessor(null); } catch (Exception ignored) {}
+        try { RtcBeautyManager.get().release(); } catch (Exception ignored) {}
         try { if (videoCapturer != null) videoCapturer.stopCapture(); } catch (Exception ignored) {}
         try { if (videoCapturer != null) videoCapturer.dispose(); } catch (Exception ignored) {}
         try { if (surfaceTextureHelper != null) surfaceTextureHelper.dispose(); } catch (Exception ignored) {}
@@ -319,9 +458,13 @@ public class RtcPeerClient {
     private class PcObserver implements PeerConnection.Observer {
         @Override public void onSignalingChange(PeerConnection.SignalingState s) {}
         @Override public void onIceConnectionChange(PeerConnection.IceConnectionState s) {
-            if (events == null) return;
-            if (s == PeerConnection.IceConnectionState.CONNECTED || s == PeerConnection.IceConnectionState.COMPLETED) events.onIceConnected();
-            if (s == PeerConnection.IceConnectionState.DISCONNECTED || s == PeerConnection.IceConnectionState.FAILED) events.onIceDisconnected();
+            if (s == PeerConnection.IceConnectionState.CONNECTED || s == PeerConnection.IceConnectionState.COMPLETED) {
+                if (events != null) events.onIceConnected();
+            }
+            if (s == PeerConnection.IceConnectionState.DISCONNECTED || s == PeerConnection.IceConnectionState.FAILED) {
+                try { if (pc != null && s == PeerConnection.IceConnectionState.FAILED) pc.restartIce(); } catch (Exception ignored) {}
+                if (events != null) events.onIceDisconnected();
+            }
         }
         @Override public void onIceConnectionReceivingChange(boolean b) {}
         @Override public void onIceGatheringChange(PeerConnection.IceGatheringState s) {}

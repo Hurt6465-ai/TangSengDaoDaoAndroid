@@ -46,6 +46,10 @@ public class RtcAudioManager {
         return next;
     }
 
+    public boolean isSpeakerOn() {
+        return audioManager != null && audioManager.isSpeakerphoneOn();
+    }
+
     private void requestFocus() {
         if (audioManager == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
