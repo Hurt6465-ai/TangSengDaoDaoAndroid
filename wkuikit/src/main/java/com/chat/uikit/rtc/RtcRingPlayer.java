@@ -14,10 +14,9 @@ import android.util.Log;
 
 /**
  * Lightweight call ringtone helper.
- * Put files here if you want real ringtones:
- *   wkuikit/src/main/res/raw/bohao.mp3
- *   wkuikit/src/main/res/raw/laidian.mp3
- * If the files are missing, it falls back to short system tones.
+ * Incoming ringtone file location:
+ *   wkuikit/src/main/res/raw/newrtc.mp3
+ * Outgoing dialing sound is intentionally disabled.
  */
 public class RtcRingPlayer {
     private static final String TAG = "RtcRingPlayer";
@@ -32,18 +31,16 @@ public class RtcRingPlayer {
         this.context = context.getApplicationContext();
     }
 
+    /** No outgoing dialing sound. */
     public void playOutgoing() {
         stop();
-        if (!playRawLoop("bohao")) {
-            playFallbackTone(false);
-        }
     }
 
     public void playIncoming() {
         stop();
         startVibration();
-        if (!playRawLoop("laidian")) {
-            playFallbackTone(true);
+        if (!playRawLoop("newrtc")) {
+            playFallbackTone();
         }
     }
 
@@ -92,17 +89,17 @@ public class RtcRingPlayer {
         }
     }
 
-    private void playFallbackTone(boolean incoming) {
+    private void playFallbackTone() {
         try {
-            toneGenerator = new ToneGenerator(AudioManager.STREAM_RING, incoming ? 80 : 55);
+            toneGenerator = new ToneGenerator(AudioManager.STREAM_RING, 80);
             loopingTone = true;
             Runnable r = new Runnable() {
                 @Override public void run() {
                     if (!loopingTone || toneGenerator == null) return;
                     try {
-                        toneGenerator.startTone(incoming ? ToneGenerator.TONE_SUP_RINGTONE : ToneGenerator.TONE_SUP_DIAL, incoming ? 900 : 350);
+                        toneGenerator.startTone(ToneGenerator.TONE_SUP_RINGTONE, 900);
                     } catch (Exception ignored) {}
-                    handler.postDelayed(this, incoming ? 1800 : 2600);
+                    handler.postDelayed(this, 1800);
                 }
             };
             handler.post(r);
