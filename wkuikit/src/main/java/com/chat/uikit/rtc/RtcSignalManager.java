@@ -3,6 +3,7 @@ package com.chat.uikit.rtc;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.chat.base.msgitem.WKContentType;
 import com.chat.uikit.rtc.model.RtcSignal;
 import com.xinbida.wukongim.entity.WKMsg;
 
@@ -33,16 +34,34 @@ public class RtcSignalManager {
     public String myUid() { return myUid; }
 
     public boolean tryHandleIncomingMsg(WKMsg msg) {
-        return tryHandleIncomingText(extractSignalText(msg));
+        String text = extractSignalText(msg);
+        boolean handled = tryHandleIncomingText(text);
+        if (handled && msg != null) {
+            Log.i(TAG, "handled rtc signal msg type=" + msg.type
+                    + ", from=" + msg.fromUID
+                    + ", channel=" + msg.channelID
+                    + ", clientMsgNO=" + msg.clientMsgNO);
+        }
+        return handled;
     }
 
     public static boolean isSignalMsg(WKMsg msg) {
+        // RTC signals are sent as WK_TEXT. Do not inspect image/video/voice payloads,
+        // otherwise a malformed media payload could be filtered by mistake.
+        if (msg == null || msg.type != WKContentType.WK_TEXT) return false;
         String text = extractSignalText(msg);
-        return !TextUtils.isEmpty(text) && text.startsWith(RtcConstants.SIGNAL_PREFIX);
+        if (TextUtils.isEmpty(text)) return false;
+        try {
+            return RtcSignal.fromTransportText(text) != null;
+        } catch (Exception e) {
+            Log.w(TAG, "ignore malformed rtc-looking text, clientMsgNO=" + msg.clientMsgNO, e);
+            return false;
+        }
     }
 
     public static String extractSignalText(WKMsg msg) {
         if (msg == null) return "";
+        if (msg.type != WKContentType.WK_TEXT) return "";
         try {
             if (msg.baseContentMsgModel != null) {
                 String text = safePickSignalText(msg.baseContentMsgModel.getDisplayContent());
@@ -68,8 +87,8 @@ public class RtcSignalManager {
             try {
                 JSONObject object = new JSONObject(text);
                 String content = object.optString("content", object.optString("text", ""));
-                if (!TextUtils.isEmpty(content) && content.startsWith(RtcConstants.SIGNAL_PREFIX)) {
-                    return content;
+                if (!TextUtils.isEmpty(content) && content.trim().startsWith(RtcConstants.SIGNAL_PREFIX)) {
+                    return content.trim();
                 }
             } catch (Exception ignored) {
             }
@@ -81,10 +100,20 @@ public class RtcSignalManager {
         try {
             RtcSignal s = RtcSignal.fromTransportText(text);
             if (s == null) return false;
-            if (!TextUtils.isEmpty(s.toUid) && !TextUtils.equals(s.toUid, myUid)) return true;
-            if (!TextUtils.isEmpty(s.fromUid) && TextUtils.equals(s.fromUid, myUid)) return true;
-            if (RtcSignal.INVITE.equals(s.type) && s.isExpired()) return true;
+            if (!TextUtils.isEmpty(s.toUid) && !TextUtils.equals(s.toUid, myUid)) {
+                Log.i(TAG, "skip rtc signal for other uid, type=" + s.type + ", callId=" + s.callId + ", to=" + s.toUid + ", me=" + myUid);
+                return true;
+            }
+            if (!TextUtils.isEmpty(s.fromUid) && TextUtils.equals(s.fromUid, myUid)) {
+                Log.i(TAG, "skip self rtc signal, type=" + s.type + ", callId=" + s.callId);
+                return true;
+            }
+            if (RtcSignal.INVITE.equals(s.type) && s.isExpired()) {
+                Log.i(TAG, "skip expired invite, callId=" + s.callId);
+                return true;
+            }
             if (rememberSignal(s)) return true;
+            Log.i(TAG, "dispatch rtc signal type=" + s.type + ", callId=" + s.callId + ", from=" + s.fromUid + ", to=" + s.toUid);
             if (delegate != null) delegate.onRtcSignal(s);
             return true;
         } catch (Exception e) {
