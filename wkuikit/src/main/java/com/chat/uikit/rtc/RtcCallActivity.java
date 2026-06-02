@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
@@ -529,8 +530,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         v.setCompoundDrawablePadding(dp(6));
         try {
             Drawable d = new IconicsDrawable(this, icon)
-                    .colorInt(Color.WHITE)
                     .sizeDp(22);
+            d.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);
             v.setCompoundDrawablesWithIntrinsicBounds(null, d, null, null);
         } catch (Throwable ignored) {
             v.setCompoundDrawables(null, null, null, null);
