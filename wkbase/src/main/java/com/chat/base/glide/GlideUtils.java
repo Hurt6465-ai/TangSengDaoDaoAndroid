@@ -2,15 +2,15 @@ package com.chat.base.glide;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.res.AssetFileDescriptor;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.database.Cursor;
 import android.net.Uri;
 import android.provider.MediaStore;
+import android.provider.OpenableColumns;
 import android.text.TextUtils;
 import android.widget.ImageView;
 
@@ -54,6 +54,7 @@ import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import top.zibin.luban.Luban;
 import top.zibin.luban.OnCompressListener;
@@ -356,153 +357,212 @@ public class GlideUtils {
         compressImg(context, list, icompressListener);
     }
 
-    /**
-     * 统一聊天图片压缩规则：
-     * 1) 小于 100KB 的 WebP 原样保留，避免越压越大、越压越糊。
-     * 2) 小于 100KB 的非 WebP 只做格式转换，输出 WebP，不缩尺寸。
-     * 3) 大于等于 100KB 的图片统一压缩并输出 WebP。
-     * 4) GIF 保留原图，避免动图被 BitmapFactory 解成静态首帧。
-     */
-    private static final long SMALL_IMAGE_BYTES = 100L * 1024L;
+    private static final long SMALL_WEBP_LIMIT_BYTES = 100L * 1024L;
     private static final int MAX_COMPRESS_SIDE = 1440;
-    private static final int SMALL_CONVERT_QUALITY = 88;
-    private static final int NORMAL_COMPRESS_QUALITY = 76;
+    private static final int WEBP_QUALITY = 76;
 
     /**
      * 压缩图片
      *
-     * @param context context
-     * @param paths   图片本地地址
+     * 规则：
+     * 1. WebP < 100KB：不压缩，保留原文件。
+     * 2. WebP >= 100KB：压缩，仍输出 WebP。
+     * 3. 非 WebP < 100KB：不缩尺寸，只转换成 WebP。
+     * 4. 非 WebP >= 100KB：缩放压缩并输出 WebP。
+     * 5. GIF：保留动画，不转静态 WebP。
      */
     public void compressImg(Context context, List<String> paths, final ICompressListener iCompressListener) {
-        if (iCompressListener == null) return;
-        if (paths == null || paths.isEmpty()) {
-            iCompressListener.onResult(new ArrayList<>());
-            return;
-        }
         new Thread(() -> {
             List<File> result = new ArrayList<>();
-            for (String path : paths) {
-                File file = compressSourceToWebp(context, path);
-                if (file != null) {
-                    result.add(file);
+            if (paths != null) {
+                for (String path : paths) {
+                    String outPath = compressLocalImageToWebpIfNeeded(context, path);
+                    if (!TextUtils.isEmpty(outPath)) {
+                        File file = new File(normalizeFilePath(outPath));
+                        if (file.exists()) {
+                            result.add(file);
+                        }
+                    }
                 }
             }
-            new Handler(Looper.getMainLooper()).post(() -> iCompressListener.onResult(result));
+            new Handler(Looper.getMainLooper()).post(() -> {
+                if (iCompressListener != null) {
+                    iCompressListener.onResult(result);
+                }
+            });
         }).start();
     }
 
-    public interface ICompressListener {
-        void onResult(List<File> files);
-    }
-
-    private static class ImageFileCompressEngine implements CompressFileEngine {
-
-        @Override
-        public void onStartCompress(Context context, ArrayList<Uri> source, OnKeyValueResultCallbackListener call) {
-            if (source == null || source.isEmpty()) return;
-            new Thread(() -> {
-                for (Uri uri : source) {
-                    String sourceKey = uri == null ? "" : uri.toString();
-                    String callbackPath = null;
-                    File compressed = compressSourceToWebp(context, sourceKey);
-                    if (compressed != null) {
-                        callbackPath = compressed.getAbsolutePath();
-                    }
-                    if (call != null) {
-                        call.onCallback(sourceKey, callbackPath);
-                    }
-                }
-            }).start();
+    private static String compressLocalImageToWebpIfNeeded(Context context, String path) {
+        if (TextUtils.isEmpty(path)) return path;
+        String lower = path.toLowerCase(Locale.US);
+        if (lower.startsWith("http://") || lower.startsWith("https://")) return path;
+        if (lower.endsWith(".gif")) return path;
+        if (lower.startsWith("content://")) {
+            return compressUriImageToWebpIfNeeded(context, Uri.parse(path), "content");
         }
+
+        String localPath = normalizeFilePath(path);
+        File source = new File(localPath);
+        if (!source.exists() || !source.isFile()) return path;
+        if (isWebpPath(localPath) && source.length() < SMALL_WEBP_LIMIT_BYTES) return localPath;
+        return decodeAndWriteWebp(localPath, source.getName());
     }
 
-    private static File compressSourceToWebp(Context context, String source) {
-        if (context == null || TextUtils.isEmpty(source)) return null;
+    private static String compressUriImageToWebpIfNeeded(Context context, Uri uri, String sourceName) {
+        if (context == null || uri == null) return null;
+        String mime = "";
         try {
-            if (isGifSource(context, source)) {
-                return getOriginalFileOrCopy(context, source, "gif");
-            }
-
-            long sourceSize = getSourceLength(context, source);
-            File localFile = getExistingLocalFile(source);
-            if (isWebpSource(context, source) && sourceSize > 0 && sourceSize < SMALL_IMAGE_BYTES) {
-                return getOriginalFileOrCopy(context, source, "webp");
-            }
-
-            boolean smallConvertOnly = sourceSize > 0 && sourceSize < SMALL_IMAGE_BYTES;
-            Bitmap bitmap = decodeBitmap(context, source, smallConvertOnly ? Integer.MAX_VALUE : MAX_COMPRESS_SIDE);
-            if (bitmap == null) {
-                return localFile;
-            }
-
-            File dir = new File(WKConstants.imageDir);
-            if (!dir.exists()) {
-                //noinspection ResultOfMethodCallIgnored
-                dir.mkdirs();
-            }
-            File out = new File(dir, DateUtils.getCreateFileName("CMP_") + "_" + System.nanoTime() + ".webp");
-            FileOutputStream outputStream = null;
-            try {
-                outputStream = new FileOutputStream(out);
-                int quality = smallConvertOnly ? SMALL_CONVERT_QUALITY : NORMAL_COMPRESS_QUALITY;
-                boolean ok = bitmap.compress(getWebpCompressFormat(), quality, outputStream);
-                outputStream.flush();
-                return ok && out.exists() && out.length() > 0 ? out : localFile;
-            } finally {
-                if (outputStream != null) {
-                    try {
-                        outputStream.close();
-                    } catch (Exception ignored) {
-                    }
-                }
-                if (!bitmap.isRecycled()) {
-                    bitmap.recycle();
-                }
-            }
-        } catch (Exception e) {
-            WKLogUtils.e("compress image to webp failed: " + e.getMessage());
-            return getExistingLocalFile(source);
+            mime = context.getContentResolver().getType(uri);
+        } catch (Exception ignored) {
         }
-    }
+        String uriString = uri.toString();
+        boolean isGif = (!TextUtils.isEmpty(mime) && mime.toLowerCase(Locale.US).contains("gif"))
+                || uriString.toLowerCase(Locale.US).endsWith(".gif");
+        if (isGif) return uriString;
 
-    private static Bitmap decodeBitmap(Context context, String source, int maxSide) {
+        boolean isWebp = (!TextUtils.isEmpty(mime) && mime.toLowerCase(Locale.US).contains("webp"))
+                || uriString.toLowerCase(Locale.US).endsWith(".webp");
+        long size = getUriSize(context, uri);
+        if (isWebp && size > 0 && size < SMALL_WEBP_LIMIT_BYTES) {
+            // 返回 null 让 PictureSelector 使用原文件；content uri 原样传给 File 不可靠。
+            return null;
+        }
+
+        Bitmap bitmap = null;
+        FileOutputStream outputStream = null;
+        File out = null;
+        InputStream boundsStream = null;
+        InputStream inputStream = null;
         try {
             BitmapFactory.Options bounds = new BitmapFactory.Options();
             bounds.inJustDecodeBounds = true;
-            decodeSource(context, source, bounds);
+            boundsStream = context.getContentResolver().openInputStream(uri);
+            BitmapFactory.decodeStream(boundsStream, null, bounds);
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
 
             int sample = 1;
-            if (maxSide != Integer.MAX_VALUE) {
-                while (bounds.outWidth / sample > maxSide || bounds.outHeight / sample > maxSide) {
-                    sample *= 2;
-                }
+            while (bounds.outWidth / sample > MAX_COMPRESS_SIDE || bounds.outHeight / sample > MAX_COMPRESS_SIDE) {
+                sample *= 2;
             }
-
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inSampleSize = Math.max(1, sample);
             options.inPreferredConfig = Bitmap.Config.RGB_565;
-            return decodeSource(context, source, options);
+            inputStream = context.getContentResolver().openInputStream(uri);
+            bitmap = BitmapFactory.decodeStream(inputStream, null, options);
+            if (bitmap == null) return null;
+
+            out = createTargetWebpFile(sourceName);
+            outputStream = new FileOutputStream(out);
+            boolean ok = bitmap.compress(getWebpCompressFormatCompat(), WEBP_QUALITY, outputStream);
+            outputStream.flush();
+            return ok && out.exists() && out.length() > 0 ? out.getAbsolutePath() : null;
         } catch (Exception ignored) {
             return null;
-        }
-    }
-
-    private static Bitmap decodeSource(Context context, String source, BitmapFactory.Options options) throws Exception {
-        if (isContentUri(source)) {
-            InputStream inputStream = null;
+        } finally {
             try {
-                inputStream = context.getContentResolver().openInputStream(Uri.parse(source));
-                return BitmapFactory.decodeStream(inputStream, null, options);
-            } finally {
+                if (boundsStream != null) boundsStream.close();
+            } catch (Exception ignored) {
+            }
+            try {
                 if (inputStream != null) inputStream.close();
+            } catch (Exception ignored) {
+            }
+            try {
+                if (outputStream != null) outputStream.close();
+            } catch (Exception ignored) {
+            }
+            if (bitmap != null && !bitmap.isRecycled()) bitmap.recycle();
+            if (out != null && out.exists() && out.length() <= 0) {
+                //noinspection ResultOfMethodCallIgnored
+                out.delete();
             }
         }
-        return BitmapFactory.decodeFile(stripFileScheme(source), options);
     }
 
-    private static Bitmap.CompressFormat getWebpCompressFormat() {
+    private static String decodeAndWriteWebp(String localPath, String sourceName) {
+        Bitmap bitmap = null;
+        FileOutputStream outputStream = null;
+        File out = null;
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(localPath, bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return localPath;
+
+            int sample = 1;
+            while (bounds.outWidth / sample > MAX_COMPRESS_SIDE || bounds.outHeight / sample > MAX_COMPRESS_SIDE) {
+                sample *= 2;
+            }
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = Math.max(1, sample);
+            options.inPreferredConfig = Bitmap.Config.RGB_565;
+            bitmap = BitmapFactory.decodeFile(localPath, options);
+            if (bitmap == null) return localPath;
+
+            out = createTargetWebpFile(sourceName);
+            outputStream = new FileOutputStream(out);
+            boolean ok = bitmap.compress(getWebpCompressFormatCompat(), WEBP_QUALITY, outputStream);
+            outputStream.flush();
+            return ok && out.exists() && out.length() > 0 ? out.getAbsolutePath() : localPath;
+        } catch (Exception ignored) {
+            return localPath;
+        } finally {
+            try {
+                if (outputStream != null) outputStream.close();
+            } catch (Exception ignored) {
+            }
+            if (bitmap != null && !bitmap.isRecycled()) bitmap.recycle();
+            if (out != null && out.exists() && out.length() <= 0) {
+                //noinspection ResultOfMethodCallIgnored
+                out.delete();
+            }
+        }
+    }
+
+    private static File createTargetWebpFile(String sourceName) {
+        File dir = new File(WKConstants.imageDir);
+        if (!dir.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            dir.mkdirs();
+        }
+        String safe = TextUtils.isEmpty(sourceName) ? "img" : sourceName.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+        return new File(dir, DateUtils.getCreateFileName("CMP_") + "_" + Math.abs(safe.hashCode()) + ".webp");
+    }
+
+    private static String normalizeFilePath(String path) {
+        if (TextUtils.isEmpty(path)) return path;
+        if (path.startsWith("file://")) {
+            try {
+                String real = Uri.parse(path).getPath();
+                return TextUtils.isEmpty(real) ? path.substring("file://".length()) : real;
+            } catch (Exception ignored) {
+                return path.substring("file://".length());
+            }
+        }
+        return path;
+    }
+
+    private static boolean isWebpPath(String path) {
+        return !TextUtils.isEmpty(path) && path.toLowerCase(Locale.US).endsWith(".webp");
+    }
+
+    private static long getUriSize(Context context, Uri uri) {
+        Cursor cursor = null;
+        try {
+            cursor = context.getContentResolver().query(uri, new String[]{OpenableColumns.SIZE}, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                int index = cursor.getColumnIndex(OpenableColumns.SIZE);
+                if (index >= 0) return cursor.getLong(index);
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return -1;
+    }
+
+    private static Bitmap.CompressFormat getWebpCompressFormatCompat() {
         if (Build.VERSION.SDK_INT >= 30) {
             try {
                 return Bitmap.CompressFormat.valueOf("WEBP_LOSSY");
@@ -513,110 +573,33 @@ public class GlideUtils {
         return Bitmap.CompressFormat.WEBP;
     }
 
-    private static File getOriginalFileOrCopy(Context context, String source, String extension) {
-        File local = getExistingLocalFile(source);
-        if (local != null) return local;
-        if (!isContentUri(source)) return null;
-        InputStream inputStream = null;
-        FileOutputStream outputStream = null;
-        try {
-            File dir = new File(WKConstants.imageDir);
-            if (!dir.exists()) {
-                //noinspection ResultOfMethodCallIgnored
-                dir.mkdirs();
-            }
-            File out = new File(dir, DateUtils.getCreateFileName("SRC_") + "_" + System.nanoTime() + "." + extension);
-            inputStream = context.getContentResolver().openInputStream(Uri.parse(source));
-            if (inputStream == null) return null;
-            outputStream = new FileOutputStream(out);
-            byte[] buffer = new byte[16 * 1024];
-            int len;
-            while ((len = inputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, len);
-            }
-            outputStream.flush();
-            return out.exists() && out.length() > 0 ? out : null;
-        } catch (Exception ignored) {
-            return null;
-        } finally {
-            if (inputStream != null) {
-                try {
-                    inputStream.close();
-                } catch (Exception ignored) {
+    public interface ICompressListener {
+        void onResult(List<File> files);
+    }
+
+    private static class ImageFileCompressEngine implements CompressFileEngine {
+
+        @Override
+        public void onStartCompress(Context context, ArrayList<Uri> source, OnKeyValueResultCallbackListener call) {
+            new Thread(() -> {
+                if (source == null) return;
+                for (Uri uri : source) {
+                    String src = uri == null ? "" : uri.toString();
+                    String compressed;
+                    if (uri != null && "file".equalsIgnoreCase(uri.getScheme())) {
+                        compressed = compressLocalImageToWebpIfNeeded(context, uri.getPath());
+                        if (TextUtils.equals(compressed, uri.getPath())) {
+                            compressed = null;
+                        }
+                    } else {
+                        compressed = compressUriImageToWebpIfNeeded(context, uri, src);
+                    }
+                    if (call != null) {
+                        call.onCallback(src, compressed);
+                    }
                 }
-            }
-            if (outputStream != null) {
-                try {
-                    outputStream.close();
-                } catch (Exception ignored) {
-                }
-            }
+            }).start();
         }
-    }
-
-    private static long getSourceLength(Context context, String source) {
-        try {
-            File file = getExistingLocalFile(source);
-            if (file != null) return file.length();
-            if (isContentUri(source)) {
-                AssetFileDescriptor afd = null;
-                try {
-                    afd = context.getContentResolver().openAssetFileDescriptor(Uri.parse(source), "r");
-                    return afd == null ? 0 : afd.getLength();
-                } finally {
-                    if (afd != null) afd.close();
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return 0;
-    }
-
-    private static File getExistingLocalFile(String source) {
-        try {
-            if (TextUtils.isEmpty(source) || isContentUri(source)) return null;
-            File file = new File(stripFileScheme(source));
-            return file.exists() ? file : null;
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private static boolean isContentUri(String source) {
-        return !TextUtils.isEmpty(source) && source.toLowerCase().startsWith("content://");
-    }
-
-    private static String stripFileScheme(String source) {
-        if (!TextUtils.isEmpty(source) && source.toLowerCase().startsWith("file://")) {
-            return Uri.parse(source).getPath();
-        }
-        return source;
-    }
-
-    private static boolean isWebpSource(Context context, String source) {
-        String lower = source == null ? "" : source.toLowerCase();
-        if (lower.endsWith(".webp")) return true;
-        if (isContentUri(source)) {
-            try {
-                String type = context.getContentResolver().getType(Uri.parse(source));
-                return type != null && type.toLowerCase().contains("webp");
-            } catch (Exception ignored) {
-            }
-        }
-        return false;
-    }
-
-    private static boolean isGifSource(Context context, String source) {
-        String lower = source == null ? "" : source.toLowerCase();
-        if (lower.endsWith(".gif")) return true;
-        if (isContentUri(source)) {
-            try {
-                String type = context.getContentResolver().getType(Uri.parse(source));
-                return type != null && type.toLowerCase().contains("gif");
-            } catch (Exception ignored) {
-            }
-        }
-        return false;
     }
 
 }
