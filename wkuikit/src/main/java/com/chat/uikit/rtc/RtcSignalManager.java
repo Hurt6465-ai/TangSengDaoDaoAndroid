@@ -51,7 +51,7 @@ public class RtcSignalManager {
     }
 
     public static String extractSignalText(WKMsg msg) {
-        if (msg == null || msg.type != WKContentType.WK_TEXT) return "";
+        if (msg == null || (msg.type != WKContentType.WK_TEXT && msg.type != WKContentType.WK_INSIDE_MSG)) return "";
 
         // 1) Prefer raw SDK content. Do not inspect media payloads or generic display text.
         String text = pickValidSignalText(msg.content);
