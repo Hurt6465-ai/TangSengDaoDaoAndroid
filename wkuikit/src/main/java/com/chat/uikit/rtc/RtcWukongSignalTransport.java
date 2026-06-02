@@ -2,7 +2,6 @@ package com.chat.uikit.rtc;
 
 import android.text.TextUtils;
 
-import com.chat.base.msgitem.WKContentType;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -14,14 +13,17 @@ import java.lang.reflect.Field;
 /**
  * WuKong IM transport for WebRTC signaling.
  *
- * Reliability first:
- * - Send RTC signaling as normal WK_TEXT so the other device receives invite/offer/answer/ice
- *   through the same path as normal chat messages.
- * - Do NOT force WK_INSIDE_MSG and do NOT force noPersist here. Some WuKong SDK/server
- *   combinations will not deliver those packets to the peer listener, which makes the callee
- *   unable to receive incoming calls.
- * - The chat UI must hide these packets with RtcSignalManager's strict prefix/protocol/type check.
- * - We still best-effort set noUnread/receipt=0/expire to reduce unread pollution.
+ * This class must balance two requirements:
+ * 1) The peer must receive invite/offer/answer/ice in the normal online message listener.
+ * 2) Signaling packets must not become chat bubbles, unread badges, or cache pollution.
+ *
+ * Important implementation detail for WuKongIM:
+ * - Keep payload as WK_TEXT. Do not change content.type to WK_INSIDE_MSG; some SDK/server
+ *   combinations will not deliver those packets through the RTC listener used by the app.
+ * - Use WKSendOptions.header.noPersist = true so the packet is an online signaling packet,
+ *   not a stored chat message.
+ * - Use WKSendOptions.header.redDot = false. WuKongIM uses redDot to decide whether the
+ *   peer should show unread/red-dot behavior; there is no noUnread field in the SDK header.
  */
 public class RtcWukongSignalTransport implements RtcSignalTransport {
     private static final int SIGNAL_EXPIRE_SECONDS = 5 * 60;
@@ -31,44 +33,53 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         if (TextUtils.isEmpty(peerUid) || TextUtils.isEmpty(payload)) return;
 
         WKTextContent content = new WKTextContent(payload);
-        try {
-            content.type = WKContentType.WK_TEXT;
-        } catch (Exception ignored) {
-        }
-
         WKChannel channel = new WKChannel(peerUid, WKChannelType.PERSONAL);
         WKSendOptions options = new WKSendOptions();
-        options.expire = SIGNAL_EXPIRE_SECONDS;
 
-        markSignalButKeepDeliverable(content);
-        markSignalButKeepDeliverable(options);
-
+        applyRealtimeSignalOptions(options);
         WKIM.getInstance().getMsgManager().sendWithOptions(content, channel, options);
     }
 
-    /**
-     * Do not set noPersist here. noPersist/inside can break incoming-call delivery on some SDKs.
-     */
-    private void markSignalButKeepDeliverable(Object object) {
+    private void applyRealtimeSignalOptions(WKSendOptions options) {
+        if (options == null) return;
+        options.expire = SIGNAL_EXPIRE_SECONDS;
+        try {
+            if (options.header != null) {
+                // Online delivery, no local/remote chat cache pollution.
+                options.header.noPersist = true;
+                // This is the real unread/red-dot switch in WKMsgHeader.
+                options.header.redDot = false;
+                // Do not set syncOnce. Multi-device users should still be able to receive calls.
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            if (options.setting != null) {
+                options.setting.receipt = 0;
+                options.setting.stream = 0;
+            }
+        } catch (Exception ignored) {
+        }
+
+        // Reflection fallback for older/newer SDK variants or obfuscated fields.
+        markByReflection(options);
+        markByReflection(getFieldValue(options, "header"));
+        markByReflection(getFieldValue(options, "setting"));
+    }
+
+    private void markByReflection(Object object) {
         if (object == null) return;
-        setBooleanField(object, "noUnread", true);
-        setBooleanField(object, "no_unread", true);
+        setBooleanField(object, "noPersist", true);
+        setBooleanField(object, "no_persist", true);
+        setBooleanField(object, "redDot", false);
+        setBooleanField(object, "red_dot", false);
+        setIntField(object, "receipt", 0);
+        setIntField(object, "stream", 0);
         setIntField(object, "expire", SIGNAL_EXPIRE_SECONDS);
-
-        Object header = getFieldValue(object, "header");
-        if (header != null && header != object) {
-            setBooleanField(header, "noUnread", true);
-            setBooleanField(header, "no_unread", true);
-        }
-
-        Object setting = getFieldValue(object, "setting");
-        if (setting != null && setting != object) {
-            setIntField(setting, "receipt", 0);
-            setIntField(setting, "stream", 0);
-        }
     }
 
     private Object getFieldValue(Object object, String name) {
+        if (object == null) return null;
         try {
             Field f = object.getClass().getField(name);
             f.setAccessible(true);
@@ -79,6 +90,7 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
     }
 
     private void setBooleanField(Object object, String name, boolean value) {
+        if (object == null) return;
         try {
             Field f = object.getClass().getField(name);
             f.setAccessible(true);
@@ -92,6 +104,7 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
     }
 
     private void setIntField(Object object, String name, int value) {
+        if (object == null) return;
         try {
             Field f = object.getClass().getField(name);
             f.setAccessible(true);
