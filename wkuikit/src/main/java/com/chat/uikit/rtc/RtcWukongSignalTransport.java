@@ -2,11 +2,11 @@ package com.chat.uikit.rtc;
 
 import android.text.TextUtils;
 
+import com.chat.base.msgitem.WKContentType;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 import com.xinbida.wukongim.entity.WKSendOptions;
-import com.chat.base.msgitem.WKContentType;
 import com.xinbida.wukongim.msgmodel.WKTextContent;
 
 import java.lang.reflect.Field;
@@ -14,10 +14,14 @@ import java.lang.reflect.Field;
 /**
  * WuKong IM transport for WebRTC signaling.
  *
- * Important:
- * These packets are not user messages. They should not create chat bubbles or unread counts.
- * Different WuKong SDK versions expose the no-persist/no-unread flags in different places,
- * so this class sets all known flags by reflection and still keeps a short expire time.
+ * Reliability first:
+ * - Send RTC signaling as normal WK_TEXT so the other device receives invite/offer/answer/ice
+ *   through the same path as normal chat messages.
+ * - Do NOT force WK_INSIDE_MSG and do NOT force noPersist here. Some WuKong SDK/server
+ *   combinations will not deliver those packets to the peer listener, which makes the callee
+ *   unable to receive incoming calls.
+ * - The chat UI must hide these packets with RtcSignalManager's strict prefix/protocol/type check.
+ * - We still best-effort set noUnread/receipt=0/expire to reduce unread pollution.
  */
 public class RtcWukongSignalTransport implements RtcSignalTransport {
     private static final int SIGNAL_EXPIRE_SECONDS = 5 * 60;
@@ -25,37 +29,34 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
     @Override
     public void sendSignal(String peerUid, String payload) throws Exception {
         if (TextUtils.isEmpty(peerUid) || TextUtils.isEmpty(payload)) return;
+
         WKTextContent content = new WKTextContent(payload);
-        // RTC packets are not chat messages. Mark them as inside/no-persist as early
-        // as possible so they do not enter conversation cache or unread counters.
         try {
-            content.type = WKContentType.WK_INSIDE_MSG;
+            content.type = WKContentType.WK_TEXT;
         } catch (Exception ignored) {
         }
+
         WKChannel channel = new WKChannel(peerUid, WKChannelType.PERSONAL);
         WKSendOptions options = new WKSendOptions();
         options.expire = SIGNAL_EXPIRE_SECONDS;
 
-        // Best-effort compatibility across WuKong SDK versions.
-        // If a field does not exist, reflection just ignores it.
-        markNoPersistAndNoUnread(content);
-        markNoPersistAndNoUnread(options);
+        markSignalButKeepDeliverable(content);
+        markSignalButKeepDeliverable(options);
 
         WKIM.getInstance().getMsgManager().sendWithOptions(content, channel, options);
     }
 
-    private void markNoPersistAndNoUnread(Object object) {
+    /**
+     * Do not set noPersist here. noPersist/inside can break incoming-call delivery on some SDKs.
+     */
+    private void markSignalButKeepDeliverable(Object object) {
         if (object == null) return;
-        setBooleanField(object, "noPersist", true);
-        setBooleanField(object, "no_persist", true);
         setBooleanField(object, "noUnread", true);
         setBooleanField(object, "no_unread", true);
         setIntField(object, "expire", SIGNAL_EXPIRE_SECONDS);
 
         Object header = getFieldValue(object, "header");
         if (header != null && header != object) {
-            setBooleanField(header, "noPersist", true);
-            setBooleanField(header, "no_persist", true);
             setBooleanField(header, "noUnread", true);
             setBooleanField(header, "no_unread", true);
         }
