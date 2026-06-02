@@ -4,6 +4,9 @@ import android.text.TextUtils;
 
 import com.chat.base.msgitem.WKContentType;
 import com.chat.uikit.rtc.model.RtcSignal;
+import com.xinbida.wukongim.WKIM;
+import com.xinbida.wukongim.entity.WKChannel;
+import com.xinbida.wukongim.entity.WKChannelType;
 import com.xinbida.wukongim.entity.WKMsg;
 
 import org.json.JSONObject;
@@ -182,13 +185,35 @@ public class RtcSignalManager {
         transport.sendSignal(signal.toUid, signal.toTransportText());
     }
 
-    public void sendInvite(String callId, String toUid, String name, String avatar, int callType) throws Exception {
+    public void sendInvite(String callId, String toUid, String ignoredPeerName, String ignoredPeerAvatar, int callType) throws Exception {
         RtcSignal s = RtcSignal.base(RtcSignal.INVITE, callId, myUid, toUid);
         s.mode = RtcConstants.modeOf(callType);
-        s.fromName = name;
-        s.fromAvatar = avatar;
+        // INVITE must carry caller profile, not the callee profile shown in caller UI.
+        s.fromName = getSelfName();
+        s.fromAvatar = getSelfAvatar();
         s.expiresAt = System.currentTimeMillis() + 45_000;
         send(s);
+    }
+
+    private String getSelfName() {
+        try {
+            WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(myUid, WKChannelType.PERSONAL);
+            if (channel != null) {
+                String name = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
+                if (!TextUtils.isEmpty(name)) return name;
+            }
+        } catch (Exception ignored) {
+        }
+        return TextUtils.isEmpty(myUid) ? "好友" : myUid;
+    }
+
+    private String getSelfAvatar() {
+        try {
+            WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(myUid, WKChannelType.PERSONAL);
+            if (channel != null && !TextUtils.isEmpty(channel.avatar)) return channel.avatar;
+        } catch (Exception ignored) {
+        }
+        return "";
     }
 
     public void sendSimple(String type, String callId, String toUid) throws Exception {
