@@ -1,14 +1,16 @@
 package com.chat.uikit.rtc;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
-import android.media.projection.MediaProjectionManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -20,16 +22,17 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
-import androidx.core.graphics.drawable.DrawableCompat;
 
 import com.chat.uikit.R;
 import com.chat.uikit.rtc.model.RtcSignal;
+import com.mikepenz.fontawesome_typeface_library.FontAwesome;
+import com.mikepenz.iconics.IconicsDrawable;
 
 import org.webrtc.EglBase;
 import org.webrtc.IceCandidate;
@@ -38,17 +41,22 @@ import org.webrtc.RendererCommon;
 import org.webrtc.SessionDescription;
 import org.webrtc.SurfaceViewRenderer;
 
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class RtcCallActivity extends Activity implements RtcPeerClient.Events, RtcCallManager.ActiveCallListener {
     private static final int REQ_PERMISSIONS = 7001;
-    private static final int REQ_SCREEN_SHARE = 7002;
     private static final long CONTROLS_AUTO_HIDE_MS = 2000L;
 
     private String callId;
     private String peerUid;
     private String peerName;
+    private String peerAvatar;
     private int callType;
     private boolean incoming;
     private boolean accepted;
@@ -58,7 +66,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private boolean cameraOn = true;
     private boolean localFullScreen;
     private boolean controlsVisible = true;
-    private boolean screenSharing;
     private boolean weakMode;
 
     private EglBase eglBase;
@@ -68,23 +75,25 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private Runnable pendingPermissionAction;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final List<RtcSignal> localPending = new ArrayList<>();
+    private final ExecutorService avatarExecutor = Executors.newSingleThreadExecutor();
 
     private FrameLayout root;
     private SurfaceViewRenderer remoteRenderer;
     private SurfaceViewRenderer localRenderer;
     private FrameLayout localContainer;
     private LinearLayout topInfo;
+    private ImageView avatarImage;
     private TextView avatarText;
     private TextView nameText;
     private TextView statusText;
     private LinearLayout controlsLayout;
+    private LinearLayout sideControlsLayout;
     private LinearLayout incomingLayout;
     private TextView micBtn;
     private TextView speakerBtn;
     private TextView endBtn;
     private TextView camBtn;
     private TextView flipBtn;
-    private TextView shareBtn;
     private long connectedAt;
 
     private final Runnable timerRunnable = new Runnable() {
@@ -131,11 +140,14 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         try { RtcSignalManager.get().sendDescription(callId, peerUid, description); }
         catch (Exception e) { runOnUiThread(() -> toast(getString(R.string.rtc_send_sdp_failed))); }
     }
+
     @Override public void onIceCandidate(IceCandidate candidate) {
         try { RtcSignalManager.get().sendIce(callId, peerUid, candidate); }
         catch (Exception e) { runOnUiThread(() -> toast(getString(R.string.rtc_send_ice_failed))); }
     }
+
     @Override public void onIceConnected() { runOnUiThread(this::markConnected); }
+
     @Override public void onIceDisconnected() {
         runOnUiThread(() -> {
             if (ending) return;
@@ -145,13 +157,18 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             showCallControls();
         });
     }
-    @Override public void onRemoteVideoTrack() { runOnUiThread(() -> { if (RtcConstants.isVideo(callType)) avatarText.setVisibility(View.GONE); }); }
-    @Override public void onError(String message, Throwable error) { runOnUiThread(() -> { toast(message == null ? getString(R.string.rtc_call_error) : message); endCall(true); }); }
+
+    @Override public void onRemoteVideoTrack() { runOnUiThread(() -> { if (RtcConstants.isVideo(callType)) hideAvatar(); }); }
+
+    @Override public void onError(String message, Throwable error) {
+        runOnUiThread(() -> { toast(message == null ? getString(R.string.rtc_call_error) : message); endCall(true); });
+    }
 
     private void readIntent() {
         callId = getIntent().getStringExtra(RtcConstants.EXTRA_CALL_ID);
         peerUid = getIntent().getStringExtra(RtcConstants.EXTRA_PEER_UID);
         peerName = getIntent().getStringExtra(RtcConstants.EXTRA_PEER_NAME);
+        peerAvatar = getIntent().getStringExtra(RtcConstants.EXTRA_PEER_AVATAR);
         callType = getIntent().getIntExtra(RtcConstants.EXTRA_CALL_TYPE, RtcConstants.AUDIO);
         incoming = getIntent().getBooleanExtra(RtcConstants.EXTRA_INCOMING, false);
         if (TextUtils.isEmpty(callId)) callId = RtcCallManager.get().createCallId();
@@ -164,24 +181,29 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         localRenderer = findViewById(R.id.localRenderer);
         localContainer = findViewById(R.id.localContainer);
         topInfo = findViewById(R.id.topInfo);
+        avatarImage = findViewById(R.id.avatarImage);
         avatarText = findViewById(R.id.avatarText);
         nameText = findViewById(R.id.nameText);
         statusText = findViewById(R.id.statusText);
         controlsLayout = findViewById(R.id.controlsLayout);
+        sideControlsLayout = findViewById(R.id.sideControlsLayout);
         incomingLayout = findViewById(R.id.incomingLayout);
         micBtn = findViewById(R.id.micBtn);
         speakerBtn = findViewById(R.id.speakerBtn);
         endBtn = findViewById(R.id.endBtn);
         camBtn = findViewById(R.id.camBtn);
         flipBtn = findViewById(R.id.flipBtn);
-        shareBtn = findViewById(R.id.shareBtn);
 
         avatarText.setText(initial(peerName));
         avatarText.setBackground(circle(0xff334155));
+        avatarImage.setBackground(circle(0xff334155));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) avatarImage.setClipToOutline(true);
         nameText.setText(peerName);
         root.setBackground(gradient(0xff101827, 0xff162033, 0xff020617));
         localContainer.setBackground(round(0xee000000, dp(18)));
-        findViewById(R.id.controlsCard).setBackground(round(0x42000000, dp(28)));
+        findViewById(R.id.controlsCard).setBackgroundColor(Color.TRANSPARENT);
+
+        loadAvatar(peerAvatar);
 
         remoteRenderer.init(eglBase.getEglBaseContext(), null);
         remoteRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
@@ -192,21 +214,18 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         localRenderer.setEnableHardwareScaler(true);
         localRenderer.setMirror(true);
 
-        styleCallButton(micBtn, R.drawable.ic_rtc_mic, getString(R.string.rtc_mute), false);
-        styleCallButton(speakerBtn, R.drawable.ic_rtc_speaker, getString(R.string.rtc_speaker), false);
-        styleCallButton(camBtn, R.drawable.ic_rtc_video, getString(R.string.rtc_camera), false);
-        styleCallButton(flipBtn, R.drawable.ic_rtc_flip, getString(R.string.rtc_flip), false);
-        styleCallButton(shareBtn, R.drawable.ic_rtc_screen_share, getString(R.string.rtc_screen_share), false);
-        styleCallButton(endBtn, R.drawable.ic_rtc_hangup, getString(R.string.rtc_hangup), true);
+        styleCallButton(micBtn, FontAwesome.Icon.faw_microphone, getString(R.string.rtc_mute), false);
+        styleCallButton(speakerBtn, FontAwesome.Icon.faw_volume_up, getString(R.string.rtc_speaker), false);
+        styleCallButton(endBtn, FontAwesome.Icon.faw_phone_slash, getString(R.string.rtc_hangup), true);
+        styleCallButton(camBtn, FontAwesome.Icon.faw_video, getString(R.string.rtc_camera), false);
+        styleCallButton(flipBtn, FontAwesome.Icon.faw_sync_alt, getString(R.string.rtc_flip), false);
         styleIncoming(findViewById(R.id.rejectBtn), 0x33ffffff);
         styleIncoming(findViewById(R.id.acceptBtn), 0xff22c55e);
 
         boolean video = RtcConstants.isVideo(callType);
         remoteRenderer.setVisibility(video ? View.VISIBLE : View.GONE);
         localContainer.setVisibility(video ? View.VISIBLE : View.GONE);
-        camBtn.setVisibility(video ? View.VISIBLE : View.GONE);
-        flipBtn.setVisibility(video ? View.VISIBLE : View.GONE);
-        shareBtn.setVisibility(video ? View.VISIBLE : View.GONE);
+        sideControlsLayout.setVisibility(video ? View.VISIBLE : View.GONE);
         enableLocalDragAndSwap();
         root.setOnClickListener(v -> { if (connected && video) toggleControlsVisible(); });
 
@@ -215,13 +234,13 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         endBtn.setOnClickListener(v -> endCall(false));
         camBtn.setOnClickListener(v -> { toggleCamera(); keepControlsVisible(); });
         flipBtn.setOnClickListener(v -> { if (peerClient != null) peerClient.switchCamera(); keepControlsVisible(); });
-        shareBtn.setOnClickListener(v -> { toggleScreenShare(); keepControlsVisible(); });
         findViewById(R.id.rejectBtn).setOnClickListener(v -> rejectIncoming());
         findViewById(R.id.acceptBtn).setOnClickListener(v -> acceptIncoming());
     }
 
     private void showIncoming() {
         controlsLayout.setVisibility(View.GONE);
+        sideControlsLayout.setVisibility(View.GONE);
         incomingLayout.setVisibility(View.VISIBLE);
         statusText.setText(RtcConstants.isVideo(callType) ? getString(R.string.rtc_invite_video) : getString(R.string.rtc_invite_audio));
         ringPlayer.playIncoming();
@@ -230,6 +249,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private void showOutgoing() {
         incomingLayout.setVisibility(View.GONE);
         controlsLayout.setVisibility(View.VISIBLE);
+        sideControlsLayout.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
         statusText.setText(RtcConstants.isVideo(callType) ? getString(R.string.rtc_prepare_video) : getString(R.string.rtc_prepare_audio));
     }
 
@@ -237,7 +257,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         accepted = true;
         startWebRtc();
         try {
-            RtcSignalManager.get().sendInvite(callId, peerUid, peerName, getIntent().getStringExtra(RtcConstants.EXTRA_PEER_AVATAR), callType);
+            RtcSignalManager.get().sendInvite(callId, peerUid, peerName, peerAvatar, callType);
             statusText.setText(RtcConstants.isVideo(callType) ? getString(R.string.rtc_wait_accept_video) : getString(R.string.rtc_calling_audio));
             ringPlayer.playOutgoing();
             peerClient.createOffer();
@@ -254,6 +274,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         ringPlayer.stop();
         incomingLayout.setVisibility(View.GONE);
         controlsLayout.setVisibility(View.VISIBLE);
+        sideControlsLayout.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
         ensurePermissionsThen(() -> {
             try { RtcSignalManager.get().sendSimple(RtcSignal.ACCEPT, callId, peerUid); } catch (Exception ignored) {}
             statusText.setText(getString(R.string.rtc_connecting));
@@ -312,7 +333,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         weakMode = false;
         connectedAt = System.currentTimeMillis();
         statusText.setText("00:00");
-        if (RtcConstants.isVideo(callType)) avatarText.setVisibility(View.GONE);
+        if (RtcConstants.isVideo(callType)) hideAvatar();
         handler.post(timerRunnable);
         scheduleControlsHide();
     }
@@ -320,56 +341,23 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private void toggleMic() {
         micOn = !micOn;
         if (peerClient != null) peerClient.setMicEnabled(micOn);
-        styleCallButton(micBtn, micOn ? R.drawable.ic_rtc_mic : R.drawable.ic_rtc_mic_off, micOn ? getString(R.string.rtc_mute) : getString(R.string.rtc_muted), false);
+        styleCallButton(micBtn, micOn ? FontAwesome.Icon.faw_microphone : FontAwesome.Icon.faw_microphone_slash,
+                micOn ? getString(R.string.rtc_mute) : getString(R.string.rtc_muted), false);
     }
 
-    private void toggleSpeaker() {
-        updateSpeakerButton(audioManager.toggleSpeaker());
-    }
+    private void toggleSpeaker() { updateSpeakerButton(audioManager.toggleSpeaker()); }
 
     private void updateSpeakerButton(boolean on) {
-        styleCallButton(speakerBtn, on ? R.drawable.ic_rtc_speaker : R.drawable.ic_rtc_earpiece, on ? getString(R.string.rtc_speaker) : getString(R.string.rtc_earpiece), false);
+        styleCallButton(speakerBtn, on ? FontAwesome.Icon.faw_volume_up : FontAwesome.Icon.faw_phone,
+                on ? getString(R.string.rtc_speaker) : getString(R.string.rtc_earpiece), false);
     }
 
     private void toggleCamera() {
         cameraOn = !cameraOn;
         if (peerClient != null) peerClient.setCameraEnabled(cameraOn);
-        styleCallButton(camBtn, cameraOn ? R.drawable.ic_rtc_video : R.drawable.ic_rtc_video_off, cameraOn ? getString(R.string.rtc_camera) : getString(R.string.rtc_camera_off), false);
+        styleCallButton(camBtn, cameraOn ? FontAwesome.Icon.faw_video : FontAwesome.Icon.faw_video_slash,
+                cameraOn ? getString(R.string.rtc_camera) : getString(R.string.rtc_camera_off), false);
         localContainer.setVisibility(cameraOn ? View.VISIBLE : View.INVISIBLE);
-    }
-
-    private void toggleScreenShare() {
-        if (!RtcConstants.isVideo(callType) || peerClient == null) return;
-        if (screenSharing) {
-            screenSharing = false;
-            localRenderer.setMirror(true);
-            peerClient.stopScreenShare();
-            styleCallButton(shareBtn, R.drawable.ic_rtc_screen_share, getString(R.string.rtc_screen_share), false);
-            toast(getString(R.string.rtc_screen_share_stopped));
-            return;
-        }
-        try {
-            MediaProjectionManager manager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-            if (manager == null) { toast(getString(R.string.rtc_screen_share_failed)); return; }
-            startActivityForResult(manager.createScreenCaptureIntent(), REQ_SCREEN_SHARE);
-        } catch (Exception e) {
-            toast(getString(R.string.rtc_screen_share_failed));
-        }
-    }
-
-    @Override protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQ_SCREEN_SHARE) {
-            if (resultCode == RESULT_OK && data != null && peerClient != null) {
-                screenSharing = true;
-                localRenderer.setMirror(false);
-                peerClient.startScreenShare(data);
-                styleCallButton(shareBtn, R.drawable.ic_rtc_screen_share, getString(R.string.rtc_screen_sharing), false);
-                toast(getString(R.string.rtc_screen_share_started));
-            } else {
-                toast(getString(R.string.rtc_screen_share_cancelled));
-            }
-        }
     }
 
     private void endCall(boolean remoteEnded) {
@@ -385,6 +373,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
 
     private void cleanup() {
         handler.removeCallbacksAndMessages(null);
+        try { avatarExecutor.shutdownNow(); } catch (Exception ignored) {}
         try { if (ringPlayer != null) ringPlayer.stop(); } catch (Exception ignored) {}
         try { if (peerClient != null) peerClient.close(); } catch (Exception ignored) {}
         try { if (audioManager != null) audioManager.stop(); } catch (Exception ignored) {}
@@ -463,26 +452,32 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         controlsVisible = show;
         float target = show ? 1f : 0f;
         topInfo.animate().alpha(target).setDuration(180).start();
-        controlsLayout.animate().alpha(target).setDuration(180).withEndAction(() -> {
+        controlsLayout.animate().alpha(target).setDuration(180).start();
+        sideControlsLayout.animate().alpha(target).setDuration(180).withEndAction(() -> {
             topInfo.setVisibility(show ? View.VISIBLE : View.INVISIBLE);
             controlsLayout.setVisibility(show ? View.VISIBLE : View.INVISIBLE);
+            sideControlsLayout.setVisibility(show && RtcConstants.isVideo(callType) ? View.VISIBLE : View.INVISIBLE);
         }).start();
         if (show) {
             topInfo.setVisibility(View.VISIBLE);
             controlsLayout.setVisibility(View.VISIBLE);
+            sideControlsLayout.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
         }
     }
 
-    private void styleCallButton(TextView v, int iconRes, String label, boolean danger) {
+    private void styleCallButton(TextView v, FontAwesome.Icon icon, String label, boolean danger) {
         v.setText(label);
         v.setTypeface(Typeface.DEFAULT_BOLD);
-        v.setBackground(circle(danger ? 0xffef4444 : 0x30ffffff));
-        v.setCompoundDrawablePadding(dp(5));
-        Drawable d = ContextCompat.getDrawable(this, iconRes);
-        if (d != null) {
-            d = DrawableCompat.wrap(d.mutate());
-            DrawableCompat.setTint(d, 0xffffffff);
-            v.setCompoundDrawablesWithIntrinsicBounds(null, d, null, null);
+        v.setTextColor(danger ? 0xffff4b55 : 0xeeffffff);
+        v.setBackgroundColor(Color.TRANSPARENT);
+        v.setCompoundDrawablePadding(dp(2));
+        try {
+            Drawable d = new IconicsDrawable(this, icon);
+            d.setBounds(0, 0, dp(22), dp(22));
+            d.setColorFilter(danger ? 0xffff4b55 : 0xffffffff, PorterDuff.Mode.SRC_IN);
+            v.setCompoundDrawables(null, d, null, null);
+        } catch (Exception ignored) {
+            v.setCompoundDrawables(null, null, null, null);
         }
     }
 
@@ -494,4 +489,39 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private int clamp(int v, int min, int max) { return Math.max(min, Math.min(max, v)); }
     private String initial(String s) { return TextUtils.isEmpty(s) ? getString(R.string.rtc_friend_initial) : s.substring(0, 1).toUpperCase(); }
     private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_SHORT).show(); }
+
+    private void hideAvatar() {
+        avatarText.setVisibility(View.GONE);
+        avatarImage.setVisibility(View.GONE);
+    }
+
+    private void loadAvatar(String url) {
+        avatarText.setVisibility(View.VISIBLE);
+        avatarImage.setVisibility(View.GONE);
+        if (TextUtils.isEmpty(url)) return;
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            avatarExecutor.execute(() -> {
+                Bitmap bitmap = null;
+                HttpURLConnection connection = null;
+                try {
+                    connection = (HttpURLConnection) new URL(url).openConnection();
+                    connection.setConnectTimeout(6000);
+                    connection.setReadTimeout(6000);
+                    connection.setInstanceFollowRedirects(true);
+                    try (InputStream inputStream = connection.getInputStream()) {
+                        bitmap = BitmapFactory.decodeStream(inputStream);
+                    }
+                } catch (Exception ignored) {
+                } finally {
+                    if (connection != null) connection.disconnect();
+                }
+                final Bitmap finalBitmap = bitmap;
+                if (finalBitmap != null) handler.post(() -> {
+                    avatarImage.setImageBitmap(finalBitmap);
+                    avatarImage.setVisibility(View.VISIBLE);
+                    avatarText.setVisibility(View.GONE);
+                });
+            });
+        }
+    }
 }
