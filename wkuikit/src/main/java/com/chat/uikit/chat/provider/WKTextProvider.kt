@@ -6,12 +6,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.Typeface
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.provider.ContactsContract
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.Spannable
@@ -21,9 +20,9 @@ import android.text.Spanned
 import android.text.TextUtils
 import android.text.method.LinkMovementMethod
 import android.text.style.ForegroundColorSpan
-import android.text.style.SuperscriptSpan
-import android.text.style.SubscriptSpan
 import android.text.style.RelativeSizeSpan
+import android.text.style.SubscriptSpan
+import android.text.style.SuperscriptSpan
 import android.text.style.StyleSpan
 import android.util.TypedValue
 import android.view.Gravity
@@ -173,33 +172,38 @@ open class WKTextProvider : WKChatBaseProvider() {
         if (uiChatMsgItemEntity.wkMsg.baseContentMsgModel.reply != null && uiChatMsgItemEntity.wkMsg.baseContentMsgModel.reply.payload != null) {
             replyView(contentTvLayout, from, uiChatMsgItemEntity)
         }
-        bindInlineTranslate(adapterPosition, contentTvLayout, contentLayout, uiChatMsgItemEntity, from)
+        bindInlineTranslate(contentTvLayout, contentLayout, uiChatMsgItemEntity, from)
     }
 
     private val translationViewTag = "chat_inline_translation"
     private val translationButtonTag = "chat_inline_translate_button"
+    private val rtcSignalPrefix = "__cp_harmony_rtc__:"
 
     private fun bindInlineTranslate(
-        adapterPosition: Int,
         contentTvLayout: ViewGroup,
         buttonParent: ViewGroup,
         uiChatMsgItemEntity: WKUIChatMsgItemEntity,
         from: WKChatIteMsgFromType
     ) {
-        // RecyclerView 复用时必须深度清理旧按钮，否则旧 item 的翻译按钮会残留到新 item。
+        // RecyclerView 会复用 item，必须递归清理旧按钮；否则旧 view 会残留到每一条消息上。
         removeTaggedChildDeep(contentTvLayout, translationViewTag)
         removeTaggedChildDeep(contentTvLayout, translationButtonTag)
         removeTaggedChildDeep(buttonParent, translationButtonTag)
 
-        val content = getMessageText(uiChatMsgItemEntity.wkMsg)
+        val currentMsg = uiChatMsgItemEntity.wkMsg ?: return
+        val content = getMessageText(currentMsg)
         if (TextUtils.isEmpty(content)) return
-        val cacheKey = translationCacheKey(uiChatMsgItemEntity.wkMsg, content)
+        if (isRtcSignalText(content)) return
+
+        val cacheKey = translationCacheKey(currentMsg, content)
         val cached = readTranslationCache(cacheKey)
         if (cached != null && cached.expanded) {
             addTranslationView(contentTvLayout, cacheKey, cached.text)
         }
 
-        if (from == WKChatIteMsgFromType.RECEIVED && isLatestReceivedTextMessage(uiChatMsgItemEntity.wkMsg)) {
+        // 只给当前已加载列表里的“最后一条有效对方文本消息”显示快捷翻译按钮。
+        // 不再依赖 adapterPosition，也不允许异常时返回 true。
+        if (from == WKChatIteMsgFromType.RECEIVED && isLatestReceivedTextMessage(currentMsg)) {
             addQuickTranslateButton(buttonParent, uiChatMsgItemEntity, content, cacheKey, cached)
         }
     }
@@ -217,18 +221,19 @@ open class WKTextProvider : WKChatBaseProvider() {
         }
     }
 
-    private fun isLatestReceivedTextMessage(currentMsg: WKMsg?): Boolean {
-        if (!isValidReceivedTextForQuickTranslate(currentMsg)) return false
+    private fun isLatestReceivedTextMessage(currentMsg: WKMsg): Boolean {
         return try {
+            if (!isValidReceivedTextForQuickTranslate(currentMsg)) return false
             val chatAdapter = getAdapter() as? ChatAdapter ?: return false
             var latest: WKMsg? = null
-            for (item in chatAdapter.data) {
-                val msg = item?.wkMsg ?: continue
+            for (i in chatAdapter.data.size - 1 downTo 0) {
+                val msg = chatAdapter.data[i]?.wkMsg ?: continue
                 if (isValidReceivedTextForQuickTranslate(msg)) {
                     latest = msg
+                    break
                 }
             }
-            isSameMessageForTranslate(currentMsg, latest)
+            isSameMessage(currentMsg, latest)
         } catch (_: Exception) {
             false
         }
@@ -247,19 +252,27 @@ open class WKTextProvider : WKChatBaseProvider() {
         return true
     }
 
-    private fun isSameMessageForTranslate(a: WKMsg?, b: WKMsg?): Boolean {
+    private fun isRtcSignalText(text: String?): Boolean {
+        if (TextUtils.isEmpty(text)) return false
+        return text!!.trim().startsWith(rtcSignalPrefix)
+    }
+
+    private fun isSameMessage(a: WKMsg?, b: WKMsg?): Boolean {
         if (a == null || b == null) return false
-        if (a === b) return true
         if (!TextUtils.isEmpty(a.messageID) && a.messageID != "0" && TextUtils.equals(a.messageID, b.messageID)) return true
         if (!TextUtils.isEmpty(a.clientMsgNO) && TextUtils.equals(a.clientMsgNO, b.clientMsgNO)) return true
-        if (a.orderSeq > 0 && a.orderSeq == b.orderSeq) return true
+        if (a.orderSeq > 0 && a.orderSeq == b.orderSeq && TextUtils.equals(a.channelID, b.channelID) && a.channelType == b.channelType) return true
+        if (a.messageSeq > 0 && a.messageSeq == b.messageSeq && TextUtils.equals(a.channelID, b.channelID) && a.channelType == b.channelType) return true
         return false
     }
 
-    private fun isRtcSignalText(text: String?): Boolean {
-        if (TextUtils.isEmpty(text)) return false
-        val trimmed = text!!.trim()
-        return trimmed.startsWith("__cp_harmony_rtc__:")
+    private fun makeTranslateIconText(): SpannableString {
+        val text = SpannableString("文A")
+        text.setSpan(RelativeSizeSpan(1.08f), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(SuperscriptSpan(), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(RelativeSizeSpan(0.92f), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(SubscriptSpan(), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        return text
     }
 
     private fun addQuickTranslateButton(
@@ -272,23 +285,26 @@ open class WKTextProvider : WKChatBaseProvider() {
         val btn = AppCompatTextView(context)
         btn.tag = translationButtonTag
         btn.text = when {
-            cached == null -> buildTranslateGlyph()
+            cached == null -> makeTranslateIconText()
             cached.expanded -> "⌃"
             else -> "⌄"
         }
-        btn.rotation = if (cached == null) -10f else 0f
         btn.includeFontPadding = false
+        btn.rotation = if (cached == null) -10f else 0f
         btn.typeface = Typeface.DEFAULT_BOLD
-        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (cached == null) 10.5f else 14f)
-        btn.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
-        btn.gravity = Gravity.CENTER
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (cached == null) 10.5f else 13f)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             btn.letterSpacing = -0.08f
         }
+        btn.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
+        btn.gravity = Gravity.CENTER
+        btn.minWidth = 0
+        btn.minHeight = 0
+        btn.setPadding(0, 0, 0, dp(1))
         btn.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
-            // 浅色系圆底，避免压住气泡内容。
-            setColor(Color.rgb(255, 249, 252))
+            // 浅粉白，避免按钮太重。
+            setColor(Color.rgb(255, 248, 252))
             setStroke(dp(1), ColorUtils.setAlphaComponent(ContextCompat.getColor(context, R.color.colorAccent), 55))
         }
         btn.elevation = dp(1).toFloat()
@@ -308,18 +324,9 @@ open class WKTextProvider : WKChatBaseProvider() {
         }
         val lp = LinearLayout.LayoutParams(dp(24), dp(24))
         lp.gravity = Gravity.BOTTOM
-        lp.leftMargin = dp(4)
+        lp.leftMargin = dp(3)
         lp.bottomMargin = dp(2)
         parent.addView(btn, lp)
-    }
-
-    private fun buildTranslateGlyph(): SpannableString {
-        val span = SpannableString("文A")
-        span.setSpan(RelativeSizeSpan(1.06f), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        span.setSpan(SuperscriptSpan(), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        span.setSpan(RelativeSizeSpan(0.9f), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        span.setSpan(SubscriptSpan(), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        return span
     }
 
     private fun addTranslationView(parent: ViewGroup, cacheKey: String, text: String) {
@@ -1226,7 +1233,8 @@ open class WKTextProvider : WKChatBaseProvider() {
         replyLayout.orientation = LinearLayout.HORIZONTAL
         replyLayout.background = GradientDrawable().apply {
             cornerRadius = dp(8).toFloat()
-            setColor(Color.rgb(255, 248, 251))
+            setColor(Color.rgb(255, 247, 250))
+            setStroke(dp(1), Color.rgb(255, 232, 240))
         }
         contentLayout.addView(
             replyLayout, 1,
@@ -1361,8 +1369,9 @@ open class WKTextProvider : WKChatBaseProvider() {
             val myShapeDrawable = lineView.background as GradientDrawable
             myShapeDrawable.setColor(colors[index])
             userNameTv.setTextColor(colors[index])
+            // 回复气囊固定使用特浅粉色，不再按用户名颜色覆盖背景。
             val bgShapeDrawable = replyLayout.background as GradientDrawable
-            bgShapeDrawable.setColor(Color.rgb(255, 248, 251))
+            bgShapeDrawable.setColor(Color.rgb(255, 247, 250))
         }
         if (textModel.reply.revoke == 1) {
             replyContentLayout.visibility = View.GONE
