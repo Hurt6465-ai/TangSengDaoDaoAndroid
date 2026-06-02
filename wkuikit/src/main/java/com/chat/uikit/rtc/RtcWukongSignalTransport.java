@@ -51,6 +51,9 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         WKSendOptions options = new WKSendOptions();
 
         applyRealtimeSignalOptions(options);
+        // Some SDK versions copy no-persist/unread flags from content rather than options.
+        // Mark both sides so RTC packets never become visible chat bubbles.
+        markByReflection(content);
         WKIM.getInstance().getMsgManager().sendWithOptions(content, channel, options);
     }
 
@@ -101,6 +104,9 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         setFieldValue(object, "unread", false);
         setFieldValue(object, "needRedDot", false);
         setFieldValue(object, "need_red_dot", false);
+        setFieldValue(object, "persist", false);
+        setFieldValue(object, "isPersist", false);
+        setFieldValue(object, "is_persist", false);
 
         // Setting-like fields.
         setFieldValue(object, "receipt", 0);
