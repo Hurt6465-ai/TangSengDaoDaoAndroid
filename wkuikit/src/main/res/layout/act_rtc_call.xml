@@ -15,7 +15,7 @@
         android:id="@+id/gradientShade"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#4D000000" />
+        android:background="#33000000" />
 
     <LinearLayout
         android:id="@+id/topInfo"
@@ -28,20 +28,20 @@
         android:paddingRight="24dp">
 
         <FrameLayout
-            android:layout_width="106dp"
-            android:layout_height="106dp">
+            android:layout_width="108dp"
+            android:layout_height="108dp">
 
             <ImageView
                 android:id="@+id/avatarImage"
-                android:layout_width="106dp"
-                android:layout_height="106dp"
+                android:layout_width="108dp"
+                android:layout_height="108dp"
                 android:scaleType="centerCrop"
                 android:visibility="gone" />
 
             <TextView
                 android:id="@+id/avatarText"
-                android:layout_width="106dp"
-                android:layout_height="106dp"
+                android:layout_width="108dp"
+                android:layout_height="108dp"
                 android:gravity="center"
                 android:text="友"
                 android:textColor="#FFFFFF"
@@ -79,7 +79,6 @@
         android:layout_marginTop="96dp"
         android:layout_marginEnd="14dp"
         android:elevation="12dp"
-        android:padding="2dp"
         android:visibility="gone">
 
         <org.webrtc.SurfaceViewRenderer
@@ -88,37 +87,12 @@
             android:layout_height="match_parent" />
     </FrameLayout>
 
+    <!-- Kept only for compatibility with older RtcCallActivity fields. Actual video controls are in the bottom bar. -->
     <LinearLayout
         android:id="@+id/sideControlsLayout"
-        android:layout_width="72dp"
-        android:layout_height="wrap_content"
-        android:layout_gravity="end|center_vertical"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:paddingRight="8dp"
-        android:visibility="gone">
-
-        <TextView android:id="@+id/camBtn" android:layout_width="64dp"
-            android:layout_height="60dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="4dp"
-            android:gravity="center"
-            android:lines="1"
-            android:paddingTop="5dp"
-            android:paddingBottom="3dp"
-            android:textColor="#EEFFFFFF"
-            android:textSize="10sp" />
-        <TextView android:id="@+id/flipBtn" android:layout_width="64dp"
-            android:layout_height="60dp"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="4dp"
-            android:gravity="center"
-            android:lines="1"
-            android:paddingTop="5dp"
-            android:paddingBottom="3dp"
-            android:textColor="#EEFFFFFF"
-            android:textSize="10sp" />
-    </LinearLayout>
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/controlsLayout"
@@ -127,9 +101,9 @@
         android:layout_gravity="bottom"
         android:gravity="center"
         android:orientation="vertical"
-        android:paddingLeft="16dp"
-        android:paddingRight="16dp"
-        android:paddingBottom="26dp">
+        android:paddingLeft="10dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="24dp">
 
         <LinearLayout
             android:id="@+id/controlsCard"
@@ -137,47 +111,70 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingLeft="10dp"
-            android:paddingTop="6dp"
-            android:paddingRight="10dp"
-            android:paddingBottom="6dp">
+            android:paddingLeft="2dp"
+            android:paddingTop="4dp"
+            android:paddingRight="2dp"
+            android:paddingBottom="4dp">
 
             <TextView
                 android:id="@+id/micBtn"
-                android:layout_width="84dp"
-                android:layout_height="64dp"
-                android:layout_marginLeft="4dp"
-                android:layout_marginRight="4dp"
+                android:layout_width="0dp"
+                android:layout_height="62dp"
+                android:layout_weight="1"
                 android:gravity="center"
                 android:lines="1"
-                android:paddingTop="5dp"
-                android:paddingBottom="3dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="2dp"
                 android:textColor="#EEFFFFFF"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
+
             <TextView
                 android:id="@+id/speakerBtn"
-                android:layout_width="84dp"
-                android:layout_height="64dp"
-                android:layout_marginLeft="4dp"
-                android:layout_marginRight="4dp"
+                android:layout_width="0dp"
+                android:layout_height="62dp"
+                android:layout_weight="1"
                 android:gravity="center"
                 android:lines="1"
-                android:paddingTop="5dp"
-                android:paddingBottom="3dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="2dp"
                 android:textColor="#EEFFFFFF"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/camBtn"
+                android:layout_width="0dp"
+                android:layout_height="62dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:lines="1"
+                android:paddingTop="4dp"
+                android:paddingBottom="2dp"
+                android:textColor="#EEFFFFFF"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/flipBtn"
+                android:layout_width="0dp"
+                android:layout_height="62dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:lines="1"
+                android:paddingTop="4dp"
+                android:paddingBottom="2dp"
+                android:textColor="#EEFFFFFF"
+                android:textSize="10sp" />
+
             <TextView
                 android:id="@+id/endBtn"
-                android:layout_width="84dp"
-                android:layout_height="64dp"
-                android:layout_marginLeft="4dp"
-                android:layout_marginRight="4dp"
+                android:layout_width="0dp"
+                android:layout_height="62dp"
+                android:layout_weight="1"
                 android:gravity="center"
                 android:lines="1"
-                android:paddingTop="5dp"
-                android:paddingBottom="3dp"
-                android:textColor="#EEFFFFFF"
-                android:textSize="11sp" />
+                android:paddingTop="4dp"
+                android:paddingBottom="2dp"
+                android:textColor="#FFFF4B55"
+                android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
 
