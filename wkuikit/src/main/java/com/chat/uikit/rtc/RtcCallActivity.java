@@ -4,9 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
@@ -27,12 +25,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
 
 import com.chat.uikit.R;
 import com.chat.uikit.rtc.model.RtcSignal;
-
-import com.mikepenz.iconics.IconicsDrawable;
-import com.mikepenz.iconics.typeface.library.fontawesome.FontAwesome;
 
 import org.webrtc.EglBase;
 import org.webrtc.IceCandidate;
@@ -63,8 +60,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private boolean controlsVisible = true;
     private boolean screenSharing;
     private boolean weakMode;
-    private boolean ultraHd;
-    private boolean beautyOn = true;
 
     private EglBase eglBase;
     private RtcPeerClient peerClient;
@@ -83,15 +78,12 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private TextView nameText;
     private TextView statusText;
     private LinearLayout controlsLayout;
-    private LinearLayout sideToolsLayout;
     private LinearLayout incomingLayout;
     private TextView micBtn;
     private TextView speakerBtn;
     private TextView endBtn;
     private TextView camBtn;
     private TextView flipBtn;
-    private TextView qualityBtn;
-    private TextView beautyBtn;
     private TextView shareBtn;
     private long connectedAt;
 
@@ -176,15 +168,12 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         nameText = findViewById(R.id.nameText);
         statusText = findViewById(R.id.statusText);
         controlsLayout = findViewById(R.id.controlsLayout);
-        sideToolsLayout = findViewById(R.id.sideToolsLayout);
         incomingLayout = findViewById(R.id.incomingLayout);
         micBtn = findViewById(R.id.micBtn);
         speakerBtn = findViewById(R.id.speakerBtn);
         endBtn = findViewById(R.id.endBtn);
         camBtn = findViewById(R.id.camBtn);
         flipBtn = findViewById(R.id.flipBtn);
-        qualityBtn = findViewById(R.id.qualityBtn);
-        beautyBtn = findViewById(R.id.beautyBtn);
         shareBtn = findViewById(R.id.shareBtn);
 
         avatarText.setText(initial(peerName));
@@ -192,8 +181,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         nameText.setText(peerName);
         root.setBackground(gradient(0xff101827, 0xff162033, 0xff020617));
         localContainer.setBackground(round(0xee000000, dp(18)));
-        findViewById(R.id.controlsCard).setBackground(round(0x50000000, dp(34)));
-        sideToolsLayout.setBackground(round(0x50000000, dp(26)));
+        findViewById(R.id.controlsCard).setBackground(round(0x42000000, dp(28)));
 
         remoteRenderer.init(eglBase.getEglBaseContext(), null);
         remoteRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
@@ -204,25 +192,20 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         localRenderer.setEnableHardwareScaler(true);
         localRenderer.setMirror(true);
 
-        styleCallButton(micBtn, FontAwesome.Icon.faw_microphone, getString(R.string.rtc_mute), false);
-        styleCallButton(speakerBtn, FontAwesome.Icon.faw_volume_up, getString(R.string.rtc_speaker), false);
-        styleCallButton(endBtn, FontAwesome.Icon.faw_phone_slash, getString(R.string.rtc_hangup), true);
-        styleCallButton(camBtn, FontAwesome.Icon.faw_video, getString(R.string.rtc_camera), false);
-        styleCallButton(flipBtn, FontAwesome.Icon.faw_sync_alt, getString(R.string.rtc_flip), false);
-        updateQualityButton();
-        updateBeautyButton();
-        styleCallButton(shareBtn, FontAwesome.Icon.faw_desktop, getString(R.string.rtc_screen_share), false);
+        styleCallButton(micBtn, R.drawable.ic_rtc_mic, getString(R.string.rtc_mute), false);
+        styleCallButton(speakerBtn, R.drawable.ic_rtc_speaker, getString(R.string.rtc_speaker), false);
+        styleCallButton(camBtn, R.drawable.ic_rtc_video, getString(R.string.rtc_camera), false);
+        styleCallButton(flipBtn, R.drawable.ic_rtc_flip, getString(R.string.rtc_flip), false);
+        styleCallButton(shareBtn, R.drawable.ic_rtc_screen_share, getString(R.string.rtc_screen_share), false);
+        styleCallButton(endBtn, R.drawable.ic_rtc_hangup, getString(R.string.rtc_hangup), true);
         styleIncoming(findViewById(R.id.rejectBtn), 0x33ffffff);
         styleIncoming(findViewById(R.id.acceptBtn), 0xff22c55e);
 
         boolean video = RtcConstants.isVideo(callType);
         remoteRenderer.setVisibility(video ? View.VISIBLE : View.GONE);
         localContainer.setVisibility(video ? View.VISIBLE : View.GONE);
-        sideToolsLayout.setVisibility(video ? View.VISIBLE : View.GONE);
         camBtn.setVisibility(video ? View.VISIBLE : View.GONE);
         flipBtn.setVisibility(video ? View.VISIBLE : View.GONE);
-        qualityBtn.setVisibility(video ? View.VISIBLE : View.GONE);
-        beautyBtn.setVisibility(video ? View.VISIBLE : View.GONE);
         shareBtn.setVisibility(video ? View.VISIBLE : View.GONE);
         enableLocalDragAndSwap();
         root.setOnClickListener(v -> { if (connected && video) toggleControlsVisible(); });
@@ -232,8 +215,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         endBtn.setOnClickListener(v -> endCall(false));
         camBtn.setOnClickListener(v -> { toggleCamera(); keepControlsVisible(); });
         flipBtn.setOnClickListener(v -> { if (peerClient != null) peerClient.switchCamera(); keepControlsVisible(); });
-        qualityBtn.setOnClickListener(v -> { toggleQuality(); keepControlsVisible(); });
-        beautyBtn.setOnClickListener(v -> { toggleBeauty(); keepControlsVisible(); });
         shareBtn.setOnClickListener(v -> { toggleScreenShare(); keepControlsVisible(); });
         findViewById(R.id.rejectBtn).setOnClickListener(v -> rejectIncoming());
         findViewById(R.id.acceptBtn).setOnClickListener(v -> acceptIncoming());
@@ -241,7 +222,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
 
     private void showIncoming() {
         controlsLayout.setVisibility(View.GONE);
-        if (sideToolsLayout != null) sideToolsLayout.setVisibility(View.GONE);
         incomingLayout.setVisibility(View.VISIBLE);
         statusText.setText(RtcConstants.isVideo(callType) ? getString(R.string.rtc_invite_video) : getString(R.string.rtc_invite_audio));
         ringPlayer.playIncoming();
@@ -250,7 +230,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private void showOutgoing() {
         incomingLayout.setVisibility(View.GONE);
         controlsLayout.setVisibility(View.VISIBLE);
-        if (sideToolsLayout != null && RtcConstants.isVideo(callType)) sideToolsLayout.setVisibility(View.VISIBLE);
         statusText.setText(RtcConstants.isVideo(callType) ? getString(R.string.rtc_prepare_video) : getString(R.string.rtc_prepare_audio));
     }
 
@@ -275,7 +254,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         ringPlayer.stop();
         incomingLayout.setVisibility(View.GONE);
         controlsLayout.setVisibility(View.VISIBLE);
-        if (sideToolsLayout != null && RtcConstants.isVideo(callType)) sideToolsLayout.setVisibility(View.VISIBLE);
         ensurePermissionsThen(() -> {
             try { RtcSignalManager.get().sendSimple(RtcSignal.ACCEPT, callId, peerUid); } catch (Exception ignored) {}
             statusText.setText(getString(R.string.rtc_connecting));
@@ -295,8 +273,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         audioManager.start(RtcConstants.isVideo(callType));
         updateSpeakerButton(audioManager.isSpeakerOn());
         peerClient = new RtcPeerClient(this, eglBase.getEglBaseContext(), this);
-        peerClient.setBeautyEnabled(beautyOn);
-        peerClient.setUltraHdEnabled(ultraHd);
         peerClient.start(RtcConstants.isVideo(callType), defaultIceServers(), localRenderer, remoteRenderer);
         peerClient.swapRenderers(false);
     }
@@ -344,7 +320,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private void toggleMic() {
         micOn = !micOn;
         if (peerClient != null) peerClient.setMicEnabled(micOn);
-        styleCallButton(micBtn, micOn ? FontAwesome.Icon.faw_microphone : FontAwesome.Icon.faw_microphone_slash, micOn ? getString(R.string.rtc_mute) : getString(R.string.rtc_muted), false);
+        styleCallButton(micBtn, micOn ? R.drawable.ic_rtc_mic : R.drawable.ic_rtc_mic_off, micOn ? getString(R.string.rtc_mute) : getString(R.string.rtc_muted), false);
     }
 
     private void toggleSpeaker() {
@@ -352,36 +328,14 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     private void updateSpeakerButton(boolean on) {
-        styleCallButton(speakerBtn, on ? FontAwesome.Icon.faw_volume_up : FontAwesome.Icon.faw_volume_down, on ? getString(R.string.rtc_speaker) : getString(R.string.rtc_earpiece), false);
+        styleCallButton(speakerBtn, on ? R.drawable.ic_rtc_speaker : R.drawable.ic_rtc_earpiece, on ? getString(R.string.rtc_speaker) : getString(R.string.rtc_earpiece), false);
     }
 
     private void toggleCamera() {
         cameraOn = !cameraOn;
         if (peerClient != null) peerClient.setCameraEnabled(cameraOn);
-        styleCallButton(camBtn, cameraOn ? FontAwesome.Icon.faw_video : FontAwesome.Icon.faw_video_slash, cameraOn ? getString(R.string.rtc_camera) : getString(R.string.rtc_camera_off), false);
+        styleCallButton(camBtn, cameraOn ? R.drawable.ic_rtc_video : R.drawable.ic_rtc_video_off, cameraOn ? getString(R.string.rtc_camera) : getString(R.string.rtc_camera_off), false);
         localContainer.setVisibility(cameraOn ? View.VISIBLE : View.INVISIBLE);
-    }
-
-    private void toggleQuality() {
-        ultraHd = !ultraHd;
-        if (peerClient != null) peerClient.setUltraHdEnabled(ultraHd);
-        updateQualityButton();
-        toast(getString(ultraHd ? R.string.rtc_quality_fhd_on : R.string.rtc_quality_hd_on));
-    }
-
-    private void updateQualityButton() {
-        styleCallButton(qualityBtn, ultraHd ? FontAwesome.Icon.faw_expand : FontAwesome.Icon.faw_compress, ultraHd ? getString(R.string.rtc_quality_fhd) : getString(R.string.rtc_quality_hd), false);
-    }
-
-    private void toggleBeauty() {
-        beautyOn = !beautyOn;
-        if (peerClient != null) peerClient.setBeautyEnabled(beautyOn);
-        updateBeautyButton();
-        toast(getString(beautyOn ? R.string.rtc_beauty_on : R.string.rtc_beauty_off));
-    }
-
-    private void updateBeautyButton() {
-        styleCallButton(beautyBtn, FontAwesome.Icon.faw_magic, beautyOn ? getString(R.string.rtc_beauty_on) : getString(R.string.rtc_beauty_off), false);
     }
 
     private void toggleScreenShare() {
@@ -390,7 +344,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             screenSharing = false;
             localRenderer.setMirror(true);
             peerClient.stopScreenShare();
-            styleCallButton(shareBtn, FontAwesome.Icon.faw_desktop, getString(R.string.rtc_screen_share), false);
+            styleCallButton(shareBtn, R.drawable.ic_rtc_screen_share, getString(R.string.rtc_screen_share), false);
             toast(getString(R.string.rtc_screen_share_stopped));
             return;
         }
@@ -410,7 +364,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
                 screenSharing = true;
                 localRenderer.setMirror(false);
                 peerClient.startScreenShare(data);
-                styleCallButton(shareBtn, FontAwesome.Icon.faw_desktop, getString(R.string.rtc_screen_sharing), false);
+                styleCallButton(shareBtn, R.drawable.ic_rtc_screen_share, getString(R.string.rtc_screen_sharing), false);
                 toast(getString(R.string.rtc_screen_share_started));
             } else {
                 toast(getString(R.string.rtc_screen_share_cancelled));
@@ -512,29 +466,23 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         controlsLayout.animate().alpha(target).setDuration(180).withEndAction(() -> {
             topInfo.setVisibility(show ? View.VISIBLE : View.INVISIBLE);
             controlsLayout.setVisibility(show ? View.VISIBLE : View.INVISIBLE);
-            if (RtcConstants.isVideo(callType)) sideToolsLayout.setVisibility(show ? View.VISIBLE : View.INVISIBLE);
         }).start();
-        if (RtcConstants.isVideo(callType)) sideToolsLayout.animate().alpha(target).setDuration(180).start();
         if (show) {
             topInfo.setVisibility(View.VISIBLE);
             controlsLayout.setVisibility(View.VISIBLE);
-            if (RtcConstants.isVideo(callType)) sideToolsLayout.setVisibility(View.VISIBLE);
         }
     }
 
-    private void styleCallButton(TextView v, FontAwesome.Icon icon, String label, boolean danger) {
-        if (v == null) return;
+    private void styleCallButton(TextView v, int iconRes, String label, boolean danger) {
         v.setText(label);
         v.setTypeface(Typeface.DEFAULT_BOLD);
         v.setBackground(circle(danger ? 0xffef4444 : 0x30ffffff));
-        v.setCompoundDrawablePadding(dp(6));
-        try {
-            Drawable d = new IconicsDrawable(this, icon);
-            d.setBounds(0, 0, dp(22), dp(22));
-            d.setColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN);
-            v.setCompoundDrawables(null, d, null, null);
-        } catch (Throwable ignored) {
-            v.setCompoundDrawables(null, null, null, null);
+        v.setCompoundDrawablePadding(dp(5));
+        Drawable d = ContextCompat.getDrawable(this, iconRes);
+        if (d != null) {
+            d = DrawableCompat.wrap(d.mutate());
+            DrawableCompat.setTint(d, 0xffffffff);
+            v.setCompoundDrawablesWithIntrinsicBounds(null, d, null, null);
         }
     }
 
