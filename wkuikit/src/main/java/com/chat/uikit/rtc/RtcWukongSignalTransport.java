@@ -14,21 +14,22 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * WuKong IM transport for WebRTC signaling.
  *
- * 关键约束：
- * 1) 对端必须能通过正常在线消息监听收到 invite/offer/answer/ice。
- * 2) 信令包绝不能变成聊天气泡、未读红点或缓存污染。
+ * Key requirements:
+ * 1) The peer must receive invite / offer / answer / ice through the normal online message flow.
+ * 2) Signaling packets must not become chat bubbles, unread badges, or cache pollution.
  *
- * 实现要点：
- * - payload 保持 WK_TEXT，不改成 WK_INSIDE_MSG（某些 SDK/服务端组合不会通过 RTC 监听投递）。
- * - header.noPersist = true：在线信令包，不落库为聊天消息。
- * - header.redDot = false：避免对端产生未读红点。
- * - 反射兜底使用 getDeclaredField 遍历继承链（getField 只能拿 public 字段，
- *   会导致混淆或非 public 字段设置失败，从而信令被当普通消息持久化）。
+ * Implementation notes:
+ * - Keep payload as WK_TEXT. Do not switch to WK_INSIDE_MSG here; some SDK/server combinations
+ *   do not deliver inside messages through the listener used by the RTC module.
+ * - header.noPersist = true: online signaling, do not store as normal chat history.
+ * - header.redDot = false: do not increase unread/red-dot count.
+ * - Reflection uses getDeclaredField across the inheritance chain. getField only sees public
+ *   fields and can fail on SDK variants or obfuscation.
  */
 public class RtcWukongSignalTransport implements RtcSignalTransport {
     private static final int SIGNAL_EXPIRE_SECONDS = 5 * 60;
 
-    // 反射字段缓存：避免每次发信令都全量反射，保证性能。key = "className#fieldName"
+    // key = className#fieldName
     private static final ConcurrentHashMap<String, Field> FIELD_CACHE = new ConcurrentHashMap<>();
     private static final Field FIELD_NOT_FOUND;
 
@@ -55,17 +56,20 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
 
     private void applyRealtimeSignalOptions(WKSendOptions options) {
         if (options == null) return;
+
         options.expire = SIGNAL_EXPIRE_SECONDS;
+
         try {
             if (options.header != null) {
-                // 在线投递，不污染本地/远端聊天缓存。
+                // Online delivery, no local/remote chat cache pollution.
                 options.header.noPersist = true;
-                // WKMsgHeader 中真正的未读/红点开关。
+                // WKMsgHeader's real unread/red-dot switch.
                 options.header.redDot = false;
-                // 不设置 syncOnce，多端用户仍应能收到通话。
+                // Do not set syncOnce. Multi-device users should still be able to receive calls.
             }
         } catch (Exception ignored) {
         }
+
         try {
             if (options.setting != null) {
                 options.setting.receipt = 0;
@@ -74,10 +78,127 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         } catch (Exception ignored) {
         }
 
-        // 反射兜底（适配旧/新 SDK 变体或混淆字段）
+        // Reflection fallback for older/newer SDK variants or non-public fields.
         markByReflection(options);
         markByReflection(getFieldValue(options, "header"));
         markByReflection(getFieldValue(options, "setting"));
     }
 
-    private void markByReflection(Object object
+    private void markByReflection(Object object) {
+        if (object == null) return;
+
+        // Header-like fields.
+        setFieldValue(object, "noPersist", true);
+        setFieldValue(object, "no_persist", true);
+        setFieldValue(object, "redDot", false);
+        setFieldValue(object, "red_dot", false);
+
+        // SDK variants may use different names for unread/red-dot behavior.
+        setFieldValue(object, "noUnread", true);
+        setFieldValue(object, "no_unread", true);
+        setFieldValue(object, "showUnread", false);
+        setFieldValue(object, "show_unread", false);
+        setFieldValue(object, "unread", false);
+        setFieldValue(object, "needRedDot", false);
+        setFieldValue(object, "need_red_dot", false);
+
+        // Setting-like fields.
+        setFieldValue(object, "receipt", 0);
+        setFieldValue(object, "stream", 0);
+        setFieldValue(object, "expire", SIGNAL_EXPIRE_SECONDS);
+
+        // Do not set syncOnce=true here. It can make multi-device or background invite delivery unreliable.
+    }
+
+    private Object getFieldValue(Object object, String fieldName) {
+        if (object == null || TextUtils.isEmpty(fieldName)) return null;
+        try {
+            Field field = findField(object.getClass(), fieldName);
+            if (field == null || field == FIELD_NOT_FOUND) return null;
+            field.setAccessible(true);
+            return field.get(object);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private void setFieldValue(Object object, String fieldName, Object value) {
+        if (object == null || TextUtils.isEmpty(fieldName)) return;
+        try {
+            Field field = findField(object.getClass(), fieldName);
+            if (field == null || field == FIELD_NOT_FOUND) return;
+
+            field.setAccessible(true);
+            Class<?> type = field.getType();
+
+            if (type == boolean.class || type == Boolean.class) {
+                if (value instanceof Boolean) {
+                    field.set(object, value);
+                } else if (value instanceof Number) {
+                    field.set(object, ((Number) value).intValue() != 0);
+                } else if (value instanceof String) {
+                    field.set(object, "1".equals(value) || "true".equalsIgnoreCase((String) value));
+                }
+                return;
+            }
+
+            if (type == int.class || type == Integer.class) {
+                if (value instanceof Number) {
+                    field.set(object, ((Number) value).intValue());
+                } else if (value instanceof Boolean) {
+                    field.set(object, ((Boolean) value) ? 1 : 0);
+                } else if (value instanceof String) {
+                    try {
+                        field.set(object, Integer.parseInt((String) value));
+                    } catch (Exception ignored) {
+                    }
+                }
+                return;
+            }
+
+            if (type == long.class || type == Long.class) {
+                if (value instanceof Number) {
+                    field.set(object, ((Number) value).longValue());
+                } else if (value instanceof Boolean) {
+                    field.set(object, ((Boolean) value) ? 1L : 0L);
+                } else if (value instanceof String) {
+                    try {
+                        field.set(object, Long.parseLong((String) value));
+                    } catch (Exception ignored) {
+                    }
+                }
+                return;
+            }
+
+            if (type == String.class) {
+                field.set(object, String.valueOf(value));
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private Field findField(Class<?> clazz, String fieldName) {
+        if (clazz == null || TextUtils.isEmpty(fieldName)) return FIELD_NOT_FOUND;
+
+        String key = clazz.getName() + "#" + fieldName;
+        Field cached = FIELD_CACHE.get(key);
+        if (cached != null) return cached;
+
+        Class<?> current = clazz;
+        while (current != null && current != Object.class) {
+            try {
+                Field field = current.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                FIELD_CACHE.put(key, field);
+                return field;
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            } catch (Exception ignored) {
+                break;
+            }
+        }
+
+        FIELD_CACHE.put(key, FIELD_NOT_FOUND);
+        return FIELD_NOT_FOUND;
+    }
+}
