@@ -2,6 +2,12 @@ package com.chat.base.glide;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.res.AssetFileDescriptor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.MediaStore;
@@ -43,6 +49,8 @@ import com.luck.picture.lib.utils.DateUtils;
 import com.luck.picture.lib.utils.DensityUtil;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
@@ -348,8 +356,17 @@ public class GlideUtils {
         compressImg(context, list, icompressListener);
     }
 
-    private final List<File> files = new ArrayList<>();
-    private int errCount = 0;
+    /**
+     * 统一聊天图片压缩规则：
+     * 1) 小于 100KB 的 WebP 原样保留，避免越压越大、越压越糊。
+     * 2) 小于 100KB 的非 WebP 只做格式转换，输出 WebP，不缩尺寸。
+     * 3) 大于等于 100KB 的图片统一压缩并输出 WebP。
+     * 4) GIF 保留原图，避免动图被 BitmapFactory 解成静态首帧。
+     */
+    private static final long SMALL_IMAGE_BYTES = 100L * 1024L;
+    private static final int MAX_COMPRESS_SIDE = 1440;
+    private static final int SMALL_CONVERT_QUALITY = 88;
+    private static final int NORMAL_COMPRESS_QUALITY = 76;
 
     /**
      * 压缩图片
@@ -358,35 +375,21 @@ public class GlideUtils {
      * @param paths   图片本地地址
      */
     public void compressImg(Context context, List<String> paths, final ICompressListener iCompressListener) {
-        files.clear();
-        errCount = 0;
-        Luban.with(context)
-                .load(paths)
-                .ignoreBy(100)
-                .setTargetDir(WKConstants.imageDir)
-                .filter(path -> !(TextUtils.isEmpty(path) || path.toLowerCase().endsWith(".gif")))
-                .setCompressListener(new OnCompressListener() {
-                    @Override
-                    public void onStart() {
-                    }
-
-                    @Override
-                    public void onSuccess(int index, File file) {
-                        if (file != null) files.add(file);
-                        if ((files.size() + errCount) == paths.size()) {
-                            iCompressListener.onResult(files);
-                        }
-                    }
-
-                    @Override
-                    public void onError(int index, Throwable e) {
-                        errCount++;
-                        if ((files.size() + errCount) == paths.size()) {
-                            iCompressListener.onResult(files);
-                        }
-                    }
-                }).launch();
-
+        if (iCompressListener == null) return;
+        if (paths == null || paths.isEmpty()) {
+            iCompressListener.onResult(new ArrayList<>());
+            return;
+        }
+        new Thread(() -> {
+            List<File> result = new ArrayList<>();
+            for (String path : paths) {
+                File file = compressSourceToWebp(context, path);
+                if (file != null) {
+                    result.add(file);
+                }
+            }
+            new Handler(Looper.getMainLooper()).post(() -> iCompressListener.onResult(result));
+        }).start();
     }
 
     public interface ICompressListener {
@@ -397,39 +400,223 @@ public class GlideUtils {
 
         @Override
         public void onStartCompress(Context context, ArrayList<Uri> source, OnKeyValueResultCallbackListener call) {
-            Luban.with(context).load(source).ignoreBy(100).setRenameListener(new OnRenameListener() {
-                @Override
-                public String rename(String filePath) {
-                    int indexOf = filePath.lastIndexOf(".");
-                    String postfix = indexOf != -1 ? filePath.substring(indexOf) : ".jpg";
-                    return DateUtils.getCreateFileName("CMP_") + postfix;
-                }
-            }).filter(path -> {
-                if (PictureMimeType.isUrlHasImage(path) && !PictureMimeType.isHasHttp(path)) {
-                    return true;
-                }
-                return !PictureMimeType.isUrlHasGif(path);
-            }).setCompressListener(new OnNewCompressListener() {
-                @Override
-                public void onStart() {
-
-                }
-
-                @Override
-                public void onSuccess(String source, File compressFile) {
+            if (source == null || source.isEmpty()) return;
+            new Thread(() -> {
+                for (Uri uri : source) {
+                    String sourceKey = uri == null ? "" : uri.toString();
+                    String callbackPath = null;
+                    File compressed = compressSourceToWebp(context, sourceKey);
+                    if (compressed != null) {
+                        callbackPath = compressed.getAbsolutePath();
+                    }
                     if (call != null) {
-                        call.onCallback(source, compressFile.getAbsolutePath());
+                        call.onCallback(sourceKey, callbackPath);
                     }
                 }
-
-                @Override
-                public void onError(String source, Throwable e) {
-                    if (call != null) {
-                        call.onCallback(source, null);
-                    }
-                }
-            }).launch();
+            }).start();
         }
+    }
+
+    private static File compressSourceToWebp(Context context, String source) {
+        if (context == null || TextUtils.isEmpty(source)) return null;
+        try {
+            if (isGifSource(context, source)) {
+                return getOriginalFileOrCopy(context, source, "gif");
+            }
+
+            long sourceSize = getSourceLength(context, source);
+            File localFile = getExistingLocalFile(source);
+            if (isWebpSource(context, source) && sourceSize > 0 && sourceSize < SMALL_IMAGE_BYTES) {
+                return getOriginalFileOrCopy(context, source, "webp");
+            }
+
+            boolean smallConvertOnly = sourceSize > 0 && sourceSize < SMALL_IMAGE_BYTES;
+            Bitmap bitmap = decodeBitmap(context, source, smallConvertOnly ? Integer.MAX_VALUE : MAX_COMPRESS_SIDE);
+            if (bitmap == null) {
+                return localFile;
+            }
+
+            File dir = new File(WKConstants.imageDir);
+            if (!dir.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                dir.mkdirs();
+            }
+            File out = new File(dir, DateUtils.getCreateFileName("CMP_") + "_" + System.nanoTime() + ".webp");
+            FileOutputStream outputStream = null;
+            try {
+                outputStream = new FileOutputStream(out);
+                int quality = smallConvertOnly ? SMALL_CONVERT_QUALITY : NORMAL_COMPRESS_QUALITY;
+                boolean ok = bitmap.compress(getWebpCompressFormat(), quality, outputStream);
+                outputStream.flush();
+                return ok && out.exists() && out.length() > 0 ? out : localFile;
+            } finally {
+                if (outputStream != null) {
+                    try {
+                        outputStream.close();
+                    } catch (Exception ignored) {
+                    }
+                }
+                if (!bitmap.isRecycled()) {
+                    bitmap.recycle();
+                }
+            }
+        } catch (Exception e) {
+            WKLogUtils.e("compress image to webp failed: " + e.getMessage());
+            return getExistingLocalFile(source);
+        }
+    }
+
+    private static Bitmap decodeBitmap(Context context, String source, int maxSide) {
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            decodeSource(context, source, bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+
+            int sample = 1;
+            if (maxSide != Integer.MAX_VALUE) {
+                while (bounds.outWidth / sample > maxSide || bounds.outHeight / sample > maxSide) {
+                    sample *= 2;
+                }
+            }
+
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = Math.max(1, sample);
+            options.inPreferredConfig = Bitmap.Config.RGB_565;
+            return decodeSource(context, source, options);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static Bitmap decodeSource(Context context, String source, BitmapFactory.Options options) throws Exception {
+        if (isContentUri(source)) {
+            InputStream inputStream = null;
+            try {
+                inputStream = context.getContentResolver().openInputStream(Uri.parse(source));
+                return BitmapFactory.decodeStream(inputStream, null, options);
+            } finally {
+                if (inputStream != null) inputStream.close();
+            }
+        }
+        return BitmapFactory.decodeFile(stripFileScheme(source), options);
+    }
+
+    private static Bitmap.CompressFormat getWebpCompressFormat() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                return Bitmap.CompressFormat.valueOf("WEBP_LOSSY");
+            } catch (Exception ignored) {
+            }
+        }
+        //noinspection deprecation
+        return Bitmap.CompressFormat.WEBP;
+    }
+
+    private static File getOriginalFileOrCopy(Context context, String source, String extension) {
+        File local = getExistingLocalFile(source);
+        if (local != null) return local;
+        if (!isContentUri(source)) return null;
+        InputStream inputStream = null;
+        FileOutputStream outputStream = null;
+        try {
+            File dir = new File(WKConstants.imageDir);
+            if (!dir.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                dir.mkdirs();
+            }
+            File out = new File(dir, DateUtils.getCreateFileName("SRC_") + "_" + System.nanoTime() + "." + extension);
+            inputStream = context.getContentResolver().openInputStream(Uri.parse(source));
+            if (inputStream == null) return null;
+            outputStream = new FileOutputStream(out);
+            byte[] buffer = new byte[16 * 1024];
+            int len;
+            while ((len = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, len);
+            }
+            outputStream.flush();
+            return out.exists() && out.length() > 0 ? out : null;
+        } catch (Exception ignored) {
+            return null;
+        } finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (Exception ignored) {
+                }
+            }
+            if (outputStream != null) {
+                try {
+                    outputStream.close();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    private static long getSourceLength(Context context, String source) {
+        try {
+            File file = getExistingLocalFile(source);
+            if (file != null) return file.length();
+            if (isContentUri(source)) {
+                AssetFileDescriptor afd = null;
+                try {
+                    afd = context.getContentResolver().openAssetFileDescriptor(Uri.parse(source), "r");
+                    return afd == null ? 0 : afd.getLength();
+                } finally {
+                    if (afd != null) afd.close();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return 0;
+    }
+
+    private static File getExistingLocalFile(String source) {
+        try {
+            if (TextUtils.isEmpty(source) || isContentUri(source)) return null;
+            File file = new File(stripFileScheme(source));
+            return file.exists() ? file : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static boolean isContentUri(String source) {
+        return !TextUtils.isEmpty(source) && source.toLowerCase().startsWith("content://");
+    }
+
+    private static String stripFileScheme(String source) {
+        if (!TextUtils.isEmpty(source) && source.toLowerCase().startsWith("file://")) {
+            return Uri.parse(source).getPath();
+        }
+        return source;
+    }
+
+    private static boolean isWebpSource(Context context, String source) {
+        String lower = source == null ? "" : source.toLowerCase();
+        if (lower.endsWith(".webp")) return true;
+        if (isContentUri(source)) {
+            try {
+                String type = context.getContentResolver().getType(Uri.parse(source));
+                return type != null && type.toLowerCase().contains("webp");
+            } catch (Exception ignored) {
+            }
+        }
+        return false;
+    }
+
+    private static boolean isGifSource(Context context, String source) {
+        String lower = source == null ? "" : source.toLowerCase();
+        if (lower.endsWith(".gif")) return true;
+        if (isContentUri(source)) {
+            try {
+                String type = context.getContentResolver().getType(Uri.parse(source));
+                return type != null && type.toLowerCase().contains("gif");
+            } catch (Exception ignored) {
+            }
+        }
+        return false;
     }
 
 }
