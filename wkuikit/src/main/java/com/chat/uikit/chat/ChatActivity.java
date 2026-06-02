@@ -424,6 +424,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (TextUtils.isEmpty(path) || !getLocalFlag(KEY_IMAGE_COMPRESS, true)) return path;
         if (isHttpUrl(path)) return path;
 
+        // content:// 无法稳定拿到真实后缀和大小时，统一转成 WebP；本地 file/path 在下面按规则处理。
         if (path.startsWith("content://")) {
             return compressImageUriToWebp(path);
         }
@@ -437,6 +438,12 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         try {
             File source = new File(localPath);
             if (!source.exists() || !source.isFile()) return path;
+
+            String lowerPath = localPath.toLowerCase(Locale.US);
+            // GIF 保留动画，不在这里压成静态 WebP。
+            if (lowerPath.endsWith(".gif")) return path;
+            // 产品规则：小于 100KB 的 WebP 不压缩；其它格式即使小于 100KB 也只做 WebP 转换。
+            if (lowerPath.endsWith(".webp") && source.length() < 100 * 1024) return path;
 
             BitmapFactory.Options bounds = new BitmapFactory.Options();
             bounds.inJustDecodeBounds = true;
@@ -459,6 +466,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             boolean ok = bitmap.compress(getWebpCompressFormat(), 76, outputStream);
             outputStream.flush();
             if (ok && out.exists() && out.length() > 0) {
+                Log.e("ChatImage", "final local image path=" + out.getAbsolutePath());
                 return out.getAbsolutePath();
             }
         } catch (Exception e) {
@@ -478,6 +486,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 out.delete();
             }
         }
+        Log.e("ChatImage", "final local image path=" + path);
         return path;
     }
 
