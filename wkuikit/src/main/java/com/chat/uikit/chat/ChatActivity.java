@@ -12,6 +12,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.ColorDrawable;
 import android.app.AlertDialog;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
@@ -31,11 +32,13 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
+import android.widget.PopupWindow;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -569,26 +572,108 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
 
-    private void showCallPopupMenuLower(View anchor, List<PopupMenuItem> list) {
-        if (wkVBinding == null || wkVBinding.topLayout == null || wkVBinding.topLayout.rightView == null) {
-            WKDialogUtils.getInstance().showScreenPopup(anchor, list);
-            return;
-        }
-        final View popupAnchor = new View(this);
-        popupAnchor.setAlpha(0f);
-        wkVBinding.topLayout.rightView.addView(
-                popupAnchor,
-                LayoutHelper.createFrame(42, 1, Gravity.TOP | Gravity.END, 0, AndroidUtilities.dp(46f), 46, 0)
-        );
-        popupAnchor.post(() -> {
-            WKDialogUtils.getInstance().showScreenPopup(popupAnchor, list);
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+    private void showCallPopupMenuLower(View anchor) {
+        // 自定义通话菜单：比系统 popup 下移一点，带半透明玻璃质感和背景虚化/压暗。
+        // 不再走 WKDialogUtils.showScreenPopup，避免位置太贴顶部、风格不统一。
+        try {
+            final int popupWidth = AndroidUtilities.dp(184f);
+            final PopupWindow[] popupRef = new PopupWindow[1];
+
+            LinearLayout root = new LinearLayout(this);
+            root.setOrientation(LinearLayout.VERTICAL);
+            root.setPadding(AndroidUtilities.dp(8f), AndroidUtilities.dp(8f), AndroidUtilities.dp(8f), AndroidUtilities.dp(8f));
+            GradientDrawable bg = new GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    new int[]{Color.argb(244, 255, 255, 255), Color.argb(232, 245, 248, 255), Color.argb(236, 238, 246, 255)}
+            );
+            bg.setCornerRadius(AndroidUtilities.dp(18f));
+            root.setBackground(bg);
+
+            root.addView(createCallPopupItem(getString(R.string.video_call), R.mipmap.chat_calls_video, () -> {
+                if (popupRef[0] != null) popupRef[0].dismiss();
+                p2pCall(1);
+            }), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48));
+            root.addView(createCallPopupItem(getString(R.string.audio_call), R.mipmap.chat_calls_voice, () -> {
+                if (popupRef[0] != null) popupRef[0].dismiss();
+                p2pCall(0);
+            }), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48));
+
+            PopupWindow popup = new PopupWindow(root, popupWidth, LayoutHelper.WRAP_CONTENT, true);
+            popupRef[0] = popup;
+            popup.setOutsideTouchable(true);
+            popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            if (android.os.Build.VERSION.SDK_INT >= 21) {
+                popup.setElevation(AndroidUtilities.dp(14f));
+            }
+
+            View dimView = createCallPopupDimView();
+            if (dimView != null) dimView.setOnClickListener(v -> popup.dismiss());
+            popup.setOnDismissListener(() -> removeCallPopupDimView(dimView));
+
+            if (dimView != null) {
                 try {
-                    wkVBinding.topLayout.rightView.removeView(popupAnchor);
+                    ((ViewGroup) getWindow().getDecorView()).addView(dimView, new ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                    ));
                 } catch (Exception ignored) {
                 }
-            }, 800);
+            }
+
+            int xOffset = -(popupWidth - AndroidUtilities.dp(42f));
+            int yOffset = AndroidUtilities.dp(14f);
+            popup.showAsDropDown(anchor, xOffset, yOffset);
+        } catch (Exception e) {
+            Log.e("ChatActivity", "show call popup failed", e);
+            List<PopupMenuItem> fallback = new ArrayList<>();
+            fallback.add(new PopupMenuItem(getString(R.string.video_call), R.mipmap.chat_calls_video, () -> p2pCall(1)));
+            fallback.add(new PopupMenuItem(getString(R.string.audio_call), R.mipmap.chat_calls_voice, () -> p2pCall(0)));
+            WKDialogUtils.getInstance().showScreenPopup(anchor, fallback);
+        }
+    }
+
+    private View createCallPopupItem(String title, int iconRes, Runnable action) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(AndroidUtilities.dp(12f), 0, AndroidUtilities.dp(12f), 0);
+        row.setBackground(Theme.createSelectorDrawable(Color.argb(22, 0, 0, 0)));
+
+        ImageView icon = new AppCompatImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setColorFilter(new PorterDuffColorFilter(ContextCompat.getColor(this, R.color.popupTextColor), PorterDuff.Mode.MULTIPLY));
+        row.addView(icon, LayoutHelper.createLinear(24, 24));
+
+        TextView tv = new TextView(this);
+        tv.setText(title);
+        tv.setTextSize(15);
+        tv.setSingleLine(true);
+        tv.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
+        row.addView(tv, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 12, 0, 0, 0));
+        row.setOnClickListener(v -> {
+            if (action != null) action.run();
         });
+        return row;
+    }
+
+    private View createCallPopupDimView() {
+        try {
+            View dim = new View(this);
+            dim.setBackgroundColor(Color.argb(58, 8, 12, 20));
+            dim.setClickable(true);
+            return dim;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private void removeCallPopupDimView(View dimView) {
+        if (dimView == null) return;
+        try {
+            ViewGroup parent = (ViewGroup) dimView.getParent();
+            if (parent != null) parent.removeView(dimView);
+        } catch (Exception ignored) {
+        }
     }
 
     private void initRtcCallModule() {
@@ -925,10 +1010,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                                 showToast(R.string.call_blacklist);
                                 return;
                             }
-                            List<PopupMenuItem> list = new ArrayList<>();
-                            list.add(new PopupMenuItem(getString(R.string.video_call), R.mipmap.chat_calls_video, () -> p2pCall(1)));
-                            list.add(new PopupMenuItem(getString(R.string.audio_call), R.mipmap.chat_calls_voice, () -> p2pCall(0)));
-                            showCallPopupMenuLower(view, list);
+                            showCallPopupMenuLower(view);
                         } else {
                             WKChannelMember channelMember = WKIM.getInstance().getChannelMembersManager().getMember(channelId, channelType, loginUID);
                             if (channelMember != null && channelMember.status == WKChannelStatus.statusBlacklist) {
@@ -1739,6 +1821,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
         }
 
+        rebuildMsgLinks(list);
+
         if (isSetNewData) {
             if (unreadStartMsgOrderSeq != 0) {
                 for (int i = 0, size = list.size(); i < size; i++) {
@@ -1773,6 +1857,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 chatAdapter.addData(0, list);
             }
         }
+        rebuildMsgLinks(chatAdapter.getData());
+
         if (tipsOrderSeq != 0 || lastPreviewMsgOrderSeq != 0) {
             wkVBinding.recyclerView.setVisibility(View.VISIBLE);
             if (tipsOrderSeq != 0) {
@@ -1817,6 +1903,27 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }, 500);
     }
 
+
+    private void rebuildMsgLinks(List<WKUIChatMsgItemEntity> data) {
+        if (WKReader.isEmpty(data)) return;
+        WKUIChatMsgItemEntity lastRealItem = null;
+        for (int i = 0; i < data.size(); i++) {
+            WKUIChatMsgItemEntity item = data.get(i);
+            if (item == null || item.wkMsg == null) continue;
+            int type = item.wkMsg.type;
+            if (type == WKContentType.msgPromptTime || type == WKContentType.msgPromptNewMsg || type == WKContentType.loading || type == WKContentType.emptyView || type == WKContentType.spanEmptyView) {
+                item.previousMsg = lastRealItem == null ? null : lastRealItem.wkMsg;
+                item.nextMsg = null;
+                continue;
+            }
+            item.previousMsg = lastRealItem == null ? null : lastRealItem.wkMsg;
+            item.nextMsg = null;
+            if (lastRealItem != null) {
+                lastRealItem.nextMsg = item.wkMsg;
+            }
+            lastRealItem = item;
+        }
+    }
 
     private void hideOrShowRightView(boolean isShow) {
         if (((channelId.equals(WKSystemAccount.system_file_helper) || channelId.equals(WKSystemAccount.system_team)) && channelType == WKChannelType.PERSONAL) || channelType == WKChannelType.CUSTOMER_SERVICE) {
@@ -2863,7 +2970,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                                 maxMsgOrderSeq = msg.orderSeq;
                             }
                             if (previousMsgIndex != -1) {
-                                chatAdapter.notifyBackground(previousMsgIndex);
+                                chatAdapter.notifyItemChanged(previousMsgIndex, chatAdapter.getData().get(previousMsgIndex));
                             }
                         }
                         if (isShowHistory || redDot > 0) {
