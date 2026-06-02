@@ -387,11 +387,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         try {
             File source = new File(path);
             if (!source.exists()) return path;
-            if (source.length() < 180 * 1024) return path;
+            // 100KB 以下的小图直接发送原图，避免二次压缩后反而变糊或变大。
+            if (source.length() <= 100 * 1024) return path;
 
             BitmapFactory.Options bounds = new BitmapFactory.Options();
             bounds.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(path, bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return path;
 
             int sample = 1;
             while (bounds.outWidth / sample > 1440 || bounds.outHeight / sample > 1440) {
@@ -409,13 +411,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 //noinspection ResultOfMethodCallIgnored
                 dir.mkdirs();
             }
-            File out = new File(dir, "img_" + System.currentTimeMillis() + ".jpg");
+            // 图片压缩输出使用 WebP。WebM 是视频容器格式，不适合作为 WKImageContent 图片文件。
+            File out = new File(dir, "img_" + System.currentTimeMillis() + ".webp");
             FileOutputStream outputStream = new FileOutputStream(out);
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 76, outputStream);
+            boolean ok = bitmap.compress(Bitmap.CompressFormat.WEBP, 76, outputStream);
             outputStream.flush();
             outputStream.close();
             bitmap.recycle();
-            return out.exists() && out.length() > 0 ? out.getAbsolutePath() : path;
+            return ok && out.exists() && out.length() > 0 ? out.getAbsolutePath() : path;
         } catch (Exception e) {
             Log.e("ChatActivity", "compress image failed", e);
             return path;
@@ -565,6 +568,28 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         applyGlassDialogStyle(dialog);
     }
 
+
+    private void showCallPopupMenuLower(View anchor, List<PopupMenuItem> list) {
+        if (wkVBinding == null || wkVBinding.topLayout == null || wkVBinding.topLayout.rightView == null) {
+            WKDialogUtils.getInstance().showScreenPopup(anchor, list);
+            return;
+        }
+        final View popupAnchor = new View(this);
+        popupAnchor.setAlpha(0f);
+        wkVBinding.topLayout.rightView.addView(
+                popupAnchor,
+                LayoutHelper.createFrame(42, 1, Gravity.TOP | Gravity.END, 0, AndroidUtilities.dp(46f), 46, 0)
+        );
+        popupAnchor.post(() -> {
+            WKDialogUtils.getInstance().showScreenPopup(popupAnchor, list);
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    wkVBinding.topLayout.rightView.removeView(popupAnchor);
+                } catch (Exception ignored) {
+                }
+            }, 800);
+        });
+    }
 
     private void initRtcCallModule() {
         RtcCallManager.get().configure(getApplicationContext(), loginUID, new RtcWukongSignalTransport());
@@ -903,7 +928,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                             List<PopupMenuItem> list = new ArrayList<>();
                             list.add(new PopupMenuItem(getString(R.string.video_call), R.mipmap.chat_calls_video, () -> p2pCall(1)));
                             list.add(new PopupMenuItem(getString(R.string.audio_call), R.mipmap.chat_calls_voice, () -> p2pCall(0)));
-                            WKDialogUtils.getInstance().showScreenPopup(view, list);
+                            showCallPopupMenuLower(view, list);
                         } else {
                             WKChannelMember channelMember = WKIM.getInstance().getChannelMembersManager().getMember(channelId, channelType, loginUID);
                             if (channelMember != null && channelMember.status == WKChannelStatus.statusBlacklist) {
