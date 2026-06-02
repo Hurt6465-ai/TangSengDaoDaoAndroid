@@ -201,8 +201,10 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) avatarImage.setClipToOutline(true);
         nameText.setText(peerName);
         root.setBackground(gradient(0xff101827, 0xff162033, 0xff020617));
-        localContainer.setBackground(round(0x00000000, dp(16)));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) localContainer.setClipToOutline(true);
+        // SurfaceViewRenderer cannot be clipped reliably on all Android versions.
+        // Keep the PiP container transparent to avoid the black outer rectangle.
+        localContainer.setBackgroundColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) localContainer.setClipToOutline(false);
         findViewById(R.id.controlsCard).setBackgroundColor(Color.TRANSPARENT);
 
         loadAvatar(peerAvatar);
@@ -358,7 +360,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private void toggleSpeaker() { updateSpeakerButton(audioManager.toggleSpeaker()); }
 
     private void updateSpeakerButton(boolean on) {
-        styleCallButton(speakerBtn, on ? "faw-volume-up" : "faw-phone",
+        styleCallButton(speakerBtn, on ? "faw-volume-up" : "faw-assistive-listening-systems",
                 on ? getString(R.string.rtc_speaker) : getString(R.string.rtc_earpiece), false);
     }
 
