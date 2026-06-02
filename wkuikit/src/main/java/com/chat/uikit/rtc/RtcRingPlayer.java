@@ -2,23 +2,22 @@ package com.chat.uikit.rtc;
 
 import android.content.Context;
 import android.media.AudioAttributes;
-import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.ToneGenerator;
-import android.os.Build;
+import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.os.VibrationEffect;
+import android.os.Build;
 import android.util.Log;
 
 /**
- * Incoming ringtone helper.
- *
- * Put your ringtone here:
- *   wkuikit/src/main/res/raw/newrtc.mp3
- *
- * No outgoing dial tone is played by design.
+ * Lightweight call ringtone helper.
+ * Put files here if you want real ringtones:
+ *   wkuikit/src/main/res/raw/bohao.mp3
+ *   wkuikit/src/main/res/raw/laidian.mp3
+ * If the files are missing, it falls back to short system tones.
  */
 public class RtcRingPlayer {
     private static final String TAG = "RtcRingPlayer";
@@ -34,15 +33,17 @@ public class RtcRingPlayer {
     }
 
     public void playOutgoing() {
-        // Product decision: no outgoing dial tone.
         stop();
+        if (!playRawLoop("bohao")) {
+            playFallbackTone(false);
+        }
     }
 
     public void playIncoming() {
         stop();
         startVibration();
-        if (!playRawLoop("newrtc")) {
-            playFallbackTone();
+        if (!playRawLoop("laidian")) {
+            playFallbackTone(true);
         }
     }
 
@@ -91,17 +92,17 @@ public class RtcRingPlayer {
         }
     }
 
-    private void playFallbackTone() {
+    private void playFallbackTone(boolean incoming) {
         try {
-            toneGenerator = new ToneGenerator(AudioManager.STREAM_RING, 80);
+            toneGenerator = new ToneGenerator(AudioManager.STREAM_RING, incoming ? 80 : 55);
             loopingTone = true;
             Runnable r = new Runnable() {
                 @Override public void run() {
                     if (!loopingTone || toneGenerator == null) return;
                     try {
-                        toneGenerator.startTone(ToneGenerator.TONE_SUP_RINGTONE, 900);
+                        toneGenerator.startTone(incoming ? ToneGenerator.TONE_SUP_RINGTONE : ToneGenerator.TONE_SUP_DIAL, incoming ? 900 : 350);
                     } catch (Exception ignored) {}
-                    handler.postDelayed(this, 1800);
+                    handler.postDelayed(this, incoming ? 1800 : 2600);
                 }
             };
             handler.post(r);
