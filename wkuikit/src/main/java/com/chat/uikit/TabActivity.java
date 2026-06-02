@@ -9,7 +9,6 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.text.TextUtils;
 import android.util.TypedValue;
@@ -70,16 +69,9 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private static final String ICON_COMMUNITY = "faw-users";
     private static final String ICON_STUDY = "faw-graduation-cap";
 
-    /** 选中后的图标、文字蓝色。 */
-    private static final int COLOR_TAB_SELECTED = 0xFF2F6BFF;
-    /** 未选中的图标、文字颜色。 */
-    private static final int COLOR_TAB_NORMAL_RES = R.color.tab_text_normal;
-    /** 被选中按钮的浅黑色背景。 */
-    private static final int COLOR_SELECTED_BUTTON_BG = 0x14000000;
-    /** 底部面板半透明白色玻璃背景。 */
-    private static final int COLOR_GLASS_PANEL_TOP = 0xE6FFFFFF;
-    private static final int COLOR_GLASS_PANEL_BOTTOM = 0xBFFFFFFF;
-    private static final int COLOR_GLASS_PANEL_STROKE = 0x55FFFFFF;
+    // 参考 Messenger 的底部导航颜色：选中蓝色，未选中淡黑灰色。
+    private static final int COLOR_TAB_SELECTED = 0xFF1877F2;
+    private static final int COLOR_TAB_NORMAL = 0xFF65676B;
 
     private CounterView msgCounterView;
     private ImageView chatIV, partnerIV, discoverIV, communityIV, studyIV;
@@ -112,7 +104,10 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         initTabViews();
         initFragments();
         initBadgesAndCounters();
-        applyBottomNavigationGlassStyle();
+
+        // 只去掉 Material 默认的选中背景/水波纹/indicator，不改底部面板背景。
+        // 面板保持 XML/主题里的原始样式，避免半透明、矩形黑线等问题。
+        disableBottomNavigationSelectedBackground();
 
         WKCommonModel.getInstance().getAppNewVersion(false, version -> {
             String v = WKDeviceUtils.getInstance().getVersionName(TabActivity.this);
@@ -180,7 +175,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
             textView.setTypeface(Typeface.DEFAULT_BOLD);
         }
         textView.setText(textResId);
-        textView.setTextColor(ContextCompat.getColor(this, COLOR_TAB_NORMAL_RES));
+        textView.setTextColor(COLOR_TAB_NORMAL);
         textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
         textView.setSingleLine(true);
         textView.setGravity(Gravity.CENTER);
@@ -191,7 +186,8 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         FrameLayout tabRoot = wkVBinding.bottomNavigation.findViewById(menuId);
         if (tabRoot == null) return;
 
-        tabRoot.setClipToOutline(false);
+        clearItemViewBackground(tabRoot);
+
         iconView.setScaleType(ImageView.ScaleType.CENTER);
         if (isShowTabText) {
             tabRoot.addView(iconView, LayoutHelper.createFrame(34, 34, Gravity.CENTER | Gravity.TOP, 0, 5, 0, 0));
@@ -228,52 +224,6 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         wkVBinding.bottomNavigation.getOrCreateBadge(R.id.i_study).setVisible(false);
     }
 
-    /**
-     * 底部导航面板玻璃效果：半透明白色渐变 + 白色描边 + 轻微阴影。
-     * 真正的实时背景模糊需要父布局或第三方 BlurView 支持，这里不改 XML，使用轻量方案模拟磨砂玻璃质感。
-     */
-    private void applyBottomNavigationGlassStyle() {
-        if (wkVBinding == null || wkVBinding.bottomNavigation == null) return;
-
-        GradientDrawable glassBackground = new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{COLOR_GLASS_PANEL_TOP, COLOR_GLASS_PANEL_BOTTOM}
-        );
-        glassBackground.setShape(GradientDrawable.RECTANGLE);
-        glassBackground.setCornerRadii(new float[]{
-                dp(24), dp(24),
-                dp(24), dp(24),
-                0, 0,
-                0, 0
-        });
-        glassBackground.setStroke(dp(1), COLOR_GLASS_PANEL_STROKE);
-
-        wkVBinding.bottomNavigation.setBackground(glassBackground);
-        wkVBinding.bottomNavigation.setElevation(dp(14));
-        wkVBinding.bottomNavigation.setTranslationZ(dp(14));
-
-        // 去掉 Material BottomNavigationView / NavigationBarView 自带选中指示器和 item 背景，避免和自定义浅黑按钮冲突。
-        disableNavigationBarDefaultActiveIndicator();
-    }
-
-    private void disableNavigationBarDefaultActiveIndicator() {
-        if (wkVBinding == null || wkVBinding.bottomNavigation == null) return;
-
-        try {
-            Method method = wkVBinding.bottomNavigation.getClass().getMethod("setItemActiveIndicatorEnabled", boolean.class);
-            method.invoke(wkVBinding.bottomNavigation, false);
-        } catch (Exception ignored) {
-            // Material 版本较旧时没有这个方法，忽略即可。
-        }
-
-        try {
-            Method method = wkVBinding.bottomNavigation.getClass().getMethod("setItemBackgroundResource", int.class);
-            method.invoke(wkVBinding.bottomNavigation, android.R.color.transparent);
-        } catch (Exception ignored) {
-            // Material 版本不支持时忽略。
-        }
-    }
-
     @Override
     protected void initListener() {
         wkVBinding.vp.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
@@ -287,6 +237,8 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         });
 
         wkVBinding.bottomNavigation.setItemIconTintList(null);
+        disableBottomNavigationSelectedBackground();
+
         wkVBinding.bottomNavigation.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
             if (itemId == R.id.i_chat) {
@@ -362,6 +314,8 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     protected void onResume() {
         super.onResume();
         syncBottomNavigationForCurrentTab();
+        disableBottomNavigationSelectedBackground();
+
         FriendModel.getInstance().syncFriends((code, msg) -> {
             if (code != HttpResponseCode.success && !TextUtils.isEmpty(msg)) {
                 showToast(msg);
@@ -430,17 +384,13 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private void playAnimation(int index) {
         lastClickChatTabTime = index == TAB_CHAT ? lastClickChatTabTime : 0L;
 
+        disableBottomNavigationSelectedBackground();
+
         setTabIcon(chatIV, ICON_CHAT, index == TAB_CHAT);
         setTabIcon(partnerIV, ICON_PARTNER, index == TAB_PARTNER);
         setTabIcon(discoverIV, ICON_DISCOVER, index == TAB_DISCOVER);
         setTabIcon(communityIV, ICON_COMMUNITY, index == TAB_COMMUNITY);
         setTabIcon(studyIV, ICON_STUDY, index == TAB_STUDY);
-
-        setTabButtonBackground(R.id.i_chat, index == TAB_CHAT);
-        setTabButtonBackground(R.id.i_partner, index == TAB_PARTNER);
-        setTabButtonBackground(R.id.i_discover, index == TAB_DISCOVER);
-        setTabButtonBackground(R.id.i_community, index == TAB_COMMUNITY);
-        setTabButtonBackground(R.id.i_study, index == TAB_STUDY);
 
         if (isShowTabText) {
             setTabTextSelected(chatTV, index == TAB_CHAT);
@@ -454,37 +404,75 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private void setTabIcon(ImageView imageView, String iconName, boolean selected) {
         if (imageView == null) return;
 
-        // 选中图标改为蓝色，不再给图标本身添加蓝色圆角背景。
-        int iconColor = selected ? COLOR_TAB_SELECTED : ContextCompat.getColor(this, COLOR_TAB_NORMAL_RES);
         IconicsDrawable drawable = new IconicsDrawable(this, iconName);
-        drawable.setColorList(ColorStateList.valueOf(iconColor));
+        drawable.setColorList(ColorStateList.valueOf(selected ? COLOR_TAB_SELECTED : COLOR_TAB_NORMAL));
         drawable.setSizeXPx(dp(24));
         drawable.setSizeYPx(dp(24));
         drawable.setPaddingPx(dp(2));
 
-        imageView.setImageDrawable(drawable);
-    }
-
-    private void setTabButtonBackground(int menuId, boolean selected) {
-        FrameLayout tabRoot = wkVBinding.bottomNavigation.findViewById(menuId);
-        if (tabRoot == null) return;
-
-        if (!selected) {
-            tabRoot.setBackgroundColor(Color.TRANSPARENT);
-            return;
+        // 不再给选中图标加任何背景，保持图二那种纯蓝色图标 + 文字效果。
+        imageView.setBackgroundColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            imageView.setForeground(null);
         }
-
-        GradientDrawable selectedBackground = new GradientDrawable();
-        selectedBackground.setShape(GradientDrawable.RECTANGLE);
-        selectedBackground.setColor(COLOR_SELECTED_BUTTON_BG);
-        selectedBackground.setCornerRadius(dp(16));
-        tabRoot.setBackground(selectedBackground);
+        imageView.setImageDrawable(drawable);
     }
 
     private void setTabTextSelected(TextView textView, boolean selected) {
         if (textView == null) return;
-        int color = selected ? COLOR_TAB_SELECTED : ContextCompat.getColor(this, COLOR_TAB_NORMAL_RES);
-        textView.setTextColor(color);
+        textView.setTextColor(selected ? COLOR_TAB_SELECTED : COLOR_TAB_NORMAL);
+    }
+
+    /**
+     * 关闭 BottomNavigationView/NavigationBarView 自带的选中背景、indicator 和水波纹。
+     * 不设置 bottomNavigation 的 background，底部面板保持布局 XML/主题原来的背景。
+     */
+    private void disableBottomNavigationSelectedBackground() {
+        if (wkVBinding == null || wkVBinding.bottomNavigation == null) {
+            return;
+        }
+
+        wkVBinding.bottomNavigation.setAlpha(1f);
+        wkVBinding.bottomNavigation.setItemIconTintList(null);
+
+        try {
+            wkVBinding.bottomNavigation.setItemRippleColor(ColorStateList.valueOf(Color.TRANSPARENT));
+        } catch (Exception ignored) {
+        }
+
+        try {
+            wkVBinding.bottomNavigation.setItemBackgroundResource(0);
+        } catch (Exception ignored) {
+        }
+
+        // Material 1.4+/1.5+ 可能有 active indicator。用反射避免低版本编译/运行问题。
+        invokeBottomNavigationMethod("setItemActiveIndicatorEnabled", new Class[]{boolean.class}, false);
+        invokeBottomNavigationMethod("setItemActiveIndicatorColor", new Class[]{ColorStateList.class}, ColorStateList.valueOf(Color.TRANSPARENT));
+        invokeBottomNavigationMethod("setItemActiveIndicatorWidth", new Class[]{int.class}, 0);
+        invokeBottomNavigationMethod("setItemActiveIndicatorHeight", new Class[]{int.class}, 0);
+        invokeBottomNavigationMethod("setItemActiveIndicatorMarginHorizontal", new Class[]{int.class}, 0);
+
+        clearItemViewBackground(wkVBinding.bottomNavigation.findViewById(R.id.i_chat));
+        clearItemViewBackground(wkVBinding.bottomNavigation.findViewById(R.id.i_partner));
+        clearItemViewBackground(wkVBinding.bottomNavigation.findViewById(R.id.i_discover));
+        clearItemViewBackground(wkVBinding.bottomNavigation.findViewById(R.id.i_community));
+        clearItemViewBackground(wkVBinding.bottomNavigation.findViewById(R.id.i_study));
+    }
+
+    private void clearItemViewBackground(View view) {
+        if (view == null) return;
+        view.setBackgroundColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            view.setForeground(null);
+        }
+    }
+
+    private void invokeBottomNavigationMethod(String methodName, Class<?>[] parameterTypes, Object... args) {
+        try {
+            Method method = wkVBinding.bottomNavigation.getClass().getMethod(methodName, parameterTypes);
+            method.invoke(wkVBinding.bottomNavigation, args);
+        } catch (Exception ignored) {
+        }
     }
 
     private int dp(int value) {
