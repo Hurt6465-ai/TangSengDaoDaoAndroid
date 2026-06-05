@@ -1,304 +1,249 @@
-package com.chat.base.act;
+package com.chat.uikit.fragment;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.annotation.TargetApi;
 import android.app.Activity;
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
-import android.content.pm.PackageManager;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.text.TextUtils;
-import android.util.Log;
-import android.view.KeyEvent;
-import android.view.LayoutInflater;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
-import android.webkit.ValueCallback;
+import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
-import android.widget.ImageView;
+import android.webkit.WebViewClient;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
 
-import com.chat.base.R;
-import com.chat.base.app.WKAppModel;
-import com.chat.base.base.WKBaseActivity;
-import com.chat.base.config.WKApiConfig;
-import com.chat.base.config.WKBinder;
-import com.chat.base.config.WKConfig;
-import com.chat.base.databinding.ActWebvieiwLayoutBinding;
-import com.chat.base.endpoint.EndpointManager;
-import com.chat.base.endpoint.EndpointSID;
-import com.chat.base.endpoint.entity.ChatChooseContacts;
-import com.chat.base.endpoint.entity.ChatViewMenu;
-import com.chat.base.endpoint.entity.ChooseChatMenu;
-import com.chat.base.entity.AppInfo;
-import com.chat.base.entity.AuthInfo;
-import com.chat.base.entity.PopupMenuItem;
-import com.chat.base.glide.GlideUtils;
-import com.chat.base.jsbrigde.CallBackFunction;
-import com.chat.base.jsbrigde.BridgeWebViewClient;
-import com.chat.base.net.HttpResponseCode;
-import com.chat.base.ui.Theme;
-import com.chat.base.ui.components.AvatarView;
-import com.chat.base.ui.components.BottomSheet;
-import com.chat.base.utils.WKDialogUtils;
-import com.chat.base.utils.WKLogUtils;
 import com.chat.base.utils.WKPermissions;
-import com.chat.base.utils.WKToastUtils;
 import com.chat.base.web.TangSengSpeechBridge;
 import com.chat.base.web.WebSpeechInputHelper;
-import com.google.gson.JsonObject;
-import com.xinbida.wukongim.WKIM;
-import com.xinbida.wukongim.entity.WKChannel;
-import com.xinbida.wukongim.entity.WKChannelType;
-import com.xinbida.wukongim.entity.WKSendOptions;
-import com.xinbida.wukongim.msgmodel.WKTextContent;
+import com.chat.uikit.TabActivity;
 
-import org.json.JSONException;
-import org.json.JSONObject;
+public class WebTabFragment extends Fragment {
+    private static final String ARG_URL = "url";
+    private static final String STATE_HAS_LOADED = "web_tab_has_loaded";
+    private static final String STATE_HAS_VISIBLE_CONTENT = "web_tab_has_visible_content";
+    private static final String STATE_LAST_URL = "web_tab_last_url";
 
-import java.util.ArrayList;
-import java.util.List;
+    private String url;
+    private String lastKnownUrl;
+    private Bundle savedWebViewState;
 
-/**
- * 2019-11-21 13:25
- */
-
-@SuppressLint("JavascriptInterface")
-public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> {
-    TextView titleTv;
-    private final int FILE_CHOOSER_RESULT_CODE = 101;
-    ValueCallback<Uri> mUploadMessage;
-    ValueCallback<Uri[]> mUploadCallbackAboveL;
-    private String channelID;
-    private byte channelType;
+    private FrameLayout cachedRoot;
+    private WebView webView;
+    private ProgressBar progressBar;
+    private View loadingView;
+    private View errorView;
     private PermissionRequest pendingPermissionRequest;
     private WebSpeechInputHelper webSpeechInputHelper;
 
-    @Override
-    protected ActWebvieiwLayoutBinding getViewBinding() {
-        return ActWebvieiwLayoutBinding.inflate(getLayoutInflater());
+    private boolean hasLoaded = false;
+    private boolean hasVisibleContent = false;
+
+    public static WebTabFragment newInstance(String url) {
+        WebTabFragment fragment = new WebTabFragment();
+        Bundle args = new Bundle();
+        args.putString(ARG_URL, url);
+        fragment.setArguments(args);
+        return fragment;
     }
 
     @Override
-    protected void setTitle(TextView titleTv) {
-        this.titleTv = titleTv;
-    }
-
-    @Override
-    protected void initPresenter() {
-        if (getIntent().hasExtra("channelID"))
-            channelID = getIntent().getStringExtra("channelID");
-        if (getIntent().hasExtra("channelType"))
-            channelType = getIntent().getByteExtra("channelType", (byte) 0);
-    }
-
-    @Override
-    protected int getBackResourceID(ImageView backIv) {
-        return R.mipmap.ic_close_white;
-    }
-
-    @Override
-    protected int getRightIvResourceId(ImageView imageView) {
-        return R.mipmap.ic_ab_other;
-    }
-
-    @Override
-    protected void rightLayoutClick() {
-        super.rightLayoutClick();
-
-        List<PopupMenuItem> list = new ArrayList<>();
-        list.add(new PopupMenuItem(getString(R.string.copy_url), R.mipmap.search_links, () -> {
-            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            ClipData mClipData = ClipData.newPlainText("Label", wkVBinding.webView.getUrl());
-            assert cm != null;
-            cm.setPrimaryClip(mClipData);
-            WKToastUtils.getInstance().showToastNormal(getString(R.string.copyed));
-        }));
-        list.add(new PopupMenuItem(getString(R.string.forward), R.mipmap.msg_forward, () -> {
-            WKTextContent textContent = new WKTextContent(wkVBinding.webView.getUrl());
-            EndpointManager.getInstance().invoke(EndpointSID.showChooseChatView, new ChooseChatMenu(new ChatChooseContacts(new ChatChooseContacts.IChoose() {
-                @Override
-                public void onResult(List<WKChannel> list) {
-                    for (WKChannel channel : list) {
-                        WKSendOptions options = new WKSendOptions();
-                        options.setting.receipt = channel.receipt;
-                        WKIM.getInstance().getMsgManager().sendWithOptions(textContent, channel,options);
-                    }
-                }
-            }), textContent));
-        }));
-
-        list.add(new PopupMenuItem(getString(R.string.refresh), R.mipmap.tool_rotate, () -> {
-            wkVBinding.webView.reload();
-        }));
-        list.add(new PopupMenuItem(getString(R.string.open_system_browser), R.mipmap.msg_openin, () -> {
-            Uri uri = Uri.parse(wkVBinding.webView.getUrl());
-            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-            startActivity(intent);
-        }));
-        ImageView rightIV = findViewById(R.id.titleRightIv);
-        WKDialogUtils.getInstance().showScreenPopup(rightIV, list);
-    }
-
-    @Override
-    protected void initView() {
-        initWebViewSetting();
-        webSpeechInputHelper = new WebSpeechInputHelper(this, wkVBinding.webView);
-        wkVBinding.webView.addJavascriptInterface(new TangSengSpeechBridge(webSpeechInputHelper), "TangSengSpeech");
-        String url = getIntent().getStringExtra("url");
-        assert url != null;
-        if (!url.startsWith("http") && !url.startsWith("HTTP") && !url.startsWith("file"))
-            url = "https://" + url;
-//        wkVBinding.webView.loadUrl("file:///android_asset/web/report.html");
-        if (url.equals(WKApiConfig.baseWebUrl + "report.html")) {
-            String wk_theme_pref = Theme.getTheme();
-            url = String.format("%s?uid=%s&token=%s&mode=%s", url, WKConfig.getInstance().getUid(), WKConfig.getInstance().getToken(), wk_theme_pref);
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        url = getArguments() == null ? "" : getArguments().getString(ARG_URL, "");
+        lastKnownUrl = url;
+        if (savedInstanceState != null) {
+            hasLoaded = savedInstanceState.getBoolean(STATE_HAS_LOADED, false);
+            hasVisibleContent = savedInstanceState.getBoolean(STATE_HAS_VISIBLE_CONTENT, false);
+            lastKnownUrl = savedInstanceState.getString(STATE_LAST_URL, url);
+            savedWebViewState = savedInstanceState;
         }
-        Log.e("加载的URL", url);
-        wkVBinding.webView.loadUrl(url);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private void initWebViewSetting() {
-        WebSettings webSettings = wkVBinding.webView.getSettings();
-        webSettings.setJavaScriptEnabled(true); // 设置支持javascript脚本
-        webSettings.setUseWideViewPort(true);
-        webSettings.setPluginState(WebSettings.PluginState.ON);
-        webSettings.setLoadWithOverviewMode(true);
-        webSettings.setDefaultTextEncodingName("UTF-8");
-        webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
-//        webSettings.setAppCacheEnabled(true);
-        webSettings.setSupportMultipleWindows(true);
-        webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
-        webSettings.setSavePassword(false);
-        webSettings.setSaveFormData(false); // 禁止保存表单
-        webSettings.setDomStorageEnabled(true);
-//        webSettings.setAppCacheMaxSize(1024 * 1024 * 8);
-        //webSettings.setAllowFileAccess(true);
-        webSettings.setAllowUniversalAccessFromFileURLs(false);
-        webSettings.setAllowFileAccessFromFileURLs(false);
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull android.view.LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        if (cachedRoot != null) {
+            ViewGroup parent = (ViewGroup) cachedRoot.getParent();
+            if (parent != null) {
+                parent.removeView(cachedRoot);
+            }
+            syncBottomNavigationWithCurrentUrl();
+            return cachedRoot;
+        }
+
+        cachedRoot = new FrameLayout(requireContext());
+        cachedRoot.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        cachedRoot.setBackgroundColor(Color.WHITE);
+
+        webView = new WebView(requireContext());
+        webView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        configureWebView(webView);
+
+        progressBar = new ProgressBar(requireContext(), null, android.R.attr.progressBarStyleHorizontal);
+        FrameLayout.LayoutParams progressLp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(2));
+        progressLp.gravity = Gravity.TOP;
+        progressBar.setMax(100);
+        progressBar.setVisibility(View.GONE);
+
+        loadingView = createLoadingView();
+        errorView = createErrorView();
+        errorView.setVisibility(View.GONE);
+
+        cachedRoot.addView(webView);
+        cachedRoot.addView(loadingView);
+        cachedRoot.addView(errorView);
+        cachedRoot.addView(progressBar, progressLp);
+
+
+        if (savedInstanceState != null) {
+            savedWebViewState = savedInstanceState;
+        }
+        restoreOrLoadUrl();
+        syncBottomNavigationWithCurrentUrl();
+        return cachedRoot;
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private void configureWebView(WebView targetWebView) {
+        WebSettings settings = targetWebView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setLoadWithOverviewMode(true);
+        settings.setUseWideViewPort(true);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setLoadsImagesAutomatically(true);
+        settings.setMediaPlaybackRequiresUserGesture(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            webSettings.setMixedContentMode(0);
+            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+            CookieManager.getInstance().setAcceptThirdPartyCookies(targetWebView, true);
         }
-        if (WKBinder.isDebug && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            WebView.setWebContentsDebuggingEnabled(true);
+        CookieManager.getInstance().setAcceptCookie(true);
+        targetWebView.setBackgroundColor(Color.WHITE);
+        targetWebView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+
+        WebSpeechInputHelper helper = getWebSpeechInputHelper(targetWebView);
+        if (helper != null) {
+            targetWebView.addJavascriptInterface(new TangSengSpeechBridge(helper), "TangSengSpeech");
         }
-        //支持屏幕缩放
-        webSettings.setSupportZoom(true);
-        webSettings.setBuiltInZoomControls(true);
-        wkVBinding.webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-        wkVBinding.webView.setWebViewClient(new BridgeWebViewClient(wkVBinding.webView) {
+
+        targetWebView.setWebViewClient(new WebViewClient() {
             @Override
-            protected void onCustomPageFinishd(WebView view, String url) {
-                super.onCustomPageFinishd(view, url);
-                if (webSpeechInputHelper != null) {
-                    webSpeechInputHelper.injectSpeechRecognitionPolyfill();
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (request == null || request.getUrl() == null) return false;
+                return handleUrl(request.getUrl().toString());
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String requestUrl) {
+                return handleUrl(requestUrl);
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String pageUrl, Bitmap favicon) {
+                super.onPageStarted(view, pageUrl, favicon);
+                lastKnownUrl = pageUrl;
+                showLoadingForNavigation();
+                showProgress(5);
+                updateBottomNavigationVisibility(pageUrl);
+            }
+
+            @Override
+            public void onPageCommitVisible(WebView view, String pageUrl) {
+                super.onPageCommitVisible(view, pageUrl);
+                lastKnownUrl = pageUrl;
+                hasVisibleContent = true;
+                hideLoadingAndError();
+                updateBottomNavigationVisibility(pageUrl);
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String pageUrl) {
+                super.onPageFinished(view, pageUrl);
+                lastKnownUrl = pageUrl;
+                hasVisibleContent = true;
+                hideLoadingAndError();
+                hideProgress();
+                updateBottomNavigationVisibility(pageUrl);
+                WebSpeechInputHelper helper = getWebSpeechInputHelper(view);
+                if (helper != null) helper.injectSpeechRecognitionPolyfill();
+            }
+
+            @Override
+            public void doUpdateVisitedHistory(WebView view, String pageUrl, boolean isReload) {
+                super.doUpdateVisitedHistory(view, pageUrl, isReload);
+                lastKnownUrl = pageUrl;
+                updateBottomNavigationVisibility(pageUrl);
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                if (request != null && request.isForMainFrame()) {
+                    hideProgress();
+                    if (!hasVisibleContent) showErrorView();
+                    updateBottomNavigationVisibility(view == null ? lastKnownUrl : view.getUrl());
                 }
             }
-        });
-        // wkVBinding.webView.setBackgroundColor(ContextCompat.getColor(this, R.color.homeColor));
-    }
 
-    @Override
-    protected boolean supportSlideBack() {
-        return false;
-    }
-
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            if (wkVBinding.webView.canGoBack()) {
-                wkVBinding.webView.goBack();
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                if (webView != null) {
+                    cachedRoot.removeView(webView);
+                    webView.destroy();
+                    webView = null;
+                }
+                hasLoaded = false;
+                hasVisibleContent = false;
+                showErrorView();
+                syncBottomNavigationWithCurrentUrl();
                 return true;
-            } else return super.onKeyDown(keyCode, event);
-        } else
-            return super.onKeyDown(keyCode, event);
-    }
-
-
-//    @Override
-//    protected void backListener(int type) {
-//        // super.backListener(type);
-//        if (wkVBinding.webView.canGoBack()) {
-//            wkVBinding.webView.goBack();
-//        } else {
-//            super.onBackPressed();
-//        }
-//    }
-
-    @Override
-    protected void initListener() {
-        wkVBinding.webView.registerHandler("quit", (var1, var2) -> {
-            finish();
-        });
-        wkVBinding.webView.registerHandler("auth", (data, function) -> {
-            if (!TextUtils.isEmpty(data)) {
-                try {
-                    JSONObject jsonObject = new JSONObject(data);
-                    String appId = jsonObject.optString("app_id");
-                    if (!TextUtils.isEmpty(appId)) {
-                        getAppInfo(appId, function);
-                    }
-                } catch (JSONException e) {
-                    throw new RuntimeException(e);
-                }
-
-            }
-            Log.e("需要授权的信息", data);
-        });
-        wkVBinding.webView.registerHandler("getChannel", (data, function) -> {
-            JsonObject jsonObject = new JsonObject();
-            jsonObject.addProperty("channelID", channelID);
-            jsonObject.addProperty("channelType", channelType);
-            function.onCallBack(jsonObject.toString());
-        });
-        wkVBinding.webView.registerHandler("showConversation", (data, function) -> {
-            if (!TextUtils.isEmpty(data)) {
-                try {
-                    JSONObject jsonObject = new JSONObject(data);
-                    String channelID = jsonObject.optString("channel_id");
-                    byte channelType = (byte) jsonObject.optInt("channel_type");
-                    EndpointManager.getInstance().invoke(EndpointSID.chatView, new ChatViewMenu(WKWebViewActivity.this, channelID, channelType, 0, true));
-                    finish();
-                } catch (JSONException e) {
-                    WKLogUtils.e("显示最近会话页面错误");
-                }
             }
         });
 
-        wkVBinding.webView.setWebChromeClient(new WebChromeClient() {
+        targetWebView.setWebChromeClient(new WebChromeClient() {
             @Override
-            public void onReceivedTitle(WebView webView, String s) {
-                super.onReceivedTitle(webView, s);
-                if (!TextUtils.isEmpty(s) && !"about:blank".equals(s)) {
-                    titleTv.setText(s);
-                }
-            }
-
-            @Override
-            public void onProgressChanged(WebView webView, int i) {
-                super.onProgressChanged(webView, i);
-                if (i > 99) {
-                    wkVBinding.progress.setVisibility(View.GONE);
-//                    hideLoadingDialog();
-                } else {
-                    wkVBinding.progress.setVisibility(View.VISIBLE);
-                    wkVBinding.progress.setProgress(i);
-                }
+            public void onProgressChanged(WebView view, int newProgress) {
+                super.onProgressChanged(view, newProgress);
+                if (newProgress >= 100) hideProgress(); else showProgress(newProgress);
             }
 
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                runOnUiThread(() -> {
+                FragmentActivity activity = getActivity();
+                if (activity == null) {
+                    request.deny();
+                    return;
+                }
+
+                activity.runOnUiThread(() -> {
                     boolean needAudio = false;
                     for (String resource : request.getResources()) {
                         if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
@@ -312,7 +257,7 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
                         return;
                     }
 
-                    if (ContextCompat.checkSelfPermission(WKWebViewActivity.this, Manifest.permission.RECORD_AUDIO)
+                    if (ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO)
                             == PackageManager.PERMISSION_GRANTED) {
                         request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
                         return;
@@ -320,8 +265,8 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
 
                     pendingPermissionRequest = request;
                     String desc = String.format(
-                            getString(R.string.microphone_permissions_des),
-                            getString(R.string.app_name)
+                            getString(com.chat.base.R.string.microphone_permissions_des),
+                            getString(com.chat.base.R.string.app_name)
                     );
                     WKPermissions.getInstance().checkPermissions(new WKPermissions.IPermissionResult() {
                         @Override
@@ -342,7 +287,7 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
                                 pendingPermissionRequest = null;
                             }
                         }
-                    }, WKWebViewActivity.this, desc, Manifest.permission.RECORD_AUDIO);
+                    }, activity, desc, Manifest.permission.RECORD_AUDIO);
                 });
             }
 
@@ -353,94 +298,272 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
                     pendingPermissionRequest = null;
                 }
             }
-
-//            @Override
-//            public void openFileChooser(ValueCallback<Uri> uploadMsg, String acceptType, String capture) {
-//                mUploadMessage = uploadMsg;
-//                Intent i = new Intent(Intent.ACTION_GET_CONTENT);
-//                i.addCategory(Intent.CATEGORY_OPENABLE);
-//                i.setType("*/*");
-//                WKWebViewActivity.this.startActivityForResult(Intent.createChooser(i, "File Browser"), FILE_CHOOSER_RESULT_CODE);
-//            }
-
-            // For Android 5.0+
-            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, WebChromeClient.FileChooserParams fileChooserParams) {
-
-                mUploadCallbackAboveL = filePathCallback;
-                Intent i = new Intent(Intent.ACTION_GET_CONTENT);
-                i.addCategory(Intent.CATEGORY_OPENABLE);
-                i.setType("*/*");
-                startActivityForResult(
-                        Intent.createChooser(i, "File Browser"),
-                        FILE_CHOOSER_RESULT_CODE);
-                return true;
-            }
-
         });
-
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == FILE_CHOOSER_RESULT_CODE) {
-            if (null == mUploadMessage && null == mUploadCallbackAboveL) return;
-            Uri result = data == null || resultCode != RESULT_OK ? null : data.getData();
-            if (mUploadCallbackAboveL != null) {
-                onActivityResultAboveL(requestCode, resultCode, data);
-            } else if (mUploadMessage != null) {
-                mUploadMessage.onReceiveValue(result);
-                mUploadMessage = null;
-            }
+    private boolean handleUrl(String requestUrl) {
+        if (TextUtils.isEmpty(requestUrl)) return false;
+        Uri uri = Uri.parse(requestUrl);
+        String scheme = uri.getScheme();
+        if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) return false;
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, uri));
+        } catch (Exception ignored) {
         }
-
+        return true;
     }
 
-
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    private void onActivityResultAboveL(int requestCode, int resultCode, Intent data) {
-        if (requestCode != FILE_CHOOSER_RESULT_CODE
-                || mUploadCallbackAboveL == null) {
+    private void restoreOrLoadUrl() {
+        if (webView == null) return;
+        if (savedWebViewState != null && hasLoaded) {
+            try {
+                webView.restoreState(savedWebViewState);
+            } catch (Exception ignored) {
+            }
+            if (hasVisibleContent) hideLoadingAndError(); else showFullLoading();
             return;
         }
-        Uri[] results = null;
-        if (resultCode == Activity.RESULT_OK) {
-            if (data == null) {
-            } else {
-                String dataString = data.getDataString();
-                ClipData clipData = data.getClipData();
-                if (clipData != null) {
-                    results = new Uri[clipData.getItemCount()];
-                    for (int i = 0; i < clipData.getItemCount(); i++) {
-                        ClipData.Item item = clipData.getItemAt(i);
-                        results[i] = item.getUri();
-                    }
-                }
-                if (dataString != null)
-                    results = new Uri[]{Uri.parse(dataString)};
+        if (!hasLoaded && !TextUtils.isEmpty(url)) {
+            showFullLoading();
+            webView.loadUrl(url);
+            hasLoaded = true;
+            lastKnownUrl = url;
+        }
+    }
+
+    private WebSpeechInputHelper getWebSpeechInputHelper(WebView targetWebView) {
+        FragmentActivity activity = getActivity();
+        if (activity == null || targetWebView == null) return null;
+        if (webSpeechInputHelper == null) {
+            webSpeechInputHelper = new WebSpeechInputHelper(activity, targetWebView);
+        } else {
+            webSpeechInputHelper.setWebView(targetWebView);
+        }
+        return webSpeechInputHelper;
+    }
+
+    private View createLoadingView() {
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_HORIZONTAL);
+        root.setBackgroundColor(Color.WHITE);
+        root.setPadding(dp(22), dp(28), dp(22), dp(22));
+        root.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        ProgressBar spinner = new ProgressBar(requireContext());
+        LinearLayout.LayoutParams spinnerLp = new LinearLayout.LayoutParams(dp(36), dp(36));
+        spinnerLp.gravity = Gravity.CENTER_HORIZONTAL;
+        spinnerLp.bottomMargin = dp(18);
+        root.addView(spinner, spinnerLp);
+
+        TextView title = new TextView(requireContext());
+        title.setText("正在加载");
+        title.setTextColor(Color.rgb(55, 65, 81));
+        title.setTextSize(16);
+        title.setGravity(Gravity.CENTER);
+        root.addView(title, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView subtitle = new TextView(requireContext());
+        subtitle.setText("请稍候，内容马上回来");
+        subtitle.setTextColor(Color.rgb(156, 163, 175));
+        subtitle.setTextSize(13);
+        subtitle.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subtitleLp.topMargin = dp(6);
+        subtitleLp.bottomMargin = dp(22);
+        root.addView(subtitle, subtitleLp);
+
+        for (int i = 0; i < 5; i++) {
+            View row = new View(requireContext());
+            row.setBackgroundColor(i % 2 == 0 ? Color.rgb(241, 245, 249) : Color.rgb(248, 250, 252));
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(i == 0 ? 64 : 48));
+            rowLp.topMargin = dp(10);
+            root.addView(row, rowLp);
+        }
+        return root;
+    }
+
+    private View createErrorView() {
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER);
+        root.setPadding(dp(28), dp(28), dp(28), dp(28));
+        root.setBackgroundColor(Color.WHITE);
+        root.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        TextView title = new TextView(requireContext());
+        title.setText("页面加载失败");
+        title.setTextColor(Color.rgb(31, 41, 55));
+        title.setTextSize(18);
+        title.setGravity(Gravity.CENTER);
+        root.addView(title, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView desc = new TextView(requireContext());
+        desc.setText("网络不稳定或页面暂时无法访问");
+        desc.setTextColor(Color.rgb(107, 114, 128));
+        desc.setTextSize(14);
+        desc.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        descLp.topMargin = dp(8);
+        descLp.bottomMargin = dp(18);
+        root.addView(desc, descLp);
+
+        Button retry = new Button(requireContext());
+        retry.setText("重新加载");
+        retry.setAllCaps(false);
+        retry.setOnClickListener(v -> reloadCurrentPage());
+        root.addView(retry, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44)));
+        return root;
+    }
+
+    private void reloadCurrentPage() {
+        if (webView == null) {
+            recreateWebViewAndLoad();
+            return;
+        }
+        showFullLoading();
+        String targetUrl = !TextUtils.isEmpty(lastKnownUrl) ? lastKnownUrl : url;
+        if (!TextUtils.isEmpty(targetUrl)) {
+            webView.loadUrl(targetUrl);
+            hasLoaded = true;
+        } else {
+            webView.reload();
+        }
+    }
+
+    private void recreateWebViewAndLoad() {
+        if (cachedRoot == null || getContext() == null) return;
+        webView = new WebView(requireContext());
+        webView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        configureWebView(webView);
+        getWebSpeechInputHelper(webView);
+        cachedRoot.addView(webView, 0);
+        hasLoaded = false;
+        hasVisibleContent = false;
+        restoreOrLoadUrl();
+    }
+
+    private void showFullLoading() {
+        if (loadingView != null && !hasVisibleContent) loadingView.setVisibility(View.VISIBLE);
+        if (errorView != null) errorView.setVisibility(View.GONE);
+    }
+
+    private void showLoadingForNavigation() {
+        if (!hasVisibleContent && loadingView != null) loadingView.setVisibility(View.VISIBLE);
+        if (errorView != null) errorView.setVisibility(View.GONE);
+    }
+
+    private void hideLoadingAndError() {
+        if (loadingView != null) loadingView.setVisibility(View.GONE);
+        if (errorView != null) errorView.setVisibility(View.GONE);
+    }
+
+    private void showErrorView() {
+        if (loadingView != null) loadingView.setVisibility(View.GONE);
+        if (errorView != null) errorView.setVisibility(View.VISIBLE);
+    }
+
+    private void showProgress(int progress) {
+        if (progressBar != null) {
+            progressBar.setVisibility(View.VISIBLE);
+            progressBar.setProgress(Math.max(3, progress));
+        }
+    }
+
+    private void hideProgress() {
+        if (progressBar != null) {
+            progressBar.setProgress(100);
+            progressBar.setVisibility(View.GONE);
+        }
+    }
+
+    public boolean canGoBack() {
+        return webView != null && webView.canGoBack();
+    }
+
+    public void goBack() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            syncBottomNavigationWithCurrentUrl();
+        }
+    }
+
+    public void syncBottomNavigationWithCurrentUrl() {
+        updateBottomNavigationVisibility(getCurrentPageUrl());
+    }
+
+    private String getCurrentPageUrl() {
+        if (webView != null && !TextUtils.isEmpty(webView.getUrl())) return webView.getUrl();
+        if (!TextUtils.isEmpty(lastKnownUrl)) return lastKnownUrl;
+        return url;
+    }
+
+    private void updateBottomNavigationVisibility(String currentUrl) {
+        Activity activity = getActivity();
+        if (activity instanceof TabActivity) {
+            ((TabActivity) activity).setBottomNavigationVisible(isRootPage(currentUrl));
+        }
+    }
+
+    private boolean isRootPage(String currentUrl) {
+        if (TextUtils.isEmpty(currentUrl) || TextUtils.isEmpty(url)) return true;
+        try {
+            Uri current = Uri.parse(currentUrl);
+            Uri root = Uri.parse(url);
+            if (!TextUtils.equals(current.getHost(), root.getHost())) return false;
+            if (!TextUtils.equals(normalizePath(current.getPath()), normalizePath(root.getPath()))) return false;
+            String fragment = current.getFragment();
+            return TextUtils.isEmpty(fragment) || "/".equals(fragment);
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    private String normalizePath(String path) {
+        if (TextUtils.isEmpty(path)) return "/";
+        if (path.length() > 1 && path.endsWith("/")) return path.substring(0, path.length() - 1);
+        return path;
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (webView != null) webView.onPause();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (webView != null) webView.onResume();
+        syncBottomNavigationWithCurrentUrl();
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putBoolean(STATE_HAS_LOADED, hasLoaded);
+        outState.putBoolean(STATE_HAS_VISIBLE_CONTENT, hasVisibleContent);
+        outState.putString(STATE_LAST_URL, getCurrentPageUrl());
+        if (webView != null) {
+            try {
+                webView.saveState(outState);
+            } catch (Exception ignored) {
             }
         }
-        mUploadCallbackAboveL.onReceiveValue(results);
-        mUploadCallbackAboveL = null;
-    }
-
-
-    @SuppressLint("NewApi")
-    @Override
-    protected void onPause() {
-        wkVBinding.webView.onPause();
-        super.onPause();
-    }
-
-    @SuppressLint("NewApi")
-    @Override
-    protected void onResume() {
-        wkVBinding.webView.onResume();
-        super.onResume();
     }
 
     @Override
-    protected void onDestroy() {
+    public void onDestroyView() {
+        if (cachedRoot != null) {
+            ViewGroup parent = (ViewGroup) cachedRoot.getParent();
+            if (parent != null) parent.removeView(cachedRoot);
+        }
+        super.onDestroyView();
+    }
+
+    @Override
+    public void onDestroy() {
         if (webSpeechInputHelper != null) {
             webSpeechInputHelper.destroy();
             webSpeechInputHelper = null;
@@ -452,81 +575,24 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
             }
             pendingPermissionRequest = null;
         }
+        if (webView != null) {
+            try {
+                webView.stopLoading();
+                webView.setWebChromeClient(null);
+                webView.setWebViewClient(null);
+                webView.destroy();
+            } catch (Exception ignored) {
+            }
+            webView = null;
+        }
+        progressBar = null;
+        loadingView = null;
+        errorView = null;
+        cachedRoot = null;
         super.onDestroy();
     }
 
-    private void getAppInfo(String appId, CallBackFunction function) {
-        WKAppModel.Companion.getInstance().getAppInfo(appId, (code, msg, appInfo) -> {
-            if (code == HttpResponseCode.success) {
-                authDialog(appInfo, function);
-            } else {
-                if (!TextUtils.isEmpty(msg)) {
-                    showToast(msg);
-                }
-            }
-        });
-    }
-
-    private void authDialog(AppInfo appInfo, CallBackFunction function) {
-        View authView = LayoutInflater.from(this).inflate(R.layout.auth_dialog_layout, getViewBinding().webView, false);
-        TextView appName = authView.findViewById(R.id.appNameTv);
-        AvatarView appIV = authView.findViewById(R.id.appIV);
-        TextView nameTv = authView.findViewById(R.id.nameTv);
-        TextView descTv = authView.findViewById(R.id.descTv);
-        AvatarView avatarView = authView.findViewById(R.id.avatarView);
-        descTv.setText(String.format(getString(R.string.str_request_desc), getString(R.string.app_name)));
-        appIV.setSize(30f);
-        appName.setText(appInfo.getApp_name());
-        GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(appInfo.getApp_logo()), appIV.imageView);
-        avatarView.setSize(40f);
-        WKChannel loginChannel = WKIM.getInstance().getChannelManager().getChannel(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
-        avatarView.showAvatar(loginChannel);
-        nameTv.setText(loginChannel.channelName);
-        BottomSheet bottomSheet = new BottomSheet(this, true);
-        bottomSheet.setCustomView(authView);
-        authView.findViewById(R.id.cancelBtn).setOnClickListener(v -> {
-            bottomSheet.setDelegate(null);
-            bottomSheet.dismiss();
-        });
-        authView.findViewById(R.id.sureBtn).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                WKAppModel.Companion.getInstance().getAuthCode(appInfo.getApp_id(), new WKAppModel.IAuth() {
-                    @Override
-                    public void onResult(int code, @Nullable String msg, @Nullable AuthInfo authInfo) {
-                        if (authInfo != null) {
-                            JSONObject json = new JSONObject();
-                            try {
-                                json.put("code", authInfo.getAuthcode());
-                            } catch (JSONException e) {
-                                throw new RuntimeException(e);
-                            }
-                            function.onCallBack(json.toString());
-                            bottomSheet.setDelegate(null);
-                            bottomSheet.dismiss();
-                        }
-                    }
-                });
-            }
-        });
-        bottomSheet.setOpenNoDelay(false);
-        bottomSheet.setDelegate(new BottomSheet.BottomSheetDelegateInterface() {
-
-            @Override
-            public void onOpenAnimationStart() {
-
-            }
-
-            @Override
-            public void onOpenAnimationEnd() {
-
-            }
-
-            @Override
-            public boolean canDismiss() {
-                return false;
-            }
-        });
-        bottomSheet.show();
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 }
