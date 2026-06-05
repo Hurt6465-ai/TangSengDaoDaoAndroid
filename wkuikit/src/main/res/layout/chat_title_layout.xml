@@ -34,6 +34,7 @@
 
 
         <FrameLayout
+            android:id="@+id/avatarContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
@@ -64,6 +65,7 @@
             android:requiresFadingEdge="horizontal">
 
             <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/titleNameRowLayout"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content">
 
