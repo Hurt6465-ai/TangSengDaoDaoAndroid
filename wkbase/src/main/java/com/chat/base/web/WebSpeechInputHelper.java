@@ -27,10 +27,9 @@ import java.util.ArrayList;
 /**
  * Native speech-to-text helper for WebView pages.
  *
- * It does not depend on the page's Web Speech API. The app uses Android's
- * SpeechRecognizer to get text, then either:
- * 1) injects the recognized text into the focused input/textarea/contenteditable element, or
- * 2) sends a Web Speech-like result event back to the page for existing voice buttons.
+ * Stable version: it uses Android SpeechRecognizer directly and never opens the
+ * system speech recognition popup. Some phones crash when the popup is opened
+ * from an embedded WebView page, so this version avoids that path completely.
  */
 public class WebSpeechInputHelper {
     private final FragmentActivity activity;
@@ -51,7 +50,7 @@ public class WebSpeechInputHelper {
 
     /**
      * Start native recognition and insert the final result into the focused page input.
-     * This is useful for a page that directly calls window.TangSengSpeech.startSpeech().
+     * JS can call: window.TangSengSpeech.startSpeech()
      */
     public void startSpeechInput() {
         startSpeechInput(true);
@@ -59,7 +58,7 @@ public class WebSpeechInputHelper {
 
     /**
      * Start native recognition and return the result through the injected Web Speech polyfill.
-     * This is useful for pages that already call recognition.start().
+     * Existing page code like recognition.start() will use this path.
      */
     public void startSpeechRecognitionForPage() {
         startSpeechInput(false);
@@ -94,12 +93,18 @@ public class WebSpeechInputHelper {
             @Override
             public void onResult(boolean result) {
                 if (result) startListeningInternal();
-                else notifySpeechErrorToPage("缺少麦克风权限", SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS);
+                else {
+                    showToast("缺少麦克风权限");
+                    notifySpeechErrorToPage("缺少麦克风权限", SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS);
+                }
             }
 
             @Override
             public void clickResult(boolean isCancel) {
-                if (isCancel) notifySpeechErrorToPage("缺少麦克风权限", SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS);
+                if (isCancel) {
+                    showToast("缺少麦克风权限");
+                    notifySpeechErrorToPage("缺少麦克风权限", SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS);
+                }
             }
         }, activity, desc, Manifest.permission.RECORD_AUDIO);
     }
@@ -144,45 +149,38 @@ public class WebSpeechInputHelper {
         rememberCurrentEditableElement();
 
         if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
-            startSystemRecognitionFallback("当前系统没有可用的语音识别服务，尝试打开系统语音输入");
+            String message = "当前系统没有可用的语音识别服务";
+            showToast(message);
+            notifySpeechErrorToPage(message, -2);
             return;
         }
 
         releaseRecognizer();
 
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(activity);
+        try {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(activity);
+        } catch (Exception e) {
+            String message = "创建语音识别服务失败";
+            showToast(message);
+            notifySpeechErrorToPage(message, -3);
+            return;
+        }
+
         speechRecognizer.setRecognitionListener(new RecognitionListener() {
             @Override
             public void onReadyForSpeech(Bundle params) {
                 showToast("请开始说话");
             }
 
-            @Override
-            public void onBeginningOfSpeech() {
-            }
-
-            @Override
-            public void onRmsChanged(float rmsdB) {
-            }
-
-            @Override
-            public void onBufferReceived(byte[] buffer) {
-            }
-
-            @Override
-            public void onEndOfSpeech() {
-            }
+            @Override public void onBeginningOfSpeech() {}
+            @Override public void onRmsChanged(float rmsdB) {}
+            @Override public void onBufferReceived(byte[] buffer) {}
+            @Override public void onEndOfSpeech() {}
 
             @Override
             public void onError(int error) {
                 String message = getErrorMessage(error);
                 releaseRecognizer();
-
-                if (shouldFallbackToSystemRecognizer(error)) {
-                    startSystemRecognitionFallback(message);
-                    return;
-                }
-
                 showToast(message);
                 notifySpeechErrorToPage(message, error);
             }
@@ -202,13 +200,8 @@ public class WebSpeechInputHelper {
                 releaseRecognizer();
             }
 
-            @Override
-            public void onPartialResults(Bundle partialResults) {
-            }
-
-            @Override
-            public void onEvent(int eventType, Bundle params) {
-            }
+            @Override public void onPartialResults(Bundle partialResults) {}
+            @Override public void onEvent(int eventType, Bundle params) {}
         });
 
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -222,57 +215,10 @@ public class WebSpeechInputHelper {
             speechRecognizer.startListening(intent);
         } catch (Exception e) {
             releaseRecognizer();
-            startSystemRecognitionFallback("启动语音识别失败，尝试打开系统语音输入");
+            String message = "启动语音识别失败";
+            showToast(message);
+            notifySpeechErrorToPage(message, -4);
         }
-    }
-
-    private boolean shouldFallbackToSystemRecognizer(int error) {
-        return error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS
-                || error == SpeechRecognizer.ERROR_CLIENT
-                || error == SpeechRecognizer.ERROR_SERVER
-                || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
-                || error == SpeechRecognizer.ERROR_NETWORK
-                || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT;
-    }
-
-    private void startSystemRecognitionFallback(String reason) {
-        if (Thread.currentThread() != Looper.getMainLooper().getThread()) {
-            mainHandler.post(() -> startSystemRecognitionFallback(reason));
-            return;
-        }
-
-        if (destroyed || activity == null || activity.isFinishing()) return;
-
-        if (!TextUtils.isEmpty(reason)) {
-            showToast(reason);
-        }
-
-        rememberCurrentEditableElement();
-
-        WebSpeechProxyActivity.start(activity, new WebSpeechProxyActivity.Callback() {
-            @Override
-            public void onResult(String text) {
-                if (destroyed) return;
-                if (TextUtils.isEmpty(text)) {
-                    showToast("没有识别到内容");
-                    notifySpeechErrorToPage("没有识别到内容", SpeechRecognizer.ERROR_NO_MATCH);
-                    return;
-                }
-
-                if (insertResultIntoFocusedElement) {
-                    insertTextIntoWebView(text);
-                }
-                notifySpeechResultToPage(text);
-            }
-
-            @Override
-            public void onError(String message) {
-                if (destroyed) return;
-                String safeMessage = TextUtils.isEmpty(message) ? "系统语音输入失败" : message;
-                showToast(safeMessage);
-                notifySpeechErrorToPage(safeMessage, -4);
-            }
-        });
     }
 
     private String readBestResult(Bundle results) {
