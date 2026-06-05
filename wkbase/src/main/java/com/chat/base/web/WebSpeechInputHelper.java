@@ -324,6 +324,10 @@ public class WebSpeechInputHelper {
             case SpeechRecognizer.ERROR_CLIENT:
                 return "语音识别客户端错误";
             case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
+                if (activity != null && ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    return "系统语音服务无麦克风权限，请检查 Google/语音服务麦克风权限或系统麦克风开关";
+                }
                 return "缺少麦克风权限";
             case SpeechRecognizer.ERROR_NETWORK:
             case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
