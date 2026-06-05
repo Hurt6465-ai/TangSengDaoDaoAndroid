@@ -141,13 +141,13 @@ public class WebSpeechInputHelper {
 
         if (destroyed || activity == null || activity.isFinishing()) return;
 
+        rememberCurrentEditableElement();
+
         if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
-            showToast("当前系统没有可用的语音识别服务");
-            notifySpeechErrorToPage("当前系统没有可用的语音识别服务", -2);
+            startSystemRecognitionFallback("当前系统没有可用的语音识别服务，尝试打开系统语音输入");
             return;
         }
 
-        rememberCurrentEditableElement();
         releaseRecognizer();
 
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(activity);
@@ -176,9 +176,15 @@ public class WebSpeechInputHelper {
             @Override
             public void onError(int error) {
                 String message = getErrorMessage(error);
+                releaseRecognizer();
+
+                if (shouldFallbackToSystemRecognizer(error)) {
+                    startSystemRecognitionFallback(message);
+                    return;
+                }
+
                 showToast(message);
                 notifySpeechErrorToPage(message, error);
-                releaseRecognizer();
             }
 
             @Override
@@ -215,10 +221,58 @@ public class WebSpeechInputHelper {
         try {
             speechRecognizer.startListening(intent);
         } catch (Exception e) {
-            showToast("启动语音识别失败");
-            notifySpeechErrorToPage("启动语音识别失败", -3);
             releaseRecognizer();
+            startSystemRecognitionFallback("启动语音识别失败，尝试打开系统语音输入");
         }
+    }
+
+    private boolean shouldFallbackToSystemRecognizer(int error) {
+        return error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS
+                || error == SpeechRecognizer.ERROR_CLIENT
+                || error == SpeechRecognizer.ERROR_SERVER
+                || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                || error == SpeechRecognizer.ERROR_NETWORK
+                || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT;
+    }
+
+    private void startSystemRecognitionFallback(String reason) {
+        if (Thread.currentThread() != Looper.getMainLooper().getThread()) {
+            mainHandler.post(() -> startSystemRecognitionFallback(reason));
+            return;
+        }
+
+        if (destroyed || activity == null || activity.isFinishing()) return;
+
+        if (!TextUtils.isEmpty(reason)) {
+            showToast(reason);
+        }
+
+        rememberCurrentEditableElement();
+
+        WebSpeechProxyActivity.start(activity, new WebSpeechProxyActivity.Callback() {
+            @Override
+            public void onResult(String text) {
+                if (destroyed) return;
+                if (TextUtils.isEmpty(text)) {
+                    showToast("没有识别到内容");
+                    notifySpeechErrorToPage("没有识别到内容", SpeechRecognizer.ERROR_NO_MATCH);
+                    return;
+                }
+
+                if (insertResultIntoFocusedElement) {
+                    insertTextIntoWebView(text);
+                }
+                notifySpeechResultToPage(text);
+            }
+
+            @Override
+            public void onError(String message) {
+                if (destroyed) return;
+                String safeMessage = TextUtils.isEmpty(message) ? "系统语音输入失败" : message;
+                showToast(safeMessage);
+                notifySpeechErrorToPage(safeMessage, -4);
+            }
+        });
     }
 
     private String readBestResult(Bundle results) {
