@@ -1,11 +1,13 @@
 package com.chat.base.act;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -14,6 +16,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -22,6 +25,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
 import com.chat.base.R;
 import com.chat.base.app.WKAppModel;
@@ -40,13 +44,17 @@ import com.chat.base.entity.AuthInfo;
 import com.chat.base.entity.PopupMenuItem;
 import com.chat.base.glide.GlideUtils;
 import com.chat.base.jsbrigde.CallBackFunction;
+import com.chat.base.jsbrigde.BridgeWebViewClient;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.ui.Theme;
 import com.chat.base.ui.components.AvatarView;
 import com.chat.base.ui.components.BottomSheet;
 import com.chat.base.utils.WKDialogUtils;
 import com.chat.base.utils.WKLogUtils;
+import com.chat.base.utils.WKPermissions;
 import com.chat.base.utils.WKToastUtils;
+import com.chat.base.web.TangSengSpeechBridge;
+import com.chat.base.web.WebSpeechInputHelper;
 import com.google.gson.JsonObject;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
@@ -72,6 +80,8 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
     ValueCallback<Uri[]> mUploadCallbackAboveL;
     private String channelID;
     private byte channelType;
+    private PermissionRequest pendingPermissionRequest;
+    private WebSpeechInputHelper webSpeechInputHelper;
 
     @Override
     protected ActWebvieiwLayoutBinding getViewBinding() {
@@ -142,10 +152,12 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
     @Override
     protected void initView() {
         initWebViewSetting();
+        webSpeechInputHelper = new WebSpeechInputHelper(this, wkVBinding.webView);
+        wkVBinding.webView.addJavascriptInterface(new TangSengSpeechBridge(webSpeechInputHelper), "TangSengSpeech");
         String url = getIntent().getStringExtra("url");
         assert url != null;
         if (!url.startsWith("http") && !url.startsWith("HTTP") && !url.startsWith("file"))
-            url = "http://" + url;
+            url = "https://" + url;
 //        wkVBinding.webView.loadUrl("file:///android_asset/web/report.html");
         if (url.equals(WKApiConfig.baseWebUrl + "report.html")) {
             String wk_theme_pref = Theme.getTheme();
@@ -184,6 +196,15 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
         webSettings.setSupportZoom(true);
         webSettings.setBuiltInZoomControls(true);
         wkVBinding.webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        wkVBinding.webView.setWebViewClient(new BridgeWebViewClient(wkVBinding.webView) {
+            @Override
+            protected void onCustomPageFinishd(WebView view, String url) {
+                super.onCustomPageFinishd(view, url);
+                if (webSpeechInputHelper != null) {
+                    webSpeechInputHelper.injectSpeechRecognitionPolyfill();
+                }
+            }
+        });
         // wkVBinding.webView.setBackgroundColor(ContextCompat.getColor(this, R.color.homeColor));
     }
 
@@ -275,6 +296,64 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
                 }
             }
 
+            @Override
+            public void onPermissionRequest(final PermissionRequest request) {
+                runOnUiThread(() -> {
+                    boolean needAudio = false;
+                    for (String resource : request.getResources()) {
+                        if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
+                            needAudio = true;
+                            break;
+                        }
+                    }
+
+                    if (!needAudio) {
+                        request.deny();
+                        return;
+                    }
+
+                    if (ContextCompat.checkSelfPermission(WKWebViewActivity.this, Manifest.permission.RECORD_AUDIO)
+                            == PackageManager.PERMISSION_GRANTED) {
+                        request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                        return;
+                    }
+
+                    pendingPermissionRequest = request;
+                    String desc = String.format(
+                            getString(R.string.microphone_permissions_des),
+                            getString(R.string.app_name)
+                    );
+                    WKPermissions.getInstance().checkPermissions(new WKPermissions.IPermissionResult() {
+                        @Override
+                        public void onResult(boolean result) {
+                            if (pendingPermissionRequest == null) return;
+                            if (result) {
+                                pendingPermissionRequest.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                            } else {
+                                pendingPermissionRequest.deny();
+                            }
+                            pendingPermissionRequest = null;
+                        }
+
+                        @Override
+                        public void clickResult(boolean isCancel) {
+                            if (isCancel && pendingPermissionRequest != null) {
+                                pendingPermissionRequest.deny();
+                                pendingPermissionRequest = null;
+                            }
+                        }
+                    }, WKWebViewActivity.this, desc, Manifest.permission.RECORD_AUDIO);
+                });
+            }
+
+            @Override
+            public void onPermissionRequestCanceled(PermissionRequest request) {
+                super.onPermissionRequestCanceled(request);
+                if (pendingPermissionRequest == request) {
+                    pendingPermissionRequest = null;
+                }
+            }
+
 //            @Override
 //            public void openFileChooser(ValueCallback<Uri> uploadMsg, String acceptType, String capture) {
 //                mUploadMessage = uploadMsg;
@@ -358,6 +437,22 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
     protected void onResume() {
         wkVBinding.webView.onResume();
         super.onResume();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (webSpeechInputHelper != null) {
+            webSpeechInputHelper.destroy();
+            webSpeechInputHelper = null;
+        }
+        if (pendingPermissionRequest != null) {
+            try {
+                pendingPermissionRequest.deny();
+            } catch (Exception ignored) {
+            }
+            pendingPermissionRequest = null;
+        }
+        super.onDestroy();
     }
 
     private void getAppInfo(String appId, CallBackFunction function) {
