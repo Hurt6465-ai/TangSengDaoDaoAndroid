@@ -5,6 +5,10 @@
 
     <queries>
         <package android:name="com.tencent.mm" />
+        <!-- Android 11+ package visibility: allow native SpeechRecognizer to find a recognition service. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
     </queries>
 
     <dist:module dist:instant="true" />
