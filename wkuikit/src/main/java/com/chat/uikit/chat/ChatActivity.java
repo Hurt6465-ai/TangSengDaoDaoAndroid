@@ -1754,17 +1754,12 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     private void bindTopProfileClick() {
         View.OnClickListener listener = view -> openChatProfilePage();
-        bindProfileClickView(wkVBinding.topLayout.titleView, listener);
-        bindProfileClickView(wkVBinding.topLayout.titleContentLayout, listener);
+        // 只允许头像和用户名区域进入资料页；顶部栏其它空白区域不响应。
         bindProfileClickView(wkVBinding.topLayout.avatarContainer, listener);
         bindProfileClickView(wkVBinding.topLayout.avatarView, listener);
-        bindProfileClickView(wkVBinding.topLayout.titleTextLayout, listener);
         bindProfileClickView(wkVBinding.topLayout.titleNameRowLayout, listener);
         bindProfileClickView(wkVBinding.topLayout.titleCenterTv, listener);
         bindProfileClickView(wkVBinding.topLayout.categoryLayout, listener);
-        bindProfileClickView(wkVBinding.topLayout.subtitleView, listener);
-        bindProfileClickView(wkVBinding.topLayout.subtitleTv, listener);
-        bindProfileClickView(wkVBinding.topLayout.subtitleCountTv, listener);
     }
 
     private void bindProfileClickView(View view, View.OnClickListener listener) {
