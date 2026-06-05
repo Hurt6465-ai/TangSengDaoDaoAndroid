@@ -1,8 +1,10 @@
 package com.chat.uikit.fragment;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
@@ -13,6 +15,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
+import android.webkit.PermissionRequest;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -28,8 +31,13 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
 
+import com.chat.base.utils.WKPermissions;
+import com.chat.base.web.TangSengSpeechBridge;
+import com.chat.base.web.WebSpeechInputHelper;
 import com.chat.uikit.TabActivity;
 
 public class WebTabFragment extends Fragment {
@@ -47,6 +55,8 @@ public class WebTabFragment extends Fragment {
     private ProgressBar progressBar;
     private View loadingView;
     private View errorView;
+    private PermissionRequest pendingPermissionRequest;
+    private WebSpeechInputHelper webSpeechInputHelper;
 
     private boolean hasLoaded = false;
     private boolean hasVisibleContent = false;
@@ -108,6 +118,7 @@ public class WebTabFragment extends Fragment {
         cachedRoot.addView(errorView);
         cachedRoot.addView(progressBar, progressLp);
 
+
         if (savedInstanceState != null) {
             savedWebViewState = savedInstanceState;
         }
@@ -137,6 +148,11 @@ public class WebTabFragment extends Fragment {
         CookieManager.getInstance().setAcceptCookie(true);
         targetWebView.setBackgroundColor(Color.WHITE);
         targetWebView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+
+        WebSpeechInputHelper helper = getWebSpeechInputHelper(targetWebView);
+        if (helper != null) {
+            targetWebView.addJavascriptInterface(new TangSengSpeechBridge(helper), "TangSengSpeech");
+        }
 
         targetWebView.setWebViewClient(new WebViewClient() {
             @Override
@@ -176,6 +192,8 @@ public class WebTabFragment extends Fragment {
                 hideLoadingAndError();
                 hideProgress();
                 updateBottomNavigationVisibility(pageUrl);
+                WebSpeechInputHelper helper = getWebSpeechInputHelper(view);
+                if (helper != null) helper.injectSpeechRecognitionPolyfill();
             }
 
             @Override
@@ -216,6 +234,70 @@ public class WebTabFragment extends Fragment {
                 super.onProgressChanged(view, newProgress);
                 if (newProgress >= 100) hideProgress(); else showProgress(newProgress);
             }
+
+            @Override
+            public void onPermissionRequest(final PermissionRequest request) {
+                FragmentActivity activity = getActivity();
+                if (activity == null) {
+                    request.deny();
+                    return;
+                }
+
+                activity.runOnUiThread(() -> {
+                    boolean needAudio = false;
+                    for (String resource : request.getResources()) {
+                        if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
+                            needAudio = true;
+                            break;
+                        }
+                    }
+
+                    if (!needAudio) {
+                        request.deny();
+                        return;
+                    }
+
+                    if (ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO)
+                            == PackageManager.PERMISSION_GRANTED) {
+                        request.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                        return;
+                    }
+
+                    pendingPermissionRequest = request;
+                    String desc = String.format(
+                            getString(com.chat.base.R.string.microphone_permissions_des),
+                            getString(com.chat.base.R.string.app_name)
+                    );
+                    WKPermissions.getInstance().checkPermissions(new WKPermissions.IPermissionResult() {
+                        @Override
+                        public void onResult(boolean result) {
+                            if (pendingPermissionRequest == null) return;
+                            if (result) {
+                                pendingPermissionRequest.grant(new String[]{PermissionRequest.RESOURCE_AUDIO_CAPTURE});
+                            } else {
+                                pendingPermissionRequest.deny();
+                            }
+                            pendingPermissionRequest = null;
+                        }
+
+                        @Override
+                        public void clickResult(boolean isCancel) {
+                            if (isCancel && pendingPermissionRequest != null) {
+                                pendingPermissionRequest.deny();
+                                pendingPermissionRequest = null;
+                            }
+                        }
+                    }, activity, desc, Manifest.permission.RECORD_AUDIO);
+                });
+            }
+
+            @Override
+            public void onPermissionRequestCanceled(PermissionRequest request) {
+                super.onPermissionRequestCanceled(request);
+                if (pendingPermissionRequest == request) {
+                    pendingPermissionRequest = null;
+                }
+            }
         });
     }
 
@@ -247,6 +329,17 @@ public class WebTabFragment extends Fragment {
             hasLoaded = true;
             lastKnownUrl = url;
         }
+    }
+
+    private WebSpeechInputHelper getWebSpeechInputHelper(WebView targetWebView) {
+        FragmentActivity activity = getActivity();
+        if (activity == null || targetWebView == null) return null;
+        if (webSpeechInputHelper == null) {
+            webSpeechInputHelper = new WebSpeechInputHelper(activity, targetWebView);
+        } else {
+            webSpeechInputHelper.setWebView(targetWebView);
+        }
+        return webSpeechInputHelper;
     }
 
     private View createLoadingView() {
@@ -343,6 +436,7 @@ public class WebTabFragment extends Fragment {
         webView = new WebView(requireContext());
         webView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         configureWebView(webView);
+        getWebSpeechInputHelper(webView);
         cachedRoot.addView(webView, 0);
         hasLoaded = false;
         hasVisibleContent = false;
@@ -470,6 +564,17 @@ public class WebTabFragment extends Fragment {
 
     @Override
     public void onDestroy() {
+        if (webSpeechInputHelper != null) {
+            webSpeechInputHelper.destroy();
+            webSpeechInputHelper = null;
+        }
+        if (pendingPermissionRequest != null) {
+            try {
+                pendingPermissionRequest.deny();
+            } catch (Exception ignored) {
+            }
+            pendingPermissionRequest = null;
+        }
         if (webView != null) {
             try {
                 webView.stopLoading();
