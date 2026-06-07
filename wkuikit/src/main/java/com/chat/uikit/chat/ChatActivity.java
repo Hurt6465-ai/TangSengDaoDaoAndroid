@@ -990,37 +990,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         return "";
     }
 
-    private boolean isQuickTranslatableReceivedText(WKMsg msg) {
-        if (msg == null) return false;
-        if (shouldHideFromChatList(msg)) return false;
-        if (msg.type != WKContentType.WK_TEXT) return false;
-        if (msg.remoteExtra != null && msg.remoteExtra.revoke == 1) return false;
-        if (TextUtils.isEmpty(msg.fromUID)) return false;
-        if (TextUtils.equals(msg.fromUID, loginUID)) return false;
-
-        String text = getMessagePayloadText(msg);
-        if (TextUtils.isEmpty(text)) return false;
-        return !text.trim().startsWith("__cp_harmony_rtc__:");
-    }
-
-    private int findLatestQuickTranslatableReceivedTextIndex() {
-        if (chatAdapter == null || WKReader.isEmpty(chatAdapter.getData())) return -1;
-        for (int i = chatAdapter.getData().size() - 1; i >= 0; i--) {
-            WKUIChatMsgItemEntity item = chatAdapter.getData().get(i);
-            if (item != null && isQuickTranslatableReceivedText(item.wkMsg)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private void notifyFullRebindIfValid(int index) {
-        if (chatAdapter == null) return;
-        if (index < 0 || index >= chatAdapter.getData().size()) return;
-        // 这里必须使用无 payload 的完整刷新，确保 WKTextProvider.setData() 重新执行并清理旧翻译按钮。
-        chatAdapter.notifyItemChanged(index);
-    }
-
     private boolean isSameMessage(WKMsg first, WKMsg second) {
         if (first == null || second == null) return false;
         if (first.clientSeq != 0 && first.clientSeq == second.clientSeq) return true;
@@ -1393,7 +1362,15 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
         });
 
-        bindTopProfileClick();
+        SingleClickUtil.onSingleClick(wkVBinding.topLayout.titleView, view -> {
+            WKChannelMember member = WKIM.getInstance().getChannelMembersManager().getMember(channelId, channelType, loginUID);
+
+            if ((member != null && member.isDeleted == 1) || channelType == WKChannelType.CUSTOMER_SERVICE)
+                return;
+            Intent intent = new Intent(ChatActivity.this, channelType == WKChannelType.GROUP ? GroupDetailActivity.class : ChatPersonalActivity.class);
+            intent.putExtra("channelId", channelId);
+            startActivity(intent);
+        });
 
         wkVBinding.recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -1750,32 +1727,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
             return null;
         });
-    }
-
-    private void bindTopProfileClick() {
-        View.OnClickListener listener = view -> openChatProfilePage();
-        // 只允许头像和用户名区域进入资料页；顶部栏其它空白区域不响应。
-        bindProfileClickView(wkVBinding.topLayout.avatarContainer, listener);
-        bindProfileClickView(wkVBinding.topLayout.avatarView, listener);
-        bindProfileClickView(wkVBinding.topLayout.titleNameRowLayout, listener);
-        bindProfileClickView(wkVBinding.topLayout.titleCenterTv, listener);
-        bindProfileClickView(wkVBinding.topLayout.categoryLayout, listener);
-    }
-
-    private void bindProfileClickView(View view, View.OnClickListener listener) {
-        if (view == null || listener == null) return;
-        view.setClickable(true);
-        SingleClickUtil.onSingleClick(view, listener);
-    }
-
-    private void openChatProfilePage() {
-        WKChannelMember member = WKIM.getInstance().getChannelMembersManager().getMember(channelId, channelType, loginUID);
-        if ((member != null && member.isDeleted == 1) || channelType == WKChannelType.CUSTOMER_SERVICE) {
-            return;
-        }
-        Intent intent = new Intent(ChatActivity.this, channelType == WKChannelType.GROUP ? GroupDetailActivity.class : ChatPersonalActivity.class);
-        intent.putExtra("channelId", channelId);
-        startActivity(intent);
     }
 
     @Override
@@ -2393,7 +2344,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
         }
         rebuildMsgLinks(chatAdapter.getData());
-        notifyFullRebindIfValid(findLatestQuickTranslatableReceivedTextIndex());
     }
 
     private void showToast(int textId) {
@@ -3233,9 +3183,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                                 chatAdapter.removeAt(chatAdapter.getItemCount() - 1);
                             }
                         }
-                        int oldQuickTranslateIndex = isQuickTranslatableReceivedText(msg)
-                                ? findLatestQuickTranslatableReceivedTextIndex()
-                                : -1;
                         WKMsg timeMsg = addTimeMsg(msg.timestamp);
                         WKUIChatMsgItemEntity itemEntity = WKIMUtils.getInstance().msg2UiMsg(this, msg, count, showNickName, chatAdapter.isShowChooseItem());
                         if (timeMsg != null && chatAdapter.getData().size() > 1) {
@@ -3267,9 +3214,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                         if (msg.orderSeq > maxMsgOrderSeq) {
                             maxMsgOrderSeq = msg.orderSeq;
                         }
-                        notifyFullRebindIfValid(oldQuickTranslateIndex);
-                        if (previousMsgIndex != -1 && previousMsgIndex < chatAdapter.getData().size() && previousMsgIndex != oldQuickTranslateIndex) {
-                            notifyFullRebindIfValid(previousMsgIndex);
+                        if (previousMsgIndex != -1 && previousMsgIndex < chatAdapter.getData().size()) {
+                            chatAdapter.notifyItemChanged(previousMsgIndex, chatAdapter.getData().get(previousMsgIndex));
                         }
                     }
                     if (isShowHistory || redDot > 0) {
@@ -3525,7 +3471,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     WKIM.getInstance().getMsgManager().saveAndUpdateConversationMsg(noRelationMsg, false);
                 }
                 rebuildMsgLinks(chatAdapter.getData());
-                notifyFullRebindIfValid(findLatestQuickTranslatableReceivedTextIndex());
                 break;
             }
         }
