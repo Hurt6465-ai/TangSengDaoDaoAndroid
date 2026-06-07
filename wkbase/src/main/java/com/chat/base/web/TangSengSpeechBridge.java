@@ -25,8 +25,13 @@ public class TangSengSpeechBridge {
      */
     @JavascriptInterface
     public void startSpeech() {
+        startSpeechWithLang("zh-CN");
+    }
+
+    @JavascriptInterface
+    public void startSpeechWithLang(String language) {
         runOnMain(() -> {
-            if (helper != null) helper.startSpeechInput();
+            if (helper != null) helper.startSpeechInput(language);
         });
     }
 
@@ -37,8 +42,13 @@ public class TangSengSpeechBridge {
      */
     @JavascriptInterface
     public void startRecognition() {
+        startRecognitionWithLang("zh-CN");
+    }
+
+    @JavascriptInterface
+    public void startRecognitionWithLang(String language) {
         runOnMain(() -> {
-            if (helper != null) helper.startSpeechRecognitionForPage();
+            if (helper != null) helper.startSpeechRecognitionForPage(language);
         });
     }
 
