@@ -24,31 +24,34 @@ import com.chat.base.utils.WKPermissions;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Locale;
 
 /**
  * Native speech-to-text helper for WebView pages.
  *
- * Important:
- * 1. It never opens the system speech recognition popup. Some phones crash when
- *    that popup is launched from an embedded WebView page.
- * 2. All SpeechRecognizer calls are forced onto the Android main thread. Some
- *    devices return fake permission/service errors when SpeechRecognizer is
- *    created or started from a WebView bridge thread.
+ * This version intentionally keeps the Android SpeechRecognizer call path simple,
+ * similar to common Google ASR sample apps:
+ * - use SpeechRecognizer.createSpeechRecognizer(context)
+ * - use RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+ * - use LANGUAGE_MODEL_FREE_FORM
+ * - use Locale.getDefault()
+ * - enable partial results
+ * - reuse one SpeechRecognizer instance instead of destroying it after every run
+ *
+ * It does not use device-only/offline/calling-package extras or the system speech popup fallback.
  */
 public class WebSpeechInputHelper {
     private static final String TAG = "WebSpeechInputHelper";
 
     private final FragmentActivity activity;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
     private WebView webView;
     private SpeechRecognizer speechRecognizer;
     private boolean destroyed;
-    private boolean insertResultIntoFocusedElement = true;
     private boolean listening;
-    private boolean usingOnDeviceRecognizer;
-    private boolean triedOnDeviceRecognizer;
-    private boolean triedStandardRecognizer;
-    private String currentLanguage = "zh-CN";
+    private boolean insertResultIntoFocusedElement = true;
+    private String lastPartialText = "";
 
     public WebSpeechInputHelper(FragmentActivity activity, WebView webView) {
         this.activity = activity;
@@ -64,11 +67,11 @@ public class WebSpeechInputHelper {
      * JS can call: window.TangSengSpeech.startSpeech()
      */
     public void startSpeechInput() {
-        startSpeechInput("zh-CN");
+        startSpeechInput(null);
     }
 
-    public void startSpeechInput(String language) {
-        runOnMain(() -> startSpeechInputOnMain(true, language));
+    public void startSpeechInput(String ignoredLanguage) {
+        runOnMain(() -> startSpeechInputOnMain(true));
     }
 
     /**
@@ -76,30 +79,29 @@ public class WebSpeechInputHelper {
      * Existing page code like recognition.start() will use this path.
      */
     public void startSpeechRecognitionForPage() {
-        startSpeechRecognitionForPage("zh-CN");
+        startSpeechRecognitionForPage(null);
     }
 
-    public void startSpeechRecognitionForPage(String language) {
-        runOnMain(() -> startSpeechInputOnMain(false, language));
+    public void startSpeechRecognitionForPage(String ignoredLanguage) {
+        runOnMain(() -> startSpeechInputOnMain(false));
     }
 
-    private void startSpeechInputOnMain(boolean insertIntoFocusedElement, String language) {
+    private void startSpeechInputOnMain(boolean insertIntoFocusedElement) {
         if (destroyed || activity == null || activity.isFinishing()) return;
+
         if (webView == null) {
-            showToast("网页还没有准备好");
-            notifySpeechErrorToPage("网页还没有准备好", -1);
+            String message = "网页还没有准备好";
+            showToast(message);
+            notifySpeechErrorToPage(message, -1);
             return;
         }
 
         insertResultIntoFocusedElement = insertIntoFocusedElement;
-        currentLanguage = normalizeLanguage(language);
-        triedOnDeviceRecognizer = false;
-        triedStandardRecognizer = false;
-        usingOnDeviceRecognizer = false;
+        lastPartialText = "";
 
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED) {
-            startListeningInternalOnMain();
+            startListeningOnMain(false);
             return;
         }
 
@@ -113,7 +115,7 @@ public class WebSpeechInputHelper {
                 runOnMain(() -> {
                     if (destroyed) return;
                     if (result) {
-                        startListeningInternalOnMain();
+                        startListeningOnMain(false);
                     } else {
                         String message = "缺少麦克风权限";
                         showToast(message);
@@ -145,17 +147,35 @@ public class WebSpeechInputHelper {
                     "window.__TangSengSpeechPolyfillInstalled=true;" +
                     "function call(fn,arg){try{if(typeof fn==='function')fn(arg);}catch(e){console.error(e);}}" +
                     "function fire(name,detail){try{window.dispatchEvent(new CustomEvent(name,{detail:detail}));}catch(e){try{var ev=document.createEvent('CustomEvent');ev.initCustomEvent(name,false,false,detail);window.dispatchEvent(ev);}catch(_){}}}" +
-                    "function makeResults(text){var alt={transcript:text,confidence:1};var one=[alt];one.isFinal=true;one.item=function(i){return this[i];};var results=[one];results.item=function(i){return this[i];};return results;}" +
+                    "function makeResults(text,isFinal){var alt={transcript:text,confidence:isFinal?1:0.6};var one=[alt];one.isFinal=!!isFinal;one.item=function(i){return this[i];};var results=[one];results.item=function(i){return this[i];};return results;}" +
                     "function NativeSpeechRecognition(){this.lang='zh-CN';this.continuous=false;this.interimResults=false;this.maxAlternatives=1;this.onstart=null;this.onresult=null;this.onerror=null;this.onend=null;this.onnomatch=null;}" +
                     "NativeSpeechRecognition.prototype.start=function(){window.__TangSengSpeechActiveRecognition=this;call(this.onstart,{type:'start'});var lang=this.lang||'zh-CN';if(window.TangSengSpeech&&window.TangSengSpeech.startRecognitionWithLang){window.TangSengSpeech.startRecognitionWithLang(String(lang));}else if(window.TangSengSpeech&&window.TangSengSpeech.startRecognition){window.TangSengSpeech.startRecognition();}else if(window.TangSengSpeech&&window.TangSengSpeech.startSpeechWithLang){window.TangSengSpeech.startSpeechWithLang(String(lang));}else if(window.TangSengSpeech&&window.TangSengSpeech.startSpeech){window.TangSengSpeech.startSpeech();}else{call(this.onerror,{type:'error',error:'not-allowed',message:'TangSengSpeech bridge not found'});call(this.onend,{type:'end'});}};" +
-                    "NativeSpeechRecognition.prototype.stop=function(){call(this.onend,{type:'end'});};" +
-                    "NativeSpeechRecognition.prototype.abort=function(){call(this.onend,{type:'end'});};" +
-                    "window.__TangSengSpeechNativeResult=function(text){var rec=window.__TangSengSpeechActiveRecognition;fire('TangSengSpeechResult',{text:text});if(rec){call(rec.onresult,{type:'result',resultIndex:0,results:makeResults(text)});call(rec.onend,{type:'end'});}};" +
+                    "NativeSpeechRecognition.prototype.stop=function(){try{if(window.TangSengSpeech&&window.TangSengSpeech.stop)window.TangSengSpeech.stop();}catch(e){}call(this.onend,{type:'end'});};" +
+                    "NativeSpeechRecognition.prototype.abort=function(){try{if(window.TangSengSpeech&&window.TangSengSpeech.stop)window.TangSengSpeech.stop();}catch(e){}call(this.onend,{type:'end'});};" +
+                    "window.__TangSengSpeechNativePartial=function(text){var rec=window.__TangSengSpeechActiveRecognition;fire('TangSengSpeechPartial',{text:text});if(rec&&rec.interimResults){call(rec.onresult,{type:'result',resultIndex:0,results:makeResults(text,false)});}};" +
+                    "window.__TangSengSpeechNativeResult=function(text){var rec=window.__TangSengSpeechActiveRecognition;fire('TangSengSpeechResult',{text:text});if(rec){call(rec.onresult,{type:'result',resultIndex:0,results:makeResults(text,true)});call(rec.onend,{type:'end'});}};" +
                     "window.__TangSengSpeechNativeError=function(message,code){var rec=window.__TangSengSpeechActiveRecognition;fire('TangSengSpeechError',{message:message,code:code});if(rec){call(rec.onerror,{type:'error',error:'no-speech',message:message,code:code});call(rec.onend,{type:'end'});}};" +
                     "window.SpeechRecognition=NativeSpeechRecognition;" +
                     "window.webkitSpeechRecognition=NativeSpeechRecognition;" +
                     "})();";
             runJavascript(js);
+        });
+    }
+
+    public void stop() {
+        runOnMain(() -> {
+            if (speechRecognizer != null && listening) {
+                try {
+                    speechRecognizer.stopListening();
+                } catch (Exception e) {
+                    Log.w(TAG, "stopListening failed", e);
+                    try {
+                        speechRecognizer.cancel();
+                    } catch (Exception ignored) {
+                    }
+                    listening = false;
+                }
+            }
         });
     }
 
@@ -167,149 +187,134 @@ public class WebSpeechInputHelper {
         });
     }
 
-    private void startListeningInternalOnMain() {
+    private void startListeningOnMain(boolean delayedAfterCancel) {
         if (destroyed || activity == null || activity.isFinishing()) return;
 
-        rememberCurrentEditableElement();
-
-        boolean onDeviceAvailable = isOnDeviceRecognitionAvailableOnMain();
-        boolean standardAvailable = isStandardRecognitionAvailableOnMain();
-
-        if (!onDeviceAvailable && !standardAvailable) {
+        if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
             String message = "当前系统没有可用的语音识别服务";
             showToast(message);
             notifySpeechErrorToPage(message, -2);
             return;
         }
 
-        if (onDeviceAvailable && !triedOnDeviceRecognizer) {
-            triedOnDeviceRecognizer = true;
-            if (startListeningWithRecognizerOnMain(true)) return;
+        if (!ensureRecognizerOnMain()) return;
+
+        if (listening) {
+            try {
+                speechRecognizer.cancel();
+            } catch (Exception e) {
+                Log.w(TAG, "cancel before restart failed", e);
+            }
+            listening = false;
+            if (!delayedAfterCancel) {
+                mainHandler.postDelayed(() -> startListeningOnMain(true), 180);
+            }
+            return;
         }
 
-        if (standardAvailable && !triedStandardRecognizer) {
-            triedStandardRecognizer = true;
-            if (startListeningWithRecognizerOnMain(false)) return;
-        }
-
-        String message = "启动语音识别失败，请检查系统语音服务";
-        showToast(message);
-        notifySpeechErrorToPage(message, -4);
-    }
-
-    private boolean startListeningWithRecognizerOnMain(boolean useOnDevice) {
-        releaseRecognizerOnMain();
-        usingOnDeviceRecognizer = useOnDevice;
-
-        try {
-            if (useOnDevice && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                speechRecognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(activity);
-            } else {
-                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(activity);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, (useOnDevice ? "createOnDeviceSpeechRecognizer" : "createSpeechRecognizer") + " failed", e);
-            releaseRecognizerOnMain();
-            if (useOnDevice && isStandardRecognitionAvailableOnMain() && !triedStandardRecognizer) {
-                triedStandardRecognizer = true;
-                return startListeningWithRecognizerOnMain(false);
-            }
-            String message = "创建语音识别服务失败：" + safeExceptionName(e);
-            showToast(message);
-            notifySpeechErrorToPage(message, -3);
-            return false;
-        }
-
-        speechRecognizer.setRecognitionListener(new RecognitionListener() {
-            @Override
-            public void onReadyForSpeech(Bundle params) {
-                runOnMain(() -> showToast("请开始说话"));
-            }
-
-            @Override public void onBeginningOfSpeech() {}
-            @Override public void onRmsChanged(float rmsdB) {}
-            @Override public void onBufferReceived(byte[] buffer) {}
-            @Override public void onEndOfSpeech() {}
-
-            @Override
-            public void onError(int error) {
-                runOnMain(() -> handleRecognitionErrorOnMain(error));
-            }
-
-            @Override
-            public void onResults(Bundle results) {
-                runOnMain(() -> handleRecognitionResultsOnMain(results));
-            }
-
-            @Override public void onPartialResults(Bundle partialResults) {}
-            @Override public void onEvent(int eventType, Bundle params) {}
-        });
+        rememberCurrentEditableElement();
 
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentLanguage);
-        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
-        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
-        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "请开始说话");
-        intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, activity.getPackageName());
-        if (useOnDevice) {
-            intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
-        }
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, getDefaultLanguageTag());
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
 
         try {
             listening = true;
+            lastPartialText = "";
             speechRecognizer.startListening(intent);
-            Log.i(TAG, "startListening success, onDevice=" + useOnDevice + ", lang=" + currentLanguage);
-            return true;
+            Log.i(TAG, "startListening success, lang=" + getDefaultLanguageTag());
         } catch (Exception e) {
-            Log.e(TAG, "startListening failed, onDevice=" + useOnDevice, e);
-            releaseRecognizerOnMain();
-            if (useOnDevice && isStandardRecognitionAvailableOnMain() && !triedStandardRecognizer) {
-                triedStandardRecognizer = true;
-                return startListeningWithRecognizerOnMain(false);
-            }
+            listening = false;
+            Log.e(TAG, "startListening failed", e);
             String message = "启动语音识别失败：" + safeExceptionName(e);
             showToast(message);
             notifySpeechErrorToPage(message, -4);
+        }
+    }
+
+    private boolean ensureRecognizerOnMain() {
+        if (speechRecognizer != null) return true;
+
+        try {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(activity);
+            speechRecognizer.setRecognitionListener(new RecognitionListener() {
+                @Override
+                public void onReadyForSpeech(Bundle params) {
+                    runOnMain(() -> showToast("请开始说话"));
+                }
+
+                @Override public void onBeginningOfSpeech() {}
+                @Override public void onRmsChanged(float rmsdB) {}
+                @Override public void onBufferReceived(byte[] buffer) {}
+                @Override public void onEndOfSpeech() {}
+
+                @Override
+                public void onError(int error) {
+                    runOnMain(() -> handleRecognitionErrorOnMain(error));
+                }
+
+                @Override
+                public void onResults(Bundle results) {
+                    runOnMain(() -> handleRecognitionResultsOnMain(results));
+                }
+
+                @Override
+                public void onPartialResults(Bundle partialResults) {
+                    runOnMain(() -> handlePartialResultsOnMain(partialResults));
+                }
+
+                @Override public void onEvent(int eventType, Bundle params) {}
+            });
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "createSpeechRecognizer failed", e);
+            speechRecognizer = null;
+            String message = "创建语音识别服务失败：" + safeExceptionName(e);
+            showToast(message);
+            notifySpeechErrorToPage(message, -3);
             return false;
         }
     }
 
     private void handleRecognitionErrorOnMain(int error) {
         listening = false;
-        boolean shouldFallbackToStandard = usingOnDeviceRecognizer
-                && !triedStandardRecognizer
-                && isStandardRecognitionAvailableOnMain()
-                && isFallbackError(error);
-
         String message = getErrorMessage(error);
-        Log.w(TAG, "SpeechRecognizer error code=" + error + ", onDevice=" + usingOnDeviceRecognizer + ", message=" + message);
-        releaseRecognizerOnMain();
-
-        if (shouldFallbackToStandard) {
-            triedStandardRecognizer = true;
-            startListeningWithRecognizerOnMain(false);
-            return;
-        }
-
+        Log.w(TAG, "SpeechRecognizer error code=" + error + ", message=" + message);
         showToast(message);
         notifySpeechErrorToPage(message, error);
+
+        if (error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+            releaseRecognizerOnMain();
+        }
+    }
+
+    private void handlePartialResultsOnMain(Bundle partialResults) {
+        String text = readBestResult(partialResults);
+        if (TextUtils.isEmpty(text) || TextUtils.equals(text, lastPartialText)) return;
+        lastPartialText = text;
+        notifySpeechPartialToPage(text);
     }
 
     private void handleRecognitionResultsOnMain(Bundle results) {
         listening = false;
         String text = readBestResult(results);
         if (TextUtils.isEmpty(text)) {
+            text = lastPartialText;
+        }
+
+        if (TextUtils.isEmpty(text)) {
             String message = "没有识别到内容";
             showToast(message);
             notifySpeechErrorToPage(message, SpeechRecognizer.ERROR_NO_MATCH);
-        } else {
-            if (insertResultIntoFocusedElement) {
-                insertTextIntoWebView(text);
-            }
-            notifySpeechResultToPage(text);
+            return;
         }
-        releaseRecognizerOnMain();
+
+        if (insertResultIntoFocusedElement) {
+            insertTextIntoWebView(text);
+        }
+        notifySpeechResultToPage(text);
     }
 
     private String readBestResult(Bundle results) {
@@ -368,6 +373,14 @@ public class WebSpeechInputHelper {
         runJavascript(js);
     }
 
+    private void notifySpeechPartialToPage(String text) {
+        String js = "(function(text){" +
+                "try{if(window.__TangSengSpeechNativePartial)window.__TangSengSpeechNativePartial(text);}" +
+                "catch(e){console.error(e);}" +
+                "})(" + JSONObject.quote(text) + ");";
+        runJavascript(js);
+    }
+
     private void notifySpeechResultToPage(String text) {
         String js = "(function(text){" +
                 "try{if(window.__TangSengSpeechNativeResult)window.__TangSengSpeechNativeResult(text);}" +
@@ -418,38 +431,11 @@ public class WebSpeechInputHelper {
         }
     }
 
-    private boolean isFallbackError(int error) {
-        return error == SpeechRecognizer.ERROR_CLIENT
-                || error == SpeechRecognizer.ERROR_SERVER
-                || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
-                || error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS;
-    }
-
-    private boolean isOnDeviceRecognitionAvailableOnMain() {
-        if (activity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false;
-        try {
-            return SpeechRecognizer.isOnDeviceRecognitionAvailable(activity);
-        } catch (Exception e) {
-            Log.w(TAG, "isOnDeviceRecognitionAvailable failed", e);
-            return false;
-        }
-    }
-
-    private boolean isStandardRecognitionAvailableOnMain() {
-        if (activity == null) return false;
-        try {
-            return SpeechRecognizer.isRecognitionAvailable(activity);
-        } catch (Exception e) {
-            Log.w(TAG, "isRecognitionAvailable failed", e);
-            return false;
-        }
-    }
-
-    private String normalizeLanguage(String language) {
-        if (TextUtils.isEmpty(language)) return "zh-CN";
-        String normalized = language.trim().replace('_', '-');
-        if (TextUtils.isEmpty(normalized)) return "zh-CN";
-        return normalized;
+    private String getDefaultLanguageTag() {
+        Locale locale = Locale.getDefault();
+        String value = locale == null ? "" : locale.toString();
+        if (TextUtils.isEmpty(value)) return "zh-CN";
+        return value.replace('_', '-');
     }
 
     private String getErrorMessage(int error) {
@@ -461,7 +447,7 @@ public class WebSpeechInputHelper {
             case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
                 if (activity != null && ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO)
                         == PackageManager.PERMISSION_GRANTED) {
-                    return "系统语音服务返回权限错误（错误码 9），App 麦克风权限已允许，请检查系统语音服务或 ROM 限制";
+                    return "系统语音服务返回权限错误（错误码 9），App 麦克风权限已允许，请检查系统语音服务设置";
                 }
                 return "缺少麦克风权限（错误码 9）";
             case SpeechRecognizer.ERROR_NETWORK:
