@@ -17,6 +17,7 @@ public class WKApiConfig {
     public static final String NODEBB_BASE_URL = "https://bbs.886.best";
     public static final String NODEBB_HOME_URL = NODEBB_BASE_URL + "/";
     public static final String NODEBB_PARTNERS_SWIPE_URL = NODEBB_BASE_URL + "/partners/swipe";
+    public static final String NODEBB_DISCOVER_VIDEO_URL = NODEBB_BASE_URL + "/video";
     public static final String NODEBB_SSO_API_BASE_URL = "https://api.886.best/v1/";
 
     public static void initBaseURL(String apiURL) {
