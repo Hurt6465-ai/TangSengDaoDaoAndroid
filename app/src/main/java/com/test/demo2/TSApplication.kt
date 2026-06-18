@@ -33,7 +33,6 @@ import com.chat.push.WKPushApplication
 import com.chat.scan.WKScanApplication
 import com.chat.uikit.TabActivity
 import com.chat.uikit.WKUIKitApplication
-import com.chat.uikit.debug.DebugLogManager
 import com.chat.uikit.chat.manager.WKIMUtils
 import com.chat.uikit.user.service.UserModel
 import com.test.ts.R
@@ -76,7 +75,6 @@ class TSApplication : MultiDexApplication() {
 
             override fun onActivityResumed(p0: Activity) {
                 ActManagerUtils.getInstance().currentActivity = p0
-                DebugLogManager.log("TSApplication", "activity resumed: " + p0.javaClass.simpleName)
             }
 
             override fun onActivityPaused(p0: Activity) {
@@ -158,7 +156,6 @@ class TSApplication : MultiDexApplication() {
         helper.register(this, object : AppFrontBackHelper.OnAppStatusListener {
             override fun onFront() {
                 isAppInForeground = true
-                DebugLogManager.log("TSApplication", "onFront, cancel background disconnect")
                 cancelBackgroundDisconnect()
 
                 if (!TextUtils.isEmpty(WKConfig.getInstance().token)) {
@@ -169,7 +166,6 @@ class TSApplication : MultiDexApplication() {
                         }, 1000)
                     }
                     WKIMUtils.getInstance().initIMListener()
-                    DebugLogManager.log("TSApplication", "onFront call startChat()")
                     WKUIKitApplication.getInstance().startChat()
                     UserModel.getInstance().getOnlineUsers()
 
@@ -181,12 +177,9 @@ class TSApplication : MultiDexApplication() {
 
                 val result = EndpointManager.getInstance().invoke("rtc_is_calling", null)
                 val isCalling = result as? Boolean ?: false
-                DebugLogManager.log("TSApplication", "onBack, disconnectFlag=" + WKBaseApplication.getInstance().disconnect + ", isCalling=" + isCalling)
 
                 if (WKBaseApplication.getInstance().disconnect && !isCalling) {
                     scheduleBackgroundDisconnect()
-                } else {
-                    DebugLogManager.log("TSApplication", "onBack skip scheduleBackgroundDisconnect")
                 }
 
                 // 不要在这里立刻 removeListener。
@@ -201,20 +194,14 @@ class TSApplication : MultiDexApplication() {
 
     private fun scheduleBackgroundDisconnect() {
         cancelBackgroundDisconnect()
-        DebugLogManager.log("TSApplication", "scheduleBackgroundDisconnect delayMs=$BACKGROUND_DISCONNECT_DELAY_MS")
 
         val runnable = Runnable {
             val result = EndpointManager.getInstance().invoke("rtc_is_calling", null)
             val isCalling = result as? Boolean ?: false
 
-            DebugLogManager.log("TSApplication", "background disconnect fired, foreground=" + isAppInForeground + ", isCalling=" + isCalling + ", disconnectFlag=" + WKBaseApplication.getInstance().disconnect)
-
             if (!isAppInForeground && !isCalling && WKBaseApplication.getInstance().disconnect) {
-                DebugLogManager.log("TSApplication", "background disconnect execute removeListener + stopConn")
                 WKIMUtils.getInstance().removeListener()
                 WKUIKitApplication.getInstance().stopConn()
-            } else {
-                DebugLogManager.log("TSApplication", "background disconnect skip")
             }
             backgroundDisconnectRunnable = null
         }
@@ -225,7 +212,6 @@ class TSApplication : MultiDexApplication() {
 
     private fun cancelBackgroundDisconnect() {
         backgroundDisconnectRunnable?.let {
-            DebugLogManager.log("TSApplication", "cancelBackgroundDisconnect")
             mainHandler.removeCallbacks(it)
         }
         backgroundDisconnectRunnable = null
