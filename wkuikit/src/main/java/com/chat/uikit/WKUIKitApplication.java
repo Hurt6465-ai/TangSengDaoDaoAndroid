@@ -109,7 +109,6 @@ import com.chat.uikit.user.UserDetailActivity;
 import com.chat.uikit.rtc.RtcCallManager;
 import com.chat.uikit.rtc.RtcSignalManager;
 import com.chat.uikit.rtc.RtcWukongSignalTransport;
-import com.chat.uikit.debug.DebugLogManager;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -118,7 +117,6 @@ import com.xinbida.wukongim.msgmodel.WKImageContent;
 import com.xinbida.wukongim.msgmodel.WKMessageContent;
 import com.xinbida.wukongim.msgmodel.WKTextContent;
 import com.xinbida.wukongim.msgmodel.WKVideoContent;
-import com.xinbida.wukongim.message.type.WKConnectStatus;
 
 import org.json.JSONObject;
 
@@ -139,17 +137,6 @@ public class WKUIKitApplication {
     public SensitiveWords sensitiveWords;
     public boolean isRefreshChatActivityMessage = false;
     private boolean rtcSignalListenerAdded = false;
-    /**
-     * 缓存 WuKongIM SDK 的连接状态，避免 App 回前台时无条件 connection()。
-     * 无条件 connection() 会让 SDK 重新进入 connecting，用户会看到标题变成“连接中/接收中”。
-     *
-     * -1 表示未知状态。不要依赖 SDK 是否存在 fail 常量，避免不同 SDK 小版本编译差异。
-     */
-    private volatile int currentConnectStatus = -1;
-    private volatile long lastStartChatTime = 0L;
-    private boolean connectionStatusTrackerAdded = false;
-    private static final long MIN_START_CHAT_INTERVAL_MS = 3000L;
-    private static final long MAX_CONNECTING_KEEP_MS = 15_000L;
 
     private WKUIKitApplication() {
     }
@@ -195,79 +182,20 @@ public class WKUIKitApplication {
             String imToken = WKConfig.getInstance().getImToken();
             String uid = WKConfig.getInstance().getUid();
             WKIM.getInstance().init(mContext.get(), uid, imToken);
-            DebugLogManager.log("WKUIKitApplication", "initIM uid=" + uid + ", hasImToken=" + !TextUtils.isEmpty(imToken));
-
-            // 登录、切换账号或进程重建后，SDK 已重新 init，不能沿用旧账号/旧连接状态。
-            currentConnectStatus = -1;
-            lastStartChatTime = 0L;
-            registerConnectionStatusTracker();
 
         }
     }
 
     public void startChat() {
-        if (TextUtils.isEmpty(WKConfig.getInstance().getToken())) {
-            DebugLogManager.log("WKUIKitApplication", "startChat skip, empty token");
-            return;
+        if (!TextUtils.isEmpty(WKConfig.getInstance().getToken())) {
+            Log.e("去连接", "-->");
+            WKIM.getInstance().getConnectionManager().connection();
         }
-
-        registerConnectionStatusTracker();
-
-        int status = currentConnectStatus;
-        long now = System.currentTimeMillis();
-
-        // 已连接、正在同步、同步完成时，不要重复调用 connection()。
-        // 否则 App 从后台回前台会被我们自己打回 connecting -> syncMsg，标题就显示“连接中/接收中”。
-        if (status == WKConnectStatus.success
-                || status == WKConnectStatus.syncMsg
-                || status == WKConnectStatus.syncCompleted) {
-            DebugLogManager.log("WKUIKitApplication", "startChat skip, already active, status=" + statusName(status));
-            return;
-        }
-
-        // 正在连接中时不要频繁重复调用；如果卡在 connecting 超过 15 秒，再允许重新触发一次。
-        if (status == WKConnectStatus.connecting && now - lastStartChatTime < MAX_CONNECTING_KEEP_MS) {
-            DebugLogManager.log("WKUIKitApplication", "startChat skip, connecting, status=" + statusName(status));
-            return;
-        }
-
-        // 防止 Activity 前后台快速切换、多个入口同时触发 connection()。
-        if (now - lastStartChatTime < MIN_START_CHAT_INTERVAL_MS) {
-            DebugLogManager.log("WKUIKitApplication", "startChat skip, too frequent, status=" + statusName(status));
-            return;
-        }
-
-        lastStartChatTime = now;
-        DebugLogManager.log("WKUIKitApplication", "startChat call connection(), status=" + statusName(status));
-        WKIM.getInstance().getConnectionManager().connection();
     }
 
     public void stopConn() {
-        DebugLogManager.log("WKUIKitApplication", "stopConn call disconnect(false), totalMsgCount=" + totalMsgCount);
         EndpointManager.getInstance().invoke("push_update_device_badge", totalMsgCount);
         WKIM.getInstance().getConnectionManager().disconnect(false);
-        currentConnectStatus = -1;
-    }
-
-    private void registerConnectionStatusTracker() {
-        if (connectionStatusTrackerAdded) {
-            return;
-        }
-        connectionStatusTrackerAdded = true;
-        WKIM.getInstance().getConnectionManager().addOnConnectionStatusListener("uikit_connection_tracker", (status, reason) -> {
-            currentConnectStatus = status;
-            DebugLogManager.log("WKUIKitApplication", "connection status=" + statusName(status) + ", reason=" + reason);
-        });
-    }
-
-    private String statusName(int status) {
-        if (status == WKConnectStatus.success) return "success(" + status + ")";
-        if (status == WKConnectStatus.syncMsg) return "syncMsg/接收中(" + status + ")";
-        if (status == WKConnectStatus.syncCompleted) return "syncCompleted(" + status + ")";
-        if (status == WKConnectStatus.connecting) return "connecting/连接中(" + status + ")";
-        if (status == WKConnectStatus.noNetwork) return "noNetwork(" + status + ")";
-        if (status == WKConnectStatus.kicked) return "kicked(" + status + ")";
-        return "unknown(" + status + ")";
     }
 
     private void initRtcSignalModule() {
@@ -288,9 +216,6 @@ public class WKUIKitApplication {
     }
 
     private void initKitModuleListener() {
-        // 全局记录 SDK 连接状态。ChatFragment 只负责展示，这里负责避免重复触发重连。
-        registerConnectionStatusTracker();
-
         // 注册消息model到sdk
         WKIM.getInstance().getMsgManager().registerContentMsg(WKCardContent.class);
 
@@ -650,10 +575,7 @@ public class WKUIKitApplication {
         MsgModel.getInstance().stopTimer();
         EndpointManager.getInstance().invoke("wk_logout", null);
         WKConfig.getInstance().clearInfo();
-        DebugLogManager.log("WKUIKitApplication", "exitLogin call disconnect(true), from=" + from);
         WKIM.getInstance().getConnectionManager().disconnect(true);
-        currentConnectStatus = -1;
-        lastStartChatTime = 0L;
         ActManagerUtils.getInstance().clearAllActivity();
         EndpointManager.getInstance().invoke("main_show_home_view", from);
         //关闭UI层数据库
