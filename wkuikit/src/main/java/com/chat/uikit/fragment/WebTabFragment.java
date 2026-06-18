@@ -17,6 +17,7 @@ import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
 import android.webkit.RenderProcessGoneDetail;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -49,6 +50,7 @@ public class WebTabFragment extends Fragment {
     private static final String STATE_HAS_LOADED = "web_tab_has_loaded";
     private static final String STATE_HAS_VISIBLE_CONTENT = "web_tab_has_visible_content";
     private static final String STATE_LAST_URL = "web_tab_last_url";
+    private static final int FILE_CHOOSER_REQUEST_CODE = 7106;
 
     private String url;
     private String rootContentUrl;
@@ -61,6 +63,7 @@ public class WebTabFragment extends Fragment {
     private View loadingView;
     private View errorView;
     private PermissionRequest pendingPermissionRequest;
+    private ValueCallback<Uri[]> filePathCallback;
     private WebSpeechInputHelper webSpeechInputHelper;
 
     private boolean hasLoaded = false;
@@ -145,14 +148,22 @@ public class WebTabFragment extends Fragment {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setLoadsImagesAutomatically(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
+        String ua = settings.getUserAgentString();
+        if (!TextUtils.isEmpty(ua) && !ua.contains("TangSengDaoDaoApp")) {
+            settings.setUserAgentString(ua + " TangSengDaoDaoApp/1.0");
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
             CookieManager.getInstance().setAcceptThirdPartyCookies(targetWebView, true);
         }
         CookieManager.getInstance().setAcceptCookie(true);
         targetWebView.setBackgroundColor(Color.WHITE);
+        targetWebView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         targetWebView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
 
         WebSpeechInputHelper helper = getWebSpeechInputHelper(targetWebView);
@@ -198,6 +209,10 @@ public class WebTabFragment extends Fragment {
                 hideLoadingAndError();
                 hideProgress();
                 updateBottomNavigationVisibility(pageUrl);
+                try {
+                    CookieManager.getInstance().flush();
+                } catch (Exception ignored) {
+                }
                 WebSpeechInputHelper helper = getWebSpeechInputHelper(view);
                 if (helper != null) helper.injectSpeechRecognitionPolyfill();
             }
@@ -239,6 +254,27 @@ public class WebTabFragment extends Fragment {
             public void onProgressChanged(WebView view, int newProgress) {
                 super.onProgressChanged(view, newProgress);
                 if (newProgress >= 100) hideProgress(); else showProgress(newProgress);
+            }
+
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+                if (WebTabFragment.this.filePathCallback != null) {
+                    WebTabFragment.this.filePathCallback.onReceiveValue(null);
+                }
+                WebTabFragment.this.filePathCallback = filePathCallback;
+                try {
+                    Intent intent = fileChooserParams == null ? new Intent(Intent.ACTION_GET_CONTENT) : fileChooserParams.createIntent();
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("image/*");
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                    }
+                    startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE);
+                } catch (Exception e) {
+                    WebTabFragment.this.filePathCallback = null;
+                    return false;
+                }
+                return true;
             }
 
             @Override
@@ -575,6 +611,28 @@ public class WebTabFragment extends Fragment {
         if (TextUtils.isEmpty(path)) return "/";
         if (path.length() > 1 && path.endsWith("/")) return path.substring(0, path.length() - 1);
         return path;
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != FILE_CHOOSER_REQUEST_CODE) return;
+        if (filePathCallback == null) return;
+
+        Uri[] results = null;
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            if (data.getClipData() != null) {
+                int count = data.getClipData().getItemCount();
+                results = new Uri[count];
+                for (int i = 0; i < count; i++) {
+                    results[i] = data.getClipData().getItemAt(i).getUri();
+                }
+            } else if (data.getData() != null) {
+                results = new Uri[]{data.getData()};
+            }
+        }
+        filePathCallback.onReceiveValue(results);
+        filePathCallback = null;
     }
 
     @Override
