@@ -35,10 +35,14 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 
+import com.chat.base.config.WKConfig;
 import com.chat.base.utils.WKPermissions;
 import com.chat.base.web.TangSengSpeechBridge;
 import com.chat.base.web.WebSpeechInputHelper;
 import com.chat.uikit.TabActivity;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class WebTabFragment extends Fragment {
     private static final String ARG_URL = "url";
@@ -47,6 +51,7 @@ public class WebTabFragment extends Fragment {
     private static final String STATE_LAST_URL = "web_tab_last_url";
 
     private String url;
+    private String rootContentUrl;
     private String lastKnownUrl;
     private Bundle savedWebViewState;
 
@@ -73,7 +78,8 @@ public class WebTabFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         url = getArguments() == null ? "" : getArguments().getString(ARG_URL, "");
-        lastKnownUrl = url;
+        rootContentUrl = resolveRootContentUrl(url);
+        lastKnownUrl = rootContentUrl;
         if (savedInstanceState != null) {
             hasLoaded = savedInstanceState.getBoolean(STATE_HAS_LOADED, false);
             hasVisibleContent = savedInstanceState.getBoolean(STATE_HAS_VISIBLE_CONTENT, false);
@@ -325,10 +331,55 @@ public class WebTabFragment extends Fragment {
         }
         if (!hasLoaded && !TextUtils.isEmpty(url)) {
             showFullLoading();
-            webView.loadUrl(url);
+            loadUrlWithOptionalAuth(url);
             hasLoaded = true;
-            lastKnownUrl = url;
+            lastKnownUrl = rootContentUrl;
         }
+    }
+
+    private void loadUrlWithOptionalAuth(String targetUrl) {
+        if (webView == null || TextUtils.isEmpty(targetUrl)) return;
+        if (isNodeBBSSOUrl(targetUrl)) {
+            Map<String, String> headers = new HashMap<>();
+            String token = WKConfig.getInstance().getToken();
+            if (!TextUtils.isEmpty(token)) {
+                headers.put("token", token);
+            }
+            webView.loadUrl(targetUrl, headers);
+            return;
+        }
+        webView.loadUrl(targetUrl);
+    }
+
+    private boolean isNodeBBSSOUrl(String targetUrl) {
+        if (TextUtils.isEmpty(targetUrl)) return false;
+        try {
+            Uri uri = Uri.parse(targetUrl);
+            String host = uri.getHost();
+            String path = uri.getPath();
+            return "api.886.best".equalsIgnoreCase(host)
+                    && path != null
+                    && path.contains("/community/nodebb-login");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private String resolveRootContentUrl(String originalUrl) {
+        if (TextUtils.isEmpty(originalUrl)) return originalUrl;
+        try {
+            Uri uri = Uri.parse(originalUrl);
+            String host = uri.getHost();
+            String path = uri.getPath();
+            if ("api.886.best".equalsIgnoreCase(host)
+                    && path != null
+                    && path.contains("/community/nodebb-login")) {
+                String redirect = uri.getQueryParameter("redirect");
+                if (!TextUtils.isEmpty(redirect)) return redirect;
+            }
+        } catch (Exception ignored) {
+        }
+        return originalUrl;
     }
 
     private WebSpeechInputHelper getWebSpeechInputHelper(WebView targetWebView) {
@@ -424,7 +475,7 @@ public class WebTabFragment extends Fragment {
         showFullLoading();
         String targetUrl = !TextUtils.isEmpty(lastKnownUrl) ? lastKnownUrl : url;
         if (!TextUtils.isEmpty(targetUrl)) {
-            webView.loadUrl(targetUrl);
+            loadUrlWithOptionalAuth(targetUrl);
             hasLoaded = true;
         } else {
             webView.reload();
@@ -510,7 +561,7 @@ public class WebTabFragment extends Fragment {
         if (TextUtils.isEmpty(currentUrl) || TextUtils.isEmpty(url)) return true;
         try {
             Uri current = Uri.parse(currentUrl);
-            Uri root = Uri.parse(url);
+            Uri root = Uri.parse(TextUtils.isEmpty(rootContentUrl) ? url : rootContentUrl);
             if (!TextUtils.equals(current.getHost(), root.getHost())) return false;
             if (!TextUtils.equals(normalizePath(current.getPath()), normalizePath(root.getPath()))) return false;
             String fragment = current.getFragment();
