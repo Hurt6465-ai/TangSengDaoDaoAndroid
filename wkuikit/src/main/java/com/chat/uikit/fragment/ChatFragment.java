@@ -40,7 +40,6 @@ import com.chat.uikit.chat.adapter.ChatConversationAdapter;
 import com.chat.uikit.chat.manager.WKIMUtils;
 import com.chat.uikit.contacts.service.FriendModel;
 import com.chat.uikit.databinding.FragChatConversationLayoutBinding;
-import com.chat.uikit.debug.DebugLogManager;
 import com.chat.uikit.enity.ChatConversationMsg;
 import com.chat.uikit.group.service.GroupModel;
 import com.chat.uikit.message.MsgModel;
@@ -133,11 +132,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         wkVBinding.rightIv.setOnClickListener(view -> {
             List<PopupMenuItem> list = EndpointManager.getInstance().invokes(EndpointCategory.tabMenus, null);
             WKDialogUtils.getInstance().showScreenPopup(view, list);
-        });
-        // 手机端查看运行日志：长按顶部标题/“连接中/接收中”文字即可打开调试窗口。
-        wkVBinding.textSwitcher.setOnLongClickListener(view -> {
-            DebugLogManager.showLogWindow(requireActivity());
-            return true;
         });
 
         wkVBinding.deviceIv.setOnClickListener(v -> EndpointManager.getInstance().invoke("show_pc_login_view", getActivity()));
@@ -472,7 +466,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
 //        WKIM.getInstance().getConversationManager().addOnRefreshMsgListener("chat_fragment", this::resetData);
         // 监听连接状态
         WKIM.getInstance().getConnectionManager().addOnConnectionStatusListener("chat_fragment", (i, reason) -> {
-            DebugLogManager.log("ChatFragment", "ui connection status=" + statusName(i) + ", reason=" + reason);
             if (wkVBinding.textSwitcher.getTag() != null) {
                 Object tag = wkVBinding.textSwitcher.getTag();
                 if (tag instanceof Integer) {
@@ -498,7 +491,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                 WKUIKitApplication.getInstance().exitLogin(from);
             }
             wkVBinding.textSwitcher.setTag(i);
-            if (i != WKConnectStatus.success && i != WKConnectStatus.syncMsg && i != WKConnectStatus.syncCompleted) {
+            if (i != WKConnectStatus.success && i != WKConnectStatus.syncMsg) {
                 startConnectTimer();
             } else {
                 EndpointManager.getInstance().invoke("wk_close_disconnect_screen", null);
@@ -894,16 +887,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                 }
             }
         });
-    }
-
-    private String statusName(int status) {
-        if (status == WKConnectStatus.success) return "success(" + status + ")";
-        if (status == WKConnectStatus.syncMsg) return "syncMsg/接收中(" + status + ")";
-        if (status == WKConnectStatus.syncCompleted) return "syncCompleted(" + status + ")";
-        if (status == WKConnectStatus.connecting) return "connecting/连接中(" + status + ")";
-        if (status == WKConnectStatus.noNetwork) return "noNetwork(" + status + ")";
-        if (status == WKConnectStatus.kicked) return "kicked(" + status + ")";
-        return "unknown(" + status + ")";
     }
 
     @Override
