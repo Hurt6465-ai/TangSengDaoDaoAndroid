@@ -209,10 +209,12 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         fragments.clear();
         fragments.add(new ChatFragment());
         fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_PARTNERS_SWIPE_URL)));
-        fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_PARTNERS_SWIPE_URL)));
+        fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_DISCOVER_VIDEO_URL)));
         fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_HOME_URL)));
         fragments.add(WebTabFragment.newInstance("https://886.best"));
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
+        // 预加载语伴、发现、社区三个 WebView，减少首次切换 Tab 时的白屏等待。
+        wkVBinding.vp.setOffscreenPageLimit(3);
         // 底部是一级导航，只允许点击切换；横滑手势留给聊天页内部二级导航使用。
         wkVBinding.vp.setUserInputEnabled(false);
     }
