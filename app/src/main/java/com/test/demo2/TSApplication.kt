@@ -39,6 +39,24 @@ import com.test.ts.R
 import kotlin.system.exitProcess
 
 class TSApplication : MultiDexApplication() {
+
+    companion object {
+        /**
+         * App 切到后台后延迟断开 IM 长连接的时间。
+         *
+         * 不建议一切后台就断开：
+         * 1. 用户短时间切回前台会频繁重连，体验慢；
+         * 2. 频繁登录、鉴权、同步消息会增加服务端压力；
+         * 3. 延迟窗口内仍保留监听器，避免后台短时间收消息链路被提前拆掉。
+         */
+        private const val BACKGROUND_DISCONNECT_DELAY_MS = 120_000L
+    }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var backgroundDisconnectRunnable: Runnable? = null
+    @Volatile
+    private var isAppInForeground = false
+
     override fun onCreate() {
         super.onCreate()
         val processName = getProcessName(this, Process.myPid())
@@ -137,6 +155,9 @@ class TSApplication : MultiDexApplication() {
         val helper = AppFrontBackHelper()
         helper.register(this, object : AppFrontBackHelper.OnAppStatusListener {
             override fun onFront() {
+                isAppInForeground = true
+                cancelBackgroundDisconnect()
+
                 if (!TextUtils.isEmpty(WKConfig.getInstance().token)) {
                     if (WKBaseApplication.getInstance().disconnect) {
                         Handler(Looper.getMainLooper()).postDelayed({
@@ -152,20 +173,48 @@ class TSApplication : MultiDexApplication() {
             }
 
             override fun onBack() {
+                isAppInForeground = false
+
                 val result = EndpointManager.getInstance().invoke("rtc_is_calling", null)
-                var isCalling = false
-                if (result != null) {
-                    isCalling = result as Boolean
-                }
+                val isCalling = result as? Boolean ?: false
+
                 if (WKBaseApplication.getInstance().disconnect && !isCalling) {
-                    WKUIKitApplication.getInstance().stopConn()
+                    scheduleBackgroundDisconnect()
                 }
-                WKIMUtils.getInstance().removeListener()
+
+                // 不要在这里立刻 removeListener。
+                // 后台延迟断开期间连接仍然存在，如果提前移除监听器，短时间后台收到的消息可能无法正常处理。
+                // 监听器在真正 stopConn 前再移除。
                 WKSharedPreferencesUtil.getInstance()
                     .putLong("lock_start_time", WKTimeUtils.getInstance().currentSeconds)
 
             }
         })
+    }
+
+    private fun scheduleBackgroundDisconnect() {
+        cancelBackgroundDisconnect()
+
+        val runnable = Runnable {
+            val result = EndpointManager.getInstance().invoke("rtc_is_calling", null)
+            val isCalling = result as? Boolean ?: false
+
+            if (!isAppInForeground && !isCalling && WKBaseApplication.getInstance().disconnect) {
+                WKIMUtils.getInstance().removeListener()
+                WKUIKitApplication.getInstance().stopConn()
+            }
+            backgroundDisconnectRunnable = null
+        }
+
+        backgroundDisconnectRunnable = runnable
+        mainHandler.postDelayed(runnable, BACKGROUND_DISCONNECT_DELAY_MS)
+    }
+
+    private fun cancelBackgroundDisconnect() {
+        backgroundDisconnectRunnable?.let {
+            mainHandler.removeCallbacks(it)
+        }
+        backgroundDisconnectRunnable = null
     }
 
     private fun addListener() {
