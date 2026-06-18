@@ -29,6 +29,7 @@ import com.chat.base.adapter.WKFragmentStateAdapter;
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.common.WKCommonModel;
 import com.chat.base.config.WKConstants;
+import com.chat.base.config.WKApiConfig;
 import com.chat.base.endpoint.EndpointCategory;
 import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.net.HttpResponseCode;
@@ -207,9 +208,9 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private void initFragments() {
         fragments.clear();
         fragments.add(new ChatFragment());
-        fragments.add(PlaceholderTabFragment.newInstance(getString(R.string.tab_text_partner), getString(R.string.tab_placeholder_partner_desc)));
-        fragments.add(PlaceholderTabFragment.newInstance(getString(R.string.tab_text_discover), getString(R.string.tab_placeholder_discover_desc)));
-        fragments.add(WebTabFragment.newInstance("https://bbs.886.best"));
+        fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_PARTNERS_SWIPE_URL)));
+        fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_PARTNERS_SWIPE_URL)));
+        fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_HOME_URL)));
         fragments.add(WebTabFragment.newInstance("https://886.best"));
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
         // 底部是一级导航，只允许点击切换；横滑手势留给聊天页内部二级导航使用。
