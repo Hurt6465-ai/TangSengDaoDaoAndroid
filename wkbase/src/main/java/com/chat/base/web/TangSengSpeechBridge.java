@@ -5,26 +5,51 @@ import android.os.Looper;
 import android.webkit.JavascriptInterface;
 
 /**
- * JavaScript bridge exposed as window.TangSengLocation in WebView pages.
+ * Minimal JavaScript bridge exposed as window.TangSengSpeech in WebView pages.
+ *
+ * JavaScriptInterface methods may be called from a WebView bridge thread instead
+ * of the Android main thread. SpeechRecognizer is strict on some devices, so all
+ * calls into WebSpeechInputHelper are forwarded through the main thread here.
  */
-public class TangSengLocationBridge {
-    private final WebLocationHelper helper;
+public class TangSengSpeechBridge {
+    private final WebSpeechInputHelper helper;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    public TangSengLocationBridge(WebLocationHelper helper) {
+    public TangSengSpeechBridge(WebSpeechInputHelper helper) {
         this.helper = helper;
     }
 
+    /**
+     * For page buttons that want the app to insert text into the currently focused input.
+     * JS: window.TangSengSpeech.startSpeech()
+     */
     @JavascriptInterface
-    public void requestLocation(String callbackId) {
-        runOnMain(() -> {
-            if (helper != null) helper.requestLocation(callbackId);
-        });
+    public void startSpeech() {
+        startSpeechWithLang("zh-CN");
     }
 
     @JavascriptInterface
-    public String getLastLocation() {
-        return helper == null ? "" : helper.getLastLocationJson();
+    public void startSpeechWithLang(String language) {
+        runOnMain(() -> {
+            if (helper != null) helper.startSpeechInput(language);
+        });
+    }
+
+    /**
+     * For the injected SpeechRecognition polyfill.
+     * It returns result through window.__TangSengSpeechNativeResult(text), without direct insertion.
+     * JS: window.TangSengSpeech.startRecognition()
+     */
+    @JavascriptInterface
+    public void startRecognition() {
+        startRecognitionWithLang("zh-CN");
+    }
+
+    @JavascriptInterface
+    public void startRecognitionWithLang(String language) {
+        runOnMain(() -> {
+            if (helper != null) helper.startSpeechRecognitionForPage(language);
+        });
     }
 
     @JavascriptInterface
