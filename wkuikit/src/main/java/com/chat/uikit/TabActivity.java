@@ -215,8 +215,10 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
         // 底部是一级导航，只允许点击切换；横滑手势留给聊天页内部二级导航使用。
         wkVBinding.vp.setUserInputEnabled(false);
-        // 不主动预加载所有 NodeBB WebView，避免 /video 在隐藏 WebView 里初始化失败。
-        wkVBinding.vp.setOffscreenPageLimit(1);
+        // 预创建并预加载底部“语伴”和“发现”两个 WebView。
+        // 当前页是聊天页，offscreen=2 会让 index 1/2 的 WebView 提前创建、登录、加载网页，
+        // 点击底部语伴/发现时直接显示已热好的页面，减少 WebView 白屏。
+        wkVBinding.vp.setOffscreenPageLimit(2);
     }
 
     private void initBadgesAndCounters() {
