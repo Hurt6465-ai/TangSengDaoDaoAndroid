@@ -19,9 +19,9 @@ import java.util.List;
 
 public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseViewHolder> {
     private static final int[] ROOM_BACKGROUNDS = new int[]{
-            R.drawable.room_01, R.drawable.room_02, R.drawable.room_03, R.drawable.room_04,
-            R.drawable.room_05, R.drawable.room_06, R.drawable.room_07, R.drawable.room_08,
-            R.drawable.room_09, R.drawable.room_10, R.drawable.room_11, R.drawable.room_12
+            R.drawable.room_bg_01, R.drawable.room_bg_02, R.drawable.room_bg_03, R.drawable.room_bg_04,
+            R.drawable.room_bg_05, R.drawable.room_bg_06, R.drawable.room_bg_07, R.drawable.room_bg_08,
+            R.drawable.room_bg_09, R.drawable.room_bg_10, R.drawable.room_bg_11, R.drawable.room_bg_12
     };
 
     private static final int[] REPLY_AVATAR_IDS = new int[]{
