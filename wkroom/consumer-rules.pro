@@ -1,0 +1,1 @@
+# Room module consumer rules
