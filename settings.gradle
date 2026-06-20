@@ -28,3 +28,5 @@ include ':wkuikit'
 include ':wkscan'
 include ':wklogin'
 include ':wkpush'
+
+include ':wkroom'
