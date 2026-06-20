@@ -16,6 +16,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.ValueCallback;
@@ -38,6 +39,9 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 
 import com.chat.base.config.WKConfig;
+import com.chat.base.endpoint.EndpointManager;
+import com.chat.base.endpoint.EndpointSID;
+import com.chat.base.endpoint.entity.ChatViewMenu;
 import com.chat.base.utils.WKPermissions;
 import com.chat.base.web.TangSengLocationBridge;
 import com.chat.base.web.TangSengSpeechBridge;
@@ -45,6 +49,8 @@ import com.chat.base.web.WebAppDataPrefetcher;
 import com.chat.base.web.WebLocationHelper;
 import com.chat.base.web.WebSpeechInputHelper;
 import com.chat.uikit.TabActivity;
+
+import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -180,6 +186,7 @@ public class WebTabFragment extends Fragment {
         if (locationHelper != null) {
             targetWebView.addJavascriptInterface(new TangSengLocationBridge(locationHelper), "TangSengLocation");
         }
+        addTangSengChatBridge(targetWebView);
 
         targetWebView.setWebViewClient(new WebViewClient() {
             @Override
@@ -667,6 +674,27 @@ public class WebTabFragment extends Fragment {
         if (TextUtils.isEmpty(path)) return "/";
         if (path.length() > 1 && path.endsWith("/")) return path.substring(0, path.length() - 1);
         return path;
+    }
+
+    private void addTangSengChatBridge(WebView targetWebView) {
+        if (targetWebView == null) return;
+        targetWebView.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void showConversation(String data) {
+                FragmentActivity activity = getActivity();
+                if (activity == null || TextUtils.isEmpty(data)) return;
+                activity.runOnUiThread(() -> {
+                    try {
+                        JSONObject jsonObject = new JSONObject(data);
+                        String channelID = jsonObject.optString("channel_id");
+                        byte channelType = (byte) jsonObject.optInt("channel_type", 1);
+                        if (TextUtils.isEmpty(channelID)) return;
+                        EndpointManager.getInstance().invoke(EndpointSID.chatView, new ChatViewMenu(activity, channelID, channelType, 0, true));
+                    } catch (Exception ignored) {
+                    }
+                });
+            }
+        }, "TangSengChat");
     }
 
     @Override
