@@ -7,6 +7,7 @@ import android.graphics.Typeface;
 import android.os.Build;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.MotionEvent;
 import android.widget.TextView;
 
 import androidx.core.app.ActivityOptionsCompat;
@@ -91,6 +92,8 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     private boolean isUnreadCountDirty = true;
     private boolean isShowingTopicRooms = false;
     private boolean topicRoomFragmentLoaded = false;
+    private float topicSwipeStartX = 0f;
+    private float topicSwipeStartY = 0f;
 
     @Override
     protected boolean isShowBackLayout() {
@@ -154,6 +157,26 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         }
     }
 
+    private boolean handleTopicSwipe(MotionEvent event) {
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                topicSwipeStartX = event.getX();
+                topicSwipeStartY = event.getY();
+                return false;
+            case MotionEvent.ACTION_UP:
+                float dx = event.getX() - topicSwipeStartX;
+                float dy = event.getY() - topicSwipeStartY;
+                if (Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                    if (dx < 0) showTopicRooms(true);
+                    else showTopicRooms(false);
+                    return true;
+                }
+                return false;
+            default:
+                return false;
+        }
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     @Override
     protected void initListener() {
@@ -163,6 +186,10 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         });
         wkVBinding.messageTabTv.setOnClickListener(view -> showTopicRooms(false));
         wkVBinding.roomTabTv.setOnClickListener(view -> showTopicRooms(true));
+        wkVBinding.chatRoomTabLayout.setOnTouchListener((view, event) -> handleTopicSwipe(event));
+        wkVBinding.chatPageContainer.setOnTouchListener((view, event) -> handleTopicSwipe(event));
+        wkVBinding.recyclerView.setOnTouchListener((view, event) -> handleTopicSwipe(event));
+        wkVBinding.roomContainer.setOnTouchListener((view, event) -> handleTopicSwipe(event));
 
         wkVBinding.deviceIv.setOnClickListener(v -> EndpointManager.getInstance().invoke("show_pc_login_view", getActivity()));
         wkVBinding.searchIv.setOnClickListener(view1 -> {
