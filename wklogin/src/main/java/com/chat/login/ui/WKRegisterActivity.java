@@ -11,6 +11,7 @@ import android.text.TextWatcher;
 import android.text.method.HideReturnsTransformationMethod;
 import android.text.method.PasswordTransformationMethod;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 
@@ -61,6 +62,7 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
 
     @Override
     protected void initView() {
+        wkVBinding.getVCodeBtn.getBackground().setTint(Theme.colorAccount);
         wkVBinding.registerBtn.getBackground().setTint(Theme.colorAccount);
         wkVBinding.privacyPolicyTv.setTextColor(Theme.colorAccount);
         wkVBinding.userAgreementTv.setTextColor(Theme.colorAccount);
@@ -75,20 +77,11 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
         wkVBinding.authCheckBox.setVisibility(View.VISIBLE);
         wkVBinding.authCheckBox.setEnabled(true);
         wkVBinding.authCheckBox.setChecked(false, true);
+        hideSmsCodeViews();
 
         wkVBinding.privacyPolicyTv.setOnClickListener(v -> showWebView(WKApiConfig.baseWebUrl + "privacy_policy.html"));
         wkVBinding.userAgreementTv.setOnClickListener(v -> showWebView(WKApiConfig.baseWebUrl + "user_agreement.html"));
         wkVBinding.registerAppTv.setText(String.format(getString(R.string.register_app), getString(R.string.app_name)));
-
-        // 手机号注册不再使用短信验证码，界面和交互入口全部关闭，避免误导用户。
-        wkVBinding.registerVerifyLayout.setVisibility(View.GONE);
-        wkVBinding.registerVerifyLineView.setVisibility(View.GONE);
-        wkVBinding.verfiEt.setVisibility(View.GONE);
-        wkVBinding.verfiEt.setText("");
-        wkVBinding.getVCodeBtn.setVisibility(View.GONE);
-        wkVBinding.getVCodeBtn.setEnabled(false);
-        wkVBinding.getVCodeBtn.setOnClickListener(null);
-
         wkVBinding.nameEt.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
@@ -144,11 +137,12 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
                         return;
                     }
                     loadingPopup.show();
-                    // 手机号注册不再要求短信验证码，后端也需要同步放开 /user/register 的 code 校验。
+                    // 手机号无验证码注册：验证码 code 固定传空字符串。后端 /user/register 必须同步放开 code 校验。
                     presenter.registerApp("", code, "", phone, pwd, inviteCode);
                 }
             }
         });
+        wkVBinding.getVCodeBtn.setOnClickListener(null);
 
         wkVBinding.myTv.setOnClickListener(view1 -> wkVBinding.authCheckBox.setChecked(!wkVBinding.authCheckBox.isChecked(), true));
         wkVBinding.authCheckBox.setOnClickListener(view1 -> wkVBinding.authCheckBox.setChecked(!wkVBinding.authCheckBox.isChecked(), true));
@@ -198,6 +192,34 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
         }
     }
 
+    /**
+     * 注册不再需要短信验证码。
+     * 这里不依赖新增 XML id，直接用现有 verfiEt/getVCodeBtn 找到验证码所在行并隐藏，
+     * 避免只替换 Java 文件时因为 ViewBinding 字段不存在导致编译失败。
+     */
+    private void hideSmsCodeViews() {
+        wkVBinding.verfiEt.setText("");
+        wkVBinding.verfiEt.setVisibility(View.GONE);
+        wkVBinding.getVCodeBtn.setEnabled(false);
+        wkVBinding.getVCodeBtn.setAlpha(0f);
+        wkVBinding.getVCodeBtn.setVisibility(View.GONE);
+        wkVBinding.getVCodeBtn.setOnClickListener(null);
+
+        View verifyLayout = (View) wkVBinding.verfiEt.getParent();
+        if (verifyLayout != null) {
+            ViewGroup parent = (ViewGroup) verifyLayout.getParent();
+            if (parent != null) {
+                int index = parent.indexOfChild(verifyLayout);
+                verifyLayout.setVisibility(View.GONE);
+                if (index >= 0 && index + 1 < parent.getChildCount()) {
+                    parent.getChildAt(index + 1).setVisibility(View.GONE);
+                }
+            } else {
+                verifyLayout.setVisibility(View.GONE);
+            }
+        }
+    }
+
 
     ActivityResultLauncher<Intent> intentActivityResultLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
         //此处是跳转的result回调方法
@@ -240,7 +262,7 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
 
     @Override
     public void setRegisterCodeSuccess(int code, String msg, int exist) {
-        // 手机号注册已取消短信验证码入口，不再启动验证码倒计时或锁定手机号输入框。
+        // 手机号无验证码注册不再发送短信验证码，此回调保留为空实现以满足 LoginView 接口。
     }
 
     @Override
