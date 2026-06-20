@@ -147,10 +147,9 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
             }
 
             String phone = Objects.requireNonNull(wkVBinding.nameEt.getText()).toString();
-            String smsCode = Objects.requireNonNull(wkVBinding.verfiEt.getText()).toString();
             String pwd = Objects.requireNonNull(wkVBinding.pwdEt.getText()).toString();
             String inviteCode = Objects.requireNonNull(wkVBinding.inviteCodeTv.getText()).toString();
-            if (!TextUtils.isEmpty(phone) && !TextUtils.isEmpty(smsCode) && !TextUtils.isEmpty(pwd)) {
+            if (!TextUtils.isEmpty(phone) && !TextUtils.isEmpty(pwd)) {
                 if (pwd.length() < 6 || pwd.length() > 16) {
                     showSingleBtnDialog(getString(R.string.pwd_length_error));
                 } else {
@@ -159,7 +158,8 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
                         return;
                     }
                     loadingPopup.show();
-                    presenter.registerApp(smsCode, code, "", phone, pwd, inviteCode);
+                    // 手机号注册不再要求短信验证码，后端也需要同步放开 /user/register 的 code 校验。
+                    presenter.registerApp("", code, "", phone, pwd, inviteCode);
                 }
             }
         });
@@ -212,9 +212,8 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
 
     private void checkStatus() {
         String phone = Objects.requireNonNull(wkVBinding.nameEt.getText()).toString();
-        String smsCode = Objects.requireNonNull(wkVBinding.verfiEt.getText()).toString();
         String pwd = Objects.requireNonNull(wkVBinding.pwdEt.getText()).toString();
-        if (!TextUtils.isEmpty(phone) && !TextUtils.isEmpty(smsCode) && !TextUtils.isEmpty(pwd)) {
+        if (!TextUtils.isEmpty(phone) && !TextUtils.isEmpty(pwd)) {
             wkVBinding.registerBtn.setAlpha(1f);
             wkVBinding.registerBtn.setEnabled(true);
         } else {
