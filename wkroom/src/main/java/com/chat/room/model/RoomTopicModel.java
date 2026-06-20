@@ -3,8 +3,6 @@ package com.chat.room.model;
 import android.content.Context;
 import android.text.TextUtils;
 
-import com.chat.base.config.WKConfig;
-import com.chat.base.entity.UserInfoEntity;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.room.WKRoomApplication;
@@ -48,19 +46,11 @@ public class RoomTopicModel {
             return;
         }
 
-        UserInfoEntity userInfo = WKConfig.getInstance().getUserInfo();
-        String uid = userInfo == null ? "" : userInfo.uid;
-        if (TextUtils.isEmpty(uid)) uid = WKConfig.getInstance().getUid();
-        String name = userInfo == null ? "" : (!TextUtils.isEmpty(userInfo.name) ? userInfo.name : userInfo.username);
-        if (TextUtils.isEmpty(name)) name = WKConfig.getInstance().getUserName();
-        if (TextUtils.isEmpty(name)) name = uid;
-
+        // group/create 的 members 参数是“要邀请进群的好友列表”，不是创建者自己。
+        // 创建者会由服务端自动加入；这里不能把自己的 uid 塞进去，否则服务端会按“添加成员”校验好友关系，
+        // 于是出现“添加用户非好友关系，请先添加好友”。
         ArrayList<String> members = new ArrayList<>();
         ArrayList<String> names = new ArrayList<>();
-        if (!TextUtils.isEmpty(uid)) {
-            members.add(uid);
-            names.add(name);
-        }
 
         GroupModel.getInstance().createGroup(safeTitle, members, names, (code, msg, groupEntity) -> {
             if (code == HttpResponseCode.success && groupEntity != null && !TextUtils.isEmpty(groupEntity.group_no)) {
