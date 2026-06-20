@@ -16,6 +16,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -53,7 +54,10 @@ import com.chat.base.utils.WKDialogUtils;
 import com.chat.base.utils.WKLogUtils;
 import com.chat.base.utils.WKPermissions;
 import com.chat.base.utils.WKToastUtils;
+import com.chat.base.web.TangSengLocationBridge;
 import com.chat.base.web.TangSengSpeechBridge;
+import com.chat.base.web.WebAppDataPrefetcher;
+import com.chat.base.web.WebLocationHelper;
 import com.chat.base.web.WebSpeechInputHelper;
 import com.google.gson.JsonObject;
 import com.xinbida.wukongim.WKIM;
@@ -82,6 +86,7 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
     private byte channelType;
     private PermissionRequest pendingPermissionRequest;
     private WebSpeechInputHelper webSpeechInputHelper;
+    private WebLocationHelper webLocationHelper;
 
     @Override
     protected ActWebvieiwLayoutBinding getViewBinding() {
@@ -153,7 +158,9 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
     protected void initView() {
         initWebViewSetting();
         webSpeechInputHelper = new WebSpeechInputHelper(this, wkVBinding.webView);
+        webLocationHelper = new WebLocationHelper(this, wkVBinding.webView);
         wkVBinding.webView.addJavascriptInterface(new TangSengSpeechBridge(webSpeechInputHelper), "TangSengSpeech");
+        wkVBinding.webView.addJavascriptInterface(new TangSengLocationBridge(webLocationHelper), "TangSengLocation");
         String url = getIntent().getStringExtra("url");
         assert url != null;
         if (!url.startsWith("http") && !url.startsWith("HTTP") && !url.startsWith("file"))
@@ -182,6 +189,7 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
         webSettings.setSavePassword(false);
         webSettings.setSaveFormData(false); // 禁止保存表单
         webSettings.setDomStorageEnabled(true);
+        webSettings.setGeolocationEnabled(true);
 //        webSettings.setAppCacheMaxSize(1024 * 1024 * 8);
         //webSettings.setAllowFileAccess(true);
         webSettings.setAllowUniversalAccessFromFileURLs(false);
@@ -203,6 +211,10 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
                 if (webSpeechInputHelper != null) {
                     webSpeechInputHelper.injectSpeechRecognitionPolyfill();
                 }
+                if (webLocationHelper != null) {
+                    webLocationHelper.injectLocationPolyfill();
+                }
+                WebAppDataPrefetcher.inject(view);
             }
         });
         // wkVBinding.webView.setBackgroundColor(ContextCompat.getColor(this, R.color.homeColor));
@@ -294,6 +306,31 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
                     wkVBinding.progress.setVisibility(View.VISIBLE);
                     wkVBinding.progress.setProgress(i);
                 }
+            }
+
+            @Override
+            public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                if (ContextCompat.checkSelfPermission(WKWebViewActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                        || ContextCompat.checkSelfPermission(WKWebViewActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    callback.invoke(origin, true, false);
+                    return;
+                }
+
+                String desc = String.format(
+                        getString(R.string.location_permissions_desc),
+                        getString(R.string.app_name)
+                );
+                WKPermissions.getInstance().checkPermissions(new WKPermissions.IPermissionResult() {
+                    @Override
+                    public void onResult(boolean result) {
+                        callback.invoke(origin, result, false);
+                    }
+
+                    @Override
+                    public void clickResult(boolean isCancel) {
+                        if (isCancel) callback.invoke(origin, false, false);
+                    }
+                }, WKWebViewActivity.this, desc, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION);
             }
 
             @Override
@@ -444,6 +481,10 @@ public class WKWebViewActivity extends WKBaseActivity<ActWebvieiwLayoutBinding> 
         if (webSpeechInputHelper != null) {
             webSpeechInputHelper.destroy();
             webSpeechInputHelper = null;
+        }
+        if (webLocationHelper != null) {
+            webLocationHelper.destroy();
+            webLocationHelper = null;
         }
         if (pendingPermissionRequest != null) {
             try {
