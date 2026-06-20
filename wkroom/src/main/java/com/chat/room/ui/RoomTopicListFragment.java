@@ -26,16 +26,12 @@ import com.chat.room.databinding.FragmentRoomTopicListBinding;
 import com.chat.room.entity.RoomTopicEntity;
 import com.chat.room.entity.RoomTopicListResponse;
 import com.chat.room.model.RoomTopicModel;
+import com.chat.room.store.RoomTopicStore;
 import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-/**
- * 话题聊天室列表：类似帖子列表。
- * 排序：置顶优先，其次最后回复时间；卡片只显示发布者大头像 + 最近6个去重回复者小头像。
- */
 public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListBinding> {
     private RoomTopicAdapter adapter;
 
@@ -87,7 +83,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
                 wkVBinding.refreshLayout.finishRefresh(true);
                 List<RoomTopicEntity> rooms = result == null ? null : result.rooms;
                 if (rooms == null) rooms = new ArrayList<>();
-                sortRooms(rooms);
+                RoomTopicStore.sortRooms(rooms);
                 adapter.setList(rooms);
                 updateEmpty();
             }
@@ -140,11 +136,10 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
             @Override
             public void onSuccess(RoomTopicEntity result) {
                 RoomTopicEntity target = result == null ? room : result;
-                target.pinned = pinned ? 1 : 0;
                 int index = adapter.indexOfRoom(target.getRoomId(), target.getChannelId());
                 if (index >= 0) adapter.getData().set(index, target);
                 else if (position >= 0 && position < adapter.getData().size()) adapter.getData().set(position, target);
-                sortRooms(adapter.getData());
+                RoomTopicStore.sortRooms(adapter.getData());
                 adapter.notifyDataSetChanged();
             }
 
@@ -181,15 +176,23 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         wkVBinding.recyclerView.setVisibility(empty ? android.view.View.GONE : android.view.View.VISIBLE);
     }
 
-    private void sortRooms(List<RoomTopicEntity> rooms) {
-        if (rooms == null || rooms.size() <= 1) return;
-        Collections.sort(rooms, (a, b) -> {
-            int pinCompare = Integer.compare(b == null ? 0 : b.pinned, a == null ? 0 : a.pinned);
-            if (pinCompare != 0) return pinCompare;
-            long at = a == null ? 0 : Math.max(a.last_reply_at, a.created_at);
-            long bt = b == null ? 0 : Math.max(b.last_reply_at, b.created_at);
-            return Long.compare(bt, at);
-        });
+    private TextView createTagChip(Context context, String text) {
+        TextView chip = new TextView(context);
+        chip.setText("# " + text);
+        chip.setGravity(Gravity.CENTER);
+        chip.setPadding(AndroidUtilities.dp(12), 0, AndroidUtilities.dp(12), 0);
+        chip.setTextSize(14);
+        chip.setTypeface(chip.getTypeface(), android.graphics.Typeface.BOLD);
+        return chip;
+    }
+
+    private void updateTagChips(List<TextView> chips, String selectedTag) {
+        for (TextView chip : chips) {
+            String tagText = chip.getText() == null ? "" : chip.getText().toString().replace("#", "").trim();
+            boolean selected = TextUtils.equals(tagText, selectedTag);
+            chip.setTextColor(selected ? Color.WHITE : Color.rgb(37, 99, 235));
+            chip.setBackgroundResource(selected ? R.drawable.room_chip_blue : R.drawable.room_chip_white);
+        }
     }
 
     @SuppressLint("SetTextI18n")
@@ -209,6 +212,36 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         title.setTextSize(18);
         title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
         root.addView(title, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView tagTitle = new TextView(context);
+        tagTitle.setText(R.string.peipe_room_tag_title);
+        tagTitle.setTextColor(Color.rgb(71, 85, 105));
+        tagTitle.setTextSize(13);
+        LinearLayout.LayoutParams tagTitleLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        tagTitleLp.topMargin = AndroidUtilities.dp(12);
+        root.addView(tagTitle, tagTitleLp);
+
+        String[] tags = new String[]{"学习", "闲谈", "交友"};
+        final String[] selectedTag = new String[]{tags[0]};
+        LinearLayout tagRow = new LinearLayout(context);
+        tagRow.setOrientation(LinearLayout.HORIZONTAL);
+        tagRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams tagRowLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(36));
+        tagRowLp.topMargin = AndroidUtilities.dp(6);
+        root.addView(tagRow, tagRowLp);
+        List<TextView> tagViews = new ArrayList<>();
+        for (String tag : tags) {
+            TextView chip = createTagChip(context, tag);
+            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(30));
+            chipLp.setMarginEnd(AndroidUtilities.dp(8));
+            tagRow.addView(chip, chipLp);
+            tagViews.add(chip);
+            chip.setOnClickListener(v -> {
+                selectedTag[0] = tag;
+                updateTagChips(tagViews, selectedTag[0]);
+            });
+        }
+        updateTagChips(tagViews, selectedTag[0]);
 
         EditText input = new EditText(context);
         input.setSingleLine(false);
@@ -245,8 +278,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         publish.setTextSize(15);
         publish.setTypeface(publish.getTypeface(), android.graphics.Typeface.BOLD);
         publish.setBackgroundResource(R.drawable.room_publish_bg);
-        LinearLayout.LayoutParams pubLp = new LinearLayout.LayoutParams(AndroidUtilities.dp(84), AndroidUtilities.dp(42));
-        actions.addView(publish, pubLp);
+        actions.addView(publish, new LinearLayout.LayoutParams(AndroidUtilities.dp(84), AndroidUtilities.dp(42)));
 
         AlertDialog dialog = new AlertDialog.Builder(context).create();
         dialog.setView(root);
@@ -258,13 +290,13 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
                 return;
             }
             publish.setEnabled(false);
-            RoomTopicModel.getInstance().createRoom(text, "闲谈", "中文", new IRequestResultListener<RoomTopicEntity>() {
+            RoomTopicModel.getInstance().createRoom(text, selectedTag[0], "中文", new IRequestResultListener<RoomTopicEntity>() {
                 @Override
                 public void onSuccess(RoomTopicEntity result) {
                     dialog.dismiss();
                     if (result != null) {
                         adapter.getData().add(0, result);
-                        sortRooms(adapter.getData());
+                        RoomTopicStore.sortRooms(adapter.getData());
                         adapter.notifyDataSetChanged();
                         updateEmpty();
                         openNativeChat(result);
