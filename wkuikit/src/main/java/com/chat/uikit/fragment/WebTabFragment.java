@@ -15,6 +15,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
+import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.ValueCallback;
@@ -38,7 +39,10 @@ import androidx.fragment.app.FragmentActivity;
 
 import com.chat.base.config.WKConfig;
 import com.chat.base.utils.WKPermissions;
+import com.chat.base.web.TangSengLocationBridge;
 import com.chat.base.web.TangSengSpeechBridge;
+import com.chat.base.web.WebAppDataPrefetcher;
+import com.chat.base.web.WebLocationHelper;
 import com.chat.base.web.WebSpeechInputHelper;
 import com.chat.uikit.TabActivity;
 
@@ -65,6 +69,7 @@ public class WebTabFragment extends Fragment {
     private PermissionRequest pendingPermissionRequest;
     private ValueCallback<Uri[]> filePathCallback;
     private WebSpeechInputHelper webSpeechInputHelper;
+    private WebLocationHelper webLocationHelper;
 
     private boolean hasLoaded = false;
     private boolean hasVisibleContent = false;
@@ -142,6 +147,7 @@ public class WebTabFragment extends Fragment {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
+        settings.setGeolocationEnabled(true);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
         settings.setSupportZoom(false);
@@ -169,6 +175,10 @@ public class WebTabFragment extends Fragment {
         WebSpeechInputHelper helper = getWebSpeechInputHelper(targetWebView);
         if (helper != null) {
             targetWebView.addJavascriptInterface(new TangSengSpeechBridge(helper), "TangSengSpeech");
+        }
+        WebLocationHelper locationHelper = getWebLocationHelper(targetWebView);
+        if (locationHelper != null) {
+            targetWebView.addJavascriptInterface(new TangSengLocationBridge(locationHelper), "TangSengLocation");
         }
 
         targetWebView.setWebViewClient(new WebViewClient() {
@@ -199,6 +209,9 @@ public class WebTabFragment extends Fragment {
                 hasVisibleContent = true;
                 hideLoadingAndError();
                 updateBottomNavigationVisibility(pageUrl);
+                WebLocationHelper locationHelper = getWebLocationHelper(view);
+                if (locationHelper != null) locationHelper.injectLocationPolyfill();
+                WebAppDataPrefetcher.inject(view);
             }
 
             @Override
@@ -215,6 +228,9 @@ public class WebTabFragment extends Fragment {
                 }
                 WebSpeechInputHelper helper = getWebSpeechInputHelper(view);
                 if (helper != null) helper.injectSpeechRecognitionPolyfill();
+                WebLocationHelper locationHelper = getWebLocationHelper(view);
+                if (locationHelper != null) locationHelper.injectLocationPolyfill();
+                WebAppDataPrefetcher.inject(view);
             }
 
             @Override
@@ -275,6 +291,35 @@ public class WebTabFragment extends Fragment {
                     return false;
                 }
                 return true;
+            }
+
+            @Override
+            public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                FragmentActivity activity = getActivity();
+                if (activity == null) {
+                    callback.invoke(origin, false, false);
+                    return;
+                }
+                if (ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                        || ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    callback.invoke(origin, true, false);
+                    return;
+                }
+                String desc = String.format(
+                        getString(com.chat.base.R.string.location_permissions_desc),
+                        getString(com.chat.base.R.string.app_name)
+                );
+                WKPermissions.getInstance().checkPermissions(new WKPermissions.IPermissionResult() {
+                    @Override
+                    public void onResult(boolean result) {
+                        callback.invoke(origin, result, false);
+                    }
+
+                    @Override
+                    public void clickResult(boolean isCancel) {
+                        if (isCancel) callback.invoke(origin, false, false);
+                    }
+                }, activity, desc, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION);
             }
 
             @Override
@@ -427,6 +472,17 @@ public class WebTabFragment extends Fragment {
             webSpeechInputHelper.setWebView(targetWebView);
         }
         return webSpeechInputHelper;
+    }
+
+    private WebLocationHelper getWebLocationHelper(WebView targetWebView) {
+        FragmentActivity activity = getActivity();
+        if (activity == null || targetWebView == null) return null;
+        if (webLocationHelper == null) {
+            webLocationHelper = new WebLocationHelper(activity, targetWebView);
+        } else {
+            webLocationHelper.setWebView(targetWebView);
+        }
+        return webLocationHelper;
     }
 
     private View createLoadingView() {
@@ -676,6 +732,10 @@ public class WebTabFragment extends Fragment {
         if (webSpeechInputHelper != null) {
             webSpeechInputHelper.destroy();
             webSpeechInputHelper = null;
+        }
+        if (webLocationHelper != null) {
+            webLocationHelper.destroy();
+            webLocationHelper = null;
         }
         if (pendingPermissionRequest != null) {
             try {
