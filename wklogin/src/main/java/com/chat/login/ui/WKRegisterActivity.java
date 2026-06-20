@@ -61,7 +61,6 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
 
     @Override
     protected void initView() {
-        wkVBinding.getVCodeBtn.getBackground().setTint(Theme.colorAccount);
         wkVBinding.registerBtn.getBackground().setTint(Theme.colorAccount);
         wkVBinding.privacyPolicyTv.setTextColor(Theme.colorAccount);
         wkVBinding.userAgreementTv.setTextColor(Theme.colorAccount);
@@ -80,30 +79,17 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
         wkVBinding.privacyPolicyTv.setOnClickListener(v -> showWebView(WKApiConfig.baseWebUrl + "privacy_policy.html"));
         wkVBinding.userAgreementTv.setOnClickListener(v -> showWebView(WKApiConfig.baseWebUrl + "user_agreement.html"));
         wkVBinding.registerAppTv.setText(String.format(getString(R.string.register_app), getString(R.string.app_name)));
+
+        // 手机号注册不再使用短信验证码，界面和交互入口全部关闭，避免误导用户。
+        wkVBinding.registerVerifyLayout.setVisibility(View.GONE);
+        wkVBinding.registerVerifyLineView.setVisibility(View.GONE);
+        wkVBinding.verfiEt.setVisibility(View.GONE);
+        wkVBinding.verfiEt.setText("");
+        wkVBinding.getVCodeBtn.setVisibility(View.GONE);
+        wkVBinding.getVCodeBtn.setEnabled(false);
+        wkVBinding.getVCodeBtn.setOnClickListener(null);
+
         wkVBinding.nameEt.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-
-            }
-
-            @Override
-            public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-
-            }
-
-            @Override
-            public void afterTextChanged(Editable editable) {
-                if (editable.length() > 0) {
-                    wkVBinding.getVCodeBtn.setAlpha(1f);
-                    wkVBinding.getVCodeBtn.setEnabled(true);
-                } else {
-                    wkVBinding.getVCodeBtn.setEnabled(false);
-                    wkVBinding.getVCodeBtn.setAlpha(0.2f);
-                }
-                checkStatus();
-            }
-        });
-        wkVBinding.verfiEt.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
 
@@ -161,16 +147,6 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
                     // 手机号注册不再要求短信验证码，后端也需要同步放开 /user/register 的 code 校验。
                     presenter.registerApp("", code, "", phone, pwd, inviteCode);
                 }
-            }
-        });
-        wkVBinding.getVCodeBtn.setOnClickListener(v -> {
-            String phone = Objects.requireNonNull(wkVBinding.nameEt.getText()).toString();
-            if (!TextUtils.isEmpty(phone)) {
-                if (code.equals("0086") && wkVBinding.nameEt.getText().toString().length() != 11) {
-                    showSingleBtnDialog(getString(R.string.phone_error));
-                    return;
-                }
-                presenter.registerCode(code, phone);
             }
         });
 
@@ -264,16 +240,7 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
 
     @Override
     public void setRegisterCodeSuccess(int code, String msg, int exist) {
-        if (code == HttpResponseCode.success) {
-            if (exist == 1) {
-                showSingleBtnDialog(getString(R.string.account_exist));
-            } else {
-                wkVBinding.nameEt.setEnabled(false);
-                presenter.startTimer();
-            }
-        } else {
-            showToast(msg);
-        }
+        // 手机号注册已取消短信验证码入口，不再启动验证码倒计时或锁定手机号输入框。
     }
 
     @Override
