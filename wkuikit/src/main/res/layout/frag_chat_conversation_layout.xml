@@ -55,7 +55,48 @@
             android:src="@mipmap/msg_add"
             android:tint="@color/popupTextColor" />
     </LinearLayout>
+    <LinearLayout
+        android:id="@+id/chatRoomTabLayout"
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
 
+        <TextView
+            android:id="@+id/messageTabTv"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:gravity="center"
+            android:minWidth="66dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="消息"
+            android:textColor="@color/colorDark"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/roomTabTv"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginStart="12dp"
+            android:gravity="center"
+            android:minWidth="82dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="聊天室"
+            android:textColor="#6B7280"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/chatPageContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
     <com.scwang.smart.refresh.layout.SmartRefreshLayout
         android:id="@+id/refreshLayout"
@@ -69,5 +110,12 @@
             android:layout_height="match_parent"
             tools:listitem="@layout/item_chat_conv_layout" />
     </com.scwang.smart.refresh.layout.SmartRefreshLayout>
+
+        <FrameLayout
+            android:id="@+id/roomContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+    </FrameLayout>
 
 </LinearLayout>
