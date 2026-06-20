@@ -137,8 +137,9 @@ public class WKRegisterActivity extends WKBaseActivity<ActRegisterLayoutBinding>
                         return;
                     }
                     loadingPopup.show();
-                    // 手机号无验证码注册：验证码 code 固定传空字符串。后端 /user/register 必须同步放开 code 校验。
-                    presenter.registerApp("", code, "", phone, pwd, inviteCode);
+                    // 后端 docker-compose 配置了固定短信验证码 TS_SMSCODE=123456。
+                    // 注册页隐藏验证码输入框，提交时自动携带固定验证码，用户无需手动输入。
+                    presenter.registerApp("123456", code, "", phone, pwd, inviteCode);
                 }
             }
         });
