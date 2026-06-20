@@ -12,6 +12,7 @@ import android.widget.TextView;
 import androidx.core.app.ActivityOptionsCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.util.Pair;
+import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -88,6 +89,8 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     // 缓存未读数，避免频繁计算
     private int cachedUnreadCount = 0;
     private boolean isUnreadCountDirty = true;
+    private boolean isShowingTopicRooms = false;
+    private boolean topicRoomFragmentLoaded = false;
 
     @Override
     protected boolean isShowBackLayout() {
@@ -124,6 +127,31 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         Theme.setPressedBackground(wkVBinding.deviceIv);
         Theme.setPressedBackground(wkVBinding.searchIv);
         Theme.setPressedBackground(wkVBinding.rightIv);
+        Theme.setPressedBackground(wkVBinding.messageTabTv);
+        Theme.setPressedBackground(wkVBinding.roomTabTv);
+        showTopicRooms(false);
+    }
+
+    private void showTopicRooms(boolean showRooms) {
+        isShowingTopicRooms = showRooms;
+        wkVBinding.refreshLayout.setVisibility(showRooms ? View.GONE : View.VISIBLE);
+        wkVBinding.roomContainer.setVisibility(showRooms ? View.VISIBLE : View.GONE);
+        wkVBinding.messageTabTv.setTextSize(showRooms ? 16 : 18);
+        wkVBinding.roomTabTv.setTextSize(showRooms ? 18 : 16);
+        wkVBinding.messageTabTv.setTextColor(ContextCompat.getColor(requireActivity(), showRooms ? R.color.popupTextColor : R.color.colorDark));
+        wkVBinding.roomTabTv.setTextColor(ContextCompat.getColor(requireActivity(), showRooms ? R.color.colorDark : R.color.popupTextColor));
+        if (showRooms) ensureTopicRoomFragment();
+    }
+
+    private void ensureTopicRoomFragment() {
+        if (topicRoomFragmentLoaded || !isAdded()) return;
+        Object fragmentObject = EndpointManager.getInstance().invoke("peipe_topic_room_fragment", null);
+        if (fragmentObject instanceof Fragment) {
+            topicRoomFragmentLoaded = true;
+            getChildFragmentManager().beginTransaction()
+                    .replace(R.id.roomContainer, (Fragment) fragmentObject)
+                    .commitAllowingStateLoss();
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -133,6 +161,8 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             List<PopupMenuItem> list = EndpointManager.getInstance().invokes(EndpointCategory.tabMenus, null);
             WKDialogUtils.getInstance().showScreenPopup(view, list);
         });
+        wkVBinding.messageTabTv.setOnClickListener(view -> showTopicRooms(false));
+        wkVBinding.roomTabTv.setOnClickListener(view -> showTopicRooms(true));
 
         wkVBinding.deviceIv.setOnClickListener(v -> EndpointManager.getInstance().invoke("show_pc_login_view", getActivity()));
         wkVBinding.searchIv.setOnClickListener(view1 -> {
