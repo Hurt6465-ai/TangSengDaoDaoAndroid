@@ -1,24 +1,22 @@
 package com.chat.room.model;
 
-import android.content.Context;
 import android.text.TextUtils;
 
-import com.chat.base.net.HttpResponseCode;
+import com.chat.base.base.WKBaseModel;
 import com.chat.base.net.IRequestResultListener;
-import com.chat.room.WKRoomApplication;
+import com.chat.room.entity.CreateRoomTopicRequest;
 import com.chat.room.entity.RoomTopicEntity;
 import com.chat.room.entity.RoomTopicListResponse;
-import com.chat.room.store.RoomTopicStore;
-import com.chat.uikit.group.service.GroupModel;
-import com.xinbida.wukongim.entity.WKChannelType;
 
-import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * 话题房间本地目录模型。
- * 发布话题直接调用唐僧已有 group/create 创建原生群聊。
+ * 话题聊天室模型。
+ * 不再调用普通 group/create，避免普通建群接口的好友关系校验。
+ * 所有开放话题房走服务端专用 /v1/chatrooms/* 接口。
  */
-public class RoomTopicModel {
+public class RoomTopicModel extends WKBaseModel {
     private RoomTopicModel() {
     }
 
@@ -31,12 +29,7 @@ public class RoomTopicModel {
     }
 
     public void listRooms(IRequestResultListener<RoomTopicListResponse> listener) {
-        RoomTopicListResponse response = new RoomTopicListResponse();
-        Context context = WKRoomApplication.getInstance().getContext();
-        response.rooms = RoomTopicStore.loadRooms(context);
-        RoomTopicStore.sortRooms(response.rooms);
-        response.server_time = System.currentTimeMillis();
-        if (listener != null) listener.onSuccess(response);
+        request(createService(RoomTopicService.class).listRooms(), listener);
     }
 
     public void createRoom(String title, String tag, String language, IRequestResultListener<RoomTopicEntity> listener) {
@@ -45,38 +38,19 @@ public class RoomTopicModel {
             if (listener != null) listener.onFail(400, "请输入话题名");
             return;
         }
-
-        // group/create 的 members 参数是“要邀请进群的好友列表”，不是创建者自己。
-        // 创建者会由服务端自动加入；这里不能把自己的 uid 塞进去，否则服务端会按“添加成员”校验好友关系，
-        // 于是出现“添加用户非好友关系，请先添加好友”。
-        ArrayList<String> members = new ArrayList<>();
-        ArrayList<String> names = new ArrayList<>();
-
-        GroupModel.getInstance().createGroup(safeTitle, members, names, (code, msg, groupEntity) -> {
-            if (code == HttpResponseCode.success && groupEntity != null && !TextUtils.isEmpty(groupEntity.group_no)) {
-                RoomTopicEntity room = RoomTopicStore.createLocalRoom(
-                        WKRoomApplication.getInstance().getContext(),
-                        safeTitle,
-                        tag,
-                        language,
-                        groupEntity.group_no
-                );
-                room.channel_id = groupEntity.group_no;
-                room.channel_type = WKChannelType.GROUP;
-                RoomTopicStore.upsertRoom(WKRoomApplication.getInstance().getContext(), room);
-                if (listener != null) listener.onSuccess(room);
-            } else if (listener != null) {
-                listener.onFail(code, TextUtils.isEmpty(msg) ? "创建话题群聊失败" : msg);
-            }
-        });
+        CreateRoomTopicRequest request = new CreateRoomTopicRequest();
+        request.title = safeTitle;
+        request.tag = TextUtils.isEmpty(tag) ? "闲谈" : tag;
+        request.language = TextUtils.isEmpty(language) ? "中文" : language;
+        this.request(createService(RoomTopicService.class).createRoom(request), listener);
     }
 
     public void enterRoom(RoomTopicEntity room, IRequestResultListener<RoomTopicEntity> listener) {
-        if (room == null || TextUtils.isEmpty(room.getChannelId())) {
+        if (room == null) {
             if (listener != null) listener.onFail(404, "话题不存在");
             return;
         }
-        if (listener != null) listener.onSuccess(room);
+        request(createService(RoomTopicService.class).enterRoom(baseRoomRequest(room)), listener);
     }
 
     public void pinRoom(RoomTopicEntity room, boolean pinned, IRequestResultListener<RoomTopicEntity> listener) {
@@ -84,13 +58,24 @@ public class RoomTopicModel {
             if (listener != null) listener.onFail(400, "话题不存在");
             return;
         }
-        room.pinned = pinned ? 1 : 0;
-        RoomTopicStore.upsertRoom(WKRoomApplication.getInstance().getContext(), room);
-        if (listener != null) listener.onSuccess(room);
+        Map<String, Object> request = baseRoomRequest(room);
+        request.put("pinned", pinned ? 1 : 0);
+        this.request(createService(RoomTopicService.class).pinRoom(request), listener);
     }
 
     public void deleteRoom(RoomTopicEntity room, IRequestResultListener<Object> listener) {
-        RoomTopicStore.deleteRoom(WKRoomApplication.getInstance().getContext(), room);
-        if (listener != null) listener.onSuccess(new Object());
+        if (room == null) {
+            if (listener != null) listener.onFail(400, "话题不存在");
+            return;
+        }
+        this.request(createService(RoomTopicService.class).deleteRoom(baseRoomRequest(room)), listener);
+    }
+
+    private Map<String, Object> baseRoomRequest(RoomTopicEntity room) {
+        Map<String, Object> request = new HashMap<>();
+        request.put("room_id", room == null ? "" : room.getRoomId());
+        request.put("channel_id", room == null ? "" : room.getChannelId());
+        request.put("channel_type", room == null ? 2 : room.channel_type);
+        return request;
     }
 }
