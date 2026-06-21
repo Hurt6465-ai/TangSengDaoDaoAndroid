@@ -7,6 +7,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -67,6 +68,8 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
 
     private static final String ARG_EMBEDDED_IN_CHAT = "embedded_in_chat";
     private boolean embeddedInChat = false;
+    private float embeddedSwipeStartX = 0f;
+    private float embeddedSwipeStartY = 0f;
 
     public static ContactsFragment newEmbeddedInstance() {
         ContactsFragment fragment = new ContactsFragment();
@@ -134,6 +137,10 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
         contactsHeaderAdapter = new ContactsHeaderAdapter();
         initAdapter(headerRecyclerView, contactsHeaderAdapter);
         wkVBinding.quickSideBarView.setOnQuickSideBarTouchListener(this);
+        if (embeddedInChat) {
+            wkVBinding.contactsRootLayout.setOnTouchListener((view, event) -> handleEmbeddedSwipe(event));
+            wkVBinding.recyclerView.setOnTouchListener((view, event) -> handleEmbeddedSwipe(event));
+        }
         friendAdapter.addChildClickViewIds(R.id.contentLayout);
         friendAdapter.setOnItemChildClickListener((adapter, view, position) -> SingleClickUtil.determineTriggerSingleClick(view, view1 -> {
             FriendUIEntity friendEntity = (FriendUIEntity) adapter.getItem(position);
@@ -301,6 +308,28 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
         layoutParams.topMargin = AndroidUtilities.dp(15);
         layoutParams.bottomMargin = AndroidUtilities.dp(15);
         return linearLayout;
+    }
+
+    private boolean handleEmbeddedSwipe(MotionEvent event) {
+        if (!embeddedInChat || event == null) return false;
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                embeddedSwipeStartX = event.getX();
+                embeddedSwipeStartY = event.getY();
+                return false;
+            case MotionEvent.ACTION_UP:
+                float dx = event.getX() - embeddedSwipeStartX;
+                float dy = event.getY() - embeddedSwipeStartY;
+                if (Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                    if (dx > 0) {
+                        EndpointManager.getInstance().invoke("peipe_switch_home_page", 1);
+                        return true;
+                    }
+                }
+                return false;
+            default:
+                return false;
+        }
     }
 
     @Override
