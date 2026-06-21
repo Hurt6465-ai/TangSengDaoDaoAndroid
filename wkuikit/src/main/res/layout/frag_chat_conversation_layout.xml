@@ -1,125 +1,270 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/title_bg"
-    android:orientation="vertical"
-    android:paddingTop="34dp">
+    android:layout_height="match_parent">
 
     <LinearLayout
-        android:id="@+id/topToolbarLayout"
+        android:id="@+id/chatMainLayout"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:visibility="gone">
+        android:layout_height="match_parent"
+        android:background="@drawable/title_bg"
+        android:orientation="vertical"
+        android:paddingTop="34dp">
 
-        <TextSwitcher
-            android:id="@+id/textSwitcher"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:tag="-1" />
-
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/deviceIv"
-            android:layout_width="1dp"
-            android:layout_height="1dp"
-            android:visibility="gone" />
-
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/searchIv"
-            android:layout_width="1dp"
-            android:layout_height="1dp"
-            android:visibility="gone" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/chatRoomTabLayout"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="18dp"
-        android:paddingEnd="14dp">
-
-        <TextView
-            android:id="@+id/messageTabTv"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:gravity="center"
-            android:minWidth="56dp"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
-            android:text="@string/peipe_chat_tab_message"
-            android:textColor="@color/colorDark"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/roomTabTv"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:layout_marginStart="16dp"
-            android:gravity="center"
-            android:minWidth="74dp"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
-            android:text="@string/peipe_chat_tab_room"
-            android:textColor="#6B7280"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/contactsTabTv"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:layout_marginStart="16dp"
-            android:gravity="center"
-            android:minWidth="64dp"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
-            android:text="@string/peipe_chat_tab_contacts"
-            android:textColor="#6B7280"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <View
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1" />
-
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/rightIv"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:padding="10dp"
-            android:src="@mipmap/icon_chat_toolbar_more"
-            android:tint="@color/popupTextColor" />
-    </LinearLayout>
-
-    <FrameLayout
-        android:id="@+id/chatPageContainer"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <com.scwang.smart.refresh.layout.SmartRefreshLayout
-            android:id="@+id/refreshLayout"
+        <LinearLayout
+            android:id="@+id/topToolbarLayout"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@color/homeColor">
+            android:layout_height="0dp"
+            android:visibility="gone">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recyclerView"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                tools:listitem="@layout/item_chat_conv_layout" />
-        </com.scwang.smart.refresh.layout.SmartRefreshLayout>
+            <TextSwitcher
+                android:id="@+id/textSwitcher"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:tag="-1" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/deviceIv"
+                android:layout_width="1dp"
+                android:layout_height="1dp"
+                android:visibility="gone" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/searchIv"
+                android:layout_width="1dp"
+                android:layout_height="1dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/chatRoomTabLayout"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="18dp"
+            android:paddingEnd="14dp">
+
+            <TextView
+                android:id="@+id/messageTabTv"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:gravity="center"
+                android:minWidth="56dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="@string/peipe_chat_tab_message"
+                android:textColor="@color/colorDark"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/roomTabTv"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="16dp"
+                android:gravity="center"
+                android:minWidth="74dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="@string/peipe_chat_tab_room"
+                android:textColor="#6B7280"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/contactsTabTv"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="16dp"
+                android:gravity="center"
+                android:minWidth="64dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="@string/peipe_chat_tab_contacts"
+                android:textColor="#6B7280"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/rightIv"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@android:color/transparent"
+                android:padding="10dp"
+                android:src="@mipmap/icon_chat_toolbar_more"
+                android:tint="@color/popupTextColor" />
+        </LinearLayout>
 
         <FrameLayout
-            android:id="@+id/roomContainer"
+            android:id="@+id/chatPageContainer"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone" />
-    </FrameLayout>
+            android:layout_height="0dp"
+            android:layout_weight="1">
 
-</LinearLayout>
+            <com.scwang.smart.refresh.layout.SmartRefreshLayout
+                android:id="@+id/refreshLayout"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/homeColor">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    tools:listitem="@layout/item_chat_conv_layout" />
+            </com.scwang.smart.refresh.layout.SmartRefreshLayout>
+
+            <FrameLayout
+                android:id="@+id/roomContainer"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+
+            <FrameLayout
+                android:id="@+id/contactsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/homeColor"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <View
+        android:id="@+id/sideMenuMask"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#66000000"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/sideMenuPanel"
+        android:layout_width="304dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:background="@drawable/shape_side_menu_panel_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="12dp"
+        android:orientation="vertical"
+        android:paddingStart="22dp"
+        android:paddingTop="54dp"
+        android:paddingEnd="22dp"
+        android:paddingBottom="24dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/sideProfileLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/shape_side_menu_header_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="14dp">
+
+            <com.chat.base.ui.components.AvatarView
+                android:id="@+id/sideAvatarView"
+                android:layout_width="58dp"
+                android:layout_height="58dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/sideNameTv"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:lines="1"
+                    android:textColor="@color/colorDark"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/user_detail_info"
+                    android:textColor="@color/color999"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/setting"
+            android:textColor="@color/color999"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/sideNewMsgNoticeTv"
+            style="@style/PeipeSideMenuItem"
+            android:text="@string/new_msg_notice" />
+
+        <TextView
+            android:id="@+id/sideDarkModeTv"
+            style="@style/PeipeSideMenuItem"
+            android:text="@string/dark_night" />
+
+        <TextView
+            android:id="@+id/sideLanguageTv"
+            style="@style/PeipeSideMenuItem"
+            android:text="@string/language" />
+
+        <TextView
+            android:id="@+id/sideFontSizeTv"
+            style="@style/PeipeSideMenuItem"
+            android:text="@string/font_size" />
+
+        <LinearLayout
+            android:id="@+id/sideClearCacheLayout"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/shape_side_menu_item_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/clear_img_cache"
+                android:textColor="@color/colorDark"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/sideCacheSizeTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/color999"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/sideLogoutTv"
+            style="@style/PeipeSideMenuItem"
+            android:text="@string/login_out"
+            android:textColor="@color/red" />
+    </LinearLayout>
+</FrameLayout>
