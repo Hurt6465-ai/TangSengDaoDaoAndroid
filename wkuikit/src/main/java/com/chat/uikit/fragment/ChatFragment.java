@@ -3,6 +3,7 @@ package com.chat.uikit.fragment;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.text.TextUtils;
@@ -25,7 +26,6 @@ import com.chat.base.config.WKSharedPreferencesUtil;
 import com.chat.base.endpoint.EndpointCategory;
 import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.endpoint.entity.ChatViewMenu;
-import com.chat.base.entity.PopupMenuItem;
 import com.chat.base.msgitem.WKContentType;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.ui.Theme;
@@ -46,6 +46,13 @@ import com.chat.uikit.enity.ChatConversationMsg;
 import com.chat.uikit.group.service.GroupModel;
 import com.chat.uikit.message.MsgModel;
 import com.chat.uikit.search.remote.GlobalActivity;
+import com.chat.uikit.user.service.UserModel;
+import com.chat.uikit.user.MyInfoActivity;
+import com.chat.uikit.setting.WKThemeSettingActivity;
+import com.chat.uikit.setting.WKSetFontSizeActivity;
+import com.chat.uikit.setting.WKLanguageActivity;
+import com.chat.uikit.setting.MsgNoticesSettingActivity;
+import com.chat.base.utils.DataCleanManager;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKCMDKeys;
 import com.xinbida.wukongim.entity.WKChannel;
@@ -90,12 +97,15 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     // 缓存未读数，避免频繁计算
     private int cachedUnreadCount = 0;
     private boolean isUnreadCountDirty = true;
+    private static final int PAGE_MESSAGES = 0;
+    private static final int PAGE_TOPIC_ROOMS = 1;
+    private static final int PAGE_CONTACTS = 2;
+    private int currentHomePage = PAGE_MESSAGES;
     private boolean isShowingTopicRooms = false;
     private boolean topicRoomFragmentLoaded = false;
+    private boolean contactsFragmentLoaded = false;
     private float topicSwipeStartX = 0f;
     private float topicSwipeStartY = 0f;
-    private boolean topicSwipeMaybeDragging = false;
-    private long lastTopicSwipeHandledAt = 0L;
 
     @Override
     protected boolean isShowBackLayout() {
@@ -131,23 +141,42 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
 
         Theme.setPressedBackground(wkVBinding.deviceIv);
         Theme.setPressedBackground(wkVBinding.searchIv);
-        Theme.setPressedBackground(wkVBinding.rightIv);
+        wkVBinding.rightIv.setBackgroundColor(Color.TRANSPARENT);
         Theme.setPressedBackground(wkVBinding.messageTabTv);
         Theme.setPressedBackground(wkVBinding.roomTabTv);
-        showTopicRooms(false);
+        Theme.setPressedBackground(wkVBinding.contactsTabTv);
+        showHomePage(PAGE_MESSAGES);
     }
 
     private void showTopicRooms(boolean showRooms) {
-        isShowingTopicRooms = showRooms;
-        wkVBinding.refreshLayout.setVisibility(showRooms ? View.GONE : View.VISIBLE);
+        showHomePage(showRooms ? PAGE_TOPIC_ROOMS : PAGE_MESSAGES);
+    }
+
+    private void showHomePage(int page) {
+        currentHomePage = page;
+        isShowingTopicRooms = page == PAGE_TOPIC_ROOMS;
+        boolean showMessages = page == PAGE_MESSAGES;
+        boolean showRooms = page == PAGE_TOPIC_ROOMS;
+        boolean showContacts = page == PAGE_CONTACTS;
+
+        wkVBinding.refreshLayout.setVisibility(showMessages ? View.VISIBLE : View.GONE);
         wkVBinding.roomContainer.setVisibility(showRooms ? View.VISIBLE : View.GONE);
-        wkVBinding.messageTabTv.setTextSize(showRooms ? 16 : 18);
-        wkVBinding.roomTabTv.setTextSize(showRooms ? 18 : 16);
-        wkVBinding.messageTabTv.setTextColor(ContextCompat.getColor(requireActivity(), showRooms ? R.color.popupTextColor : R.color.colorDark));
-        wkVBinding.roomTabTv.setTextColor(ContextCompat.getColor(requireActivity(), showRooms ? R.color.colorDark : R.color.popupTextColor));
+        wkVBinding.contactsContainer.setVisibility(showContacts ? View.VISIBLE : View.GONE);
+
+        updateHomeTabStyle(wkVBinding.messageTabTv, showMessages);
+        updateHomeTabStyle(wkVBinding.roomTabTv, showRooms);
+        updateHomeTabStyle(wkVBinding.contactsTabTv, showContacts);
+
         if (showRooms) {
             ensureTopicRoomFragment();
+        } else if (showContacts) {
+            ensureContactsFragment();
         }
+    }
+
+    private void updateHomeTabStyle(TextView tabView, boolean selected) {
+        tabView.setTextSize(selected ? 18 : 16);
+        tabView.setTextColor(ContextCompat.getColor(requireActivity(), selected ? R.color.colorDark : R.color.popupTextColor));
     }
 
     private void removeTopicRoomRowsFromMessageList() {
@@ -181,61 +210,49 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         }
     }
 
+    private void ensureContactsFragment() {
+        if (contactsFragmentLoaded || !isAdded()) return;
+        contactsFragmentLoaded = true;
+        ContactsFragment contactsFragment = ContactsFragment.newEmbeddedInstance();
+        getChildFragmentManager().beginTransaction()
+                .replace(R.id.contactsContainer, contactsFragment)
+                .commitAllowingStateLoss();
+    }
+
     private boolean handleTopicSwipe(MotionEvent event) {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 topicSwipeStartX = event.getX();
                 topicSwipeStartY = event.getY();
-                topicSwipeMaybeDragging = false;
-                return false;
-            case MotionEvent.ACTION_MOVE:
-                float moveDx = event.getX() - topicSwipeStartX;
-                float moveDy = event.getY() - topicSwipeStartY;
-                if (Math.abs(moveDx) > AndroidUtilities.dp(18) && Math.abs(moveDx) > Math.abs(moveDy) * 1.2f) {
-                    topicSwipeMaybeDragging = true;
-                }
                 return false;
             case MotionEvent.ACTION_UP:
                 float dx = event.getX() - topicSwipeStartX;
                 float dy = event.getY() - topicSwipeStartY;
-                boolean horizontalSwipe = Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f;
-                if (horizontalSwipe) {
-                    markTopicSwipeHandled();
-                    if (dx < 0) showTopicRooms(true);
-                    else showTopicRooms(false);
-                    return true;
+                if (Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                    if (dx < 0 && currentHomePage < PAGE_CONTACTS) {
+                        showHomePage(currentHomePage + 1);
+                        return true;
+                    }
+                    if (dx > 0 && currentHomePage > PAGE_MESSAGES) {
+                        showHomePage(currentHomePage - 1);
+                        return true;
+                    }
                 }
-                if (topicSwipeMaybeDragging) {
-                    markTopicSwipeHandled();
-                    return true;
-                }
-                return false;
-            case MotionEvent.ACTION_CANCEL:
-                topicSwipeMaybeDragging = false;
                 return false;
             default:
                 return false;
         }
     }
 
-    private void markTopicSwipeHandled() {
-        topicSwipeMaybeDragging = false;
-        lastTopicSwipeHandledAt = android.os.SystemClock.elapsedRealtime();
-    }
-
-    private boolean isTopicSwipeClickBlocked() {
-        return android.os.SystemClock.elapsedRealtime() - lastTopicSwipeHandledAt < 350L;
-    }
-
     @SuppressLint("ClickableViewAccessibility")
     @Override
     protected void initListener() {
-        wkVBinding.rightIv.setOnClickListener(view -> {
-            List<PopupMenuItem> list = EndpointManager.getInstance().invokes(EndpointCategory.tabMenus, null);
-            WKDialogUtils.getInstance().showScreenPopup(view, list);
-        });
-        wkVBinding.messageTabTv.setOnClickListener(view -> showTopicRooms(false));
-        wkVBinding.roomTabTv.setOnClickListener(view -> showTopicRooms(true));
+        wkVBinding.rightIv.setOnClickListener(view -> openSideMenu());
+        wkVBinding.sideMenuMask.setOnClickListener(view -> closeSideMenu());
+        wkVBinding.messageTabTv.setOnClickListener(view -> showHomePage(PAGE_MESSAGES));
+        wkVBinding.roomTabTv.setOnClickListener(view -> showHomePage(PAGE_TOPIC_ROOMS));
+        wkVBinding.contactsTabTv.setOnClickListener(view -> showHomePage(PAGE_CONTACTS));
+        initSideMenuListeners();
         EndpointManager.getInstance().setMethod("peipe_show_topic_rooms", object -> {
             showTopicRooms(Boolean.TRUE.equals(object));
             return null;
@@ -256,7 +273,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         });
         chatConversationAdapter.addChildClickViewIds(R.id.contentLayout);
         chatConversationAdapter.setOnItemChildClickListener((adapter, view, position) -> SingleClickUtil.determineTriggerSingleClick(view, v -> {
-            if (isTopicSwipeClickBlocked()) return;
             ChatConversationMsg uiConversationMsg = (ChatConversationMsg) adapter.getItem(position);
             if (uiConversationMsg != null && uiConversationMsg.uiConversationMsg != null) {
                 if (view.getId() == R.id.contentLayout) {
@@ -983,6 +999,107 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                 });
     }
 
+    private void initSideMenuListeners() {
+        SingleClickUtil.onSingleClick(wkVBinding.sideProfileLayout, view -> {
+            closeSideMenu();
+            startActivity(new Intent(getActivity(), MyInfoActivity.class));
+        });
+        SingleClickUtil.onSingleClick(wkVBinding.sideNewMsgNoticeTv, view -> openSideMenuActivity(MsgNoticesSettingActivity.class));
+        SingleClickUtil.onSingleClick(wkVBinding.sideDarkModeTv, view -> openSideMenuActivity(WKThemeSettingActivity.class));
+        SingleClickUtil.onSingleClick(wkVBinding.sideLanguageTv, view -> openSideMenuActivity(WKLanguageActivity.class));
+        SingleClickUtil.onSingleClick(wkVBinding.sideFontSizeTv, view -> openSideMenuActivity(WKSetFontSizeActivity.class));
+        SingleClickUtil.onSingleClick(wkVBinding.sideClearCacheLayout, view -> clearImageCacheFromSideMenu());
+        SingleClickUtil.onSingleClick(wkVBinding.sideLogoutTv, view -> logoutFromSideMenu());
+    }
+
+    private void openSideMenuActivity(Class<?> activityClass) {
+        closeSideMenu();
+        startActivity(new Intent(getActivity(), activityClass));
+    }
+
+    private void refreshSideMenuUserInfo() {
+        if (wkVBinding == null || wkVBinding.sideAvatarView == null) return;
+        wkVBinding.sideAvatarView.setSize(58);
+        if (WKConfig.getInstance().getUserInfo() != null) {
+            wkVBinding.sideNameTv.setText(WKConfig.getInstance().getUserInfo().name);
+        }
+        wkVBinding.sideAvatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
+        refreshSideCacheSize();
+    }
+
+    private void refreshSideCacheSize() {
+        Context context = getContext();
+        if (context == null) return;
+        new Thread(() -> {
+            String cacheSize = "0.00M";
+            try {
+                cacheSize = DataCleanManager.getTotalCacheSize(context);
+                if ("0.0Byte".equalsIgnoreCase(cacheSize)) {
+                    cacheSize = "0.00M";
+                }
+            } catch (Exception ignored) {
+            }
+            String finalCacheSize = cacheSize;
+            AndroidUtilities.runOnUIThread(() -> {
+                if (isAdded() && wkVBinding != null && wkVBinding.sideCacheSizeTv != null) {
+                    wkVBinding.sideCacheSizeTv.setText(finalCacheSize);
+                }
+            });
+        }).start();
+    }
+
+    private void clearImageCacheFromSideMenu() {
+        WKDialogUtils.getInstance().showDialog(getActivity(), getString(R.string.clear_img_cache), getString(R.string.clear_img_cache_tips), true, "", getString(R.string.sure), 0, Theme.colorAccount, index -> {
+            if (index == 1) {
+                try {
+                    DataCleanManager.clearAllCache(requireContext());
+                } catch (Exception ignored) {
+                }
+                wkVBinding.sideCacheSizeTv.setText("0.00M");
+            }
+        });
+    }
+
+    private void logoutFromSideMenu() {
+        WKDialogUtils.getInstance().showDialog(getActivity(), getString(R.string.login_out), getString(R.string.login_out_dialog), true, "", getString(R.string.login_out), 0, 0, index -> {
+            if (index == 1) {
+                UserModel.getInstance().quit(null);
+                WKUIKitApplication.getInstance().exitLogin(0);
+            }
+        });
+    }
+
+    private void openSideMenu() {
+        refreshSideMenuUserInfo();
+        wkVBinding.sideMenuMask.setVisibility(View.VISIBLE);
+        wkVBinding.sideMenuPanel.setVisibility(View.VISIBLE);
+        wkVBinding.sideMenuPanel.post(() -> {
+            wkVBinding.sideMenuPanel.setTranslationX(wkVBinding.sideMenuPanel.getWidth());
+            wkVBinding.sideMenuPanel.animate().translationX(0).setDuration(180).start();
+        });
+    }
+
+    private void closeSideMenu() {
+        if (wkVBinding == null || wkVBinding.sideMenuPanel.getVisibility() != View.VISIBLE) return;
+        wkVBinding.sideMenuPanel.animate()
+                .translationX(wkVBinding.sideMenuPanel.getWidth())
+                .setDuration(160)
+                .withEndAction(() -> {
+                    if (wkVBinding == null) return;
+                    wkVBinding.sideMenuPanel.setVisibility(View.GONE);
+                    wkVBinding.sideMenuMask.setVisibility(View.GONE);
+                })
+                .start();
+    }
+
+    public boolean closeSideMenuIfOpen() {
+        if (wkVBinding != null && wkVBinding.sideMenuPanel.getVisibility() == View.VISIBLE) {
+            closeSideMenu();
+            return true;
+        }
+        return false;
+    }
+
     //检测正在输入的定时器
     private void startTimer() {
         Observable.interval(0, 1, TimeUnit.SECONDS).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread()).subscribe(new Observer<>() {
@@ -1051,6 +1168,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     @Override
     public void onResume() {
         super.onResume();
+        refreshSideMenuUserInfo();
         int pcOnline = WKSharedPreferencesUtil.getInstance().getInt(WKConfig.getInstance().getUid() + "_pc_online");
         wkVBinding.deviceIv.setVisibility(pcOnline == 1 ? View.VISIBLE : View.GONE);
 //        String appLoginType = String.format(getString(R.string.pc_login), getString(R.string.app_name));
