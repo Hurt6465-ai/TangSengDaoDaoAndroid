@@ -1,7 +1,9 @@
 package com.chat.room.adapter;
 
+import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.View;
+import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 
@@ -31,25 +33,74 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
 
     @Override
     protected void convert(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
-        holder.setText(R.id.langTv, room == null ? "中文" : room.getLangLabel());
-        holder.setText(R.id.tagTv, "# " + (room == null ? "闲谈" : room.getTagLabel()));
-        holder.setText(R.id.titleTv, room == null ? "聊天室" : room.getShowTitle());
+        holder.setText(R.id.langTv, room == null ? getContext().getString(R.string.peipe_room_lang_cn) : room.getLangLabel());
+        String tag = room == null ? getContext().getString(R.string.peipe_room_tag_chat) : room.getTagLabel(getContext());
+        holder.setText(R.id.tagTv, "# " + tag);
+        holder.setText(R.id.titleTv, room == null ? getContext().getString(R.string.peipe_room_tab_title) : room.getShowTitle());
+        holder.getView(R.id.tagTv).setBackground(makeTagBackground(room == null ? "闲谈" : room.getRawTag()));
+
+        ImageView bgIv = holder.getView(R.id.bgIv);
+        bgIv.setImageResource(backgroundRes(room == null ? 1 : room.background_index));
 
         bindCardAvatars(holder, room);
 
         View card = holder.getView(R.id.cardRoot);
-        card.setContentDescription(room == null || TextUtils.isEmpty(room.title) ? "聊天室" : room.title);
+        card.setContentDescription(room == null || TextUtils.isEmpty(room.title) ? getContext().getString(R.string.peipe_room_tab_title) : room.title);
+    }
+
+    private GradientDrawable makeTagBackground(String rawTag) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setCornerRadius(8f);
+        drawable.setColor(tagColor(rawTag));
+        return drawable;
+    }
+
+    private int tagColor(String rawTag) {
+        if (TextUtils.isEmpty(rawTag)) return 0xFF64748B;
+        if ("练口语".equals(rawTag)) return 0xFF16A34A;
+        if ("找搭子".equals(rawTag)) return 0xFFEC4899;
+        if ("工作".equals(rawTag)) return 0xFFF97316;
+        if ("影视".equals(rawTag)) return 0xFF8B5CF6;
+        if ("音乐".equals(rawTag)) return 0xFF06B6D4;
+        if ("学习".equals(rawTag)) return 0xFF3B82F6;
+        if ("交友".equals(rawTag)) return 0xFFEF4444;
+        return 0xFF64748B;
+    }
+
+    private int backgroundRes(int index) {
+        switch (index) {
+            case 2: return R.drawable.room_bg_02;
+            case 3: return R.drawable.room_bg_03;
+            case 4: return R.drawable.room_bg_04;
+            case 5: return R.drawable.room_bg_05;
+            case 6: return R.drawable.room_bg_06;
+            case 7: return R.drawable.room_bg_07;
+            case 8: return R.drawable.room_bg_08;
+            case 9: return R.drawable.room_bg_09;
+            case 10: return R.drawable.room_bg_10;
+            case 11: return R.drawable.room_bg_11;
+            case 12: return R.drawable.room_bg_12;
+            case 13: return R.drawable.room_bg_13;
+            case 14: return R.drawable.room_bg_14;
+            case 15: return R.drawable.room_bg_15;
+            case 16: return R.drawable.room_bg_16;
+            case 17: return R.drawable.room_bg_17;
+            case 18: return R.drawable.room_bg_18;
+            case 19: return R.drawable.room_bg_19;
+            case 20: return R.drawable.room_bg_20;
+            default: return R.drawable.room_bg_01;
+        }
     }
 
     private void bindCardAvatars(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
         AvatarView creatorAvatar = holder.getView(R.id.creatorAvatar);
-        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 58f);
+        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 54f);
 
         List<RoomTopicEntity.RoomMember> members = room == null ? Collections.emptyList() : room.getSideMembers();
         for (int i = 0; i < SIDE_AVATAR_IDS.length; i++) {
             AvatarView avatarView = holder.getView(SIDE_AVATAR_IDS[i]);
             RoomTopicEntity.RoomMember member = members != null && i < members.size() ? members.get(i) : null;
-            bindMemberAvatar(avatarView, member, 26f);
+            bindMemberAvatar(avatarView, member, 24f);
         }
     }
 
