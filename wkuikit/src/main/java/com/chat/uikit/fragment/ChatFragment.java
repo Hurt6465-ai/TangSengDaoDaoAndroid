@@ -186,6 +186,10 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         });
         wkVBinding.messageTabTv.setOnClickListener(view -> showTopicRooms(false));
         wkVBinding.roomTabTv.setOnClickListener(view -> showTopicRooms(true));
+        EndpointManager.getInstance().setMethod("peipe_show_topic_rooms", object -> {
+            showTopicRooms(Boolean.TRUE.equals(object));
+            return null;
+        });
         wkVBinding.chatRoomTabLayout.setOnTouchListener((view, event) -> handleTopicSwipe(event));
         wkVBinding.chatPageContainer.setOnTouchListener((view, event) -> handleTopicSwipe(event));
         wkVBinding.recyclerView.setOnTouchListener((view, event) -> handleTopicSwipe(event));
@@ -764,10 +768,34 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         }
     }
 
+    private boolean isTopicRoomConversation(WKUIConversationMsg uiConversationMsg) {
+        if (uiConversationMsg == null) return false;
+        if (uiConversationMsg.channelType == WKChannelType.GROUP && !TextUtils.isEmpty(uiConversationMsg.channelID) && uiConversationMsg.channelID.startsWith("topic_")) {
+            return true;
+        }
+        WKChannel channel = uiConversationMsg.getWkChannel();
+        if (channel == null) return false;
+        return hasTopicRoomFlag(channel.remoteExtraMap) || hasTopicRoomFlag(channel.localExtra);
+    }
+
+    private boolean hasTopicRoomFlag(java.util.Map<String, Object> map) {
+        if (map == null) return false;
+        Object value = map.get("topic_room");
+        if (value == null) return false;
+        if (value instanceof Number) return ((Number) value).intValue() == 1;
+        return "1".equals(String.valueOf(value)) || "true".equalsIgnoreCase(String.valueOf(value));
+    }
+
     private int msgCount = 0;
 
     private void resetData(WKUIConversationMsg uiConversationMsg, boolean isEnd) {
         if (uiConversationMsg == null) {
+            return;
+        }
+        if (isTopicRoomConversation(uiConversationMsg)) {
+            if (isEnd) {
+                sortMsg(chatConversationAdapter.getData());
+            }
             return;
         }
         // || (uiConversationMsg.getWkChannel() != null && uiConversationMsg.getWkChannel().follow == 0 && uiConversationMsg.channelType == WKChannelType.PERSONAL)
@@ -876,6 +904,9 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                     List<ChatConversationMsg> normalList = new ArrayList<>();
                     for (int i = 0, size = listCopy.size(); i < size; i++) {
                         ChatConversationMsg msg = listCopy.get(i);
+                        if (msg == null || isTopicRoomConversation(msg.uiConversationMsg)) {
+                            continue;
+                        }
                         if (msg.uiConversationMsg.getWkChannel() != null && msg.uiConversationMsg.getWkChannel().top == 1) {
                             topList.add(msg);
                         } else {
