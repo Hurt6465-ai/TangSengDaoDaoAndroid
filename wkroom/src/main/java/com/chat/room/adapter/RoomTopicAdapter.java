@@ -10,6 +10,7 @@ import androidx.annotation.NonNull;
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.viewholder.BaseViewHolder;
 import com.chat.base.ui.components.AvatarView;
+import com.chat.base.utils.AndroidUtilities;
 import com.chat.room.R;
 import com.chat.room.entity.RoomTopicEntity;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -35,9 +36,11 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
     protected void convert(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
         holder.setText(R.id.langTv, room == null ? getContext().getString(R.string.peipe_room_lang_cn) : room.getLangLabel());
         String tag = room == null ? getContext().getString(R.string.peipe_room_tag_chat) : room.getTagLabel(getContext());
+        String rawTag = room == null ? "闲谈" : room.getRawTag();
         holder.setText(R.id.tagTv, "# " + tag);
+        holder.setTextColor(R.id.tagTv, tagColor(rawTag));
         holder.setText(R.id.titleTv, room == null ? getContext().getString(R.string.peipe_room_tab_title) : room.getShowTitle());
-        holder.getView(R.id.tagTv).setBackground(makeTagBackground(room == null ? "闲谈" : room.getRawTag()));
+        holder.getView(R.id.tagTv).setBackground(makeTagBackground(rawTag));
 
         ImageView bgIv = holder.getView(R.id.bgIv);
         bgIv.setImageResource(backgroundRes(room == null ? 1 : room.background_index));
@@ -50,9 +53,15 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
 
     private GradientDrawable makeTagBackground(String rawTag) {
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setCornerRadius(8f);
-        drawable.setColor(tagColor(rawTag));
+        int color = tagColor(rawTag);
+        drawable.setCornerRadius(AndroidUtilities.dp(8));
+        drawable.setColor(withAlpha(color, 0x33));
+        drawable.setStroke(AndroidUtilities.dp(1), withAlpha(color, 0x66));
         return drawable;
+    }
+
+    private int withAlpha(int color, int alpha) {
+        return (color & 0x00FFFFFF) | ((alpha & 0xFF) << 24);
     }
 
     private int tagColor(String rawTag) {
@@ -94,13 +103,17 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
 
     private void bindCardAvatars(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
         AvatarView creatorAvatar = holder.getView(R.id.creatorAvatar);
-        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 54f);
+        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 46f);
 
         List<RoomTopicEntity.RoomMember> members = room == null ? Collections.emptyList() : room.getSideMembers();
         for (int i = 0; i < SIDE_AVATAR_IDS.length; i++) {
             AvatarView avatarView = holder.getView(SIDE_AVATAR_IDS[i]);
             RoomTopicEntity.RoomMember member = members != null && i < members.size() ? members.get(i) : null;
-            bindMemberAvatar(avatarView, member, 24f);
+            if (member == null || TextUtils.isEmpty(member.uid)) {
+                avatarView.setVisibility(View.GONE);
+            } else {
+                bindMemberAvatar(avatarView, member, 40f);
+            }
         }
     }
 
