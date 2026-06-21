@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="peipe_room_tab_title">Chatrooms</string>
+    <string name="peipe_room_empty_title">No public rooms</string>
+    <string name="peipe_room_empty_desc">Post a topic. Others can tap the card to join a native group chat.</string>
+    <string name="peipe_room_create">Post topic</string>
+    <string name="peipe_room_title_hint">Topic title</string>
+    <string name="peipe_room_tag_title">Choose tag</string>
+    <string name="peipe_room_cancel">Cancel</string>
+    <string name="peipe_room_publish">Post</string>
+    <string name="peipe_room_pin">Pin</string>
+    <string name="peipe_room_unpin">Unpin</string>
+    <string name="peipe_room_delete">Delete</string>
+    <string name="peipe_room_lang_cn">Chinese</string>
+    <string name="peipe_room_tag_speaking">Speaking</string>
+    <string name="peipe_room_tag_partner">Partner</string>
+    <string name="peipe_room_tag_work">Work</string>
+    <string name="peipe_room_tag_movie">Movies</string>
+    <string name="peipe_room_tag_music">Music</string>
+    <string name="peipe_room_tag_study">Study</string>
+    <string name="peipe_room_tag_friend">Friends</string>
+    <string name="peipe_room_tag_chat">Chat</string>
+</resources>
