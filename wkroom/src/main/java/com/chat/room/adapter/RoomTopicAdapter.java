@@ -20,13 +20,11 @@ import java.util.List;
 public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseViewHolder> {
     private static final int[] ROOM_BACKGROUNDS = new int[]{
             R.drawable.room_bg_01, R.drawable.room_bg_02, R.drawable.room_bg_03, R.drawable.room_bg_04,
-            R.drawable.room_bg_05, R.drawable.room_bg_06, R.drawable.room_bg_07, R.drawable.room_bg_08,
-            R.drawable.room_bg_09, R.drawable.room_bg_10, R.drawable.room_bg_11, R.drawable.room_bg_12
+            R.drawable.room_bg_05, R.drawable.room_bg_06, R.drawable.room_bg_07, R.drawable.room_bg_08
     };
 
-    private static final int[] REPLY_AVATAR_IDS = new int[]{
-            R.id.replyAvatar1, R.id.replyAvatar2, R.id.replyAvatar3,
-            R.id.replyAvatar4, R.id.replyAvatar5, R.id.replyAvatar6
+    private static final int[] CARD_AVATAR_IDS = new int[]{
+            R.id.cardAvatar1, R.id.cardAvatar2, R.id.cardAvatar3, R.id.cardAvatar4
     };
 
     public RoomTopicAdapter(List<RoomTopicEntity> data) {
@@ -40,22 +38,20 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         holder.setText(R.id.langTv, room == null ? "中文" : room.getLangLabel());
         holder.setText(R.id.tagTv, "# " + (room == null ? "闲谈" : room.getTagLabel()));
         holder.setText(R.id.titleTv, room == null ? "话题聊天室" : room.getShowTitle());
-        holder.setText(R.id.metaTv, room == null ? "刚刚发布" : room.getMetaText());
+        holder.setText(R.id.metaTv, room == null ? "发布" : room.getMetaText());
+        holder.getView(R.id.hotTv).setVisibility(room != null && room.hot == 1 ? View.VISIBLE : View.GONE);
 
-        int unread = room == null ? 0 : room.unread;
-        holder.setText(R.id.unreadTv, unread > 99 ? "99+" : String.valueOf(unread));
+        int unread = 0;
+        if (room != null) unread = Math.max(room.mention_unread_count, room.unread_count);
+        holder.setText(R.id.unreadTv, room != null && room.mention_unread_count > 0 ? "@" : (unread > 99 ? "99+" : String.valueOf(unread)));
         holder.getView(R.id.unreadTv).setVisibility(unread > 0 ? View.VISIBLE : View.GONE);
 
-        AvatarView creatorAvatar = holder.getView(R.id.creatorAvatar);
-        creatorAvatar.setSize(50);
-        bindAvatar(context, creatorAvatar, room == null ? null : room.creator_uid, room == null ? null : room.creator_avatar, room == null ? null : room.creator_avatar_cache_key);
-
-        List<RoomTopicEntity.RoomAvatar> replies = room == null ? null : room.getDedupReplyAvatars();
-        for (int i = 0; i < REPLY_AVATAR_IDS.length; i++) {
-            AvatarView avatarView = holder.getView(REPLY_AVATAR_IDS[i]);
-            avatarView.setSize(34);
-            if (replies != null && i < replies.size()) {
-                RoomTopicEntity.RoomAvatar avatar = replies.get(i);
+        List<RoomTopicEntity.RoomAvatar> avatars = room == null ? null : room.getCardAvatars();
+        for (int i = 0; i < CARD_AVATAR_IDS.length; i++) {
+            AvatarView avatarView = holder.getView(CARD_AVATAR_IDS[i]);
+            avatarView.setSize(28);
+            if (avatars != null && i < avatars.size()) {
+                RoomTopicEntity.RoomAvatar avatar = avatars.get(i);
                 avatarView.setVisibility(View.VISIBLE);
                 bindAvatar(context, avatarView, avatar.uid, avatar.avatar, avatar.avatar_cache_key);
             } else {
