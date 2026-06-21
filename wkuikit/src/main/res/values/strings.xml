@@ -332,5 +332,8 @@
     <string name="chat_voice_release_cancel">松手取消</string>
     <string name="chat_voice_long_press_hint">长按麦克风录音</string>
     <string name="chat_more_menu">聊天菜单</string>
+    <string name="peipe_chat_tab_message">消息</string>
+    <string name="peipe_chat_tab_room">聊天室</string>
+    <string name="peipe_chat_tab_contacts">联系人</string>
 </resources>
 
