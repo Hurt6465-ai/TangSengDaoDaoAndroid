@@ -394,22 +394,37 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
         } else if (item.channelID.equals(WKSystemAccount.system_team)) {
             showName = getContext().getString(R.string.wk_system_notice);
         }
-        helper.setGone(R.id.groupIV, item.channelType != WKChannelType.GROUP);
+        boolean isTopicRoom = isTopicRoomConversation(item);
+        helper.setGone(R.id.groupIV, item.channelType != WKChannelType.GROUP || isTopicRoom);
         boolean isTop;
         AvatarView avatarView = helper.getView(R.id.avatarView);
-        avatarView.setSize(50);
+        avatarView.setSize(50, isTopicRoom ? 10 : 25);
         if (item.getWkChannel() != null) {
+            if (TextUtils.isEmpty(showName))
+                showName = TextUtils.isEmpty(item.getWkChannel().channelRemark) ? item.getWkChannel().channelName : item.getWkChannel().channelRemark;
             if (item.channelType == WKChannelType.COMMUNITY) {
                 EndpointManager.getInstance().invoke("show_community_avatar", new ShowCommunityAvatarMenu(getContext(), avatarView, item.getWkChannel()));
+            } else if (isTopicRoom) {
+                if (TextUtils.isEmpty(showName)) showName = getExtraString(item.getWkChannel().localExtra, "topic_title");
+                String avatar = TextUtils.isEmpty(item.getWkChannel().avatar) ? getExtraString(item.getWkChannel().localExtra, "creator_avatar") : item.getWkChannel().avatar;
+                String avatarCacheKey = TextUtils.isEmpty(item.getWkChannel().avatarCacheKey) ? getExtraString(item.getWkChannel().localExtra, "creator_avatar_cache_key") : item.getWkChannel().avatarCacheKey;
+                if (TextUtils.isEmpty(avatar)) {
+                    avatarView.showDefaultAvatar(showName);
+                } else {
+                    avatarView.showAvatarUrl(avatar, avatarCacheKey, showName);
+                }
             } else {
                 avatarView.defaultAvatarTv.setVisibility(View.GONE);
                 avatarView.imageView.setVisibility(View.VISIBLE);
                 avatarView.showAvatar(item.getWkChannel(), true);
             }
-            EndpointManager.getInstance().invoke("show_avatar_other_info", new AvatarOtherViewMenu(helper.getView(R.id.otherLayout), item.getWkChannel(), avatarView, false));
+            if (!isTopicRoom) {
+                helper.getView(R.id.otherLayout).setVisibility(View.VISIBLE);
+                EndpointManager.getInstance().invoke("show_avatar_other_info", new AvatarOtherViewMenu(helper.getView(R.id.otherLayout), item.getWkChannel(), avatarView, false));
+            } else {
+                helper.getView(R.id.otherLayout).setVisibility(View.GONE);
+            }
             isTop = item.getWkChannel().top == 1;
-            if (TextUtils.isEmpty(showName))
-                showName = TextUtils.isEmpty(item.getWkChannel().channelRemark) ? item.getWkChannel().channelName : item.getWkChannel().channelRemark;
             if (TextUtils.isEmpty(showName)) {
                 showName = getContext().getString(R.string.chat);
 //                if (!isScrolling)
@@ -467,7 +482,11 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
                 showName = getContext().getString(R.string.chat);
             avatarView.defaultAvatarTv.setVisibility(View.GONE);
             avatarView.imageView.setVisibility(View.VISIBLE);
-            avatarView.imageView.setImageResource(R.drawable.default_view_bg);
+            if (isTopicRoom) {
+                avatarView.showDefaultAvatar(showName);
+            } else {
+                avatarView.imageView.setImageResource(R.drawable.default_view_bg);
+            }
             //消息头像
 //            avatarView.showAvatar(item.channelID, item.channelType);
 //            GlideUtils.getInstance().showAvatarImg(getContext(), item.channelID, item.channelType, "", helper.getView(R.id.avatarIv));
@@ -476,6 +495,31 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
             WKIM.getInstance().getChannelManager().fetchChannelInfo(item.channelID, item.channelType);
         }
         helper.setText(R.id.nameTv, showName);
+    }
+
+    private String getExtraString(java.util.Map<String, Object> map, String key) {
+        if (map == null || TextUtils.isEmpty(key)) return "";
+        Object value = map.get(key);
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private boolean isTopicRoomConversation(WKUIConversationMsg item) {
+        if (item == null) return false;
+        if (item.channelType == WKChannelType.GROUP && !TextUtils.isEmpty(item.channelID) && item.channelID.startsWith("topic_")) {
+            return true;
+        }
+        WKChannel channel = item.getWkChannel();
+        if (channel == null) return false;
+        if ("topic_room".equals(channel.category)) return true;
+        return hasTopicRoomFlag(channel.remoteExtraMap) || hasTopicRoomFlag(channel.localExtra);
+    }
+
+    private boolean hasTopicRoomFlag(java.util.Map<String, Object> map) {
+        if (map == null) return false;
+        Object value = map.get("topic_room");
+        if (value == null) return false;
+        if (value instanceof Number) return ((Number) value).intValue() == 1;
+        return "1".equals(String.valueOf(value)) || "true".equalsIgnoreCase(String.valueOf(value));
     }
 
     private boolean isSetChatPwd(WKChannel channel) {
