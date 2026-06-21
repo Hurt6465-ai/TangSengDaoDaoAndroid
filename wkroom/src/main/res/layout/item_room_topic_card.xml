@@ -31,9 +31,25 @@
         android:paddingEnd="18dp"
         android:paddingBottom="8dp">
 
-        <LinearLayout
+        <!-- 话题放顶部 -->
+        <TextView
+            android:id="@+id/titleTv"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:gravity="start|center_vertical"
+            android:maxLines="2"
+            android:paddingEnd="28dp"
+            android:text="聊天室"
+            android:textColor="#FFFFFFFF"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <!-- 标签放中间 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -65,20 +81,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/titleTv"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:gravity="center_vertical"
-            android:maxLines="2"
-            android:paddingEnd="28dp"
-            android:text="聊天室"
-            android:textColor="#FFFFFFFF"
-            android:textSize="21sp"
-            android:textStyle="bold" />
-
+        <!-- 头像放底部 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="46dp"
@@ -96,9 +99,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="44dp"
                 android:layout_marginStart="9dp"
-                android:translationY="4dp"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:translationY="4dp">
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar1"
