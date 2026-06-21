@@ -307,4 +307,7 @@
     <string name="tab_text_study">လေ့လာ</string>
     <string name="tab_placeholder_partner_desc">စကားဖော် မကြာမီလာမည်</string>
     <string name="tab_placeholder_discover_desc">ရှာဖွေ မကြာမီလာမည်</string>
+    <string name="peipe_chat_tab_message">မက်ဆေ့ချ်</string>
+    <string name="peipe_chat_tab_room">စကားခန်း</string>
+    <string name="peipe_chat_tab_contacts">အဆက်အသွယ်</string>
 </resources>
