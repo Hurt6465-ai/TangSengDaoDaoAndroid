@@ -42,6 +42,8 @@ public class RoomTopicEntity implements Serializable {
     public double hot_score;
     public double match_score;
     public int reply_count;
+    /** 参与过该话题的人数：创建者 + 进入过或回复过的用户。 */
+    public int participant_count;
     public int pinned;
     public int hot;
     public long hot_until;
@@ -105,6 +107,30 @@ public class RoomTopicEntity implements Serializable {
         if (online_count > 0) return online_count;
         if (active_users > 0) return active_users;
         return member_count;
+    }
+
+    public int getParticipantCount() {
+        if (participant_count > 0) return participant_count;
+        if (member_count > 0) return member_count;
+        int uniqueCount = countUniqueMembers();
+        if (uniqueCount > 0) return uniqueCount;
+        if (reply_count > 0) return reply_count + 1;
+        return 1;
+    }
+
+    private int countUniqueMembers() {
+        HashSet<String> seen = new HashSet<>();
+        RoomMember creator = getCreatorMember();
+        String creatorKey = keyOf(creator);
+        if (!TextUtils.isEmpty(creatorKey)) seen.add(creatorKey);
+        List<RoomMember> source = getSourceMembers();
+        if (source != null) {
+            for (RoomMember member : source) {
+                String key = keyOf(member);
+                if (!TextUtils.isEmpty(key)) seen.add(key);
+            }
+        }
+        return seen.size();
     }
 
     public String getOnlineLabel() {
@@ -185,6 +211,7 @@ public class RoomTopicEntity implements Serializable {
         if (next.last_reply_at > 0) last_reply_at = next.last_reply_at;
         if (next.expire_at > 0) expire_at = next.expire_at;
         if (next.reply_count >= 0) reply_count = next.reply_count;
+        if (next.participant_count >= 0) participant_count = next.participant_count;
         if (next.online_count >= 0) online_count = next.online_count;
         if (next.member_count >= 0) member_count = next.member_count;
         if (next.active_users >= 0) active_users = next.active_users;
