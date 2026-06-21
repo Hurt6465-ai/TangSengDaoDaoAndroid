@@ -5,91 +5,95 @@
     android:layout_height="match_parent"
     android:background="@drawable/title_bg"
     android:orientation="vertical"
-    android:paddingTop="40dp">
+    android:paddingTop="34dp">
 
     <LinearLayout
+        android:id="@+id/topToolbarLayout"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:gravity="center_vertical">
+        android:layout_height="0dp"
+        android:visibility="gone">
 
         <TextSwitcher
             android:id="@+id/textSwitcher"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="15dp"
-            android:inAnimation="@anim/ts_in_anim"
-            android:outAnimation="@anim/ts_out_anim"
-            android:tag="-1"
-            android:text="@string/not_connected" />
-
-        <View
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
+            android:tag="-1" />
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/deviceIv"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginEnd="30dp"
-            android:src="@mipmap/menu_devices"
-            android:tint="@color/popupTextColor"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
             android:visibility="gone" />
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/searchIv"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginEnd="35dp"
-            android:src="@mipmap/ic_ab_search"
-            android:tint="@color/popupTextColor" />
-
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/rightIv"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginEnd="15dp"
-            android:src="@mipmap/msg_add"
-            android:tint="@color/popupTextColor" />
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
     </LinearLayout>
+
     <LinearLayout
         android:id="@+id/chatRoomTabLayout"
         android:layout_width="match_parent"
-        android:layout_height="42dp"
+        android:layout_height="48dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp">
+        android:paddingStart="18dp"
+        android:paddingEnd="14dp">
 
         <TextView
             android:id="@+id/messageTabTv"
             android:layout_width="wrap_content"
-            android:layout_height="32dp"
+            android:layout_height="36dp"
             android:gravity="center"
-            android:minWidth="66dp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:text="消息"
+            android:minWidth="56dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:text="@string/peipe_chat_tab_message"
             android:textColor="@color/colorDark"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/roomTabTv"
             android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:layout_marginStart="12dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="16dp"
             android:gravity="center"
-            android:minWidth="82dp"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
-            android:text="聊天室"
+            android:minWidth="74dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:text="@string/peipe_chat_tab_room"
+            android:textColor="#6B7280"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/contactsTabTv"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="16dp"
+            android:gravity="center"
+            android:minWidth="64dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:text="@string/peipe_chat_tab_contacts"
             android:textColor="#6B7280"
             android:textSize="16sp"
             android:textStyle="bold" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/rightIv"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:padding="10dp"
+            android:src="@mipmap/icon_chat_toolbar_more"
+            android:tint="@color/popupTextColor" />
     </LinearLayout>
 
     <FrameLayout
@@ -98,18 +102,18 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-    <com.scwang.smart.refresh.layout.SmartRefreshLayout
-        android:id="@+id/refreshLayout"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/homeColor">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerView"
+        <com.scwang.smart.refresh.layout.SmartRefreshLayout
+            android:id="@+id/refreshLayout"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            tools:listitem="@layout/item_chat_conv_layout" />
-    </com.scwang.smart.refresh.layout.SmartRefreshLayout>
+            android:background="@color/homeColor">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                tools:listitem="@layout/item_chat_conv_layout" />
+        </com.scwang.smart.refresh.layout.SmartRefreshLayout>
 
         <FrameLayout
             android:id="@+id/roomContainer"
