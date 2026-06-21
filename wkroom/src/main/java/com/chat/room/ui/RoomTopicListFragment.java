@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Color;
 import android.text.TextUtils;
+import android.view.MotionEvent;
 import android.view.Gravity;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
@@ -34,6 +35,9 @@ import java.util.List;
 
 public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListBinding> {
     private RoomTopicAdapter adapter;
+    private float swipeStartX = 0f;
+    private float swipeStartY = 0f;
+    private boolean firstResume = true;
 
     public static RoomTopicListFragment newInstance() {
         return new RoomTopicListFragment();
@@ -69,11 +73,44 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
             showCardMenu(adapter.getItem(position), position);
             return true;
         });
+        wkVBinding.recyclerView.setOnTouchListener((view, event) -> handleSwipe(event));
+        wkVBinding.refreshLayout.setOnTouchListener((view, event) -> handleSwipe(event));
     }
 
     @Override
     protected void initData() {
         loadRooms(false);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (firstResume) {
+            firstResume = false;
+        } else {
+            loadRooms(false);
+        }
+    }
+
+    private boolean handleSwipe(MotionEvent event) {
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                swipeStartX = event.getX();
+                swipeStartY = event.getY();
+                return false;
+            case MotionEvent.ACTION_UP:
+                float dx = event.getX() - swipeStartX;
+                float dy = event.getY() - swipeStartY;
+                if (Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                    if (dx > 0) {
+                        EndpointManager.getInstance().invoke("peipe_show_topic_rooms", false);
+                        return true;
+                    }
+                }
+                return false;
+            default:
+                return false;
+        }
     }
 
     private void loadRooms(boolean showError) {
@@ -299,6 +336,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
                         RoomTopicStore.sortRooms(adapter.getData());
                         adapter.notifyDataSetChanged();
                         updateEmpty();
+                        loadRooms(false);
                         openNativeChat(result);
                     } else {
                         loadRooms(false);
