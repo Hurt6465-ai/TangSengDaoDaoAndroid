@@ -1,6 +1,9 @@
 package com.chat.room.entity;
 
+import android.content.Context;
 import android.text.TextUtils;
+
+import com.chat.room.R;
 
 import com.xinbida.wukongim.entity.WKChannelType;
 
@@ -75,11 +78,22 @@ public class RoomTopicEntity implements Serializable {
         return "聊天室";
     }
 
-    public String getTagLabel() {
+    public String getRawTag() {
         if (!TextUtils.isEmpty(tag)) return tag;
-        if (!TextUtils.isEmpty(type) && "nearby".equals(type)) return "附近";
-        if (!TextUtils.isEmpty(type) && "language".equals(type)) return "语伴";
+        if (!TextUtils.isEmpty(type) && "language".equals(type)) return "练口语";
         return "闲谈";
+    }
+
+    public String getTagLabel(Context context) {
+        String raw = getRawTag();
+        if ("练口语".equals(raw)) return context.getString(R.string.peipe_room_tag_speaking);
+        if ("找搭子".equals(raw)) return context.getString(R.string.peipe_room_tag_partner);
+        if ("工作".equals(raw)) return context.getString(R.string.peipe_room_tag_work);
+        if ("影视".equals(raw)) return context.getString(R.string.peipe_room_tag_movie);
+        if ("音乐".equals(raw)) return context.getString(R.string.peipe_room_tag_music);
+        if ("学习".equals(raw)) return context.getString(R.string.peipe_room_tag_study);
+        if ("交友".equals(raw)) return context.getString(R.string.peipe_room_tag_friend);
+        return context.getString(R.string.peipe_room_tag_chat);
     }
 
     public String getLangLabel() {
