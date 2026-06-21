@@ -3,13 +3,14 @@
     android:id="@+id/cardRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="22dp"
-    android:layout_marginTop="7dp"
-    android:layout_marginEnd="22dp"
-    android:layout_marginBottom="9dp"
+    android:layout_marginStart="30dp"
+    android:layout_marginTop="8dp"
+    android:layout_marginEnd="30dp"
+    android:layout_marginBottom="10dp"
     android:background="@drawable/room_card_fallback"
     android:clipToOutline="true"
-    android:minHeight="166dp">
+    android:elevation="3dp"
+    android:minHeight="150dp">
 
     <ImageView
         android:id="@+id/bgIv"
@@ -21,13 +22,13 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#4A000000" />
+        android:background="#33000000" />
 
     <View
         android:layout_width="match_parent"
-        android:layout_height="78dp"
+        android:layout_height="72dp"
         android:layout_gravity="bottom"
-        android:background="#36000000" />
+        android:background="@drawable/room_card_bottom_soft_gradient" />
 
     <LinearLayout
         android:id="@+id/topicTextBlock"
@@ -44,18 +45,18 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:includeFontPadding="true"
-            android:lineSpacingExtra="2dp"
+            android:lineSpacingExtra="3dp"
             android:maxLines="2"
             android:text="聊天室"
             android:textColor="#FFFFFFFF"
-            android:textSize="21sp"
+            android:textSize="22sp"
             android:textStyle="bold" />
 
         <LinearLayout
             android:id="@+id/tagRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="5dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -90,104 +91,94 @@
         </LinearLayout>
     </LinearLayout>
 
-    <FrameLayout
-        android:id="@+id/bottomPanel"
+    <LinearLayout
+        android:id="@+id/bottomRow"
         android:layout_width="match_parent"
-        android:layout_height="54dp"
+        android:layout_height="44dp"
         android:layout_gravity="bottom"
         android:layout_marginStart="18dp"
         android:layout_marginEnd="18dp"
-        android:layout_marginBottom="10dp"
-        android:background="@drawable/room_card_bottom_panel"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp">
+        android:layout_marginBottom="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="22dp"
-            android:layout_gravity="top"
-            android:background="@drawable/room_card_bottom_glow" />
+        <com.chat.base.ui.components.AvatarView
+            android:id="@+id/creatorAvatar"
+            android:layout_width="38dp"
+            android:layout_height="38dp" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+        <TextView
+            android:id="@+id/creatorNameTv"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="9dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:includeFontPadding="true"
+            android:maxLines="1"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="2"
+            android:text="发布者"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <FrameLayout
+            android:id="@+id/sideAvatarStack"
+            android:layout_width="146dp"
+            android:layout_height="34dp"
+            android:layout_marginStart="8dp">
 
             <com.chat.base.ui.components.AvatarView
-                android:id="@+id/creatorAvatar"
-                android:layout_width="40dp"
-                android:layout_height="40dp" />
+                android:id="@+id/sideAvatar6"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="end|center_vertical" />
+
+            <com.chat.base.ui.components.AvatarView
+                android:id="@+id/sideAvatar5"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="end|center_vertical" />
+
+            <com.chat.base.ui.components.AvatarView
+                android:id="@+id/sideAvatar4"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="end|center_vertical" />
+
+            <com.chat.base.ui.components.AvatarView
+                android:id="@+id/sideAvatar3"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="end|center_vertical" />
+
+            <com.chat.base.ui.components.AvatarView
+                android:id="@+id/sideAvatar2"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="end|center_vertical" />
+
+            <com.chat.base.ui.components.AvatarView
+                android:id="@+id/sideAvatar1"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="end|center_vertical" />
 
             <TextView
-                android:id="@+id/creatorNameTv"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:ellipsize="end"
-                android:includeFontPadding="true"
-                android:maxLines="1"
-                android:text="发布者"
+                android:id="@+id/participantCountTv"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="end|center_vertical"
+                android:background="@drawable/room_participant_count_bg"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="+8"
                 android:textColor="#FFFFFFFF"
-                android:textSize="13sp"
+                android:textSize="10sp"
                 android:textStyle="bold" />
-
-            <FrameLayout
-                android:id="@+id/sideAvatarStack"
-                android:layout_width="176dp"
-                android:layout_height="34dp"
-                android:layout_marginStart="8dp">
-
-                <com.chat.base.ui.components.AvatarView
-                    android:id="@+id/sideAvatar6"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="end|center_vertical" />
-
-                <com.chat.base.ui.components.AvatarView
-                    android:id="@+id/sideAvatar5"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="end|center_vertical" />
-
-                <com.chat.base.ui.components.AvatarView
-                    android:id="@+id/sideAvatar4"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="end|center_vertical" />
-
-                <com.chat.base.ui.components.AvatarView
-                    android:id="@+id/sideAvatar3"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="end|center_vertical" />
-
-                <com.chat.base.ui.components.AvatarView
-                    android:id="@+id/sideAvatar2"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="end|center_vertical" />
-
-                <com.chat.base.ui.components.AvatarView
-                    android:id="@+id/sideAvatar1"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="end|center_vertical" />
-
-                <TextView
-                    android:id="@+id/participantCountTv"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:layout_gravity="end|center_vertical"
-                    android:background="@drawable/room_participant_count_bg"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:text="+8"
-                    android:textColor="#FF111827"
-                    android:textSize="11sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
-        </LinearLayout>
-    </FrameLayout>
+        </FrameLayout>
+    </LinearLayout>
 </FrameLayout>
