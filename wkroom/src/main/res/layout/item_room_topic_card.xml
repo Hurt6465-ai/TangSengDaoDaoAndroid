@@ -87,56 +87,51 @@
 
             <com.chat.base.ui.components.AvatarView
                 android:id="@+id/creatorAvatar"
-                android:layout_width="54dp"
-                android:layout_height="54dp" />
-
-            <Space
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
+                android:layout_width="46dp"
+                android:layout_height="46dp" />
 
             <LinearLayout
                 android:id="@+id/sideAvatarRow"
                 android:layout_width="wrap_content"
-                android:layout_height="28dp"
-                android:gravity="center_vertical|end"
+                android:layout_height="46dp"
+                android:layout_marginStart="8dp"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar1"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="3dp" />
+                    android:layout_width="40dp"
+                    android:layout_height="40dp" />
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar2"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="3dp" />
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="-4dp" />
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar3"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="3dp" />
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="-4dp" />
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar4"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="3dp" />
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="-4dp" />
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar5"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="3dp" />
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="-4dp" />
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar6"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="3dp" />
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="-4dp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
