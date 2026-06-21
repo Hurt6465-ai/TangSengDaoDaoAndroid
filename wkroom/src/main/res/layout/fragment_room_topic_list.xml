@@ -16,8 +16,8 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
-            android:paddingTop="10dp"
-            android:paddingBottom="100dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="88dp"
             tools:listitem="@layout/item_room_topic_card" />
     </com.scwang.smart.refresh.layout.SmartRefreshLayout>
 
