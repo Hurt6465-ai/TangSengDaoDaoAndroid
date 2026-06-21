@@ -144,8 +144,9 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         wkVBinding.rightIv.setBackgroundColor(Color.TRANSPARENT);
         Theme.setPressedBackground(wkVBinding.messageTabTv);
         Theme.setPressedBackground(wkVBinding.roomTabTv);
-        Theme.setPressedBackground(wkVBinding.contactsTabTv);
+        Theme.setPressedBackground(wkVBinding.contactsTabLayout);
         showHomePage(PAGE_MESSAGES);
+        updateContactsBadge();
     }
 
     private void showTopicRooms(boolean showRooms) {
@@ -177,6 +178,12 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     private void updateHomeTabStyle(TextView tabView, boolean selected) {
         tabView.setTextSize(selected ? 18 : 16);
         tabView.setTextColor(ContextCompat.getColor(requireActivity(), selected ? R.color.colorDark : R.color.popupTextColor));
+    }
+
+    private void updateContactsBadge() {
+        if (wkVBinding == null || wkVBinding.contactsBadgeView == null) return;
+        int count = WKSharedPreferencesUtil.getInstance().getInt(WKConfig.getInstance().getUid() + "_new_friend_count");
+        wkVBinding.contactsBadgeView.setVisibility(count > 0 ? View.VISIBLE : View.GONE);
     }
 
     private void removeTopicRoomRowsFromMessageList() {
@@ -251,16 +258,28 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         wkVBinding.sideMenuMask.setOnClickListener(view -> closeSideMenu());
         wkVBinding.messageTabTv.setOnClickListener(view -> showHomePage(PAGE_MESSAGES));
         wkVBinding.roomTabTv.setOnClickListener(view -> showHomePage(PAGE_TOPIC_ROOMS));
+        wkVBinding.contactsTabLayout.setOnClickListener(view -> showHomePage(PAGE_CONTACTS));
         wkVBinding.contactsTabTv.setOnClickListener(view -> showHomePage(PAGE_CONTACTS));
         initSideMenuListeners();
         EndpointManager.getInstance().setMethod("peipe_show_topic_rooms", object -> {
             showTopicRooms(Boolean.TRUE.equals(object));
             return null;
         });
+        EndpointManager.getInstance().setMethod("peipe_switch_home_page", object -> {
+            if (object instanceof Integer) {
+                showHomePage((Integer) object);
+            }
+            return null;
+        });
+        EndpointManager.getInstance().setMethod("chat_fragment_contacts_badge", EndpointCategory.wkRefreshMailList, object -> {
+            updateContactsBadge();
+            return null;
+        });
         wkVBinding.chatRoomTabLayout.setOnTouchListener((view, event) -> handleTopicSwipe(event));
         wkVBinding.chatPageContainer.setOnTouchListener((view, event) -> handleTopicSwipe(event));
         wkVBinding.recyclerView.setOnTouchListener((view, event) -> handleTopicSwipe(event));
         wkVBinding.roomContainer.setOnTouchListener((view, event) -> handleTopicSwipe(event));
+        wkVBinding.contactsContainer.setOnTouchListener((view, event) -> handleTopicSwipe(event));
 
         wkVBinding.deviceIv.setOnClickListener(v -> EndpointManager.getInstance().invoke("show_pc_login_view", getActivity()));
         wkVBinding.searchIv.setOnClickListener(view1 -> {
@@ -1169,6 +1188,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     public void onResume() {
         super.onResume();
         refreshSideMenuUserInfo();
+        updateContactsBadge();
         int pcOnline = WKSharedPreferencesUtil.getInstance().getInt(WKConfig.getInstance().getUid() + "_pc_online");
         wkVBinding.deviceIv.setVisibility(pcOnline == 1 ? View.VISIBLE : View.GONE);
 //        String appLoginType = String.format(getString(R.string.pc_login), getString(R.string.app_name));
