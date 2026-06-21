@@ -26,7 +26,7 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
     };
 
     public RoomTopicAdapter(List<RoomTopicEntity> data) {
-        super(R.layout.item_room_card, data);
+        super(R.layout.item_room_topic_card, data);
     }
 
     @Override
