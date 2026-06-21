@@ -1,91 +1,84 @@
 package com.chat.room.adapter;
 
-import android.content.Context;
 import android.text.TextUtils;
 import android.view.View;
+
+import com.chat.base.ui.components.AvatarView;
+import com.chat.base.glide.GlideUtils;
+import java.util.Collections;
 
 import androidx.annotation.NonNull;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.viewholder.BaseViewHolder;
-import com.chat.base.config.WKApiConfig;
-import com.chat.base.glide.GlideUtils;
-import com.chat.base.ui.components.AvatarView;
 import com.chat.room.R;
-import com.chat.room.entity.RoomTopicEntity;
-import com.xinbida.wukongim.entity.WKChannelType;
+import com.chat.room.entity.RoomEntity;
 
 import java.util.List;
 
-public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseViewHolder> {
+public class RoomListAdapter extends BaseQuickAdapter<RoomEntity, BaseViewHolder> {
     private static final int[] ROOM_BACKGROUNDS = new int[]{
-            R.drawable.room_bg_01, R.drawable.room_bg_02, R.drawable.room_bg_03, R.drawable.room_bg_04,
-            R.drawable.room_bg_05, R.drawable.room_bg_06, R.drawable.room_bg_07, R.drawable.room_bg_08
+            R.drawable.room_bg_01, R.drawable.room_bg_02, R.drawable.room_bg_03, R.drawable.room_bg_04, R.drawable.room_bg_05,
+            R.drawable.room_bg_06, R.drawable.room_bg_07, R.drawable.room_bg_08, R.drawable.room_bg_09, R.drawable.room_bg_10,
+            R.drawable.room_bg_11, R.drawable.room_bg_12, R.drawable.room_bg_13, R.drawable.room_bg_14, R.drawable.room_bg_15,
+            R.drawable.room_bg_16, R.drawable.room_bg_17, R.drawable.room_bg_18, R.drawable.room_bg_19, R.drawable.room_bg_20
     };
 
-    private static final int[] CARD_AVATAR_IDS = new int[]{
-            R.id.cardAvatar1, R.id.cardAvatar2, R.id.cardAvatar3, R.id.cardAvatar4
-    };
-
-    public RoomTopicAdapter(List<RoomTopicEntity> data) {
-        super(R.layout.item_room_topic_card, data);
+    public RoomListAdapter(List<RoomEntity> data) {
+        super(R.layout.item_room_card, data);
     }
 
     @Override
-    protected void convert(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
-        Context context = holder.itemView.getContext();
-        bindBackground(context, holder, room);
-        holder.setText(R.id.langTv, room == null ? "中文" : room.getLangLabel());
-        holder.setText(R.id.tagTv, "# " + (room == null ? "闲谈" : room.getTagLabel()));
-        holder.setText(R.id.titleTv, room == null ? "话题聊天室" : room.getShowTitle());
-        holder.setText(R.id.metaTv, room == null ? "发布" : room.getMetaText());
-        holder.getView(R.id.hotTv).setVisibility(room != null && room.hot == 1 ? View.VISIBLE : View.GONE);
-
-        int unread = 0;
-        if (room != null) unread = Math.max(room.mention_unread_count, room.unread_count);
-        holder.setText(R.id.unreadTv, room != null && room.mention_unread_count > 0 ? "@" : (unread > 99 ? "99+" : String.valueOf(unread)));
-        holder.getView(R.id.unreadTv).setVisibility(unread > 0 ? View.VISIBLE : View.GONE);
-
-        List<RoomTopicEntity.RoomAvatar> avatars = room == null ? null : room.getCardAvatars();
-        for (int i = 0; i < CARD_AVATAR_IDS.length; i++) {
-            AvatarView avatarView = holder.getView(CARD_AVATAR_IDS[i]);
-            avatarView.setSize(28);
-            if (avatars != null && i < avatars.size()) {
-                RoomTopicEntity.RoomAvatar avatar = avatars.get(i);
-                avatarView.setVisibility(View.VISIBLE);
-                bindAvatar(context, avatarView, avatar.uid, avatar.avatar, avatar.avatar_cache_key);
-            } else {
-                avatarView.setVisibility(View.GONE);
-            }
-        }
-    }
-
-    private void bindBackground(Context context, BaseViewHolder holder, RoomTopicEntity room) {
-        if (room != null && !TextUtils.isEmpty(room.background_url)) {
-            GlideUtils.getInstance().showImg(context, WKApiConfig.getShowUrl(room.background_url), holder.getView(R.id.bgIv));
-            return;
-        }
+    protected void convert(@NonNull BaseViewHolder holder, RoomEntity room) {
         String seed = room == null ? "" : room.getRoomId();
-        int index = room != null && room.background_index > 0 ? (room.background_index - 1) : ((seed.hashCode() & 0x7fffffff) % ROOM_BACKGROUNDS.length);
-        holder.setImageResource(R.id.bgIv, ROOM_BACKGROUNDS[Math.abs(index) % ROOM_BACKGROUNDS.length]);
+        int bgIndex = (seed.hashCode() & 0x7fffffff) % ROOM_BACKGROUNDS.length;
+        holder.setImageResource(R.id.bgIv, ROOM_BACKGROUNDS[bgIndex]);
+        holder.setText(R.id.langTv, room == null ? "CN" : room.getLangLabel());
+        holder.setText(R.id.tagTv, "# " + (room == null ? "闲谈" : room.getTagLabel()));
+        holder.setText(R.id.titleTv, room == null ? "聊天室" : room.getShowTitle());
+        holder.getView(R.id.metaTv).setVisibility(View.GONE);
+        holder.getView(R.id.onlineTv).setVisibility(View.GONE);
+
+        String distance = room == null ? "" : room.getDistanceLabel();
+        holder.setText(R.id.distanceTv, distance);
+        holder.getView(R.id.distanceTv).setVisibility(TextUtils.isEmpty(distance) ? View.GONE : View.VISIBLE);
+
+        holder.getView(R.id.unreadTv).setVisibility(View.GONE);
+
+        bindCardAvatars(holder, room);
+
+        View card = holder.getView(R.id.cardRoot);
+        card.setContentDescription(room == null || TextUtils.isEmpty(room.title) ? "聊天室" : room.title);
     }
 
-    private void bindAvatar(Context context, AvatarView avatarView, String uid, String avatarUrl, String cacheKey) {
-        avatarView.spotView.setVisibility(View.GONE);
-        avatarView.onlineTv.setVisibility(View.INVISIBLE);
-        avatarView.defaultAvatarTv.setVisibility(View.GONE);
-        if (!TextUtils.isEmpty(avatarUrl)) {
-            GlideUtils.getInstance().showAvatarImg(context, WKApiConfig.getShowUrl(avatarUrl), cacheKey == null ? "" : cacheKey, avatarView.imageView);
-        } else if (!TextUtils.isEmpty(uid)) {
-            avatarView.showAvatar(uid, WKChannelType.PERSONAL);
+    private void bindCardAvatars(@NonNull BaseViewHolder holder, RoomEntity room) {
+        AvatarView creatorAvatar = holder.getView(R.id.creatorAvatar);
+        creatorAvatar.setSize(56);
+        RoomEntity.RoomMember creator = room == null ? null : room.getCreatorMember();
+        if (creator != null && !TextUtils.isEmpty(creator.avatar)) {
+            creatorAvatar.setVisibility(View.VISIBLE);
+            GlideUtils.getInstance().showAvatarImg(getContext(), creator.avatar, creator.avatar_cache_key, creatorAvatar.imageView);
         } else {
-            avatarView.imageView.setImageResource(com.chat.base.R.drawable.default_view_bg);
+            creatorAvatar.setVisibility(View.INVISIBLE);
+        }
+
+        int[] ids = new int[]{R.id.sideAvatar1, R.id.sideAvatar2, R.id.sideAvatar3, R.id.sideAvatar4, R.id.sideAvatar5, R.id.sideAvatar6};
+        List<RoomEntity.RoomMember> members = room == null ? Collections.emptyList() : room.getSideMembers();
+        for (int i = 0; i < ids.length; i++) {
+            AvatarView avatarView = holder.getView(ids[i]);
+            avatarView.setSize(26);
+            if (members != null && i < members.size() && members.get(i) != null && !TextUtils.isEmpty(members.get(i).avatar)) {
+                avatarView.setVisibility(View.VISIBLE);
+                GlideUtils.getInstance().showAvatarImg(getContext(), members.get(i).avatar, members.get(i).avatar_cache_key, avatarView.imageView);
+            } else {
+                avatarView.setVisibility(View.INVISIBLE);
+            }
         }
     }
 
     public int indexOfRoom(String roomId, String channelId) {
         for (int i = 0; i < getData().size(); i++) {
-            RoomTopicEntity item = getData().get(i);
+            RoomEntity item = getData().get(i);
             if (item == null) continue;
             if (!TextUtils.isEmpty(roomId) && roomId.equals(item.getRoomId())) return i;
             if (!TextUtils.isEmpty(channelId) && channelId.equals(item.getChannelId())) return i;
