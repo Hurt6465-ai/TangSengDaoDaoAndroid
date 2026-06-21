@@ -33,6 +33,8 @@ public class AvatarView extends FrameLayout {
     public TextView defaultAvatarTv;
     public View spotView;
     public TextView onlineTv;
+    private float avatarSize = 40f;
+    private float avatarCornerSize = 20f;
 
     public AvatarView(Context context) {
         super(context);
@@ -121,7 +123,12 @@ public class AvatarView extends FrameLayout {
         };
         int index = TextUtils.isEmpty(seed) ? 0 : (seed.hashCode() & 0x7fffffff) % colors.length;
         GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.OVAL);
+        if (avatarCornerSize >= avatarSize / 2f - 0.5f) {
+            drawable.setShape(GradientDrawable.OVAL);
+        } else {
+            drawable.setShape(GradientDrawable.RECTANGLE);
+            drawable.setCornerRadius(AndroidUtilities.dp(avatarCornerSize));
+        }
         drawable.setColor(colors[index]);
         drawable.setStroke(AndroidUtilities.dp(1), 0x66FFFFFF);
         return drawable;
@@ -140,6 +147,8 @@ public class AvatarView extends FrameLayout {
     }
 
     public void setSize(float size, float cornerSize) {
+        avatarSize = size;
+        avatarCornerSize = cornerSize;
         imageView.getLayoutParams().width = AndroidUtilities.dp(size);
         imageView.getLayoutParams().height = AndroidUtilities.dp(size);
         imageView.setShapeAppearanceModel(imageView.getShapeAppearanceModel()
@@ -150,6 +159,9 @@ public class AvatarView extends FrameLayout {
         defaultAvatarTv.getLayoutParams().height = AndroidUtilities.dp(size);
         defaultAvatarTv.getLayoutParams().width = AndroidUtilities.dp(size);
         defaultAvatarTv.setTextSize(size * 0.38f);
+        if (defaultAvatarTv.getVisibility() == VISIBLE) {
+            defaultAvatarTv.setBackground(makeDefaultAvatarBg(defaultAvatarTv.getText() == null ? "" : defaultAvatarTv.getText().toString()));
+        }
 
     }
 
