@@ -652,7 +652,11 @@ public class WebTabFragment extends Fragment {
     private void updateBottomNavigationVisibility(String currentUrl) {
         Activity activity = getActivity();
         if (activity instanceof TabActivity) {
-            ((TabActivity) activity).setBottomNavigationVisible(isRootPage(currentUrl));
+            TabActivity tabActivity = (TabActivity) activity;
+            if (!tabActivity.isCurrentFragment(this)) {
+                return;
+            }
+            tabActivity.setBottomNavigationVisible(isRootPage(currentUrl));
         }
     }
 
