@@ -94,6 +94,8 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     private boolean topicRoomFragmentLoaded = false;
     private float topicSwipeStartX = 0f;
     private float topicSwipeStartY = 0f;
+    private boolean topicSwipeMaybeDragging = false;
+    private long lastTopicSwipeHandledAt = 0L;
 
     @Override
     protected boolean isShowBackLayout() {
@@ -184,19 +186,45 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             case MotionEvent.ACTION_DOWN:
                 topicSwipeStartX = event.getX();
                 topicSwipeStartY = event.getY();
+                topicSwipeMaybeDragging = false;
+                return false;
+            case MotionEvent.ACTION_MOVE:
+                float moveDx = event.getX() - topicSwipeStartX;
+                float moveDy = event.getY() - topicSwipeStartY;
+                if (Math.abs(moveDx) > AndroidUtilities.dp(18) && Math.abs(moveDx) > Math.abs(moveDy) * 1.2f) {
+                    topicSwipeMaybeDragging = true;
+                }
                 return false;
             case MotionEvent.ACTION_UP:
                 float dx = event.getX() - topicSwipeStartX;
                 float dy = event.getY() - topicSwipeStartY;
-                if (Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                boolean horizontalSwipe = Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f;
+                if (horizontalSwipe) {
+                    markTopicSwipeHandled();
                     if (dx < 0) showTopicRooms(true);
                     else showTopicRooms(false);
                     return true;
                 }
+                if (topicSwipeMaybeDragging) {
+                    markTopicSwipeHandled();
+                    return true;
+                }
+                return false;
+            case MotionEvent.ACTION_CANCEL:
+                topicSwipeMaybeDragging = false;
                 return false;
             default:
                 return false;
         }
+    }
+
+    private void markTopicSwipeHandled() {
+        topicSwipeMaybeDragging = false;
+        lastTopicSwipeHandledAt = android.os.SystemClock.elapsedRealtime();
+    }
+
+    private boolean isTopicSwipeClickBlocked() {
+        return android.os.SystemClock.elapsedRealtime() - lastTopicSwipeHandledAt < 350L;
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -228,6 +256,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         });
         chatConversationAdapter.addChildClickViewIds(R.id.contentLayout);
         chatConversationAdapter.setOnItemChildClickListener((adapter, view, position) -> SingleClickUtil.determineTriggerSingleClick(view, v -> {
+            if (isTopicSwipeClickBlocked()) return;
             ChatConversationMsg uiConversationMsg = (ChatConversationMsg) adapter.getItem(position);
             if (uiConversationMsg != null && uiConversationMsg.uiConversationMsg != null) {
                 if (view.getId() == R.id.contentLayout) {
