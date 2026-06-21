@@ -30,9 +30,9 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
             R.id.sideAvatar1, R.id.sideAvatar2, R.id.sideAvatar3,
             R.id.sideAvatar4, R.id.sideAvatar5, R.id.sideAvatar6
     };
-    private static final int SIDE_AVATAR_SIZE_DP = 28;
-    private static final int SIDE_AVATAR_STEP_DP = 22;
-    private static final int COUNT_BUBBLE_SIZE_DP = 32;
+    private static final int SIDE_AVATAR_SIZE_DP = 24;
+    private static final int SIDE_AVATAR_STEP_DP = 19;
+    private static final int COUNT_BUBBLE_SIZE_DP = 30;
     private static final int COUNT_GAP_DP = 7;
 
     public RoomTopicAdapter(List<RoomTopicEntity> data) {
@@ -120,7 +120,7 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
 
     private void bindCardAvatars(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
         AvatarView creatorAvatar = holder.getView(R.id.creatorAvatar);
-        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 40f);
+        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 38f);
 
         List<RoomTopicEntity.RoomMember> members = room == null ? Collections.emptyList() : room.getSideMembers();
         int participantCount = room == null ? 0 : room.getParticipantCount();
