@@ -302,5 +302,8 @@
     <string name="tab_text_discover">Discover</string>
     <string name="tab_text_community">Community</string>
     <string name="tab_text_study">Study</string>
+    <string name="peipe_chat_tab_message">Chats</string>
+    <string name="peipe_chat_tab_room">Rooms</string>
+    <string name="peipe_chat_tab_contacts">Contacts</string>
 </resources>
 
