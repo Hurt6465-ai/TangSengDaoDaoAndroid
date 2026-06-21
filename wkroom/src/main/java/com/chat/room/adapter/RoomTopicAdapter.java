@@ -30,10 +30,10 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
             R.id.sideAvatar1, R.id.sideAvatar2, R.id.sideAvatar3,
             R.id.sideAvatar4, R.id.sideAvatar5, R.id.sideAvatar6
     };
-    private static final int SIDE_AVATAR_SIZE_DP = 24;
-    private static final int SIDE_AVATAR_STEP_DP = 17;
-    private static final int COUNT_BUBBLE_SIZE_DP = 30;
-    private static final int COUNT_GAP_DP = 6;
+    private static final int SIDE_AVATAR_SIZE_DP = 34;
+    private static final int SIDE_AVATAR_STEP_DP = 25;
+    private static final int COUNT_BUBBLE_SIZE_DP = 38;
+    private static final int COUNT_GAP_DP = 5;
 
     public RoomTopicAdapter(List<RoomTopicEntity> data) {
         super(R.layout.item_room_topic_card, data);
@@ -70,7 +70,7 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
     private GradientDrawable makeTagBackground(String rawTag) {
         GradientDrawable drawable = new GradientDrawable();
         int color = tagTextColor(rawTag);
-        drawable.setCornerRadius(AndroidUtilities.dp(10));
+        drawable.setCornerRadius(AndroidUtilities.dp(7));
         // 假磨砂：高透明白底 + 标签色描边。比直接彩色透明底更清楚，也兼容低版本 Android。
         drawable.setColor(0xE6FFFFFF);
         drawable.setStroke(AndroidUtilities.dp(1), withAlpha(color, 0x4D));
@@ -120,7 +120,7 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
 
     private void bindCardAvatars(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
         AvatarView creatorAvatar = holder.getView(R.id.creatorAvatar);
-        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 38f);
+        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 52f);
 
         List<RoomTopicEntity.RoomMember> members = room == null ? Collections.emptyList() : room.getSideMembers();
         int participantCount = room == null ? 0 : room.getParticipantCount();
@@ -128,6 +128,7 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         TextView countTv = holder.getView(R.id.participantCountTv);
         countTv.setVisibility(showCount ? View.VISIBLE : View.GONE);
         if (showCount) {
+            layoutCountBubble(countTv);
             countTv.setText(formatParticipantCount(participantCount));
         }
 
@@ -151,6 +152,13 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         lp.setMarginEnd(AndroidUtilities.dp(endMarginDp));
         avatarView.setLayoutParams(lp);
     }
+
+    private void layoutCountBubble(TextView countTv) {
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(AndroidUtilities.dp(COUNT_BUBBLE_SIZE_DP), AndroidUtilities.dp(COUNT_BUBBLE_SIZE_DP));
+        lp.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
+        countTv.setLayoutParams(lp);
+    }
+
 
     private String formatParticipantCount(int count) {
         if (count > 99) return "+99";
