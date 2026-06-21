@@ -143,7 +143,29 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         wkVBinding.roomTabTv.setTextSize(showRooms ? 18 : 16);
         wkVBinding.messageTabTv.setTextColor(ContextCompat.getColor(requireActivity(), showRooms ? R.color.popupTextColor : R.color.colorDark));
         wkVBinding.roomTabTv.setTextColor(ContextCompat.getColor(requireActivity(), showRooms ? R.color.colorDark : R.color.popupTextColor));
-        if (showRooms) ensureTopicRoomFragment();
+        if (showRooms) {
+            ensureTopicRoomFragment();
+        }
+    }
+
+    private void removeTopicRoomRowsFromMessageList() {
+        if (chatConversationAdapter == null || chatConversationAdapter.getData() == null || chatConversationAdapter.getData().isEmpty()) {
+            return;
+        }
+        List<ChatConversationMsg> kept = new ArrayList<>();
+        boolean changed = false;
+        for (ChatConversationMsg item : chatConversationAdapter.getData()) {
+            if (item == null || isTopicRoomConversation(item.uiConversationMsg)) {
+                changed = true;
+                continue;
+            }
+            kept.add(item);
+        }
+        if (changed) {
+            chatConversationAdapter.setList(kept);
+            rebuildIndexCache();
+            setAllCount();
+        }
     }
 
     private void ensureTopicRoomFragment() {
@@ -792,12 +814,8 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         if (uiConversationMsg == null) {
             return;
         }
-        if (isTopicRoomConversation(uiConversationMsg)) {
-            if (isEnd) {
-                sortMsg(chatConversationAdapter.getData());
-            }
-            return;
-        }
+        // 话题聊天室已经是原生群会话：进入过的话题应该出现在消息列表里，
+        // 最后消息、未读、@提醒和排序都交给唐僧原生会话系统处理。
         // || (uiConversationMsg.getWkChannel() != null && uiConversationMsg.getWkChannel().follow == 0 && uiConversationMsg.channelType == WKChannelType.PERSONAL)
         if (uiConversationMsg.isDeleted == 1 || TextUtils.equals(uiConversationMsg.channelID, "0")) {
             if (isEnd) {
@@ -904,7 +922,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                     List<ChatConversationMsg> normalList = new ArrayList<>();
                     for (int i = 0, size = listCopy.size(); i < size; i++) {
                         ChatConversationMsg msg = listCopy.get(i);
-                        if (msg == null || isTopicRoomConversation(msg.uiConversationMsg)) {
+                        if (msg == null) {
                             continue;
                         }
                         if (msg.uiConversationMsg.getWkChannel() != null && msg.uiConversationMsg.getWkChannel().top == 1) {
