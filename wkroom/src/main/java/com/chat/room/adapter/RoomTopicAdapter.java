@@ -31,9 +31,9 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
             R.id.sideAvatar4, R.id.sideAvatar5, R.id.sideAvatar6
     };
     private static final int SIDE_AVATAR_SIZE_DP = 24;
-    private static final int SIDE_AVATAR_STEP_DP = 19;
+    private static final int SIDE_AVATAR_STEP_DP = 17;
     private static final int COUNT_BUBBLE_SIZE_DP = 30;
-    private static final int COUNT_GAP_DP = 7;
+    private static final int COUNT_GAP_DP = 6;
 
     public RoomTopicAdapter(List<RoomTopicEntity> data) {
         super(R.layout.item_room_topic_card, data);
