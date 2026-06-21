@@ -38,7 +38,7 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         String tag = room == null ? getContext().getString(R.string.peipe_room_tag_chat) : room.getTagLabel(getContext());
         String rawTag = room == null ? "闲谈" : room.getRawTag();
         holder.setText(R.id.tagTv, "# " + tag);
-        holder.setTextColor(R.id.tagTv, tagColor(rawTag));
+        holder.setTextColor(R.id.tagTv, tagTextColor(rawTag));
         holder.setText(R.id.titleTv, room == null ? getContext().getString(R.string.peipe_room_tab_title) : room.getShowTitle());
         holder.getView(R.id.tagTv).setBackground(makeTagBackground(rawTag));
 
@@ -53,10 +53,11 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
 
     private GradientDrawable makeTagBackground(String rawTag) {
         GradientDrawable drawable = new GradientDrawable();
-        int color = tagColor(rawTag);
-        drawable.setCornerRadius(AndroidUtilities.dp(8));
-        drawable.setColor(withAlpha(color, 0x33));
-        drawable.setStroke(AndroidUtilities.dp(1), withAlpha(color, 0x66));
+        int color = tagTextColor(rawTag);
+        drawable.setCornerRadius(AndroidUtilities.dp(9));
+        // 假磨砂：高透明白底 + 标签色描边。比直接彩色透明底更清楚，也兼容低版本 Android。
+        drawable.setColor(0xE6FFFFFF);
+        drawable.setStroke(AndroidUtilities.dp(1), withAlpha(color, 0x4D));
         return drawable;
     }
 
@@ -64,16 +65,16 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         return (color & 0x00FFFFFF) | ((alpha & 0xFF) << 24);
     }
 
-    private int tagColor(String rawTag) {
-        if (TextUtils.isEmpty(rawTag)) return 0xFF64748B;
-        if ("练口语".equals(rawTag)) return 0xFF16A34A;
-        if ("找搭子".equals(rawTag)) return 0xFFEC4899;
-        if ("工作".equals(rawTag)) return 0xFFF97316;
-        if ("影视".equals(rawTag)) return 0xFF8B5CF6;
-        if ("音乐".equals(rawTag)) return 0xFF06B6D4;
-        if ("学习".equals(rawTag)) return 0xFF3B82F6;
-        if ("交友".equals(rawTag)) return 0xFFEF4444;
-        return 0xFF64748B;
+    private int tagTextColor(String rawTag) {
+        if (TextUtils.isEmpty(rawTag)) return 0xFF475569;
+        if ("练口语".equals(rawTag)) return 0xFF15803D;
+        if ("找搭子".equals(rawTag)) return 0xFFBE123C;
+        if ("工作".equals(rawTag)) return 0xFFC2410C;
+        if ("影视".equals(rawTag)) return 0xFF6D28D9;
+        if ("音乐".equals(rawTag)) return 0xFF0F766E;
+        if ("学习".equals(rawTag)) return 0xFF1D4ED8;
+        if ("交友".equals(rawTag)) return 0xFFDC2626;
+        return 0xFF475569;
     }
 
     private int backgroundRes(int index) {
@@ -103,26 +104,33 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
 
     private void bindCardAvatars(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
         AvatarView creatorAvatar = holder.getView(R.id.creatorAvatar);
-        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 46f);
+        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 44f);
 
         List<RoomTopicEntity.RoomMember> members = room == null ? Collections.emptyList() : room.getSideMembers();
         for (int i = 0; i < SIDE_AVATAR_IDS.length; i++) {
             AvatarView avatarView = holder.getView(SIDE_AVATAR_IDS[i]);
             RoomTopicEntity.RoomMember member = members != null && i < members.size() ? members.get(i) : null;
-            if (member == null || TextUtils.isEmpty(member.uid)) {
+            if (member == null || (TextUtils.isEmpty(member.uid) && TextUtils.isEmpty(member.avatar) && TextUtils.isEmpty(member.name))) {
                 avatarView.setVisibility(View.GONE);
             } else {
-                bindMemberAvatar(avatarView, member, 40f);
+                bindMemberAvatar(avatarView, member, 38f);
             }
         }
     }
 
     private void bindMemberAvatar(AvatarView avatarView, RoomTopicEntity.RoomMember member, float size) {
         if (avatarView == null) return;
-        avatarView.setSize(size);
-        if (member != null && !TextUtils.isEmpty(member.uid)) {
+        avatarView.setSize(size, size / 2f);
+        avatarView.setStrokeWidth(1f);
+        if (member != null && !TextUtils.isEmpty(member.avatar)) {
+            avatarView.setVisibility(View.VISIBLE);
+            avatarView.showAvatarUrl(member.avatar, member.avatar_cache_key, member.name);
+        } else if (member != null && !TextUtils.isEmpty(member.uid)) {
             avatarView.setVisibility(View.VISIBLE);
             avatarView.showAvatar(member.uid, WKChannelType.PERSONAL, member.avatar_cache_key);
+        } else if (member != null && !TextUtils.isEmpty(member.name)) {
+            avatarView.setVisibility(View.VISIBLE);
+            avatarView.showDefaultAvatar(member.name);
         } else {
             avatarView.setVisibility(View.INVISIBLE);
         }
