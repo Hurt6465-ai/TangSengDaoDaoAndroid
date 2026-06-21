@@ -1453,8 +1453,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (channel == null) return;
             if (channel.channelID.equals(channelId) && channel.channelType == channelType) {
                 showChannelName(channel);
-                wkVBinding.topLayout.avatarView.showAvatar(channel);
-                EndpointManager.getInstance().invoke("show_avatar_other_info", new AvatarOtherViewMenu(wkVBinding.topLayout.otherLayout, channel, wkVBinding.topLayout.avatarView, true));
+                showTopAvatar(channel);
                 if (channel.channelType == WKChannelType.PERSONAL) {
                     setOnlineView(channel);
                 } else {
@@ -1782,9 +1781,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (channel.robot == 1) {
                 wkVBinding.topLayout.categoryLayout.addView(Theme.getChannelCategoryTV(this, getString(R.string.bot), ContextCompat.getColor(this, R.color.colorFFC107), ContextCompat.getColor(this, R.color.white), ContextCompat.getColor(this, R.color.colorFFC107)), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 5, 1, 1, 0));
             }
-            EndpointManager.getInstance().invoke("show_avatar_other_info", new AvatarOtherViewMenu(wkVBinding.topLayout.otherLayout, channel, wkVBinding.topLayout.avatarView, true));
+            showTopAvatar(channel);
+        } else {
+            wkVBinding.topLayout.avatarView.showAvatar(channelId, channelType, avatarKey);
         }
-        wkVBinding.topLayout.avatarView.showAvatar(channelId, channelType, avatarKey);
 
         if (channelType == WKChannelType.GROUP) {
             if (groupType == WKGroupType.normalGroup) {
@@ -2308,6 +2308,50 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         wkVBinding.chatUnreadLayout.msgCountTv.setCount(redDot, false);
         wkVBinding.chatUnreadLayout.msgCountTv.setVisibility(show ? View.VISIBLE : View.GONE);
         wkVBinding.chatUnreadLayout.newMsgLayout.post(() -> CommonAnim.getInstance().showOrHide(wkVBinding.chatUnreadLayout.newMsgLayout, show, show, false));
+    }
+
+    private void showTopAvatar(WKChannel channel) {
+        if (channel == null) return;
+        wkVBinding.topLayout.avatarView.setSize(40);
+        if (isTopicRoomChannel(channel)) {
+            wkVBinding.topLayout.otherLayout.setVisibility(View.GONE);
+            String showName = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
+            if (TextUtils.isEmpty(showName)) showName = getExtraString(channel.localExtra, "topic_title");
+            String avatar = TextUtils.isEmpty(channel.avatar) ? getExtraString(channel.localExtra, "creator_avatar") : channel.avatar;
+            String avatarCacheKey = TextUtils.isEmpty(channel.avatarCacheKey) ? getExtraString(channel.localExtra, "creator_avatar_cache_key") : channel.avatarCacheKey;
+            if (TextUtils.isEmpty(avatar)) {
+                wkVBinding.topLayout.avatarView.showDefaultAvatar(showName);
+            } else {
+                wkVBinding.topLayout.avatarView.showAvatarUrl(avatar, avatarCacheKey, showName);
+            }
+        } else {
+            wkVBinding.topLayout.otherLayout.setVisibility(View.VISIBLE);
+            wkVBinding.topLayout.avatarView.showAvatar(channel);
+            EndpointManager.getInstance().invoke("show_avatar_other_info", new AvatarOtherViewMenu(wkVBinding.topLayout.otherLayout, channel, wkVBinding.topLayout.avatarView, true));
+        }
+    }
+
+    private String getExtraString(java.util.Map<String, Object> map, String key) {
+        if (map == null || TextUtils.isEmpty(key)) return "";
+        Object value = map.get(key);
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private boolean isTopicRoomChannel(WKChannel channel) {
+        if (channel == null) return false;
+        if (channel.channelType == WKChannelType.GROUP && !TextUtils.isEmpty(channel.channelID) && channel.channelID.startsWith("topic_")) {
+            return true;
+        }
+        if ("topic_room".equals(channel.category)) return true;
+        return hasTopicRoomFlag(channel.remoteExtraMap) || hasTopicRoomFlag(channel.localExtra);
+    }
+
+    private boolean hasTopicRoomFlag(java.util.Map<String, Object> map) {
+        if (map == null) return false;
+        Object value = map.get("topic_room");
+        if (value == null) return false;
+        if (value instanceof Number) return ((Number) value).intValue() == 1;
+        return "1".equals(String.valueOf(value)) || "true".equalsIgnoreCase(String.valueOf(value));
     }
 
     private void showChannelName(WKChannel channel) {
