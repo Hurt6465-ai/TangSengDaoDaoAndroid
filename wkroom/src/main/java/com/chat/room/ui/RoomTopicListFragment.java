@@ -45,6 +45,8 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     private RoomTopicAdapter adapter;
     private float swipeStartX = 0f;
     private float swipeStartY = 0f;
+    private boolean swipeMaybeDragging = false;
+    private long lastSwipeHandledAt = 0L;
     private boolean firstResume = true;
 
     public static RoomTopicListFragment newInstance() {
@@ -79,7 +81,10 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         ensureViews();
         refreshLayout.setOnRefreshListener(layout -> loadRooms(true));
         createBtn.setOnClickListener(v -> showCreateDialog());
-        adapter.setOnItemClickListener((adapter1, view, position) -> openTopic(adapter.getItem(position)));
+        adapter.setOnItemClickListener((adapter1, view, position) -> {
+            if (isSwipeClickBlocked()) return;
+            openTopic(adapter.getItem(position));
+        });
         adapter.setOnItemLongClickListener((adapter1, view, position) -> {
             showCardMenu(adapter.getItem(position), position);
             return true;
@@ -119,20 +124,44 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
             case MotionEvent.ACTION_DOWN:
                 swipeStartX = event.getX();
                 swipeStartY = event.getY();
+                swipeMaybeDragging = false;
+                return false;
+            case MotionEvent.ACTION_MOVE:
+                float moveDx = event.getX() - swipeStartX;
+                float moveDy = event.getY() - swipeStartY;
+                if (Math.abs(moveDx) > AndroidUtilities.dp(18) && Math.abs(moveDx) > Math.abs(moveDy) * 1.2f) {
+                    swipeMaybeDragging = true;
+                }
                 return false;
             case MotionEvent.ACTION_UP:
                 float dx = event.getX() - swipeStartX;
                 float dy = event.getY() - swipeStartY;
-                if (Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                    if (dx > 0) {
-                        EndpointManager.getInstance().invoke("peipe_show_topic_rooms", false);
-                        return true;
-                    }
+                boolean horizontalSwipe = Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f;
+                if (horizontalSwipe && dx > 0) {
+                    markSwipeHandled();
+                    EndpointManager.getInstance().invoke("peipe_show_topic_rooms", false);
+                    return true;
                 }
+                if (swipeMaybeDragging) {
+                    markSwipeHandled();
+                    return true;
+                }
+                return false;
+            case MotionEvent.ACTION_CANCEL:
+                swipeMaybeDragging = false;
                 return false;
             default:
                 return false;
         }
+    }
+
+    private void markSwipeHandled() {
+        swipeMaybeDragging = false;
+        lastSwipeHandledAt = android.os.SystemClock.elapsedRealtime();
+    }
+
+    private boolean isSwipeClickBlocked() {
+        return android.os.SystemClock.elapsedRealtime() - lastSwipeHandledAt < 350L;
     }
 
     private void loadRooms(boolean showError) {
@@ -233,6 +262,48 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         boolean empty = adapter == null || adapter.getData().isEmpty();
         emptyLayout.setVisibility(empty ? android.view.View.VISIBLE : android.view.View.GONE);
         recyclerView.setVisibility(empty ? android.view.View.GONE : android.view.View.VISIBLE);
+    }
+
+    private void recoverCreatedRoomAfterFailure(String title, String tag, AlertDialog dialog, TextView publish, String failMsg) {
+        RoomTopicModel.getInstance().listRooms(new IRequestResultListener<RoomTopicListResponse>() {
+            @Override
+            public void onSuccess(RoomTopicListResponse result) {
+                publish.setEnabled(true);
+                List<RoomTopicEntity> rooms = result == null ? null : result.rooms;
+                if (rooms == null) rooms = new ArrayList<>();
+                RoomTopicStore.sortRooms(rooms);
+                adapter.setList(rooms);
+                updateEmpty();
+
+                RoomTopicEntity created = findRoomByTitleTag(rooms, title, tag);
+                if (created != null) {
+                    dialog.dismiss();
+                    openNativeChat(created);
+                    return;
+                }
+                WKToastUtils.getInstance().showToastNormal(TextUtils.isEmpty(failMsg) ? "发布失败" : failMsg);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                publish.setEnabled(true);
+                WKToastUtils.getInstance().showToastNormal(TextUtils.isEmpty(failMsg) ? "发布失败" : failMsg);
+            }
+        });
+    }
+
+    private RoomTopicEntity findRoomByTitleTag(List<RoomTopicEntity> rooms, String title, String tag) {
+        if (rooms == null || TextUtils.isEmpty(title)) return null;
+        for (RoomTopicEntity room : rooms) {
+            if (room == null) continue;
+            if (TextUtils.equals(title, room.getShowTitle()) && (TextUtils.isEmpty(tag) || TextUtils.equals(tag, room.getRawTag()))) {
+                return room;
+            }
+        }
+        for (RoomTopicEntity room : rooms) {
+            if (room != null && TextUtils.equals(title, room.getShowTitle())) return room;
+        }
+        return null;
     }
 
     private TextView createTagChip(Context context, String text) {
@@ -393,8 +464,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
 
                 @Override
                 public void onFail(int code, String msg) {
-                    publish.setEnabled(true);
-                    WKToastUtils.getInstance().showToastNormal(TextUtils.isEmpty(msg) ? "发布失败" : msg);
+                    recoverCreatedRoomAfterFailure(text, selectedTag[0], dialog, publish, msg);
                 }
             });
         });
