@@ -296,10 +296,6 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         }
     }
 
-    public boolean isCurrentFragment(Fragment fragment) {
-        return fragment != null && fragment == getCurrentFragment();
-    }
-
     private Fragment getCurrentFragment() {
         if (wkVBinding == null || wkVBinding.vp == null) {
             return null;
@@ -376,6 +372,9 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
 
     private boolean handleBackPress() {
         Fragment fragment = getCurrentFragment();
+        if (fragment instanceof ChatFragment && ((ChatFragment) fragment).closeSideMenuIfOpen()) {
+            return true;
+        }
         if (fragment instanceof WebTabFragment) {
             WebTabFragment webTabFragment = (WebTabFragment) fragment;
             if (webTabFragment.canGoBack()) {
