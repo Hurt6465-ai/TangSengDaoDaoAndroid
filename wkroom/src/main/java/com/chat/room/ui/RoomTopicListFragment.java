@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListBinding> {
+    private FragmentRoomTopicListBinding binding;
     private RoomTopicAdapter adapter;
     private float swipeStartX = 0f;
     private float swipeStartY = 0f;
@@ -50,31 +51,34 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
 
     @Override
     protected FragmentRoomTopicListBinding getViewBinding() {
-        return FragmentRoomTopicListBinding.inflate(getLayoutInflater());
+        binding = FragmentRoomTopicListBinding.inflate(getLayoutInflater());
+        return binding;
     }
 
     @Override
     protected void initView() {
         adapter = new RoomTopicAdapter(new ArrayList<>());
-        initAdapter(wkVBinding.recyclerView, adapter);
-        if (wkVBinding.recyclerView.getItemAnimator() instanceof DefaultItemAnimator) {
-            ((DefaultItemAnimator) wkVBinding.recyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
+        initAdapter(binding.recyclerView, adapter);
+        if (binding.recyclerView.getItemAnimator() instanceof DefaultItemAnimator) {
+            ((DefaultItemAnimator) binding.recyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
         }
-        wkVBinding.refreshLayout.setEnableLoadMore(false);
-        wkVBinding.refreshLayout.setEnableRefresh(true);
+        binding.refreshLayout.setEnableLoadMore(false);
+        binding.refreshLayout.setEnableRefresh(true);
     }
 
     @Override
     protected void initListener() {
-        wkVBinding.refreshLayout.setOnRefreshListener(refreshLayout -> loadRooms(true));
-        wkVBinding.createBtn.setOnClickListener(v -> showCreateDialog());
+        binding.refreshLayout.setOnRefreshListener(refreshLayout -> loadRooms(true));
+        binding.createBtn.setOnClickListener(v -> showCreateDialog());
         adapter.setOnItemClickListener((adapter1, view, position) -> openTopic(adapter.getItem(position)));
         adapter.setOnItemLongClickListener((adapter1, view, position) -> {
             showCardMenu(adapter.getItem(position), position);
             return true;
         });
-        wkVBinding.recyclerView.setOnTouchListener((view, event) -> handleSwipe(event));
-        wkVBinding.refreshLayout.setOnTouchListener((view, event) -> handleSwipe(event));
+        binding.getRoot().setOnTouchListener((view, event) -> handleSwipe(event));
+        binding.recyclerView.setOnTouchListener((view, event) -> handleSwipe(event));
+        binding.refreshLayout.setOnTouchListener((view, event) -> handleSwipe(event));
+        binding.emptyLayout.setOnTouchListener((view, event) -> handleSwipe(event));
     }
 
     @Override
@@ -117,7 +121,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         RoomTopicModel.getInstance().listRooms(new IRequestResultListener<RoomTopicListResponse>() {
             @Override
             public void onSuccess(RoomTopicListResponse result) {
-                wkVBinding.refreshLayout.finishRefresh(true);
+                binding.refreshLayout.finishRefresh(true);
                 List<RoomTopicEntity> rooms = result == null ? null : result.rooms;
                 if (rooms == null) rooms = new ArrayList<>();
                 RoomTopicStore.sortRooms(rooms);
@@ -127,7 +131,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
 
             @Override
             public void onFail(int code, String msg) {
-                wkVBinding.refreshLayout.finishRefresh(false);
+                binding.refreshLayout.finishRefresh(false);
                 updateEmpty();
                 if (showError && !TextUtils.isEmpty(msg)) WKToastUtils.getInstance().showToastNormal(msg);
             }
@@ -209,8 +213,8 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
 
     private void updateEmpty() {
         boolean empty = adapter == null || adapter.getData().isEmpty();
-        wkVBinding.emptyLayout.setVisibility(empty ? android.view.View.VISIBLE : android.view.View.GONE);
-        wkVBinding.recyclerView.setVisibility(empty ? android.view.View.GONE : android.view.View.VISIBLE);
+        binding.emptyLayout.setVisibility(empty ? android.view.View.VISIBLE : android.view.View.GONE);
+        binding.recyclerView.setVisibility(empty ? android.view.View.GONE : android.view.View.VISIBLE);
     }
 
     private TextView createTagChip(Context context, String text) {
