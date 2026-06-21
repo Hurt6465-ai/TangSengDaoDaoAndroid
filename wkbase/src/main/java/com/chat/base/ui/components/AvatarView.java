@@ -2,6 +2,7 @@ package com.chat.base.ui.components;
 
 import android.content.Context;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.Gravity;
@@ -25,6 +26,7 @@ import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 
 import java.io.File;
+import java.util.Locale;
 
 public class AvatarView extends FrameLayout {
     public ShapeableImageView imageView;
@@ -80,6 +82,51 @@ public class AvatarView extends FrameLayout {
         setSize(40);
     }
 
+    private void prepareImageAvatar() {
+        imageView.setVisibility(VISIBLE);
+        defaultAvatarTv.setVisibility(GONE);
+    }
+
+    public void showDefaultAvatar(String name) {
+        String letter = getAvatarLetter(name);
+        defaultAvatarTv.setText(letter);
+        defaultAvatarTv.setBackground(makeDefaultAvatarBg(name));
+        defaultAvatarTv.setVisibility(VISIBLE);
+        imageView.setVisibility(INVISIBLE);
+        spotView.setVisibility(GONE);
+        onlineTv.setVisibility(INVISIBLE);
+    }
+
+    public void showAvatarUrl(String avatar, String avatarCacheKey, String fallbackName) {
+        if (TextUtils.isEmpty(avatar)) {
+            showDefaultAvatar(fallbackName);
+            return;
+        }
+        prepareImageAvatar();
+        String url = WKApiConfig.getShowUrl(avatar);
+        GlideUtils.getInstance().showAvatarImg(getContext(), url, avatarCacheKey, imageView);
+    }
+
+    private String getAvatarLetter(String name) {
+        if (TextUtils.isEmpty(name)) return "#";
+        String trim = name.trim();
+        if (TextUtils.isEmpty(trim)) return "#";
+        return trim.substring(0, 1).toUpperCase(Locale.getDefault());
+    }
+
+    private GradientDrawable makeDefaultAvatarBg(String seed) {
+        int[] colors = new int[]{
+                0xFF2563EB, 0xFF7C3AED, 0xFFDB2777, 0xFF059669,
+                0xFFEA580C, 0xFF0891B2, 0xFF4F46E5, 0xFFDC2626
+        };
+        int index = TextUtils.isEmpty(seed) ? 0 : (seed.hashCode() & 0x7fffffff) % colors.length;
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.OVAL);
+        drawable.setColor(colors[index]);
+        drawable.setStroke(AndroidUtilities.dp(1), 0x66FFFFFF);
+        return drawable;
+    }
+
     public void setStrokeWidth(float width) {
         imageView.setStrokeWidth(AndroidUtilities.dp(width));
     }
@@ -89,15 +136,7 @@ public class AvatarView extends FrameLayout {
     }
 
     public void setSize(float size) {
-        float cornerSize = size * 0.4F;
-        imageView.getLayoutParams().width = AndroidUtilities.dp(size);
-        imageView.getLayoutParams().height = AndroidUtilities.dp(size);
-        imageView.setShapeAppearanceModel(imageView.getShapeAppearanceModel()
-                .toBuilder()
-                .setAllCorners(CornerFamily.ROUNDED, AndroidUtilities.dp(cornerSize))
-                .build());
-        defaultAvatarTv.getLayoutParams().height = AndroidUtilities.dp(size);
-        defaultAvatarTv.getLayoutParams().width = AndroidUtilities.dp(size);
+        setSize(size, size / 2f);
     }
 
     public void setSize(float size, float cornerSize) {
@@ -110,15 +149,18 @@ public class AvatarView extends FrameLayout {
 
         defaultAvatarTv.getLayoutParams().height = AndroidUtilities.dp(size);
         defaultAvatarTv.getLayoutParams().width = AndroidUtilities.dp(size);
+        defaultAvatarTv.setTextSize(size * 0.38f);
 
     }
 
     public void showAvatar(String channelID, byte channelType, String avatarCacheKey) {
+        prepareImageAvatar();
         String url = getAvatarURL(channelID, channelType);
         GlideUtils.getInstance().showAvatarImg(getContext(), url, avatarCacheKey, imageView);
     }
 
     public void showAvatar(String channelID, byte channelType, boolean showOnlineStatus) {
+        prepareImageAvatar();
         spotView.setVisibility(GONE);
         onlineTv.setVisibility(INVISIBLE);
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
@@ -131,6 +173,7 @@ public class AvatarView extends FrameLayout {
     }
 
     public void showAvatar(String channelID, byte channelType) {
+        prepareImageAvatar();
         spotView.setVisibility(GONE);
         onlineTv.setVisibility(INVISIBLE);
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
@@ -147,6 +190,7 @@ public class AvatarView extends FrameLayout {
     }
 
     public void showAvatar(WKChannel channel, boolean showOnlineStatus) {
+        prepareImageAvatar();
         String avatarCacheKey = channel.avatarCacheKey;
         String url;
         if (!TextUtils.isEmpty(channel.avatar) && channel.avatar.contains("/")) {
