@@ -240,17 +240,27 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         chip.setText("# " + text);
         chip.setGravity(Gravity.CENTER);
         chip.setPadding(AndroidUtilities.dp(12), 0, AndroidUtilities.dp(12), 0);
-        chip.setTextSize(14);
+        chip.setTextSize(13);
         chip.setTypeface(chip.getTypeface(), android.graphics.Typeface.BOLD);
         return chip;
     }
 
     private void updateTagChips(List<TextView> chips, String selectedTag) {
         for (TextView chip : chips) {
-            String tagText = chip.getText() == null ? "" : chip.getText().toString().replace("#", "").trim();
+            String tagText = chip.getTag() == null ? "" : String.valueOf(chip.getTag());
             boolean selected = TextUtils.equals(tagText, selectedTag);
             chip.setTextColor(selected ? Color.WHITE : Color.rgb(37, 99, 235));
             chip.setBackgroundResource(selected ? R.drawable.room_chip_blue : R.drawable.room_chip_white);
+        }
+    }
+
+    private static class TagOption {
+        final String value;
+        final String label;
+
+        TagOption(String value, String label) {
+            this.value = value;
+            this.label = label;
         }
     }
 
@@ -280,23 +290,39 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         tagTitleLp.topMargin = AndroidUtilities.dp(12);
         root.addView(tagTitle, tagTitleLp);
 
-        String[] tags = new String[]{"学习", "闲谈", "交友"};
-        final String[] selectedTag = new String[]{tags[0]};
-        LinearLayout tagRow = new LinearLayout(context);
-        tagRow.setOrientation(LinearLayout.HORIZONTAL);
-        tagRow.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams tagRowLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(36));
-        tagRowLp.topMargin = AndroidUtilities.dp(6);
-        root.addView(tagRow, tagRowLp);
+        TagOption[] tags = new TagOption[]{
+                new TagOption("练口语", getString(R.string.peipe_room_tag_speaking)),
+                new TagOption("找搭子", getString(R.string.peipe_room_tag_partner)),
+                new TagOption("工作", getString(R.string.peipe_room_tag_work)),
+                new TagOption("影视", getString(R.string.peipe_room_tag_movie)),
+                new TagOption("音乐", getString(R.string.peipe_room_tag_music)),
+                new TagOption("学习", getString(R.string.peipe_room_tag_study)),
+                new TagOption("闲谈", getString(R.string.peipe_room_tag_chat))
+        };
+        final String[] selectedTag = new String[]{tags[0].value};
+        LinearLayout tagWrap = new LinearLayout(context);
+        tagWrap.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams tagWrapLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        tagWrapLp.topMargin = AndroidUtilities.dp(6);
+        root.addView(tagWrap, tagWrapLp);
         List<TextView> tagViews = new ArrayList<>();
-        for (String tag : tags) {
-            TextView chip = createTagChip(context, tag);
-            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(30));
-            chipLp.setMarginEnd(AndroidUtilities.dp(8));
+        LinearLayout tagRow = null;
+        for (int i = 0; i < tags.length; i++) {
+            if (i % 4 == 0) {
+                tagRow = new LinearLayout(context);
+                tagRow.setOrientation(LinearLayout.HORIZONTAL);
+                tagRow.setGravity(Gravity.CENTER_VERTICAL);
+                tagWrap.addView(tagRow, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(34)));
+            }
+            TagOption option = tags[i];
+            TextView chip = createTagChip(context, option.label);
+            chip.setTag(option.value);
+            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(28));
+            chipLp.setMarginEnd(AndroidUtilities.dp(7));
             tagRow.addView(chip, chipLp);
             tagViews.add(chip);
             chip.setOnClickListener(v -> {
-                selectedTag[0] = tag;
+                selectedTag[0] = String.valueOf(v.getTag());
                 updateTagChips(tagViews, selectedTag[0]);
             });
         }
