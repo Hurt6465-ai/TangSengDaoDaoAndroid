@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Build;
+import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
@@ -64,6 +65,17 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
  */
 public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> implements OnQuickSideBarTouchListener {
 
+    private static final String ARG_EMBEDDED_IN_CHAT = "embedded_in_chat";
+    private boolean embeddedInChat = false;
+
+    public static ContactsFragment newEmbeddedInstance() {
+        ContactsFragment fragment = new ContactsFragment();
+        Bundle bundle = new Bundle();
+        bundle.putBoolean(ARG_EMBEDDED_IN_CHAT, true);
+        fragment.setArguments(bundle);
+        return fragment;
+    }
+
     private ContactsHeaderAdapter contactsHeaderAdapter;
     private FriendAdapter friendAdapter;
     private TextView allContactsCountTv;
@@ -80,6 +92,12 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
     }
 
     @Override
+    protected void getDataBundle(Bundle bundle) {
+        super.getDataBundle(bundle);
+        embeddedInChat = bundle != null && bundle.getBoolean(ARG_EMBEDDED_IN_CHAT, false);
+    }
+
+    @Override
     protected void initView() {
         wkVBinding.textView.setTextSize(22);
         Typeface face = Typeface.createFromAsset(getResources().getAssets(),
@@ -90,6 +108,11 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
         wkVBinding.refreshLayout.setEnableOverScrollDrag(true);
         wkVBinding.refreshLayout.setEnableLoadMore(false);
         wkVBinding.refreshLayout.setEnableRefresh(false);
+        if (embeddedInChat) {
+            wkVBinding.contactsRootLayout.setPadding(0, 0, 0, 0);
+            wkVBinding.contactsRootLayout.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.homeColor));
+            wkVBinding.contactsHeaderLayout.setVisibility(View.GONE);
+        }
         Theme.setPressedBackground(wkVBinding.searchIv);
         Theme.setPressedBackground(wkVBinding.rightIv);
     }
