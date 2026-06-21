@@ -11,4 +11,13 @@
     <string name="peipe_room_pin">置顶</string>
     <string name="peipe_room_unpin">取消置顶</string>
     <string name="peipe_room_delete">删除</string>
+    <string name="peipe_room_lang_cn">中文</string>
+    <string name="peipe_room_tag_speaking">练口语</string>
+    <string name="peipe_room_tag_partner">找搭子</string>
+    <string name="peipe_room_tag_work">工作</string>
+    <string name="peipe_room_tag_movie">影视</string>
+    <string name="peipe_room_tag_music">音乐</string>
+    <string name="peipe_room_tag_study">学习</string>
+    <string name="peipe_room_tag_friend">交友</string>
+    <string name="peipe_room_tag_chat">闲谈</string>
 </resources>
