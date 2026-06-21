@@ -296,6 +296,10 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         }
     }
 
+    public boolean isCurrentFragment(Fragment fragment) {
+        return fragment != null && fragment == getCurrentFragment();
+    }
+
     private Fragment getCurrentFragment() {
         if (wkVBinding == null || wkVBinding.vp == null) {
             return null;
