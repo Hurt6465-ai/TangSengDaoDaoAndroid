@@ -2,16 +2,25 @@ package com.chat.login.ui;
 
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
+import android.app.Dialog;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.chat.base.base.WKBaseActivity;
@@ -48,20 +57,20 @@ import java.util.Objects;
 public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLayoutBinding> {
 
     private static final int MAX_PARTNER_PHOTOS = 5;
+    private static final int MAX_LANGUAGES = 5;
     private static final int MAX_IMAGE_EDGE = 720;
     private static final int TARGET_IMAGE_BYTES = 150 * 1024;
-    private static final int MIN_WEBP_QUALITY = 50;
+    private static final int MIN_WEBP_QUALITY = 48;
 
     private String avatarPath;
     private final ArrayList<String> partnerPhotoPaths = new ArrayList<>();
+    private final LinkedHashSet<String> selectedNativeLanguages = new LinkedHashSet<>();
+    private final LinkedHashSet<String> selectedLearningLanguages = new LinkedHashSet<>();
     private final LinkedHashSet<String> selectedTags = new LinkedHashSet<>();
 
     private String selectedCountry = "";
     private String selectedGender = "";
-    private String selectedNativeLanguage = "";
-    private String selectedLearningLanguage = "";
     private String selectedBirthday = "";
-    private String selectedEducation = "";
 
     @Override
     protected ActPerfectUserInfoLayoutBinding getViewBinding() {
@@ -75,25 +84,56 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
 
     @Override
     protected void initView() {
-        wkVBinding.avatarView.setSize(76);
+        wkVBinding.avatarView.setSize(96);
         wkVBinding.avatarView.setStrokeWidth(0);
         wkVBinding.avatarView.imageView.setImageResource(R.mipmap.icon_default_header);
         wkVBinding.sureBtn.getBackground().setTint(Theme.colorAccount);
         wkVBinding.countryFlagTv.setVisibility(View.GONE);
         refreshPartnerPhotos();
+        refreshTags();
     }
 
     @Override
     protected void initListener() {
         wkVBinding.avatarView.setOnClickListener(v -> chooseAvatar());
         wkVBinding.uploadPartnerPhotoBtn.setOnClickListener(v -> choosePartnerPhotos());
-        wkVBinding.countryTv.setOnClickListener(v -> selectSingle(wkVBinding.countryTv, R.string.profile_country_region, R.array.profile_country_options));
-        wkVBinding.genderTv.setOnClickListener(v -> selectSingle(wkVBinding.genderTv, R.string.profile_gender, R.array.profile_gender_options));
-        wkVBinding.nativeLanguageTv.setOnClickListener(v -> selectSingle(wkVBinding.nativeLanguageTv, R.string.profile_native_language, R.array.profile_language_options));
-        wkVBinding.learningLanguageTv.setOnClickListener(v -> selectSingle(wkVBinding.learningLanguageTv, R.string.profile_learning_language, R.array.profile_language_options));
+        wkVBinding.countryTv.setOnClickListener(v -> showSingleOptionDialog(
+                R.string.profile_country_region,
+                R.array.profile_country_options,
+                value -> {
+                    selectedCountry = value;
+                    wkVBinding.countryTv.setText(value);
+                    wkVBinding.countryTv.setTextColor(Color.parseColor("#172033"));
+                    String flag = extractFlag(value);
+                    wkVBinding.countryFlagTv.setText(flag);
+                    wkVBinding.countryFlagTv.setVisibility(TextUtils.isEmpty(flag) ? View.GONE : View.VISIBLE);
+                }
+        ));
+        wkVBinding.genderTv.setOnClickListener(v -> showSingleOptionDialog(
+                R.string.profile_gender,
+                R.array.profile_gender_options,
+                value -> {
+                    selectedGender = value;
+                    wkVBinding.genderTv.setText(value);
+                    wkVBinding.genderTv.setTextColor(Color.parseColor("#172033"));
+                }
+        ));
+        wkVBinding.nativeLanguageTv.setOnClickListener(v -> showMultiOptionDialog(
+                R.string.profile_native_language,
+                R.array.profile_language_options,
+                selectedNativeLanguages,
+                MAX_LANGUAGES,
+                () -> updateMultiText(wkVBinding.nativeLanguageTv, selectedNativeLanguages)
+        ));
+        wkVBinding.learningLanguageTv.setOnClickListener(v -> showMultiOptionDialog(
+                R.string.profile_learning_language,
+                R.array.profile_language_options,
+                selectedLearningLanguages,
+                MAX_LANGUAGES,
+                () -> updateMultiText(wkVBinding.learningLanguageTv, selectedLearningLanguages)
+        ));
         wkVBinding.birthdayTv.setOnClickListener(v -> showBirthdayPicker());
-        wkVBinding.educationTv.setOnClickListener(v -> selectSingle(wkVBinding.educationTv, R.string.profile_education_optional, R.array.profile_education_options));
-        wkVBinding.tagBtn.setOnClickListener(v -> showTagCategoryDialog());
+        wkVBinding.tagBtn.setOnClickListener(v -> showTagFullDialog());
         wkVBinding.sureBtn.setOnClickListener(v -> saveProfile());
     }
 
@@ -164,12 +204,12 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
 
     private View createPhotoItem(String photoPath, int index) {
         FrameLayout frameLayout = new FrameLayout(this);
-        LinearLayout.LayoutParams frameParams = new LinearLayout.LayoutParams(dp(82), dp(82));
+        LinearLayout.LayoutParams frameParams = new LinearLayout.LayoutParams(dp(88), dp(88));
         frameParams.setMarginEnd(dp(10));
         frameLayout.setLayoutParams(frameParams);
 
         ImageView imageView = new ImageView(this);
-        FrameLayout.LayoutParams imageParams = new FrameLayout.LayoutParams(dp(78), dp(78));
+        FrameLayout.LayoutParams imageParams = new FrameLayout.LayoutParams(dp(84), dp(84));
         imageParams.gravity = Gravity.BOTTOM | Gravity.START;
         imageView.setLayoutParams(imageParams);
         imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -179,13 +219,13 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         frameLayout.addView(imageView);
 
         TextView deleteTv = new TextView(this);
-        FrameLayout.LayoutParams deleteParams = new FrameLayout.LayoutParams(dp(26), dp(26));
+        FrameLayout.LayoutParams deleteParams = new FrameLayout.LayoutParams(dp(24), dp(24));
         deleteParams.gravity = Gravity.TOP | Gravity.END;
         deleteTv.setLayoutParams(deleteParams);
         deleteTv.setGravity(Gravity.CENTER);
         deleteTv.setText("×");
         deleteTv.setTextColor(0xFFFFFFFF);
-        deleteTv.setTextSize(18);
+        deleteTv.setTextSize(17);
         deleteTv.setBackgroundResource(R.drawable.profile_photo_delete_bg);
         deleteTv.setOnClickListener(v -> {
             if (index >= 0 && index < partnerPhotoPaths.size()) {
@@ -217,33 +257,116 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
                 .show();
     }
 
-    private void selectSingle(TextView target, int titleRes, int arrayRes) {
+    private void showSingleOptionDialog(int titleRes, int arrayRes, SingleSelectCallback callback) {
         String[] options = getResources().getStringArray(arrayRes);
-        new AlertDialog.Builder(this)
-                .setTitle(titleRes)
-                .setItems(options, (dialog, which) -> {
-                    String value = options[which];
-                    target.setText(value);
-                    target.setTextColor(getColorCompat(com.chat.base.R.color.colorDark));
-                    saveSelectedValue(target.getId(), value);
-                })
-                .show();
+        Dialog dialog = createFullScreenDialog();
+        LinearLayout root = createDialogRoot();
+        root.addView(createDialogHeader(getString(titleRes), dialog));
+        ScrollView scrollView = new ScrollView(this);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(6), dp(16), dp(24));
+        scrollView.addView(content);
+        root.addView(scrollView, new LinearLayout.LayoutParams(-1, 0, 1));
+        addOptionGrid(content, options, null, 1, value -> {
+            callback.onSelected(value);
+            dialog.dismiss();
+        });
+        dialog.setContentView(root);
+        dialog.show();
     }
 
-    private void saveSelectedValue(int viewId, String value) {
-        if (viewId == R.id.countryTv) {
-            selectedCountry = value;
-            String flag = extractFlag(value);
-            wkVBinding.countryFlagTv.setText(flag);
-            wkVBinding.countryFlagTv.setVisibility(TextUtils.isEmpty(flag) ? View.GONE : View.VISIBLE);
-        } else if (viewId == R.id.genderTv) {
-            selectedGender = value;
-        } else if (viewId == R.id.nativeLanguageTv) {
-            selectedNativeLanguage = value;
-        } else if (viewId == R.id.learningLanguageTv) {
-            selectedLearningLanguage = value;
-        } else if (viewId == R.id.educationTv) {
-            selectedEducation = value;
+    private void showMultiOptionDialog(int titleRes, int arrayRes, LinkedHashSet<String> selectedSet, int maxCount, Runnable onDone) {
+        String[] options = getResources().getStringArray(arrayRes);
+        Dialog dialog = createFullScreenDialog();
+        LinearLayout root = createDialogRoot();
+        root.addView(createDialogHeader(getString(titleRes), dialog));
+        TextView hint = new TextView(this);
+        hint.setText(getString(R.string.profile_language_multi_hint, maxCount));
+        hint.setTextColor(Color.parseColor("#667085"));
+        hint.setTextSize(14);
+        hint.setPadding(dp(20), 0, dp(20), dp(8));
+        root.addView(hint);
+        ScrollView scrollView = new ScrollView(this);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(16), dp(6), dp(16), dp(16));
+        scrollView.addView(content);
+        root.addView(scrollView, new LinearLayout.LayoutParams(-1, 0, 1));
+        addOptionGrid(content, options, selectedSet, maxCount, null);
+        TextView done = createBottomAction(getString(R.string.wklogin_sure));
+        done.setOnClickListener(v -> {
+            onDone.run();
+            dialog.dismiss();
+        });
+        root.addView(done);
+        dialog.setContentView(root);
+        dialog.show();
+    }
+
+    private void addOptionGrid(LinearLayout content, String[] options, LinkedHashSet<String> selectedSet, int maxCount, SingleSelectCallback singleCallback) {
+        LinearLayout row = null;
+        for (int i = 0; i < options.length; i++) {
+            if (i % 2 == 0) {
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                content.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            }
+            String option = options[i];
+            TextView item = createOptionItem(option, selectedSet != null && selectedSet.contains(option), false);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(58), 1);
+            params.setMargins(dp(4), dp(6), dp(4), dp(6));
+            item.setLayoutParams(params);
+            if (selectedSet == null) {
+                item.setOnClickListener(v -> {
+                    if (singleCallback != null) singleCallback.onSelected(option);
+                });
+            } else {
+                item.setOnClickListener(v -> {
+                    if (selectedSet.contains(option)) {
+                        selectedSet.remove(option);
+                    } else {
+                        if (selectedSet.size() >= maxCount) {
+                            showToast(getString(R.string.profile_select_max_count, maxCount));
+                            return;
+                        }
+                        selectedSet.add(option);
+                    }
+                    item.setBackground(makeRoundBg(selectedSet.contains(option), false, tagColorFor(option)));
+                    item.setTextColor(selectedSet.contains(option) ? Color.parseColor("#3327A8") : Color.parseColor("#172033"));
+                });
+            }
+            row.addView(item);
+            if (i == options.length - 1 && i % 2 == 0) {
+                SpaceView space = new SpaceView(this);
+                LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, dp(58), 1);
+                sp.setMargins(dp(4), dp(6), dp(4), dp(6));
+                row.addView(space, sp);
+            }
+        }
+    }
+
+    private TextView createOptionItem(String text, boolean selected, boolean small) {
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setGravity(Gravity.CENTER_VERTICAL);
+        tv.setPadding(dp(14), 0, dp(14), 0);
+        tv.setSingleLine(false);
+        tv.setMaxLines(2);
+        tv.setTextSize(small ? 14 : 15);
+        tv.setTypeface(null, android.graphics.Typeface.BOLD);
+        tv.setTextColor(selected ? Color.parseColor("#3327A8") : Color.parseColor("#172033"));
+        tv.setBackground(makeRoundBg(selected, false, tagColorFor(text)));
+        return tv;
+    }
+
+    private void updateMultiText(TextView target, LinkedHashSet<String> selectedSet) {
+        if (selectedSet.isEmpty()) {
+            target.setText(R.string.profile_select);
+            target.setTextColor(Color.parseColor("#667085"));
+        } else {
+            target.setText(TextUtils.join("、", selectedSet));
+            target.setTextColor(Color.parseColor("#172033"));
         }
     }
 
@@ -262,52 +385,172 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         DatePickerDialog dialog = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
             selectedBirthday = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth);
             wkVBinding.birthdayTv.setText(selectedBirthday);
-            wkVBinding.birthdayTv.setTextColor(getColorCompat(com.chat.base.R.color.colorDark));
+            wkVBinding.birthdayTv.setTextColor(Color.parseColor("#172033"));
         }, calendar.get(Calendar.YEAR) - 20, calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH));
         dialog.getDatePicker().setMaxDate(System.currentTimeMillis());
         dialog.show();
     }
 
-    private void showTagCategoryDialog() {
+    private void showTagFullDialog() {
         String[] categories = getResources().getStringArray(R.array.profile_tag_category_options);
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.profile_tag_category_title)
-                .setItems(categories, (dialog, which) -> showTagDialog(getTagArrayRes(which)))
-                .show();
+        Dialog dialog = createFullScreenDialog();
+        LinearLayout root = createDialogRoot();
+        root.addView(createDialogHeader(getString(R.string.profile_choose_tags), dialog));
+
+        HorizontalScrollView categoryScroll = new HorizontalScrollView(this);
+        categoryScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout categoryBar = new LinearLayout(this);
+        categoryBar.setOrientation(LinearLayout.HORIZONTAL);
+        categoryBar.setPadding(dp(14), 0, dp(14), dp(10));
+        categoryScroll.addView(categoryBar);
+        root.addView(categoryScroll);
+
+        ScrollView tagScroll = new ScrollView(this);
+        LinearLayout tagContainer = new LinearLayout(this);
+        tagContainer.setOrientation(LinearLayout.VERTICAL);
+        tagContainer.setPadding(dp(16), dp(4), dp(16), dp(16));
+        tagScroll.addView(tagContainer);
+        root.addView(tagScroll, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        final int[] activeIndex = {0};
+        final float[] downX = {0};
+        Runnable render = () -> renderTagPage(categories, activeIndex[0], categoryBar, tagContainer);
+        tagScroll.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                downX[0] = event.getX();
+            } else if (event.getAction() == MotionEvent.ACTION_UP) {
+                float dx = event.getX() - downX[0];
+                if (Math.abs(dx) > dp(70)) {
+                    if (dx < 0 && activeIndex[0] < categories.length - 1) {
+                        activeIndex[0]++;
+                        render.run();
+                        return true;
+                    } else if (dx > 0 && activeIndex[0] > 0) {
+                        activeIndex[0]--;
+                        render.run();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        });
+        render.run();
+
+        TextView done = createBottomAction(getString(R.string.wklogin_sure));
+        done.setOnClickListener(v -> {
+            refreshTags();
+            dialog.dismiss();
+        });
+        root.addView(done);
+        dialog.setContentView(root);
+        dialog.show();
+    }
+
+    private void renderTagPage(String[] categories, int activeIndex, LinearLayout categoryBar, LinearLayout tagContainer) {
+        categoryBar.removeAllViews();
+        for (int i = 0; i < categories.length; i++) {
+            int index = i;
+            TextView tab = new TextView(this);
+            tab.setText(categories[i]);
+            tab.setTextSize(14);
+            tab.setTypeface(null, android.graphics.Typeface.BOLD);
+            tab.setGravity(Gravity.CENTER);
+            tab.setTextColor(i == activeIndex ? Color.WHITE : Color.parseColor("#1B2640"));
+            tab.setBackground(makeCategoryTabBg(i == activeIndex, i));
+            LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(-2, dp(42));
+            tabParams.setMargins(dp(4), 0, dp(4), 0);
+            tab.setPadding(dp(16), 0, dp(16), 0);
+            categoryBar.addView(tab, tabParams);
+            tab.setOnClickListener(v -> renderTagPage(categories, index, categoryBar, tagContainer));
+        }
+
+        tagContainer.removeAllViews();
+        int arrayRes = getTagArrayRes(activeIndex);
+        String[] tags = getResources().getStringArray(arrayRes);
+        TextView section = new TextView(this);
+        section.setText(categories[activeIndex]);
+        section.setTextSize(20);
+        section.setTypeface(null, android.graphics.Typeface.BOLD);
+        section.setTextColor(Color.parseColor("#111827"));
+        section.setPadding(dp(4), dp(8), dp(4), dp(8));
+        tagContainer.addView(section);
+
+        LinearLayout row = null;
+        for (int i = 0; i < tags.length; i++) {
+            if (i % 2 == 0) {
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                tagContainer.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            }
+            String tag = tags[i];
+            boolean selected = selectedTags.contains(tag);
+            TextView item = createOptionItem(tag, selected, true);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(50), 1);
+            params.setMargins(dp(4), dp(6), dp(4), dp(6));
+            row.addView(item, params);
+            item.setOnClickListener(v -> {
+                if (selectedTags.contains(tag)) {
+                    selectedTags.remove(tag);
+                } else {
+                    selectedTags.add(tag);
+                }
+                renderTagPage(categories, activeIndex, categoryBar, tagContainer);
+            });
+            if (i == tags.length - 1 && i % 2 == 0) {
+                SpaceView space = new SpaceView(this);
+                LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, dp(50), 1);
+                sp.setMargins(dp(4), dp(6), dp(4), dp(6));
+                row.addView(space, sp);
+            }
+        }
     }
 
     private int getTagArrayRes(int index) {
-        if (index == 0) return R.array.profile_tag_learning_options;
-        if (index == 1) return R.array.profile_tag_social_options;
-        if (index == 2) return R.array.profile_tag_personality_options;
-        if (index == 3) return R.array.profile_tag_interest_options;
-        if (index == 4) return R.array.profile_tag_job_options;
-        return R.array.profile_tag_relationship_options;
-    }
-
-    private void showTagDialog(int arrayRes) {
-        String[] tags = getResources().getStringArray(arrayRes);
-        boolean[] checkedItems = new boolean[tags.length];
-        for (int i = 0; i < tags.length; i++) {
-            checkedItems[i] = selectedTags.contains(tags[i]);
-        }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.profile_choose_tags)
-                .setMultiChoiceItems(tags, checkedItems, (dialog, which, isChecked) -> {
-                    if (isChecked) {
-                        selectedTags.add(tags[which]);
-                    } else {
-                        selectedTags.remove(tags[which]);
-                    }
-                })
-                .setPositiveButton(R.string.wklogin_sure, (dialog, which) -> refreshTags())
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+        if (index == 0) return R.array.profile_tag_language_skill_options;
+        if (index == 1) return R.array.profile_tag_learning_goal_options;
+        if (index == 2) return R.array.profile_tag_interaction_options;
+        if (index == 3) return R.array.profile_tag_safety_options;
+        if (index == 4) return R.array.profile_tag_relationship_intent_options;
+        if (index == 5) return R.array.profile_tag_personality_options;
+        if (index == 6) return R.array.profile_tag_pet_options;
+        if (index == 7) return R.array.profile_tag_sports_options;
+        if (index == 8) return R.array.profile_tag_movie_options;
+        if (index == 9) return R.array.profile_tag_job_options;
+        return R.array.profile_tag_education_options;
     }
 
     private void refreshTags() {
-        wkVBinding.tagResultTv.setText(selectedTags.isEmpty() ? getString(R.string.profile_choose_tags_hint) : TextUtils.join("  ", selectedTags));
-        wkVBinding.tagResultTv.setTextColor(getColorCompat(selectedTags.isEmpty() ? com.chat.base.R.color.color999 : com.chat.base.R.color.colorDark));
+        wkVBinding.selectedTagsLayout.removeAllViews();
+        if (selectedTags.isEmpty()) {
+            TextView hint = new TextView(this);
+            hint.setText(R.string.profile_choose_tags_hint);
+            hint.setTextColor(Color.parseColor("#667085"));
+            hint.setTextSize(14);
+            hint.setTypeface(null, android.graphics.Typeface.BOLD);
+            wkVBinding.selectedTagsLayout.addView(hint);
+            return;
+        }
+        ArrayList<String> tags = new ArrayList<>(selectedTags);
+        LinearLayout row = null;
+        for (int i = 0; i < tags.size(); i++) {
+            if (i % 3 == 0) {
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                wkVBinding.selectedTagsLayout.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            }
+            String tag = tags.get(i);
+            TextView chip = new TextView(this);
+            chip.setText(tag);
+            chip.setGravity(Gravity.CENTER);
+            chip.setTextSize(13);
+            chip.setTypeface(null, android.graphics.Typeface.BOLD);
+            chip.setTextColor(Color.parseColor("#1B2640"));
+            chip.setSingleLine(true);
+            chip.setBackground(makeRoundBg(true, true, tagColorFor(tag)));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(34), 1);
+            params.setMargins(dp(3), dp(4), dp(3), dp(4));
+            row.addView(chip, params);
+        }
     }
 
     private void saveProfile() {
@@ -328,16 +571,12 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             showToast(R.string.profile_gender_required);
             return;
         }
-        if (TextUtils.isEmpty(selectedNativeLanguage)) {
+        if (selectedNativeLanguages.isEmpty()) {
             showToast(R.string.profile_native_language_required);
             return;
         }
-        if (TextUtils.isEmpty(selectedLearningLanguage)) {
+        if (selectedLearningLanguages.isEmpty()) {
             showToast(R.string.profile_learning_language_required);
-            return;
-        }
-        if (TextUtils.isEmpty(selectedBirthday)) {
-            showToast(R.string.profile_birthday_required);
             return;
         }
         if (selectedTags.isEmpty()) {
@@ -382,8 +621,9 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             if (code == HttpResponseCode.success) {
                 next.run();
             } else {
-                loadingPopup.dismiss();
-                showToast(R.string.profile_avatar_upload_failed);
+                // 头像接口异常不能再把注册流程卡死；资料已保存，头像可进入 App 后重试。
+                showToast(R.string.profile_avatar_upload_failed_non_blocking);
+                next.run();
             }
         });
     }
@@ -406,12 +646,11 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         editor.putString(prefix + "_intro", getEditTextString(wkVBinding.introEt));
         editor.putString(prefix + "_country", selectedCountry);
         editor.putString(prefix + "_gender", selectedGender);
-        editor.putString(prefix + "_native_language", selectedNativeLanguage);
-        editor.putString(prefix + "_learning_language", selectedLearningLanguage);
+        editor.putString(prefix + "_native_language", TextUtils.join(",", selectedNativeLanguages));
+        editor.putString(prefix + "_learning_language", TextUtils.join(",", selectedLearningLanguages));
         editor.putString(prefix + "_birthday", selectedBirthday);
         editor.putString(prefix + "_height", getEditTextString(wkVBinding.heightEt));
         editor.putString(prefix + "_weight", getEditTextString(wkVBinding.weightEt));
-        editor.putString(prefix + "_education", selectedEducation);
         editor.putString(prefix + "_tags", TextUtils.join(",", selectedTags));
         editor.apply();
     }
@@ -491,13 +730,13 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         String fileName = (avatar ? "avatar_" : "partner_") + System.currentTimeMillis() + "_" + Math.abs(sourcePath.hashCode()) + ".webp";
         File outFile = new File(outDir, fileName);
 
-        int quality = 86;
+        int quality = 88;
         while (quality >= MIN_WEBP_QUALITY) {
             writeWebp(outputBitmap, outFile, quality);
             if (outFile.length() <= TARGET_IMAGE_BYTES || quality == MIN_WEBP_QUALITY) {
                 break;
             }
-            quality -= 6;
+            quality -= 5;
         }
 
         if (!outputBitmap.isRecycled()) {
@@ -519,15 +758,140 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         }
     }
 
+    private Dialog createFullScreenDialog() {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+        dialog.setOnShowListener(d -> {
+            Window showWindow = dialog.getWindow();
+            if (showWindow != null) {
+                showWindow.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+                showWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            }
+        });
+        return dialog;
+    }
+
+    private LinearLayout createDialogRoot() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundResource(R.drawable.profile_page_bg);
+        root.setPadding(0, dp(18), 0, dp(16));
+        return root;
+    }
+
+    private View createDialogHeader(String title, Dialog dialog) {
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setPadding(dp(20), 0, dp(16), dp(12));
+        TextView titleTv = new TextView(this);
+        titleTv.setText(title);
+        titleTv.setTextColor(Color.parseColor("#111827"));
+        titleTv.setTextSize(22);
+        titleTv.setTypeface(null, android.graphics.Typeface.BOLD);
+        header.addView(titleTv, new LinearLayout.LayoutParams(0, dp(52), 1));
+        TextView close = new TextView(this);
+        close.setText("×");
+        close.setTextSize(28);
+        close.setTextColor(Color.parseColor("#344054"));
+        close.setGravity(Gravity.CENTER);
+        close.setOnClickListener(v -> dialog.dismiss());
+        header.addView(close, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        return header;
+    }
+
+    private TextView createBottomAction(String text) {
+        TextView done = new TextView(this);
+        done.setText(text);
+        done.setGravity(Gravity.CENTER);
+        done.setTextColor(Color.WHITE);
+        done.setTextSize(17);
+        done.setTypeface(null, android.graphics.Typeface.BOLD);
+        done.setBackground(makeGradientButtonBg());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(56));
+        params.setMargins(dp(22), dp(12), dp(22), dp(8));
+        done.setLayoutParams(params);
+        return done;
+    }
+
+    private GradientDrawable makeRoundBg(boolean selected, boolean soft, int accentColor) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setCornerRadius(dp(18));
+        if (selected) {
+            drawable.setColor(soft ? lighten(accentColor, 0.86f) : lighten(accentColor, 0.90f));
+            drawable.setStroke(dp(1), lighten(accentColor, 0.35f));
+        } else {
+            drawable.setColor(Color.parseColor("#FBFCFF"));
+            drawable.setStroke(dp(1), Color.parseColor("#FFFFFF"));
+        }
+        return drawable;
+    }
+
+    private GradientDrawable makeCategoryTabBg(boolean selected, int index) {
+        int color = tagPalette()[index % tagPalette().length];
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setCornerRadius(dp(21));
+        drawable.setColor(selected ? color : Color.parseColor("#F9FAFF"));
+        drawable.setStroke(dp(1), selected ? color : Color.WHITE);
+        return drawable;
+    }
+
+    private GradientDrawable makeGradientButtonBg() {
+        GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{Color.parseColor("#8A3FFC"), Color.parseColor("#4057F6")});
+        drawable.setCornerRadius(dp(18));
+        return drawable;
+    }
+
+    private int[] tagPalette() {
+        return new int[]{
+                Color.parseColor("#7C3AED"),
+                Color.parseColor("#2563EB"),
+                Color.parseColor("#0891B2"),
+                Color.parseColor("#059669"),
+                Color.parseColor("#EA580C"),
+                Color.parseColor("#DB2777"),
+                Color.parseColor("#9333EA"),
+                Color.parseColor("#0EA5E9"),
+                Color.parseColor("#16A34A"),
+                Color.parseColor("#F59E0B"),
+                Color.parseColor("#EF4444")
+        };
+    }
+
+    private int tagColorFor(String value) {
+        int[] colors = tagPalette();
+        return colors[Math.abs(value.hashCode()) % colors.length];
+    }
+
+    private int lighten(int color, float factor) {
+        int r = Color.red(color);
+        int g = Color.green(color);
+        int b = Color.blue(color);
+        r = (int) (r + (255 - r) * factor);
+        g = (int) (g + (255 - g) * factor);
+        b = (int) (b + (255 - b) * factor);
+        return Color.rgb(r, g, b);
+    }
+
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private int getColorCompat(int colorRes) {
-        return getResources().getColor(colorRes);
-    }
-
     private interface ImageCompressCallback {
         void onResult(String compressedPath);
+    }
+
+    private interface SingleSelectCallback {
+        void onSelected(String value);
+    }
+
+    private static class SpaceView extends View {
+        public SpaceView(android.content.Context context) {
+            super(context);
+        }
     }
 }
