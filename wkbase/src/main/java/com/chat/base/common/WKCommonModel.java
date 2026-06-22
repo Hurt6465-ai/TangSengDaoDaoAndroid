@@ -160,6 +160,7 @@ public class WKCommonModel extends WKBaseModel {
             putIfNotEmpty(hashMap, "creator_name", getExtraString(remoteExtraMap, "creator_name"));
             putIfNotEmpty(hashMap, "creator_avatar", getExtraString(remoteExtraMap, "creator_avatar"));
             putIfNotEmpty(hashMap, "creator_avatar_cache_key", getExtraString(remoteExtraMap, "creator_avatar_cache_key"));
+            putIfNotEmpty(hashMap, "expire_at", firstNotEmpty(getExtraString(remoteExtraMap, "expire_at"), getExtraString(hashMap, "expire_at")));
         }
 
         wkChannel.channelName = firstNotEmpty(entity.name, getExtraString(hashMap, "topic_title"));
@@ -168,7 +169,7 @@ public class WKCommonModel extends WKBaseModel {
         String creatorAvatar = firstNotEmpty(getExtraString(remoteExtraMap, "creator_avatar"), getExtraString(hashMap, "creator_avatar"));
         String creatorAvatarCacheKey = firstNotEmpty(getExtraString(remoteExtraMap, "creator_avatar_cache_key"), getExtraString(hashMap, "creator_avatar_cache_key"));
         wkChannel.avatar = isTopicRoom ? firstNotEmpty(entity.logo, creatorAvatar, localAvatar) : entity.logo;
-        wkChannel.avatarCacheKey = isTopicRoom ? firstNotEmpty(localAvatarCacheKey, creatorAvatarCacheKey) : localAvatarCacheKey;
+        wkChannel.avatarCacheKey = isTopicRoom ? firstNotEmpty(creatorAvatarCacheKey, localAvatarCacheKey) : localAvatarCacheKey;
         wkChannel.channelRemark = entity.remark;
         wkChannel.status = entity.status;
         wkChannel.online = entity.online;
