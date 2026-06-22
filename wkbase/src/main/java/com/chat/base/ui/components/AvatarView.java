@@ -202,6 +202,20 @@ public class AvatarView extends FrameLayout {
     }
 
     public void showAvatar(WKChannel channel, boolean showOnlineStatus) {
+        if (channel == null) return;
+        if (isTopicRoomChannel(channel)) {
+            String showName = firstNotEmpty(channel.channelRemark, channel.channelName, getTopicExtraString(channel, "topic_title"));
+            String avatar = firstNotEmpty(channel.avatar, getTopicExtraString(channel, "creator_avatar"));
+            String avatarCacheKey = firstNotEmpty(channel.avatarCacheKey, getTopicExtraString(channel, "creator_avatar_cache_key"));
+            if (TextUtils.isEmpty(avatar)) {
+                showDefaultAvatar(showName);
+            } else {
+                showAvatarUrl(avatar, avatarCacheKey, showName);
+            }
+            spotView.setVisibility(GONE);
+            onlineTv.setVisibility(INVISIBLE);
+            return;
+        }
         prepareImageAvatar();
         String avatarCacheKey = channel.avatarCacheKey;
         String url;
@@ -229,6 +243,41 @@ public class AvatarView extends FrameLayout {
             spotView.setVisibility(GONE);
             onlineTv.setVisibility(INVISIBLE);
         }
+    }
+
+    private boolean isTopicRoomChannel(WKChannel channel) {
+        if (channel == null) return false;
+        if (channel.channelType == 2 && !TextUtils.isEmpty(channel.channelID) && channel.channelID.startsWith("topic_")) return true;
+        if ("topic_room".equals(channel.category)) return true;
+        return hasTopicRoomFlag(channel.remoteExtraMap) || hasTopicRoomFlag(channel.localExtra);
+    }
+
+    private boolean hasTopicRoomFlag(java.util.Map<String, Object> map) {
+        if (map == null) return false;
+        Object value = map.get("topic_room");
+        if (value instanceof Number) return ((Number) value).intValue() == 1;
+        return value != null && ("1".equals(String.valueOf(value)) || "true".equalsIgnoreCase(String.valueOf(value)));
+    }
+
+    private String getTopicExtraString(WKChannel channel, String key) {
+        if (channel == null || TextUtils.isEmpty(key)) return "";
+        String value = getExtraString(channel.localExtra, key);
+        if (TextUtils.isEmpty(value)) value = getExtraString(channel.remoteExtraMap, key);
+        return value;
+    }
+
+    private String getExtraString(java.util.Map<String, Object> map, String key) {
+        if (map == null || TextUtils.isEmpty(key)) return "";
+        Object value = map.get(key);
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private String firstNotEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (!TextUtils.isEmpty(value)) return value;
+        }
+        return "";
     }
 
     private String getAvatarURL(String channelID, byte channelType) {
