@@ -2,18 +2,14 @@ package com.chat.room.adapter;
 
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
-import android.view.Gravity;
 import android.view.View;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.chad.library.adapter.base.viewholder.BaseViewHolder;
 import com.chat.base.ui.components.AvatarView;
-import com.chat.base.utils.AndroidUtilities;
 import com.chat.room.R;
 import com.chat.room.entity.RoomTopicEntity;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -30,10 +26,6 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
             R.id.sideAvatar1, R.id.sideAvatar2, R.id.sideAvatar3,
             R.id.sideAvatar4, R.id.sideAvatar5, R.id.sideAvatar6
     };
-    private static final int SIDE_AVATAR_SIZE_DP = 34;
-    private static final int SIDE_AVATAR_STEP_DP = 25;
-    private static final int COUNT_BUBBLE_SIZE_DP = 38;
-    private static final int COUNT_GAP_DP = 5;
 
     public RoomTopicAdapter(List<RoomTopicEntity> data) {
         super(R.layout.item_room_topic_card, data);
@@ -43,12 +35,10 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
     protected void convert(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
         holder.setText(R.id.langTv, room == null ? getContext().getString(R.string.peipe_room_lang_cn) : room.getLangLabel());
         String tag = room == null ? getContext().getString(R.string.peipe_room_tag_chat) : room.getTagLabel(getContext());
-        String rawTag = room == null ? "闲谈" : room.getRawTag();
         holder.setText(R.id.tagTv, "# " + tag);
-        holder.setTextColor(R.id.tagTv, tagTextColor(rawTag));
         holder.setText(R.id.titleTv, room == null ? getContext().getString(R.string.peipe_room_tab_title) : room.getShowTitle());
         holder.setText(R.id.creatorNameTv, creatorName(room));
-        holder.getView(R.id.tagTv).setBackground(makeTagBackground(rawTag));
+        holder.getView(R.id.tagTv).setBackground(makeTagBackground(room == null ? "闲谈" : room.getRawTag()));
 
         ImageView bgIv = holder.getView(R.id.bgIv);
         bgIv.setImageResource(backgroundRes(room == null ? 1 : room.background_index));
@@ -69,28 +59,21 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
 
     private GradientDrawable makeTagBackground(String rawTag) {
         GradientDrawable drawable = new GradientDrawable();
-        int color = tagTextColor(rawTag);
-        drawable.setCornerRadius(AndroidUtilities.dp(7));
-        // 假磨砂：高透明白底 + 标签色描边。比直接彩色透明底更清楚，也兼容低版本 Android。
-        drawable.setColor(0xE6FFFFFF);
-        drawable.setStroke(AndroidUtilities.dp(1), withAlpha(color, 0x4D));
+        drawable.setCornerRadius(8f);
+        drawable.setColor(tagColor(rawTag));
         return drawable;
     }
 
-    private int withAlpha(int color, int alpha) {
-        return (color & 0x00FFFFFF) | ((alpha & 0xFF) << 24);
-    }
-
-    private int tagTextColor(String rawTag) {
-        if (TextUtils.isEmpty(rawTag)) return 0xFF475569;
-        if ("练口语".equals(rawTag)) return 0xFF15803D;
-        if ("找搭子".equals(rawTag)) return 0xFFBE123C;
-        if ("工作".equals(rawTag)) return 0xFFC2410C;
-        if ("影视".equals(rawTag)) return 0xFF6D28D9;
-        if ("音乐".equals(rawTag)) return 0xFF0F766E;
-        if ("学习".equals(rawTag)) return 0xFF1D4ED8;
-        if ("交友".equals(rawTag)) return 0xFFDC2626;
-        return 0xFF475569;
+    private int tagColor(String rawTag) {
+        if (TextUtils.isEmpty(rawTag)) return 0xFF64748B;
+        if ("练口语".equals(rawTag)) return 0xFF16A34A;
+        if ("找搭子".equals(rawTag)) return 0xFFEC4899;
+        if ("工作".equals(rawTag)) return 0xFFF97316;
+        if ("影视".equals(rawTag)) return 0xFF8B5CF6;
+        if ("音乐".equals(rawTag)) return 0xFF06B6D4;
+        if ("学习".equals(rawTag)) return 0xFF3B82F6;
+        if ("交友".equals(rawTag)) return 0xFFEF4444;
+        return 0xFF64748B;
     }
 
     private int backgroundRes(int index) {
@@ -120,66 +103,24 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
 
     private void bindCardAvatars(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
         AvatarView creatorAvatar = holder.getView(R.id.creatorAvatar);
-        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 52f);
+        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 40f);
 
         List<RoomTopicEntity.RoomMember> members = room == null ? Collections.emptyList() : room.getSideMembers();
-        int participantCount = room == null ? 0 : room.getParticipantCount();
-        boolean showCount = participantCount > SIDE_AVATAR_IDS.length;
-        TextView countTv = holder.getView(R.id.participantCountTv);
-        countTv.setVisibility(showCount ? View.VISIBLE : View.GONE);
-        if (showCount) {
-            layoutCountBubble(countTv);
-            countTv.setText(formatParticipantCount(participantCount));
-        }
-
-        int visibleAvatarCount = showCount ? 5 : SIDE_AVATAR_IDS.length;
-        int baseEndMargin = showCount ? COUNT_BUBBLE_SIZE_DP + COUNT_GAP_DP : 0;
         for (int i = 0; i < SIDE_AVATAR_IDS.length; i++) {
             AvatarView avatarView = holder.getView(SIDE_AVATAR_IDS[i]);
             RoomTopicEntity.RoomMember member = members != null && i < members.size() ? members.get(i) : null;
-            if (i >= visibleAvatarCount || member == null || (TextUtils.isEmpty(member.uid) && TextUtils.isEmpty(member.avatar) && TextUtils.isEmpty(member.name))) {
-                avatarView.setVisibility(View.GONE);
-            } else {
-                layoutSideAvatar(avatarView, baseEndMargin + i * SIDE_AVATAR_STEP_DP);
-                bindMemberAvatar(avatarView, member, SIDE_AVATAR_SIZE_DP);
-            }
+            bindMemberAvatar(avatarView, member, 26f);
         }
-    }
-
-    private void layoutSideAvatar(AvatarView avatarView, int endMarginDp) {
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(AndroidUtilities.dp(SIDE_AVATAR_SIZE_DP), AndroidUtilities.dp(SIDE_AVATAR_SIZE_DP));
-        lp.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
-        lp.setMarginEnd(AndroidUtilities.dp(endMarginDp));
-        avatarView.setLayoutParams(lp);
-    }
-
-    private void layoutCountBubble(TextView countTv) {
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(AndroidUtilities.dp(COUNT_BUBBLE_SIZE_DP), AndroidUtilities.dp(COUNT_BUBBLE_SIZE_DP));
-        lp.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
-        countTv.setLayoutParams(lp);
-    }
-
-
-    private String formatParticipantCount(int count) {
-        if (count > 99) return "+99";
-        return "+" + Math.max(count, 0);
     }
 
     private void bindMemberAvatar(AvatarView avatarView, RoomTopicEntity.RoomMember member, float size) {
         if (avatarView == null) return;
-        avatarView.setSize(size, size / 2f);
-        avatarView.setStrokeWidth(1f);
-        if (member != null && !TextUtils.isEmpty(member.avatar)) {
-            avatarView.setVisibility(View.VISIBLE);
-            avatarView.showAvatarUrl(member.avatar, member.avatar_cache_key, member.name);
-        } else if (member != null && !TextUtils.isEmpty(member.uid)) {
+        avatarView.setSize(size);
+        if (member != null && !TextUtils.isEmpty(member.uid)) {
             avatarView.setVisibility(View.VISIBLE);
             avatarView.showAvatar(member.uid, WKChannelType.PERSONAL, member.avatar_cache_key);
-        } else if (member != null && !TextUtils.isEmpty(member.name)) {
-            avatarView.setVisibility(View.VISIBLE);
-            avatarView.showDefaultAvatar(member.name);
         } else {
-            avatarView.setVisibility(View.INVISIBLE);
+            avatarView.setVisibility(View.GONE);
         }
     }
 
