@@ -1,269 +1,272 @@
-package com.chat.base.ui.components;
+package com.chat.base.common;
 
-import android.content.Context;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
-import android.util.AttributeSet;
-import android.view.Gravity;
-import android.view.View;
-import android.widget.FrameLayout;
-import android.widget.ImageView;
-import android.widget.TextView;
 
-import androidx.annotation.Nullable;
-
+import com.alibaba.fastjson.JSON;
 import com.chat.base.R;
-import com.chat.base.config.WKApiConfig;
+import com.chat.base.WKBaseApplication;
+import com.chat.base.base.WKBaseModel;
+import com.chat.base.config.WKConfig;
 import com.chat.base.config.WKConstants;
-import com.chat.base.glide.GlideUtils;
+import com.chat.base.config.WKSharedPreferencesUtil;
+import com.chat.base.endpoint.EndpointManager;
+import com.chat.base.entity.AppModule;
+import com.chat.base.entity.AppVersion;
+import com.chat.base.entity.ChannelInfoEntity;
+import com.chat.base.entity.WKAPPConfig;
+import com.chat.base.entity.WKChannelState;
+import com.chat.base.net.HttpResponseCode;
+import com.chat.base.net.IRequestResultListener;
 import com.chat.base.utils.AndroidUtilities;
-import com.chat.base.utils.LayoutHelper;
-import com.chat.base.utils.WKTimeUtils;
-import com.google.android.material.imageview.ShapeableImageView;
-import com.google.android.material.shape.CornerFamily;
+import com.chat.base.utils.DispatchQueuePool;
+import com.chat.base.utils.WKDeviceUtils;
+import com.chat.base.utils.WKReader;
+import com.chat.base.utils.WKToastUtils;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
+import com.xinbida.wukongim.entity.WKChannelExtras;
 
-import java.io.File;
-import java.util.Locale;
+import org.jetbrains.annotations.NotNull;
 
-public class AvatarView extends FrameLayout {
-    public ShapeableImageView imageView;
-    public TextView defaultAvatarTv;
-    public View spotView;
-    public TextView onlineTv;
-    private float avatarSize = 40f;
-    private float avatarCornerSize = 20f;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 
-    public AvatarView(Context context) {
-        super(context);
-        init();
+/**
+ * 4/21/21 6:23 PM
+ */
+public class WKCommonModel extends WKBaseModel {
+    private final DispatchQueuePool dispatchQueuePool = new DispatchQueuePool(3);
+
+    private WKCommonModel() {
     }
 
-    public AvatarView(Context context, @Nullable AttributeSet attrs) {
-        super(context, attrs);
-        init();
+    private static class CommonModelBinder {
+        final static WKCommonModel model = new WKCommonModel();
     }
 
-    public AvatarView(Context context, @Nullable AttributeSet attrs, int defStyle) {
-        super(context, attrs, defStyle);
-        init();
+    public static WKCommonModel getInstance() {
+        return CommonModelBinder.model;
     }
 
-    private void init() {
-        imageView = new ShapeableImageView(getContext());
-//        imageView.setStrokeColorResource(R.color.borderColor);
-//        imageView.setStrokeWidth(AndroidUtilities.dp(1));
-        imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        imageView.setPadding(AndroidUtilities.dp(0.1f), AndroidUtilities.dp(0.1f), AndroidUtilities.dp(0.1f), AndroidUtilities.dp(0.1f));
-        imageView.setImageResource(R.drawable.default_view_bg);
-
-        spotView = new View(getContext());
-        spotView.setBackgroundResource(R.drawable.online_spot);
-        spotView.setVisibility(GONE);
-
-        defaultAvatarTv = new TextView(getContext());
-        defaultAvatarTv.setTextSize(20f);
-        defaultAvatarTv.setTextColor(0xffffffff);
-        defaultAvatarTv.setBackgroundResource(R.drawable.shape_rand);
-        defaultAvatarTv.setTypeface(Typeface.DEFAULT_BOLD);
-        defaultAvatarTv.setVisibility(GONE);
-        defaultAvatarTv.setGravity(Gravity.CENTER);
-
-        onlineTv = new TextView(getContext());
-        onlineTv.setTextColor(0xff02F507);
-        onlineTv.setTextSize(9f);
-        onlineTv.setPadding(AndroidUtilities.dp(3), 0, AndroidUtilities.dp(3), 0);
-        onlineTv.setBackgroundResource(R.drawable.online_bg);
-        onlineTv.setVisibility(INVISIBLE);
-        addView(imageView, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
-        addView(onlineTv, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END, 0, 0, 0, 0));
-        addView(spotView, LayoutHelper.createFrame(15, 15, Gravity.BOTTOM | Gravity.END, 0, 0, 0, 0));
-        addView(defaultAvatarTv, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
-        setSize(40);
-    }
-
-    private void prepareImageAvatar() {
-        imageView.setVisibility(VISIBLE);
-        defaultAvatarTv.setVisibility(GONE);
-    }
-
-    public void showDefaultAvatar(String name) {
-        String letter = getAvatarLetter(name);
-        defaultAvatarTv.setText(letter);
-        defaultAvatarTv.setBackground(makeDefaultAvatarBg(name));
-        defaultAvatarTv.setVisibility(VISIBLE);
-        imageView.setVisibility(INVISIBLE);
-        spotView.setVisibility(GONE);
-        onlineTv.setVisibility(INVISIBLE);
-    }
-
-    public void showAvatarUrl(String avatar, String avatarCacheKey, String fallbackName) {
-        if (TextUtils.isEmpty(avatar)) {
-            showDefaultAvatar(fallbackName);
-            return;
-        }
-        prepareImageAvatar();
-        String url = WKApiConfig.getShowUrl(avatar);
-        GlideUtils.getInstance().showAvatarImg(getContext(), url, avatarCacheKey, imageView);
-    }
-
-    private String getAvatarLetter(String name) {
-        if (TextUtils.isEmpty(name)) return "#";
-        String trim = name.trim();
-        if (TextUtils.isEmpty(trim)) return "#";
-        return trim.substring(0, 1).toUpperCase(Locale.getDefault());
-    }
-
-    private GradientDrawable makeDefaultAvatarBg(String seed) {
-        int[] colors = new int[]{
-                0xFF2563EB, 0xFF7C3AED, 0xFFDB2777, 0xFF059669,
-                0xFFEA580C, 0xFF0891B2, 0xFF4F46E5, 0xFFDC2626
-        };
-        int index = TextUtils.isEmpty(seed) ? 0 : (seed.hashCode() & 0x7fffffff) % colors.length;
-        GradientDrawable drawable = new GradientDrawable();
-        if (avatarCornerSize >= avatarSize / 2f - 0.5f) {
-            drawable.setShape(GradientDrawable.OVAL);
-        } else {
-            drawable.setShape(GradientDrawable.RECTANGLE);
-            drawable.setCornerRadius(AndroidUtilities.dp(avatarCornerSize));
-        }
-        drawable.setColor(colors[index]);
-        drawable.setStroke(AndroidUtilities.dp(1), 0x66FFFFFF);
-        return drawable;
-    }
-
-    public void setStrokeWidth(float width) {
-        imageView.setStrokeWidth(AndroidUtilities.dp(width));
-    }
-
-    public void setStrokeColor(int colorResource) {
-        imageView.setStrokeColorResource(colorResource);
-    }
-
-    public void setSize(float size) {
-        setSize(size, size / 2f);
-    }
-
-    public void setSize(float size, float cornerSize) {
-        avatarSize = size;
-        avatarCornerSize = cornerSize;
-        imageView.getLayoutParams().width = AndroidUtilities.dp(size);
-        imageView.getLayoutParams().height = AndroidUtilities.dp(size);
-        imageView.setShapeAppearanceModel(imageView.getShapeAppearanceModel()
-                .toBuilder()
-                .setAllCorners(CornerFamily.ROUNDED, AndroidUtilities.dp(cornerSize))
-                .build());
-
-        defaultAvatarTv.getLayoutParams().height = AndroidUtilities.dp(size);
-        defaultAvatarTv.getLayoutParams().width = AndroidUtilities.dp(size);
-        defaultAvatarTv.setTextSize(size * 0.38f);
-        if (defaultAvatarTv.getVisibility() == VISIBLE) {
-            defaultAvatarTv.setBackground(makeDefaultAvatarBg(defaultAvatarTv.getText() == null ? "" : defaultAvatarTv.getText().toString()));
-        }
-
-    }
-
-    public void showAvatar(String channelID, byte channelType, String avatarCacheKey) {
-        prepareImageAvatar();
-        String url = getAvatarURL(channelID, channelType);
-        GlideUtils.getInstance().showAvatarImg(getContext(), url, avatarCacheKey, imageView);
-    }
-
-    public void showAvatar(String channelID, byte channelType, boolean showOnlineStatus) {
-        prepareImageAvatar();
-        spotView.setVisibility(GONE);
-        onlineTv.setVisibility(INVISIBLE);
-        WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
-        if (channel != null) {
-            showAvatar(channel, showOnlineStatus);
-        } else {
-            String url = getAvatarURL(channelID, channelType);
-            GlideUtils.getInstance().showAvatarImg(getContext(), url, "", imageView);
-        }
-    }
-
-    public void showAvatar(String channelID, byte channelType) {
-        prepareImageAvatar();
-        spotView.setVisibility(GONE);
-        onlineTv.setVisibility(INVISIBLE);
-        WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
-        if (channel != null) {
-            showAvatar(channel, false);
-        } else {
-            String url = getAvatarURL(channelID, channelType);
-            GlideUtils.getInstance().showAvatarImg(getContext(), url, "", imageView);
-        }
-    }
-
-    public void showAvatar(WKChannel channel) {
-        showAvatar(channel, false);
-    }
-
-    public void showAvatar(WKChannel channel, boolean showOnlineStatus) {
-        if (channel == null) return;
-        if (isTopicRoomChannel(channel)) {
-            String showName = firstNotEmpty(channel.channelRemark, channel.channelName, getTopicExtraString(channel, "topic_title"));
-            String avatar = firstNotEmpty(channel.avatar, getTopicExtraString(channel, "creator_avatar"));
-            String avatarCacheKey = firstNotEmpty(channel.avatarCacheKey, getTopicExtraString(channel, "creator_avatar_cache_key"));
-            if (TextUtils.isEmpty(avatar)) {
-                showDefaultAvatar(showName);
-            } else {
-                showAvatarUrl(avatar, avatarCacheKey, showName);
-            }
-            spotView.setVisibility(GONE);
-            onlineTv.setVisibility(INVISIBLE);
-            return;
-        }
-        prepareImageAvatar();
-        String avatarCacheKey = channel.avatarCacheKey;
-        String url;
-        if (!TextUtils.isEmpty(channel.avatar) && channel.avatar.contains("/")) {
-            url = WKApiConfig.getShowUrl(channel.avatar);
-        } else {
-            url = getAvatarURL(channel.channelID, channel.channelType);
-        }
-        GlideUtils.getInstance().showAvatarImg(imageView.getContext(), url, avatarCacheKey, imageView);
-        if (showOnlineStatus) {
-            if (channel.online == 1) {
-                spotView.setVisibility(VISIBLE);
-                onlineTv.setVisibility(INVISIBLE);
-            } else {
-                spotView.setVisibility(GONE);
-                String showTime = WKTimeUtils.getInstance().getOnlineTime(channel.lastOffline);
-                if (TextUtils.isEmpty(showTime)) {
-                    onlineTv.setVisibility(INVISIBLE);
+    public void getAppNewVersion(boolean isShowToast, final IAppNewVersion iAppNewVersion) {
+        String v = WKDeviceUtils.getInstance().getVersionName(WKBaseApplication.getInstance().getContext());
+        request(createService(WKCommonService.class).getAppNewVersion(v), new IRequestResultListener<AppVersion>() {
+            @Override
+            public void onSuccess(AppVersion result) {
+                if ((result == null || TextUtils.isEmpty(result.download_url)) && isShowToast) {
+                    WKToastUtils.getInstance().showToastNormal(WKBaseApplication.getInstance().getContext().getString(R.string.is_new_version));
                 } else {
-                    onlineTv.setVisibility(VISIBLE);
-                    onlineTv.setText(showTime);
+                    iAppNewVersion.onNewVersion(result);
                 }
             }
+
+            @Override
+            public void onFail(int code, String msg) {
+
+            }
+        });
+    }
+
+    public interface IAppNewVersion {
+        void onNewVersion(AppVersion version);
+    }
+
+    public interface IAppConfig {
+        void onResult(int code, String msg, WKAPPConfig wkappConfig);
+    }
+
+    public void getAppConfig(IAppConfig iAppConfig) {
+        request(createService(WKCommonService.class).getAppConfig(), new IRequestResultListener<>() {
+            @Override
+            public void onSuccess(WKAPPConfig result) {
+                WKConfig.getInstance().saveAppConfig(result);
+                if (iAppConfig != null) {
+                    iAppConfig.onResult(HttpResponseCode.success, "", result);
+                }
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (iAppConfig != null) {
+                    iAppConfig.onResult(code, msg, null);
+                }
+            }
+        });
+    }
+
+    public void getChannelState(String channelID, byte channelType, final IChannelState iChannelState) {
+        request(createService(WKCommonService.class).getChannelState(channelID, channelType), new IRequestResultListener<WKChannelState>() {
+            @Override
+            public void onSuccess(WKChannelState result) {
+                iChannelState.onResult(result);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                iChannelState.onResult(null);
+            }
+        });
+    }
+
+    public interface IChannelState {
+        void onResult(WKChannelState channelState);
+    }
+
+
+    public void getChannel(String channelID, byte channelType, IGetChannel iGetChannel) {
+        dispatchQueuePool.execute(() -> request(createService(WKCommonService.class).getChannel(channelID, channelType), new IRequestResultListener<ChannelInfoEntity>() {
+            @Override
+            public void onSuccess(ChannelInfoEntity result) {
+                saveChannel(result);
+                if (iGetChannel != null) {
+                    AndroidUtilities.runOnUIThread(() -> iGetChannel.onResult(HttpResponseCode.success, "", result));
+                }
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (iGetChannel != null) {
+                    AndroidUtilities.runOnUIThread(() -> iGetChannel.onResult(code, msg, null));
+
+                }
+            }
+        }));
+
+    }
+
+    private void saveChannel(ChannelInfoEntity entity) {
+        if (entity == null || entity.channel == null) return;
+
+        WKChannel localChannel = WKIM.getInstance().getChannelManager()
+                .getChannel(entity.channel.channel_id, entity.channel.channel_type);
+        HashMap<String, Object> remoteExtraMap = entity.extra == null ? new HashMap<>() : new HashMap<>(entity.extra);
+        HashMap<String, Object> hashMap = new HashMap<>();
+        if (localChannel != null && localChannel.localExtra != null) {
+            hashMap.putAll(localChannel.localExtra);
+        }
+
+        WKChannel wkChannel = new WKChannel(entity.channel.channel_id, entity.channel.channel_type);
+        boolean isTopicRoom = isTopicRoomEntity(entity, remoteExtraMap);
+        boolean isRefreshContacts = false;
+        if (localChannel != null && !TextUtils.isEmpty(localChannel.channelID)) {
+            if (localChannel.follow != entity.follow || localChannel.status != entity.status) {
+                isRefreshContacts = true;
+            }
+        }
+
+        String localAvatar = localChannel == null ? "" : localChannel.avatar;
+        String localAvatarCacheKey = localChannel == null ? "" : localChannel.avatarCacheKey;
+        String localChannelName = localChannel == null ? "" : localChannel.channelName;
+
+        if (isTopicRoom) {
+            hashMap.put("topic_room", 1);
+            putIfNotEmpty(hashMap, "topic_title", firstNotEmpty(
+                    getExtraString(remoteExtraMap, "topic_title"),
+                    entity.name,
+                    getExtraString(hashMap, "topic_title"),
+                    localChannelName));
+            putIfNotEmpty(hashMap, "creator_uid", firstNotEmpty(
+                    getExtraString(remoteExtraMap, "creator_uid"),
+                    getExtraString(hashMap, "creator_uid")));
+            putIfNotEmpty(hashMap, "creator_name", firstNotEmpty(
+                    getExtraString(remoteExtraMap, "creator_name"),
+                    getExtraString(hashMap, "creator_name")));
+            putIfNotEmpty(hashMap, "creator_avatar", firstNotEmpty(
+                    cleanTopicGroupAvatar(getExtraString(remoteExtraMap, "creator_avatar"), entity.channel.channel_id),
+                    cleanTopicGroupAvatar(entity.logo, entity.channel.channel_id),
+                    cleanTopicGroupAvatar(getExtraString(hashMap, "creator_avatar"), entity.channel.channel_id),
+                    cleanTopicGroupAvatar(localAvatar, entity.channel.channel_id)));
+            putIfNotEmpty(hashMap, "creator_avatar_cache_key", firstNotEmpty(
+                    getExtraString(remoteExtraMap, "creator_avatar_cache_key"),
+                    getExtraString(hashMap, "creator_avatar_cache_key")));
+        }
+
+        wkChannel.channelName = firstNotEmpty(
+                entity.name,
+                getExtraString(hashMap, "topic_title"),
+                getExtraString(remoteExtraMap, "topic_title"),
+                localChannelName);
+
+        String creatorAvatar = firstNotEmpty(
+                getExtraString(hashMap, "creator_avatar"),
+                cleanTopicGroupAvatar(getExtraString(remoteExtraMap, "creator_avatar"), entity.channel.channel_id));
+        String creatorAvatarCacheKey = firstNotEmpty(
+                getExtraString(remoteExtraMap, "creator_avatar_cache_key"),
+                getExtraString(hashMap, "creator_avatar_cache_key"));
+        if (isTopicRoom) {
+            String topicAvatar = firstNotEmpty(
+                    creatorAvatar,
+                    cleanTopicGroupAvatar(entity.logo, entity.channel.channel_id),
+                    cleanTopicGroupAvatar(localAvatar, entity.channel.channel_id));
+            String creatorUID = getExtraString(hashMap, "creator_uid");
+            if (TextUtils.isEmpty(topicAvatar) && !TextUtils.isEmpty(creatorUID)) {
+                topicAvatar = "users/" + creatorUID + "/avatar";
+                hashMap.put("creator_avatar", topicAvatar);
+            }
+            wkChannel.avatar = topicAvatar;
+            wkChannel.avatarCacheKey = firstNotEmpty(creatorAvatarCacheKey, localAvatarCacheKey);
         } else {
-            spotView.setVisibility(GONE);
-            onlineTv.setVisibility(INVISIBLE);
+            wkChannel.avatar = entity.logo;
+            wkChannel.avatarCacheKey = localAvatarCacheKey;
+        }
+
+        wkChannel.channelRemark = entity.remark;
+        wkChannel.status = entity.status;
+        wkChannel.online = entity.online;
+        wkChannel.lastOffline = entity.last_offline;
+        wkChannel.receipt = entity.receipt;
+        wkChannel.robot = entity.robot;
+        wkChannel.category = entity.category;
+        if (isTopicRoom && TextUtils.isEmpty(wkChannel.category)) {
+            wkChannel.category = "topic_room";
+        }
+        wkChannel.top = entity.stick;
+        wkChannel.mute = entity.mute;
+        wkChannel.showNick = entity.show_nick;
+        wkChannel.follow = entity.follow;
+        wkChannel.save = entity.save;
+        wkChannel.forbidden = entity.forbidden;
+        wkChannel.invite = entity.invite;
+        wkChannel.flame = entity.flame;
+        wkChannel.flameSecond = entity.flame_second;
+        wkChannel.deviceFlag = entity.device_flag;
+        if (entity.parent_channel != null) {
+            wkChannel.parentChannelID = entity.parent_channel.channel_id;
+            wkChannel.parentChannelType = entity.parent_channel.channel_type;
+        }
+        wkChannel.remoteExtraMap = remoteExtraMap;
+        hashMap.put(WKChannelExtras.beDeleted, entity.be_deleted);
+        hashMap.put(WKChannelExtras.beBlacklist, entity.be_blacklist);
+        hashMap.put(WKChannelExtras.notice, entity.notice);
+        wkChannel.localExtra = hashMap;
+        WKIM.getInstance().getChannelManager().saveOrUpdateChannel(wkChannel);
+        if (isRefreshContacts) {
+            EndpointManager.getInstance().invoke(WKConstants.refreshContacts, null);
         }
     }
 
-    private boolean isTopicRoomChannel(WKChannel channel) {
-        if (channel == null) return false;
-        if (channel.channelType == 2 && !TextUtils.isEmpty(channel.channelID) && channel.channelID.startsWith("topic_")) return true;
-        if ("topic_room".equals(channel.category)) return true;
-        return hasTopicRoomFlag(channel.remoteExtraMap) || hasTopicRoomFlag(channel.localExtra);
+    private String cleanTopicGroupAvatar(String avatar, String channelID) {
+        if (isTopicGroupAvatar(avatar, channelID)) return "";
+        return avatar;
     }
 
-    private boolean hasTopicRoomFlag(java.util.Map<String, Object> map) {
-        if (map == null) return false;
-        Object value = map.get("topic_room");
+    private boolean isTopicGroupAvatar(String avatar, String channelID) {
+        if (TextUtils.isEmpty(avatar)) return false;
+        String lower = avatar.toLowerCase(java.util.Locale.US);
+        if (lower.contains("groups/topic_") && lower.contains("/avatar")) return true;
+        return !TextUtils.isEmpty(channelID)
+                && channelID.startsWith("topic_")
+                && lower.contains("groups/" + channelID.toLowerCase(java.util.Locale.US) + "/avatar");
+    }
+
+    private boolean isTopicRoomEntity(ChannelInfoEntity entity, HashMap<String, Object> extra) {
+        if (entity == null || entity.channel == null) return false;
+        if (entity.channel.channel_type == 2 && !TextUtils.isEmpty(entity.channel.channel_id) && entity.channel.channel_id.startsWith("topic_")) return true;
+        if ("topic_room".equals(entity.category)) return true;
+        Object value = extra == null ? null : extra.get("topic_room");
         if (value instanceof Number) return ((Number) value).intValue() == 1;
         return value != null && ("1".equals(String.valueOf(value)) || "true".equalsIgnoreCase(String.valueOf(value)));
-    }
-
-    private String getTopicExtraString(WKChannel channel, String key) {
-        if (channel == null || TextUtils.isEmpty(key)) return "";
-        String value = getExtraString(channel.localExtra, key);
-        if (TextUtils.isEmpty(value)) value = getExtraString(channel.remoteExtraMap, key);
-        return value;
     }
 
     private String getExtraString(java.util.Map<String, Object> map, String key) {
@@ -280,22 +283,65 @@ public class AvatarView extends FrameLayout {
         return "";
     }
 
-    private String getAvatarURL(String channelID, byte channelType) {
-        String filePath = WKConstants.avatarCacheDir + channelType + "_" + channelID;
-        File file = new File(filePath);
-        if (file.exists()) {
-            return filePath;
-        } else {
-            String url = WKApiConfig.getShowAvatar(channelID, channelType);
-            return url;
+    private void putIfNotEmpty(HashMap<String, Object> map, String key, String value) {
+        if (map != null && !TextUtils.isEmpty(key) && !TextUtils.isEmpty(value)) {
+            map.put(key, value);
         }
     }
 
-    public static void clearCache(String channelID, byte channelType) {
-        String filePath = WKConstants.avatarCacheDir + channelType + "_" + channelID;
-        File file = new File(filePath);
-        if (file.exists()) {
-            file.delete();
-        }
+    public interface IGetChannel {
+        void onResult(int code, String msg, ChannelInfoEntity entity);
+    }
+
+    public void getAppModule(@NotNull final IAppModule iAppModule) {
+        request(createService(WKCommonService.class).getAppModule(), new IRequestResultListener<List<AppModule>>() {
+            @Override
+            public void onSuccess(List<AppModule> result) {
+                String text = WKSharedPreferencesUtil.getInstance().getSPWithUID("app_module");
+                List<AppModule> localSavedAppModule = new ArrayList<>();
+                if (!TextUtils.isEmpty(text)) {
+                    localSavedAppModule = JSON.parseArray(text, AppModule.class);
+                }
+                List<AppModule> tempList = new ArrayList<>();
+                if (WKReader.isNotEmpty(result)) {
+                    for (AppModule item : result) {
+                        AppModule m = new AppModule();
+                        m.setName(item.getName());
+                        m.setDesc(item.getDesc());
+                        m.setSid(item.getSid());
+                        m.setStatus(item.getStatus());
+                        if (item.getStatus() == 2) {
+                            m.setChecked(true);
+                        } else if (item.getStatus() == 0) {
+                            m.setChecked(false);
+                        } else {
+                            if (WKReader.isNotEmpty(localSavedAppModule)) {
+                                for (AppModule temp : localSavedAppModule) {
+                                    if (temp.getSid().equals(item.getSid())) {
+                                        m.setChecked(temp.getChecked());
+                                    }
+                                }
+                            } else {
+                                m.setChecked(false);
+                            }
+                        }
+                        tempList.add(m);
+                    }
+                }
+                String json = JSON.toJSONString(tempList);
+                WKSharedPreferencesUtil.getInstance().putSPWithUID("app_module", json);
+
+                iAppModule.onResult(HttpResponseCode.success, "", tempList);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                iAppModule.onResult(code, msg, null);
+            }
+        });
+    }
+
+    public interface IAppModule {
+        void onResult(int code, String msg, List<AppModule> list);
     }
 }
