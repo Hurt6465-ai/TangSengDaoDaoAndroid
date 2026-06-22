@@ -106,6 +106,9 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     private boolean contactsFragmentLoaded = false;
     private float topicSwipeStartX = 0f;
     private float topicSwipeStartY = 0f;
+    // 定时清理消息会话列表里已经过期的话题聊天室，避免后端删除后本地会话仍残留。
+    private Disposable topicRoomExpireDisposable;
+    private static final long TOPIC_ROOM_EXPIRE_CHECK_SECONDS = 60L;
 
     @Override
     protected boolean isShowBackLayout() {
@@ -360,6 +363,11 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         //频道刷新监听 - 使用缓存快速查找
         WKIM.getInstance().getChannelManager().addOnRefreshChannelInfo("chat_fragment_refresh_channel", (channel, isEnd) -> {
             if (channel != null && !TextUtils.isEmpty(channel.channelID)) {
+                if (isExpiredTopicRoomChannel(channel)) {
+                    deleteExpiredTopicRoomLocal(channel.channelID, channel.channelType, 0);
+                    removeConversationIfExists(channel.channelID, channel.channelType);
+                    return;
+                }
                 int i = findConversationIndex(channel.channelID, channel.channelType);
                 if (i >= 0) {
                     ChatConversationMsg msg = chatConversationAdapter.getData().get(i);
@@ -537,7 +545,13 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                 return;
             }
             if (list.size() == 1) {
-                resetData(list.get(0), true);
+                WKUIConversationMsg single = list.get(0);
+                if (isExpiredTopicRoomConversation(single)) {
+                    deleteExpiredTopicRoomLocal(single);
+                    removeConversationIfExists(single.channelID, single.channelType);
+                    return;
+                }
+                resetData(single, true);
                 return;
             }
 
@@ -554,6 +568,11 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             List<ChatConversationMsg> uiList = new ArrayList<>();
             // 多条
             for (WKUIConversationMsg uiConversationMsg : list) {
+                if (isExpiredTopicRoomConversation(uiConversationMsg)) {
+                    deleteExpiredTopicRoomLocal(uiConversationMsg);
+                    removeConversationIfExists(uiConversationMsg.channelID, uiConversationMsg.channelType);
+                    continue;
+                }
                 boolean isAdd = true;
                 for (int i = 0, size = chatConversationAdapter.getData().size(); i < size; i++) {
                     if (!TextUtils.isEmpty(chatConversationAdapter.getData().get(i).uiConversationMsg.channelID) && !TextUtils.isEmpty(uiConversationMsg.channelID) && chatConversationAdapter.getData().get(i).uiConversationMsg.channelID.equals(uiConversationMsg.channelID) && chatConversationAdapter.getData().get(i).uiConversationMsg.channelType == uiConversationMsg.channelType) {
@@ -716,7 +735,12 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             List<ChatConversationMsg> tempList = new ArrayList<>();
             if (WKReader.isNotEmpty(list)) {
                 for (int i = 0, size = list.size(); i < size; i++) {
-                    tempList.add(new ChatConversationMsg(list.get(i)));
+                    WKUIConversationMsg conversation = list.get(i);
+                    if (isExpiredTopicRoomConversation(conversation)) {
+                        deleteExpiredTopicRoomLocal(conversation);
+                        continue;
+                    }
+                    tempList.add(new ChatConversationMsg(conversation));
                 }
             }
             AndroidUtilities.runOnUIThread(() -> sortMsg(tempList));
@@ -859,8 +883,15 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         if (uiConversationMsg.channelType == WKChannelType.GROUP && !TextUtils.isEmpty(uiConversationMsg.channelID) && uiConversationMsg.channelID.startsWith("topic_")) {
             return true;
         }
-        WKChannel channel = uiConversationMsg.getWkChannel();
+        return isTopicRoomChannel(uiConversationMsg.getWkChannel());
+    }
+
+    private boolean isTopicRoomChannel(WKChannel channel) {
         if (channel == null) return false;
+        if (channel.channelType == WKChannelType.GROUP && !TextUtils.isEmpty(channel.channelID) && channel.channelID.startsWith("topic_")) {
+            return true;
+        }
+        if ("topic_room".equals(channel.category)) return true;
         return hasTopicRoomFlag(channel.remoteExtraMap) || hasTopicRoomFlag(channel.localExtra);
     }
 
@@ -872,10 +903,135 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         return "1".equals(String.valueOf(value)) || "true".equalsIgnoreCase(String.valueOf(value));
     }
 
+    private boolean isExpiredTopicRoomConversation(WKUIConversationMsg uiConversationMsg) {
+        if (!isTopicRoomConversation(uiConversationMsg)) return false;
+        long expireAt = getTopicRoomExpireAt(uiConversationMsg);
+        return expireAt > 0 && expireAt <= System.currentTimeMillis();
+    }
+
+    private boolean isExpiredTopicRoomChannel(WKChannel channel) {
+        if (!isTopicRoomChannel(channel)) return false;
+        long expireAt = getTopicRoomExpireAt(channel);
+        return expireAt > 0 && expireAt <= System.currentTimeMillis();
+    }
+
+    private long getTopicRoomExpireAt(WKUIConversationMsg uiConversationMsg) {
+        if (uiConversationMsg == null) return 0L;
+        long expireAt = getTopicRoomExpireAt(uiConversationMsg.getWkChannel());
+        if (expireAt > 0) return expireAt;
+        return getLongExtra(uiConversationMsg.localExtraMap, "expire_at");
+    }
+
+    private long getTopicRoomExpireAt(WKChannel channel) {
+        if (channel == null) return 0L;
+        long expireAt = getLongExtra(channel.localExtra, "expire_at");
+        if (expireAt <= 0) expireAt = getLongExtra(channel.remoteExtraMap, "expire_at");
+        return expireAt;
+    }
+
+    private long getLongExtra(java.util.Map<String, Object> map, String key) {
+        if (map == null || TextUtils.isEmpty(key)) return 0L;
+        Object value = map.get(key);
+        if (value == null) return 0L;
+        if (value instanceof Number) return ((Number) value).longValue();
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (Exception ignored) {
+            return 0L;
+        }
+    }
+
+    private void startTopicRoomExpireWatcher() {
+        if (topicRoomExpireDisposable != null && !topicRoomExpireDisposable.isDisposed()) return;
+        topicRoomExpireDisposable = Observable.interval(TOPIC_ROOM_EXPIRE_CHECK_SECONDS, TOPIC_ROOM_EXPIRE_CHECK_SECONDS, TimeUnit.SECONDS)
+                .subscribeOn(Schedulers.computation())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(value -> cleanupExpiredTopicRoomConversations(), throwable -> {
+                });
+    }
+
+    private void cleanupExpiredTopicRoomConversations() {
+        if (chatConversationAdapter == null || WKReader.isEmpty(chatConversationAdapter.getData())) return;
+        List<WKUIConversationMsg> expiredList = new ArrayList<>();
+        for (ChatConversationMsg item : chatConversationAdapter.getData()) {
+            if (item != null && isExpiredTopicRoomConversation(item.uiConversationMsg)) {
+                expiredList.add(item.uiConversationMsg);
+            }
+        }
+        if (WKReader.isEmpty(expiredList)) return;
+        for (WKUIConversationMsg item : expiredList) {
+            deleteExpiredTopicRoomLocal(item);
+        }
+        boolean changed = false;
+        boolean unreadChanged = false;
+        for (WKUIConversationMsg item : expiredList) {
+            int index = findConversationIndex(item.channelID, item.channelType);
+            if (index >= 0) {
+                ChatConversationMsg removed = chatConversationAdapter.getData().get(index);
+                if (removed != null && removed.uiConversationMsg != null && removed.uiConversationMsg.unreadCount > 0) {
+                    unreadChanged = true;
+                }
+                chatConversationAdapter.removeAt(index);
+                rebuildIndexCache();
+                changed = true;
+            }
+        }
+        if (changed) {
+            if (unreadChanged) markUnreadCountDirty();
+            setAllCount();
+        }
+    }
+
+    private void deleteExpiredTopicRoomLocal(WKUIConversationMsg item) {
+        if (item == null) return;
+        deleteExpiredTopicRoomLocal(item.channelID, item.channelType, item.unreadCount);
+    }
+
+    private void deleteExpiredTopicRoomLocal(String channelID, byte channelType, int unreadCount) {
+        if (TextUtils.isEmpty(channelID)) return;
+        List<WKReminder> reminders = WKIM.getInstance().getReminderManager().getReminders(channelID, channelType);
+        if (WKReader.isNotEmpty(reminders)) {
+            List<Long> reminderIds = new ArrayList<>();
+            for (WKReminder reminder : reminders) {
+                if (reminder != null && reminder.done == 0) {
+                    reminder.done = 1;
+                    reminderIds.add(reminder.reminderID);
+                }
+            }
+            if (WKReader.isNotEmpty(reminderIds)) {
+                MsgModel.getInstance().doneReminder(reminderIds);
+            }
+            WKIM.getInstance().getReminderManager().saveOrUpdateReminders(reminders);
+        }
+        if (unreadCount > 0) {
+            MsgModel.getInstance().clearUnread(channelID, channelType, 0, null);
+        }
+        WKIM.getInstance().getConversationManager().deleteWitchChannel(channelID, channelType);
+        WKIM.getInstance().getMsgManager().clearWithChannel(channelID, channelType);
+    }
+
+    private void removeConversationIfExists(String channelID, byte channelType) {
+        int index = findConversationIndex(channelID, channelType);
+        if (index < 0) return;
+        boolean unreadChanged = chatConversationAdapter.getData().get(index).uiConversationMsg.unreadCount > 0;
+        chatConversationAdapter.removeAt(index);
+        rebuildIndexCache();
+        if (unreadChanged) markUnreadCountDirty();
+        setAllCount();
+    }
+
     private int msgCount = 0;
 
     private void resetData(WKUIConversationMsg uiConversationMsg, boolean isEnd) {
         if (uiConversationMsg == null) {
+            return;
+        }
+        if (isExpiredTopicRoomConversation(uiConversationMsg)) {
+            deleteExpiredTopicRoomLocal(uiConversationMsg);
+            removeConversationIfExists(uiConversationMsg.channelID, uiConversationMsg.channelType);
+            if (isEnd) {
+                sortMsg(chatConversationAdapter.getData());
+            }
             return;
         }
         // 话题聊天室已经是原生群会话：进入过的话题应该出现在消息列表里，
@@ -1172,6 +1328,10 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             sortDisposable.dispose();
             sortDisposable = null;
         }
+        if (topicRoomExpireDisposable != null) {
+            topicRoomExpireDisposable.dispose();
+            topicRoomExpireDisposable = null;
+        }
         // 清理缓存
         conversationIndexMap.clear();
         WKIM.getInstance().getConversationManager().removeOnRefreshMsgListListener("chat_fragment");
@@ -1189,6 +1349,8 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         super.onResume();
         refreshSideMenuUserInfo();
         updateContactsBadge();
+        startTopicRoomExpireWatcher();
+        cleanupExpiredTopicRoomConversations();
         int pcOnline = WKSharedPreferencesUtil.getInstance().getInt(WKConfig.getInstance().getUid() + "_pc_online");
         wkVBinding.deviceIv.setVisibility(pcOnline == 1 ? View.VISIBLE : View.GONE);
 //        String appLoginType = String.format(getString(R.string.pc_login), getString(R.string.app_name));
