@@ -1,59 +1,289 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="hint_pwd">စကားဝှက် ထည့်ပါ</string>
+    <string name="hint_name">ဖုန်းနံပါတ် ထည့်ပါ</string>
+    <string name="hint_verfi">အတည်ပြုကုဒ် ထည့်ပါ</string>
+    <string name="name_not_null">အမည် ထည့်ပါ</string>
+    <string name="nickname_not_null">အမည်ပြောင် ဖြည့်ပါ</string>
+    <string name="pwd_not_null">စကားဝှက် ထည့်ပါ</string>
+    <string name="web_login_desc">%s Web ဝင်ရောက်မှု အတည်ပြုခြင်း</string>
+    <string name="login_sure">ဝင်ရောက်ရန် အတည်ပြုပါ</string>
+    <string name="cancel_login">ဝင်ရောက်မှု ပယ်ဖျက်ပါ</string>
+    <string name="login_title">%s သို့ ဝင်ရောက်ရန် ကြိုဆိုပါသည်</string>
+    <string name="forget_pwd">စကားဝှက် မေ့နေပါသလား</string>
+    <string name="new_account_register">အသုံးပြုသူအသစ်လား။ </string>
+    <string name="register">မှတ်ပုံတင်ရန်</string>
+    <string name="register_app">%s အတွက် မှတ်ပုံတင်ရန် ကြိုဆိုပါသည်</string>
+    <string name="get_verf_code">အတည်ပြုကုဒ် ရယူရန်</string>
+    <string name="has_account">အကောင့်ရှိပြီးသားလား။ </string>
+    <string name="login">ဝင်ရောက်ရန်</string>
+    <string name="wk_login_search">ရှာဖွေရန်</string>
+    <string name="choose_country">နိုင်ငံ သို့မဟုတ် ဒေသ ရွေးပါ</string>
+    <string name="pwd_length_error">စကားဝှက်သည် စာလုံး ၆ လုံးမှ ၁၆ လုံးအထိ ဖြစ်ရမည်</string>
+    <string name="account_exist">ဤအကောင့် ရှိပြီးသားဖြစ်သည်</string>
+    <string name="recapture">ပြန်ပို့ရန်</string>
+    <string name="wklogin_perfect_userinfo">ကိုယ်ရေးအချက်အလက် ဖြည့်စွက်ပါ</string>
+    <string name="must_input_name">အမည် (လိုအပ်သည်)</string>
+    <string name="wklogin_sure">အတည်ပြုပါ</string>
+    <string name="wklogin_upload_header">ကိုယ်ရေးပုံ အပ်လုဒ်တင်ရန် နှိပ်ပါ</string>
+    <string name="wklogin_nickname">အမည်ပြောင်</string>
+    <string name="wklogin_must_upload_header">ကိုယ်ရေးပုံ အပ်လုဒ်တင်ပါ</string>
+    <string name="login_auth_desc">သင်သည် စက်အသစ်တစ်လုံးတွင် %s သို့ ဝင်ရောက်နေသောကြောင့် လုံခြုံရေးအတည်ပြုချက် လိုအပ်ပါသည်။ အတည်ပြုပြီးပါက နောက်တစ်ကြိမ်တွင် ထပ်မံအတည်ပြုရန် မလိုအပ်ပါ။</string>
+    <string name="phone_num">ဖုန်းနံပါတ်: </string>
+    <string name="start_auth">အတည်ပြုခြင်း စတင်ပါ</string>
+    <string name="login_auth">ဝင်ရောက်မှု အတည်ပြုခြင်း</string>
+    <string name="send_code_desc">သင့်ဖုန်းနံပါတ် %s သို့ SMS အတည်ပြုကုဒ် ပို့ပြီးပါပြီ</string>
+    <string name="login_authing">ဝင်ရောက်မှု အတည်ပြုနေသည်</string>
+    <string name="other_device_login">သင့်အကောင့်သည် အခြားစက်တွင် ဝင်ရောက်ထားပါသည်။ ထပ်မံဝင်ရောက်ပါ။</string>
+    <string name="auth_phone">သင့်ဖုန်းနံပါတ်ကို အတည်ပြုပါ</string>
+    <string name="auth_phone_tips">%s သည် ဖုန်းနံပါတ် အတည်ပြုရန် SMS ပို့ပါမည်။ အတည်ပြုကုဒ်ကို ထည့်ပါ</string>
+    <string name="logging_in">ဝင်ရောက်နေသည်</string>
+    <string name="wk_ban">သင့်အကောင့်ကို ပိတ်ထားပါသည်။ ပြန်ဖွင့်လိုပါက အုပ်ချုပ်သူကို ဆက်သွယ်ပါ</string>
+    <string name="phone_notice_open">ဖုန်းသတိပေးချက် ဖွင့်ထားသည်</string>
+    <string name="phone_notice_close">ဖုန်းသတိပေးချက် ပိတ်ထားသည်</string>
+    <string name="phone_mute">ဖုန်းသတိပေးချက် အသံပိတ်</string>
+    <string name="exit_pc_login">Web %s မှ ထွက်ရန်</string>
+    <string name="pc_locking">လော့ခ်ချရန်</string>
+    <string name="pc_file">ဖိုင်ပို့ရန်</string>
+    <string name="pc_login">Web %s ဝင်ရောက်ထားသည်</string>
+    <string name="sign_in_agree">ကျွန်ုပ် ဖတ်ပြီး သဘောတူပါသည်: </string>
+    <string name="privacy_policy">ကိုယ်ရေးအချက်အလက် မူဝါဒ</string>
+    <string name="user_agreement"> နှင့် အသုံးပြုသူ သဘောတူညီချက်</string>
+    <string name="update_api">ဆာဗာလိပ်စာ ပြောင်းရန်</string>
+    <string name="web_url">Web URL</string>
+    <string name="qr_scan_login">QR ကုဒ် စကင်ဖတ်၍ ဝင်ရောက်ရန်</string>
+    <string name="web_side">%s Web ဗားရှင်း</string>
+    <string name="web_scan_login_desc">ဘရောက်ဇာဖြင့် %s သို့ ဝင်ရောက်ပြီး QR ကုဒ်ကို စကင်ဖတ်၍ ဝင်ရောက်ပါ။ ပိုမိုကောင်းမွန်သော အတွေ့အကြုံအတွက် Google Chrome အသုံးပြုရန် အကြံပြုပါသည်။</string>
+    <string name="copied">ကူးယူပြီးပါပြီ</string>
+    <string name="phone_error">ဖုန်းနံပါတ် မမှန်ကန်ပါ</string>
+    <string name="agree_auth_tips">ကိုယ်ရေးအချက်အလက် မူဝါဒနှင့် အသုံးပြုသူ သဘောတူညီချက်ကို ဦးစွာဖတ်ပြီး သဘောတူပါ</string>
+    <string name="choose_login_type">— တတိယပါတီဖြင့် ဝင်ရောက်ရန် —</string>
+    <string name="update_api_ip">http ဖြင့် စပါ၊ ဥပမာ http://172.0.0.1:8090</string>
+    <string name="input_invite_code_must">ဖိတ်ကြားကုဒ် ထည့်ပါ (လိုအပ်သည်)</string>
+    <string name="input_invite_code_not_must">ဖိတ်ကြားကုဒ် ထည့်ပါ (ရွေးချယ်နိုင်သည်)</string>
+    <string name="invite_code_not_null">ဖိတ်ကြားကုဒ် ထည့်ရန် လိုအပ်သည်</string>
+    <string name="reset_base_url">ပြန်သတ်မှတ်ရန်</string>
+    <string name="update_api_content">ဆာဗာလိပ်စာ၊ ဒိုမိန်းအမည် သို့မဟုတ် IP + port ဖြည့်သည့်အခါ http ဖြင့် စရပါမည်။\nဥပမာ:\nhttps://172.0.0.1:8090</string>
 
     <string name="profile_edit_title">ဘာသာစကားမိတ်ဖက် ပရိုဖိုင် ပြင်ဆင်ရန်</string>
-    <string name="profile_edit_subtitle">ပထမဆုံးဖွင့်မီ အချက်အလက်များကို ဖြည့်ပါ။</string>
-    <string name="profile_display_name">အသုံးပြုသူအမည် / ပြသမည့်အမည်</string>
-    <string name="profile_name_hint">အသုံးပြုသူအမည် ရိုက်ပါ</string>
-    <string name="profile_partner_photos">မိတ်ဖက် ဓာတ်ပုံများ</string>
-    <string name="profile_upload_phone_photo">ဖုန်းမှ ဓာတ်ပုံတင်ရန်</string>
+    <string name="profile_display_name">အသုံးပြုသူအမည် / ပြသအမည်</string>
+    <string name="profile_name_hint">အသုံးပြုသူအမည် ထည့်ပါ</string>
+    <string name="profile_partner_photos">ပရိုဖိုင်ဓာတ်ပုံများ</string>
+    <string name="profile_upload_phone_photo">ဖုန်းမှ ဓာတ်ပုံ အပ်လုဒ်တင်ရန်</string>
     <string name="profile_intro">မိတ်ဆက်</string>
-    <string name="profile_intro_hint">သင်လေ့ကျင့်ချင်သောဘာသာစကားနှင့် စကားပြောချင်သောအရာကို ရေးပါ။</string>
-    <string name="profile_country_region">နိုင်ငံသား / ဒေသ</string>
-    <string name="profile_gender">လိင်</string>
-    <string name="profile_native_language">မိခင်ဘာသာ / ပြောတတ်သည်</string>
-    <string name="profile_learning_language">သင်ယူချင်သောဘာသာစကား</string>
-    <string name="profile_birthday">မွေးနေ့</string>
-    <string name="profile_height_optional">အရပ် (မဖြစ်မနေမဟုတ်)</string>
-    <string name="profile_weight_optional">ကိုယ်အလေးချိန် (မဖြစ်မနေမဟုတ်)</string>
-    <string name="profile_education_optional">ပညာရေး (မဖြစ်မနေမဟုတ်)</string>
-    <string name="profile_tags">တံဆိပ်များ</string>
-    <string name="profile_choose_tags_hint">တံဆိပ်များ ရွေးပါ</string>
-    <string name="profile_choose_tags">တံဆိပ်များ ရွေးပါ</string>
+    <string name="profile_intro_hint">သင်လေ့ကျင့်ချင်သော ဘာသာစကားနှင့် စကားပြောချင်သော အကြောင်းအရာများကို ရေးပါ။</string>
+    <string name="profile_country_region">နိုင်ငံ / ဒေသ</string>
+    <string name="profile_gender">ကျား/မ</string>
+    <string name="profile_native_language">မိခင်ဘာသာစကား / ပြောနိုင်သော ဘာသာစကား</string>
+    <string name="profile_learning_language">သင်ယူလိုသော ဘာသာစကား</string>
+    <string name="profile_birthday_optional">မွေးနေ့ ရွေးချယ်နိုင်သည်</string>
+    <string name="profile_height_optional">အရပ် ရွေးချယ်နိုင်သည်</string>
+    <string name="profile_weight_optional">ကိုယ်အလေးချိန် ရွေးချယ်နိုင်သည်</string>
+    <string name="profile_tags">တဂ်များ</string>
+    <string name="profile_choose_tags_hint">တဂ်များ ရွေးပါ</string>
+    <string name="profile_choose_tags">တဂ်များ ရွေးရန်</string>
     <string name="profile_tag_category_title">အမျိုးအစား ရွေးပါ</string>
     <string name="profile_select">ရွေးပါ</string>
-    <string name="profile_save">ပရိုဖိုင် သိမ်းမည်</string>
+    <string name="profile_save">ပရိုဖိုင် သိမ်းဆည်းရန်</string>
     <string name="profile_save_failed">သိမ်းဆည်းမှု မအောင်မြင်ပါ</string>
-    <string name="profile_partner_photo_limit">ဓာတ်ပုံ အများဆုံး ၅ ပုံ</string>
+    <string name="profile_partner_photo_limit">ပရိုဖိုင်ဓာတ်ပုံ အများဆုံး ၅ ပုံ</string>
     <string name="profile_gender_male">ကျား</string>
     <string name="profile_gender_female">မ</string>
-    <string name="profile_image_compressing">ဓာတ်ပုံ ချုံ့နေသည်</string>
-    <string name="profile_image_compress_failed">ဓာတ်ပုံချုံ့၍မရပါ၊ အခြားတစ်ပုံရွေးပါ။</string>
+    <string name="profile_image_compressing">ပုံကို ချုံ့နေသည်</string>
+    <string name="profile_image_compress_failed">ပုံချုံ့ခြင်း မအောင်မြင်ပါ။ အခြားပုံတစ်ပုံ သုံးပါ</string>
     <string name="profile_preview">အစမ်းကြည့်ရန်</string>
-    <string name="profile_delete_photo">ဖျက်မည်</string>
-    <string name="profile_avatar_required">ပရိုဖိုင်ပုံ တင်ပါ</string>
-    <string name="profile_intro_required">မိတ်ဆက် ရေးပါ</string>
-    <string name="profile_country_required">နိုင်ငံသား / ဒေသ ရွေးပါ</string>
-    <string name="profile_gender_required">လိင် ရွေးပါ</string>
-    <string name="profile_native_language_required">မိခင်ဘာသာ ရွေးပါ</string>
-    <string name="profile_learning_language_required">သင်ယူချင်သောဘာသာစကား ရွေးပါ</string>
-    <string name="profile_birthday_required">မွေးနေ့ ရွေးပါ</string>
-    <string name="profile_tags_required">အနည်းဆုံး တံဆိပ်တစ်ခု ရွေးပါ</string>
-    <string name="profile_avatar_upload_failed">ပရိုဖိုင်ပုံတင်ခြင်း မအောင်မြင်ပါ၊ ခဏစောင့်ပြီး ထပ်ကြိုးစားပါ။</string>
+    <string name="profile_delete_photo">ဖျက်ရန်</string>
+    <string name="profile_avatar_required">ကိုယ်ရေးပုံ အပ်လုဒ်တင်ပါ</string>
+    <string name="profile_intro_required">မိတ်ဆက်စာ ဖြည့်ပါ</string>
+    <string name="profile_country_required">နိုင်ငံ / ဒေသ ရွေးပါ</string>
+    <string name="profile_gender_required">ကျား/မ ရွေးပါ</string>
+    <string name="profile_native_language_required">မိခင်ဘာသာစကား ရွေးပါ</string>
+    <string name="profile_learning_language_required">သင်ယူလိုသော ဘာသာစကား ရွေးပါ</string>
+    <string name="profile_tags_required">အနည်းဆုံး တဂ်တစ်ခု ရွေးပါ</string>
+    <string name="profile_avatar_upload_failed_non_blocking">ပုံအပ်လုဒ်တင်မှု မအောင်မြင်ပါ။ ပရိုဖိုင်ကို သိမ်းဆည်းပြီးပါပြီ။ ကိုယ်ရေးပုံကို နောက်မှ ထပ်စမ်းပါ။</string>
+    <string name="profile_language_multi_hint">တစ်ခုထက်ပို ရွေးနိုင်သည်။ အများဆုံး %1$d ခု</string>
+    <string name="profile_tag_multi_select_hint">တစ်ခုထက်ပို ရွေးနိုင်သည်။ တဂ်များကို နှိပ်၍ ရွေးပါ</string>
+    <string name="profile_tag_single_select_hint">ဤအမျိုးအစားတွင် တစ်ခုသာ ရွေးနိုင်သည်။ အသစ်ရွေးပါက ယခင်ရွေးချယ်မှုကို အစားထိုးမည်</string>
+    <string name="profile_select_max_count">အများဆုံး %1$d ခု ရွေးနိုင်သည်</string>
 
     <string-array name="profile_country_options">
-        <item>🇲🇲 မြန်မာ</item><item>🇨🇳 တရုတ်</item><item>🇺🇸 အမေရိကန်</item><item>🇬🇧 ဗြိတိန်</item><item>🇹🇭 ထိုင်း</item><item>🇯🇵 ဂျပန်</item><item>🇰🇷 ကိုရီးယား</item><item>🇸🇬 စင်ကာပူ</item><item>🇲🇾 မလေးရှား</item><item>🇮🇩 အင်ဒိုနီးရှား</item><item>🇻🇳 ဗီယက်နမ်</item><item>🇱🇦 လာအို</item><item>🇰🇭 ကမ္ဘောဒီးယား</item><item>🇮🇳 အိန္ဒိယ</item><item>🌍 အခြား</item>
+        <item>🇲🇲 မြန်မာ</item>
+        <item>🇨🇳 တရုတ်</item>
+        <item>🇺🇸 အမေရိကန်</item>
+        <item>🇬🇧 ဗြိတိန်</item>
+        <item>🇹🇭 ထိုင်း</item>
+        <item>🇯🇵 ဂျပန်</item>
+        <item>🇰🇷 ကိုရီးယား</item>
+        <item>🇸🇬 စင်ကာပူ</item>
+        <item>🇲🇾 မလေးရှား</item>
+        <item>🇮🇩 အင်ဒိုနီးရှား</item>
+        <item>🇻🇳 ဗီယက်နမ်</item>
+        <item>🇱🇦 လာအို</item>
+        <item>🇰🇭 ကမ္ဘောဒီးယား</item>
+        <item>🇮🇳 အိန္ဒိယ</item>
+        <item>🇵🇭 ဖိလစ်ပိုင်</item>
+        <item>🇦🇺 ဩစတြေးလျ</item>
+        <item>🇨🇦 ကနေဒါ</item>
+        <item>🌍 အခြား</item>
     </string-array>
-    <string-array name="profile_gender_options"><item>ကျား</item><item>မ</item><item>မပြောလိုပါ</item></string-array>
+
+    <string-array name="profile_gender_options">
+        <item>♂ ကျား</item>
+        <item>♀ မ</item>
+        <item>⚪ မဖော်ပြလို</item>
+    </string-array>
+
     <string-array name="profile_language_options">
-        <item>🇲🇲 မြန်မာဘာသာ</item><item>🇨🇳 တရုတ်ဘာသာ</item><item>🇺🇸 အင်္ဂလိပ်ဘာသာ</item><item>🇹🇭 ထိုင်းဘာသာ</item><item>🇯🇵 ဂျပန်ဘာသာ</item><item>🇰🇷 ကိုရီးယားဘာသာ</item><item>🇻🇳 ဗီယက်နမ်ဘာသာ</item><item>🇮🇩 အင်ဒိုနီးရှားဘာသာ</item><item>🇲🇾 မလေးဘာသာ</item><item>🇱🇦 လာအိုဘာသာ</item><item>🇰🇭 ခမာဘာသာ</item><item>🇮🇳 ဟိန္ဒီဘာသာ</item><item>🌍 အခြား</item>
+        <item>🇲🇲 မြန်မာဘာသာ</item>
+        <item>🇨🇳 တရုတ်ဘာသာ</item>
+        <item>🇺🇸 အင်္ဂလိပ်ဘာသာ</item>
+        <item>🇹🇭 ထိုင်းဘာသာ</item>
+        <item>🇯🇵 ဂျပန်ဘာသာ</item>
+        <item>🇰🇷 ကိုရီးယားဘာသာ</item>
+        <item>🇻🇳 ဗီယက်နမ်ဘာသာ</item>
+        <item>🇮🇩 အင်ဒိုနီးရှားဘာသာ</item>
+        <item>🇲🇾 မလေးဘာသာ</item>
+        <item>🇱🇦 လာအိုဘာသာ</item>
+        <item>🇰🇭 ခမာဘာသာ</item>
+        <item>🇮🇳 ဟိန္ဒီဘာသာ</item>
+        <item>🇫🇷 ပြင်သစ်ဘာသာ</item>
+        <item>🇩🇪 ဂျာမန်ဘာသာ</item>
+        <item>🇪🇸 စပိန်ဘာသာ</item>
+        <item>🌍 အခြား</item>
     </string-array>
-    <string-array name="profile_education_options"><item>အလယ်တန်းနှင့်အောက်</item><item>အထက်တန်း</item><item>ကောလိပ်</item><item>ဘွဲ့</item><item>မာစတာနှင့်အထက်</item><item>အခြား</item></string-array>
-    <string-array name="profile_tag_category_options"><item>သင်ယူရန် ရည်ရွယ်ချက်</item><item>လူမှုရေးရည်ရွယ်ချက်</item><item>စရိုက်</item><item>စိတ်ဝင်စားမှု</item><item>အလုပ်</item><item>ဆက်ဆံရေး</item></string-array>
-    <string-array name="profile_tag_learning_options"><item>နေ့စဉ်စကားပြော</item><item>ခရီးသွား</item><item>အလုပ်</item><item>စာမေးပွဲ</item><item>နိုင်ငံခြားပညာရေး</item><item>စီးပွားရေးစကားပြော</item><item>စကားပြောလေ့ကျင့်</item><item>အသံထွက်ပြင်</item></string-array>
-    <string-array name="profile_tag_social_options"><item>ဘာသာစကားမိတ်ဖက်</item><item>သူငယ်ချင်း</item><item>အနီးအနားချတ်</item><item>အသံချတ်</item><item>စာချတ်</item><item>ယဉ်ကျေးမှုဖလှယ်</item><item>အလေးအနက်စကားပြော</item><item>ပေါ့ပေါ့ပါးပါး</item></string-array>
-    <string-array name="profile_tag_personality_options"><item>စိတ်ရှည်</item><item>တက်ကြွသူ</item><item>ငြိမ်သက်</item><item>အတွင်းကျ</item><item>ဟာသရှိ</item><item>နူးညံ့</item><item>အလေးအနက်</item><item>ဖြည်းဖြည်းနွေးလာတတ်သူ</item><item>နားထောင်ကောင်း</item></string-array>
-    <string-array name="profile_tag_interest_options"><item>ရုပ်ရှင်</item><item>ဂိမ်း</item><item>အားကစား</item><item>အစားအစာ</item><item>စာဖတ်</item><item>အိမ်မွေးတိရစ္ဆာန်</item><item>ဓာတ်ပုံ</item><item>အန်နီမေး</item><item>ဂီတ</item><item>ခရီးသွား</item><item>နည်းပညာ</item><item>ကြံ့ခိုင်ရေး</item></string-array>
-    <string-array name="profile_tag_job_options"><item>ကျောင်းသား</item><item>ဝန်ထမ်း</item><item>စားပွဲထိုး</item><item>ဆရာ</item><item>ရဲ</item><item>ယာဉ်မောင်း</item><item>အရောင်း</item><item>လုပ်ငန်းရှင်</item><item>လွတ်လပ်အလုပ်</item><item>အလုပ်မရှိ</item><item>အခြား</item></string-array>
-    <string-array name="profile_tag_relationship_options"><item>တစ်ကိုယ်တည်း</item><item>ချစ်သူရှိ</item><item>ကွာရှင်း</item><item>လက်ထပ်ပြီး</item><item>မပြောလိုပါ</item></string-array>
+
+    <string-array name="profile_tag_category_options">
+        <item>ဘာသာစကားအဆင့်</item>
+        <item>သင်ယူမှု ရည်ရွယ်ချက်</item>
+        <item>ဆက်ဆံရေး အခြေအနေ</item>
+        <item>ဆက်ဆံရေး ရည်ရွယ်ချက်</item>
+        <item>ကိုယ်ရည်ကိုယ်သွေး</item>
+        <item>အိမ်မွေးတိရစ္ဆာန် စိတ်ဝင်စားမှု</item>
+        <item>အားကစား စိတ်ဝင်စားမှု</item>
+        <item>ရုပ်ရှင်နှင့် အစီအစဉ်များ</item>
+        <item>အလုပ်အကိုင် အခြေအနေ</item>
+        <item>ပညာရေး</item>
+        <item>လုံခြုံရေး နယ်နိမိတ်များ</item>
+    </string-array>
+
+    <string-array name="profile_tag_language_skill_options">
+        <item>မိခင်ဘာသာစကား ပြောသူ</item>
+        <item>ကျွမ်းကျင်စွာ ပြောနိုင်သည်</item>
+        <item>အလယ်အလတ်အထက်</item>
+        <item>အစပြုသူ</item>
+        <item>အခြေခံမရှိသေး</item>
+    </string-array>
+
+    <string-array name="profile_tag_learning_goal_options">
+        <item>ဘာသာစကားမိတ်ဖက် ရှာရန်</item>
+        <item>အလုပ်အတွက် လိုအပ်သည်</item>
+        <item>စိတ်ဝင်စားမှု</item>
+        <item>သူငယ်ချင်းဖွဲ့ရန်</item>
+        <item>ယဉ်ကျေးမှု ဖလှယ်ရန်</item>
+        <item>နိုင်ငံခြားပညာသင်ရန်</item>
+        <item>ခရီးသွားရန် ပြင်ဆင်ခြင်း</item>
+        <item>လုပ်ငန်းခွင် တိုးတက်မှု</item>
+        <item>နေ့စဉ် လေ့ကျင့်ရန်</item>
+    </string-array>
+
+    <string-array name="profile_tag_relationship_status_options">
+        <item>မဖော်ပြလို</item>
+        <item>တစ်ကိုယ်တည်း</item>
+        <item>ချစ်သူရှိသည်</item>
+        <item>လက်ထပ်ပြီး</item>
+        <item>ကွာရှင်းပြီး</item>
+    </string-array>
+
+    <string-array name="profile_tag_relationship_intent_options">
+        <item>သင်ယူရန်သာ</item>
+        <item>ချစ်ရေးမပါ</item>
+        <item>အခြေအနေအတိုင်း ဆက်ကြည့်မည်</item>
+        <item>ချစ်ရေးကို မငြင်းပါ</item>
+        <item>သူငယ်ချင်းအရင်</item>
+        <item>တစ်မြို့တည်း သူငယ်ချင်း</item>
+        <item>အဝေးချစ်ရေး လက်ခံနိုင်သည်</item>
+    </string-array>
+
+    <string-array name="profile_tag_personality_options">
+        <item>စိတ်ရှည်</item>
+        <item>ပွင့်လင်းဖော်ရွေ</item>
+        <item>ငြိမ်သက်</item>
+        <item>အတွင်းကျ</item>
+        <item>ဟာသဉာဏ်ရှိ</item>
+        <item>နူးညံ့</item>
+        <item>တည်ကြည်</item>
+        <item>ရင်းနှီးရန် အချိန်ယူတတ်</item>
+        <item>စိတ်ခံစားမှု နားလည်မှုမြင့်</item>
+        <item>ပေါင်းသင်းလွယ်</item>
+    </string-array>
+
+    <string-array name="profile_tag_pet_options">
+        <item>ခွေး</item>
+        <item>ကြောင်</item>
+        <item>ယုန်</item>
+        <item>ငှက်</item>
+        <item>ငါး</item>
+        <item>ဟမ်းစတာ</item>
+        <item>တွားသွားသတ္တဝါ</item>
+        <item>တိရစ္ဆာန်ချစ်သူ</item>
+    </string-array>
+
+    <string-array name="profile_tag_sports_options">
+        <item>ပြေးခြင်း</item>
+        <item>ဘတ်စကက်ဘော</item>
+        <item>ဘောလုံး</item>
+        <item>ဘက်ဒမင်တန်</item>
+        <item>ကိုယ်လက်လေ့ကျင့်ခန်း</item>
+        <item>ယောဂ</item>
+        <item>ရေကူး</item>
+        <item>စက်ဘီးစီးခြင်း</item>
+        <item>တောင်တက်လမ်းလျှောက်</item>
+        <item>စကိတ်ဘုတ်စီးခြင်း</item>
+    </string-array>
+
+    <string-array name="profile_tag_movie_options">
+        <item>ရုပ်ရှင်</item>
+        <item>ဟာသ</item>
+        <item>အချစ်</item>
+        <item>အက်ရှင်</item>
+        <item>လျှို့ဝှက်ဆန်းကြယ်</item>
+        <item>မှတ်တမ်းရုပ်ရှင်</item>
+        <item>ဇာတ်လမ်းတွဲ</item>
+        <item>အန်နီမေး</item>
+        <item>ဖျော်ဖြေရေး အစီအစဉ်</item>
+        <item>ဗီဒီယိုတိုများ</item>
+    </string-array>
+
+    <string-array name="profile_tag_job_options">
+        <item>မဖော်ပြလို</item>
+        <item>ကျောင်းသား/ကျောင်းသူ</item>
+        <item>ဝန်ထမ်း</item>
+        <item>စားပွဲထိုး</item>
+        <item>ဆရာ/ဆရာမ</item>
+        <item>ရဲအရာရှိ</item>
+        <item>ယာဉ်မောင်း</item>
+        <item>အရောင်း</item>
+        <item>လုပ်ငန်းရှင်</item>
+        <item>အလွတ်တန်းလုပ်ကိုင်သူ</item>
+        <item>အလုပ်ရှာနေ</item>
+        <item>အခြား</item>
+    </string-array>
+
+    <string-array name="profile_tag_education_options">
+        <item>မဖော်ပြလို</item>
+        <item>အလယ်တန်းနှင့် အောက်</item>
+        <item>အထက်တန်း</item>
+        <item>ဘွဲ့</item>
+        <item>မဟာဘွဲ့နှင့် အထက်</item>
+        <item>အခြား</item>
+    </string-array>
+
+    <string-array name="profile_tag_safety_options">
+        <item>ယဉ်ကျေးစွာ စကားပြော</item>
+        <item>နှောင့်ယှက်မှု မရှိ</item>
+        <item>ဆက်သွယ်ရန်အချက်အလက် မမျှဝေ</item>
+        <item>အက်ပ်အတွင်းသာ ဆက်သွယ်</item>
+        <item>နယ်နိမိတ် လေးစား</item>
+        <item>ဖော်ရွေစွာ ပြင်ပေး</item>
+        <item>မစော်ကား</item>
+    </string-array>
 </resources>
