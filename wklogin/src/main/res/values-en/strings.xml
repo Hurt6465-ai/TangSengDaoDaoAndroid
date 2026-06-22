@@ -1,124 +1,289 @@
 <resources>
-    <!-- 登录相关，保留原版地道表达，仅修正错误 -->
     <string name="hint_pwd">Enter password</string>
-    <string name="hint_name">Phone number</string>
+    <string name="hint_name">Enter phone number</string>
     <string name="hint_verfi">Enter verification code</string>
-    <string name="name_not_null">Please enter name</string>
-    <string name="nickname_not_null">Nickname cannot be empty</string>
-    <string name="pwd_not_null">Please enter password</string>
-    <string name="web_login_desc">Web %s login confirmation</string>
+    <string name="name_not_null">Enter name</string>
+    <string name="nickname_not_null">Please enter a nickname</string>
+    <string name="pwd_not_null">Please enter your password</string>
+    <string name="web_login_desc">%s Web login confirmation</string>
     <string name="login_sure">Confirm login</string>
     <string name="cancel_login">Cancel login</string>
-    <string name="login_title">Log in to %s</string> <!-- 原 Welcome Login 语法错误 -->
-    <string name="forget_pwd">Forgot password?</string> <!-- 原 Forget password 不规范 -->
+    <string name="login_title">Welcome to %s</string>
+    <string name="forget_pwd">Forgot password?</string>
     <string name="new_account_register">New user? </string>
     <string name="register">Register</string>
-    <string name="register_app">Sign up for %s</string> <!-- 原 Welcome Register 语法错误 -->
-    <string name="get_verf_code">Get verification code</string> <!-- verify code -> verification code -->
-    <string name="has_account">Already have an account?</string> <!-- 中文问号 -> 英文半角 -->
-    <string name="login">Login</string>
+    <string name="register_app">Register for %s</string>
+    <string name="get_verf_code">Get verification code</string>
+    <string name="has_account">Already have an account? </string>
+    <string name="login">Log in</string>
     <string name="wk_login_search">Search</string>
     <string name="choose_country">Select country or region</string>
-    <string name="pwd_length_error">Password must be 6–16 characters</string> <!-- digits 只能指数字 -->
-    <string name="account_exist">Account already exists</string> <!-- 去掉多余的 the -->
-    <string name="recapture">Resend</string> <!-- Reacquire 不常用，验证码用 Resend -->
-    <string name="wklogin_perfect_userinfo">Complete profile</string> <!-- Info 丢失了“完善资料”的含义 -->
-    <string name="must_input_name">Name (Required)</string> <!-- 全角括号->半角 -->
-    <string name="wklogin_sure">Sure</string> <!-- 保留原版，更符合你们风格 -->
-    <string name="wklogin_upload_header">Click to upload profile picture</string>
-    <string name="wklogin_nickname">Nickname</string> <!-- NickName 大小写统一 -->
+    <string name="pwd_length_error">Password must be 6-16 characters</string>
+    <string name="account_exist">This account already exists</string>
+    <string name="recapture">Resend</string>
+    <string name="wklogin_perfect_userinfo">Complete profile</string>
+    <string name="must_input_name">Name (required)</string>
+    <string name="wklogin_sure">OK</string>
+    <string name="wklogin_upload_header">Tap to upload profile picture</string>
+    <string name="wklogin_nickname">Nickname</string>
     <string name="wklogin_must_upload_header">Please upload a profile picture</string>
-    <string name="login_auth_desc">You are logging in to %s on a new device. Security verification is required. After passing, it will not be needed again.</string>
-    <string name="phone_num">Mobile:</string> <!-- 中文冒号->英文 -->
+    <string name="login_auth_desc">You are logging in to %s on a new device. Security verification is required. After verification, you will not need to verify again next time.</string>
+    <string name="phone_num">Mobile: </string>
     <string name="start_auth">Start verification</string>
-    <string name="login_auth">Login authentication</string>
+    <string name="login_auth">Login verification</string>
     <string name="send_code_desc">We have sent a verification SMS to your mobile number %s</string>
-    <string name="login_authing">Login verification</string> <!-- 保留原版，你们已有统一表述 -->
-    <string name="other_device_login">You are already logged in on another device. Please log in again.</string> <!-- 原版把 device 当主语，错误 -->
+    <string name="login_authing">Verifying login</string>
+    <string name="other_device_login">Your account is logged in on another device. Please log in again!</string>
     <string name="auth_phone">Verify your phone number</string>
-    <string name="auth_phone_tips">%s will send an SMS to verify your phone number. Please enter your verification code.</string>
-    <string name="logging_in">Logging in</string> <!-- 保留原版 -->
-    <string name="wk_ban">Your account has been blocked. Please contact the admin to unblock it.</string> <!-- background administrator 不地道 -->
-    <string name="phone_notice_open">Mobile notifications enabled</string> <!-- 保留原版 -->
-    <string name="phone_notice_close">Mobile notifications disabled</string> <!-- 保留原版 -->
-    <string name="phone_mute">Mute Mobile</string> <!-- 保留原版 -->
-    <string name="exit_pc_login">Log Out of %s for Web</string> <!-- 保留原版大小写 -->
+    <string name="auth_phone_tips">%s will send an SMS to verify your phone number. Please enter the verification code.</string>
+    <string name="logging_in">Logging in</string>
+    <string name="wk_ban">Your account has been blocked. To unblock it, please contact the administrator.</string>
+    <string name="phone_notice_open">Mobile notifications enabled</string>
+    <string name="phone_notice_close">Mobile notifications disabled</string>
+    <string name="phone_mute">Mute mobile notifications</string>
+    <string name="exit_pc_login">Log out from Web %s</string>
     <string name="pc_locking">Lock</string>
-    <string name="pc_file">Send File</string> <!-- 保留原版 -->
-    <string name="pc_login">Logged into %s for Web.</string> <!-- 保留句点 -->
-    <string name="sign_in_agree">I have read and agree to the</string> <!-- 缺少 to 导致语法错误 -->
-    <string name="privacy_policy">Privacy Policy</string> <!-- 去掉多余空格 -->
-    <string name="user_agreement">User Agreement</string>
-    <string name="update_api">Update API address</string> <!-- API 应大写 -->
+    <string name="pc_file">Send file</string>
+    <string name="pc_login">Web %s logged in</string>
+    <string name="sign_in_agree">I have read and agree to the </string>
+    <string name="privacy_policy">Privacy Policy</string>
+    <string name="user_agreement"> and User Agreement</string>
+    <string name="update_api">Change server address</string>
     <string name="web_url">Web URL</string>
-    <string name="qr_scan_login">QR code scan login</string>
-    <string name="web_side">%s for Web</string> <!-- Web side 生硬 -->
-    <string name="web_scan_login_desc">Go to %s in your browser, then scan the QR code to log in. For the best experience, we recommend Google Chrome.</string> <!-- 原句缺少动词 -->
+    <string name="qr_scan_login">Scan QR code to log in</string>
+    <string name="web_side">%s Web version</string>
+    <string name="web_scan_login_desc">Please use your browser to visit %s, then scan the QR code to sign in. For a better experience, we recommend using Google Chrome.</string>
     <string name="copied">Copied</string>
-    <string name="phone_error">Invalid phone number</string> <!-- Illegal 用词不当 -->
+    <string name="phone_error">Invalid mobile phone number</string>
     <string name="agree_auth_tips">Please read and agree to the Privacy Policy and User Agreement first</string>
-    <string name="choose_login_type">Third-party login</string> <!-- 原 Log in 严重错译“第三方登录” -->
-    <string name="update_api_ip">Must start with http (e.g. http://172.0.0.1)</string>
-    <string name="input_invite_code_must">Please enter invitation code (required)</string>
-    <string name="input_invite_code_not_must">Please enter invitation code (optional)</string>
-    <string name="invite_code_not_null">Invitation code cannot be empty</string>
+    <string name="choose_login_type">— Third-party login —</string>
+    <string name="update_api_ip">Start with http, for example: http://172.0.0.1:8090</string>
+    <string name="input_invite_code_must">Please enter the invitation code (required)</string>
+    <string name="input_invite_code_not_must">Please enter the invitation code (optional)</string>
+    <string name="invite_code_not_null">The invitation code cannot be empty</string>
     <string name="reset_base_url">Reset</string>
-    <string name="update_api_content">Enter the server address, domain name or IP:port. Must start with http.\nExample:\nhttps://172.0.0.1:8090</string>
+    <string name="update_api_content">The server address, domain name, or IP + port must start with http.\nExample:\nhttps://172.0.0.1:8090</string>
 
-    <!-- Profile 部分，沿用已经核对好的版本 -->
-    <string name="profile_edit_title">Edit partner profile</string>
-    <string name="profile_edit_subtitle">Fill in these details before using language partners for the first time.</string>
+    <string name="profile_edit_title">Edit language partner profile</string>
     <string name="profile_display_name">Username / Display name</string>
     <string name="profile_name_hint">Enter username</string>
-    <string name="profile_partner_photos">Partner photos</string>
-    <string name="profile_upload_phone_photo">Upload photos from phone</string>
+    <string name="profile_partner_photos">Profile photos</string>
+    <string name="profile_upload_phone_photo">Upload from phone</string>
     <string name="profile_intro">Intro</string>
-    <string name="profile_intro_hint">Tell others what language you want to practice and what you like to talk about.</string>
-    <string name="profile_country_region">Nationality / Region</string>
+    <string name="profile_intro_hint">Say which language you want to practice and what you like to chat about.</string>
+    <string name="profile_country_region">Country / Region</string>
     <string name="profile_gender">Gender</string>
     <string name="profile_native_language">Native language / I speak</string>
-    <string name="profile_learning_language">Learning language</string>
-    <string name="profile_birthday">Birthday</string>
-    <string name="profile_height_optional">Height (optional)</string>
-    <string name="profile_weight_optional">Weight (optional)</string>
-    <string name="profile_education_optional">Education (optional)</string>
+    <string name="profile_learning_language">Language to learn</string>
+    <string name="profile_birthday_optional">Birthday optional</string>
+    <string name="profile_height_optional">Height optional</string>
+    <string name="profile_weight_optional">Weight optional</string>
     <string name="profile_tags">Tags</string>
     <string name="profile_choose_tags_hint">Choose tags</string>
     <string name="profile_choose_tags">Choose tags</string>
     <string name="profile_tag_category_title">Choose category</string>
-    <string name="profile_select">Select</string>
+    <string name="profile_select">Please select</string>
     <string name="profile_save">Save profile</string>
     <string name="profile_save_failed">Save failed</string>
-    <string name="profile_partner_photo_limit">Up to 5 partner photos</string>
+    <string name="profile_partner_photo_limit">Up to 5 profile photos</string>
     <string name="profile_gender_male">Male</string>
     <string name="profile_gender_female">Female</string>
-    <string name="profile_image_compressing">Compressing image…</string>
-    <string name="profile_image_compress_failed">Image compression failed. Try another photo.</string>
+    <string name="profile_image_compressing">Compressing image</string>
+    <string name="profile_image_compress_failed">Image compression failed. Please try another image.</string>
     <string name="profile_preview">Preview</string>
     <string name="profile_delete_photo">Delete</string>
     <string name="profile_avatar_required">Please upload an avatar</string>
-    <string name="profile_intro_required">Please enter an intro</string>
-    <string name="profile_country_required">Please choose nationality / region</string>
-    <string name="profile_gender_required">Please choose gender</string>
-    <string name="profile_native_language_required">Please choose native language</string>
-    <string name="profile_learning_language_required">Please choose learning language</string>
-    <string name="profile_birthday_required">Please choose birthday</string>
+    <string name="profile_intro_required">Please write an intro</string>
+    <string name="profile_country_required">Please choose a country / region</string>
+    <string name="profile_gender_required">Please choose a gender</string>
+    <string name="profile_native_language_required">Please choose your native language</string>
+    <string name="profile_learning_language_required">Please choose the language you want to learn</string>
     <string name="profile_tags_required">Please choose at least one tag</string>
-    <string name="profile_avatar_upload_failed">Avatar upload failed. Please try again later.</string>
+    <string name="profile_avatar_upload_failed_non_blocking">Image upload failed. Profile saved; you can retry uploading the avatar later.</string>
+    <string name="profile_language_multi_hint">Multiple choice, up to %1$d</string>
+    <string name="profile_tag_multi_select_hint">Tap to select multiple tags</string>
+    <string name="profile_tag_single_select_hint">Only one tag can be selected in this category. Selecting a new one will replace the previous selection.</string>
+    <string name="profile_select_max_count">Select up to %1$d</string>
 
     <string-array name="profile_country_options">
-        <item>🇲🇲 Myanmar</item><item>🇨🇳 China</item><item>🇺🇸 United States</item><item>🇬🇧 United Kingdom</item><item>🇹🇭 Thailand</item><item>🇯🇵 Japan</item><item>🇰🇷 Korea</item><item>🇸🇬 Singapore</item><item>🇲🇾 Malaysia</item><item>🇮🇩 Indonesia</item><item>🇻🇳 Vietnam</item><item>🇱🇦 Laos</item><item>🇰🇭 Cambodia</item><item>🇮🇳 India</item><item>🌍 Other</item>
+        <item>🇲🇲 Myanmar</item>
+        <item>🇨🇳 China</item>
+        <item>🇺🇸 United States</item>
+        <item>🇬🇧 United Kingdom</item>
+        <item>🇹🇭 Thailand</item>
+        <item>🇯🇵 Japan</item>
+        <item>🇰🇷 Korea</item>
+        <item>🇸🇬 Singapore</item>
+        <item>🇲🇾 Malaysia</item>
+        <item>🇮🇩 Indonesia</item>
+        <item>🇻🇳 Vietnam</item>
+        <item>🇱🇦 Laos</item>
+        <item>🇰🇭 Cambodia</item>
+        <item>🇮🇳 India</item>
+        <item>🇵🇭 Philippines</item>
+        <item>🇦🇺 Australia</item>
+        <item>🇨🇦 Canada</item>
+        <item>🌍 Other</item>
     </string-array>
-    <string-array name="profile_gender_options"><item>Male</item><item>Female</item><item>Prefer not to say</item></string-array>
+
+    <string-array name="profile_gender_options">
+        <item>♂ Male</item>
+        <item>♀ Female</item>
+        <item>⚪ Private</item>
+    </string-array>
+
     <string-array name="profile_language_options">
-        <item>🇲🇲 Burmese</item><item>🇨🇳 Chinese</item><item>🇺🇸 English</item><item>🇹🇭 Thai</item><item>🇯🇵 Japanese</item><item>🇰🇷 Korean</item><item>🇻🇳 Vietnamese</item><item>🇮🇩 Indonesian</item><item>🇲🇾 Malay</item><item>🇱🇦 Lao</item><item>🇰🇭 Khmer</item><item>🇮🇳 Hindi</item><item>🌍 Other</item>
+        <item>🇲🇲 Burmese</item>
+        <item>🇨🇳 Chinese</item>
+        <item>🇺🇸 English</item>
+        <item>🇹🇭 Thai</item>
+        <item>🇯🇵 Japanese</item>
+        <item>🇰🇷 Korean</item>
+        <item>🇻🇳 Vietnamese</item>
+        <item>🇮🇩 Indonesian</item>
+        <item>🇲🇾 Malay</item>
+        <item>🇱🇦 Lao</item>
+        <item>🇰🇭 Khmer</item>
+        <item>🇮🇳 Hindi</item>
+        <item>🇫🇷 French</item>
+        <item>🇩🇪 German</item>
+        <item>🇪🇸 Spanish</item>
+        <item>🌍 Other</item>
     </string-array>
-    <string-array name="profile_education_options"><item>Middle school or below</item><item>High school</item><item>College</item><item>Bachelor</item><item>Master or above</item><item>Other</item></string-array>
-    <string-array name="profile_tag_category_options"><item>Learning goals</item><item>Social goals</item><item>Personality</item><item>Interests</item><item>Job</item><item>Relationship</item></string-array>
-    <string-array name="profile_tag_learning_options"><item>Daily chat</item><item>Travel</item><item>Work</item><item>Exam</item><item>Study abroad</item><item>Business</item><item>Speaking practice</item><item>Pronunciation</item></string-array>
-    <string-array name="profile_tag_social_options"><item>Language partner</item><item>Friends</item><item>Nearby chat</item><item>Voice chat</item><item>Text chat</item><item>Culture exchange</item><item>Serious talk</item><item>Casual chat</item></string-array>
-    <string-array name="profile_tag_personality_options"><item>Patient</item><item>Outgoing</item><item>Quiet</item><item>Introvert</item><item>Humorous</item><item>Gentle</item><item>Serious</item><item>Slow to warm up</item><item>Good listener</item></string-array>
-    <string-array name="profile_tag_interest_options"><item>Movies</item><item>Games</item><item>Sports</item><item>Food</item><item>Reading</item><item>Pets</item><item>Photography</item><item>Anime</item><item>Music</item><item>Travel</item><item>Technology</item><item>Fitness</item></string-array>
-    <string-array name="profile_tag_job_options"><item>Student</item><item>Employee</item><item>Waiter</item><item>Teacher</item><item>Police</item><item>Driver</item><item>Sales</item><item>Boss</item><item>Freelancer</item><item>Unemployed</item><item>Other</item></string-array>
-    <string-array name="profile_tag_relationship_options"><item>Single</item><item>In a relationship</item><item>Divorced</item><item>Married</item><item>Private</item></string-array>
+
+    <string-array name="profile_tag_category_options">
+        <item>Language Level</item>
+        <item>Learning Goals</item>
+        <item>Relationship Status</item>
+        <item>Relationship Intention</item>
+        <item>Personality</item>
+        <item>Pets</item>
+        <item>Sports</item>
+        <item>Movies &amp; Shows</item>
+        <item>Work Status</item>
+        <item>Education</item>
+        <item>Safety Boundaries</item>
+    </string-array>
+
+    <string-array name="profile_tag_language_skill_options">
+        <item>Native speaker</item>
+        <item>Fluent</item>
+        <item>Upper intermediate</item>
+        <item>Beginner</item>
+        <item>Complete beginner</item>
+    </string-array>
+
+    <string-array name="profile_tag_learning_goal_options">
+        <item>Find a language partner</item>
+        <item>Work needs</item>
+        <item>Interest</item>
+        <item>Make friends</item>
+        <item>Cultural exchange</item>
+        <item>Study abroad</item>
+        <item>Travel prep</item>
+        <item>Career growth</item>
+        <item>Daily practice</item>
+    </string-array>
+
+    <string-array name="profile_tag_relationship_status_options">
+        <item>Private</item>
+        <item>Single</item>
+        <item>Dating</item>
+        <item>Married</item>
+        <item>Divorced</item>
+    </string-array>
+
+    <string-array name="profile_tag_relationship_intent_options">
+        <item>Learning only</item>
+        <item>No dating</item>
+        <item>Let it happen</item>
+        <item>Open to dating</item>
+        <item>Friends first</item>
+        <item>Local friends</item>
+        <item>Long-distance OK</item>
+    </string-array>
+
+    <string-array name="profile_tag_personality_options">
+        <item>Patient</item>
+        <item>Outgoing</item>
+        <item>Quiet</item>
+        <item>Introvert</item>
+        <item>Humorous</item>
+        <item>Gentle</item>
+        <item>Serious</item>
+        <item>Slow to warm up</item>
+        <item>High EQ</item>
+        <item>Easygoing</item>
+    </string-array>
+
+    <string-array name="profile_tag_pet_options">
+        <item>Dogs</item>
+        <item>Cats</item>
+        <item>Rabbits</item>
+        <item>Birds</item>
+        <item>Fish</item>
+        <item>Hamsters</item>
+        <item>Reptiles</item>
+        <item>Animal lover</item>
+    </string-array>
+
+    <string-array name="profile_tag_sports_options">
+        <item>Running</item>
+        <item>Basketball</item>
+        <item>Football</item>
+        <item>Badminton</item>
+        <item>Fitness</item>
+        <item>Yoga</item>
+        <item>Swimming</item>
+        <item>Cycling</item>
+        <item>Hiking</item>
+        <item>Skateboarding</item>
+    </string-array>
+
+    <string-array name="profile_tag_movie_options">
+        <item>Movies</item>
+        <item>Comedy</item>
+        <item>Romance</item>
+        <item>Action</item>
+        <item>Mystery</item>
+        <item>Documentary</item>
+        <item>TV series</item>
+        <item>Anime</item>
+        <item>Variety shows</item>
+        <item>Short videos</item>
+    </string-array>
+
+    <string-array name="profile_tag_job_options">
+        <item>Private</item>
+        <item>Student</item>
+        <item>Employee</item>
+        <item>Waiter</item>
+        <item>Teacher</item>
+        <item>Police officer</item>
+        <item>Driver</item>
+        <item>Sales</item>
+        <item>Business owner</item>
+        <item>Freelancer</item>
+        <item>Between jobs</item>
+        <item>Other</item>
+    </string-array>
+
+    <string-array name="profile_tag_education_options">
+        <item>Private</item>
+        <item>Middle school or below</item>
+        <item>High school</item>
+        <item>Bachelor</item>
+        <item>Master or above</item>
+        <item>Other</item>
+    </string-array>
+
+    <string-array name="profile_tag_safety_options">
+        <item>Polite chat</item>
+        <item>No harassment</item>
+        <item>No contact exchange</item>
+        <item>In-app only</item>
+        <item>Respect boundaries</item>
+        <item>Friendly correction</item>
+        <item>No offense</item>
+    </string-array>
 </resources>
