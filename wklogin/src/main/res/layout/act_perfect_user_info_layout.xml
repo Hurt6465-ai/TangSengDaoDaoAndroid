@@ -33,25 +33,17 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/profile_edit_title"
-                android:textColor="@color/colorDark"
-                android:textSize="24sp"
+                android:textColor="#111827"
+                android:textSize="25sp"
                 android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="@string/profile_edit_subtitle"
-                android:textColor="@color/color999"
-                android:textSize="14sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="22dp"
                 android:text="@string/profile_display_name"
-                android:textColor="@color/colorDark"
-                android:textSize="15sp"
+                android:textColor="#1A2238"
+                android:textSize="16sp"
                 android:textStyle="bold" />
 
             <LinearLayout
@@ -62,38 +54,42 @@
                 android:orientation="horizontal">
 
                 <FrameLayout
-                    android:layout_width="88dp"
-                    android:layout_height="88dp">
+                    android:layout_width="126dp"
+                    android:layout_height="126dp">
 
                     <com.chat.base.ui.components.AvatarView
                         android:id="@+id/avatarView"
-                        android:layout_width="76dp"
-                        android:layout_height="76dp"
+                        android:layout_width="108dp"
+                        android:layout_height="108dp"
                         android:layout_gravity="center" />
 
                     <TextView
                         android:id="@+id/countryFlagTv"
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
                         android:layout_gravity="start|bottom"
+                        android:layout_marginStart="3dp"
+                        android:layout_marginBottom="7dp"
                         android:background="@drawable/profile_flag_bg"
                         android:gravity="center"
-                        android:textSize="15sp" />
+                        android:textSize="16sp" />
 
                     <View
                         android:id="@+id/onlineDotView"
-                        android:layout_width="13dp"
-                        android:layout_height="13dp"
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
                         android:layout_gravity="end|top"
-                        android:layout_marginTop="6dp"
-                        android:layout_marginEnd="7dp"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginEnd="8dp"
                         android:background="@drawable/profile_online_dot_bg" />
 
                     <androidx.appcompat.widget.AppCompatImageView
                         android:id="@+id/coverIv"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
                         android:layout_gravity="end|bottom"
+                        android:layout_marginEnd="24dp"
+                        android:layout_marginBottom="26dp"
                         android:src="@mipmap/ico_xiangji" />
                 </FrameLayout>
 
@@ -101,7 +97,7 @@
                     android:id="@+id/nameEt"
                     android:layout_width="0dp"
                     android:layout_height="58dp"
-                    android:layout_marginStart="12dp"
+                    android:layout_marginStart="4dp"
                     android:layout_weight="1"
                     android:background="@drawable/profile_field_bg"
                     android:gravity="center_vertical"
@@ -110,18 +106,43 @@
                     android:paddingStart="16dp"
                     android:paddingEnd="16dp"
                     android:singleLine="true"
-                    android:textColor="@color/colorDark"
-                    android:textColorHint="@color/color999"
-                    android:textSize="16sp" />
+                    android:textColor="#111827"
+                    android:textColorHint="#667085"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
-                android:text="@string/profile_partner_photos"
-                android:textColor="@color/colorDark"
+                android:text="@string/profile_intro"
+                android:textColor="#1A2238"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <androidx.appcompat.widget.AppCompatEditText
+                android:id="@+id/introEt"
+                android:layout_width="match_parent"
+                android:layout_height="112dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/profile_field_bg"
+                android:gravity="top|start"
+                android:hint="@string/profile_intro_hint"
+                android:maxLength="160"
+                android:padding="16dp"
+                android:textColor="#111827"
+                android:textColorHint="#667085"
                 android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/profile_partner_photos"
+                android:textColor="#1A2238"
+                android:textSize="16sp"
                 android:textStyle="bold" />
 
             <HorizontalScrollView
@@ -149,29 +170,6 @@
                 android:textColor="#342C8C"
                 android:textSize="17sp"
                 android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/profile_intro"
-                android:textColor="@color/colorDark"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <androidx.appcompat.widget.AppCompatEditText
-                android:id="@+id/introEt"
-                android:layout_width="match_parent"
-                android:layout_height="112dp"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/profile_field_bg"
-                android:gravity="top|start"
-                android:hint="@string/profile_intro_hint"
-                android:maxLength="160"
-                android:padding="16dp"
-                android:textColor="@color/colorDark"
-                android:textColorHint="@color/color999"
-                android:textSize="15sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -258,7 +256,7 @@
             <TextView
                 style="@style/ProfileLabelText"
                 android:layout_marginTop="18dp"
-                android:text="@string/profile_birthday" />
+                android:text="@string/profile_birthday_optional" />
 
             <TextView
                 android:id="@+id/birthdayTv"
@@ -282,12 +280,41 @@
                         style="@style/ProfileLabelText"
                         android:text="@string/profile_height_optional" />
 
-                    <androidx.appcompat.widget.AppCompatEditText
-                        android:id="@+id/heightEt"
-                        style="@style/ProfileEditText"
-                        android:hint="170"
-                        android:inputType="number"
-                        android:maxLength="3" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="58dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/profile_field_bg"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="14dp">
+
+                        <androidx.appcompat.widget.AppCompatEditText
+                            android:id="@+id/heightEt"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@color/transparent"
+                            android:gravity="center_vertical"
+                            android:hint="170"
+                            android:inputType="number"
+                            android:maxLength="3"
+                            android:padding="0dp"
+                            android:textColor="#0F172A"
+                            android:textColorHint="#6B7280"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:text="cm"
+                            android:textColor="#4B5563"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <LinearLayout
@@ -301,43 +328,60 @@
                         style="@style/ProfileLabelText"
                         android:text="@string/profile_weight_optional" />
 
-                    <androidx.appcompat.widget.AppCompatEditText
-                        android:id="@+id/weightEt"
-                        style="@style/ProfileEditText"
-                        android:hint="60"
-                        android:inputType="number"
-                        android:maxLength="3" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="58dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/profile_field_bg"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="14dp">
+
+                        <androidx.appcompat.widget.AppCompatEditText
+                            android:id="@+id/weightEt"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@color/transparent"
+                            android:gravity="center_vertical"
+                            android:hint="60"
+                            android:inputType="number"
+                            android:maxLength="3"
+                            android:padding="0dp"
+                            android:textColor="#0F172A"
+                            android:textColorHint="#6B7280"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:text="kg"
+                            android:textColor="#4B5563"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
-
-            <TextView
-                style="@style/ProfileLabelText"
-                android:layout_marginTop="18dp"
-                android:text="@string/profile_education_optional" />
-
-            <TextView
-                android:id="@+id/educationTv"
-                style="@style/ProfileSelectText"
-                android:text="@string/profile_select" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
                 android:text="@string/profile_tags"
-                android:textColor="@color/colorDark"
-                android:textSize="15sp"
+                android:textColor="#1A2238"
+                android:textSize="16sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/tagResultTv"
+            <LinearLayout
+                android:id="@+id/selectedTagsLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:minHeight="24dp"
-                android:text="@string/profile_choose_tags_hint"
-                android:textColor="@color/color999"
-                android:textSize="14sp" />
+                android:layout_marginTop="8dp"
+                android:minHeight="36dp"
+                android:orientation="vertical" />
 
             <TextView
                 android:id="@+id/tagBtn"
@@ -356,7 +400,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="86dp"
-        android:background="#F8F7FF"
+        android:background="@drawable/profile_bottom_bg"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="24dp"
