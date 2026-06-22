@@ -84,7 +84,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
 
     @Override
     protected void initView() {
-        wkVBinding.avatarView.setSize(96);
+        wkVBinding.avatarView.setSize(108);
         wkVBinding.avatarView.setStrokeWidth(0);
         wkVBinding.avatarView.imageView.setImageResource(R.mipmap.icon_default_header);
         wkVBinding.sureBtn.getBackground().setTint(Theme.colorAccount);
@@ -333,7 +333,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
                         selectedSet.add(option);
                     }
                     item.setBackground(makeRoundBg(selectedSet.contains(option), false, tagColorFor(option)));
-                    item.setTextColor(selectedSet.contains(option) ? Color.parseColor("#3327A8") : Color.parseColor("#172033"));
+                    item.setTextColor(selectedSet.contains(option) ? Color.parseColor("#24136F") : Color.parseColor("#101828"));
                 });
             }
             row.addView(item);
@@ -355,7 +355,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         tv.setMaxLines(2);
         tv.setTextSize(small ? 14 : 15);
         tv.setTypeface(null, android.graphics.Typeface.BOLD);
-        tv.setTextColor(selected ? Color.parseColor("#3327A8") : Color.parseColor("#172033"));
+        tv.setTextColor(selected ? Color.parseColor("#24136F") : Color.parseColor("#101828"));
         tv.setBackground(makeRoundBg(selected, false, tagColorFor(text)));
         return tv;
     }
@@ -455,7 +455,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             tab.setTextSize(14);
             tab.setTypeface(null, android.graphics.Typeface.BOLD);
             tab.setGravity(Gravity.CENTER);
-            tab.setTextColor(i == activeIndex ? Color.WHITE : Color.parseColor("#1B2640"));
+            tab.setTextColor(i == activeIndex ? Color.WHITE : Color.parseColor("#101828"));
             tab.setBackground(makeCategoryTabBg(i == activeIndex, i));
             LinearLayout.LayoutParams tabParams = new LinearLayout.LayoutParams(-2, dp(42));
             tabParams.setMargins(dp(4), 0, dp(4), 0);
@@ -467,13 +467,23 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         tagContainer.removeAllViews();
         int arrayRes = getTagArrayRes(activeIndex);
         String[] tags = getResources().getStringArray(arrayRes);
+        boolean singleChoice = isSingleChoiceTagCategory(activeIndex);
+
         TextView section = new TextView(this);
         section.setText(categories[activeIndex]);
-        section.setTextSize(20);
+        section.setTextSize(21);
         section.setTypeface(null, android.graphics.Typeface.BOLD);
-        section.setTextColor(Color.parseColor("#111827"));
-        section.setPadding(dp(4), dp(8), dp(4), dp(8));
+        section.setTextColor(Color.parseColor("#0F172A"));
+        section.setPadding(dp(4), dp(8), dp(4), 0);
         tagContainer.addView(section);
+
+        TextView hint = new TextView(this);
+        hint.setText(singleChoice ? R.string.profile_tag_single_select_hint : R.string.profile_tag_multi_select_hint);
+        hint.setTextSize(13);
+        hint.setTypeface(null, android.graphics.Typeface.BOLD);
+        hint.setTextColor(Color.parseColor("#475467"));
+        hint.setPadding(dp(4), dp(4), dp(4), dp(10));
+        tagContainer.addView(hint);
 
         LinearLayout row = null;
         for (int i = 0; i < tags.length; i++) {
@@ -485,38 +495,53 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             String tag = tags[i];
             boolean selected = selectedTags.contains(tag);
             TextView item = createOptionItem(tag, selected, true);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(50), 1);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(52), 1);
             params.setMargins(dp(4), dp(6), dp(4), dp(6));
             row.addView(item, params);
             item.setOnClickListener(v -> {
                 if (selectedTags.contains(tag)) {
                     selectedTags.remove(tag);
                 } else {
+                    if (singleChoice) {
+                        removeTagsForCategory(activeIndex);
+                    }
                     selectedTags.add(tag);
                 }
                 renderTagPage(categories, activeIndex, categoryBar, tagContainer);
             });
             if (i == tags.length - 1 && i % 2 == 0) {
                 SpaceView space = new SpaceView(this);
-                LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, dp(50), 1);
+                LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(0, dp(52), 1);
                 sp.setMargins(dp(4), dp(6), dp(4), dp(6));
                 row.addView(space, sp);
             }
         }
     }
 
+    private boolean isSingleChoiceTagCategory(int index) {
+        // 感情状况、职业状态、学历适合单选；其他分类用于展示兴趣/偏好，可多选。
+        return index == 2 || index == 8 || index == 9;
+    }
+
+    private void removeTagsForCategory(int index) {
+        String[] tags = getResources().getStringArray(getTagArrayRes(index));
+        for (String tag : tags) {
+            selectedTags.remove(tag);
+        }
+    }
+
     private int getTagArrayRes(int index) {
         if (index == 0) return R.array.profile_tag_language_skill_options;
         if (index == 1) return R.array.profile_tag_learning_goal_options;
-        if (index == 2) return R.array.profile_tag_interaction_options;
-        if (index == 3) return R.array.profile_tag_safety_options;
-        if (index == 4) return R.array.profile_tag_relationship_intent_options;
-        if (index == 5) return R.array.profile_tag_personality_options;
-        if (index == 6) return R.array.profile_tag_pet_options;
-        if (index == 7) return R.array.profile_tag_sports_options;
-        if (index == 8) return R.array.profile_tag_movie_options;
-        if (index == 9) return R.array.profile_tag_job_options;
-        return R.array.profile_tag_education_options;
+        if (index == 2) return R.array.profile_tag_relationship_status_options;
+        if (index == 3) return R.array.profile_tag_relationship_intent_options;
+        if (index == 4) return R.array.profile_tag_personality_options;
+        if (index == 5) return R.array.profile_tag_pet_options;
+        if (index == 6) return R.array.profile_tag_sports_options;
+        if (index == 7) return R.array.profile_tag_movie_options;
+        if (index == 8) return R.array.profile_tag_job_options;
+        if (index == 9) return R.array.profile_tag_education_options;
+        return R.array.profile_tag_safety_options;
     }
 
     private void refreshTags() {
@@ -544,7 +569,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             chip.setGravity(Gravity.CENTER);
             chip.setTextSize(13);
             chip.setTypeface(null, android.graphics.Typeface.BOLD);
-            chip.setTextColor(Color.parseColor("#1B2640"));
+            chip.setTextColor(Color.parseColor("#101828"));
             chip.setSingleLine(true);
             chip.setBackground(makeRoundBg(true, true, tagColorFor(tag)));
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(34), 1);
