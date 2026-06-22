@@ -188,25 +188,38 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         if (channel == null) {
             channel = new WKChannel(room.getChannelId(), channelType);
         }
+        RoomTopicEntity.RoomMember creator = room.getCreatorMember();
+        String creatorAvatar = !TextUtils.isEmpty(room.creator_avatar) ? room.creator_avatar : creator.avatar;
+        String creatorAvatarCacheKey = !TextUtils.isEmpty(room.creator_avatar_cache_key) ? room.creator_avatar_cache_key : creator.avatar_cache_key;
+        String creatorName = !TextUtils.isEmpty(room.creator_name) ? room.creator_name : creator.name;
+        String creatorUID = !TextUtils.isEmpty(room.creator_uid) ? room.creator_uid : creator.uid;
+
         channel.channelName = room.getShowTitle();
         channel.category = "topic_room";
-        if (!TextUtils.isEmpty(room.creator_avatar)) {
-            channel.avatar = room.creator_avatar;
-            channel.avatarCacheKey = room.creator_avatar_cache_key;
+        if (!TextUtils.isEmpty(creatorAvatar)) {
+            channel.avatar = creatorAvatar;
+            channel.avatarCacheKey = creatorAvatarCacheKey;
         }
         if (channel.remoteExtraMap == null) {
             channel.remoteExtraMap = new HashMap<>();
         }
         channel.remoteExtraMap.put("topic_room", 1);
+        channel.remoteExtraMap.put("topic_title", room.getShowTitle());
+        if (!TextUtils.isEmpty(creatorAvatar)) channel.remoteExtraMap.put("creator_avatar", creatorAvatar);
+        if (!TextUtils.isEmpty(creatorAvatarCacheKey)) channel.remoteExtraMap.put("creator_avatar_cache_key", creatorAvatarCacheKey);
+        if (!TextUtils.isEmpty(creatorName)) channel.remoteExtraMap.put("creator_name", creatorName);
+        if (!TextUtils.isEmpty(creatorUID)) channel.remoteExtraMap.put("creator_uid", creatorUID);
         if (channel.localExtra == null) {
             channel.localExtra = new HashMap<>();
         }
         channel.localExtra.put("topic_room", 1);
         channel.localExtra.put("topic_title", room.getShowTitle());
-        if (!TextUtils.isEmpty(room.creator_avatar)) {
-            channel.localExtra.put("creator_avatar", room.creator_avatar);
-            channel.localExtra.put("creator_avatar_cache_key", room.creator_avatar_cache_key);
+        if (!TextUtils.isEmpty(creatorAvatar)) {
+            channel.localExtra.put("creator_avatar", creatorAvatar);
+            channel.localExtra.put("creator_avatar_cache_key", creatorAvatarCacheKey);
         }
+        if (!TextUtils.isEmpty(creatorName)) channel.localExtra.put("creator_name", creatorName);
+        if (!TextUtils.isEmpty(creatorUID)) channel.localExtra.put("creator_uid", creatorUID);
         WKIM.getInstance().getChannelManager().saveOrUpdateChannel(channel);
     }
 
@@ -265,6 +278,49 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         boolean empty = adapter == null || adapter.getData().isEmpty();
         emptyLayout.setVisibility(empty ? android.view.View.VISIBLE : android.view.View.GONE);
         recyclerView.setVisibility(empty ? android.view.View.GONE : android.view.View.VISIBLE);
+    }
+
+
+    private void recoverCreatedRoomAfterFailure(String title, String tag, AlertDialog dialog, TextView publish, String failMsg) {
+        RoomTopicModel.getInstance().listRooms(new IRequestResultListener<RoomTopicListResponse>() {
+            @Override
+            public void onSuccess(RoomTopicListResponse result) {
+                publish.setEnabled(true);
+                List<RoomTopicEntity> rooms = result == null ? null : result.rooms;
+                if (rooms == null) rooms = new ArrayList<>();
+                RoomTopicStore.sortRooms(rooms);
+                adapter.setList(rooms);
+                updateEmpty();
+
+                RoomTopicEntity created = findRoomByTitleTag(rooms, title, tag);
+                if (created != null) {
+                    dialog.dismiss();
+                    openNativeChat(created);
+                    return;
+                }
+                WKToastUtils.getInstance().showToastNormal(TextUtils.isEmpty(failMsg) ? "发布失败" : failMsg);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                publish.setEnabled(true);
+                WKToastUtils.getInstance().showToastNormal(TextUtils.isEmpty(failMsg) ? "发布失败" : failMsg);
+            }
+        });
+    }
+
+    private RoomTopicEntity findRoomByTitleTag(List<RoomTopicEntity> rooms, String title, String tag) {
+        if (rooms == null || TextUtils.isEmpty(title)) return null;
+        for (RoomTopicEntity room : rooms) {
+            if (room == null) continue;
+            if (TextUtils.equals(title, room.getShowTitle()) && (TextUtils.isEmpty(tag) || TextUtils.equals(tag, room.getRawTag()))) {
+                return room;
+            }
+        }
+        for (RoomTopicEntity room : rooms) {
+            if (room != null && TextUtils.equals(title, room.getShowTitle())) return room;
+        }
+        return null;
     }
 
     private TextView createTagChip(Context context, String text) {
@@ -425,8 +481,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
 
                 @Override
                 public void onFail(int code, String msg) {
-                    publish.setEnabled(true);
-                    WKToastUtils.getInstance().showToastNormal(TextUtils.isEmpty(msg) ? "发布失败" : msg);
+                    recoverCreatedRoomAfterFailure(text, selectedTag[0], dialog, publish, msg);
                 }
             });
         });
