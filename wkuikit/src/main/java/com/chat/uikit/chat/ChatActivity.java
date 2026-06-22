@@ -2316,9 +2316,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (isTopicRoomChannel(channel)) {
             wkVBinding.topLayout.otherLayout.setVisibility(View.GONE);
             String showName = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
-            if (TextUtils.isEmpty(showName)) showName = getExtraString(channel.localExtra, "topic_title");
-            String avatar = TextUtils.isEmpty(channel.avatar) ? getExtraString(channel.localExtra, "creator_avatar") : channel.avatar;
-            String avatarCacheKey = TextUtils.isEmpty(channel.avatarCacheKey) ? getExtraString(channel.localExtra, "creator_avatar_cache_key") : channel.avatarCacheKey;
+            if (TextUtils.isEmpty(showName)) showName = getTopicExtraString(channel, "topic_title");
+            String avatar = TextUtils.isEmpty(channel.avatar) ? getTopicExtraString(channel, "creator_avatar") : channel.avatar;
+            String avatarCacheKey = TextUtils.isEmpty(channel.avatarCacheKey) ? getTopicExtraString(channel, "creator_avatar_cache_key") : channel.avatarCacheKey;
             if (TextUtils.isEmpty(avatar)) {
                 wkVBinding.topLayout.avatarView.showDefaultAvatar(showName);
             } else {
@@ -2329,6 +2329,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             wkVBinding.topLayout.avatarView.showAvatar(channel);
             EndpointManager.getInstance().invoke("show_avatar_other_info", new AvatarOtherViewMenu(wkVBinding.topLayout.otherLayout, channel, wkVBinding.topLayout.avatarView, true));
         }
+    }
+
+    private String getTopicExtraString(WKChannel channel, String key) {
+        if (channel == null) return "";
+        String value = getExtraString(channel.localExtra, key);
+        if (TextUtils.isEmpty(value)) value = getExtraString(channel.remoteExtraMap, key);
+        return value;
     }
 
     private String getExtraString(java.util.Map<String, Object> map, String key) {
