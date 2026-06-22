@@ -136,6 +136,7 @@ public class WKCommonModel extends WKBaseModel {
     }
 
     private void saveChannel(ChannelInfoEntity entity) {
+        if (entity == null || entity.channel == null) return;
         HashMap<String, Object> hashMap = null;
         WKChannel wkChannel = new WKChannel(entity.channel.channel_id, entity.channel.channel_type);
         WKChannel localChannel = WKIM.getInstance().getChannelManager().getChannel(entity.channel.channel_id, entity.channel.channel_type);
@@ -150,8 +151,24 @@ public class WKCommonModel extends WKBaseModel {
         if (hashMap == null)
             hashMap = new HashMap<>();
 
-        wkChannel.channelName = entity.name;
-        wkChannel.avatar = entity.logo;
+        HashMap<String, Object> remoteExtraMap = entity.extra == null ? new HashMap<>() : new HashMap<>(entity.extra);
+        boolean isTopicRoom = isTopicRoomEntity(entity, remoteExtraMap);
+        if (isTopicRoom) {
+            hashMap.put("topic_room", 1);
+            putIfNotEmpty(hashMap, "topic_title", firstNotEmpty(getExtraString(remoteExtraMap, "topic_title"), entity.name));
+            putIfNotEmpty(hashMap, "creator_uid", getExtraString(remoteExtraMap, "creator_uid"));
+            putIfNotEmpty(hashMap, "creator_name", getExtraString(remoteExtraMap, "creator_name"));
+            putIfNotEmpty(hashMap, "creator_avatar", getExtraString(remoteExtraMap, "creator_avatar"));
+            putIfNotEmpty(hashMap, "creator_avatar_cache_key", getExtraString(remoteExtraMap, "creator_avatar_cache_key"));
+        }
+
+        wkChannel.channelName = firstNotEmpty(entity.name, getExtraString(hashMap, "topic_title"));
+        String localAvatar = localChannel == null ? "" : localChannel.avatar;
+        String localAvatarCacheKey = localChannel == null ? "" : localChannel.avatarCacheKey;
+        String creatorAvatar = firstNotEmpty(getExtraString(remoteExtraMap, "creator_avatar"), getExtraString(hashMap, "creator_avatar"));
+        String creatorAvatarCacheKey = firstNotEmpty(getExtraString(remoteExtraMap, "creator_avatar_cache_key"), getExtraString(hashMap, "creator_avatar_cache_key"));
+        wkChannel.avatar = isTopicRoom ? firstNotEmpty(entity.logo, creatorAvatar, localAvatar) : entity.logo;
+        wkChannel.avatarCacheKey = isTopicRoom ? firstNotEmpty(localAvatarCacheKey, creatorAvatarCacheKey) : localAvatarCacheKey;
         wkChannel.channelRemark = entity.remark;
         wkChannel.status = entity.status;
         wkChannel.online = entity.online;
@@ -173,7 +190,7 @@ public class WKCommonModel extends WKBaseModel {
             wkChannel.parentChannelID = entity.parent_channel.channel_id;
             wkChannel.parentChannelType = entity.parent_channel.channel_type;
         }
-        wkChannel.remoteExtraMap = (HashMap) entity.extra;
+        wkChannel.remoteExtraMap = remoteExtraMap;
         hashMap.put(WKChannelExtras.beDeleted, entity.be_deleted);
         hashMap.put(WKChannelExtras.beBlacklist, entity.be_blacklist);
         hashMap.put(WKChannelExtras.notice, entity.notice);
@@ -193,6 +210,35 @@ public class WKCommonModel extends WKBaseModel {
         WKIM.getInstance().getChannelManager().saveOrUpdateChannel(wkChannel);
         if (isRefreshContacts) {
             EndpointManager.getInstance().invoke(WKConstants.refreshContacts, null);
+        }
+    }
+
+    private boolean isTopicRoomEntity(ChannelInfoEntity entity, HashMap<String, Object> extra) {
+        if (entity == null || entity.channel == null) return false;
+        if (entity.channel.channel_type == 2 && !TextUtils.isEmpty(entity.channel.channel_id) && entity.channel.channel_id.startsWith("topic_")) return true;
+        if ("topic_room".equals(entity.category)) return true;
+        Object value = extra == null ? null : extra.get("topic_room");
+        if (value instanceof Number) return ((Number) value).intValue() == 1;
+        return value != null && ("1".equals(String.valueOf(value)) || "true".equalsIgnoreCase(String.valueOf(value)));
+    }
+
+    private String getExtraString(java.util.Map<String, Object> map, String key) {
+        if (map == null || TextUtils.isEmpty(key)) return "";
+        Object value = map.get(key);
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private String firstNotEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (!TextUtils.isEmpty(value)) return value;
+        }
+        return "";
+    }
+
+    private void putIfNotEmpty(HashMap<String, Object> map, String key, String value) {
+        if (map != null && !TextUtils.isEmpty(key) && !TextUtils.isEmpty(value)) {
+            map.put(key, value);
         }
     }
 
