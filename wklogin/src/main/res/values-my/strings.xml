@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="profile_edit_title">ဘာသာစကားမိတ်ဖက် ပရိုဖိုင် ပြင်ဆင်ရန်</string>
+    <string name="profile_edit_subtitle">ပထမဆုံးဖွင့်မီ အချက်အလက်များကို ဖြည့်ပါ။</string>
+    <string name="profile_display_name">အသုံးပြုသူအမည် / ပြသမည့်အမည်</string>
+    <string name="profile_name_hint">အသုံးပြုသူအမည် ရိုက်ပါ</string>
+    <string name="profile_partner_photos">မိတ်ဖက် ဓာတ်ပုံများ</string>
+    <string name="profile_upload_phone_photo">ဖုန်းမှ ဓာတ်ပုံတင်ရန်</string>
+    <string name="profile_intro">မိတ်ဆက်</string>
+    <string name="profile_intro_hint">သင်လေ့ကျင့်ချင်သောဘာသာစကားနှင့် စကားပြောချင်သောအရာကို ရေးပါ။</string>
+    <string name="profile_country_region">နိုင်ငံသား / ဒေသ</string>
+    <string name="profile_gender">လိင်</string>
+    <string name="profile_native_language">မိခင်ဘာသာ / ပြောတတ်သည်</string>
+    <string name="profile_learning_language">သင်ယူချင်သောဘာသာစကား</string>
+    <string name="profile_birthday">မွေးနေ့</string>
+    <string name="profile_height_optional">အရပ် (မဖြစ်မနေမဟုတ်)</string>
+    <string name="profile_weight_optional">ကိုယ်အလေးချိန် (မဖြစ်မနေမဟုတ်)</string>
+    <string name="profile_education_optional">ပညာရေး (မဖြစ်မနေမဟုတ်)</string>
+    <string name="profile_tags">တံဆိပ်များ</string>
+    <string name="profile_choose_tags_hint">တံဆိပ်များ ရွေးပါ</string>
+    <string name="profile_choose_tags">တံဆိပ်များ ရွေးပါ</string>
+    <string name="profile_tag_category_title">အမျိုးအစား ရွေးပါ</string>
+    <string name="profile_select">ရွေးပါ</string>
+    <string name="profile_save">ပရိုဖိုင် သိမ်းမည်</string>
+    <string name="profile_save_failed">သိမ်းဆည်းမှု မအောင်မြင်ပါ</string>
+    <string name="profile_partner_photo_limit">ဓာတ်ပုံ အများဆုံး ၅ ပုံ</string>
+    <string name="profile_gender_male">ကျား</string>
+    <string name="profile_gender_female">မ</string>
+    <string name="profile_image_compressing">ဓာတ်ပုံ ချုံ့နေသည်</string>
+    <string name="profile_image_compress_failed">ဓာတ်ပုံချုံ့၍မရပါ၊ အခြားတစ်ပုံရွေးပါ။</string>
+    <string name="profile_preview">အစမ်းကြည့်ရန်</string>
+    <string name="profile_delete_photo">ဖျက်မည်</string>
+    <string name="profile_avatar_required">ပရိုဖိုင်ပုံ တင်ပါ</string>
+    <string name="profile_intro_required">မိတ်ဆက် ရေးပါ</string>
+    <string name="profile_country_required">နိုင်ငံသား / ဒေသ ရွေးပါ</string>
+    <string name="profile_gender_required">လိင် ရွေးပါ</string>
+    <string name="profile_native_language_required">မိခင်ဘာသာ ရွေးပါ</string>
+    <string name="profile_learning_language_required">သင်ယူချင်သောဘာသာစကား ရွေးပါ</string>
+    <string name="profile_birthday_required">မွေးနေ့ ရွေးပါ</string>
+    <string name="profile_tags_required">အနည်းဆုံး တံဆိပ်တစ်ခု ရွေးပါ</string>
+    <string name="profile_avatar_upload_failed">ပရိုဖိုင်ပုံတင်ခြင်း မအောင်မြင်ပါ၊ ခဏစောင့်ပြီး ထပ်ကြိုးစားပါ။</string>
+
+    <string-array name="profile_country_options">
+        <item>🇲🇲 မြန်မာ</item><item>🇨🇳 တရုတ်</item><item>🇺🇸 အမေရိကန်</item><item>🇬🇧 ဗြိတိန်</item><item>🇹🇭 ထိုင်း</item><item>🇯🇵 ဂျပန်</item><item>🇰🇷 ကိုရီးယား</item><item>🇸🇬 စင်ကာပူ</item><item>🇲🇾 မလေးရှား</item><item>🇮🇩 အင်ဒိုနီးရှား</item><item>🇻🇳 ဗီယက်နမ်</item><item>🇱🇦 လာအို</item><item>🇰🇭 ကမ္ဘောဒီးယား</item><item>🇮🇳 အိန္ဒိယ</item><item>🌍 အခြား</item>
+    </string-array>
+    <string-array name="profile_gender_options"><item>ကျား</item><item>မ</item><item>မပြောလိုပါ</item></string-array>
+    <string-array name="profile_language_options">
+        <item>🇲🇲 မြန်မာဘာသာ</item><item>🇨🇳 တရုတ်ဘာသာ</item><item>🇺🇸 အင်္ဂလိပ်ဘာသာ</item><item>🇹🇭 ထိုင်းဘာသာ</item><item>🇯🇵 ဂျပန်ဘာသာ</item><item>🇰🇷 ကိုရီးယားဘာသာ</item><item>🇻🇳 ဗီယက်နမ်ဘာသာ</item><item>🇮🇩 အင်ဒိုနီးရှားဘာသာ</item><item>🇲🇾 မလေးဘာသာ</item><item>🇱🇦 လာအိုဘာသာ</item><item>🇰🇭 ခမာဘာသာ</item><item>🇮🇳 ဟိန္ဒီဘာသာ</item><item>🌍 အခြား</item>
+    </string-array>
+    <string-array name="profile_education_options"><item>အလယ်တန်းနှင့်အောက်</item><item>အထက်တန်း</item><item>ကောလိပ်</item><item>ဘွဲ့</item><item>မာစတာနှင့်အထက်</item><item>အခြား</item></string-array>
+    <string-array name="profile_tag_category_options"><item>သင်ယူရန် ရည်ရွယ်ချက်</item><item>လူမှုရေးရည်ရွယ်ချက်</item><item>စရိုက်</item><item>စိတ်ဝင်စားမှု</item><item>အလုပ်</item><item>ဆက်ဆံရေး</item></string-array>
+    <string-array name="profile_tag_learning_options"><item>နေ့စဉ်စကားပြော</item><item>ခရီးသွား</item><item>အလုပ်</item><item>စာမေးပွဲ</item><item>နိုင်ငံခြားပညာရေး</item><item>စီးပွားရေးစကားပြော</item><item>စကားပြောလေ့ကျင့်</item><item>အသံထွက်ပြင်</item></string-array>
+    <string-array name="profile_tag_social_options"><item>ဘာသာစကားမိတ်ဖက်</item><item>သူငယ်ချင်း</item><item>အနီးအနားချတ်</item><item>အသံချတ်</item><item>စာချတ်</item><item>ယဉ်ကျေးမှုဖလှယ်</item><item>အလေးအနက်စကားပြော</item><item>ပေါ့ပေါ့ပါးပါး</item></string-array>
+    <string-array name="profile_tag_personality_options"><item>စိတ်ရှည်</item><item>တက်ကြွသူ</item><item>ငြိမ်သက်</item><item>အတွင်းကျ</item><item>ဟာသရှိ</item><item>နူးညံ့</item><item>အလေးအနက်</item><item>ဖြည်းဖြည်းနွေးလာတတ်သူ</item><item>နားထောင်ကောင်း</item></string-array>
+    <string-array name="profile_tag_interest_options"><item>ရုပ်ရှင်</item><item>ဂိမ်း</item><item>အားကစား</item><item>အစားအစာ</item><item>စာဖတ်</item><item>အိမ်မွေးတိရစ္ဆာန်</item><item>ဓာတ်ပုံ</item><item>အန်နီမေး</item><item>ဂီတ</item><item>ခရီးသွား</item><item>နည်းပညာ</item><item>ကြံ့ခိုင်ရေး</item></string-array>
+    <string-array name="profile_tag_job_options"><item>ကျောင်းသား</item><item>ဝန်ထမ်း</item><item>စားပွဲထိုး</item><item>ဆရာ</item><item>ရဲ</item><item>ယာဉ်မောင်း</item><item>အရောင်း</item><item>လုပ်ငန်းရှင်</item><item>လွတ်လပ်အလုပ်</item><item>အလုပ်မရှိ</item><item>အခြား</item></string-array>
+    <string-array name="profile_tag_relationship_options"><item>တစ်ကိုယ်တည်း</item><item>ချစ်သူရှိ</item><item>ကွာရှင်း</item><item>လက်ထပ်ပြီး</item><item>မပြောလိုပါ</item></string-array>
+</resources>
