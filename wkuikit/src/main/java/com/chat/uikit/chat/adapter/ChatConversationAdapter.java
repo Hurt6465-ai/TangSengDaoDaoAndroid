@@ -3,6 +3,7 @@ package com.chat.uikit.chat.adapter;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
@@ -399,6 +400,7 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
         boolean isTop;
         AvatarView avatarView = helper.getView(R.id.avatarView);
         avatarView.setSize(50, isTopicRoom ? 10 : 25);
+        showTopicBadge(helper, isTopicRoom);
         if (item.getWkChannel() != null) {
             if (TextUtils.isEmpty(showName))
                 showName = TextUtils.isEmpty(item.getWkChannel().channelRemark) ? item.getWkChannel().channelName : item.getWkChannel().channelRemark;
@@ -474,6 +476,7 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
 
 //            GlideUtils.getInstance().showAvatarImg(getContext(), item.channelID, item.channelType, item.getWkChannel().avatar, helper.getView(R.id.avatarIv));
         } else {
+            helper.getView(R.id.otherLayout).setVisibility(View.GONE);
             if (TextUtils.isEmpty(showName))
                 showName = getContext().getString(R.string.chat);
             avatarView.defaultAvatarTv.setVisibility(View.GONE);
@@ -491,6 +494,23 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
             WKIM.getInstance().getChannelManager().fetchChannelInfo(item.channelID, item.channelType);
         }
         helper.setText(R.id.nameTv, showName);
+    }
+
+    private void showTopicBadge(@NotNull BaseViewHolder helper, boolean isTopicRoom) {
+        ImageView topicBadgeIv = helper.getView(R.id.topicBadgeIv);
+        topicBadgeIv.setVisibility(isTopicRoom ? View.VISIBLE : View.GONE);
+        if (!isTopicRoom) {
+            topicBadgeIv.setColorFilter(null);
+            return;
+        }
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(ContextCompat.getColor(getContext(), R.color.colorAccent));
+        bg.setStroke(AndroidUtilities.dp(1f), 0xFFFFFFFF);
+        topicBadgeIv.setBackground(bg);
+        int padding = AndroidUtilities.dp(3f);
+        topicBadgeIv.setPadding(padding, padding, padding, padding);
+        topicBadgeIv.setColorFilter(new PorterDuffColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN));
     }
 
     private String getTopicExtraString(WKChannel channel, String key) {
