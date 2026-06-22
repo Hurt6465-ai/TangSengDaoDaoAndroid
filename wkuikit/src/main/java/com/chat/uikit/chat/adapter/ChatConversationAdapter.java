@@ -405,9 +405,9 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
             if (item.channelType == WKChannelType.COMMUNITY) {
                 EndpointManager.getInstance().invoke("show_community_avatar", new ShowCommunityAvatarMenu(getContext(), avatarView, item.getWkChannel()));
             } else if (isTopicRoom) {
-                if (TextUtils.isEmpty(showName)) showName = getExtraString(item.getWkChannel().localExtra, "topic_title");
-                String avatar = TextUtils.isEmpty(item.getWkChannel().avatar) ? getExtraString(item.getWkChannel().localExtra, "creator_avatar") : item.getWkChannel().avatar;
-                String avatarCacheKey = TextUtils.isEmpty(item.getWkChannel().avatarCacheKey) ? getExtraString(item.getWkChannel().localExtra, "creator_avatar_cache_key") : item.getWkChannel().avatarCacheKey;
+                if (TextUtils.isEmpty(showName)) showName = getTopicExtraString(item.getWkChannel(), "topic_title");
+                String avatar = TextUtils.isEmpty(item.getWkChannel().avatar) ? getTopicExtraString(item.getWkChannel(), "creator_avatar") : item.getWkChannel().avatar;
+                String avatarCacheKey = TextUtils.isEmpty(item.getWkChannel().avatarCacheKey) ? getTopicExtraString(item.getWkChannel(), "creator_avatar_cache_key") : item.getWkChannel().avatarCacheKey;
                 if (TextUtils.isEmpty(avatar)) {
                     avatarView.showDefaultAvatar(showName);
                 } else {
@@ -495,6 +495,13 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
             WKIM.getInstance().getChannelManager().fetchChannelInfo(item.channelID, item.channelType);
         }
         helper.setText(R.id.nameTv, showName);
+    }
+
+    private String getTopicExtraString(WKChannel channel, String key) {
+        if (channel == null) return "";
+        String value = getExtraString(channel.localExtra, key);
+        if (TextUtils.isEmpty(value)) value = getExtraString(channel.remoteExtraMap, key);
+        return value;
     }
 
     private String getExtraString(java.util.Map<String, Object> map, String key) {
