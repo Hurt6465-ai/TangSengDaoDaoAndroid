@@ -63,4 +63,173 @@
     <string name="invite_code_not_null">邀请码不能为空</string>
     <string name="reset_base_url">重置</string>
     <string name="update_api_content">填写服务器地址，域名或IP+端口的方式，都必须是http开头。\n例：\n例：https://172.0.0.1:8090</string>
+
+    <string name="profile_edit_title">编辑语伴资料</string>
+    <string name="profile_edit_subtitle">第一次打开语伴前，需要先填写这些资料。</string>
+    <string name="profile_display_name">用户名 / 显示名</string>
+    <string name="profile_name_hint">请输入用户名</string>
+    <string name="profile_partner_photos">语伴照片</string>
+    <string name="profile_upload_phone_photo">上传手机图片</string>
+    <string name="profile_intro">介绍</string>
+    <string name="profile_intro_hint">介绍一下你想练什么语言、喜欢聊什么。</string>
+    <string name="profile_country_region">国籍 / 地区</string>
+    <string name="profile_gender">性别</string>
+    <string name="profile_native_language">母语 / 我会说</string>
+    <string name="profile_learning_language">想学语言</string>
+    <string name="profile_birthday">出生日期</string>
+    <string name="profile_height_optional">身高 选填</string>
+    <string name="profile_weight_optional">体重 选填</string>
+    <string name="profile_education_optional">学历 选填</string>
+    <string name="profile_tags">标签</string>
+    <string name="profile_choose_tags_hint">选择标签</string>
+    <string name="profile_choose_tags">选择标签</string>
+    <string name="profile_tag_category_title">选择分类</string>
+    <string name="profile_select">请选择</string>
+    <string name="profile_save">保存资料</string>
+    <string name="profile_save_failed">保存失败</string>
+    <string name="profile_partner_photo_limit">语伴照片最多 5 张</string>
+    <string name="profile_gender_male">男</string>
+    <string name="profile_gender_female">女</string>
+    <string name="profile_image_compressing">正在压缩图片</string>
+    <string name="profile_image_compress_failed">图片压缩失败，请换一张</string>
+    <string name="profile_preview">预览</string>
+    <string name="profile_delete_photo">删除</string>
+    <string name="profile_avatar_required">请上传头像</string>
+    <string name="profile_intro_required">请填写介绍</string>
+    <string name="profile_country_required">请选择国籍 / 地区</string>
+    <string name="profile_gender_required">请选择性别</string>
+    <string name="profile_native_language_required">请选择母语</string>
+    <string name="profile_learning_language_required">请选择想学语言</string>
+    <string name="profile_birthday_required">请选择出生日期</string>
+    <string name="profile_tags_required">请至少选择一个标签</string>
+    <string name="profile_avatar_upload_failed">头像上传失败，请稍后再试</string>
+
+    <string-array name="profile_country_options">
+        <item>🇲🇲 缅甸</item>
+        <item>🇨🇳 中国</item>
+        <item>🇺🇸 美国</item>
+        <item>🇬🇧 英国</item>
+        <item>🇹🇭 泰国</item>
+        <item>🇯🇵 日本</item>
+        <item>🇰🇷 韩国</item>
+        <item>🇸🇬 新加坡</item>
+        <item>🇲🇾 马来西亚</item>
+        <item>🇮🇩 印度尼西亚</item>
+        <item>🇻🇳 越南</item>
+        <item>🇱🇦 老挝</item>
+        <item>🇰🇭 柬埔寨</item>
+        <item>🇮🇳 印度</item>
+        <item>🌍 其他</item>
+    </string-array>
+
+    <string-array name="profile_gender_options">
+        <item>男</item>
+        <item>女</item>
+        <item>保密</item>
+    </string-array>
+
+    <string-array name="profile_language_options">
+        <item>🇲🇲 缅甸语</item>
+        <item>🇨🇳 中文</item>
+        <item>🇺🇸 英语</item>
+        <item>🇹🇭 泰语</item>
+        <item>🇯🇵 日语</item>
+        <item>🇰🇷 韩语</item>
+        <item>🇻🇳 越南语</item>
+        <item>🇮🇩 印尼语</item>
+        <item>🇲🇾 马来语</item>
+        <item>🇱🇦 老挝语</item>
+        <item>🇰🇭 高棉语</item>
+        <item>🇮🇳 印地语</item>
+        <item>🌍 其他</item>
+    </string-array>
+
+    <string-array name="profile_education_options">
+        <item>初中及以下</item>
+        <item>高中 / 中专</item>
+        <item>大专</item>
+        <item>本科</item>
+        <item>硕士及以上</item>
+        <item>其他</item>
+    </string-array>
+
+    <string-array name="profile_tag_category_options">
+        <item>学习目的</item>
+        <item>社交目的</item>
+        <item>性格</item>
+        <item>兴趣</item>
+        <item>职业</item>
+        <item>感情状况</item>
+    </string-array>
+
+    <string-array name="profile_tag_learning_options">
+        <item>日常聊天</item>
+        <item>旅行</item>
+        <item>工作</item>
+        <item>考试</item>
+        <item>留学</item>
+        <item>商务沟通</item>
+        <item>口语练习</item>
+        <item>纠正发音</item>
+    </string-array>
+
+    <string-array name="profile_tag_social_options">
+        <item>找语伴</item>
+        <item>找朋友</item>
+        <item>附近聊天</item>
+        <item>语音聊天</item>
+        <item>文字聊天</item>
+        <item>文化交流</item>
+        <item>认真交流</item>
+        <item>轻松聊天</item>
+    </string-array>
+
+    <string-array name="profile_tag_personality_options">
+        <item>有耐心</item>
+        <item>外向</item>
+        <item>安静</item>
+        <item>内向</item>
+        <item>幽默</item>
+        <item>温柔</item>
+        <item>认真</item>
+        <item>慢热</item>
+        <item>喜欢倾听</item>
+    </string-array>
+
+    <string-array name="profile_tag_interest_options">
+        <item>电影</item>
+        <item>游戏</item>
+        <item>运动</item>
+        <item>美食</item>
+        <item>阅读</item>
+        <item>宠物</item>
+        <item>拍照</item>
+        <item>动漫</item>
+        <item>音乐</item>
+        <item>旅游</item>
+        <item>科技</item>
+        <item>健身</item>
+    </string-array>
+
+    <string-array name="profile_tag_job_options">
+        <item>在校生</item>
+        <item>普通职工</item>
+        <item>服务员</item>
+        <item>老师</item>
+        <item>警察</item>
+        <item>司机</item>
+        <item>销售</item>
+        <item>老板</item>
+        <item>自由职业</item>
+        <item>无业</item>
+        <item>其他</item>
+    </string-array>
+
+    <string-array name="profile_tag_relationship_options">
+        <item>单身</item>
+        <item>热恋</item>
+        <item>离异</item>
+        <item>结婚</item>
+        <item>保密</item>
+    </string-array>
 </resources>
