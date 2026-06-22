@@ -405,14 +405,10 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
             if (item.channelType == WKChannelType.COMMUNITY) {
                 EndpointManager.getInstance().invoke("show_community_avatar", new ShowCommunityAvatarMenu(getContext(), avatarView, item.getWkChannel()));
             } else if (isTopicRoom) {
-                if (TextUtils.isEmpty(showName)) showName = getTopicExtraString(item.getWkChannel(), "topic_title");
-                String avatar = TextUtils.isEmpty(item.getWkChannel().avatar) ? getTopicExtraString(item.getWkChannel(), "creator_avatar") : item.getWkChannel().avatar;
-                String avatarCacheKey = TextUtils.isEmpty(item.getWkChannel().avatarCacheKey) ? getTopicExtraString(item.getWkChannel(), "creator_avatar_cache_key") : item.getWkChannel().avatarCacheKey;
-                if (TextUtils.isEmpty(avatar)) {
-                    avatarView.showDefaultAvatar(showName);
-                } else {
-                    avatarView.showAvatarUrl(avatar, avatarCacheKey, showName);
+                if (TextUtils.isEmpty(showName)) {
+                    showName = getTopicExtraString(item.getWkChannel(), "topic_title");
                 }
+                avatarView.showAvatar(item.getWkChannel());
             } else {
                 avatarView.defaultAvatarTv.setVisibility(View.GONE);
                 avatarView.imageView.setVisibility(View.VISIBLE);
