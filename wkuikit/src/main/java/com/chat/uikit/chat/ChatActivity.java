@@ -2315,15 +2315,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         wkVBinding.topLayout.avatarView.setSize(40);
         if (isTopicRoomChannel(channel)) {
             wkVBinding.topLayout.otherLayout.setVisibility(View.GONE);
-            String showName = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
-            if (TextUtils.isEmpty(showName)) showName = getTopicExtraString(channel, "topic_title");
-            String avatar = TextUtils.isEmpty(channel.avatar) ? getTopicExtraString(channel, "creator_avatar") : channel.avatar;
-            String avatarCacheKey = TextUtils.isEmpty(channel.avatarCacheKey) ? getTopicExtraString(channel, "creator_avatar_cache_key") : channel.avatarCacheKey;
-            if (TextUtils.isEmpty(avatar)) {
-                wkVBinding.topLayout.avatarView.showDefaultAvatar(showName);
-            } else {
-                wkVBinding.topLayout.avatarView.showAvatarUrl(avatar, avatarCacheKey, showName);
-            }
+            wkVBinding.topLayout.avatarView.showAvatar(channel);
         } else {
             wkVBinding.topLayout.otherLayout.setVisibility(View.VISIBLE);
             wkVBinding.topLayout.avatarView.showAvatar(channel);
@@ -2368,6 +2360,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             wkVBinding.topLayout.titleCenterTv.setText(R.string.wk_file_helper);
         } else {
             String showName = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
+            if (TextUtils.isEmpty(showName) && isTopicRoomChannel(channel)) {
+                showName = getTopicExtraString(channel, "topic_title");
+            }
             wkVBinding.topLayout.titleCenterTv.setText(showName);
         }
     }
