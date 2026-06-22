@@ -3,8 +3,8 @@
     <style name="ProfileLabelText">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:textColor">@color/colorDark</item>
-        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">#101828</item>
+        <item name="android:textSize">15sp</item>
         <item name="android:textStyle">bold</item>
     </style>
 
@@ -15,12 +15,12 @@
         <item name="android:background">@drawable/profile_field_bg</item>
         <item name="android:gravity">center_vertical</item>
         <item name="android:paddingStart">16dp</item>
-        <item name="android:paddingEnd">16dp</item>
-        <item name="android:textColor">@color/colorDark</item>
-        <item name="android:textSize">16sp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:textColor">#0F172A</item>
+        <item name="android:textSize">15sp</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:drawableEnd">@mipmap/ic_arrow_right</item>
-        <item name="android:drawablePadding">8dp</item>
+        <item name="android:drawableEnd">@drawable/profile_ic_arrow_right</item>
+        <item name="android:drawablePadding">6dp</item>
     </style>
 
     <style name="ProfileEditText">
@@ -31,8 +31,8 @@
         <item name="android:gravity">center_vertical</item>
         <item name="android:paddingStart">16dp</item>
         <item name="android:paddingEnd">16dp</item>
-        <item name="android:textColor">@color/colorDark</item>
-        <item name="android:textColorHint">@color/color999</item>
+        <item name="android:textColor">#111827</item>
+        <item name="android:textColorHint">#6B7280</item>
         <item name="android:textSize">16sp</item>
         <item name="android:textStyle">bold</item>
     </style>
