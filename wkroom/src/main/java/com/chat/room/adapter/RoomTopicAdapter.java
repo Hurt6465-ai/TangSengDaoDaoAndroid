@@ -103,7 +103,7 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
 
     private void bindCardAvatars(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
         AvatarView creatorAvatar = holder.getView(R.id.creatorAvatar);
-        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 40f);
+        bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 44f);
 
         List<RoomTopicEntity.RoomMember> members = room == null ? Collections.emptyList() : room.getSideMembers();
         for (int i = 0; i < SIDE_AVATAR_IDS.length; i++) {
