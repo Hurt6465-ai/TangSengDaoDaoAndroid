@@ -64,6 +64,7 @@ import com.xinbida.wukongim.message.type.WKConnectReason;
 import com.xinbida.wukongim.message.type.WKConnectStatus;
 
 import org.jetbrains.annotations.NotNull;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -446,6 +447,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                         }
                     }
                 }
+                case "topicRoomDeleted" -> handleTopicRoomDeletedCmd(wkCmd.paramJsonObject);
                 case "sync_channel_state" -> {
                     String fromUID = wkCmd.paramJsonObject.optString("from_uid");
                     String channelId = wkCmd.paramJsonObject.optString("channel_id");
@@ -558,8 +560,11 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             if (chatConversationAdapter.getData().isEmpty()) {
                 List<ChatConversationMsg> uiList = new ArrayList<>();
                 for (WKUIConversationMsg uiConversationMsg : list) {
-                    ChatConversationMsg msg = new ChatConversationMsg(uiConversationMsg);
-                    uiList.add(msg);
+                    if (isExpiredTopicRoomConversation(uiConversationMsg)) {
+                        deleteExpiredTopicRoomLocal(uiConversationMsg);
+                        continue;
+                    }
+                    uiList.add(new ChatConversationMsg(uiConversationMsg));
                 }
                 sortMsg(uiList);
                 setAllCount();
@@ -878,6 +883,33 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         }
     }
 
+    private void handleTopicRoomDeletedCmd(JSONObject paramJsonObject) {
+        if (paramJsonObject == null) return;
+        String channelID = paramJsonObject.optString("channel_id");
+        if (TextUtils.isEmpty(channelID)) {
+            channelID = paramJsonObject.optString("room_id");
+        }
+        int type = paramJsonObject.optInt("channel_type", WKChannelType.GROUP);
+        byte channelType = (byte) type;
+        if (TextUtils.isEmpty(channelID)) return;
+
+        WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
+        boolean isTopicRoom = channelID.startsWith("topic_") || isTopicRoomChannel(channel);
+        if (!isTopicRoom) return;
+
+        int unreadCount = 0;
+        int index = findConversationIndex(channelID, channelType);
+        if (index >= 0
+                && chatConversationAdapter != null
+                && chatConversationAdapter.getData() != null
+                && index < chatConversationAdapter.getData().size()
+                && chatConversationAdapter.getData().get(index).uiConversationMsg != null) {
+            unreadCount = chatConversationAdapter.getData().get(index).uiConversationMsg.unreadCount;
+        }
+        deleteExpiredTopicRoomLocal(channelID, channelType, unreadCount);
+        removeConversationIfExists(channelID, channelType);
+    }
+
     private boolean isTopicRoomConversation(WKUIConversationMsg uiConversationMsg) {
         if (uiConversationMsg == null) return false;
         if (uiConversationMsg.channelType == WKChannelType.GROUP && !TextUtils.isEmpty(uiConversationMsg.channelID) && uiConversationMsg.channelID.startsWith("topic_")) {
@@ -943,7 +975,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
 
     private void startTopicRoomExpireWatcher() {
         if (topicRoomExpireDisposable != null && !topicRoomExpireDisposable.isDisposed()) return;
-        topicRoomExpireDisposable = Observable.interval(TOPIC_ROOM_EXPIRE_CHECK_SECONDS, TOPIC_ROOM_EXPIRE_CHECK_SECONDS, TimeUnit.SECONDS)
+        topicRoomExpireDisposable = Observable.interval(0, TOPIC_ROOM_EXPIRE_CHECK_SECONDS, TimeUnit.SECONDS)
                 .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(value -> cleanupExpiredTopicRoomConversations(), throwable -> {
@@ -1003,9 +1035,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             }
             WKIM.getInstance().getReminderManager().saveOrUpdateReminders(reminders);
         }
-        if (unreadCount > 0) {
-            MsgModel.getInstance().clearUnread(channelID, channelType, 0, null);
-        }
+        MsgModel.getInstance().clearUnread(channelID, channelType, 0, null);
         WKIM.getInstance().getConversationManager().deleteWitchChannel(channelID, channelType);
         WKIM.getInstance().getMsgManager().clearWithChannel(channelID, channelType);
     }
@@ -1128,8 +1158,30 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             sortDisposable.dispose();
         }
 
+        // 排序前先过滤已过期的话题聊天室，避免旧数据再次被 setList 带回消息列表。
+        // 先收集再删除，避免在遍历 adapter 数据时触发删除监听导致并发修改。
+        List<ChatConversationMsg> cleanedList = new ArrayList<>();
+        List<WKUIConversationMsg> expiredList = new ArrayList<>();
+        if (WKReader.isNotEmpty(list)) {
+            for (ChatConversationMsg item : list) {
+                if (item == null || item.uiConversationMsg == null) {
+                    continue;
+                }
+                if (isExpiredTopicRoomConversation(item.uiConversationMsg)) {
+                    expiredList.add(item.uiConversationMsg);
+                    continue;
+                }
+                cleanedList.add(item);
+            }
+        }
+        if (WKReader.isNotEmpty(expiredList)) {
+            for (WKUIConversationMsg item : expiredList) {
+                deleteExpiredTopicRoomLocal(item);
+            }
+        }
+
         // 复制列表避免并发修改
-        List<ChatConversationMsg> listCopy = new ArrayList<>(list);
+        List<ChatConversationMsg> listCopy = new ArrayList<>(cleanedList);
 
         sortDisposable = Observable.fromCallable(() -> {
                     // 在后台线程执行分组和排序
