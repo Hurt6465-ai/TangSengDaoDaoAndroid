@@ -121,4 +121,11 @@
     <string name="can_not_play_video_with_revoke">视频已被撤回，无法播放</string>
     <string name="wk_video">视频</string>
     <string name="last_message_file">[文件]</string>
+    <string name="chat_translate_menu_translate">翻译</string>
+    <string name="chat_translate_no_text">没有可翻译的文字</string>
+    <string name="chat_translate_need_api_key">请先在 AI 翻译设置里填写 API Key</string>
+    <string name="chat_translate_translating">正在翻译…</string>
+    <string name="chat_translate_failed_prefix">翻译失败：</string>
+    <string name="chat_translate_language_title">选择语言</string>
+    <string name="chat_wingman_hide_quick_replies">隐藏快捷回复</string>
 </resources>
