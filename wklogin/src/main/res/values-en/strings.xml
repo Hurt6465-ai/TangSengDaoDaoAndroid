@@ -65,18 +65,26 @@
     <string name="update_api_content">Enter the server address, in domain or IP + port format, must start with http.\nExample:\nhttps://172.0.0.1:8090</string>
 
     <string name="profile_intro">Introduction</string>
-    <string name="profile_intro_hint">Briefly introduce yourself</string>
+    <string name="profile_intro_hint">Introduce yourself, where you are from, and languages you want to practice</string>
     <string name="profile_country_region">Nationality / Region</string>
+    <string name="profile_country_hint">Nationality / Region · Select one, avatar will match the flag</string>
     <string name="profile_native_language">Native language</string>
-    <string name="profile_learning_language">Language currently learning</string>
+    <string name="profile_native_language_hint">Native language · Multiple select, up to 5</string>
+    <string name="profile_learning_language">Learning language</string>
+    <string name="profile_learning_language_hint">Learning language · Multiple select, up to 5</string>
     <string name="profile_gender">Gender</string>
+    <string name="profile_gender_hint">Gender · Select one</string>
     <string name="profile_birthday">Date of birth</string>
+    <string name="profile_birthday_hint">Date of birth · Select one</string>
     <string name="profile_intro_required">Please fill in your introduction</string>
     <string name="profile_country_required">Please select nationality / region</string>
     <string name="profile_native_language_required">Please select native language</string>
-    <string name="profile_learning_language_required">Please select the language you are learning</string>
+    <string name="profile_learning_language_required">Please select learning language</string>
     <string name="profile_gender_required">Please select gender</string>
     <string name="profile_birthday_required">Please select date of birth</string>
+    <string name="profile_multi_select_limit">You can select up to 5</string>
+    <string name="profile_multi_select_title">%1$s (up to 5)</string>
+    <string name="profile_select_done">Done</string>
 
     <string-array name="profile_country_options">
         <item>🇲🇲 Myanmar</item>
