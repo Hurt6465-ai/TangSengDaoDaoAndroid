@@ -45,8 +45,9 @@ public class AvatarView extends FrameLayout {
     public View spotView;
     public TextView onlineTv;
     public TextView flagTv;
-    private static final float PEIPE_FLAG_MAX_TEXT_DP = 14f;
-    private static final float PEIPE_FLAG_MIN_TEXT_DP = 10f;
+    private static final float FLAG_TEXT_MIN_DP = 10f;
+    private static final float FLAG_TEXT_MAX_DP = 15f;
+    private static final float FLAG_TEXT_RATIO = 0.35f;
     private static final String PROFILE_EXTRA_PREF = "front_profile_extra";
     private float avatarSize = 40f;
     private float avatarCornerSize = 20f;
@@ -67,7 +68,8 @@ public class AvatarView extends FrameLayout {
     }
 
     private void init() {
-        // Same as Peipe CSS `overflow: visible`: the flag may sit slightly outside avatar bounds.
+        // 跟 Web 版 .cp-avatar-stack / .wkconv-avatar-flag-wrap 一样：
+        // 头像自己裁圆，国旗作为左下角浮层，允许边缘探出一点。
         setClipChildren(false);
         setClipToPadding(false);
 
@@ -100,11 +102,14 @@ public class AvatarView extends FrameLayout {
 
         flagTv = new TextView(getContext());
         flagTv.setGravity(Gravity.CENTER);
-        // Peipe is a plain emoji span: no bold, no background, no badge container.
-        // Use dp/px-like text sizing instead of sp so Android system font scale will not blow the flag up.
-        flagTv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, PEIPE_FLAG_MAX_TEXT_DP);
+        // Web 版就是一个 emoji span：font-size:14/15px; line-height:1; background:transparent。
+        // Android 这里用 dp，而不是默认 sp，避免系统字体缩放把国旗放大。
+        flagTv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f);
         flagTv.setTypeface(Typeface.DEFAULT);
+        flagTv.getPaint().setFakeBoldText(false);
         flagTv.setIncludeFontPadding(false);
+        flagTv.setSingleLine(true);
+        flagTv.setMaxLines(1);
         flagTv.setMinWidth(0);
         flagTv.setMinHeight(0);
         flagTv.setMinimumWidth(0);
@@ -216,18 +221,18 @@ public class AvatarView extends FrameLayout {
         return drawable;
     }
 
-
     private void applyFlagStyle() {
         if (flagTv == null) return;
         flagTv.setGravity(Gravity.CENTER);
         flagTv.setIncludeFontPadding(false);
+        flagTv.setSingleLine(true);
+        flagTv.setMaxLines(1);
         flagTv.setPadding(0, 0, 0, 0);
         flagTv.setAlpha(1f);
-        // Do not use software layer + setShadowLayer on color emoji.
-        // On many Android emoji renderers it makes the bitmap glyph look gray/transparent.
+        // 关键：不要 software layer，不要 text shadow，不要圆形底。
+        // 彩色 emoji 在 software layer + shadow 下容易发灰/像半透明。
+        flagTv.setLayerType(View.LAYER_TYPE_NONE, null);
         flagTv.setShadowLayer(0f, 0f, 0f, 0x00000000);
-        flagTv.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-        // No circular badge/background: keep it the same plain floating emoji as Peipe.
         flagTv.setBackground(null);
         flagTv.bringToFront();
     }
@@ -263,15 +268,15 @@ public class AvatarView extends FrameLayout {
         }
 
         FrameLayout.LayoutParams flagParams = (FrameLayout.LayoutParams) flagTv.getLayoutParams();
-        // Peipe CSS: width/height auto, left:-2px, bottom:2px, font-size:14px.
-        // Do not give TextView a fixed square box; the emoji should be drawn at its natural width.
+        // 对齐 Web：position:absolute; left:-1/-3px; bottom:-2/-3px; width:auto; height:auto;
+        // 它是叠在头像左下角的，只是边缘向外探出一点，不是固定 18/20dp 方块。
         flagParams.width = LayoutHelper.WRAP_CONTENT;
         flagParams.height = LayoutHelper.WRAP_CONTENT;
         flagParams.gravity = Gravity.BOTTOM | Gravity.START;
-        flagParams.leftMargin = -AndroidUtilities.dp(2);
-        flagParams.bottomMargin = AndroidUtilities.dp(2);
+        flagParams.leftMargin = -AndroidUtilities.dp(3);
+        flagParams.bottomMargin = -AndroidUtilities.dp(3);
         flagTv.setLayoutParams(flagParams);
-        float flagTextDp = Math.max(PEIPE_FLAG_MIN_TEXT_DP, Math.min(PEIPE_FLAG_MAX_TEXT_DP, size * 0.23f));
+        float flagTextDp = Math.max(FLAG_TEXT_MIN_DP, Math.min(FLAG_TEXT_MAX_DP, size * FLAG_TEXT_RATIO));
         flagTv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, flagTextDp);
         applyFlagStyle();
 
@@ -398,6 +403,7 @@ public class AvatarView extends FrameLayout {
             return;
         }
         flagTv.setText(flag);
+        applyFlagStyle();
         flagTv.setVisibility(VISIBLE);
         flagTv.bringToFront();
     }
@@ -424,7 +430,9 @@ public class AvatarView extends FrameLayout {
             return;
         }
         flagTv.setText(flag);
+        applyFlagStyle();
         flagTv.setVisibility(VISIBLE);
+        flagTv.bringToFront();
     }
 
     private void hideFlag() {
