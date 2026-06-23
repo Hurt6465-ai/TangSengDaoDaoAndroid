@@ -46,8 +46,7 @@
                 android:text="@string/profile_display_name"
                 android:textColor="#1A2238"
                 android:textSize="16sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -104,7 +103,6 @@
                     android:layout_marginStart="4dp"
                     android:layout_weight="1"
                     android:background="@drawable/profile_field_bg"
-                    android:visibility="gone"
                     android:gravity="center_vertical"
                     android:hint="@string/profile_name_hint"
                     android:maxLength="20"
@@ -261,7 +259,10 @@
             <TextView
                 style="@style/ProfileLabelText"
                 android:layout_marginTop="18dp"
-                android:text="@string/profile_birthday_optional" />
+                android:text="@string/profile_birthday_optional"
+                android:textColor="#98A2B3"
+                android:textSize="12sp"
+                android:textStyle="normal" />
 
             <TextView
                 android:id="@+id/birthdayTv"
@@ -283,7 +284,10 @@
 
                     <TextView
                         style="@style/ProfileLabelText"
-                        android:text="@string/profile_height_optional" />
+                        android:text="@string/profile_height_optional"
+                        android:textColor="#98A2B3"
+                        android:textSize="12sp"
+                        android:textStyle="normal" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -331,7 +335,10 @@
 
                     <TextView
                         style="@style/ProfileLabelText"
-                        android:text="@string/profile_weight_optional" />
+                        android:text="@string/profile_weight_optional"
+                        android:textColor="#98A2B3"
+                        android:textSize="12sp"
+                        android:textStyle="normal" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
