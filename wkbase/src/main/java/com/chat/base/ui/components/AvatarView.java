@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -44,6 +45,8 @@ public class AvatarView extends FrameLayout {
     public View spotView;
     public TextView onlineTv;
     public TextView flagTv;
+    private static final float PEIPE_FLAG_MAX_TEXT_DP = 14f;
+    private static final float PEIPE_FLAG_MIN_TEXT_DP = 10f;
     private static final String PROFILE_EXTRA_PREF = "front_profile_extra";
     private float avatarSize = 40f;
     private float avatarCornerSize = 20f;
@@ -64,8 +67,7 @@ public class AvatarView extends FrameLayout {
     }
 
     private void init() {
-        // Match Peipe full-screen avatar: the flag is a small floating emoji and may extend
-        // a little outside the avatar instead of being clipped by the avatar container.
+        // Same as Peipe CSS `overflow: visible`: the flag may sit slightly outside avatar bounds.
         setClipChildren(false);
         setClipToPadding(false);
 
@@ -98,20 +100,23 @@ public class AvatarView extends FrameLayout {
 
         flagTv = new TextView(getContext());
         flagTv.setGravity(Gravity.CENTER);
-        flagTv.setTextSize(10f);
+        // Peipe is a plain emoji span: no bold, no background, no badge container.
+        // Use dp/px-like text sizing instead of sp so Android system font scale will not blow the flag up.
+        flagTv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, PEIPE_FLAG_MAX_TEXT_DP);
         flagTv.setTypeface(Typeface.DEFAULT);
         flagTv.setIncludeFontPadding(false);
-        flagTv.setAlpha(1f);
-        // Same as Peipe: no white badge/background, just a small flag with a light drop shadow
-        // so the emoji stays readable on top of photos.
-        flagTv.setBackground(null);
-        flagTv.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-        flagTv.setShadowLayer(AndroidUtilities.dp(1.5f), 0f, AndroidUtilities.dp(1f), 0xAA000000);
+        flagTv.setMinWidth(0);
+        flagTv.setMinHeight(0);
+        flagTv.setMinimumWidth(0);
+        flagTv.setMinimumHeight(0);
+        flagTv.setPadding(0, 0, 0, 0);
+        flagTv.setLineSpacing(0f, 1f);
+        applyFlagStyle();
         flagTv.setVisibility(GONE);
 
         addView(imageView, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
         addView(defaultAvatarTv, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
-        addView(flagTv, LayoutHelper.createFrame(14, 14, Gravity.BOTTOM | Gravity.START, 0, 0, 0, 0));
+        addView(flagTv, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START, 0, 0, 0, 0));
         addView(spotView, LayoutHelper.createFrame(9, 9, Gravity.TOP | Gravity.END, 0, 0, 0, 0));
         addView(onlineTv, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END, 0, 0, 0, 0));
         setSize(40);
@@ -212,6 +217,22 @@ public class AvatarView extends FrameLayout {
     }
 
 
+    private void applyFlagStyle() {
+        if (flagTv == null) return;
+        flagTv.setGravity(Gravity.CENTER);
+        flagTv.setIncludeFontPadding(false);
+        flagTv.setPadding(0, 0, 0, 0);
+        flagTv.setAlpha(1f);
+        // Do not use software layer + setShadowLayer on color emoji.
+        // On many Android emoji renderers it makes the bitmap glyph look gray/transparent.
+        flagTv.setShadowLayer(0f, 0f, 0f, 0x00000000);
+        flagTv.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        // No circular badge/background: keep it the same plain floating emoji as Peipe.
+        flagTv.setBackground(null);
+        flagTv.bringToFront();
+    }
+
+
     public void setStrokeWidth(float width) {
         imageView.setStrokeWidth(AndroidUtilities.dp(width));
     }
@@ -241,22 +262,18 @@ public class AvatarView extends FrameLayout {
             defaultAvatarTv.setBackground(makeDefaultAvatarBg(defaultAvatarTv.getText() == null ? "" : defaultAvatarTv.getText().toString()));
         }
 
-        // Peipe full-screen uses 14px flag on a 60px avatar. Keep the same ratio here
-        // instead of making the flag 50% of the avatar, which looks huge on Android.
-        int flagSize = Math.max(12, Math.round(size * 0.30f));
         FrameLayout.LayoutParams flagParams = (FrameLayout.LayoutParams) flagTv.getLayoutParams();
-        flagParams.width = AndroidUtilities.dp(flagSize);
-        flagParams.height = AndroidUtilities.dp(flagSize);
+        // Peipe CSS: width/height auto, left:-2px, bottom:2px, font-size:14px.
+        // Do not give TextView a fixed square box; the emoji should be drawn at its natural width.
+        flagParams.width = LayoutHelper.WRAP_CONTENT;
+        flagParams.height = LayoutHelper.WRAP_CONTENT;
         flagParams.gravity = Gravity.BOTTOM | Gravity.START;
-        // CSS equivalent: left: -2px; bottom: 2px.
         flagParams.leftMargin = -AndroidUtilities.dp(2);
         flagParams.bottomMargin = AndroidUtilities.dp(2);
         flagTv.setLayoutParams(flagParams);
-        float flagTextSize = Math.max(9f, Math.min(14f, size * 0.23f));
-        flagTv.setTextSize(flagTextSize);
-        flagTv.setAlpha(1f);
-        flagTv.setBackground(null);
-        flagTv.setShadowLayer(AndroidUtilities.dp(1.5f), 0f, AndroidUtilities.dp(1f), 0xAA000000);
+        float flagTextDp = Math.max(PEIPE_FLAG_MIN_TEXT_DP, Math.min(PEIPE_FLAG_MAX_TEXT_DP, size * 0.23f));
+        flagTv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, flagTextDp);
+        applyFlagStyle();
 
         int spotSize = Math.max(6, Math.round(size * 0.17f));
         FrameLayout.LayoutParams spotParams = (FrameLayout.LayoutParams) spotView.getLayoutParams();
@@ -382,6 +399,7 @@ public class AvatarView extends FrameLayout {
         }
         flagTv.setText(flag);
         flagTv.setVisibility(VISIBLE);
+        flagTv.bringToFront();
     }
 
     /**
