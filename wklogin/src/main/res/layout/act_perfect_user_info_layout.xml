@@ -6,7 +6,9 @@
     android:background="@drawable/profile_page_bg"
     android:orientation="vertical">
 
-    <include layout="@layout/wk_title_bar_layout" />
+    <include
+        android:visibility="gone"
+        layout="@layout/wk_title_bar_layout" />
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
@@ -20,7 +22,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="14dp"
             android:layout_marginEnd="12dp"
             android:background="@drawable/profile_card_bg"
             android:orientation="vertical"
@@ -44,23 +46,24 @@
                 android:text="@string/profile_display_name"
                 android:textColor="#1A2238"
                 android:textSize="16sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:gravity="center_vertical"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
                 android:orientation="horizontal">
 
                 <FrameLayout
-                    android:layout_width="126dp"
-                    android:layout_height="126dp">
+                    android:layout_width="146dp"
+                    android:layout_height="146dp">
 
                     <com.chat.base.ui.components.AvatarView
                         android:id="@+id/avatarView"
-                        android:layout_width="108dp"
-                        android:layout_height="108dp"
+                        android:layout_width="124dp"
+                        android:layout_height="124dp"
                         android:layout_gravity="center" />
 
                     <TextView
@@ -81,15 +84,16 @@
                         android:layout_gravity="end|top"
                         android:layout_marginTop="8dp"
                         android:layout_marginEnd="8dp"
-                        android:background="@drawable/profile_online_dot_bg" />
+                        android:background="@drawable/profile_online_dot_bg"
+                        android:visibility="gone" />
 
                     <androidx.appcompat.widget.AppCompatImageView
                         android:id="@+id/coverIv"
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
                         android:layout_gravity="end|bottom"
-                        android:layout_marginEnd="24dp"
-                        android:layout_marginBottom="26dp"
+                        android:layout_marginEnd="33dp"
+                        android:layout_marginBottom="36dp"
                         android:src="@mipmap/ico_xiangji" />
                 </FrameLayout>
 
@@ -100,6 +104,7 @@
                     android:layout_marginStart="4dp"
                     android:layout_weight="1"
                     android:background="@drawable/profile_field_bg"
+                    android:visibility="gone"
                     android:gravity="center_vertical"
                     android:hint="@string/profile_name_hint"
                     android:maxLength="20"
