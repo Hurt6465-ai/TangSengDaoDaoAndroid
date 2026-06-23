@@ -7,11 +7,8 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
-import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -46,10 +43,11 @@ public class AvatarView extends FrameLayout {
     public TextView defaultAvatarTv;
     public View spotView;
     public TextView onlineTv;
-    public TextView flagTv;
-    private static final float FLAG_TEXT_MIN_DP = 10f;
-    private static final float FLAG_TEXT_MAX_DP = 15f;
-    private static final float FLAG_TEXT_RATIO = 0.34f;
+    public ImageView flagIv;
+    private static final float FLAG_WIDTH_RATIO = 0.42f;
+    private static final float FLAG_HEIGHT_RATIO = 2f / 3f;
+    private static final int FLAG_MIN_WIDTH_DP = 16;
+    private static final int FLAG_MIN_HEIGHT_DP = 11;
     private static final String PROFILE_EXTRA_PREF = "front_profile_extra";
     private float avatarSize = 40f;
     private float avatarCornerSize = 20f;
@@ -102,48 +100,18 @@ public class AvatarView extends FrameLayout {
         // 不再把“最后在线时间”压在头像右下角，聊天页/列表需要时间时放到文字区域显示。
         onlineTv.setVisibility(GONE);
 
-        flagTv = new FlagTextView(getContext());
-        flagTv.setGravity(Gravity.CENTER);
-        // 和网页一样仍然是真 emoji 文本，不使用图片资源。
-        // 这里必须给 emoji 保留字体自身的上下留白和少量透明 overhang，
-        // 否则 Android TextView 会把彩色 emoji 位图边缘裁掉，看起来像发灰/半透明。
-        flagTv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f);
-        flagTv.setTypeface(Typeface.DEFAULT);
-        flagTv.getPaint().setFakeBoldText(false);
-        flagTv.setIncludeFontPadding(true);
-        flagTv.setSingleLine(false);
-        flagTv.setMaxLines(1);
-        flagTv.setMinWidth(0);
-        flagTv.setMinHeight(0);
-        flagTv.setMinimumWidth(0);
-        flagTv.setMinimumHeight(0);
-        int flagOverhang = AndroidUtilities.dp(1f);
-        flagTv.setPadding(flagOverhang, flagOverhang, flagOverhang, flagOverhang);
-        flagTv.setLineSpacing(0f, 1f);
+        flagIv = new ImageView(getContext());
+        flagIv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        flagIv.setAdjustViewBounds(false);
         applyFlagStyle();
-        flagTv.setVisibility(GONE);
+        flagIv.setVisibility(GONE);
 
         addView(imageView, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
         addView(defaultAvatarTv, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
-        addView(flagTv, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START, 0, 0, 0, 0));
+        addView(flagIv, LayoutHelper.createFrame(17, 11, Gravity.BOTTOM | Gravity.START, 0, 0, 0, 0));
         addView(spotView, LayoutHelper.createFrame(9, 9, Gravity.TOP | Gravity.END, 0, 0, 0, 0));
         addView(onlineTv, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END, 0, 0, 0, 0));
         setSize(40);
-    }
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        // 等价于 Web 的 overflow: visible，避免国旗左下角探出 2-3dp 时被父容器裁掉。
-        ViewParent parent = getParent();
-        int depth = 0;
-        while (parent instanceof ViewGroup && depth < 2) {
-            ViewGroup group = (ViewGroup) parent;
-            group.setClipChildren(false);
-            group.setClipToPadding(false);
-            parent = group.getParent();
-            depth++;
-        }
     }
 
     private void prepareImageAvatar() {
@@ -241,22 +209,17 @@ public class AvatarView extends FrameLayout {
     }
 
     private void applyFlagStyle() {
-        if (flagTv == null) return;
-        flagTv.setGravity(Gravity.CENTER);
-        // 不要关闭 font padding。国旗 emoji 是彩色位图字形，实际绘制范围经常
-        // 比 TextView 的紧凑文本框更大；关闭后会裁边，视觉上就像半透明。
-        flagTv.setIncludeFontPadding(true);
-        flagTv.setSingleLine(false);
-        flagTv.setMaxLines(1);
-        int flagOverhang = AndroidUtilities.dp(1f);
-        flagTv.setPadding(flagOverhang, flagOverhang, flagOverhang, flagOverhang);
-        flagTv.setAlpha(1f);
-        // 不要 software layer，不要文字阴影，不要圆形底，保持和网页一致的原生 emoji。
-        flagTv.setLayerType(View.LAYER_TYPE_NONE, null);
-        flagTv.setShadowLayer(0f, 0f, 0f, 0x00000000);
-        flagTv.setBackground(null);
-        flagTv.bringToFront();
+        if (flagIv == null) return;
+        // 稳定版不用 TextView/emoji，直接用本地 PNG 资源，避免系统 emoji 字体和 GPU 合成造成发灰/半透明。
+        // 这里保持纯国旗：无圆形底、无阴影、无 tint、无 alpha、按原始 3:2 比例 FIT_CENTER 显示，不裁剪。
+        flagIv.setAlpha(1f);
+        flagIv.setBackground(null);
+        flagIv.setColorFilter(null);
+        flagIv.setPadding(0, 0, 0, 0);
+        flagIv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        flagIv.bringToFront();
     }
+
 
 
     public void setStrokeWidth(float width) {
@@ -288,17 +251,16 @@ public class AvatarView extends FrameLayout {
             defaultAvatarTv.setBackground(makeDefaultAvatarBg(defaultAvatarTv.getText() == null ? "" : defaultAvatarTv.getText().toString()));
         }
 
-        FrameLayout.LayoutParams flagParams = (FrameLayout.LayoutParams) flagTv.getLayoutParams();
-        // 对齐 Web：position:absolute; left:-3px; bottom:-3px; width:auto; height:auto;
-        // 只移动位置，不裁剪 emoji 本身；尺寸由字体自然测量决定。
-        flagParams.width = LayoutHelper.WRAP_CONTENT;
-        flagParams.height = LayoutHelper.WRAP_CONTENT;
+        FrameLayout.LayoutParams flagParams = (FrameLayout.LayoutParams) flagIv.getLayoutParams();
+        int flagWidth = Math.max(FLAG_MIN_WIDTH_DP, Math.round(size * FLAG_WIDTH_RATIO));
+        int flagHeight = Math.max(FLAG_MIN_HEIGHT_DP, Math.round(flagWidth * FLAG_HEIGHT_RATIO));
+        flagParams.width = AndroidUtilities.dp(flagWidth);
+        flagParams.height = AndroidUtilities.dp(flagHeight);
         flagParams.gravity = Gravity.BOTTOM | Gravity.START;
-        flagParams.leftMargin = -AndroidUtilities.dp(3);
-        flagParams.bottomMargin = -AndroidUtilities.dp(3);
-        flagTv.setLayoutParams(flagParams);
-        float flagTextDp = Math.max(FLAG_TEXT_MIN_DP, Math.min(FLAG_TEXT_MAX_DP, size * FLAG_TEXT_RATIO));
-        flagTv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, flagTextDp);
+        // 叠在头像左下角，左/下轻微探出，和网页截图里的位置一致。
+        flagParams.leftMargin = -AndroidUtilities.dp(Math.max(2f, size * 0.08f));
+        flagParams.bottomMargin = -AndroidUtilities.dp(Math.max(1f, size * 0.04f));
+        flagIv.setLayoutParams(flagParams);
         applyFlagStyle();
 
         int spotSize = Math.max(6, Math.round(size * 0.17f));
@@ -414,19 +376,19 @@ public class AvatarView extends FrameLayout {
 
 
     private void updateFlagView(WKChannel channel) {
-        updateFlagByCountry(getChannelFlagEmoji(channel));
+        updateFlagByCountry(getChannelCountry(channel));
     }
 
     private void updateFlagByCountry(String countryOrFlag) {
-        String flag = countryToFlagEmoji(countryOrFlag);
-        if (TextUtils.isEmpty(flag)) {
+        int flagResId = countryToFlagRes(countryOrFlag);
+        if (flagResId == 0) {
             hideFlag();
             return;
         }
-        flagTv.setText(flag);
+        flagIv.setImageResource(flagResId);
         applyFlagStyle();
-        flagTv.setVisibility(VISIBLE);
-        flagTv.bringToFront();
+        flagIv.setVisibility(VISIBLE);
+        flagIv.bringToFront();
     }
 
     /**
@@ -445,25 +407,18 @@ public class AvatarView extends FrameLayout {
                 getTopicExtraString(channel, "nationality_code"),
                 getTopicExtraString(channel, "nationality")
         );
-        String flag = countryToFlagEmoji(country);
-        if (TextUtils.isEmpty(flag)) {
-            hideFlag();
-            return;
-        }
-        flagTv.setText(flag);
-        applyFlagStyle();
-        flagTv.setVisibility(VISIBLE);
-        flagTv.bringToFront();
+        updateFlagByCountry(country);
     }
 
     private void hideFlag() {
-        if (flagTv != null) {
-            flagTv.setText("");
-            flagTv.setVisibility(GONE);
+        if (flagIv != null) {
+            flagIv.setImageDrawable(null);
+            flagIv.setVisibility(GONE);
         }
     }
 
-    private String getChannelFlagEmoji(WKChannel channel) {
+
+    private String getChannelCountry(WKChannel channel) {
         if (channel == null) return "";
         String country = firstNotEmpty(
                 getExtraString(channel.localExtra, "country_code"),
@@ -483,7 +438,7 @@ public class AvatarView extends FrameLayout {
         if (TextUtils.isEmpty(country)) {
             country = getLocalSavedCountry(channel.channelID);
         }
-        return countryToFlagEmoji(country);
+        return country;
     }
 
     private String getLocalSavedCountry(String channelID) {
@@ -499,12 +454,18 @@ public class AvatarView extends FrameLayout {
         return country;
     }
 
-    private String countryToFlagEmoji(String country) {
-        if (TextUtils.isEmpty(country)) return "";
+    private int countryToFlagRes(String country) {
+        if (TextUtils.isEmpty(country)) return 0;
         String value = country.trim();
-        if (TextUtils.isEmpty(value)) return "";
-        String firstFlag = extractFirstEmojiFlag(value);
-        if (!TextUtils.isEmpty(firstFlag)) return firstFlag;
+        if (TextUtils.isEmpty(value)) return 0;
+
+        String flagCode = extractFirstEmojiFlagCountryCode(value);
+        if (!TextUtils.isEmpty(flagCode)) {
+            return countryCodeToFlagRes(flagCode);
+        }
+        if (value.startsWith("🌍") || value.startsWith("🌎") || value.startsWith("🌏")) {
+            return R.drawable.ic_flag_other;
+        }
 
         String normalized = value.toLowerCase(Locale.US)
                 .replace("_", "")
@@ -512,20 +473,24 @@ public class AvatarView extends FrameLayout {
                 .replace(" ", "")
                 .replace("/", "");
 
-        if (isCountry(normalized, "mm", "myanmar", "burma", "burmese") || value.contains("缅甸") || value.contains("မြန်မာ")) return "🇲🇲";
-        if (isCountry(normalized, "cn", "chn", "china", "chinese", "prc") || value.contains("中国") || value.contains("中國") || value.contains("中文") || value.contains("တရုတ်")) return "🇨🇳";
-        if (isCountry(normalized, "th", "tha", "thailand", "thai") || value.contains("泰国") || value.contains("泰語") || value.contains("泰语") || value.contains("ထိုင်း")) return "🇹🇭";
-        if (isCountry(normalized, "jp", "jpn", "japan", "japanese") || value.contains("日本") || value.contains("ဂျပန်")) return "🇯🇵";
-        if (isCountry(normalized, "kr", "kor", "korea", "southkorea", "republicofkorea", "korean") || value.contains("韩国") || value.contains("韓國") || value.contains("ကိုရီးယား")) return "🇰🇷";
-        if (isCountry(normalized, "vn", "vnm", "vietnam", "viet Nam", "vietnamese") || value.contains("越南") || value.contains("ဗီယက်နမ်")) return "🇻🇳";
-        if (isCountry(normalized, "la", "lao", "laos") || value.contains("老挝") || value.contains("寮國") || value.contains("လာအို")) return "🇱🇦";
-        if (isCountry(normalized, "kh", "khm", "cambodia", "khmer") || value.contains("柬埔寨") || value.contains("高棉") || value.contains("ကမ္ဘောဒီးယား") || value.contains("ခမာ")) return "🇰🇭";
-        if (isCountry(normalized, "my", "mys", "malaysia", "malay") || value.contains("马来西亚") || value.contains("馬來西亞") || value.contains("马来语") || value.contains("မလေး")) return "🇲🇾";
-        if (isCountry(normalized, "sg", "sgp", "singapore") || value.contains("新加坡") || value.contains("စင်ကာပူ")) return "🇸🇬";
-        if (isCountry(normalized, "us", "usa", "unitedstates", "america", "american", "english") || value.contains("美国") || value.contains("美國") || value.contains("英语") || value.contains("အမေရိကန်") || value.contains("အင်္ဂလိပ်")) return "🇺🇸";
-        if (isCountry(normalized, "other", "others") || value.contains("其他") || value.contains("အခြား")) return "🌍";
-        if (normalized.length() == 2) return countryCodeToEmoji(normalized.toUpperCase(Locale.US));
-        return "";
+        if (isCountry(normalized, "mm", "mya", "myanmar", "burma", "burmese") || value.contains("缅甸") || value.contains("မြန်မာ")) return R.drawable.ic_flag_mm;
+        if (isCountry(normalized, "cn", "chn", "china", "chinese", "prc") || value.contains("中国") || value.contains("中國") || value.contains("中文") || value.contains("တရုတ်")) return R.drawable.ic_flag_cn;
+        if (isCountry(normalized, "th", "tha", "thailand", "thai") || value.contains("泰国") || value.contains("泰國") || value.contains("泰語") || value.contains("泰语") || value.contains("ထိုင်း")) return R.drawable.ic_flag_th;
+        if (isCountry(normalized, "jp", "jpn", "japan", "japanese") || value.contains("日本") || value.contains("ဂျပန်")) return R.drawable.ic_flag_jp;
+        if (isCountry(normalized, "kr", "kor", "korea", "southkorea", "republicofkorea", "korean") || value.contains("韩国") || value.contains("韓國") || value.contains("ကိုရီးယား")) return R.drawable.ic_flag_kr;
+        if (isCountry(normalized, "vn", "vnm", "vietnam", "vietnamese") || value.contains("越南") || value.contains("ဗီယက်နမ်")) return R.drawable.ic_flag_vn;
+        if (isCountry(normalized, "la", "lao", "laos") || value.contains("老挝") || value.contains("寮國") || value.contains("လာအို")) return R.drawable.ic_flag_la;
+        if (isCountry(normalized, "kh", "khm", "cambodia", "khmer") || value.contains("柬埔寨") || value.contains("高棉") || value.contains("ကမ္ဘောဒီးယား") || value.contains("ခမာ")) return R.drawable.ic_flag_kh;
+        if (isCountry(normalized, "my", "mys", "malaysia", "malay") || value.contains("马来西亚") || value.contains("馬來西亞") || value.contains("马来语") || value.contains("မလေး")) return R.drawable.ic_flag_my;
+        if (isCountry(normalized, "sg", "sgp", "singapore") || value.contains("新加坡") || value.contains("စင်ကာပူ")) return R.drawable.ic_flag_sg;
+        if (isCountry(normalized, "us", "usa", "unitedstates", "america", "american", "english") || value.contains("美国") || value.contains("美國") || value.contains("英语") || value.contains("အမေရိကန်") || value.contains("အင်္ဂလိပ်")) return R.drawable.ic_flag_us;
+        if (isCountry(normalized, "other", "others") || value.contains("其他") || value.contains("အခြား")) return R.drawable.ic_flag_other;
+
+        if (normalized.length() == 2) {
+            int flagRes = countryCodeToFlagRes(normalized.toUpperCase(Locale.US));
+            return flagRes == 0 ? R.drawable.ic_flag_other : flagRes;
+        }
+        return 0;
     }
 
     private boolean isCountry(String normalized, String... values) {
@@ -536,7 +501,7 @@ public class AvatarView extends FrameLayout {
         return false;
     }
 
-    private String extractFirstEmojiFlag(String value) {
+    private String extractFirstEmojiFlagCountryCode(String value) {
         if (TextUtils.isEmpty(value)) return "";
         for (int offset = 0; offset < value.length(); ) {
             int first = value.codePointAt(offset);
@@ -544,11 +509,12 @@ public class AvatarView extends FrameLayout {
             if (nextOffset >= value.length()) break;
             int second = value.codePointAt(nextOffset);
             if (isRegionalIndicator(first) && isRegionalIndicator(second)) {
-                return new String(Character.toChars(first)) + new String(Character.toChars(second));
+                char firstChar = (char) ('A' + first - 0x1F1E6);
+                char secondChar = (char) ('A' + second - 0x1F1E6);
+                return "" + firstChar + secondChar;
             }
             offset = nextOffset;
         }
-        if (value.startsWith("🌍") || value.startsWith("🌎") || value.startsWith("🌏")) return "🌍";
         return "";
     }
 
@@ -556,13 +522,48 @@ public class AvatarView extends FrameLayout {
         return codePoint >= 0x1F1E6 && codePoint <= 0x1F1FF;
     }
 
-    private String countryCodeToEmoji(String code) {
-        if (TextUtils.isEmpty(code) || code.length() != 2) return "";
-        int first = Character.toUpperCase(code.charAt(0)) - 'A' + 0x1F1E6;
-        int second = Character.toUpperCase(code.charAt(1)) - 'A' + 0x1F1E6;
-        if (!isRegionalIndicator(first) || !isRegionalIndicator(second)) return "";
-        return new String(Character.toChars(first)) + new String(Character.toChars(second));
+    private int countryCodeToFlagRes(String code) {
+        if (TextUtils.isEmpty(code)) return 0;
+        String upper = code.trim().toUpperCase(Locale.US);
+        switch (upper) {
+            case "MM":
+            case "MYA":
+                return R.drawable.ic_flag_mm;
+            case "CN":
+            case "CHN":
+                return R.drawable.ic_flag_cn;
+            case "TH":
+            case "THA":
+                return R.drawable.ic_flag_th;
+            case "JP":
+            case "JPN":
+                return R.drawable.ic_flag_jp;
+            case "KR":
+            case "KOR":
+                return R.drawable.ic_flag_kr;
+            case "VN":
+            case "VNM":
+                return R.drawable.ic_flag_vn;
+            case "LA":
+            case "LAO":
+                return R.drawable.ic_flag_la;
+            case "KH":
+            case "KHM":
+                return R.drawable.ic_flag_kh;
+            case "MY":
+            case "MYS":
+                return R.drawable.ic_flag_my;
+            case "SG":
+            case "SGP":
+                return R.drawable.ic_flag_sg;
+            case "US":
+            case "USA":
+                return R.drawable.ic_flag_us;
+            default:
+                return 0;
+        }
     }
+
 
     private String getTopicAvatar(WKChannel channel, String creatorUid) {
         if (channel == null) return "";
@@ -647,36 +648,4 @@ public class AvatarView extends FrameLayout {
             file.delete();
         }
     }
-
-    private static class FlagTextView extends TextView {
-        private int extraOverhang;
-
-        public FlagTextView(Context context) {
-            super(context);
-            init();
-        }
-
-        public FlagTextView(Context context, @Nullable AttributeSet attrs) {
-            super(context, attrs);
-            init();
-        }
-
-        public FlagTextView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
-            super(context, attrs, defStyleAttr);
-            init();
-        }
-
-        private void init() {
-            extraOverhang = AndroidUtilities.dp(1f);
-            setIncludeFontPadding(true);
-        }
-
-        @Override
-        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-            // 彩色 emoji 的真实图形会超过普通文字测量框，给透明边缘留空间，防止被裁成发灰。
-            setMeasuredDimension(getMeasuredWidth() + extraOverhang * 2, getMeasuredHeight() + extraOverhang * 2);
-        }
-    }
-
 }
