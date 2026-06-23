@@ -136,17 +136,12 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
                 if (WKReader.isNotEmpty(paths)) {
                     ChooseResult result = paths.get(0);
                     if (result != null && !TextUtils.isEmpty(result.path)) {
-                        showToast(R.string.profile_image_compressing);
-                        compressImageAsync(result.path, true, compressedPath -> {
-                            if (TextUtils.isEmpty(compressedPath)) {
-                                showToast(R.string.profile_image_compress_failed);
-                                return;
-                            }
-                            avatarPath = compressedPath;
-                            avatarUploadPath = compressedPath;
-                            GlideUtils.getInstance().showImg(PerfectUserInfoActivity.this, avatarPath, wkVBinding.avatarView.imageView);
-                            wkVBinding.coverIv.setVisibility(View.GONE);
-                        });
+                        // 头像上传接口沿用旧逻辑，对压缩后的 WebP/JPG 兼容不稳定。
+                        // 注册/完善资料阶段先只保存原图路径并本地预览，不再压缩、不再上传，避免触发全局异常返回资料页。
+                        avatarPath = result.path;
+                        avatarUploadPath = "";
+                        GlideUtils.getInstance().showImg(PerfectUserInfoActivity.this, avatarPath, wkVBinding.avatarView.imageView);
+                        wkVBinding.coverIv.setVisibility(View.GONE);
                     }
                 }
             }
@@ -635,6 +630,10 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             showToast(R.string.profile_avatar_required);
             return;
         }
+        if (TextUtils.isEmpty(getEditTextString(wkVBinding.nameEt))) {
+            showToast(R.string.nickname_not_null);
+            return;
+        }
         if (TextUtils.isEmpty(getEditTextString(wkVBinding.introEt))) {
             showToast(R.string.profile_intro_required);
             return;
@@ -666,7 +665,9 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             if (code == HttpResponseCode.success) {
                 saveLocalUserName(name);
                 saveLocalProfile();
-                updateSexIfNeeded(() -> uploadAvatarIfNeeded(this::finishPerfectUserInfo));
+                // 头像仅本地预览，注册资料保存阶段不再上传头像。
+                // 等头像接口确认稳定支持压缩图后，再在个人资料页单独开放上传。
+                updateSexIfNeeded(this::finishPerfectUserInfo);
             } else {
                 loadingPopup.dismiss();
                 showToast(TextUtils.isEmpty(msg) ? getString(R.string.profile_save_failed) : msg);
