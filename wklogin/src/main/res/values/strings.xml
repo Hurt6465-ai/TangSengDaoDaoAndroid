@@ -63,4 +63,53 @@
     <string name="invite_code_not_null">邀请码不能为空</string>
     <string name="reset_base_url">重置</string>
     <string name="update_api_content">填写服务器地址，域名或IP+端口的方式，都必须是http开头。\n例：\n例：https://172.0.0.1:8090</string>
+
+    <string name="profile_intro">介绍</string>
+    <string name="profile_intro_hint">简单介绍一下你自己</string>
+    <string name="profile_country_region">国籍 / 地区</string>
+    <string name="profile_native_language">母语</string>
+    <string name="profile_learning_language">正在学的语言</string>
+    <string name="profile_gender">性别</string>
+    <string name="profile_birthday">出生日期</string>
+    <string name="profile_intro_required">请填写介绍</string>
+    <string name="profile_country_required">请选择国籍 / 地区</string>
+    <string name="profile_native_language_required">请选择母语</string>
+    <string name="profile_learning_language_required">请选择正在学的语言</string>
+    <string name="profile_gender_required">请选择性别</string>
+    <string name="profile_birthday_required">请选择出生日期</string>
+
+    <string-array name="profile_country_options">
+        <item>🇲🇲 缅甸</item>
+        <item>🇨🇳 中国</item>
+        <item>🇹🇭 泰国</item>
+        <item>🇯🇵 日本</item>
+        <item>🇰🇷 韩国</item>
+        <item>🇻🇳 越南</item>
+        <item>🇱🇦 老挝</item>
+        <item>🇰🇭 柬埔寨</item>
+        <item>🇲🇾 马来西亚</item>
+        <item>🇸🇬 新加坡</item>
+        <item>🇺🇸 美国</item>
+        <item>🌍 其他</item>
+    </string-array>
+
+    <string-array name="profile_language_options">
+        <item>🇲🇲 缅甸语</item>
+        <item>🇨🇳 中文</item>
+        <item>🇺🇸 英语</item>
+        <item>🇹🇭 泰语</item>
+        <item>🇯🇵 日语</item>
+        <item>🇰🇷 韩语</item>
+        <item>🇻🇳 越南语</item>
+        <item>🇱🇦 老挝语</item>
+        <item>🇰🇭 高棉语</item>
+        <item>🇲🇾 马来语</item>
+        <item>🌍 其他</item>
+    </string-array>
+
+    <string-array name="profile_gender_options">
+        <item>男</item>
+        <item>女</item>
+        <item>保密</item>
+    </string-array>
 </resources>
