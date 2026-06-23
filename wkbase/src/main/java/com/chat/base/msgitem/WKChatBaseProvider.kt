@@ -97,7 +97,6 @@ import java.util.HashSet
 import java.util.LinkedHashMap
 import java.util.WeakHashMap
 import kotlin.concurrent.thread
-import kotlin.math.abs
 import kotlin.math.max
 
 /**
@@ -118,14 +117,12 @@ private data class WingmanMemoryEntry(
 
 private data class TranslationCacheHit(
     val key: String,
-    val text: String,
-    val expanded: Boolean = false
+    val text: String
 )
 
 private data class TranslationCacheEntry(
     val text: String,
-    val expanded: Boolean,
-    val time: Long
+    val expanded: Boolean
 )
 
 /**
@@ -160,12 +157,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
     private val wingmanReplyMemory = LinkedHashMap<String, WingmanMemoryEntry>(16, 0.75f, true)
     private val wingmanInflightKeys = HashSet<String>()
     private val translationInflightKeys = HashSet<String>()
-    private val translationDiskLoadingKeys = HashSet<String>()
     private val latestTranslateButtonCache = HashMap<String, String>()
-    private val translationMemoryCache = LinkedHashMap<String, TranslationCacheEntry>(64, 0.75f, true)
-    private val whitespaceRegex = Regex("\\s+")
-    private var wingmanActiveRequestCount = 0
-    private var wingmanLastRequestAt = 0L
 
     companion object {
         private const val PAYLOAD_TRANSLATION_CHANGED = "payload_translation_changed"
@@ -173,13 +165,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         private const val WINGMAN_MEMORY_TTL_MS = 45L * 60L * 1000L
         private const val MAX_WINGMAN_MEMORY_ITEMS = 100
         private const val MAX_WINGMAN_HISTORY_LINES = 8
-        private const val MAX_WINGMAN_HISTORY_SCAN = 60
-        private const val MAX_WINGMAN_HISTORY_LINE_CHARS = 120
-        private const val MAX_WINGMAN_PEER_TEXT_CHARS = 500
-        private const val MAX_WINGMAN_CONCURRENT_REQUESTS = 2
-        private const val MIN_WINGMAN_REQUEST_INTERVAL_MS = 800L
         private const val MAX_INLINE_TRANSLATE_SCAN = 80
-        private const val MAX_TRANSLATION_MEMORY_ITEMS = 200
         private const val TRANSLATION_CACHE_TTL_MS = 7L * 24L * 60L * 60L * 1000L
     }
 
@@ -261,6 +247,13 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                 }
             }
         }
+
+        if (msgItemEntity.isUpdateStatus) {
+            val baseView = helper.getViewOrNull<LinearLayout>(R.id.wkBaseContentLayout)
+            if (baseView != null) {
+                setMsgTimeAndStatus(msgItemEntity, baseView, from)
+            }
+        }
     }
 
     override fun convert(helper: BaseViewHolder, item: WKUIChatMsgItemEntity) {
@@ -333,6 +326,27 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
 
     private fun chatAdapterOrNull(): ChatAdapter? {
         return getAdapter() as? ChatAdapter
+    }
+
+    private fun remoteRevoke(msg: WKMsg?): Int {
+        return msg?.remoteExtra?.revoke ?: 0
+    }
+
+    private fun isSameMessage(a: WKMsg?, b: WKMsg?): Boolean {
+        if (a == null || b == null) return false
+        val sameClient = !TextUtils.isEmpty(a.clientMsgNO) && a.clientMsgNO == b.clientMsgNO
+        val sameServer = !TextUtils.isEmpty(a.messageID) && a.messageID != "0" && a.messageID == b.messageID
+        return sameClient || sameServer
+    }
+
+    private fun dismissScrimPopup(animated: Boolean = true) {
+        val window = scrimPopupWindow ?: return
+        scrimPopupWindow = null
+        if (animated) {
+            window.dismiss(true)
+        } else {
+            window.dismiss()
+        }
     }
 
     private fun getDataPosition(holder: BaseViewHolder): Int {
@@ -535,7 +549,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         val nextIsSystem = nextMsg != null && WKContentType.isSystemMsg(nextMsg.type)
 
         if (previousMsg != null
-            && previousMsg.remoteExtra.revoke == 0
+            && remoteRevoke(previousMsg) == 0
             && previousMsg.isDeleted == 0
             && !previousIsSystem
             && !TextUtils.isEmpty(previousMsg.fromUID)
@@ -545,7 +559,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         }
 
         if (nextMsg != null
-            && nextMsg.remoteExtra.revoke == 0
+            && remoteRevoke(nextMsg) == 0
             && nextMsg.isDeleted == 0
             && !nextIsSystem
             && !TextUtils.isEmpty(nextMsg.fromUID)
@@ -566,7 +580,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         var nextUID = ""
         if (nowMsg != null
             && !TextUtils.isEmpty(nowMsg.fromUID)
-            && nowMsg.remoteExtra.revoke == 0
+            && remoteRevoke(nowMsg) == 0
             && !WKContentType.isSystemMsg(nowMsg.type)
         ) {
             nowUID = nowMsg.fromUID
@@ -574,7 +588,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         if (nextMsg != null
             && !TextUtils.isEmpty(nextMsg.fromUID)
             && nextMsg.type != WKContentType.screenshot
-            && nextMsg.remoteExtra.revoke == 0
+            && remoteRevoke(nextMsg) == 0
             && !WKContentType.isSystemMsg(nextMsg.type)
         ) {
             nextUID = nextMsg.fromUID
@@ -682,7 +696,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         checkBox.setStrokeWidth(AndroidUtilities.dp(2f))
         checkBox.setColor(Theme.colorAccount, ContextCompat.getColor(context, R.color.white))
         checkBox.visibility = if (uiChatMsgItemEntity.wkMsg.flame == 1) INVISIBLE else VISIBLE
-        checkBox.setChecked(uiChatMsgItemEntity.isChecked, true)
+        checkBox.setChecked(uiChatMsgItemEntity.isChecked, false)
     }
 
     private fun cancelCheckBoxAnimator(view: View) {
@@ -876,10 +890,8 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             PorterDuff.Mode.MULTIPLY
         )
 
-        val displayStatus = if (mMsg.remoteExtra != null && mMsg.remoteExtra.needUpload == 1) {
-            WKSendMsgResult.send_loading
-        } else {
-            mMsg.status
+        if (mMsg.remoteExtra != null && mMsg.remoteExtra.needUpload == 1) {
+            mMsg.status = WKSendMsgResult.send_loading
         }
 
         if (fromType != WKChatIteMsgFromType.SEND) {
@@ -893,7 +905,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         val drawable: RLottieDrawable = if (mMsg.setting.receipt == 1 && mMsg.remoteExtra != null && mMsg.remoteExtra.readedCount > 0) {
             RLottieDrawable(context, R.raw.ticks_double, "ticks_double", AndroidUtilities.dp(18f), AndroidUtilities.dp(18f))
         } else {
-            when (displayStatus) {
+            when (mMsg.status) {
                 WKSendMsgResult.send_success -> {
                     RLottieDrawable(context, R.raw.ticks_single, "ticks_single", AndroidUtilities.dp(18f), AndroidUtilities.dp(18f))
                 }
@@ -909,7 +921,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             }
         }
 
-        val tintColor = if (displayStatus <= WKSendMsgResult.send_success) {
+        val tintColor = if (mMsg.status <= WKSendMsgResult.send_success) {
             ContextCompat.getColor(context, if (isShowNormalColor) R.color.color999 else R.color.white)
         } else {
             ContextCompat.getColor(context, R.color.white)
@@ -1034,17 +1046,14 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         }
         if (revokeSecond == 0) revokeSecond = 120
         return (WKTimeUtils.getInstance().currentSeconds - mMsg.timestamp < revokeSecond
-                && mMsg.fromUID == WKConfig.getInstance().uid
-                && mMsg.status == WKSendMsgResult.send_success)
-                || (isManager && mMsg.status == WKSendMsgResult.send_success)
+                && mMsg.fromUID == WKConfig.getInstance().uid)
+                || isManager
     }
 
     open fun getMsgConfig(msgType: Int): MsgConfig {
-        return if (EndpointManager.getInstance().invoke(EndpointCategory.msgConfig + msgType, null) != null) {
-            EndpointManager.getInstance().invoke(EndpointCategory.msgConfig + msgType, null) as MsgConfig
-        } else {
-            MsgConfig(false)
-        }
+        return EndpointManager.getInstance()
+            .invoke(EndpointCategory.msgConfig + msgType, null) as? MsgConfig
+            ?: MsgConfig(false)
     }
 
     protected fun getPopupList(mMsg: WKMsg): List<PopupMenuItem> {
@@ -1129,9 +1138,10 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         val menus = EndpointManager.getInstance().invokes<ChatItemPopupMenu>(EndpointCategory.wkChatPopupItem, mMsg)
         if (menus != null && menus.isNotEmpty() && mMsg.flame == 0) {
             for (menu in menus) {
-                val popupMenu = if (isCopyPopupMenu(menu)) {
+                val isCopy = isCopyPopupMenu(menu)
+                val popupMenu = if (isCopy) {
                     // Deliberately replace Copy with Translate, as requested.
-                    PopupMenuItem("翻译", R.drawable.ic_chat_translate_compact,
+                    PopupMenuItem(context.getString(R.string.chat_translate_menu_translate), menu.imageResource,
                         object : PopupMenuItem.IClick {
                             override fun onClick() {
                                 translateWholeMessage(mMsg)
@@ -1150,7 +1160,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                         })
                 }
                 popupMenu.subText = menu.subText
-                popupMenu.tag = if (isCopyPopupMenu(menu)) "chat_translate" else menu.tag
+                popupMenu.tag = if (isCopy) "chat_translate" else menu.tag
                 list.add(popupMenu)
             }
         }
@@ -1172,7 +1182,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                             val size = adapter.data.size
                             while (i < size) {
                                 adapter.data[i].isChoose = true
-                                if (adapter.data[i].wkMsg.clientMsgNO == mMsg.clientMsgNO) {
+                                if (isSameMessage(adapter.data[i].wkMsg, mMsg)) {
                                     adapter.data[i].isChecked = true
                                 }
                                 adapter.notifyItemChanged(i + adapter.headerLayoutCount, adapter.data[i])
@@ -1292,7 +1302,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
     private fun translateWholeMessage(mMsg: WKMsg) {
         val content = getTranslatableMessageText(mMsg)
         if (TextUtils.isEmpty(content)) {
-            WKToastUtils.getInstance().showToastNormal("没有可翻译的文字")
+            WKToastUtils.getInstance().showToastNormal(context.getString(R.string.chat_translate_no_text))
             return
         }
         val targetLang = readAiSetting("chat_ai_source_lang", "中文")
@@ -1351,10 +1361,8 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         val adapter = chatAdapterOrNull() ?: return false
         val token = buildLatestTranslateButtonToken(adapter)
         val latestMsgKey = latestTranslateButtonCache[token] ?: findLatestPeerTranslatableMsgKey(adapter).also { latest ->
-            if (!TextUtils.isEmpty(latest)) {
-                latestTranslateButtonCache[token] = latest
-                trimLatestTranslateButtonCache()
-            }
+            latestTranslateButtonCache[token] = latest
+            trimLatestTranslateButtonCache()
         }
 
         return latestMsgKey == stableMsgKey(current)
@@ -1362,16 +1370,11 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
 
     private fun isValidPeerTranslatableMsg(msg: WKMsg): Boolean {
         if (getMsgFromType(msg) != WKChatIteMsgFromType.RECEIVED) return false
-        if (!isSupportedInlineTranslateType(msg)) return false
         if (msg.flame == 1) return false
-        if (msg.remoteExtra != null && msg.remoteExtra.revoke != 0) return false
+        if (remoteRevoke(msg) != 0) return false
         if (msg.isDeleted != 0) return false
         if (WKContentType.isSystemMsg(msg.type) || WKContentType.isLocalMsg(msg.type)) return false
         return !TextUtils.isEmpty(getTranslatableMessageText(msg))
-    }
-
-    private fun isSupportedInlineTranslateType(msg: WKMsg): Boolean {
-        return msg.type == WKContentType.WK_TEXT || msg.type == WKContentType.richText
     }
 
     private fun stableMsgKey(msg: WKMsg): String {
@@ -1383,7 +1386,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
     }
 
     private fun buildLatestTranslateButtonToken(adapter: ChatAdapter): String {
-        val fromIndex = (adapter.data.size - 5).coerceAtLeast(0)
+        val fromIndex = (adapter.data.size - MAX_INLINE_TRANSLATE_SCAN).coerceAtLeast(0)
         val tail = StringBuilder()
         for (i in fromIndex until adapter.data.size) {
             val msg = adapter.data[i].wkMsg
@@ -1394,8 +1397,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                 .append(msg.type).append(',')
                 .append(msg.fromUID).append(',')
                 .append(msg.remoteExtra?.revoke ?: 0).append(',')
-                .append(msg.isDeleted).append(',')
-                .append(getTranslatableMessageText(msg).hashCode())
+                .append(msg.isDeleted)
         }
         return adapter.data.size.toString() + tail.toString()
     }
@@ -1418,48 +1420,28 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
     protected fun getBubbleTranslation(mMsg: WKMsg): String? {
         val content = getTranslatableMessageText(mMsg)
         if (TextUtils.isEmpty(content)) return null
-        val keys = getBubbleTranslationCacheKeys(mMsg, content)
-        val hit = readTranslationCacheAny(keys.first, keys.second, allowDisk = Looper.myLooper() != Looper.getMainLooper())
-        if (hit != null) return hit.text
-        enqueueTranslationDiskLoad(mMsg, keys.first, keys.second)
-        return null
+        val targetLang = readAiSetting("chat_ai_source_lang", "中文")
+        val model = readAiSetting("chat_ai_model", "deepseek-chat")
+        val cacheSeed = listOf(getStableTranslateId(mMsg, content), content.hashCode().toString(), targetLang, model).joinToString("|")
+        val legacySeed = listOf(getLegacyTranslateId(mMsg, content), content.hashCode().toString(), targetLang, model).joinToString("|")
+        val hit = readTranslationCacheAny(
+            buildTranslationCacheKey("bubble_$cacheSeed"),
+            buildLegacyTranslationCacheKey("bubble_$legacySeed")
+        )
+        return hit?.text
     }
 
     protected fun isBubbleTranslationExpanded(mMsg: WKMsg): Boolean {
         val content = getTranslatableMessageText(mMsg)
         if (TextUtils.isEmpty(content)) return false
-        val keys = getBubbleTranslationCacheKeys(mMsg, content)
-        val hit = readTranslationCacheAny(keys.first, keys.second, allowDisk = Looper.myLooper() != Looper.getMainLooper())
-        if (hit != null) return hit.expanded
-        enqueueTranslationDiskLoad(mMsg, keys.first, keys.second)
-        return false
-    }
-
-    private fun getBubbleTranslationCacheKeys(mMsg: WKMsg, content: String): Pair<String, String> {
         val targetLang = readAiSetting("chat_ai_source_lang", "中文")
         val model = readAiSetting("chat_ai_model", "deepseek-chat")
         val cacheSeed = listOf(getStableTranslateId(mMsg, content), content.hashCode().toString(), targetLang, model).joinToString("|")
         val legacySeed = listOf(getLegacyTranslateId(mMsg, content), content.hashCode().toString(), targetLang, model).joinToString("|")
-        return Pair(
+        return readTranslationExpandedAny(
             buildTranslationCacheKey("bubble_$cacheSeed"),
             buildLegacyTranslationCacheKey("bubble_$legacySeed")
         )
-    }
-
-    private fun enqueueTranslationDiskLoad(mMsg: WKMsg, primaryKey: String, legacyKey: String) {
-        if (Looper.myLooper() != Looper.getMainLooper()) return
-        val loadKey = "$primaryKey|$legacyKey"
-        if (translationDiskLoadingKeys.contains(loadKey)) return
-        translationDiskLoadingKeys.add(loadKey)
-        thread {
-            val hit = readTranslationCacheAny(primaryKey, legacyKey, allowDisk = true)
-            mainHandler.post {
-                translationDiskLoadingKeys.remove(loadKey)
-                if (hit != null && !TextUtils.isEmpty(hit.text)) {
-                    notifyTranslationChanged(mMsg)
-                }
-            }
-        }
     }
 
     /**
@@ -1470,30 +1452,12 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         val key = getWingmanCacheKey(mMsg) ?: return emptyList()
         if (Looper.myLooper() == Looper.getMainLooper()) {
             getWingmanMemoryOnMain(key)?.let { return it }
-            enqueueWingmanDiskLoad(mMsg, key)
-            return emptyList()
         }
-        return readWingmanCacheFromDisk(key)
-    }
-
-    private fun enqueueWingmanDiskLoad(mMsg: WKMsg, key: String) {
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post { enqueueWingmanDiskLoad(mMsg, key) }
-            return
+        val cached = readWingmanCache(key)
+        if (cached.isNotEmpty() && Looper.myLooper() == Looper.getMainLooper()) {
+            putWingmanRepliesOnMain(key, cached)
         }
-        val loadKey = "disk:$key"
-        if (wingmanInflightKeys.contains(loadKey)) return
-        wingmanInflightKeys.add(loadKey)
-        thread {
-            val cached = readWingmanCacheFromDisk(key)
-            mainHandler.post {
-                wingmanInflightKeys.remove(loadKey)
-                if (cached.isNotEmpty()) {
-                    putWingmanRepliesOnMain(key, cached)
-                    notifyTranslationChanged(mMsg, PAYLOAD_WINGMAN_CHANGED)
-                }
-            }
-        }
+        return cached
     }
 
     protected fun clearWingmanReplies(mMsg: WKMsg? = null) {
@@ -1559,46 +1523,33 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
     }
 
     private fun isWingmanEnabled(): Boolean {
-        val raw = readAiSetting("chat_smart_reply_enabled", readAiSetting("chat_wingman_enabled", "0"))
+        val raw = readAiSetting("chat_smart_reply_enabled", readAiSetting("chat_wingman_enabled", "1"))
         return raw != "0" && !raw.equals("false", true) && !raw.equals("off", true)
     }
 
     private fun requestWingmanRepliesIfEnabled(mMsg: WKMsg, peerText: String) {
         if (!isWingmanEnabled()) return
         if (getMsgFromType(mMsg) != WKChatIteMsgFromType.RECEIVED) return
-        val safePeerText = normalizeAiInputText(peerText, MAX_WINGMAN_PEER_TEXT_CHARS)
-        if (TextUtils.isEmpty(safePeerText)) return
         val apiKey = readAiSetting("chat_ai_key", "")
         if (TextUtils.isEmpty(apiKey)) return
         val key = getWingmanCacheKey(mMsg) ?: return
 
         mainHandler.post {
             if (getWingmanMemoryOnMain(key) != null) {
-                notifyTranslationChanged(mMsg, PAYLOAD_WINGMAN_CHANGED)
                 return@post
             }
             if (wingmanInflightKeys.contains(key)) {
                 return@post
             }
-            val now = System.currentTimeMillis()
-            if (wingmanActiveRequestCount >= MAX_WINGMAN_CONCURRENT_REQUESTS) {
-                return@post
-            }
-            if (now - wingmanLastRequestAt < MIN_WINGMAN_REQUEST_INTERVAL_MS) {
-                return@post
-            }
-
-            val historySnapshot = buildWingmanHistory(safePeerText)
+            val historySnapshot = buildWingmanHistory(peerText)
             wingmanInflightKeys.add(key)
-            wingmanActiveRequestCount++
-            wingmanLastRequestAt = now
 
             thread {
                 try {
-                    val cached = readWingmanCacheFromDisk(key)
+                    val cached = readWingmanCache(key)
                     if (cached.isNotEmpty()) {
                         mainHandler.post {
-                            finishWingmanRequestOnMain(key)
+                            wingmanInflightKeys.remove(key)
                             putWingmanRepliesOnMain(key, cached)
                             notifyTranslationChanged(mMsg, PAYLOAD_WINGMAN_CHANGED)
                         }
@@ -1608,32 +1559,23 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                     val endpoint = readAiSetting("chat_ai_endpoint", "https://api.deepseek.com/v1/chat/completions")
                     val model = readAiSetting("chat_ai_model", "deepseek-chat")
                     val myLang = readAiSetting("chat_ai_source_lang", "中文")
-                    val replies = requestAiWingmanReplies(endpoint, apiKey, model, myLang, safePeerText, historySnapshot)
+                    val replies = requestAiWingmanReplies(endpoint, apiKey, model, myLang, peerText, historySnapshot)
                     if (replies.isNotEmpty()) {
                         saveWingmanCache(key, replies)
                         mainHandler.post {
-                            finishWingmanRequestOnMain(key)
+                            wingmanInflightKeys.remove(key)
                             putWingmanRepliesOnMain(key, replies)
                             notifyTranslationChanged(mMsg, PAYLOAD_WINGMAN_CHANGED)
                         }
                     } else {
-                        finishWingmanRequestOnMain(key)
+                        mainHandler.post { wingmanInflightKeys.remove(key) }
                     }
                 } catch (e: Exception) {
-                    finishWingmanRequestOnMain(key)
+                    mainHandler.post { wingmanInflightKeys.remove(key) }
                     warn("wingman-replies", e)
                 }
             }
         }
-    }
-
-    private fun finishWingmanRequestOnMain(key: String) {
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post { finishWingmanRequestOnMain(key) }
-            return
-        }
-        wingmanInflightKeys.remove(key)
-        wingmanActiveRequestCount = (wingmanActiveRequestCount - 1).coerceAtLeast(0)
     }
 
     private fun putWingmanRepliesOnMain(key: String, replies: List<ChatWingmanReply>) {
@@ -1669,11 +1611,6 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         val model = readAiSetting("chat_ai_model", "deepseek-chat")
         val stableId = getStableTranslateId(mMsg, content)
         return "chat_wingman_cache_" + sha256(listOf(stableId, content.hashCode().toString(), myLang, model).joinToString("|"))
-    }
-
-    private fun normalizeAiInputText(text: String, maxChars: Int): String {
-        if (TextUtils.isEmpty(text)) return ""
-        return whitespaceRegex.replace(text.trim(), " ").take(maxChars)
     }
 
     private fun requestAiWingmanReplies(
@@ -1738,20 +1675,17 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         if (Looper.myLooper() != Looper.getMainLooper()) return "（暂无历史）"
         val adapter = chatAdapterOrNull() ?: return "（暂无历史）"
         val lines = ArrayList<String>()
-        val normalizedCurrent = normalizeAiInputText(currentPeerText, MAX_WINGMAN_PEER_TEXT_CHARS)
-        var scanned = 0
+        val maxLines = MAX_WINGMAN_HISTORY_LINES
         for (item in adapter.data.asReversed()) {
-            if (scanned >= MAX_WINGMAN_HISTORY_SCAN) break
-            scanned++
             val msg = item.wkMsg ?: continue
-            if (msg.remoteExtra != null && msg.remoteExtra.revoke != 0) continue
+            if (remoteRevoke(msg) != 0) continue
             if (msg.isDeleted != 0) continue
-            val text = normalizeAiInputText(getTranslatableMessageText(msg), MAX_WINGMAN_HISTORY_LINE_CHARS)
+            val text = getTranslatableMessageText(msg)
             if (TextUtils.isEmpty(text)) continue
-            if (text == normalizedCurrent && lines.isEmpty()) continue
+            if (text == currentPeerText && lines.isEmpty()) continue
             val who = if (getMsgFromType(msg) == WKChatIteMsgFromType.SEND) "我" else "对方"
-            lines.add(0, "$who：$text")
-            if (lines.size >= MAX_WINGMAN_HISTORY_LINES) break
+            lines.add(0, "$who：${text.replace(Regex("\\s+"), " ").take(160)}")
+            if (lines.size >= maxLines) break
         }
         return if (lines.isEmpty()) "（暂无历史）" else lines.joinToString("\n")
     }
@@ -1793,12 +1727,8 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
 
     private fun readWingmanCache(key: String): List<ChatWingmanReply> {
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            return getWingmanMemoryOnMain(key) ?: emptyList()
+            getWingmanMemoryOnMain(key)?.let { return it }
         }
-        return readWingmanCacheFromDisk(key)
-    }
-
-    private fun readWingmanCacheFromDisk(key: String): List<ChatWingmanReply> {
         return try {
             val raw = context.getSharedPreferences("chat_wingman_cache", Context.MODE_PRIVATE).getString(key, "") ?: ""
             if (raw.isBlank()) return emptyList()
@@ -1852,7 +1782,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         val cacheKey = buildTranslationCacheKey(cacheSeed)
         val apiKey = readAiSetting("chat_ai_key", "")
         if (TextUtils.isEmpty(apiKey)) {
-            WKToastUtils.getInstance().showToastNormal("请先在 AI 翻译设置里填写 API Key")
+            WKToastUtils.getInstance().showToastNormal(context.getString(R.string.chat_translate_need_api_key))
             return
         }
         val endpoint = readAiSetting("chat_ai_endpoint", "https://api.deepseek.com/v1/chat/completions")
@@ -1864,7 +1794,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         mainHandler.post {
             if (translationInflightKeys.contains(cacheKey)) return@post
             translationInflightKeys.add(cacheKey)
-            WKToastUtils.getInstance().showToastNormal("正在翻译…")
+            WKToastUtils.getInstance().showToastNormal(context.getString(R.string.chat_translate_translating))
 
             thread {
                 try {
@@ -1885,7 +1815,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                     mainHandler.post { notifyTranslationChanged(mMsg) }
                 } catch (e: Exception) {
                     mainHandler.post {
-                        WKToastUtils.getInstance().showToastNormal("翻译失败：" + (e.message ?: ""))
+                        WKToastUtils.getInstance().showToastNormal(context.getString(R.string.chat_translate_failed_prefix) + (e.message ?: ""))
                     }
                 } finally {
                     mainHandler.post { translationInflightKeys.remove(cacheKey) }
@@ -2051,19 +1981,11 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         return "chat_translate_cache_" + seed.hashCode()
     }
 
-    private fun readTranslationCacheAny(
-        primaryKey: String,
-        legacyKey: String,
-        allowDisk: Boolean = true
-    ): TranslationCacheHit? {
-        val primary = readTranslationCacheEntry(primaryKey, allowDisk)
-        if (primary != null && !TextUtils.isEmpty(primary.text)) {
-            return TranslationCacheHit(primaryKey, primary.text, primary.expanded)
-        }
-        val legacy = readTranslationCacheEntry(legacyKey, allowDisk)
-        if (legacy != null && !TextUtils.isEmpty(legacy.text)) {
-            return TranslationCacheHit(legacyKey, legacy.text, legacy.expanded)
-        }
+    private fun readTranslationCacheAny(primaryKey: String, legacyKey: String): TranslationCacheHit? {
+        val primary = readTranslationCache(primaryKey)
+        if (!TextUtils.isEmpty(primary)) return TranslationCacheHit(primaryKey, primary!!)
+        val legacy = readTranslationCache(legacyKey)
+        if (!TextUtils.isEmpty(legacy)) return TranslationCacheHit(legacyKey, legacy!!)
         return null
     }
 
@@ -2076,18 +1998,17 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         }
     }
 
-    private fun readTranslationCache(key: String): String? {
-        return readTranslationCacheEntry(key, allowDisk = true)?.text
+    private fun readTranslationExpandedAny(primaryKey: String, legacyKey: String): Boolean {
+        return readTranslationCacheEntry(primaryKey)?.expanded
+            ?: readTranslationCacheEntry(legacyKey)?.expanded
+            ?: false
     }
 
-    private fun readTranslationCacheEntry(key: String, allowDisk: Boolean = true): TranslationCacheEntry? {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            getTranslationMemoryOnMain(key)?.let { return it }
-            if (!allowDisk) return null
-        } else if (!allowDisk) {
-            return null
-        }
+    private fun readTranslationCache(key: String): String? {
+        return readTranslationCacheEntry(key)?.text
+    }
 
+    private fun readTranslationCacheEntry(key: String): TranslationCacheEntry? {
         return try {
             val raw = context.getSharedPreferences("chat_translate_cache", Context.MODE_PRIVATE).getString(key, "") ?: ""
             if (raw.isBlank()) return null
@@ -2095,46 +2016,16 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             val time = obj.optLong("time", 0L)
             if (System.currentTimeMillis() - time > TRANSLATION_CACHE_TTL_MS) return null
             val text = obj.optString("text", "").takeIf { it.isNotBlank() } ?: return null
-            val entry = TranslationCacheEntry(text, obj.optBoolean("expanded", false), time)
-            putTranslationMemoryOnMain(key, entry)
-            entry
+            TranslationCacheEntry(text, obj.optBoolean("expanded", false))
         } catch (_: Exception) {
             null
         }
     }
 
-    private fun getTranslationMemoryOnMain(key: String): TranslationCacheEntry? {
-        if (Looper.myLooper() != Looper.getMainLooper()) return null
-        val entry = translationMemoryCache[key] ?: return null
-        if (System.currentTimeMillis() - entry.time > TRANSLATION_CACHE_TTL_MS) {
-            translationMemoryCache.remove(key)
-            return null
-        }
-        return entry
-    }
-
-    private fun putTranslationMemoryOnMain(key: String, entry: TranslationCacheEntry) {
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post { putTranslationMemoryOnMain(key, entry) }
-            return
-        }
-        translationMemoryCache[key] = entry
-        trimTranslationMemoryCache()
-    }
-
-    private fun trimTranslationMemoryCache() {
-        while (translationMemoryCache.size > MAX_TRANSLATION_MEMORY_ITEMS) {
-            val firstKey = translationMemoryCache.keys.firstOrNull() ?: break
-            translationMemoryCache.remove(firstKey)
-        }
-    }
-
     private fun saveTranslationCache(key: String, translated: String, expanded: Boolean) {
         try {
-            val time = System.currentTimeMillis()
-            putTranslationMemoryOnMain(key, TranslationCacheEntry(translated, expanded, time))
             val obj = JSONObject()
-                .put("time", time)
+                .put("time", System.currentTimeMillis())
                 .put("text", translated)
                 .put("expanded", expanded)
             context.getSharedPreferences("chat_translate_cache", Context.MODE_PRIVATE)
@@ -2151,11 +2042,6 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             val raw = sp.getString(key, "") ?: ""
             if (raw.isBlank()) return
             val obj = JSONObject(raw).put("expanded", expanded)
-            val text = obj.optString("text", "")
-            val time = obj.optLong("time", System.currentTimeMillis())
-            if (!TextUtils.isEmpty(text)) {
-                putTranslationMemoryOnMain(key, TranslationCacheEntry(text, expanded, time))
-            }
             sp.edit().putString(key, obj.toString()).apply()
         } catch (_: Exception) {
         }
@@ -2167,10 +2053,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                 val adapter = chatAdapterOrNull() ?: return@Runnable
                 if (mMsg != null) {
                     val index = adapter.data.indexOfFirst { item ->
-                        val msg = item.wkMsg
-                        val sameClient = !TextUtils.isEmpty(mMsg.clientMsgNO) && msg.clientMsgNO == mMsg.clientMsgNO
-                        val sameServer = !TextUtils.isEmpty(mMsg.messageID) && mMsg.messageID != "0" && msg.messageID == mMsg.messageID
-                        sameClient || sameServer
+                        isSameMessage(item.wkMsg, mMsg)
                     }
                     if (index >= 0) {
                         adapter.notifyItemChanged(index + adapter.headerLayoutCount, payload)
@@ -2204,8 +2087,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         }
 
         // Avoid stacked popup windows and leaked scrim containers when the user long-presses repeatedly.
-        scrimPopupWindow?.dismiss(true)
-        scrimPopupWindow = null
+        dismissScrimPopup(true)
 
         val scrimPopupContainerLayout: ChatScrimPopupContainerLayout = object : ChatScrimPopupContainerLayout(context) {
             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -2213,7 +2095,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                     && event.action == KeyEvent.ACTION_UP
                     && scrimPopupWindow != null
                 ) {
-                    scrimPopupWindow?.dismiss(true)
+                    dismissScrimPopup(true)
                     return true
                 }
                 return super.dispatchKeyEvent(event)
@@ -2222,7 +2104,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
                 val b = super.dispatchTouchEvent(ev)
                 if (ev.action == MotionEvent.ACTION_DOWN && !b && scrimPopupWindow != null) {
-                    scrimPopupWindow!!.dismiss(true)
+                    dismissScrimPopup(true)
                 }
                 return b
             }
@@ -2242,11 +2124,11 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                             (pos[1] + contentView.measuredHeight).toFloat()
                         )
                         if (!rect.contains(event.rawX, event.rawY)) {
-                            scrimPopupWindow?.dismiss(true)
+                            dismissScrimPopup(true)
                         }
                     }
                 } else if (event.actionMasked == MotionEvent.ACTION_OUTSIDE) {
-                    scrimPopupWindow?.dismiss(true)
+                    dismissScrimPopup(true)
                 }
                 return false
             }
@@ -2270,7 +2152,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                 subItem1.setRightIcon(R.mipmap.msg_arrowright)
                 popupLayout.addView(subItem1)
                 subItem1.setOnClickListener {
-                    scrimPopupWindow?.dismiss()
+                    dismissScrimPopup(false)
                     EndpointManager.getInstance().invoke("chat_activity_touch", null)
                     val adapter = chatAdapterOrNull() ?: return@setOnClickListener
                     EndpointManager.getInstance().invoke(
@@ -2307,7 +2189,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                 EndpointManager.getInstance().invoke("chat_popup_item", subItem)
             }
             subItem.setOnClickListener {
-                scrimPopupWindow?.dismiss()
+                dismissScrimPopup(false)
                 item.iClick.onClick()
                 EndpointManager.getInstance().invoke("chat_activity_touch", null)
             }
@@ -2329,7 +2211,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                 AndroidUtilities.dp(pad.toFloat())
             )
             reactionsLayout.setDelegate(ReactionsContainerDelegate { _: View?, reaction: String?, _: Boolean, location: IntArray? ->
-                scrimPopupWindow?.dismiss(true)
+                dismissScrimPopup(true)
                 EndpointManager.getInstance().invoke(
                     "wk_msg_reaction",
                     MsgReactionMenu(mMsg, reaction, chatAdapterOrNull(), location)
@@ -2337,11 +2219,12 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             })
         }
 
-        if (isShowReaction) {
+        val activeReactionsLayout = reactionsLayout
+        if (isShowReaction && activeReactionsLayout != null) {
             val params = LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 52 + pad, Gravity.START, 0, 0, 0, 0)
-            scrimPopupContainerLayout.addView(reactionsLayout, params)
-            scrimPopupContainerLayout.setReactionsLayout(reactionsLayout)
-            reactionsLayout?.setTransitionProgress(0f)
+            scrimPopupContainerLayout.addView(activeReactionsLayout, params)
+            scrimPopupContainerLayout.setReactionsLayout(activeReactionsLayout)
+            activeReactionsLayout.setTransitionProgress(0f)
         }
         scrimPopupContainerLayout.clipChildren = false
         val fl = FrameLayout(context)
@@ -2352,15 +2235,12 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         )
         scrimPopupContainerLayout.applyViewBottom(fl)
         scrimPopupContainerLayout.setPopupWindowLayout(popupLayout)
-        if (popupLayout.swipeBack != null) {
-            val finalReactionsLayout = reactionsLayout
-            if (isShowReaction) {
-                popupLayout.swipeBack!!.addOnSwipeBackProgressListener { _: PopupSwipeBackLayout?, toProgress: Float, progress: Float ->
-                    if (toProgress == 0f) {
-                        finalReactionsLayout?.startEnterAnimation()
-                    } else if (toProgress == 1f) {
-                        finalReactionsLayout?.alpha = 1f - progress
-                    }
+        if (popupLayout.swipeBack != null && isShowReaction && activeReactionsLayout != null) {
+            popupLayout.swipeBack!!.addOnSwipeBackProgressListener { _: PopupSwipeBackLayout?, toProgress: Float, progress: Float ->
+                if (toProgress == 0f) {
+                    activeReactionsLayout.startEnterAnimation()
+                } else if (toProgress == 1f) {
+                    activeReactionsLayout.alpha = 1f - progress
                 }
             }
         }
@@ -2417,11 +2297,12 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
 
         val finalPopupX = popupX
         val finalPopupY = popupY
-        val finalReactionsLayout1 = reactionsLayout
         val showMenu = Runnable {
             if (scrimPopupWindow == null) return@Runnable
             scrimPopupWindow!!.showAtLocation(recyclerViewLayout, Gravity.START or Gravity.TOP, finalPopupX, finalPopupY)
-            if (isShowReaction) finalReactionsLayout1?.startEnterAnimation()
+            if (isShowReaction && activeReactionsLayout != null) {
+                activeReactionsLayout.startEnterAnimation()
+            }
         }
         showMenu.run()
     }
