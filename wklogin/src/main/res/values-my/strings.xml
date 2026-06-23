@@ -1,290 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="hint_pwd">请输入密码</string>
-    <string name="hint_name">请输入手机号</string>
-    <string name="hint_verfi">请输入验证码</string>
-    <string name="name_not_null">请输入名称</string>
-    <string name="nickname_not_null">昵称不能为空</string>
-    <string name="pwd_not_null">请输入密码</string>
-    <string name="web_login_desc">网页版%s登录确认</string>
-    <string name="login_sure">确认登录</string>
-    <string name="cancel_login">取消登录</string>
-    <string name="login_title">欢迎登录%s</string>
-    <string name="forget_pwd">忘记密码</string>
-    <string name="new_account_register">新用户？请</string>
-    <string name="register">注册</string>
-    <string name="register_app">欢迎注册%s</string>
-    <string name="get_verf_code">获取验证码</string>
-    <string name="has_account">已有账号？请</string>
-    <string name="login">登录</string>
-    <string name="wk_login_search">搜索</string>
-    <string name="choose_country">选择国家或地区</string>
-    <string name="pwd_length_error">密码长度必须是6～16位</string>
-    <string name="account_exist">该账号已存在</string>
-    <string name="recapture">重新获取</string>
-    <string name="wklogin_perfect_userinfo">完善个人资料</string>
-    <string name="must_input_name">名字（必填）</string>
-    <string name="wklogin_sure">确定</string>
-    <string name="wklogin_upload_header">点击上传个人头像</string>
-    <string name="wklogin_nickname">昵称</string>
-    <string name="wklogin_must_upload_header">请上传个人头像</string>
-    <string name="login_auth_desc">你正在一台新设备登录%s，需要进行安全验证，通过后下次无需验证。</string>
-    <string name="phone_num">手机号：</string>
-    <string name="start_auth">开始验证</string>
-    <string name="login_auth">登录验证</string>
-    <string name="send_code_desc">我们已给你的手机号码%s发送了一条验证短信</string>
-    <string name="login_authing">登录验证中</string>
-    <string name="other_device_login">您已在其他设备登录，请重新登录!</string>
-    <string name="auth_phone">验证您的手机号</string>
-    <string name="auth_phone_tips">%s会发送短信验证手机号码，请输入您的验证码</string>
-    <string name="logging_in">登录中</string>
-    <string name="wk_ban">您的账号已被封禁，如需解封请联系后台管理员</string>
-    <string name="phone_notice_open">手机通知已开启</string>
-    <string name="phone_notice_close">手机通知已关闭</string>
-    <string name="phone_mute">手机静音</string>
-    <string name="exit_pc_login">退出Web%s</string>
-    <string name="pc_locking">锁定</string>
-    <string name="pc_file">传文件</string>
-    <string name="pc_login">Web %s已登录</string>
-    <string name="sign_in_agree">我已阅读并同意</string>
-    <string name="privacy_policy">《隐私政策》</string>
-    <string name="user_agreement">《用户协议》</string>
-    <string name="update_api">更改服务器地址</string>
-    <string name="web_url">Web版网址</string>
-    <string name="qr_scan_login">二维码扫描登录</string>
-    <string name="web_side">%s网页端</string>
-    <string name="web_scan_login_desc">请使用浏览器访问%s，然后扫描二维码登录。为了您更好的体验，建议使用谷歌浏览器。</string>
-    <string name="copied">已复制</string>
-    <string name="phone_error">手机号不合法</string>
-    <string name="agree_auth_tips">请先阅读并同意《隐私政策》和《用户协议》</string>
-    <string name="choose_login_type">—  第三方登录  —</string>
-    <string name="update_api_ip">以http开头(如http://172.0.0.1:8090)</string>
-    <string name="input_invite_code_must">请输入邀请码（必填）</string>
-    <string name="input_invite_code_not_must">请输入邀请码（选填）</string>
-    <string name="invite_code_not_null">邀请码不能为空</string>
-    <string name="reset_base_url">重置</string>
-    <string name="update_api_content">填写服务器地址，域名或IP+端口的方式，都必须是http开头。\n例：\n例：https://172.0.0.1:8090</string>
-
-    <string name="profile_edit_title">编辑语伴资料</string>
-    <string name="profile_display_name">用户名 / 显示名</string>
-    <string name="profile_name_hint">请输入用户名</string>
-    <string name="profile_partner_photos">语伴照片</string>
-    <string name="profile_upload_phone_photo">上传手机图片</string>
-    <string name="profile_intro">介绍</string>
-    <string name="profile_intro_hint">介绍一下你想练什么语言、喜欢聊什么。</string>
-    <string name="profile_country_region">国籍 / 地区</string>
-    <string name="profile_gender">性别</string>
-    <string name="profile_native_language">母语 / 我会说</string>
-    <string name="profile_learning_language">想学语言</string>
-    <string name="profile_birthday_optional">出生日期 选填</string>
-    <string name="profile_height_optional">身高 选填</string>
-    <string name="profile_weight_optional">体重 选填</string>
-    <string name="profile_tags">标签</string>
-    <string name="profile_choose_tags_hint">选择标签</string>
-    <string name="profile_choose_tags">选择标签</string>
-    <string name="profile_tag_category_title">选择分类</string>
-    <string name="profile_select">请选择</string>
-    <string name="profile_save">保存资料</string>
-    <string name="profile_save_failed">保存失败</string>
-    <string name="profile_partner_photo_limit">语伴照片最多 5 张</string>
-    <string name="profile_gender_male">男</string>
-    <string name="profile_gender_female">女</string>
-    <string name="profile_image_compressing">正在压缩图片</string>
-    <string name="profile_image_compress_failed">图片压缩失败，请换一张</string>
-    <string name="profile_preview">预览</string>
-    <string name="profile_delete_photo">删除</string>
-    <string name="profile_avatar_required">请上传头像</string>
-    <string name="profile_intro_required">请填写介绍</string>
-    <string name="profile_country_required">请选择国籍 / 地区</string>
-    <string name="profile_gender_required">请选择性别</string>
-    <string name="profile_native_language_required">请选择母语</string>
-    <string name="profile_learning_language_required">请选择想学语言</string>
-    <string name="profile_tags_required">请至少选择一个标签</string>
-    <string name="profile_avatar_upload_failed_non_blocking">ပရိုဖိုင်ပုံတင်ခြင်း မအောင်မြင်ပါ။ အချက်အလက်ကို သိမ်းပြီးပါပြီ။ နောက်မှ ထပ်ကြိုးစားနိုင်ပါသည်။</string>
-    <string name="profile_language_multi_hint">可多选，最多 %1$d 个</string>
-    <string name="profile_tag_multi_select_hint">တစ်ခုထက်ပို၍ ရွေးနိုင်သည်</string>
-    <string name="profile_tag_single_select_hint">ဤအမျိုးအစားတွင် တစ်ခုသာရွေးပါ</string>
-    <string name="profile_select_max_count">最多选择 %1$d 个</string>
+    <string name="profile_intro">မိတ်ဆက်</string>
+    <string name="profile_intro_hint">ကိုယ့်အကြောင်း အတိုချုံးရေးပါ</string>
+    <string name="profile_country_region">နိုင်ငံ / ဒေသ</string>
+    <string name="profile_native_language">မိခင်ဘာသာစကား</string>
+    <string name="profile_learning_language">သင်ယူနေသောဘာသာစကား</string>
+    <string name="profile_gender">လိင်</string>
+    <string name="profile_birthday">မွေးနေ့</string>
+    <string name="profile_intro_required">မိတ်ဆက်ရေးပါ</string>
+    <string name="profile_country_required">နိုင်ငံ / ဒေသ ရွေးပါ</string>
+    <string name="profile_native_language_required">မိခင်ဘာသာစကား ရွေးပါ</string>
+    <string name="profile_learning_language_required">သင်ယူနေသောဘာသာစကား ရွေးပါ</string>
+    <string name="profile_gender_required">လိင် ရွေးပါ</string>
+    <string name="profile_birthday_required">မွေးနေ့ ရွေးပါ</string>
 
     <string-array name="profile_country_options">
-        <item>🇲🇲 缅甸</item>
-        <item>🇨🇳 中国</item>
-        <item>🇺🇸 美国</item>
-        <item>🇬🇧 英国</item>
-        <item>🇹🇭 泰国</item>
-        <item>🇯🇵 日本</item>
-        <item>🇰🇷 韩国</item>
-        <item>🇸🇬 新加坡</item>
-        <item>🇲🇾 马来西亚</item>
-        <item>🇮🇩 印度尼西亚</item>
-        <item>🇻🇳 越南</item>
-        <item>🇱🇦 老挝</item>
-        <item>🇰🇭 柬埔寨</item>
-        <item>🇮🇳 印度</item>
-        <item>🇵🇭 菲律宾</item>
-        <item>🇦🇺 澳大利亚</item>
-        <item>🇨🇦 加拿大</item>
-        <item>🌍 其他</item>
-    </string-array>
-
-    <string-array name="profile_gender_options">
-        <item>♂ 男</item>
-        <item>♀ 女</item>
-        <item>⚪ 保密</item>
+        <item>🇲🇲 မြန်မာ</item>
+        <item>🇨🇳 တရုတ်</item>
+        <item>🇹🇭 ထိုင်း</item>
+        <item>🇯🇵 ဂျပန်</item>
+        <item>🇰🇷 ကိုရီးယား</item>
+        <item>🇻🇳 ဗီယက်နမ်</item>
+        <item>🇱🇦 လာအို</item>
+        <item>🇰🇭 ကမ္ဘောဒီးယား</item>
+        <item>🇲🇾 မလေးရှား</item>
+        <item>🇸🇬 စင်ကာပူ</item>
+        <item>🇺🇸 အမေရိကန်</item>
+        <item>🌍 အခြား</item>
     </string-array>
 
     <string-array name="profile_language_options">
-        <item>🇲🇲 缅甸语</item>
-        <item>🇨🇳 中文</item>
-        <item>🇺🇸 英语</item>
-        <item>🇹🇭 泰语</item>
-        <item>🇯🇵 日语</item>
-        <item>🇰🇷 韩语</item>
-        <item>🇻🇳 越南语</item>
-        <item>🇮🇩 印尼语</item>
-        <item>🇲🇾 马来语</item>
-        <item>🇱🇦 老挝语</item>
-        <item>🇰🇭 高棉语</item>
-        <item>🇮🇳 印地语</item>
-        <item>🇫🇷 法语</item>
-        <item>🇩🇪 德语</item>
-        <item>🇪🇸 西班牙语</item>
-        <item>🌍 其他</item>
+        <item>🇲🇲 မြန်မာဘာသာ</item>
+        <item>🇨🇳 တရုတ်ဘာသာ</item>
+        <item>🇺🇸 အင်္ဂလိပ်ဘာသာ</item>
+        <item>🇹🇭 ထိုင်းဘာသာ</item>
+        <item>🇯🇵 ဂျပန်ဘာသာ</item>
+        <item>🇰🇷 ကိုရီးယားဘာသာ</item>
+        <item>🇻🇳 ဗီယက်နမ်ဘာသာ</item>
+        <item>🇱🇦 လာအိုဘာသာ</item>
+        <item>🇰🇭 ခမာဘာသာ</item>
+        <item>🇲🇾 မလေးဘာသာ</item>
+        <item>🌍 အခြား</item>
     </string-array>
 
-    <string-array name="profile_tag_category_options">
-        <item>ဘာသာစကားအဆင့်</item>
-        <item>သင်ယူရည်ရွယ်ချက်</item>
-        <item>ဆက်ဆံရေးအခြေအနေ</item>
-        <item>ဆက်ဆံရေးရည်ရွယ်ချက်</item>
-        <item>ကိုယ်ရည်ကိုယ်သွေး</item>
-        <item>အိမ်မွေးတိရစ္ဆာန်</item>
-        <item>အားကစား</item>
-        <item>ရုပ်ရှင် / အစီအစဉ်</item>
-        <item>အလုပ်အခြေအနေ</item>
-        <item>ပညာရေး</item>
-        <item>လုံခြုံရေးနယ်နိမိတ်</item>
-    </string-array>
-
-    <string-array name="profile_tag_language_skill_options">
-        <item>မိခင်ဘာသာစကား</item>
-        <item>ကျွမ်းကျင်စွာ ပြောနိုင်</item>
-        <item>အလယ်အထက်</item>
-        <item>အစပြုသူ</item>
-        <item>အခြေခံမရှိသေး</item>
-    </string-array>
-
-    <string-array name="profile_tag_learning_goal_options">
-        <item>ဘာသာစကားမိတ်ဖက်ရှာ</item>
-        <item>အလုပ်အတွက်လိုအပ်</item>
-        <item>ဝါသနာ</item>
-        <item>သူငယ်ချင်းဖွဲ့</item>
-        <item>ယဉ်ကျေးမှုဖလှယ်</item>
-        <item>နိုင်ငံခြားပညာရေး</item>
-        <item>ခရီးအတွက်ပြင်ဆင်</item>
-        <item>အလုပ်တိုးတက်မှု</item>
-        <item>နေ့စဉ်လေ့ကျင့်</item>
-    </string-array>
-
-    <string-array name="profile_tag_relationship_status_options">
+    <string-array name="profile_gender_options">
+        <item>ကျား</item>
+        <item>မ</item>
         <item>လျှို့ဝှက်</item>
-        <item>တစ်ကိုယ်ရေ</item>
-        <item>ချစ်သူရှိ</item>
-        <item>လက်ထပ်ပြီး</item>
-        <item>ကွာရှင်းပြီး</item>
     </string-array>
-
-    <string-array name="profile_tag_relationship_intent_options">
-        <item>သင်ယူရန်သာ</item>
-        <item>မချစ်ရေး</item>
-        <item>အလိုအလျောက်ဖြစ်နိုင်</item>
-        <item>ချစ်ရေးမငြင်း</item>
-        <item>သူငယ်ချင်းအရင်</item>
-        <item>မြို့တူမိတ်ဆွေ</item>
-        <item>နိုင်ငံခြားချစ်ရေးလက်ခံ</item>
-    </string-array>
-
-    <string-array name="profile_tag_personality_options">
-        <item>စိတ်ရှည်</item>
-        <item>ဖော်ရွေ</item>
-        <item>ငြိမ်သက်</item>
-        <item>အတွင်းကျ</item>
-        <item>ဟာသဉာဏ်ရှိ</item>
-        <item>နူးညံ့</item>
-        <item>အလေးထား</item>
-        <item>ဖြည်းဖြည်းနီးစပ်</item>
-        <item>EQ မြင့်</item>
-        <item>ပေါင်းသင်းလွယ်</item>
-    </string-array>
-
-    <string-array name="profile_tag_pet_options">
-        <item>ခွေး</item>
-        <item>ကြောင်</item>
-        <item>ယုန်</item>
-        <item>ငှက်</item>
-        <item>ငါး</item>
-        <item>ဟမ်းစတာ</item>
-        <item>တွားသွားတိရစ္ဆာန်</item>
-        <item>တိရစ္ဆာန်ချစ်သူ</item>
-    </string-array>
-
-    <string-array name="profile_tag_sports_options">
-        <item>ပြေးခြင်း</item>
-        <item>ဘတ်စကက်ဘော</item>
-        <item>ဘောလုံး</item>
-        <item>ဘက်ဒမင်တန်</item>
-        <item>လေ့ကျင့်ခန်း</item>
-        <item>ယောဂ</item>
-        <item>ရေကူး</item>
-        <item>စက်ဘီးစီး</item>
-        <item>တောင်တက်</item>
-        <item>စကိတ်ဘုတ်</item>
-    </string-array>
-
-    <string-array name="profile_tag_movie_options">
-        <item>ရုပ်ရှင်</item>
-        <item>ဟာသကား</item>
-        <item>အချစ်ကား</item>
-        <item>အက်ရှင်</item>
-        <item>စုံထောက်</item>
-        <item>မှတ်တမ်းရုပ်ရှင်</item>
-        <item>ဇာတ်လမ်းတွဲ</item>
-        <item>အန်နီမေးရှင်း</item>
-        <item>ဖျော်ဖြေရေးအစီအစဉ်</item>
-        <item>တိုဗီဒီယို</item>
-    </string-array>
-
-    <string-array name="profile_tag_job_options">
-        <item>လျှို့ဝှက်</item>
-        <item>ကျောင်းသား</item>
-        <item>ဝန်ထမ်း</item>
-        <item>စားပွဲထိုး</item>
-        <item>ဆရာ</item>
-        <item>ရဲ</item>
-        <item>ယာဉ်မောင်း</item>
-        <item>အရောင်း</item>
-        <item>လုပ်ငန်းရှင်</item>
-        <item>ကိုယ်ပိုင်အလုပ်</item>
-        <item>အလုပ်ရှာနေ</item>
-        <item>အခြား</item>
-    </string-array>
-
-    <string-array name="profile_tag_education_options">
-        <item>လျှို့ဝှက်</item>
-        <item>အလယ်တန်းအောက်</item>
-        <item>အထက်တန်း</item>
-        <item>ဘွဲ့</item>
-        <item>မဟာဘွဲ့နှင့်အထက်</item>
-        <item>အခြား</item>
-    </string-array>
-
-    <string-array name="profile_tag_safety_options">
-        <item>ယဉ်ကျေးစွာစကားပြော</item>
-        <item>နှောင့်ယှက်မှုငြင်း</item>
-        <item>ဆက်သွယ်ရန်မမျှဝေ</item>
-        <item>ပလက်ဖောင်းအတွင်းသာ</item>
-        <item>နယ်နိမိတ်လေးစား</item>
-        <item>ဖော်ရွေစွာပြင်ပေး</item>
-        <item>မစော်ကား</item>
-    </string-array>
-    <string name="profile_default_name_prefix">မိတ်ဖက်</string>
 </resources>
