@@ -10,6 +10,8 @@ import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -47,7 +49,7 @@ public class AvatarView extends FrameLayout {
     public TextView flagTv;
     private static final float FLAG_TEXT_MIN_DP = 10f;
     private static final float FLAG_TEXT_MAX_DP = 15f;
-    private static final float FLAG_TEXT_RATIO = 0.35f;
+    private static final float FLAG_TEXT_RATIO = 0.34f;
     private static final String PROFILE_EXTRA_PREF = "front_profile_extra";
     private float avatarSize = 40f;
     private float avatarCornerSize = 20f;
@@ -100,21 +102,23 @@ public class AvatarView extends FrameLayout {
         // 不再把“最后在线时间”压在头像右下角，聊天页/列表需要时间时放到文字区域显示。
         onlineTv.setVisibility(GONE);
 
-        flagTv = new TextView(getContext());
+        flagTv = new FlagTextView(getContext());
         flagTv.setGravity(Gravity.CENTER);
-        // Web 版就是一个 emoji span：font-size:14/15px; line-height:1; background:transparent。
-        // Android 这里用 dp，而不是默认 sp，避免系统字体缩放把国旗放大。
+        // 和网页一样仍然是真 emoji 文本，不使用图片资源。
+        // 这里必须给 emoji 保留字体自身的上下留白和少量透明 overhang，
+        // 否则 Android TextView 会把彩色 emoji 位图边缘裁掉，看起来像发灰/半透明。
         flagTv.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14f);
         flagTv.setTypeface(Typeface.DEFAULT);
         flagTv.getPaint().setFakeBoldText(false);
-        flagTv.setIncludeFontPadding(false);
-        flagTv.setSingleLine(true);
+        flagTv.setIncludeFontPadding(true);
+        flagTv.setSingleLine(false);
         flagTv.setMaxLines(1);
         flagTv.setMinWidth(0);
         flagTv.setMinHeight(0);
         flagTv.setMinimumWidth(0);
         flagTv.setMinimumHeight(0);
-        flagTv.setPadding(0, 0, 0, 0);
+        int flagOverhang = AndroidUtilities.dp(1f);
+        flagTv.setPadding(flagOverhang, flagOverhang, flagOverhang, flagOverhang);
         flagTv.setLineSpacing(0f, 1f);
         applyFlagStyle();
         flagTv.setVisibility(GONE);
@@ -125,6 +129,21 @@ public class AvatarView extends FrameLayout {
         addView(spotView, LayoutHelper.createFrame(9, 9, Gravity.TOP | Gravity.END, 0, 0, 0, 0));
         addView(onlineTv, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END, 0, 0, 0, 0));
         setSize(40);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        // 等价于 Web 的 overflow: visible，避免国旗左下角探出 2-3dp 时被父容器裁掉。
+        ViewParent parent = getParent();
+        int depth = 0;
+        while (parent instanceof ViewGroup && depth < 2) {
+            ViewGroup group = (ViewGroup) parent;
+            group.setClipChildren(false);
+            group.setClipToPadding(false);
+            parent = group.getParent();
+            depth++;
+        }
     }
 
     private void prepareImageAvatar() {
@@ -224,13 +243,15 @@ public class AvatarView extends FrameLayout {
     private void applyFlagStyle() {
         if (flagTv == null) return;
         flagTv.setGravity(Gravity.CENTER);
-        flagTv.setIncludeFontPadding(false);
-        flagTv.setSingleLine(true);
+        // 不要关闭 font padding。国旗 emoji 是彩色位图字形，实际绘制范围经常
+        // 比 TextView 的紧凑文本框更大；关闭后会裁边，视觉上就像半透明。
+        flagTv.setIncludeFontPadding(true);
+        flagTv.setSingleLine(false);
         flagTv.setMaxLines(1);
-        flagTv.setPadding(0, 0, 0, 0);
+        int flagOverhang = AndroidUtilities.dp(1f);
+        flagTv.setPadding(flagOverhang, flagOverhang, flagOverhang, flagOverhang);
         flagTv.setAlpha(1f);
-        // 关键：不要 software layer，不要 text shadow，不要圆形底。
-        // 彩色 emoji 在 software layer + shadow 下容易发灰/像半透明。
+        // 不要 software layer，不要文字阴影，不要圆形底，保持和网页一致的原生 emoji。
         flagTv.setLayerType(View.LAYER_TYPE_NONE, null);
         flagTv.setShadowLayer(0f, 0f, 0f, 0x00000000);
         flagTv.setBackground(null);
@@ -268,8 +289,8 @@ public class AvatarView extends FrameLayout {
         }
 
         FrameLayout.LayoutParams flagParams = (FrameLayout.LayoutParams) flagTv.getLayoutParams();
-        // 对齐 Web：position:absolute; left:-1/-3px; bottom:-2/-3px; width:auto; height:auto;
-        // 它是叠在头像左下角的，只是边缘向外探出一点，不是固定 18/20dp 方块。
+        // 对齐 Web：position:absolute; left:-3px; bottom:-3px; width:auto; height:auto;
+        // 只移动位置，不裁剪 emoji 本身；尺寸由字体自然测量决定。
         flagParams.width = LayoutHelper.WRAP_CONTENT;
         flagParams.height = LayoutHelper.WRAP_CONTENT;
         flagParams.gravity = Gravity.BOTTOM | Gravity.START;
@@ -626,4 +647,36 @@ public class AvatarView extends FrameLayout {
             file.delete();
         }
     }
+
+    private static class FlagTextView extends TextView {
+        private int extraOverhang;
+
+        public FlagTextView(Context context) {
+            super(context);
+            init();
+        }
+
+        public FlagTextView(Context context, @Nullable AttributeSet attrs) {
+            super(context, attrs);
+            init();
+        }
+
+        public FlagTextView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
+            super(context, attrs, defStyleAttr);
+            init();
+        }
+
+        private void init() {
+            extraOverhang = AndroidUtilities.dp(1f);
+            setIncludeFontPadding(true);
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+            // 彩色 emoji 的真实图形会超过普通文字测量框，给透明边缘留空间，防止被裁成发灰。
+            setMeasuredDimension(getMeasuredWidth() + extraOverhang * 2, getMeasuredHeight() + extraOverhang * 2);
+        }
+    }
+
 }
