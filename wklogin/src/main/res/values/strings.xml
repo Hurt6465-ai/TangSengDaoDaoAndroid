@@ -65,18 +65,26 @@
     <string name="update_api_content">填写服务器地址，域名或IP+端口的方式，都必须是http开头。\n例：\n例：https://172.0.0.1:8090</string>
 
     <string name="profile_intro">介绍</string>
-    <string name="profile_intro_hint">简单介绍一下你自己</string>
+    <string name="profile_intro_hint">介绍一下你自己，比如来自哪里、想练习什么语言</string>
     <string name="profile_country_region">国籍 / 地区</string>
+    <string name="profile_country_hint">国籍 / 地区 · 请选择，头像会匹配国旗</string>
     <string name="profile_native_language">母语</string>
-    <string name="profile_learning_language">正在学的语言</string>
+    <string name="profile_native_language_hint">母语 · 可多选，最多 5 个</string>
+    <string name="profile_learning_language">学习语言</string>
+    <string name="profile_learning_language_hint">学习语言 · 可多选，最多 5 个</string>
     <string name="profile_gender">性别</string>
+    <string name="profile_gender_hint">性别 · 请选择</string>
     <string name="profile_birthday">出生日期</string>
+    <string name="profile_birthday_hint">出生日期 · 请选择</string>
     <string name="profile_intro_required">请填写介绍</string>
     <string name="profile_country_required">请选择国籍 / 地区</string>
     <string name="profile_native_language_required">请选择母语</string>
-    <string name="profile_learning_language_required">请选择正在学的语言</string>
+    <string name="profile_learning_language_required">请选择学习语言</string>
     <string name="profile_gender_required">请选择性别</string>
     <string name="profile_birthday_required">请选择出生日期</string>
+    <string name="profile_multi_select_limit">最多选择 5 个</string>
+    <string name="profile_multi_select_title">%1$s（最多选择 5 个）</string>
+    <string name="profile_select_done">完成</string>
 
     <string-array name="profile_country_options">
         <item>🇲🇲 缅甸</item>
