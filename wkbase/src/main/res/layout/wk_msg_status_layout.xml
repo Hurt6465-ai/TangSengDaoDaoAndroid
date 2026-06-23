@@ -38,7 +38,7 @@
         android:layout_gravity="center_vertical"
         android:text="10:10AM"
         android:textColor="@color/color999"
-        android:textSize="12sp"
+        android:textSize="10sp"
         tools:ignore="SmallSp" />
 
     <org.telegram.ui.Components.RLottieImageView
