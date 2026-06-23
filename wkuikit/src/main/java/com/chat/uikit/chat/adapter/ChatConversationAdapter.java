@@ -399,7 +399,7 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
         helper.setGone(R.id.groupIV, item.channelType != WKChannelType.GROUP || isTopicRoom);
         boolean isTop;
         AvatarView avatarView = helper.getView(R.id.avatarView);
-        avatarView.setSize(50, isTopicRoom ? 10 : 25);
+        avatarView.setSize(56, isTopicRoom ? 12 : 28);
         showTopicBadge(helper, isTopicRoom);
         if (item.getWkChannel() != null) {
             if (TextUtils.isEmpty(showName))
