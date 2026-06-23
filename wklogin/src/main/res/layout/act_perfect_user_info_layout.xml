@@ -23,7 +23,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:layout_marginTop="50dp">
+                android:layout_marginTop="36dp">
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/avatarView"
@@ -45,11 +45,10 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|center"
                 android:layout_marginTop="10dp"
-                android:layout_marginBottom="50dp"
+                android:layout_marginBottom="28dp"
                 android:text="@string/wklogin_upload_header"
                 android:textColor="#ff999999"
                 android:textSize="12sp" />
-
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -59,54 +58,104 @@
                 android:orientation="vertical">
 
                 <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="20dp"
-                    android:layout_marginTop="20dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="*"
-                        android:textColor="#ffff6b4c"
-                        android:textSize="14sp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:text="@string/wklogin_nickname"
-                        android:textColor="@color/color999" />
-
-                </LinearLayout>
-
-                <androidx.appcompat.widget.AppCompatEditText
-                    android:id="@+id/nameEt"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="20dp"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="18dp"
                     android:layout_marginEnd="20dp"
-                    android:background="@color/transparent"
-                    android:gravity="center_vertical"
-                    android:hint="@string/must_input_name"
-                    android:maxLength="20"
-                    android:minHeight="40dp"
-                    android:paddingStart="10dp"
-                    android:paddingEnd="10dp"
-                    android:textColor="@color/colorDark"
-                    android:textColorHint="@color/color999" />
+                    android:orientation="vertical">
 
-                <View
-                    style="@style/view_line"
-                    android:layout_marginLeft="20dp"
-                    android:layout_marginRight="20dp" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/wklogin_nickname"
+                        android:textColor="@color/color999" />
+
+                    <androidx.appcompat.widget.AppCompatEditText
+                        android:id="@+id/nameEt"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="@color/transparent"
+                        android:gravity="center_vertical"
+                        android:hint="@string/must_input_name"
+                        android:maxLength="20"
+                        android:minHeight="40dp"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textColor="@color/colorDark"
+                        android:textColorHint="@color/color999" />
+
+                    <View style="@style/view_line" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/profile_intro"
+                        android:textColor="@color/color999" />
+
+                    <androidx.appcompat.widget.AppCompatEditText
+                        android:id="@+id/introEt"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="@color/transparent"
+                        android:gravity="top|start"
+                        android:hint="@string/profile_intro_hint"
+                        android:maxLength="120"
+                        android:minHeight="72dp"
+                        android:paddingStart="10dp"
+                        android:paddingTop="8dp"
+                        android:paddingEnd="10dp"
+                        android:paddingBottom="8dp"
+                        android:textColor="@color/colorDark"
+                        android:textColorHint="@color/color999" />
+
+                    <View style="@style/view_line" />
+
+                    <TextView
+                        android:id="@+id/countryTv"
+                        style="@style/ProfileSimpleSelectText"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/profile_country_region" />
+
+                    <View style="@style/view_line" />
+
+                    <TextView
+                        android:id="@+id/nativeLanguageTv"
+                        style="@style/ProfileSimpleSelectText"
+                        android:text="@string/profile_native_language" />
+
+                    <View style="@style/view_line" />
+
+                    <TextView
+                        android:id="@+id/learningLanguageTv"
+                        style="@style/ProfileSimpleSelectText"
+                        android:text="@string/profile_learning_language" />
+
+                    <View style="@style/view_line" />
+
+                    <TextView
+                        android:id="@+id/genderTv"
+                        style="@style/ProfileSimpleSelectText"
+                        android:text="@string/profile_gender" />
+
+                    <View style="@style/view_line" />
+
+                    <TextView
+                        android:id="@+id/birthdayTv"
+                        style="@style/ProfileSimpleSelectText"
+                        android:text="@string/profile_birthday" />
+
+                    <View style="@style/view_line" />
+                </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/sureBtn"
                     style="@style/buttonNormal"
                     android:layout_marginStart="20dp"
-                    android:layout_marginTop="60dp"
+                    android:layout_marginTop="28dp"
                     android:layout_marginEnd="20dp"
                     android:text="@string/wklogin_sure"
                     app:cornerRadius="@dimen/button_radian" />
