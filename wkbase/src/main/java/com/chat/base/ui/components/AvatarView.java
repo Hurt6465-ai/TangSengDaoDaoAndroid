@@ -64,6 +64,11 @@ public class AvatarView extends FrameLayout {
     }
 
     private void init() {
+        // Match Peipe full-screen partner: the flag is allowed to float outside
+        // the avatar bounds instead of being clipped by the 40dp avatar box.
+        setClipChildren(false);
+        setClipToPadding(false);
+
         imageView = new ShapeableImageView(getContext());
 //        imageView.setStrokeColorResource(R.color.borderColor);
 //        imageView.setStrokeWidth(AndroidUtilities.dp(1));
@@ -95,11 +100,7 @@ public class AvatarView extends FrameLayout {
         flagTv.setGravity(Gravity.CENTER);
         flagTv.setTextSize(14f);
         flagTv.setTypeface(Typeface.DEFAULT_BOLD);
-        flagTv.setIncludeFontPadding(false);
-        flagTv.setAlpha(1f);
-        // 国旗不要白色底盘/阴影，直接浮在头像左下角。
-        flagTv.setBackground(null);
-        flagTv.setShadowLayer(0, 0, 0, 0);
+        applyFlagStyle();
         flagTv.setVisibility(GONE);
 
         addView(imageView, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
@@ -244,9 +245,7 @@ public class AvatarView extends FrameLayout {
         flagParams.bottomMargin = -AndroidUtilities.dp(2);
         flagTv.setLayoutParams(flagParams);
         flagTv.setTextSize(Math.max(13f, size * 0.36f));
-        flagTv.setAlpha(1f);
-        flagTv.setBackground(null);
-        flagTv.setShadowLayer(0, 0, 0, 0);
+        applyFlagStyle();
 
         int spotSize = Math.max(6, Math.round(size * 0.17f));
         FrameLayout.LayoutParams spotParams = (FrameLayout.LayoutParams) spotView.getLayoutParams();
@@ -371,6 +370,7 @@ public class AvatarView extends FrameLayout {
             return;
         }
         flagTv.setText(flag);
+        applyFlagStyle();
         flagTv.setVisibility(VISIBLE);
     }
 
@@ -396,7 +396,22 @@ public class AvatarView extends FrameLayout {
             return;
         }
         flagTv.setText(flag);
+        applyFlagStyle();
         flagTv.setVisibility(VISIBLE);
+    }
+    private void applyFlagStyle() {
+        if (flagTv == null) return;
+        flagTv.setGravity(Gravity.CENTER);
+        flagTv.setIncludeFontPadding(false);
+        flagTv.setPadding(0, 0, 0, 0);
+        flagTv.setAlpha(1f);
+        flagTv.setBackground(null);
+        // Peipe uses CSS drop-shadow on the emoji. TextView shadow is the
+        // Android equivalent: it keeps the emoji background transparent while
+        // making the flag read as solid on busy avatars.
+        flagTv.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        flagTv.setShadowLayer(AndroidUtilities.dp(1.5f), 0f, AndroidUtilities.dp(1f), 0xAA000000);
+        flagTv.bringToFront();
     }
 
     private void hideFlag() {
