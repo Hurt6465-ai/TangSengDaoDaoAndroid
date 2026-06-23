@@ -93,9 +93,10 @@ public class AvatarView extends FrameLayout {
 
         flagTv = new TextView(getContext());
         flagTv.setGravity(Gravity.CENTER);
-        flagTv.setTextSize(13f);
+        flagTv.setTextSize(14f);
         flagTv.setTypeface(Typeface.DEFAULT_BOLD);
         flagTv.setIncludeFontPadding(false);
+        flagTv.setAlpha(1f);
         // 国旗不要白色底盘/阴影，直接浮在头像左下角。
         flagTv.setBackground(null);
         flagTv.setShadowLayer(0, 0, 0, 0);
@@ -233,16 +234,17 @@ public class AvatarView extends FrameLayout {
             defaultAvatarTv.setBackground(makeDefaultAvatarBg(defaultAvatarTv.getText() == null ? "" : defaultAvatarTv.getText().toString()));
         }
 
-        int flagSize = Math.max(16, Math.round(size * 0.48f));
+        int flagSize = Math.max(17, Math.round(size * 0.50f));
         FrameLayout.LayoutParams flagParams = (FrameLayout.LayoutParams) flagTv.getLayoutParams();
         flagParams.width = AndroidUtilities.dp(flagSize);
         flagParams.height = AndroidUtilities.dp(flagSize);
         flagParams.gravity = Gravity.BOTTOM | Gravity.START;
-        // 轻微贴边，避免国旗看起来太靠内。
-        flagParams.leftMargin = -AndroidUtilities.dp(1);
-        flagParams.bottomMargin = -AndroidUtilities.dp(1);
+        // 再往左下贴一点，保持完全不透明，直接浮在头像上。
+        flagParams.leftMargin = -AndroidUtilities.dp(3);
+        flagParams.bottomMargin = -AndroidUtilities.dp(2);
         flagTv.setLayoutParams(flagParams);
-        flagTv.setTextSize(Math.max(12f, size * 0.34f));
+        flagTv.setTextSize(Math.max(13f, size * 0.36f));
+        flagTv.setAlpha(1f);
         flagTv.setBackground(null);
         flagTv.setShadowLayer(0, 0, 0, 0);
 
