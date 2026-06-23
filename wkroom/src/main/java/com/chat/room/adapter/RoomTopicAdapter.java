@@ -109,7 +109,7 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         for (int i = 0; i < SIDE_AVATAR_IDS.length; i++) {
             AvatarView avatarView = holder.getView(SIDE_AVATAR_IDS[i]);
             RoomTopicEntity.RoomMember member = members != null && i < members.size() ? members.get(i) : null;
-            bindMemberAvatar(avatarView, member, 26f);
+            bindMemberAvatar(avatarView, member, 30f);
         }
     }
 
