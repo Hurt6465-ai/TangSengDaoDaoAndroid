@@ -118,38 +118,38 @@
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar1"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
                     android:layout_marginStart="3dp" />
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar2"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
                     android:layout_marginStart="3dp" />
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar3"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
                     android:layout_marginStart="3dp" />
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar4"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
                     android:layout_marginStart="3dp" />
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar5"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
                     android:layout_marginStart="3dp" />
 
                 <com.chat.base.ui.components.AvatarView
                     android:id="@+id/sideAvatar6"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
                     android:layout_marginStart="3dp" />
 
                 <TextView
