@@ -25,6 +25,7 @@ import com.chat.login.databinding.ActPerfectUserInfoLayoutBinding;
 import com.chat.login.service.LoginModel;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
@@ -35,15 +36,17 @@ import java.util.Objects;
  * 完善个人资料
  *
  * 稳定版：头像和昵称仍走原来的服务端逻辑；
- * 新增介绍、国籍、母语、正在学的语言、性别、出生日期先保存在本地，
+ * 新增介绍、国籍、母语、学习语言、性别、出生日期先保存在本地，
  * 语伴后端插件做好后再统一迁移到服务端字段。
  */
 public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLayoutBinding> {
 
+    private static final int MAX_LANGUAGE_SELECT_COUNT = 5;
+
     String path;
     private String selectedCountry = "";
-    private String selectedNativeLanguage = "";
-    private String selectedLearningLanguage = "";
+    private final List<String> selectedNativeLanguages = new ArrayList<>();
+    private final List<String> selectedLearningLanguages = new ArrayList<>();
     private String selectedGender = "";
     private String selectedBirthday = "";
 
@@ -62,6 +65,10 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         wkVBinding.avatarView.setSize(120);
         wkVBinding.avatarView.setStrokeWidth(0);
         wkVBinding.avatarView.imageView.setImageResource(R.mipmap.icon_default_header);
+        // 资料补充页不显示头像右下角“最后在线时间”，避免和相机按钮、后续国旗角标冲突。
+        wkVBinding.avatarView.onlineTv.setText("");
+        wkVBinding.avatarView.onlineTv.setVisibility(View.GONE);
+        wkVBinding.avatarView.spotView.setVisibility(View.GONE);
     }
 
     @Override
@@ -72,14 +79,18 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             selectedCountry = value;
             wkVBinding.countryTv.setText(value);
         }));
-        wkVBinding.nativeLanguageTv.setOnClickListener(v -> chooseOption(R.string.profile_native_language, R.array.profile_language_options, value -> {
-            selectedNativeLanguage = value;
-            wkVBinding.nativeLanguageTv.setText(value);
-        }));
-        wkVBinding.learningLanguageTv.setOnClickListener(v -> chooseOption(R.string.profile_learning_language, R.array.profile_language_options, value -> {
-            selectedLearningLanguage = value;
-            wkVBinding.learningLanguageTv.setText(value);
-        }));
+        wkVBinding.nativeLanguageTv.setOnClickListener(v -> chooseMultiOption(
+                R.string.profile_native_language,
+                R.array.profile_language_options,
+                selectedNativeLanguages,
+                wkVBinding.nativeLanguageTv
+        ));
+        wkVBinding.learningLanguageTv.setOnClickListener(v -> chooseMultiOption(
+                R.string.profile_learning_language,
+                R.array.profile_language_options,
+                selectedLearningLanguages,
+                wkVBinding.learningLanguageTv
+        ));
         wkVBinding.genderTv.setOnClickListener(v -> chooseOption(R.string.profile_gender, R.array.profile_gender_options, value -> {
             selectedGender = value;
             wkVBinding.genderTv.setText(value);
@@ -104,11 +115,11 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             showToast(R.string.profile_country_required);
             return;
         }
-        if (TextUtils.isEmpty(selectedNativeLanguage)) {
+        if (selectedNativeLanguages.isEmpty()) {
             showToast(R.string.profile_native_language_required);
             return;
         }
-        if (TextUtils.isEmpty(selectedLearningLanguage)) {
+        if (selectedLearningLanguages.isEmpty()) {
             showToast(R.string.profile_learning_language_required);
             return;
         }
@@ -172,6 +183,55 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
                 .show();
     }
 
+    private void chooseMultiOption(int titleRes, int arrayRes, List<String> selectedValues, TextView targetView) {
+        String[] options = getResources().getStringArray(arrayRes);
+        boolean[] checkedItems = new boolean[options.length];
+        List<String> tempValues = new ArrayList<>(selectedValues);
+        for (int i = 0; i < options.length; i++) {
+            checkedItems[i] = tempValues.contains(options[i]);
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.profile_multi_select_title, getString(titleRes)))
+                .setMultiChoiceItems(options, checkedItems, (dialog, which, isChecked) -> {
+                    String value = options[which];
+                    if (isChecked) {
+                        if (!tempValues.contains(value)) {
+                            if (tempValues.size() >= MAX_LANGUAGE_SELECT_COUNT) {
+                                ((AlertDialog) dialog).getListView().setItemChecked(which, false);
+                                showToast(R.string.profile_multi_select_limit);
+                                return;
+                            }
+                            tempValues.add(value);
+                        }
+                    } else {
+                        tempValues.remove(value);
+                    }
+                })
+                .setPositiveButton(R.string.profile_select_done, (dialog, which) -> {
+                    selectedValues.clear();
+                    selectedValues.addAll(tempValues);
+                    updateMultiSelectText(targetView, selectedValues);
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void updateMultiSelectText(TextView targetView, List<String> selectedValues) {
+        targetView.setText(joinSelections(selectedValues));
+    }
+
+    private String joinSelections(List<String> selectedValues) {
+        if (selectedValues == null || selectedValues.isEmpty()) return "";
+        StringBuilder builder = new StringBuilder();
+        for (String value : selectedValues) {
+            if (TextUtils.isEmpty(value)) continue;
+            if (builder.length() > 0) builder.append("、");
+            builder.append(value);
+        }
+        return builder.toString();
+    }
+
     private void showBirthdayPicker() {
         Calendar calendar = Calendar.getInstance();
         DatePickerDialog dialog = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
@@ -194,11 +254,15 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
     private void saveLocalExtraProfile() {
         String uid = WKConfig.getInstance().getUid();
         String prefix = TextUtils.isEmpty(uid) ? "current" : uid;
+        String nativeLanguages = joinSelections(selectedNativeLanguages);
+        String learningLanguages = joinSelections(selectedLearningLanguages);
         SharedPreferences.Editor editor = getSharedPreferences("front_profile_extra", MODE_PRIVATE).edit();
         editor.putString(prefix + "_intro", wkVBinding.introEt.getText() == null ? "" : wkVBinding.introEt.getText().toString().trim());
         editor.putString(prefix + "_country", selectedCountry);
-        editor.putString(prefix + "_native_language", selectedNativeLanguage);
-        editor.putString(prefix + "_learning_language", selectedLearningLanguage);
+        editor.putString(prefix + "_native_language", nativeLanguages);
+        editor.putString(prefix + "_native_languages", nativeLanguages);
+        editor.putString(prefix + "_learning_language", learningLanguages);
+        editor.putString(prefix + "_learning_languages", learningLanguages);
         editor.putString(prefix + "_gender", selectedGender);
         editor.putString(prefix + "_birthday", selectedBirthday);
         editor.apply();
