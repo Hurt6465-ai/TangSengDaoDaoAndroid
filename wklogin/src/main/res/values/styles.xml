@@ -2,11 +2,19 @@
 <resources>
     <style name="ProfileSimpleSelectText">
         <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">48dp</item>
-        <item name="android:gravity">center_vertical</item>
-        <item name="android:paddingStart">10dp</item>
-        <item name="android:paddingEnd">10dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">54dp</item>
+        <item name="android:background">@drawable/profile_field_bg</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingBottom">8dp</item>
         <item name="android:textColor">@color/colorDark</item>
+        <item name="android:textColorHint">@color/color999</item>
         <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:ellipsize">end</item>
     </style>
 </resources>
