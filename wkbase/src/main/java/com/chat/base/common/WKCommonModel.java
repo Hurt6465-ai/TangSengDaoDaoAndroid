@@ -137,39 +137,83 @@ public class WKCommonModel extends WKBaseModel {
 
     private void saveChannel(ChannelInfoEntity entity) {
         if (entity == null || entity.channel == null) return;
-        HashMap<String, Object> hashMap = null;
-        WKChannel wkChannel = new WKChannel(entity.channel.channel_id, entity.channel.channel_type);
-        WKChannel localChannel = WKIM.getInstance().getChannelManager().getChannel(entity.channel.channel_id, entity.channel.channel_type);
+
+        WKChannel localChannel = WKIM.getInstance().getChannelManager()
+                .getChannel(entity.channel.channel_id, entity.channel.channel_type);
+        HashMap<String, Object> remoteExtraMap = entity.extra == null ? new HashMap<>() : new HashMap<>(entity.extra);
+        HashMap<String, Object> hashMap = new HashMap<>();
+        if (localChannel != null && localChannel.localExtra != null) {
+            hashMap.putAll(localChannel.localExtra);
+        }
+
+        boolean isTopicRoom = isTopicRoomEntity(entity, remoteExtraMap);
         boolean isRefreshContacts = false;
         if (localChannel != null && !TextUtils.isEmpty(localChannel.channelID)) {
-            wkChannel.avatarCacheKey = localChannel.avatarCacheKey;
-            hashMap = localChannel.localExtra;
-
-            if (wkChannel.follow != entity.follow || wkChannel.status != entity.status)
+            if (localChannel.follow != entity.follow || localChannel.status != entity.status) {
                 isRefreshContacts = true;
-        }
-        if (hashMap == null)
-            hashMap = new HashMap<>();
-
-        HashMap<String, Object> remoteExtraMap = entity.extra == null ? new HashMap<>() : new HashMap<>(entity.extra);
-        boolean isTopicRoom = isTopicRoomEntity(entity, remoteExtraMap);
-        if (isTopicRoom) {
-            hashMap.put("topic_room", 1);
-            putIfNotEmpty(hashMap, "topic_title", firstNotEmpty(getExtraString(remoteExtraMap, "topic_title"), entity.name));
-            putIfNotEmpty(hashMap, "creator_uid", getExtraString(remoteExtraMap, "creator_uid"));
-            putIfNotEmpty(hashMap, "creator_name", getExtraString(remoteExtraMap, "creator_name"));
-            putIfNotEmpty(hashMap, "creator_avatar", getExtraString(remoteExtraMap, "creator_avatar"));
-            putIfNotEmpty(hashMap, "creator_avatar_cache_key", getExtraString(remoteExtraMap, "creator_avatar_cache_key"));
-            putIfNotEmpty(hashMap, "expire_at", firstNotEmpty(getExtraString(remoteExtraMap, "expire_at"), getExtraString(hashMap, "expire_at")));
+            }
         }
 
-        wkChannel.channelName = firstNotEmpty(entity.name, getExtraString(hashMap, "topic_title"));
+        String localChannelName = localChannel == null ? "" : localChannel.channelName;
         String localAvatar = localChannel == null ? "" : localChannel.avatar;
         String localAvatarCacheKey = localChannel == null ? "" : localChannel.avatarCacheKey;
-        String creatorAvatar = firstNotEmpty(getExtraString(remoteExtraMap, "creator_avatar"), getExtraString(hashMap, "creator_avatar"));
-        String creatorAvatarCacheKey = firstNotEmpty(getExtraString(remoteExtraMap, "creator_avatar_cache_key"), getExtraString(hashMap, "creator_avatar_cache_key"));
-        wkChannel.avatar = isTopicRoom ? firstNotEmpty(entity.logo, creatorAvatar, localAvatar) : entity.logo;
-        wkChannel.avatarCacheKey = isTopicRoom ? firstNotEmpty(creatorAvatarCacheKey, localAvatarCacheKey) : localAvatarCacheKey;
+
+        if (isTopicRoom) {
+            hashMap.put("topic_room", 1);
+            putIfNotEmpty(hashMap, "topic_title", firstNotEmpty(
+                    getExtraString(remoteExtraMap, "topic_title"),
+                    entity.name,
+                    getExtraString(hashMap, "topic_title"),
+                    localChannelName));
+            putIfNotEmpty(hashMap, "creator_uid", firstNotEmpty(
+                    getExtraString(remoteExtraMap, "creator_uid"),
+                    getExtraString(hashMap, "creator_uid")));
+            putIfNotEmpty(hashMap, "creator_name", firstNotEmpty(
+                    getExtraString(remoteExtraMap, "creator_name"),
+                    getExtraString(hashMap, "creator_name")));
+            putIfNotEmpty(hashMap, "creator_avatar", firstNotEmpty(
+                    cleanTopicGroupAvatar(getExtraString(remoteExtraMap, "creator_avatar"), entity.channel.channel_id),
+                    cleanTopicGroupAvatar(entity.logo, entity.channel.channel_id),
+                    cleanTopicGroupAvatar(getExtraString(hashMap, "creator_avatar"), entity.channel.channel_id),
+                    cleanTopicGroupAvatar(localAvatar, entity.channel.channel_id)));
+            putIfNotEmpty(hashMap, "creator_avatar_cache_key", firstNotEmpty(
+                    getExtraString(remoteExtraMap, "creator_avatar_cache_key"),
+                    getExtraString(hashMap, "creator_avatar_cache_key")));
+            putIfNotEmpty(hashMap, "expire_at", firstNotEmpty(
+                    getExtraString(remoteExtraMap, "expire_at"),
+                    getExtraString(hashMap, "expire_at")));
+        }
+
+        WKChannel wkChannel = new WKChannel(entity.channel.channel_id, entity.channel.channel_type);
+        wkChannel.channelName = firstNotEmpty(
+                entity.name,
+                getExtraString(hashMap, "topic_title"),
+                getExtraString(remoteExtraMap, "topic_title"),
+                localChannelName);
+
+        String creatorAvatar = firstNotEmpty(
+                getExtraString(hashMap, "creator_avatar"),
+                cleanTopicGroupAvatar(getExtraString(remoteExtraMap, "creator_avatar"), entity.channel.channel_id));
+        String creatorAvatarCacheKey = firstNotEmpty(
+                getExtraString(remoteExtraMap, "creator_avatar_cache_key"),
+                getExtraString(hashMap, "creator_avatar_cache_key"));
+        if (isTopicRoom) {
+            String topicAvatar = firstNotEmpty(
+                    creatorAvatar,
+                    cleanTopicGroupAvatar(entity.logo, entity.channel.channel_id),
+                    cleanTopicGroupAvatar(localAvatar, entity.channel.channel_id));
+            String creatorUID = getExtraString(hashMap, "creator_uid");
+            if (TextUtils.isEmpty(topicAvatar) && !TextUtils.isEmpty(creatorUID)) {
+                topicAvatar = "users/" + creatorUID + "/avatar";
+                hashMap.put("creator_avatar", topicAvatar);
+            }
+            wkChannel.avatar = topicAvatar;
+            wkChannel.avatarCacheKey = firstNotEmpty(creatorAvatarCacheKey, localAvatarCacheKey);
+        } else {
+            wkChannel.avatar = entity.logo;
+            wkChannel.avatarCacheKey = localAvatarCacheKey;
+        }
+
         wkChannel.channelRemark = entity.remark;
         wkChannel.status = entity.status;
         wkChannel.online = entity.online;
@@ -177,6 +221,9 @@ public class WKCommonModel extends WKBaseModel {
         wkChannel.receipt = entity.receipt;
         wkChannel.robot = entity.robot;
         wkChannel.category = entity.category;
+        if (isTopicRoom && TextUtils.isEmpty(wkChannel.category)) {
+            wkChannel.category = "topic_room";
+        }
         wkChannel.top = entity.stick;
         wkChannel.mute = entity.mute;
         wkChannel.showNick = entity.show_nick;
@@ -195,23 +242,25 @@ public class WKCommonModel extends WKBaseModel {
         hashMap.put(WKChannelExtras.beDeleted, entity.be_deleted);
         hashMap.put(WKChannelExtras.beBlacklist, entity.be_blacklist);
         hashMap.put(WKChannelExtras.notice, entity.notice);
-//        hashMap.put(WKChannelCustomerExtras.chatBgUrl, entity.chat_bg_url);
-//        hashMap.put(WKChannelCustomerExtras.chatBgIsSvg, entity.chat_bg_is_svg);
-//        hashMap.put(WKChannelCustomerExtras.chatBgIsBlurred, entity.chat_bg_is_blurred);
-//        hashMap.put(WKChannelCustomerExtras.chatBgIsDeleted, entity.chat_bg_is_deleted);
-//        hashMap.put(WKChannelCustomerExtras.chatBgShowPattern, entity.chat_bg_show_pattern);
         wkChannel.localExtra = hashMap;
-//
-//        if (entity.extra != null) {
-//            Set<String> set = entity.extra.keySet();
-//            for (String key : set) {
-//                wkChannel.remoteExtraMap.put(key, entity.extra.get(key));
-//            }
-//        }
         WKIM.getInstance().getChannelManager().saveOrUpdateChannel(wkChannel);
         if (isRefreshContacts) {
             EndpointManager.getInstance().invoke(WKConstants.refreshContacts, null);
         }
+    }
+
+    private String cleanTopicGroupAvatar(String avatar, String channelID) {
+        if (isTopicGroupAvatar(avatar, channelID)) return "";
+        return avatar;
+    }
+
+    private boolean isTopicGroupAvatar(String avatar, String channelID) {
+        if (TextUtils.isEmpty(avatar)) return false;
+        String lower = avatar.toLowerCase(java.util.Locale.US);
+        if (lower.contains("groups/topic_") && lower.contains("/avatar")) return true;
+        return !TextUtils.isEmpty(channelID)
+                && channelID.startsWith("topic_")
+                && lower.contains("groups/" + channelID.toLowerCase(java.util.Locale.US) + "/avatar");
     }
 
     private boolean isTopicRoomEntity(ChannelInfoEntity entity, HashMap<String, Object> extra) {
