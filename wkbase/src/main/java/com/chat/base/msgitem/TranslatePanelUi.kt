@@ -182,7 +182,7 @@ object TranslatePanelUi {
             text = title
             textSize = 17f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setTextColor(ContextCompat.getColor(activity, R.color.color333))
+            setTextColor(Color.rgb(51, 51, 51))
             setPadding(0, 0, 0, AndroidUtilities.dp(8f))
             includeFontPadding = true
         }
@@ -263,7 +263,7 @@ object TranslatePanelUi {
                 if (selected) {
                     Theme.colorAccount
                 } else {
-                    ContextCompat.getColor(context, R.color.color333)
+                    Color.rgb(51, 51, 51)
                 }
             )
             typeface = if (selected) {
