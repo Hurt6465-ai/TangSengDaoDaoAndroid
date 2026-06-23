@@ -99,7 +99,7 @@
     <string name="profile_native_language_required">请选择母语</string>
     <string name="profile_learning_language_required">请选择想学语言</string>
     <string name="profile_tags_required">请至少选择一个标签</string>
-    <string name="profile_avatar_upload_failed_non_blocking">图片上传异常，资料已保存，可稍后重试头像</string>
+    <string name="profile_avatar_upload_failed_non_blocking">头像上传失败，资料已保存，可稍后在个人资料里重试</string>
     <string name="profile_language_multi_hint">可多选，最多 %1$d 个</string>
     <string name="profile_tag_multi_select_hint">可多选，点击气囊标签选择</string>
     <string name="profile_tag_single_select_hint">该分类单选，重新选择会自动替换</string>
@@ -286,4 +286,5 @@
         <item>友好纠错</item>
         <item>禁止冒犯</item>
     </string-array>
+    <string name="profile_default_name_prefix">语伴</string>
 </resources>
