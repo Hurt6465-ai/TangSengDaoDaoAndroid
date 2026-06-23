@@ -1,8 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="setting_language_auto">စနစ်အတိုင်းလိုက်ရန်</string>
-    <string name="setting_language_english">အင်္ဂလိပ်</string>
-    <string name="setting_simplified_chinese">ရိုးရှင်းတရုတ်စာ</string>
-    <string name="setting_traditional_chinese">ရိုးရာတရုတ်စာ</string>
     <string name="forward">သူငယ်ချင်းထံ ပို့ရန်</string>
     <string name="save_img">ဖုန်းထဲသို့ သိမ်းရန်</string>
     <string name="cancel">မလုပ်တော့ပါ</string>
