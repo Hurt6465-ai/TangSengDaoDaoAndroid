@@ -1,6 +1,7 @@
 package com.chat.base.ui.components;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -16,6 +17,7 @@ import androidx.annotation.Nullable;
 
 import com.chat.base.R;
 import com.chat.base.config.WKApiConfig;
+import com.chat.base.config.WKConfig;
 import com.chat.base.config.WKConstants;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.DataSource;
@@ -27,7 +29,6 @@ import com.chat.base.glide.GlideUtils;
 import com.chat.base.glide.MyGlideUrlWithId;
 import com.chat.base.utils.AndroidUtilities;
 import com.chat.base.utils.LayoutHelper;
-import com.chat.base.utils.WKTimeUtils;
 import com.google.android.material.imageview.ShapeableImageView;
 
 import com.google.android.material.shape.CornerFamily;
@@ -42,6 +43,8 @@ public class AvatarView extends FrameLayout {
     public TextView defaultAvatarTv;
     public View spotView;
     public TextView onlineTv;
+    public TextView flagTv;
+    private static final String PROFILE_EXTRA_PREF = "front_profile_extra";
     private float avatarSize = 40f;
     private float avatarCornerSize = 20f;
 
@@ -85,11 +88,22 @@ public class AvatarView extends FrameLayout {
         onlineTv.setTextSize(9f);
         onlineTv.setPadding(AndroidUtilities.dp(3), 0, AndroidUtilities.dp(3), 0);
         onlineTv.setBackgroundResource(R.drawable.online_bg);
-        onlineTv.setVisibility(INVISIBLE);
+        // 不再把“最后在线时间”压在头像右下角，聊天页/列表需要时间时放到文字区域显示。
+        onlineTv.setVisibility(GONE);
+
+        flagTv = new TextView(getContext());
+        flagTv.setGravity(Gravity.CENTER);
+        flagTv.setTextSize(13f);
+        flagTv.setTypeface(Typeface.DEFAULT_BOLD);
+        flagTv.setIncludeFontPadding(false);
+        flagTv.setBackground(makeFlagBadgeBg());
+        flagTv.setVisibility(GONE);
+
         addView(imageView, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
-        addView(onlineTv, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END, 0, 0, 0, 0));
-        addView(spotView, LayoutHelper.createFrame(15, 15, Gravity.BOTTOM | Gravity.END, 0, 0, 0, 0));
         addView(defaultAvatarTv, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
+        addView(flagTv, LayoutHelper.createFrame(18, 18, Gravity.BOTTOM | Gravity.START, 0, 0, 0, 0));
+        addView(spotView, LayoutHelper.createFrame(9, 9, Gravity.TOP | Gravity.END, 0, 0, 0, 0));
+        addView(onlineTv, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END, 0, 0, 0, 0));
         setSize(40);
     }
 
@@ -109,7 +123,8 @@ public class AvatarView extends FrameLayout {
         defaultAvatarTv.setVisibility(VISIBLE);
         imageView.setVisibility(INVISIBLE);
         spotView.setVisibility(GONE);
-        onlineTv.setVisibility(INVISIBLE);
+        onlineTv.setVisibility(GONE);
+        hideFlag();
     }
 
     public void showAvatarUrl(String avatar, String avatarCacheKey, String fallbackName) {
@@ -122,6 +137,7 @@ public class AvatarView extends FrameLayout {
             return;
         }
         prepareImageAvatar();
+        hideFlag();
         String url = WKApiConfig.getShowUrl(avatar);
         loadAvatarUrlWithFallback(url, avatarCacheKey, fallbackName, fallbackSeed);
     }
@@ -185,6 +201,14 @@ public class AvatarView extends FrameLayout {
         return drawable;
     }
 
+    private GradientDrawable makeFlagBadgeBg() {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.OVAL);
+        drawable.setColor(0xFFFFFFFF);
+        drawable.setStroke(AndroidUtilities.dp(1), 0xFFFFFFFF);
+        return drawable;
+    }
+
     public void setStrokeWidth(float width) {
         imageView.setStrokeWidth(AndroidUtilities.dp(width));
     }
@@ -214,14 +238,43 @@ public class AvatarView extends FrameLayout {
             defaultAvatarTv.setBackground(makeDefaultAvatarBg(defaultAvatarTv.getText() == null ? "" : defaultAvatarTv.getText().toString()));
         }
 
+        int flagSize = Math.max(14, Math.round(size * 0.46f));
+        FrameLayout.LayoutParams flagParams = (FrameLayout.LayoutParams) flagTv.getLayoutParams();
+        flagParams.width = AndroidUtilities.dp(flagSize);
+        flagParams.height = AndroidUtilities.dp(flagSize);
+        flagParams.gravity = Gravity.BOTTOM | Gravity.START;
+        flagParams.leftMargin = 0;
+        flagParams.bottomMargin = 0;
+        flagTv.setLayoutParams(flagParams);
+        flagTv.setTextSize(Math.max(10f, size * 0.30f));
+        flagTv.setBackground(makeFlagBadgeBg());
+
+        int spotSize = Math.max(7, Math.round(size * 0.22f));
+        FrameLayout.LayoutParams spotParams = (FrameLayout.LayoutParams) spotView.getLayoutParams();
+        spotParams.width = AndroidUtilities.dp(spotSize);
+        spotParams.height = AndroidUtilities.dp(spotSize);
+        spotParams.gravity = Gravity.TOP | Gravity.END;
+        spotParams.rightMargin = 0;
+        spotParams.topMargin = 0;
+        spotView.setLayoutParams(spotParams);
     }
 
     public void showAvatar(String channelID, byte channelType, String avatarCacheKey) {
+        WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
+        if (channel != null && isTopicRoomChannel(channel)) {
+            showTopicAvatar(channel);
+            return;
+        }
         if (isTopicRoomId(channelID, channelType)) {
             showDefaultAvatar(channelID, channelID);
             return;
         }
         prepareImageAvatar();
+        if (channel != null) {
+            updateFlagView(channel);
+        } else {
+            updateFlagByCountry(getLocalSavedCountry(channelID));
+        }
         String url = getAvatarURL(channelID, channelType);
         GlideUtils.getInstance().showAvatarImg(getContext(), url, avatarCacheKey, imageView);
     }
@@ -229,13 +282,15 @@ public class AvatarView extends FrameLayout {
     public void showAvatar(String channelID, byte channelType, boolean showOnlineStatus) {
         prepareImageAvatar();
         spotView.setVisibility(GONE);
-        onlineTv.setVisibility(INVISIBLE);
+        onlineTv.setVisibility(GONE);
+        hideFlag();
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
         if (channel != null) {
             showAvatar(channel, showOnlineStatus);
         } else if (isTopicRoomId(channelID, channelType)) {
             showDefaultAvatar(channelID, channelID);
         } else {
+            updateFlagByCountry(getLocalSavedCountry(channelID));
             String url = getAvatarURL(channelID, channelType);
             GlideUtils.getInstance().showAvatarImg(getContext(), url, "", imageView);
         }
@@ -244,13 +299,15 @@ public class AvatarView extends FrameLayout {
     public void showAvatar(String channelID, byte channelType) {
         prepareImageAvatar();
         spotView.setVisibility(GONE);
-        onlineTv.setVisibility(INVISIBLE);
+        onlineTv.setVisibility(GONE);
+        hideFlag();
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
         if (channel != null) {
             showAvatar(channel, false);
         } else if (isTopicRoomId(channelID, channelType)) {
             showDefaultAvatar(channelID, channelID);
         } else {
+            updateFlagByCountry(getLocalSavedCountry(channelID));
             String url = getAvatarURL(channelID, channelType);
             GlideUtils.getInstance().showAvatarImg(getContext(), url, "", imageView);
         }
@@ -275,24 +332,15 @@ public class AvatarView extends FrameLayout {
             url = getAvatarURL(channel.channelID, channel.channelType);
         }
         GlideUtils.getInstance().showAvatarImg(imageView.getContext(), url, avatarCacheKey, imageView);
-        if (showOnlineStatus) {
-            if (channel.online == 1) {
-                spotView.setVisibility(VISIBLE);
-                onlineTv.setVisibility(INVISIBLE);
-            } else {
-                spotView.setVisibility(GONE);
-                String showTime = WKTimeUtils.getInstance().getOnlineTime(channel.lastOffline);
-                if (TextUtils.isEmpty(showTime)) {
-                    onlineTv.setVisibility(INVISIBLE);
-                } else {
-                    onlineTv.setVisibility(VISIBLE);
-                    onlineTv.setText(showTime);
-                }
-            }
+        updateFlagView(channel);
+        // 头像上只显示更小的在线绿点；离线的“最后在线时间”不再显示在头像右下角。
+        if (showOnlineStatus && channel.online == 1) {
+            spotView.setVisibility(VISIBLE);
         } else {
             spotView.setVisibility(GONE);
-            onlineTv.setVisibility(INVISIBLE);
         }
+        onlineTv.setText("");
+        onlineTv.setVisibility(GONE);
     }
 
     public void showTopicAvatar(WKChannel channel) {
@@ -307,8 +355,154 @@ public class AvatarView extends FrameLayout {
         } else {
             showAvatarUrl(avatar, avatarCacheKey, showName, firstNotEmpty(creatorUid, showName, channel.channelID));
         }
+        updateTopicFlagView(channel);
         spotView.setVisibility(GONE);
-        onlineTv.setVisibility(INVISIBLE);
+        onlineTv.setVisibility(GONE);
+    }
+
+
+    private void updateFlagView(WKChannel channel) {
+        updateFlagByCountry(getChannelFlagEmoji(channel));
+    }
+
+    private void updateFlagByCountry(String countryOrFlag) {
+        String flag = countryToFlagEmoji(countryOrFlag);
+        if (TextUtils.isEmpty(flag)) {
+            hideFlag();
+            return;
+        }
+        flagTv.setText(flag);
+        flagTv.setVisibility(VISIBLE);
+    }
+
+    private void updateTopicFlagView(WKChannel channel) {
+        String country = firstNotEmpty(
+                getTopicExtraString(channel, "creator_country_code"),
+                getTopicExtraString(channel, "creator_country"),
+                getTopicExtraString(channel, "country_code"),
+                getTopicExtraString(channel, "country"),
+                getTopicExtraString(channel, "nationality_code"),
+                getTopicExtraString(channel, "nationality")
+        );
+        String flag = countryToFlagEmoji(country);
+        if (TextUtils.isEmpty(flag)) {
+            hideFlag();
+            return;
+        }
+        flagTv.setText(flag);
+        flagTv.setVisibility(VISIBLE);
+    }
+
+    private void hideFlag() {
+        if (flagTv != null) {
+            flagTv.setText("");
+            flagTv.setVisibility(GONE);
+        }
+    }
+
+    private String getChannelFlagEmoji(WKChannel channel) {
+        if (channel == null) return "";
+        String country = firstNotEmpty(
+                getExtraString(channel.localExtra, "country_code"),
+                getExtraString(channel.remoteExtraMap, "country_code"),
+                getExtraString(channel.localExtra, "countryCode"),
+                getExtraString(channel.remoteExtraMap, "countryCode"),
+                getExtraString(channel.localExtra, "country"),
+                getExtraString(channel.remoteExtraMap, "country"),
+                getExtraString(channel.localExtra, "nationality_code"),
+                getExtraString(channel.remoteExtraMap, "nationality_code"),
+                getExtraString(channel.localExtra, "nationality"),
+                getExtraString(channel.remoteExtraMap, "nationality")
+        );
+
+        // 兼容上一步资料页暂时保存在本地的国籍；后端接好后主要走上面的 channel extra。
+        if (TextUtils.isEmpty(country)) {
+            country = getLocalSavedCountry(channel.channelID);
+        }
+        return countryToFlagEmoji(country);
+    }
+
+    private String getLocalSavedCountry(String channelID) {
+        Context context = getContext();
+        if (context == null) return "";
+        SharedPreferences preferences = context.getSharedPreferences(PROFILE_EXTRA_PREF, Context.MODE_PRIVATE);
+        String uid = WKConfig.getInstance().getUid();
+        String country = "";
+        if (!TextUtils.isEmpty(channelID)) {
+            country = preferences.getString(channelID + "_country", "");
+        }
+        if (TextUtils.isEmpty(country) && !TextUtils.isEmpty(uid)) {
+            country = preferences.getString(uid + "_country", "");
+        }
+        if (TextUtils.isEmpty(country)) {
+            country = preferences.getString("current_country", "");
+        }
+        return country;
+    }
+
+    private String countryToFlagEmoji(String country) {
+        if (TextUtils.isEmpty(country)) return "";
+        String value = country.trim();
+        if (TextUtils.isEmpty(value)) return "";
+        String firstFlag = extractFirstEmojiFlag(value);
+        if (!TextUtils.isEmpty(firstFlag)) return firstFlag;
+
+        String normalized = value.toLowerCase(Locale.US)
+                .replace("_", "")
+                .replace("-", "")
+                .replace(" ", "")
+                .replace("/", "");
+
+        if (isCountry(normalized, "mm", "myanmar", "burma", "burmese") || value.contains("缅甸") || value.contains("မြန်မာ")) return "🇲🇲";
+        if (isCountry(normalized, "cn", "chn", "china", "chinese", "prc") || value.contains("中国") || value.contains("中國") || value.contains("中文") || value.contains("တရုတ်")) return "🇨🇳";
+        if (isCountry(normalized, "th", "tha", "thailand", "thai") || value.contains("泰国") || value.contains("泰語") || value.contains("泰语") || value.contains("ထိုင်း")) return "🇹🇭";
+        if (isCountry(normalized, "jp", "jpn", "japan", "japanese") || value.contains("日本") || value.contains("ဂျပန်")) return "🇯🇵";
+        if (isCountry(normalized, "kr", "kor", "korea", "southkorea", "republicofkorea", "korean") || value.contains("韩国") || value.contains("韓國") || value.contains("ကိုရီးယား")) return "🇰🇷";
+        if (isCountry(normalized, "vn", "vnm", "vietnam", "viet Nam", "vietnamese") || value.contains("越南") || value.contains("ဗီယက်နမ်")) return "🇻🇳";
+        if (isCountry(normalized, "la", "lao", "laos") || value.contains("老挝") || value.contains("寮國") || value.contains("လာအို")) return "🇱🇦";
+        if (isCountry(normalized, "kh", "khm", "cambodia", "khmer") || value.contains("柬埔寨") || value.contains("高棉") || value.contains("ကမ္ဘောဒီးယား") || value.contains("ခမာ")) return "🇰🇭";
+        if (isCountry(normalized, "my", "mys", "malaysia", "malay") || value.contains("马来西亚") || value.contains("馬來西亞") || value.contains("马来语") || value.contains("မလေး")) return "🇲🇾";
+        if (isCountry(normalized, "sg", "sgp", "singapore") || value.contains("新加坡") || value.contains("စင်ကာပူ")) return "🇸🇬";
+        if (isCountry(normalized, "us", "usa", "unitedstates", "america", "american", "english") || value.contains("美国") || value.contains("美國") || value.contains("英语") || value.contains("အမေရိကန်") || value.contains("အင်္ဂလိပ်")) return "🇺🇸";
+        if (isCountry(normalized, "other", "others") || value.contains("其他") || value.contains("အခြား")) return "🌍";
+        if (normalized.length() == 2) return countryCodeToEmoji(normalized.toUpperCase(Locale.US));
+        return "";
+    }
+
+    private boolean isCountry(String normalized, String... values) {
+        if (TextUtils.isEmpty(normalized) || values == null) return false;
+        for (String item : values) {
+            if (!TextUtils.isEmpty(item) && normalized.equals(item.toLowerCase(Locale.US).replace(" ", ""))) return true;
+        }
+        return false;
+    }
+
+    private String extractFirstEmojiFlag(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        for (int offset = 0; offset < value.length(); ) {
+            int first = value.codePointAt(offset);
+            int nextOffset = offset + Character.charCount(first);
+            if (nextOffset >= value.length()) break;
+            int second = value.codePointAt(nextOffset);
+            if (isRegionalIndicator(first) && isRegionalIndicator(second)) {
+                return new String(Character.toChars(first)) + new String(Character.toChars(second));
+            }
+            offset = nextOffset;
+        }
+        if (value.startsWith("🌍") || value.startsWith("🌎") || value.startsWith("🌏")) return "🌍";
+        return "";
+    }
+
+    private boolean isRegionalIndicator(int codePoint) {
+        return codePoint >= 0x1F1E6 && codePoint <= 0x1F1FF;
+    }
+
+    private String countryCodeToEmoji(String code) {
+        if (TextUtils.isEmpty(code) || code.length() != 2) return "";
+        int first = Character.toUpperCase(code.charAt(0)) - 'A' + 0x1F1E6;
+        int second = Character.toUpperCase(code.charAt(1)) - 'A' + 0x1F1E6;
+        if (!isRegionalIndicator(first) || !isRegionalIndicator(second)) return "";
+        return new String(Character.toChars(first)) + new String(Character.toChars(second));
     }
 
     private String getTopicAvatar(WKChannel channel, String creatorUid) {
