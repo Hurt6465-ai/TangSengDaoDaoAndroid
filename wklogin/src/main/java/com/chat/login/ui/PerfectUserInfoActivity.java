@@ -47,7 +47,6 @@ import java.util.Calendar;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 
 /**
  * 语伴资料完善页。
@@ -63,6 +62,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
     private static final int MIN_WEBP_QUALITY = 48;
 
     private String avatarPath;
+    private String avatarUploadPath;
     private final ArrayList<String> partnerPhotoPaths = new ArrayList<>();
     private final LinkedHashSet<String> selectedNativeLanguages = new LinkedHashSet<>();
     private final LinkedHashSet<String> selectedLearningLanguages = new LinkedHashSet<>();
@@ -84,7 +84,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
 
     @Override
     protected void initView() {
-        wkVBinding.avatarView.setSize(108);
+        wkVBinding.avatarView.setSize(124);
         wkVBinding.avatarView.setStrokeWidth(0);
         wkVBinding.avatarView.imageView.setImageResource(R.mipmap.icon_default_header);
         wkVBinding.sureBtn.getBackground().setTint(Theme.colorAccount);
@@ -109,15 +109,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
                     wkVBinding.countryFlagTv.setVisibility(TextUtils.isEmpty(flag) ? View.GONE : View.VISIBLE);
                 }
         ));
-        wkVBinding.genderTv.setOnClickListener(v -> showSingleOptionDialog(
-                R.string.profile_gender,
-                R.array.profile_gender_options,
-                value -> {
-                    selectedGender = value;
-                    wkVBinding.genderTv.setText(value);
-                    wkVBinding.genderTv.setTextColor(Color.parseColor("#172033"));
-                }
-        ));
+        wkVBinding.genderTv.setOnClickListener(v -> showGenderCenterDialog());
         wkVBinding.nativeLanguageTv.setOnClickListener(v -> showMultiOptionDialog(
                 R.string.profile_native_language,
                 R.array.profile_language_options,
@@ -151,6 +143,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
                                 return;
                             }
                             avatarPath = compressedPath;
+                            avatarUploadPath = compressedPath;
                             GlideUtils.getInstance().showImg(PerfectUserInfoActivity.this, avatarPath, wkVBinding.avatarView.imageView);
                             wkVBinding.coverIv.setVisibility(View.GONE);
                         });
@@ -255,6 +248,53 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
                     }
                 })
                 .show();
+    }
+
+    private void showGenderCenterDialog() {
+        String[] options = getResources().getStringArray(R.array.profile_gender_options);
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(18), dp(18), dp(18), dp(18));
+        root.setBackgroundResource(R.drawable.profile_card_bg);
+
+        TextView title = new TextView(this);
+        title.setText(R.string.profile_gender);
+        title.setTextColor(Color.parseColor("#111827"));
+        title.setTextSize(20);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setGravity(Gravity.CENTER);
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(42)));
+
+        for (String option : options) {
+            TextView item = createOptionItem(option, option.equals(selectedGender), false);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(54));
+            params.setMargins(0, dp(6), 0, dp(6));
+            root.addView(item, params);
+            item.setOnClickListener(v -> {
+                selectedGender = option;
+                wkVBinding.genderTv.setText(option);
+                wkVBinding.genderTv.setTextColor(Color.parseColor("#172033"));
+                dialog.dismiss();
+            });
+        }
+
+        dialog.setContentView(root);
+        dialog.setOnShowListener(d -> {
+            Window window = dialog.getWindow();
+            if (window != null) {
+                window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                WindowManager.LayoutParams params = new WindowManager.LayoutParams();
+                params.copyFrom(window.getAttributes());
+                params.width = (int) (getResources().getDisplayMetrics().widthPixels * 0.78f);
+                params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+                params.gravity = Gravity.CENTER;
+                window.setAttributes(params);
+            }
+        });
+        dialog.show();
     }
 
     private void showSingleOptionDialog(int titleRes, int arrayRes, SingleSelectCallback callback) {
@@ -414,7 +454,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
 
         final int[] activeIndex = {0};
         final float[] downX = {0};
-        Runnable render = () -> renderTagPage(categories, activeIndex[0], categoryBar, tagContainer);
+        Runnable render = () -> renderTagPage(categories, activeIndex, categoryScroll, categoryBar, tagContainer);
         tagScroll.setOnTouchListener((v, event) -> {
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
                 downX[0] = event.getX();
@@ -446,7 +486,8 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         dialog.show();
     }
 
-    private void renderTagPage(String[] categories, int activeIndex, LinearLayout categoryBar, LinearLayout tagContainer) {
+    private void renderTagPage(String[] categories, int[] activeIndexRef, HorizontalScrollView categoryScroll, LinearLayout categoryBar, LinearLayout tagContainer) {
+        int activeIndex = activeIndexRef[0];
         categoryBar.removeAllViews();
         for (int i = 0; i < categories.length; i++) {
             int index = i;
@@ -461,8 +502,19 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             tabParams.setMargins(dp(4), 0, dp(4), 0);
             tab.setPadding(dp(16), 0, dp(16), 0);
             categoryBar.addView(tab, tabParams);
-            tab.setOnClickListener(v -> renderTagPage(categories, index, categoryBar, tagContainer));
+            tab.setOnClickListener(v -> {
+                activeIndexRef[0] = index;
+                renderTagPage(categories, activeIndexRef, categoryScroll, categoryBar, tagContainer);
+            });
         }
+
+        categoryBar.post(() -> {
+            View activeTab = categoryBar.getChildAt(activeIndex);
+            if (activeTab != null) {
+                int scrollX = Math.max(0, activeTab.getLeft() - dp(20));
+                categoryScroll.smoothScrollTo(scrollX, 0);
+            }
+        });
 
         tagContainer.removeAllViews();
         int arrayRes = getTagArrayRes(activeIndex);
@@ -507,7 +559,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
                     }
                     selectedTags.add(tag);
                 }
-                renderTagPage(categories, activeIndex, categoryBar, tagContainer);
+                renderTagPage(categories, activeIndexRef, categoryScroll, categoryBar, tagContainer);
             });
             if (i == tags.length - 1 && i % 2 == 0) {
                 SpaceView space = new SpaceView(this);
@@ -583,7 +635,6 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             showToast(R.string.profile_avatar_required);
             return;
         }
-        if (checkEditInputIsEmpty(wkVBinding.nameEt, R.string.nickname_not_null)) return;
         if (TextUtils.isEmpty(getEditTextString(wkVBinding.introEt))) {
             showToast(R.string.profile_intro_required);
             return;
@@ -610,7 +661,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         }
 
         loadingPopup.show();
-        String name = Objects.requireNonNull(wkVBinding.nameEt.getText()).toString().trim();
+        String name = getSafeProfileName();
         LoginModel.getInstance().updateUserInfo("name", name, (code, msg) -> {
             if (code == HttpResponseCode.success) {
                 saveLocalUserName(name);
@@ -638,11 +689,12 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
     }
 
     private void uploadAvatarIfNeeded(Runnable next) {
-        if (TextUtils.isEmpty(avatarPath)) {
+        String uploadPath = TextUtils.isEmpty(avatarUploadPath) ? avatarPath : avatarUploadPath;
+        if (TextUtils.isEmpty(uploadPath)) {
             next.run();
             return;
         }
-        LoginModel.getInstance().uploadAvatar(avatarPath, code -> {
+        LoginModel.getInstance().uploadAvatar(uploadPath, code -> {
             if (code == HttpResponseCode.success) {
                 next.run();
             } else {
@@ -667,6 +719,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         String uid = WKConfig.getInstance().getUid();
         String prefix = TextUtils.isEmpty(uid) ? "current" : uid;
         editor.putString(prefix + "_avatar", avatarPath == null ? "" : avatarPath);
+        editor.putString(prefix + "_avatar_upload", avatarUploadPath == null ? "" : avatarUploadPath);
         editor.putString(prefix + "_photos", TextUtils.join("|", partnerPhotoPaths));
         editor.putString(prefix + "_intro", getEditTextString(wkVBinding.introEt));
         editor.putString(prefix + "_country", selectedCountry);
@@ -682,6 +735,23 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
 
     private String getEditTextString(EditText editText) {
         return editText.getText() == null ? "" : editText.getText().toString().trim();
+    }
+
+    private String getSafeProfileName() {
+        String inputName = getEditTextString(wkVBinding.nameEt);
+        if (!TextUtils.isEmpty(inputName)) {
+            return inputName;
+        }
+        UserInfoEntity userInfoEntity = WKConfig.getInstance().getUserInfo();
+        if (userInfoEntity != null && !TextUtils.isEmpty(userInfoEntity.name)) {
+            return userInfoEntity.name.trim();
+        }
+        String uid = WKConfig.getInstance().getUid();
+        if (!TextUtils.isEmpty(uid)) {
+            String suffix = uid.length() > 6 ? uid.substring(0, 6) : uid;
+            return getString(R.string.profile_default_name_prefix) + suffix;
+        }
+        return getString(R.string.profile_default_name_prefix) + System.currentTimeMillis() % 100000;
     }
 
     private void finishPerfectUserInfo() {
@@ -702,7 +772,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         new Thread(() -> {
             String result = null;
             try {
-                result = compressImageToWebp(sourcePath, avatar);
+                result = compressImageToFile(sourcePath, avatar);
             } catch (Exception ignored) {
             }
             String finalResult = result;
@@ -710,7 +780,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         }).start();
     }
 
-    private String compressImageToWebp(String sourcePath, boolean avatar) throws IOException {
+    private String compressImageToFile(String sourcePath, boolean avatar) throws IOException {
         if (TextUtils.isEmpty(sourcePath)) return "";
         File sourceFile = new File(sourcePath);
         if (!sourceFile.exists()) return "";
@@ -752,12 +822,12 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             //noinspection ResultOfMethodCallIgnored
             outDir.mkdirs();
         }
-        String fileName = (avatar ? "avatar_" : "partner_") + System.currentTimeMillis() + "_" + Math.abs(sourcePath.hashCode()) + ".webp";
+        String fileName = (avatar ? "avatar_" : "partner_") + System.currentTimeMillis() + "_" + Math.abs(sourcePath.hashCode()) + (avatar ? ".jpg" : ".webp");
         File outFile = new File(outDir, fileName);
 
         int quality = 88;
         while (quality >= MIN_WEBP_QUALITY) {
-            writeWebp(outputBitmap, outFile, quality);
+            writeCompressedBitmap(outputBitmap, outFile, quality, avatar);
             if (outFile.length() <= TARGET_IMAGE_BYTES || quality == MIN_WEBP_QUALITY) {
                 break;
             }
@@ -770,11 +840,12 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         return outFile.getAbsolutePath();
     }
 
-    private void writeWebp(Bitmap bitmap, File outFile, int quality) throws IOException {
+    private void writeCompressedBitmap(Bitmap bitmap, File outFile, int quality, boolean avatar) throws IOException {
         FileOutputStream outputStream = null;
         try {
             outputStream = new FileOutputStream(outFile, false);
-            bitmap.compress(Bitmap.CompressFormat.WEBP, quality, outputStream);
+            Bitmap.CompressFormat format = avatar ? Bitmap.CompressFormat.JPEG : Bitmap.CompressFormat.WEBP;
+            bitmap.compress(format, quality, outputStream);
             outputStream.flush();
         } finally {
             if (outputStream != null) {
