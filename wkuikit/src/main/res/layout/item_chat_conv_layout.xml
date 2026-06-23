@@ -14,8 +14,8 @@
         android:paddingBottom="5dp">
 
         <FrameLayout
-            android:layout_width="60dp"
-            android:layout_height="60dp">
+            android:layout_width="66dp"
+            android:layout_height="66dp">
 
             <com.chat.base.ui.components.AvatarView
                 android:id="@+id/avatarView"
