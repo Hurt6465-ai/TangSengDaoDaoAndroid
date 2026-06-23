@@ -96,7 +96,9 @@ public class AvatarView extends FrameLayout {
         flagTv.setTextSize(13f);
         flagTv.setTypeface(Typeface.DEFAULT_BOLD);
         flagTv.setIncludeFontPadding(false);
-        flagTv.setBackground(makeFlagBadgeBg());
+        // 国旗不要白色底盘/阴影，直接浮在头像左下角。
+        flagTv.setBackground(null);
+        flagTv.setShadowLayer(0, 0, 0, 0);
         flagTv.setVisibility(GONE);
 
         addView(imageView, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
@@ -201,13 +203,6 @@ public class AvatarView extends FrameLayout {
         return drawable;
     }
 
-    private GradientDrawable makeFlagBadgeBg() {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.OVAL);
-        drawable.setColor(0xFFFFFFFF);
-        drawable.setStroke(AndroidUtilities.dp(1), 0xFFFFFFFF);
-        return drawable;
-    }
 
     public void setStrokeWidth(float width) {
         imageView.setStrokeWidth(AndroidUtilities.dp(width));
@@ -238,18 +233,20 @@ public class AvatarView extends FrameLayout {
             defaultAvatarTv.setBackground(makeDefaultAvatarBg(defaultAvatarTv.getText() == null ? "" : defaultAvatarTv.getText().toString()));
         }
 
-        int flagSize = Math.max(14, Math.round(size * 0.46f));
+        int flagSize = Math.max(16, Math.round(size * 0.48f));
         FrameLayout.LayoutParams flagParams = (FrameLayout.LayoutParams) flagTv.getLayoutParams();
         flagParams.width = AndroidUtilities.dp(flagSize);
         flagParams.height = AndroidUtilities.dp(flagSize);
         flagParams.gravity = Gravity.BOTTOM | Gravity.START;
-        flagParams.leftMargin = 0;
-        flagParams.bottomMargin = 0;
+        // 轻微贴边，避免国旗看起来太靠内。
+        flagParams.leftMargin = -AndroidUtilities.dp(1);
+        flagParams.bottomMargin = -AndroidUtilities.dp(1);
         flagTv.setLayoutParams(flagParams);
-        flagTv.setTextSize(Math.max(10f, size * 0.30f));
-        flagTv.setBackground(makeFlagBadgeBg());
+        flagTv.setTextSize(Math.max(12f, size * 0.34f));
+        flagTv.setBackground(null);
+        flagTv.setShadowLayer(0, 0, 0, 0);
 
-        int spotSize = Math.max(7, Math.round(size * 0.22f));
+        int spotSize = Math.max(6, Math.round(size * 0.17f));
         FrameLayout.LayoutParams spotParams = (FrameLayout.LayoutParams) spotView.getLayoutParams();
         spotParams.width = AndroidUtilities.dp(spotSize);
         spotParams.height = AndroidUtilities.dp(spotSize);
@@ -375,6 +372,13 @@ public class AvatarView extends FrameLayout {
         flagTv.setVisibility(VISIBLE);
     }
 
+    /**
+     * 外部列表已有国籍/国旗字段时可直接调用，比如聊天室 member.flag/country_code。
+     */
+    public void showFlag(String countryOrFlag) {
+        updateFlagByCountry(countryOrFlag);
+    }
+
     private void updateTopicFlagView(WKChannel channel) {
         String country = firstNotEmpty(
                 getTopicExtraString(channel, "creator_country_code"),
@@ -415,7 +419,8 @@ public class AvatarView extends FrameLayout {
                 getExtraString(channel.remoteExtraMap, "nationality")
         );
 
-        // 兼容上一步资料页暂时保存在本地的国籍；后端接好后主要走上面的 channel extra。
+        // 兼容上一步资料页暂时保存在本地的国籍。
+        // 只允许当前登录用户头像读本地兜底，避免好友头像全部显示成自己的国旗。
         if (TextUtils.isEmpty(country)) {
             country = getLocalSavedCountry(channel.channelID);
         }
@@ -424,16 +429,11 @@ public class AvatarView extends FrameLayout {
 
     private String getLocalSavedCountry(String channelID) {
         Context context = getContext();
-        if (context == null) return "";
-        SharedPreferences preferences = context.getSharedPreferences(PROFILE_EXTRA_PREF, Context.MODE_PRIVATE);
+        if (context == null || TextUtils.isEmpty(channelID)) return "";
         String uid = WKConfig.getInstance().getUid();
-        String country = "";
-        if (!TextUtils.isEmpty(channelID)) {
-            country = preferences.getString(channelID + "_country", "");
-        }
-        if (TextUtils.isEmpty(country) && !TextUtils.isEmpty(uid)) {
-            country = preferences.getString(uid + "_country", "");
-        }
+        if (TextUtils.isEmpty(uid) || !channelID.equals(uid)) return "";
+        SharedPreferences preferences = context.getSharedPreferences(PROFILE_EXTRA_PREF, Context.MODE_PRIVATE);
+        String country = preferences.getString(uid + "_country", "");
         if (TextUtils.isEmpty(country)) {
             country = preferences.getString("current_country", "");
         }
