@@ -90,8 +90,8 @@
 
             <com.chat.base.ui.components.AvatarView
                 android:id="@+id/creatorAvatar"
-                android:layout_width="40dp"
-                android:layout_height="40dp" />
+                android:layout_width="44dp"
+                android:layout_height="44dp" />
 
             <TextView
                 android:id="@+id/creatorNameTv"
