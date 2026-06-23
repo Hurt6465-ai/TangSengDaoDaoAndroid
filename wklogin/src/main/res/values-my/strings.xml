@@ -1,18 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="profile_intro">မိတ်ဆက်</string>
-    <string name="profile_intro_hint">ကိုယ့်အကြောင်း အတိုချုံးရေးပါ</string>
+    <string name="profile_intro_hint">ကိုယ့်အကြောင်း၊ မည်သည့်နိုင်ငံမှဖြစ်ကြောင်း၊ လေ့ကျင့်ချင်သောဘာသာစကားကိုရေးပါ</string>
     <string name="profile_country_region">နိုင်ငံ / ဒေသ</string>
+    <string name="profile_country_hint">နိုင်ငံ / ဒေသ · ရွေးချယ်ပါ၊ ပရိုဖိုင်တွင်အလံပြပါမည်</string>
     <string name="profile_native_language">မိခင်ဘာသာစကား</string>
+    <string name="profile_native_language_hint">မိခင်ဘာသာစကား · အများဆုံး ၅ ခု ရွေးနိုင်သည်</string>
     <string name="profile_learning_language">သင်ယူနေသောဘာသာစကား</string>
+    <string name="profile_learning_language_hint">သင်ယူနေသောဘာသာစကား · အများဆုံး ၅ ခု ရွေးနိုင်သည်</string>
     <string name="profile_gender">လိင်</string>
+    <string name="profile_gender_hint">လိင် · ရွေးချယ်ပါ</string>
     <string name="profile_birthday">မွေးနေ့</string>
+    <string name="profile_birthday_hint">မွေးနေ့ · ရွေးချယ်ပါ</string>
     <string name="profile_intro_required">မိတ်ဆက်ရေးပါ</string>
     <string name="profile_country_required">နိုင်ငံ / ဒေသ ရွေးပါ</string>
     <string name="profile_native_language_required">မိခင်ဘာသာစကား ရွေးပါ</string>
     <string name="profile_learning_language_required">သင်ယူနေသောဘာသာစကား ရွေးပါ</string>
     <string name="profile_gender_required">လိင် ရွေးပါ</string>
     <string name="profile_birthday_required">မွေးနေ့ ရွေးပါ</string>
+    <string name="profile_multi_select_limit">အများဆုံး ၅ ခုသာ ရွေးနိုင်သည်</string>
+    <string name="profile_multi_select_title">%1$s (အများဆုံး ၅ ခု)</string>
+    <string name="profile_select_done">ပြီးပြီ</string>
 
     <string-array name="profile_country_options">
         <item>🇲🇲 မြန်မာ</item>
