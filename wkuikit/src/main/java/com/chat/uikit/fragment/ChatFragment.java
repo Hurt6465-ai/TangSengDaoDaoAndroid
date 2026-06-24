@@ -185,7 +185,8 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     }
 
     private void updateHomeTabStyle(TextView tabView, boolean selected) {
-        tabView.setTextSize(selected ? 18 : 16);
+        tabView.setTextSize(selected ? 20 : 16);
+        tabView.setTypeface(Typeface.DEFAULT, selected ? Typeface.BOLD : Typeface.NORMAL);
         tabView.setTextColor(ContextCompat.getColor(requireActivity(), selected ? R.color.colorDark : R.color.popupTextColor));
     }
 
@@ -668,10 +669,17 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                 WKUIKitApplication.getInstance().exitLogin(from);
             }
             wkVBinding.textSwitcher.setTag(i);
-            if (i != WKConnectStatus.success && i != WKConnectStatus.syncMsg) {
+            if (i == WKConnectStatus.success || i == WKConnectStatus.syncMsg) {
+                EndpointManager.getInstance().invoke("wk_close_disconnect_screen", null);
+                stopConnectTimer();
+            } else if (i == WKConnectStatus.connecting) {
+                // 正在连接/重连时不要弹全屏断线遮罩，允许用户继续操作本地缓存。
+                EndpointManager.getInstance().invoke("wk_close_disconnect_screen", null);
+                stopConnectTimer();
+            } else if (i == WKConnectStatus.noNetwork) {
+                // 真正无网络时再延迟提示，避免启动或短暂切后台时像死机。
                 startConnectTimer();
             } else {
-                EndpointManager.getInstance().invoke("wk_close_disconnect_screen", null);
                 stopConnectTimer();
             }
         });
@@ -1423,15 +1431,18 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     }
 
     private void startConnectTimer() {
-        if (connectTimer == null) {
-            connectTimer = new Timer();
-        }
+        stopConnectTimer();
+        connectTimer = new Timer();
         connectTimer.schedule(new TimerTask() {
             @Override
             public void run() {
-                EndpointManager.getInstance().invoke("show_disconnect_screen", getContext());
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (isAdded() && getContext() != null) {
+                        EndpointManager.getInstance().invoke("show_disconnect_screen", getContext());
+                    }
+                });
             }
-        }, 1000);
+        }, 8000);
     }
 
     private void stopConnectTimer() {
