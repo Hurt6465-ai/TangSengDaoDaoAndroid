@@ -67,9 +67,16 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
 public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> implements OnQuickSideBarTouchListener {
 
     private static final String ARG_EMBEDDED_IN_CHAT = "embedded_in_chat";
+    private static final String ENDPOINT_SWITCH_HOME_PAGE = "peipe_switch_home_page";
+    private static final int PAGE_TOPIC_ROOMS = 1;
+    private static final int EMBEDDED_SWIPE_TRIGGER_DP = 70;
+    private static final int EMBEDDED_SWIPE_CANCEL_VERTICAL_DP = 18;
+    private static final float EMBEDDED_SWIPE_HORIZONTAL_RATIO = 1.5f;
     private boolean embeddedInChat = false;
     private float embeddedSwipeStartX = 0f;
     private float embeddedSwipeStartY = 0f;
+    private boolean embeddedSwipeTracking = false;
+    private boolean embeddedSwipeTriggered = false;
 
     public static ContactsFragment newEmbeddedInstance() {
         ContactsFragment fragment = new ContactsFragment();
@@ -138,8 +145,13 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
         initAdapter(headerRecyclerView, contactsHeaderAdapter);
         wkVBinding.quickSideBarView.setOnQuickSideBarTouchListener(this);
         if (embeddedInChat) {
-            wkVBinding.contactsRootLayout.setOnTouchListener((view, event) -> handleEmbeddedSwipe(event));
-            wkVBinding.recyclerView.setOnTouchListener((view, event) -> handleEmbeddedSwipe(event));
+            wkVBinding.contactsRootLayout.setOnTouchListener((view, event) -> handleEmbeddedSwipe(event, false));
+            wkVBinding.recyclerView.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+                @Override
+                public boolean onInterceptTouchEvent(RecyclerView rv, MotionEvent event) {
+                    return handleEmbeddedSwipe(event, true);
+                }
+            });
         }
         friendAdapter.addChildClickViewIds(R.id.contentLayout);
         friendAdapter.setOnItemChildClickListener((adapter, view, position) -> SingleClickUtil.determineTriggerSingleClick(view, view1 -> {
@@ -310,23 +322,40 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
         return linearLayout;
     }
 
-    private boolean handleEmbeddedSwipe(MotionEvent event) {
+    private boolean handleEmbeddedSwipe(MotionEvent event, boolean fromRecyclerView) {
         if (!embeddedInChat || event == null) return false;
-        switch (event.getAction()) {
+        switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                embeddedSwipeStartX = event.getX();
-                embeddedSwipeStartY = event.getY();
-                return false;
-            case MotionEvent.ACTION_UP:
-                float dx = event.getX() - embeddedSwipeStartX;
-                float dy = event.getY() - embeddedSwipeStartY;
-                if (Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                    if (dx > 0) {
-                        EndpointManager.getInstance().invoke("peipe_switch_home_page", 1);
-                        return true;
-                    }
+                embeddedSwipeStartX = event.getRawX();
+                embeddedSwipeStartY = event.getRawY();
+                embeddedSwipeTracking = true;
+                embeddedSwipeTriggered = false;
+                return !fromRecyclerView;
+            case MotionEvent.ACTION_MOVE:
+                if (!embeddedSwipeTracking || embeddedSwipeTriggered) return embeddedSwipeTriggered;
+                float dx = event.getRawX() - embeddedSwipeStartX;
+                float dy = event.getRawY() - embeddedSwipeStartY;
+                float absDx = Math.abs(dx);
+                float absDy = Math.abs(dy);
+                if (absDy > AndroidUtilities.dp(EMBEDDED_SWIPE_CANCEL_VERTICAL_DP) && absDy > absDx) {
+                    embeddedSwipeTracking = false;
+                    return false;
                 }
-                return false;
+                if (dx > AndroidUtilities.dp(EMBEDDED_SWIPE_TRIGGER_DP)
+                        && absDx > absDy * EMBEDDED_SWIPE_HORIZONTAL_RATIO) {
+                    embeddedSwipeTriggered = true;
+                    embeddedSwipeTracking = false;
+                    // 联系人右滑回聊天室。用 ItemTouchListener 处理 RecyclerView，避免列表吃掉 UP 导致切换失效。
+                    EndpointManager.getInstance().invoke(ENDPOINT_SWITCH_HOME_PAGE, PAGE_TOPIC_ROOMS);
+                    return true;
+                }
+                return !fromRecyclerView && absDx > AndroidUtilities.dp(8);
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                boolean consume = embeddedSwipeTriggered;
+                embeddedSwipeTracking = false;
+                embeddedSwipeTriggered = false;
+                return consume;
             default:
                 return false;
         }
