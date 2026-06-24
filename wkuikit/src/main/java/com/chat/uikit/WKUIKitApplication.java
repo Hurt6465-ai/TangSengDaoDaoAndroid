@@ -117,6 +117,7 @@ import com.xinbida.wukongim.msgmodel.WKImageContent;
 import com.xinbida.wukongim.msgmodel.WKMessageContent;
 import com.xinbida.wukongim.msgmodel.WKTextContent;
 import com.xinbida.wukongim.msgmodel.WKVideoContent;
+import com.xinbida.wukongim.message.type.WKConnectStatus;
 
 import org.json.JSONObject;
 
@@ -137,6 +138,8 @@ public class WKUIKitApplication {
     public SensitiveWords sensitiveWords;
     public boolean isRefreshChatActivityMessage = false;
     private boolean rtcSignalListenerAdded = false;
+    private boolean imConnectionStateListenerAdded = false;
+    private volatile int lastConnectionStatus = -1;
 
     private WKUIKitApplication() {
     }
@@ -154,6 +157,7 @@ public class WKUIKitApplication {
     public void init(Application mContext) {
         this.mContext = new WeakReference<>(mContext);
         initIM();
+        initIMConnectionStateListener();
         //初始化im事件及监听
         WKIMUtils.getInstance().initIMListener();
         initKitModuleListener();
@@ -186,14 +190,30 @@ public class WKUIKitApplication {
         }
     }
 
+    private void initIMConnectionStateListener() {
+        if (TextUtils.isEmpty(WKConfig.getInstance().getToken())) return;
+        if (imConnectionStateListenerAdded) return;
+        imConnectionStateListenerAdded = true;
+        WKIM.getInstance().getConnectionManager().addOnConnectionStatusListener("uikit_connection_guard", (status, reason) -> lastConnectionStatus = status);
+    }
+
     public void startChat() {
-        if (!TextUtils.isEmpty(WKConfig.getInstance().getToken())) {
-            Log.e("去连接", "-->");
-            WKIM.getInstance().getConnectionManager().connection();
+        if (TextUtils.isEmpty(WKConfig.getInstance().getToken())) return;
+
+        if (lastConnectionStatus == WKConnectStatus.connecting
+                || lastConnectionStatus == WKConnectStatus.syncMsg
+                || lastConnectionStatus == WKConnectStatus.success) {
+            Log.d("WKUIKitApplication", "IM 正在连接/同步/已连接，忽略重复 connection");
+            return;
         }
+
+        lastConnectionStatus = WKConnectStatus.connecting;
+        Log.d("WKUIKitApplication", "IM 开始连接");
+        WKIM.getInstance().getConnectionManager().connection();
     }
 
     public void stopConn() {
+        lastConnectionStatus = -1;
         EndpointManager.getInstance().invoke("push_update_device_badge", totalMsgCount);
         WKIM.getInstance().getConnectionManager().disconnect(false);
     }
@@ -457,6 +477,7 @@ public class WKUIKitApplication {
             WKSharedPreferencesUtil.getInstance().putInt("wk_lock_screen_pwd_count", 5);
             //初始化im
             WKUIKitApplication.getInstance().initIM();
+            WKUIKitApplication.getInstance().initIMConnectionStateListener();
             WKUIKitApplication.getInstance().initRtcSignalModule();
             //初始化密钥
 //            WKIM.getInstance().getSignalProtocolManager().init();
