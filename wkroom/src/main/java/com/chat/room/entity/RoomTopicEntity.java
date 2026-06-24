@@ -61,6 +61,11 @@ public class RoomTopicEntity implements Serializable {
     public String creator_name;
     public String creator_avatar;
     public String creator_avatar_cache_key;
+    public String creator_country_code;
+    public String creator_country;
+    public String creator_nationality_code;
+    public String creator_nationality;
+    public String creator_flag;
     public List<RoomMember> members;
     public List<RoomMember> reply_users;
 
@@ -92,7 +97,7 @@ public class RoomTopicEntity implements Serializable {
         if ("找搭子".equals(raw)) return context.getString(R.string.peipe_room_tag_partner);
         if ("工作".equals(raw)) return context.getString(R.string.peipe_room_tag_work);
         if ("影视".equals(raw)) return context.getString(R.string.peipe_room_tag_movie);
-        if ("音乐".equals(raw)) return context.getString(R.string.peipe_room_tag_music);
+        if ("游戏".equals(raw)) return context.getString(R.string.peipe_room_tag_music);
         if ("学习".equals(raw)) return context.getString(R.string.peipe_room_tag_study);
         if ("交友".equals(raw)) return context.getString(R.string.peipe_room_tag_friend);
         return context.getString(R.string.peipe_room_tag_chat);
@@ -154,6 +159,11 @@ public class RoomTopicEntity implements Serializable {
         creator.name = creator_name;
         creator.avatar = creator_avatar;
         creator.avatar_cache_key = creator_avatar_cache_key;
+        creator.country_code = creator_country_code;
+        creator.country = creator_country;
+        creator.nationality_code = creator_nationality_code;
+        creator.nationality = creator_nationality;
+        creator.flag = creator_flag;
         if (!TextUtils.isEmpty(creator.uid) || !TextUtils.isEmpty(creator.avatar)) return creator;
         List<RoomMember> source = getSourceMembers();
         if (source != null && source.size() > 0) return source.get(0);
@@ -238,6 +248,11 @@ public class RoomTopicEntity implements Serializable {
         if (!TextUtils.isEmpty(next.creator_name)) creator_name = next.creator_name;
         if (!TextUtils.isEmpty(next.creator_avatar)) creator_avatar = next.creator_avatar;
         if (!TextUtils.isEmpty(next.creator_avatar_cache_key)) creator_avatar_cache_key = next.creator_avatar_cache_key;
+        if (!TextUtils.isEmpty(next.creator_country_code)) creator_country_code = next.creator_country_code;
+        if (!TextUtils.isEmpty(next.creator_country)) creator_country = next.creator_country;
+        if (!TextUtils.isEmpty(next.creator_nationality_code)) creator_nationality_code = next.creator_nationality_code;
+        if (!TextUtils.isEmpty(next.creator_nationality)) creator_nationality = next.creator_nationality;
+        if (!TextUtils.isEmpty(next.creator_flag)) creator_flag = next.creator_flag;
         if (next.members != null) members = next.members;
         if (next.reply_users != null) reply_users = next.reply_users;
     }
@@ -248,6 +263,19 @@ public class RoomTopicEntity implements Serializable {
         public String avatar;
         public String avatar_cache_key;
         public String flag;
+        public String country_code;
+        public String country;
+        public String nationality_code;
+        public String nationality;
+
+        public String getCountryOrFlag() {
+            if (!TextUtils.isEmpty(flag)) return flag;
+            if (!TextUtils.isEmpty(country_code)) return country_code;
+            if (!TextUtils.isEmpty(country)) return country;
+            if (!TextUtils.isEmpty(nationality_code)) return nationality_code;
+            if (!TextUtils.isEmpty(nationality)) return nationality;
+            return "";
+        }
     }
 
     /** 兼容旧代码里可能出现的 RoomAvatar 类型。 */
