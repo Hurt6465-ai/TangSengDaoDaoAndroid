@@ -253,27 +253,35 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
             showToast("正在进入聊天室，请稍候");
             return;
         }
-        // 新点击的房间覆盖旧请求，旧请求回调回来时会被 requestChannelId 校验拦截，
-        // 避免快速连点不同房间导致连续打开多个聊天页。
+
+        // 关键修复：打开聊天页不能被 /chatrooms/enter 的回调阻塞。
+        // enter 接口里会同步 IM 频道/订阅者，只要 IM 同步接口慢、失败或返回非 200，旧逻辑就不会打开聊天室。
+        // 这里先把本地 WKChannel 缓存好并打开原生聊天页，同时后台继续 enterRoom 补齐成员关系。
         openingChannelId = requestChannelId;
+        openNativeChat(room);
+
         RoomTopicModel.getInstance().enterRoom(room, new IRequestResultListener<RoomTopicEntity>() {
             @Override
             public void onSuccess(RoomTopicEntity result) {
                 if (!TextUtils.equals(openingChannelId, requestChannelId)) return;
                 openingChannelId = null;
-                if (!canUpdateUi()) return;
                 RoomTopicEntity target = mergeRoomForOpen(room, result);
-                openNativeChat(target);
+                byte type = target.channel_type == 0 ? WKChannelType.GROUP : target.channel_type;
+                cacheTopicChannel(target, type);
+                if (canUpdateUi()) {
+                    addOrUpdateRoom(target);
+                }
             }
 
             @Override
             public void onFail(int code, String msg) {
                 if (!TextUtils.equals(openingChannelId, requestChannelId)) return;
                 openingChannelId = null;
-                if (!canUpdateUi()) return;
-                // 进房失败时不能直接打开聊天页。否则用户没有被加入聊天室订阅者，
-                // 看起来能进页面，但发消息会一直停在“发送中”。
-                toastRoomError("进入聊天室失败", msg);
+                // 不再阻止打开聊天室。失败只提示，避免“点了没有反应”。
+                // 如果后续发消息仍一直发送中，再看后端 /v1/chatrooms/enter 或 IM 订阅者同步日志。
+                if (canUpdateUi() && !TextUtils.isEmpty(msg)) {
+                    showToast(msg);
+                }
             }
         });
     }
