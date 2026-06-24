@@ -10,6 +10,10 @@
     <string name="peipe_room_publish">Post</string>
     <string name="peipe_room_pin">Pin</string>
     <string name="peipe_room_unpin">Unpin</string>
+    <string name="peipe_room_creator">Publisher</string>
+    <string name="peipe_room_enter_failed">Failed to enter chatroom. Please try again.</string>
+    <string name="peipe_room_publish_failed">Failed to post</string>
+    <string name="peipe_room_tag_chat_hash"># Chat</string>
     <string name="peipe_room_delete">Delete</string>
     <string name="peipe_room_lang_cn">Chinese</string>
     <string name="peipe_room_tag_speaking">Speaking</string>
