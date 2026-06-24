@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="peipe_room_tab_title">聊天室</string>
+    <string name="peipe_room_tab_title">话题</string>
     <string name="peipe_room_empty_title">暂无话题聊天室</string>
     <string name="peipe_room_empty_desc">发布一个话题，大家点击卡片进入原生群聊。</string>
     <string name="peipe_room_create">发布话题</string>
