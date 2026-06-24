@@ -158,6 +158,11 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     }
 
     private void showHomePage(int page) {
+        if (page < PAGE_MESSAGES) {
+            page = PAGE_MESSAGES;
+        } else if (page > PAGE_CONTACTS) {
+            page = PAGE_CONTACTS;
+        }
         currentHomePage = page;
         isShowingTopicRooms = page == PAGE_TOPIC_ROOMS;
         boolean showMessages = page == PAGE_MESSAGES;
@@ -231,14 +236,15 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     }
 
     private boolean handleTopicSwipe(MotionEvent event) {
-        switch (event.getAction()) {
+        if (event == null) return false;
+        switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                topicSwipeStartX = event.getX();
-                topicSwipeStartY = event.getY();
+                topicSwipeStartX = event.getRawX();
+                topicSwipeStartY = event.getRawY();
                 return false;
             case MotionEvent.ACTION_UP:
-                float dx = event.getX() - topicSwipeStartX;
-                float dy = event.getY() - topicSwipeStartY;
+                float dx = event.getRawX() - topicSwipeStartX;
+                float dy = event.getRawY() - topicSwipeStartY;
                 if (Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
                     if (dx < 0 && currentHomePage < PAGE_CONTACTS) {
                         showHomePage(currentHomePage + 1);
