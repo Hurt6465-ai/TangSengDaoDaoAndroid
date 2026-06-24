@@ -169,8 +169,9 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
 
             @Override
             public void onFail(int code, String msg) {
-                if (!TextUtils.isEmpty(room.getChannelId())) openNativeChat(room);
-                else if (!TextUtils.isEmpty(msg)) WKToastUtils.getInstance().showToastNormal(msg);
+                // 进房失败时不能直接打开聊天页。否则用户没有被加入聊天室订阅者，
+                // 看起来能进页面，但发消息会一直停在“发送中”。
+                WKToastUtils.getInstance().showToastNormal(TextUtils.isEmpty(msg) ? getString(R.string.peipe_room_enter_failed) : msg);
             }
         });
     }
@@ -209,6 +210,10 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         if (!TextUtils.isEmpty(creatorAvatarCacheKey)) channel.remoteExtraMap.put("creator_avatar_cache_key", creatorAvatarCacheKey);
         if (!TextUtils.isEmpty(creatorName)) channel.remoteExtraMap.put("creator_name", creatorName);
         if (!TextUtils.isEmpty(creatorUID)) channel.remoteExtraMap.put("creator_uid", creatorUID);
+        if (!TextUtils.isEmpty(creator.getCountryOrFlag())) {
+            channel.remoteExtraMap.put("creator_country_code", creator.getCountryOrFlag());
+            channel.remoteExtraMap.put("country_code", creator.getCountryOrFlag());
+        }
         if (channel.localExtra == null) {
             channel.localExtra = new HashMap<>();
         }
@@ -220,6 +225,10 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         }
         if (!TextUtils.isEmpty(creatorName)) channel.localExtra.put("creator_name", creatorName);
         if (!TextUtils.isEmpty(creatorUID)) channel.localExtra.put("creator_uid", creatorUID);
+        if (!TextUtils.isEmpty(creator.getCountryOrFlag())) {
+            channel.localExtra.put("creator_country_code", creator.getCountryOrFlag());
+            channel.localExtra.put("country_code", creator.getCountryOrFlag());
+        }
         WKIM.getInstance().getChannelManager().saveOrUpdateChannel(channel);
     }
 
@@ -295,16 +304,16 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
                 RoomTopicEntity created = findRoomByTitleTag(rooms, title, tag);
                 if (created != null) {
                     dialog.dismiss();
-                    openNativeChat(created);
+                    openTopic(created);
                     return;
                 }
-                WKToastUtils.getInstance().showToastNormal(TextUtils.isEmpty(failMsg) ? "发布失败" : failMsg);
+                WKToastUtils.getInstance().showToastNormal(TextUtils.isEmpty(failMsg) ? getString(R.string.peipe_room_publish_failed) : failMsg);
             }
 
             @Override
             public void onFail(int code, String msg) {
                 publish.setEnabled(true);
-                WKToastUtils.getInstance().showToastNormal(TextUtils.isEmpty(failMsg) ? "发布失败" : failMsg);
+                WKToastUtils.getInstance().showToastNormal(TextUtils.isEmpty(failMsg) ? getString(R.string.peipe_room_publish_failed) : failMsg);
             }
         });
     }
