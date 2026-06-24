@@ -1,23 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="peipe_room_tab_title">စကားခန်း</string>
-    <string name="peipe_room_empty_title">အများပြည်သူ စကားခန်းမရှိသေးပါ</string>
-    <string name="peipe_room_empty_desc">ခေါင်းစဉ်တင်ပါ။ အခြားသူများက ကတ်ကိုနှိပ်ပြီး အုပ်စုစကားပြောသို့ ဝင်နိုင်သည်။</string>
+    <string name="peipe_room_empty_title">ခေါင်းစဉ်ပါ စကားခန်း မရှိသေးပါ</string>
+    <string name="peipe_room_empty_desc">ခေါင်းစဉ်တစ်ခု တင်ပါ။ အခြားသူများက ကတ်ကိုနှိပ်ပြီး မူရင်း အုပ်စုချက်တင်သို့ ဝင်နိုင်သည်။</string>
     <string name="peipe_room_create">ခေါင်းစဉ်တင်မည်</string>
     <string name="peipe_room_title_hint">ခေါင်းစဉ်ရေးပါ</string>
     <string name="peipe_room_tag_title">တဂ်ရွေးပါ</string>
-    <string name="peipe_room_cancel">ပယ်ဖျက်</string>
+    <string name="peipe_room_cancel">ပယ်ဖျက်မည်</string>
     <string name="peipe_room_publish">တင်မည်</string>
-    <string name="peipe_room_pin">ထိပ်တင်</string>
-    <string name="peipe_room_unpin">ထိပ်တင်ဖြုတ်</string>
+    <string name="peipe_room_pin">ထိပ်တင်မည်</string>
+    <string name="peipe_room_unpin">ထိပ်တင်ဖြုတ်မည်</string>
+    <string name="peipe_room_creator">တင်သူ</string>
+    <string name="peipe_room_enter_failed">စကားခန်းသို့ ဝင်မရပါ။ ခဏစောင့်ပြီး ထပ်စမ်းကြည့်ပါ။</string>
+    <string name="peipe_room_publish_failed">တင်မရပါ</string>
+    <string name="peipe_room_tag_chat_hash"># စကားပြော</string>
     <string name="peipe_room_delete">ဖျက်မည်</string>
-    <string name="peipe_room_lang_cn">တရုတ်</string>
+    <string name="peipe_room_lang_cn">တရုတ်ဘာသာ</string>
     <string name="peipe_room_tag_speaking">စကားလေ့ကျင့်</string>
     <string name="peipe_room_tag_partner">အဖော်ရှာ</string>
     <string name="peipe_room_tag_work">အလုပ်</string>
     <string name="peipe_room_tag_movie">ရုပ်ရှင်</string>
     <string name="peipe_room_tag_music">ဂီတ</string>
     <string name="peipe_room_tag_study">လေ့လာ</string>
-    <string name="peipe_room_tag_friend">မိတ်ဆွေ</string>
+    <string name="peipe_room_tag_friend">မိတ်ဆွေရှာ</string>
     <string name="peipe_room_tag_chat">စကားပြော</string>
 </resources>
