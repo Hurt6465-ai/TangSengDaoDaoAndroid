@@ -167,9 +167,18 @@ class TSApplication : MultiDexApplication() {
                                 .invoke("chow_check_lock_screen_pwd", null)
                         }, 1000)
                     }
-                    WKIMUtils.getInstance().initIMListener()
-                    WKUIKitApplication.getInstance().startChat()
-                    UserModel.getInstance().getOnlineUsers()
+                    // 只触发后台重连，不阻塞 UI；会话列表和聊天记录继续走本地缓存。
+                    mainHandler.post {
+                        WKIMUtils.getInstance().initIMListener()
+                        WKUIKitApplication.getInstance().startChat()
+                    }
+
+                    // 在线用户不是进入前台的关键路径，延迟执行，避免刚打开像卡住。
+                    mainHandler.postDelayed({
+                        if (isAppInForeground && !TextUtils.isEmpty(WKConfig.getInstance().token)) {
+                            UserModel.getInstance().getOnlineUsers()
+                        }
+                    }, 3000)
 
                 }
             }
