@@ -50,11 +50,11 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
     }
 
     private String creatorName(RoomTopicEntity room) {
-        if (room == null) return "发布者";
+        if (room == null) return getContext().getString(R.string.peipe_room_creator);
         RoomTopicEntity.RoomMember creator = room.getCreatorMember();
         if (creator != null && !TextUtils.isEmpty(creator.name)) return creator.name;
         if (!TextUtils.isEmpty(room.creator_name)) return room.creator_name;
-        return "发布者";
+        return getContext().getString(R.string.peipe_room_creator);
     }
 
     private GradientDrawable makeTagBackground(String rawTag) {
@@ -109,7 +109,7 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         for (int i = 0; i < SIDE_AVATAR_IDS.length; i++) {
             AvatarView avatarView = holder.getView(SIDE_AVATAR_IDS[i]);
             RoomTopicEntity.RoomMember member = members != null && i < members.size() ? members.get(i) : null;
-            bindMemberAvatar(avatarView, member, 30f);
+            bindMemberAvatar(avatarView, member, 32f);
         }
     }
 
@@ -119,6 +119,10 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         if (member != null && !TextUtils.isEmpty(member.uid)) {
             avatarView.setVisibility(View.VISIBLE);
             avatarView.showAvatar(member.uid, WKChannelType.PERSONAL, member.avatar_cache_key);
+            // 聊天室列表接口里已经带了 reply_users / creator 的国家字段时，直接传给公共头像组件。
+            // 不能只依赖个人频道缓存，否则新出现的网友头像拿不到 country_code，就不会显示国旗。
+            String memberCountry = member.getCountryOrFlag();
+            if (!TextUtils.isEmpty(memberCountry)) avatarView.showFlag(memberCountry);
         } else {
             avatarView.setVisibility(View.GONE);
         }
