@@ -15,33 +15,28 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
+import com.chat.base.R;
+import com.chat.base.config.WKApiConfig;
+import com.chat.base.config.WKConfig;
+import com.chat.base.config.WKConstants;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.GlideException;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.target.Target;
-import com.chat.base.R;
-import com.chat.base.common.WKCommonModel;
-import com.chat.base.config.WKApiConfig;
-import com.chat.base.config.WKConfig;
-import com.chat.base.config.WKConstants;
 import com.chat.base.glide.GlideRequestOptions;
+import com.chat.base.glide.GlideUtils;
 import com.chat.base.glide.MyGlideUrlWithId;
 import com.chat.base.utils.AndroidUtilities;
 import com.chat.base.utils.LayoutHelper;
 import com.google.android.material.imageview.ShapeableImageView;
+
 import com.google.android.material.shape.CornerFamily;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
-import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.io.File;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class AvatarView extends FrameLayout {
     public ShapeableImageView imageView;
@@ -49,33 +44,11 @@ public class AvatarView extends FrameLayout {
     public View spotView;
     public TextView onlineTv;
     public ImageView flagIv;
-
     private static final float FLAG_WIDTH_RATIO = 0.42f;
     private static final float FLAG_HEIGHT_RATIO = 2f / 3f;
-    private static final float FLAG_LEFT_OVERHANG_RATIO = 0.08f;
     private static final int FLAG_MIN_WIDTH_DP = 16;
     private static final int FLAG_MIN_HEIGHT_DP = 11;
     private static final String PROFILE_EXTRA_PREF = "front_profile_extra";
-
-    private static final Object COUNTRY_FETCH_LOCK = new Object();
-    private static final int FETCHED_PERSONAL_COUNTRY_MAX_SIZE = 3000;
-    private static final Set<String> FETCHING_PERSONAL_COUNTRY_KEYS = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
-    private static final Map<String, Boolean> FETCHED_PERSONAL_COUNTRY_KEYS = new LinkedHashMap<String, Boolean>(128, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
-            return size() > FETCHED_PERSONAL_COUNTRY_MAX_SIZE;
-        }
-    };
-    private static final Map<String, Integer> FLAG_RES_CACHE = new ConcurrentHashMap<>();
-
-    private String forcedFlagCountry = "";
-    private volatile String boundChannelKey = "";
-    private volatile String boundDisplayKey = "";
-    private String lastAvatarLoadKey = "";
-    private String defaultAvatarSeed = "";
-    private String lastDefaultBgKey = "";
-    private int currentFlagResId = 0;
-    private boolean sizeInited = false;
     private float avatarSize = 40f;
     private float avatarCornerSize = 20f;
 
@@ -146,49 +119,19 @@ public class AvatarView extends FrameLayout {
         defaultAvatarTv.setVisibility(GONE);
     }
 
-    private void resetStatusViews() {
-        spotView.setVisibility(GONE);
-        onlineTv.setText("");
-        onlineTv.setVisibility(GONE);
-    }
-
-    private void clearImageRequest(Context context) {
-        lastAvatarLoadKey = "";
-        if (context == null || imageView == null) return;
-        try {
-            Glide.with(context).clear(imageView);
-        } catch (Exception ignored) {
-        }
-    }
-
     public void showDefaultAvatar(String name) {
         showDefaultAvatar(name, name);
     }
 
     public void showDefaultAvatar(String name, String seed) {
-        clearBoundKeys();
-        clearImageRequest(getContext());
-        forcedFlagCountry = "";
-        setDefaultAvatarInternal(name, seed, false);
-    }
-
-    private void setDefaultAvatarInternal(String name, String seed, boolean keepCurrentFlag) {
-        defaultAvatarSeed = TextUtils.isEmpty(seed) ? name : seed;
         String letter = getAvatarLetter(name);
         defaultAvatarTv.setText(letter);
-
-        String bgKey = safeString(defaultAvatarSeed) + "_" + avatarSize + "_" + avatarCornerSize;
-        if (!TextUtils.equals(lastDefaultBgKey, bgKey)) {
-            defaultAvatarTv.setBackground(makeDefaultAvatarBg(defaultAvatarSeed));
-            lastDefaultBgKey = bgKey;
-        }
-
+        defaultAvatarTv.setBackground(makeDefaultAvatarBg(TextUtils.isEmpty(seed) ? name : seed));
         defaultAvatarTv.setVisibility(VISIBLE);
         imageView.setVisibility(INVISIBLE);
-        resetStatusViews();
-        if (!keepCurrentFlag) {
-            hideFlag();
-        }
+        spotView.setVisibility(GONE);
+        onlineTv.setVisibility(GONE);
+        hideFlag();
     }
 
     public void showAvatarUrl(String avatar, String avatarCacheKey, String fallbackName) {
@@ -196,48 +139,27 @@ public class AvatarView extends FrameLayout {
     }
 
     public void showAvatarUrl(String avatar, String avatarCacheKey, String fallbackName, String fallbackSeed) {
-        showAvatarUrlInternal(avatar, avatarCacheKey, fallbackName, fallbackSeed, false);
-    }
-
-    private void showAvatarUrlInternal(String avatar, String avatarCacheKey, String fallbackName, String fallbackSeed, boolean keepFlagOnFallback) {
-        clearBoundKeys();
-        resetStatusViews();
-        if (!keepFlagOnFallback) {
-            forcedFlagCountry = "";
-        }
-
         if (TextUtils.isEmpty(avatar)) {
-            clearImageRequest(getContext());
-            setDefaultAvatarInternal(fallbackName, fallbackSeed, keepFlagOnFallback);
+            showDefaultAvatar(fallbackName, fallbackSeed);
             return;
         }
-
         prepareImageAvatar();
-        clearForcedFlagAndHide();
+        hideFlag();
         String url = WKApiConfig.getShowUrl(avatar);
-        String displayKey = bindStandaloneDisplayKey("url", url, avatarCacheKey, fallbackSeed);
-        loadAvatarUrlWithFallback(url, avatarCacheKey, fallbackName, fallbackSeed, displayKey, keepFlagOnFallback);
+        loadAvatarUrlWithFallback(url, avatarCacheKey, fallbackName, fallbackSeed);
     }
 
-    private void loadAvatarUrlWithFallback(String url, String avatarCacheKey, String fallbackName, String fallbackSeed, String expectedDisplayKey, boolean keepFlagOnFallback) {
+    private void loadAvatarUrlWithFallback(String url, String avatarCacheKey, String fallbackName, String fallbackSeed) {
         if (TextUtils.isEmpty(url)) {
-            clearImageRequest(getContext());
-            setDefaultAvatarInternal(fallbackName, fallbackSeed, keepFlagOnFallback);
+            showDefaultAvatar(fallbackName, fallbackSeed);
             return;
         }
         Context context = getContext();
         if (context == null) {
-            setDefaultAvatarInternal(fallbackName, fallbackSeed, keepFlagOnFallback);
+            showDefaultAvatar(fallbackName, fallbackSeed);
             return;
         }
-
         Object model = TextUtils.isEmpty(avatarCacheKey) ? url : new MyGlideUrlWithId(url, avatarCacheKey);
-        String loadKey = expectedDisplayKey + "_url_" + url + "_" + safeString(avatarCacheKey);
-        if (TextUtils.equals(lastAvatarLoadKey, loadKey)) {
-            return;
-        }
-        lastAvatarLoadKey = loadKey;
-
         try {
             Glide.with(context)
                     .load(model)
@@ -246,11 +168,7 @@ public class AvatarView extends FrameLayout {
                     .listener(new RequestListener<Drawable>() {
                         @Override
                         public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
-                            post(() -> {
-                                if (!TextUtils.equals(expectedDisplayKey, boundDisplayKey)) return;
-                                lastAvatarLoadKey = "";
-                                setDefaultAvatarInternal(fallbackName, fallbackSeed, keepFlagOnFallback);
-                            });
+                            post(() -> showDefaultAvatar(fallbackName, fallbackSeed));
                             return true;
                         }
 
@@ -261,8 +179,7 @@ public class AvatarView extends FrameLayout {
                     })
                     .into(imageView);
         } catch (Exception e) {
-            lastAvatarLoadKey = "";
-            setDefaultAvatarInternal(fallbackName, fallbackSeed, keepFlagOnFallback);
+            showDefaultAvatar(fallbackName, fallbackSeed);
         }
     }
 
@@ -270,8 +187,7 @@ public class AvatarView extends FrameLayout {
         if (TextUtils.isEmpty(name)) return "#";
         String trim = name.trim();
         if (TextUtils.isEmpty(trim)) return "#";
-        int codePoint = trim.codePointAt(0);
-        return new String(Character.toChars(codePoint)).toUpperCase(Locale.getDefault());
+        return trim.substring(0, 1).toUpperCase(Locale.getDefault());
     }
 
     private GradientDrawable makeDefaultAvatarBg(String seed) {
@@ -304,6 +220,8 @@ public class AvatarView extends FrameLayout {
         flagIv.bringToFront();
     }
 
+
+
     public void setStrokeWidth(float width) {
         imageView.setStrokeWidth(AndroidUtilities.dp(width));
     }
@@ -317,10 +235,6 @@ public class AvatarView extends FrameLayout {
     }
 
     public void setSize(float size, float cornerSize) {
-        if (sizeInited && Float.compare(avatarSize, size) == 0 && Float.compare(avatarCornerSize, cornerSize) == 0) {
-            return;
-        }
-        sizeInited = true;
         avatarSize = size;
         avatarCornerSize = cornerSize;
         imageView.getLayoutParams().width = AndroidUtilities.dp(size);
@@ -334,11 +248,7 @@ public class AvatarView extends FrameLayout {
         defaultAvatarTv.getLayoutParams().width = AndroidUtilities.dp(size);
         defaultAvatarTv.setTextSize(size * 0.38f);
         if (defaultAvatarTv.getVisibility() == VISIBLE) {
-            String bgKey = safeString(defaultAvatarSeed) + "_" + avatarSize + "_" + avatarCornerSize;
-            defaultAvatarTv.setBackground(makeDefaultAvatarBg(defaultAvatarSeed));
-            lastDefaultBgKey = bgKey;
-        } else {
-            lastDefaultBgKey = "";
+            defaultAvatarTv.setBackground(makeDefaultAvatarBg(defaultAvatarTv.getText() == null ? "" : defaultAvatarTv.getText().toString()));
         }
 
         FrameLayout.LayoutParams flagParams = (FrameLayout.LayoutParams) flagIv.getLayoutParams();
@@ -347,99 +257,73 @@ public class AvatarView extends FrameLayout {
         flagParams.width = AndroidUtilities.dp(flagWidth);
         flagParams.height = AndroidUtilities.dp(flagHeight);
         flagParams.gravity = Gravity.BOTTOM | Gravity.START;
-        // 国旗向左探出一点，比完全压在头像内部更接近 Web 版层叠效果。
-        // 如果某个父容器仍然裁剪，需要在对应 item 父布局上额外设置 clipChildren=false / clipToPadding=false。
-        int flagLeftOverhang = Math.max(1, Math.round(size * FLAG_LEFT_OVERHANG_RATIO));
-        int flagBottomInset = Math.max(1, Math.round(size * 0.03f));
-        flagParams.leftMargin = -AndroidUtilities.dp(flagLeftOverhang);
-        flagParams.bottomMargin = AndroidUtilities.dp(flagBottomInset);
+        // 叠在头像左下角，左/下轻微探出，和网页截图里的位置一致。
+        flagParams.leftMargin = -AndroidUtilities.dp(Math.max(2f, size * 0.08f));
+        flagParams.bottomMargin = -AndroidUtilities.dp(Math.max(1f, size * 0.04f));
         flagIv.setLayoutParams(flagParams);
         applyFlagStyle();
 
-        int spotSize = Math.max(6, Math.round(size * 0.15f));
-        int spotInset = Math.max(2, Math.round(size * 0.06f));
+        int spotSize = Math.max(6, Math.round(size * 0.17f));
         FrameLayout.LayoutParams spotParams = (FrameLayout.LayoutParams) spotView.getLayoutParams();
         spotParams.width = AndroidUtilities.dp(spotSize);
         spotParams.height = AndroidUtilities.dp(spotSize);
         spotParams.gravity = Gravity.TOP | Gravity.END;
-        // 头像尺寸变大后，绿点不能贴到容器外沿，否则在 32dp/44dp 卡片头像里会看起来“跑出去”。
-        // 这里按头像尺寸给一点内缩，保证绿点始终压在头像右上角里面。
-        spotParams.rightMargin = AndroidUtilities.dp(spotInset);
-        spotParams.topMargin = AndroidUtilities.dp(spotInset);
+        spotParams.rightMargin = 0;
+        spotParams.topMargin = 0;
         spotView.setLayoutParams(spotParams);
-        spotView.bringToFront();
-        requestLayout();
     }
 
     public void showAvatar(String channelID, byte channelType, String avatarCacheKey) {
-        bindChannelKey(channelID, channelType);
-        resetStatusViews();
-
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
         if (channel != null && isTopicRoomChannel(channel)) {
             showTopicAvatar(channel);
             return;
         }
         if (isTopicRoomId(channelID, channelType)) {
-            clearImageRequest(getContext());
-            setDefaultAvatarInternal(channelID, channelID, false);
+            showDefaultAvatar(channelID, channelID);
             return;
         }
-
         prepareImageAvatar();
-        clearForcedFlagAndHide();
-        String country = channel != null ? getChannelCountry(channel) : getLocalSavedCountry(channelID);
-        updateFlagByCountry(country);
-        if (TextUtils.isEmpty(country)) {
-            tryFetchPersonalChannelCountry(channelID, channelType);
+        if (channel != null) {
+            updateFlagView(channel);
+        } else {
+            updateFlagByCountry(getLocalSavedCountry(channelID));
         }
         String url = getAvatarURL(channelID, channelType);
-        showChannelAvatarImage(url, avatarCacheKey, channelID, channelID);
+        GlideUtils.getInstance().showAvatarImg(getContext(), url, avatarCacheKey, imageView);
     }
 
     public void showAvatar(String channelID, byte channelType, boolean showOnlineStatus) {
-        bindChannelKey(channelID, channelType);
-        resetStatusViews();
-        clearForcedFlagAndHide();
-
+        prepareImageAvatar();
+        spotView.setVisibility(GONE);
+        onlineTv.setVisibility(GONE);
+        hideFlag();
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
         if (channel != null) {
             showAvatar(channel, showOnlineStatus);
         } else if (isTopicRoomId(channelID, channelType)) {
-            clearImageRequest(getContext());
-            setDefaultAvatarInternal(channelID, channelID, false);
+            showDefaultAvatar(channelID, channelID);
         } else {
-            prepareImageAvatar();
-            String country = getLocalSavedCountry(channelID);
-            updateFlagByCountry(country);
-            if (TextUtils.isEmpty(country)) {
-                tryFetchPersonalChannelCountry(channelID, channelType);
-            }
+            updateFlagByCountry(getLocalSavedCountry(channelID));
             String url = getAvatarURL(channelID, channelType);
-            showChannelAvatarImage(url, "", channelID, channelID);
+            GlideUtils.getInstance().showAvatarImg(getContext(), url, "", imageView);
         }
     }
 
     public void showAvatar(String channelID, byte channelType) {
-        bindChannelKey(channelID, channelType);
-        resetStatusViews();
-        clearForcedFlagAndHide();
-
+        prepareImageAvatar();
+        spotView.setVisibility(GONE);
+        onlineTv.setVisibility(GONE);
+        hideFlag();
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
         if (channel != null) {
             showAvatar(channel, false);
         } else if (isTopicRoomId(channelID, channelType)) {
-            clearImageRequest(getContext());
-            setDefaultAvatarInternal(channelID, channelID, false);
+            showDefaultAvatar(channelID, channelID);
         } else {
-            prepareImageAvatar();
-            String country = getLocalSavedCountry(channelID);
-            updateFlagByCountry(country);
-            if (TextUtils.isEmpty(country)) {
-                tryFetchPersonalChannelCountry(channelID, channelType);
-            }
+            updateFlagByCountry(getLocalSavedCountry(channelID));
             String url = getAvatarURL(channelID, channelType);
-            showChannelAvatarImage(url, "", channelID, channelID);
+            GlideUtils.getInstance().showAvatarImg(getContext(), url, "", imageView);
         }
     }
 
@@ -453,12 +337,7 @@ public class AvatarView extends FrameLayout {
             showTopicAvatar(channel);
             return;
         }
-
-        bindChannelKey(channel.channelID, channel.channelType);
         prepareImageAvatar();
-        resetStatusViews();
-        clearForcedFlagAndHide();
-
         String avatarCacheKey = channel.avatarCacheKey;
         String url;
         if (!TextUtils.isEmpty(channel.avatar) && channel.avatar.contains("/")) {
@@ -466,86 +345,35 @@ public class AvatarView extends FrameLayout {
         } else {
             url = getAvatarURL(channel.channelID, channel.channelType);
         }
-        String fallbackName = firstNotEmpty(channel.channelRemark, channel.channelName, channel.channelID);
-        showChannelAvatarImage(url, avatarCacheKey, fallbackName, channel.channelID);
-
-        String country = getChannelCountry(channel);
-        updateFlagByCountry(country);
-        if (TextUtils.isEmpty(country)) {
-            tryFetchPersonalChannelCountry(channel.channelID, channel.channelType);
-        }
-
+        GlideUtils.getInstance().showAvatarImg(imageView.getContext(), url, avatarCacheKey, imageView);
+        updateFlagView(channel);
         // 头像上只显示更小的在线绿点；离线的“最后在线时间”不再显示在头像右下角。
-        spotView.setVisibility(showOnlineStatus && channel.online == 1 ? VISIBLE : GONE);
+        if (showOnlineStatus && channel.online == 1) {
+            spotView.setVisibility(VISIBLE);
+        } else {
+            spotView.setVisibility(GONE);
+        }
         onlineTv.setText("");
         onlineTv.setVisibility(GONE);
     }
 
     public void showTopicAvatar(WKChannel channel) {
         if (channel == null) return;
-        bindChannelKey(channel.channelID, channel.channelType);
-        resetStatusViews();
-
         String showName = firstNotEmpty(channel.channelRemark, channel.channelName,
                 getTopicExtraString(channel, "topic_title"), getTopicExtraString(channel, "creator_name"));
         String creatorUid = getTopicExtraString(channel, "creator_uid");
         String avatar = getTopicAvatar(channel, creatorUid);
         String avatarCacheKey = firstNotEmpty(getTopicExtraString(channel, "creator_avatar_cache_key"), channel.avatarCacheKey);
         if (TextUtils.isEmpty(avatar)) {
-            clearImageRequest(getContext());
-            setDefaultAvatarInternal(showName, firstNotEmpty(creatorUid, showName, channel.channelID), true);
+            showDefaultAvatar(showName, firstNotEmpty(creatorUid, showName, channel.channelID));
         } else {
-            showAvatarUrlInternal(avatar, avatarCacheKey, showName, firstNotEmpty(creatorUid, showName, channel.channelID), true);
+            showAvatarUrl(avatar, avatarCacheKey, showName, firstNotEmpty(creatorUid, showName, channel.channelID));
         }
         updateTopicFlagView(channel);
-        resetStatusViews();
+        spotView.setVisibility(GONE);
+        onlineTv.setVisibility(GONE);
     }
 
-    private void showChannelAvatarImage(String url, String avatarCacheKey, String fallbackName, String fallbackSeed) {
-        Context context = getContext();
-        if (context == null || TextUtils.isEmpty(url)) {
-            clearImageRequest(context);
-            setDefaultAvatarInternal(fallbackName, fallbackSeed, true);
-            return;
-        }
-
-        String expectedDisplayKey = boundDisplayKey;
-        String loadKey = expectedDisplayKey + "_channel_" + safeString(url) + "_" + safeString(avatarCacheKey);
-        if (TextUtils.equals(lastAvatarLoadKey, loadKey)) {
-            return;
-        }
-        lastAvatarLoadKey = loadKey;
-
-        Object model = TextUtils.isEmpty(avatarCacheKey) || isLocalFilePath(url)
-                ? url
-                : new MyGlideUrlWithId(url, avatarCacheKey);
-        try {
-            Glide.with(context)
-                    .load(model)
-                    .dontAnimate()
-                    .apply(GlideRequestOptions.getInstance().normalRequestOption())
-                    .listener(new RequestListener<Drawable>() {
-                        @Override
-                        public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
-                            post(() -> {
-                                if (!TextUtils.equals(expectedDisplayKey, boundDisplayKey)) return;
-                                lastAvatarLoadKey = "";
-                                setDefaultAvatarInternal(fallbackName, fallbackSeed, true);
-                            });
-                            return true;
-                        }
-
-                        @Override
-                        public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
-                            return false;
-                        }
-                    })
-                    .into(imageView);
-        } catch (Exception e) {
-            lastAvatarLoadKey = "";
-            setDefaultAvatarInternal(fallbackName, fallbackSeed, true);
-        }
-    }
 
     private void updateFlagView(WKChannel channel) {
         updateFlagByCountry(getChannelCountry(channel));
@@ -557,13 +385,9 @@ public class AvatarView extends FrameLayout {
             hideFlag();
             return;
         }
-        if (currentFlagResId != flagResId) {
-            flagIv.setImageResource(flagResId);
-            currentFlagResId = flagResId;
-        }
-        if (flagIv.getVisibility() != VISIBLE) {
-            flagIv.setVisibility(VISIBLE);
-        }
+        flagIv.setImageResource(flagResId);
+        applyFlagStyle();
+        flagIv.setVisibility(VISIBLE);
         flagIv.bringToFront();
     }
 
@@ -571,8 +395,7 @@ public class AvatarView extends FrameLayout {
      * 外部列表已有国籍/国旗字段时可直接调用，比如聊天室 member.flag/country_code。
      */
     public void showFlag(String countryOrFlag) {
-        forcedFlagCountry = countryOrFlag == null ? "" : countryOrFlag;
-        updateFlagByCountry(forcedFlagCountry);
+        updateFlagByCountry(countryOrFlag);
     }
 
     private void updateTopicFlagView(WKChannel channel) {
@@ -589,20 +412,11 @@ public class AvatarView extends FrameLayout {
 
     private void hideFlag() {
         if (flagIv != null) {
-            if (currentFlagResId != 0) {
-                flagIv.setImageDrawable(null);
-                currentFlagResId = 0;
-            }
-            if (flagIv.getVisibility() != GONE) {
-                flagIv.setVisibility(GONE);
-            }
+            flagIv.setImageDrawable(null);
+            flagIv.setVisibility(GONE);
         }
     }
 
-    private void clearForcedFlagAndHide() {
-        forcedFlagCountry = "";
-        hideFlag();
-    }
 
     private String getChannelCountry(WKChannel channel) {
         if (channel == null) return "";
@@ -641,17 +455,6 @@ public class AvatarView extends FrameLayout {
     }
 
     private int countryToFlagRes(String country) {
-        if (TextUtils.isEmpty(country)) return 0;
-        String cacheKey = country.trim().toLowerCase(Locale.US);
-        if (TextUtils.isEmpty(cacheKey)) return 0;
-        Integer cached = FLAG_RES_CACHE.get(cacheKey);
-        if (cached != null) return cached;
-        int resId = countryToFlagResUncached(country);
-        FLAG_RES_CACHE.put(cacheKey, resId);
-        return resId;
-    }
-
-    private int countryToFlagResUncached(String country) {
         if (TextUtils.isEmpty(country)) return 0;
         String value = country.trim();
         if (TextUtils.isEmpty(value)) return 0;
@@ -808,6 +611,7 @@ public class AvatarView extends FrameLayout {
         }
     }
 
+
     private String getTopicAvatar(WKChannel channel, String creatorUid) {
         if (channel == null) return "";
         String creatorAvatar = firstNotEmpty(getTopicExtraString(channel, "creator_avatar"));
@@ -873,83 +677,14 @@ public class AvatarView extends FrameLayout {
         return "";
     }
 
-    private void bindChannelKey(String channelID, byte channelType) {
-        boundChannelKey = buildChannelKey(channelID, channelType);
-        boundDisplayKey = "channel_" + boundChannelKey;
-    }
-
-    private String bindStandaloneDisplayKey(String type, String value, String avatarCacheKey, String fallbackSeed) {
-        String displayKey = type + "_" + safeString(value) + "_" + safeString(avatarCacheKey) + "_" + safeString(fallbackSeed);
-        boundDisplayKey = displayKey;
-        return displayKey;
-    }
-
-    private void clearBoundKeys() {
-        boundChannelKey = "";
-        boundDisplayKey = "";
-    }
-
-    private String buildChannelKey(String channelID, byte channelType) {
-        String uid = WKConfig.getInstance().getUid();
-        return safeString(uid) + "_" + channelType + "_" + safeString(channelID);
-    }
-
-    private String safeString(String value) {
-        return value == null ? "" : value;
-    }
-
-    private boolean isLocalFilePath(String url) {
-        if (TextUtils.isEmpty(url)) return false;
-        return url.startsWith("/") || url.startsWith("file://");
-    }
-
-    private void tryFetchPersonalChannelCountry(String channelID, byte channelType) {
-        if (TextUtils.isEmpty(channelID) || channelType != WKChannelType.PERSONAL) return;
-        String uid = WKConfig.getInstance().getUid();
-        if (!TextUtils.isEmpty(uid) && channelID.equals(uid)) return;
-
-        String key = buildChannelKey(channelID, channelType);
-        synchronized (COUNTRY_FETCH_LOCK) {
-            if (FETCHED_PERSONAL_COUNTRY_KEYS.containsKey(key)) return;
-            if (!FETCHING_PERSONAL_COUNTRY_KEYS.add(key)) return;
-        }
-
-        WKCommonModel.getInstance().getChannel(channelID, channelType, (code, msg, entity) -> {
-            WKChannel refreshed = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
-            String country = getChannelCountry(refreshed);
-            boolean success = entity != null || !TextUtils.isEmpty(country);
-
-            synchronized (COUNTRY_FETCH_LOCK) {
-                FETCHING_PERSONAL_COUNTRY_KEYS.remove(key);
-                if (success) {
-                    FETCHED_PERSONAL_COUNTRY_KEYS.put(key, true);
-                }
-            }
-
-            if (TextUtils.isEmpty(country)) return;
-            post(() -> {
-                if (TextUtils.equals(key, boundChannelKey)) {
-                    updateFlagByCountry(country);
-                }
-            });
-        });
-    }
-
-    public static void clearPersonalCountryFetchCache() {
-        synchronized (COUNTRY_FETCH_LOCK) {
-            FETCHING_PERSONAL_COUNTRY_KEYS.clear();
-            FETCHED_PERSONAL_COUNTRY_KEYS.clear();
-        }
-        FLAG_RES_CACHE.clear();
-    }
-
     private String getAvatarURL(String channelID, byte channelType) {
         String filePath = WKConstants.avatarCacheDir + channelType + "_" + channelID;
         File file = new File(filePath);
         if (file.exists()) {
             return filePath;
         } else {
-            return WKApiConfig.getShowAvatar(channelID, channelType);
+            String url = WKApiConfig.getShowAvatar(channelID, channelType);
+            return url;
         }
     }
 
