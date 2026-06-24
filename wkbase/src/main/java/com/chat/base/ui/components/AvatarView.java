@@ -16,6 +16,7 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 
 import com.chat.base.R;
+import com.chat.base.common.WKCommonModel;
 import com.chat.base.config.WKApiConfig;
 import com.chat.base.config.WKConfig;
 import com.chat.base.config.WKConstants;
@@ -34,6 +35,7 @@ import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.shape.CornerFamily;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
+import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.io.File;
 import java.util.Locale;
@@ -49,6 +51,8 @@ public class AvatarView extends FrameLayout {
     private static final int FLAG_MIN_WIDTH_DP = 16;
     private static final int FLAG_MIN_HEIGHT_DP = 11;
     private static final String PROFILE_EXTRA_PREF = "front_profile_extra";
+    private String forcedFlagCountry = "";
+    private boolean isFetchingPersonalCountry = false;
     private float avatarSize = 40f;
     private float avatarCornerSize = 20f;
 
@@ -131,7 +135,7 @@ public class AvatarView extends FrameLayout {
         imageView.setVisibility(INVISIBLE);
         spotView.setVisibility(GONE);
         onlineTv.setVisibility(GONE);
-        hideFlag();
+        restoreForcedFlagOrHide();
     }
 
     public void showAvatarUrl(String avatar, String avatarCacheKey, String fallbackName) {
@@ -144,7 +148,7 @@ public class AvatarView extends FrameLayout {
             return;
         }
         prepareImageAvatar();
-        hideFlag();
+        clearForcedFlagAndHide();
         String url = WKApiConfig.getShowUrl(avatar);
         loadAvatarUrlWithFallback(url, avatarCacheKey, fallbackName, fallbackSeed);
     }
@@ -257,9 +261,11 @@ public class AvatarView extends FrameLayout {
         flagParams.width = AndroidUtilities.dp(flagWidth);
         flagParams.height = AndroidUtilities.dp(flagHeight);
         flagParams.gravity = Gravity.BOTTOM | Gravity.START;
-        // 叠在头像左下角，左/下轻微探出，和网页截图里的位置一致。
-        flagParams.leftMargin = -AndroidUtilities.dp(Math.max(2f, size * 0.08f));
-        flagParams.bottomMargin = -AndroidUtilities.dp(Math.max(1f, size * 0.04f));
+        // 小头像在列表里会被父布局裁剪，国旗必须放在头像 View 内侧，不能再用负 margin 探出。
+        // 这样 32dp 聊天室侧边头像、44dp 创建者头像、会话列表头像都能稳定显示。
+        int flagInset = Math.max(1, Math.round(size * 0.03f));
+        flagParams.leftMargin = AndroidUtilities.dp(flagInset);
+        flagParams.bottomMargin = AndroidUtilities.dp(flagInset);
         flagIv.setLayoutParams(flagParams);
         applyFlagStyle();
 
@@ -288,10 +294,11 @@ public class AvatarView extends FrameLayout {
             return;
         }
         prepareImageAvatar();
-        if (channel != null) {
-            updateFlagView(channel);
-        } else {
-            updateFlagByCountry(getLocalSavedCountry(channelID));
+        clearForcedFlagAndHide();
+        String country = channel != null ? getChannelCountry(channel) : getLocalSavedCountry(channelID);
+        updateFlagByCountry(country);
+        if (TextUtils.isEmpty(country)) {
+            tryFetchPersonalChannelCountry(channelID, channelType);
         }
         String url = getAvatarURL(channelID, channelType);
         GlideUtils.getInstance().showAvatarImg(getContext(), url, avatarCacheKey, imageView);
@@ -301,14 +308,18 @@ public class AvatarView extends FrameLayout {
         prepareImageAvatar();
         spotView.setVisibility(GONE);
         onlineTv.setVisibility(GONE);
-        hideFlag();
+        clearForcedFlagAndHide();
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
         if (channel != null) {
             showAvatar(channel, showOnlineStatus);
         } else if (isTopicRoomId(channelID, channelType)) {
             showDefaultAvatar(channelID, channelID);
         } else {
-            updateFlagByCountry(getLocalSavedCountry(channelID));
+            String country = getLocalSavedCountry(channelID);
+            updateFlagByCountry(country);
+            if (TextUtils.isEmpty(country)) {
+                tryFetchPersonalChannelCountry(channelID, channelType);
+            }
             String url = getAvatarURL(channelID, channelType);
             GlideUtils.getInstance().showAvatarImg(getContext(), url, "", imageView);
         }
@@ -318,14 +329,18 @@ public class AvatarView extends FrameLayout {
         prepareImageAvatar();
         spotView.setVisibility(GONE);
         onlineTv.setVisibility(GONE);
-        hideFlag();
+        clearForcedFlagAndHide();
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
         if (channel != null) {
             showAvatar(channel, false);
         } else if (isTopicRoomId(channelID, channelType)) {
             showDefaultAvatar(channelID, channelID);
         } else {
-            updateFlagByCountry(getLocalSavedCountry(channelID));
+            String country = getLocalSavedCountry(channelID);
+            updateFlagByCountry(country);
+            if (TextUtils.isEmpty(country)) {
+                tryFetchPersonalChannelCountry(channelID, channelType);
+            }
             String url = getAvatarURL(channelID, channelType);
             GlideUtils.getInstance().showAvatarImg(getContext(), url, "", imageView);
         }
@@ -342,6 +357,7 @@ public class AvatarView extends FrameLayout {
             return;
         }
         prepareImageAvatar();
+        clearForcedFlagAndHide();
         String avatarCacheKey = channel.avatarCacheKey;
         String url;
         if (!TextUtils.isEmpty(channel.avatar) && channel.avatar.contains("/")) {
@@ -350,7 +366,11 @@ public class AvatarView extends FrameLayout {
             url = getAvatarURL(channel.channelID, channel.channelType);
         }
         GlideUtils.getInstance().showAvatarImg(imageView.getContext(), url, avatarCacheKey, imageView);
-        updateFlagView(channel);
+        String country = getChannelCountry(channel);
+        updateFlagByCountry(country);
+        if (TextUtils.isEmpty(country)) {
+            tryFetchPersonalChannelCountry(channel.channelID, channel.channelType);
+        }
         // 头像上只显示更小的在线绿点；离线的“最后在线时间”不再显示在头像右下角。
         if (showOnlineStatus && channel.online == 1) {
             spotView.setVisibility(VISIBLE);
@@ -399,7 +419,8 @@ public class AvatarView extends FrameLayout {
      * 外部列表已有国籍/国旗字段时可直接调用，比如聊天室 member.flag/country_code。
      */
     public void showFlag(String countryOrFlag) {
-        updateFlagByCountry(countryOrFlag);
+        forcedFlagCountry = countryOrFlag == null ? "" : countryOrFlag;
+        updateFlagByCountry(forcedFlagCountry);
     }
 
     private void updateTopicFlagView(WKChannel channel) {
@@ -418,6 +439,19 @@ public class AvatarView extends FrameLayout {
         if (flagIv != null) {
             flagIv.setImageDrawable(null);
             flagIv.setVisibility(GONE);
+        }
+    }
+
+    private void clearForcedFlagAndHide() {
+        forcedFlagCountry = "";
+        hideFlag();
+    }
+
+    private void restoreForcedFlagOrHide() {
+        if (!TextUtils.isEmpty(forcedFlagCountry)) {
+            updateFlagByCountry(forcedFlagCountry);
+        } else {
+            hideFlag();
         }
     }
 
@@ -679,6 +713,22 @@ public class AvatarView extends FrameLayout {
             if (!TextUtils.isEmpty(value)) return value;
         }
         return "";
+    }
+
+    private void tryFetchPersonalChannelCountry(String channelID, byte channelType) {
+        if (TextUtils.isEmpty(channelID) || channelType != WKChannelType.PERSONAL) return;
+        String uid = WKConfig.getInstance().getUid();
+        if (!TextUtils.isEmpty(uid) && channelID.equals(uid)) return;
+        if (isFetchingPersonalCountry) return;
+        isFetchingPersonalCountry = true;
+        WKCommonModel.getInstance().getChannel(channelID, channelType, (code, msg, entity) -> {
+            isFetchingPersonalCountry = false;
+            WKChannel refreshed = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
+            String country = getChannelCountry(refreshed);
+            if (!TextUtils.isEmpty(country)) {
+                updateFlagByCountry(country);
+            }
+        });
     }
 
     private String getAvatarURL(String channelID, byte channelType) {
