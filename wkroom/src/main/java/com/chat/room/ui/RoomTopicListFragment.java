@@ -50,6 +50,9 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     private static final String EXTRA_CREATOR_COUNTRY_CODE = "creator_country_code";
     private static final String EXTRA_COUNTRY_CODE = "country_code";
     private static final String ENDPOINT_SHOW_TOPIC_ROOMS = "peipe_show_topic_rooms";
+    private static final String ENDPOINT_SWITCH_HOME_PAGE = "peipe_switch_home_page";
+    private static final int PAGE_MESSAGES = 0;
+    private static final int PAGE_CONTACTS = 2;
     private static final String DEFAULT_LANGUAGE = "中文";
     private static final String TAG_PREFIX = "# ";
     private static final int EDGE_SWIPE_MAX_START_DP = 32;
@@ -183,15 +186,13 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
             case MotionEvent.ACTION_DOWN:
                 swipeStartX = event.getRawX();
                 swipeStartY = event.getRawY();
-                trackingBackSwipe = swipeStartX <= AndroidUtilities.dp(EDGE_SWIPE_MAX_START_DP);
+                // 聊天首页的二级页签是：消息(0) -> 聊天室(1) -> 联系人(2)。
+                // 这里不要只跟踪左边缘返回手势，否则聊天室列表/空白区会吃掉事件，导致无法继续左滑到联系人。
+                trackingBackSwipe = true;
                 backSwipeTriggered = false;
-                return !fromRecyclerView && trackingBackSwipe;
+                return !fromRecyclerView;
             case MotionEvent.ACTION_MOVE:
-                if (!trackingBackSwipe || backSwipeTriggered) return !fromRecyclerView && backSwipeTriggered;
-                if (fromRecyclerView && recyclerView != null && recyclerView.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) {
-                    trackingBackSwipe = false;
-                    return false;
-                }
+                if (!trackingBackSwipe || backSwipeTriggered) return backSwipeTriggered;
                 float dx = event.getRawX() - swipeStartX;
                 float dy = event.getRawY() - swipeStartY;
                 float absDx = Math.abs(dx);
@@ -200,16 +201,22 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
                     trackingBackSwipe = false;
                     return false;
                 }
-                if (dx > AndroidUtilities.dp(SWIPE_TRIGGER_DP) && absDx > absDy * SWIPE_HORIZONTAL_RATIO) {
+                if (absDx > AndroidUtilities.dp(SWIPE_TRIGGER_DP) && absDx > absDy * SWIPE_HORIZONTAL_RATIO) {
                     backSwipeTriggered = true;
                     trackingBackSwipe = false;
-                    EndpointManager.getInstance().invoke(ENDPOINT_SHOW_TOPIC_ROOMS, false);
+                    if (dx > 0) {
+                        // 聊天室右滑回消息。保留旧 Endpoint 兼容老逻辑。
+                        EndpointManager.getInstance().invoke(ENDPOINT_SHOW_TOPIC_ROOMS, false);
+                    } else {
+                        // 聊天室左滑到联系人。原代码缺这一段，所以联系人页切不过去。
+                        EndpointManager.getInstance().invoke(ENDPOINT_SWITCH_HOME_PAGE, PAGE_CONTACTS);
+                    }
                     return true;
                 }
-                return !fromRecyclerView && trackingBackSwipe;
+                return !fromRecyclerView && absDx > AndroidUtilities.dp(8);
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
-                boolean consume = !fromRecyclerView && backSwipeTriggered;
+                boolean consume = backSwipeTriggered;
                 trackingBackSwipe = false;
                 backSwipeTriggered = false;
                 return consume;
