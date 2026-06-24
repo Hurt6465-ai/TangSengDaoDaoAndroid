@@ -263,14 +263,18 @@ public class AvatarView extends FrameLayout {
         flagIv.setLayoutParams(flagParams);
         applyFlagStyle();
 
-        int spotSize = Math.max(6, Math.round(size * 0.17f));
+        int spotSize = Math.max(6, Math.round(size * 0.15f));
+        int spotInset = Math.max(2, Math.round(size * 0.06f));
         FrameLayout.LayoutParams spotParams = (FrameLayout.LayoutParams) spotView.getLayoutParams();
         spotParams.width = AndroidUtilities.dp(spotSize);
         spotParams.height = AndroidUtilities.dp(spotSize);
         spotParams.gravity = Gravity.TOP | Gravity.END;
-        spotParams.rightMargin = 0;
-        spotParams.topMargin = 0;
+        // 头像尺寸变大后，绿点不能贴到容器外沿，否则在 32dp/44dp 卡片头像里会看起来“跑出去”。
+        // 这里按头像尺寸给一点内缩，保证绿点始终压在头像右上角里面。
+        spotParams.rightMargin = AndroidUtilities.dp(spotInset);
+        spotParams.topMargin = AndroidUtilities.dp(spotInset);
         spotView.setLayoutParams(spotParams);
+        spotView.bringToFront();
     }
 
     public void showAvatar(String channelID, byte channelType, String avatarCacheKey) {
