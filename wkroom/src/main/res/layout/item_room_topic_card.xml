@@ -8,6 +8,8 @@
     android:layout_marginEnd="20dp"
     android:layout_marginBottom="4dp"
     android:background="@drawable/room_card_fallback"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:clipToOutline="true">
 
     <ImageView
@@ -114,6 +116,8 @@
                 android:layout_marginStart="12dp"
                 android:layout_marginEnd="14dp"
                 android:gravity="center_vertical|end"
+                android:clipChildren="false"
+                android:clipToPadding="false"
                 android:orientation="horizontal">
 
                 <com.chat.base.ui.components.AvatarView
