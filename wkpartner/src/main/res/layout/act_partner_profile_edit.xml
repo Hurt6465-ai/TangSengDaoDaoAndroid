@@ -27,20 +27,11 @@
                 android:textColor="#666666"
                 android:textSize="14sp" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/partner_basic_profile"
-                android:textColor="#222222"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
             <EditText
                 android:id="@+id/nameEt"
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="16dp"
                 android:background="#FFFFFFFF"
                 android:hint="@string/partner_name"
                 android:maxLines="1"
@@ -118,15 +109,6 @@
                 android:textColorHint="#999999"
                 android:textSize="15sp" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
-                android:text="@string/partner_language_profile"
-                android:textColor="#222222"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
             <EditText
                 android:id="@+id/nativeLangEt"
                 android:layout_width="match_parent"
@@ -165,15 +147,6 @@
                 android:textColor="#999999"
                 android:textSize="12sp" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
-                android:text="@string/partner_page_profile"
-                android:textColor="#222222"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
             <EditText
                 android:id="@+id/introEt"
                 android:layout_width="match_parent"
@@ -186,56 +159,6 @@
                 android:textColor="#222222"
                 android:textColorHint="#999999"
                 android:textSize="15sp" />
-
-            <EditText
-                android:id="@+id/tagsEt"
-                android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:layout_marginTop="10dp"
-                android:background="#FFFFFFFF"
-                android:hint="@string/partner_tags_hint"
-                android:maxLines="1"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:textColor="#222222"
-                android:textColorHint="#999999"
-                android:textSize="15sp" />
-
-            <EditText
-                android:id="@+id/coverEt"
-                android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:layout_marginTop="10dp"
-                android:background="#FFFFFFFF"
-                android:hint="@string/partner_cover_hint"
-                android:maxLines="1"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:textColor="#222222"
-                android:textColorHint="#999999"
-                android:textSize="15sp" />
-
-            <EditText
-                android:id="@+id/imagesEt"
-                android:layout_width="match_parent"
-                android:layout_height="50dp"
-                android:layout_marginTop="10dp"
-                android:background="#FFFFFFFF"
-                android:hint="@string/partner_images_hint"
-                android:maxLines="1"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:textColor="#222222"
-                android:textColorHint="#999999"
-                android:textSize="15sp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/partner_image_edit_tip"
-                android:textColor="#999999"
-                android:textSize="12sp" />
 
             <TextView
                 android:id="@+id/saveBtn"
