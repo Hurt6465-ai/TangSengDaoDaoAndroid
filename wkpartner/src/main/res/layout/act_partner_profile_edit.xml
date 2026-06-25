@@ -225,7 +225,8 @@
                 android:layout_height="150dp"
                 android:layout_marginTop="14dp"
                 android:background="@drawable/bg_partner_photo_placeholder"
-                android:scaleType="centerCrop" />
+                android:scaleType="centerCrop"
+                android:src="@drawable/bg_partner_cover_default" />
 
             <TextView
                 android:id="@+id/coverUploadBtn"
