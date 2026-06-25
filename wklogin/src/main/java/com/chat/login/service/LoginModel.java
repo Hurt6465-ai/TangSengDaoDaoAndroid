@@ -238,6 +238,10 @@ public class LoginModel extends WKBaseModel {
     public void updateUserInfo(String key, String value, final ICommonListener iCommonListener) {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put(key, value);
+        updateUserInfo(jsonObject, iCommonListener);
+    }
+
+    public void updateUserInfo(JSONObject jsonObject, final ICommonListener iCommonListener) {
         request(createService(LoginService.class).updateUserInfo(jsonObject), new IRequestResultListener<>() {
             @Override
             public void onSuccess(CommonResponse result) {
