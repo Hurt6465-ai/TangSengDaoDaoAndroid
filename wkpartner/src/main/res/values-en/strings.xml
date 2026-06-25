@@ -1,7 +1,7 @@
 <resources>
     <string name="partner_profile">Partner Profile</string>
     <string name="partner_edit_profile">Edit Profile</string>
-    <string name="partner_edit_profile_tips">This page reuses the same profile fields as registration: country, native language, learning language and intro are saved to the user profile, not a separate copy.</string>
+    <string name="partner_edit_profile_tips">This page reuses the same backend fields as registration. Country, languages and birthday use pickers; tags and images are saved to server fields.</string>
     <string name="partner_say_hello">Say Hello</string>
     <string name="partner_hello_sent">Sent</string>
     <string name="partner_send_message">Message</string>
@@ -11,6 +11,7 @@
     <string name="partner_intro">Intro</string>
     <string name="partner_profile_intro_empty">No intro yet.</string>
     <string name="partner_tags">Tags</string>
+    <string name="partner_photos">Photos</string>
     <string name="partner_teacher">Teacher</string>
     <string name="partner_admin">Admin</string>
     <string name="partner_official">Official</string>
@@ -18,20 +19,28 @@
     <string name="partner_name">Name</string>
     <string name="partner_name_required">Name is required</string>
     <string name="partner_country">Country</string>
-    <string name="partner_country_required">Please choose a country</string>
     <string name="partner_choose_country">Choose country</string>
+    <string name="partner_country_required">Choose country</string>
     <string name="partner_sex">Gender</string>
     <string name="partner_sex_male">Male</string>
     <string name="partner_sex_female">Female</string>
     <string name="partner_sex_private">Private</string>
-    <string name="partner_birthday_hint">Birthday, e.g. 2000-01-01</string>
-    <string name="partner_native_language_hint">Native language, e.g. MY</string>
-    <string name="partner_native_language_required">Native language is required</string>
-    <string name="partner_learning_language_hint">Learning languages, e.g. ZH EN</string>
-    <string name="partner_learning_language_required">Learning language is required</string>
-    <string name="partner_language_edit_tip">Use uppercase language codes. Separate multiple codes with spaces, e.g. MY or ZH EN.</string>
-    <string name="partner_intro_hint">Introduce yourself, what language you want to practice, and what you like to talk about.</string>
+    <string name="partner_birthday">Birthday</string>
+    <string name="partner_choose_birthday">Choose birthday</string>
+    <string name="partner_native_language">Native language</string>
+    <string name="partner_learning_language">Learning languages</string>
+    <string name="partner_choose_native_language">Choose native language</string>
+    <string name="partner_choose_learning_language">Choose learning languages</string>
+    <string name="partner_native_language_required">Choose native language</string>
+    <string name="partner_learning_language_required">Choose learning languages</string>
+    <string name="partner_intro_hint">Introduce yourself and what you want to practice.</string>
+    <string name="partner_tags_hint">Tags, e.g. music travel food</string>
+    <string name="partner_cover_hint">Cover image URL</string>
+    <string name="partner_images_hint">Photo URLs, separated by spaces</string>
+    <string name="partner_server_image_tip">This version saves to profile_cover/profile_images server fields. Local upload will be connected separately.</string>
     <string name="partner_save">Save</string>
     <string name="partner_save_success">Saved</string>
     <string name="partner_save_failed">Save failed</string>
+    <string name="partner_confirm">OK</string>
+    <string name="partner_cancel">Cancel</string>
 </resources>
