@@ -3,7 +3,6 @@
     android:height="16dp"
     android:viewportWidth="32"
     android:viewportHeight="16">
-    <!-- 双线两个箭头：上方右箭头，下方左箭头。不要使用字体符号，避免不同机型显示成四根刺。 -->
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#CCFFFFFF"
