@@ -241,6 +241,10 @@ public class LoginModel extends WKBaseModel {
         updateUserInfo(jsonObject, iCommonListener);
     }
 
+    /**
+     * 批量更新用户资料。完善资料页需要一次提交 country_code/country，
+     * 否则注册后服务端 user.country_code 为空，聊天室头像就没有国旗。
+     */
     public void updateUserInfo(JSONObject jsonObject, final ICommonListener iCommonListener) {
         request(createService(LoginService.class).updateUserInfo(jsonObject), new IRequestResultListener<>() {
             @Override
