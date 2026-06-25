@@ -1,6 +1,7 @@
 package com.chat.base.ui.components;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -48,13 +49,13 @@ public class AvatarView extends FrameLayout {
     public TextView defaultAvatarTv;
     public View spotView;
     public TextView onlineTv;
-    public ImageView flagIv;
+    public ShapeableImageView flagIv;
 
-    private static final float FLAG_WIDTH_RATIO = 0.42f;
-    private static final float FLAG_HEIGHT_RATIO = 2f / 3f;
-    private static final float FLAG_LEFT_OVERHANG_RATIO = 0.08f;
-    private static final int FLAG_MIN_WIDTH_DP = 16;
-    private static final int FLAG_MIN_HEIGHT_DP = 11;
+    private static final float FLAG_SIZE_RATIO = 0.40f;
+    private static final float FLAG_EDGE_INSET_RATIO = 0.00f; // 0=嵌在头像边缘；负数=向左下角外浮
+    private static final float FLAG_STROKE_DP = 1.5f;
+    private static final int FLAG_MIN_SIZE_DP = 15;
+    private static final int FLAG_DEFAULT_SIZE_DP = 16;
     private static final String PROFILE_EXTRA_PREF = "front_profile_extra";
 
     private static final Object COUNTRY_FETCH_LOCK = new Object();
@@ -127,15 +128,15 @@ public class AvatarView extends FrameLayout {
         // 不再把“最后在线时间”压在头像右下角，聊天页/列表需要时间时放到文字区域显示。
         onlineTv.setVisibility(GONE);
 
-        flagIv = new ImageView(getContext());
-        flagIv.setScaleType(ImageView.ScaleType.FIT_XY);
+        flagIv = new ShapeableImageView(getContext());
+        flagIv.setScaleType(ImageView.ScaleType.CENTER_CROP);
         flagIv.setAdjustViewBounds(false);
         applyFlagStyle();
         flagIv.setVisibility(GONE);
 
         addView(imageView, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
         addView(defaultAvatarTv, LayoutHelper.createFrame(40, 40, Gravity.CENTER));
-        addView(flagIv, LayoutHelper.createFrame(17, 11, Gravity.BOTTOM | Gravity.START, 0, 0, 0, 0));
+        addView(flagIv, LayoutHelper.createFrame(FLAG_DEFAULT_SIZE_DP, FLAG_DEFAULT_SIZE_DP, Gravity.BOTTOM | Gravity.START, 0, 0, 0, 0));
         addView(spotView, LayoutHelper.createFrame(9, 9, Gravity.TOP | Gravity.END, 0, 0, 0, 0));
         addView(onlineTv, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END, 0, 0, 0, 0));
         setSize(40);
@@ -294,13 +295,19 @@ public class AvatarView extends FrameLayout {
 
     private void applyFlagStyle() {
         if (flagIv == null) return;
-        // 稳定版不用 TextView/emoji，直接用本地 PNG 资源，避免系统 emoji 字体和 GPU 合成造成发灰/半透明。
-        // 这里保持纯国旗：无圆形底、无阴影、无 tint、无 alpha、按 3:2 View 尺寸直接显示，不走裁剪。
+        // 使用纯国旗资源（PNG / Android vector drawable XML 均可），白边由 View 自己画。
+        // 不要再使用“带白边的图片素材”，否则不同头像大小下白边会显得不一致。
         flagIv.setAlpha(1f);
         flagIv.setBackground(null);
         flagIv.setColorFilter(null);
         flagIv.setPadding(0, 0, 0, 0);
-        flagIv.setScaleType(ImageView.ScaleType.FIT_XY);
+        flagIv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        flagIv.setStrokeColor(ColorStateList.valueOf(0xFFFFFFFF));
+        flagIv.setStrokeWidth(AndroidUtilities.dp(FLAG_STROKE_DP));
+        flagIv.setShapeAppearanceModel(flagIv.getShapeAppearanceModel()
+                .toBuilder()
+                .setAllCorners(CornerFamily.ROUNDED, AndroidUtilities.dp(100))
+                .build());
         flagIv.bringToFront();
     }
 
@@ -342,18 +349,21 @@ public class AvatarView extends FrameLayout {
         }
 
         FrameLayout.LayoutParams flagParams = (FrameLayout.LayoutParams) flagIv.getLayoutParams();
-        int flagWidth = Math.max(FLAG_MIN_WIDTH_DP, Math.round(size * FLAG_WIDTH_RATIO));
-        int flagHeight = Math.max(FLAG_MIN_HEIGHT_DP, Math.round(flagWidth * FLAG_HEIGHT_RATIO));
-        flagParams.width = AndroidUtilities.dp(flagWidth);
-        flagParams.height = AndroidUtilities.dp(flagHeight);
+        int flagSize = Math.max(FLAG_MIN_SIZE_DP, Math.round(size * FLAG_SIZE_RATIO));
+        flagParams.width = AndroidUtilities.dp(flagSize);
+        flagParams.height = AndroidUtilities.dp(flagSize);
         flagParams.gravity = Gravity.BOTTOM | Gravity.START;
-        // 国旗向左探出一点，比完全压在头像内部更接近 Web 版层叠效果。
-        // 如果某个父容器仍然裁剪，需要在对应 item 父布局上额外设置 clipChildren=false / clipToPadding=false。
-        int flagLeftOverhang = Math.max(1, Math.round(size * FLAG_LEFT_OVERHANG_RATIO));
-        int flagBottomInset = Math.max(1, Math.round(size * 0.03f));
-        flagParams.leftMargin = -AndroidUtilities.dp(flagLeftOverhang);
-        flagParams.bottomMargin = AndroidUtilities.dp(flagBottomInset);
+        // 圆形国旗建议“半镶嵌”在头像左下角，不再像旧长方形国旗那样向左下探出。
+        // 这样列表、聊天 item 的父容器即使没有完全放开裁剪，也不容易被切掉。
+        // 想更像 Web 那种外浮效果时，把 FLAG_EDGE_INSET_RATIO 改成 -0.04f 左右即可。
+        int flagEdgeInset = Math.round(size * FLAG_EDGE_INSET_RATIO);
+        flagParams.leftMargin = AndroidUtilities.dp(flagEdgeInset);
+        flagParams.bottomMargin = AndroidUtilities.dp(flagEdgeInset);
         flagIv.setLayoutParams(flagParams);
+        flagIv.setShapeAppearanceModel(flagIv.getShapeAppearanceModel()
+                .toBuilder()
+                .setAllCorners(CornerFamily.ROUNDED, AndroidUtilities.dp(flagSize / 2f))
+                .build());
         applyFlagStyle();
 
         int spotSize = Math.max(6, Math.round(size * 0.15f));
