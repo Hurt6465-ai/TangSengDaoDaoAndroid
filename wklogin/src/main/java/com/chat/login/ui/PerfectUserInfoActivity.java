@@ -8,6 +8,7 @@ import android.text.TextUtils;
 import android.view.View;
 import android.widget.TextView;
 
+import com.alibaba.fastjson.JSONObject;
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.config.WKConfig;
 import com.chat.base.endpoint.EndpointCategory;
@@ -133,8 +134,13 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         }
 
         String name = Objects.requireNonNull(wkVBinding.nameEt.getText()).toString().trim();
+        JSONObject profileJson = new JSONObject();
+        profileJson.put("name", name);
+        profileJson.put("country", selectedCountry);
+        profileJson.put("country_code", countryCodeFromSelection(selectedCountry));
+
         loadingPopup.show();
-        LoginModel.getInstance().updateUserInfo("name", name, (code, msg) -> {
+        LoginModel.getInstance().updateUserInfo(profileJson, (code, msg) -> {
             if (code == HttpResponseCode.success) {
                 saveLocalUserName(name);
                 saveLocalExtraProfile();
@@ -143,6 +149,24 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
                 loadingPopup.dismiss();
             }
         });
+    }
+
+    private String countryCodeFromSelection(String country) {
+        if (TextUtils.isEmpty(country)) return "";
+        String value = country.trim().toLowerCase(Locale.US);
+        if (country.contains("🇲🇲") || country.contains("缅甸") || country.contains("緬甸") || value.contains("myanmar") || value.contains("burma") || country.contains("မြန်မာ")) return "MM";
+        if (country.contains("🇨🇳") || country.contains("中国") || country.contains("中國") || value.contains("china") || country.contains("တရုတ်")) return "CN";
+        if (country.contains("🇹🇭") || country.contains("泰国") || country.contains("泰國") || value.contains("thailand") || country.contains("ထိုင်း")) return "TH";
+        if (country.contains("🇯🇵") || country.contains("日本") || value.contains("japan") || country.contains("ဂျပန်")) return "JP";
+        if (country.contains("🇰🇷") || country.contains("韩国") || country.contains("韓國") || value.contains("korea") || country.contains("ကိုရီးယား")) return "KR";
+        if (country.contains("🇻🇳") || country.contains("越南") || value.contains("vietnam") || country.contains("ဗီယက်နမ်")) return "VN";
+        if (country.contains("🇱🇦") || country.contains("老挝") || country.contains("老撾") || country.contains("寮國") || value.contains("laos") || country.contains("လာအို")) return "LA";
+        if (country.contains("🇰🇭") || country.contains("柬埔寨") || value.contains("cambodia") || value.contains("khmer") || country.contains("ကမ္ဘောဒီးယား")) return "KH";
+        if (country.contains("🇲🇾") || country.contains("马来西亚") || country.contains("馬來西亞") || value.contains("malaysia") || country.contains("မလေး")) return "MY";
+        if (country.contains("🇸🇬") || country.contains("新加坡") || value.contains("singapore") || country.contains("စင်ကာပူ")) return "SG";
+        if (country.contains("🇺🇸") || country.contains("美国") || country.contains("美國") || value.contains("united states") || value.contains("america") || country.contains("အမေရိကန်")) return "US";
+        if (country.contains("🌍") || country.contains("其他") || country.contains("其它") || value.contains("other") || country.contains("အခြား")) return "OTHER";
+        return "";
     }
 
     private boolean isEmptyText(CharSequence text) {
