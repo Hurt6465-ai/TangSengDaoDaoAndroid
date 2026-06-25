@@ -19,7 +19,6 @@ import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileBinding;
 import com.chat.uikit.chat.manager.WKIMUtils;
 import com.chat.uikit.contacts.service.FriendModel;
-import com.chat.uikit.user.MyInfoActivity;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -71,7 +70,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void initListener() {
         wkVBinding.backBtn.setOnClickListener(v -> finish());
-        wkVBinding.editBtn.setOnClickListener(v -> startActivity(new Intent(this, MyInfoActivity.class)));
+        wkVBinding.editBtn.setOnClickListener(v -> startActivity(new Intent(this, PartnerProfileEditActivity.class)));
         wkVBinding.helloBtn.setOnClickListener(v -> onMainActionClick());
     }
 
