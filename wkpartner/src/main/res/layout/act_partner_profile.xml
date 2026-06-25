@@ -19,7 +19,7 @@
             <FrameLayout
                 android:id="@+id/coverLayout"
                 android:layout_width="match_parent"
-                android:layout_height="320dp">
+                android:layout_height="330dp">
 
                 <ImageView
                     android:id="@+id/coverIv"
@@ -34,8 +34,8 @@
 
                 <ImageView
                     android:id="@+id/backBtn"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
                     android:layout_marginStart="12dp"
                     android:layout_marginTop="36dp"
                     android:padding="8dp"
@@ -44,8 +44,8 @@
 
                 <ImageView
                     android:id="@+id/editBtn"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
                     android:layout_gravity="top|end"
                     android:layout_marginTop="38dp"
                     android:layout_marginEnd="16dp"
@@ -59,144 +59,140 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_gravity="bottom"
-                    android:layout_marginStart="14dp"
-                    android:layout_marginEnd="14dp"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
                     android:layout_marginBottom="18dp"
                     android:background="@drawable/bg_partner_glass_panel"
                     android:elevation="2dp"
-                    android:orientation="vertical"
-                    android:paddingStart="14dp"
-                    android:paddingTop="14dp"
-                    android:paddingEnd="14dp"
-                    android:paddingBottom="13dp">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingTop="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="16dp">
+
+                    <com.chat.base.ui.components.AvatarView
+                        android:id="@+id/avatarView"
+                        android:layout_width="92dp"
+                        android:layout_height="92dp" />
 
                     <LinearLayout
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <com.chat.base.ui.components.AvatarView
-                            android:id="@+id/avatarView"
-                            android:layout_width="78dp"
-                            android:layout_height="78dp" />
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
                         <LinearLayout
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="14dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
-                            <LinearLayout
-                                android:layout_width="match_parent"
+                            <TextView
+                                android:id="@+id/nameTv"
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal">
-
-                                <TextView
-                                    android:id="@+id/nameTv"
-                                    android:layout_width="0dp"
-                                    android:layout_height="wrap_content"
-                                    android:layout_weight="1"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:textColor="#FFFFFFFF"
-                                    android:textSize="21sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:id="@+id/roleTv"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="8dp"
-                                    android:background="@drawable/bg_partner_glass_chip"
-                                    android:paddingStart="7dp"
-                                    android:paddingTop="2dp"
-                                    android:paddingEnd="7dp"
-                                    android:paddingBottom="2dp"
-                                    android:textColor="#FFFFFFFF"
-                                    android:textSize="11sp"
-                                    android:visibility="gone" />
-                            </LinearLayout>
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:maxWidth="150dp"
+                                android:textColor="#FFFFFFFF"
+                                android:textSize="22sp"
+                                android:textStyle="bold" />
 
                             <TextView
                                 android:id="@+id/sexAgeTv"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="5dp"
-                                android:textColor="#E6FFFFFF"
-                                android:textSize="13sp"
+                                android:layout_marginStart="8dp"
+                                android:background="@drawable/bg_partner_glass_chip"
+                                android:paddingStart="7dp"
+                                android:paddingTop="2dp"
+                                android:paddingEnd="7dp"
+                                android:paddingBottom="2dp"
+                                android:textColor="#FFFFFFFF"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
                                 android:visibility="gone" />
 
                             <TextView
-                                android:id="@+id/countryTv"
+                                android:id="@+id/roleTv"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="5dp"
-                                android:textColor="#E6FFFFFF"
-                                android:textSize="13sp"
+                                android:layout_marginStart="6dp"
+                                android:background="@drawable/bg_partner_glass_chip"
+                                android:paddingStart="7dp"
+                                android:paddingTop="2dp"
+                                android:paddingEnd="7dp"
+                                android:paddingBottom="2dp"
+                                android:textColor="#FFFFFFFF"
+                                android:textSize="11sp"
                                 android:visibility="gone" />
                         </LinearLayout>
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/langLayout"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:visibility="gone">
 
                         <TextView
-                            android:id="@+id/nativeLangTv"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:textColor="#FFFFFFFF"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
-
-                        <ImageView
-                            android:layout_width="30dp"
-                            android:layout_height="16dp"
-                            android:layout_marginStart="8dp"
-                            android:layout_marginEnd="8dp"
-                            android:src="@drawable/ic_lang_exchange_double_arrow" />
-
-                        <TextView
-                            android:id="@+id/learningLangTv"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:ellipsize="end"
-                            android:gravity="end"
-                            android:maxLines="1"
-                            android:textColor="#FFFFFFFF"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <HorizontalScrollView
-                        android:id="@+id/tagCard"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="11dp"
-                        android:overScrollMode="never"
-                        android:scrollbars="none"
-                        android:visibility="gone">
-
-                        <LinearLayout
-                            android:id="@+id/tagLayout"
+                            android:id="@+id/usernameTv"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:divider="@drawable/divider_partner_tag_space"
+                            android:layout_marginTop="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="#DDFFFFFF"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/countryTv"
+                            android:layout_width="0dp"
+                            android:layout_height="0dp"
+                            android:visibility="gone" />
+
+                        <LinearLayout
+                            android:id="@+id/langLayout"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="9dp"
+                            android:background="@drawable/bg_partner_glass_chip"
+                            android:gravity="center_vertical"
                             android:orientation="horizontal"
-                            android:showDividers="middle" />
-                    </HorizontalScrollView>
+                            android:paddingStart="10dp"
+                            android:paddingTop="5dp"
+                            android:paddingEnd="10dp"
+                            android:paddingBottom="5dp"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:id="@+id/nativeLangTv"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:maxWidth="90dp"
+                                android:textColor="#FFFFFFFF"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp"
+                                android:layout_marginEnd="8dp"
+                                android:text="⇄"
+                                android:textColor="#FFFFFFFF"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/learningLangTv"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:maxWidth="90dp"
+                                android:textColor="#FFFFFFFF"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
                 </LinearLayout>
             </FrameLayout>
 
@@ -204,28 +200,23 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingStart="14dp"
-                android:paddingTop="14dp"
-                android:paddingEnd="14dp">
+                android:paddingStart="20dp"
+                android:paddingTop="18dp"
+                android:paddingEnd="20dp">
 
                 <LinearLayout
                     android:id="@+id/introCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_partner_card"
-                    android:elevation="1dp"
                     android:orientation="vertical"
-                    android:paddingStart="16dp"
-                    android:paddingTop="14dp"
-                    android:paddingEnd="16dp"
-                    android:paddingBottom="14dp">
+                    android:paddingBottom="8dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/partner_intro"
                         android:textColor="#222222"
-                        android:textSize="16sp"
+                        android:textSize="17sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -233,23 +224,33 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:lineSpacingExtra="3dp"
-                        android:textColor="#555555"
-                        android:textSize="14sp" />
+                        android:lineSpacingExtra="4dp"
+                        android:textColor="#333333"
+                        android:textSize="16sp" />
                 </LinearLayout>
+
+                <HorizontalScrollView
+                    android:id="@+id/tagCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:overScrollMode="never"
+                    android:scrollbars="none"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:id="@+id/tagLayout"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
 
                 <LinearLayout
                     android:id="@+id/photoCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_partner_card"
-                    android:elevation="1dp"
+                    android:layout_marginTop="22dp"
                     android:orientation="vertical"
-                    android:paddingStart="16dp"
-                    android:paddingTop="14dp"
-                    android:paddingEnd="16dp"
-                    android:paddingBottom="14dp"
                     android:visibility="gone">
 
                     <TextView
@@ -257,7 +258,7 @@
                         android:layout_height="wrap_content"
                         android:text="@string/partner_photos"
                         android:textColor="#222222"
-                        android:textSize="16sp"
+                        android:textSize="17sp"
                         android:textStyle="bold" />
 
                     <HorizontalScrollView
