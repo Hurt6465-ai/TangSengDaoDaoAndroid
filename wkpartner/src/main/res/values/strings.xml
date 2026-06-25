@@ -1,8 +1,7 @@
 <resources>
     <string name="partner_profile">语伴主页</string>
     <string name="partner_edit_profile">编辑资料</string>
-    <string name="partner_edit_basic_info">头像、昵称等基础资料</string>
-    <string name="partner_edit_profile_tips">背景墙、照片墙、语言标签会在下一版接入。当前基础资料继续使用唐僧叨叨原接口。</string>
+    <string name="partner_edit_profile_tips">这里复用注册完善资料的同一套字段：国籍、母语、在学语言、介绍都会保存到用户资料，不再另存一份。</string>
     <string name="partner_say_hello">打招呼</string>
     <string name="partner_hello_sent">已打招呼</string>
     <string name="partner_send_message">发消息</string>
@@ -12,19 +11,14 @@
     <string name="partner_intro">介绍</string>
     <string name="partner_profile_intro_empty">这个人还没有填写介绍。</string>
     <string name="partner_tags">标签</string>
-    <string name="partner_moments">动态</string>
-    <string name="partner_moments_empty">动态、图片和视频下一版接入</string>
     <string name="partner_teacher">老师</string>
     <string name="partner_admin">管理员</string>
     <string name="partner_official">官方</string>
     <string name="partner_service">客服</string>
-
-    <string name="partner_basic_profile">基础资料</string>
-    <string name="partner_language_profile">语言资料</string>
-    <string name="partner_page_profile">主页资料</string>
     <string name="partner_name">昵称</string>
     <string name="partner_name_required">昵称不能为空</string>
     <string name="partner_country">国籍</string>
+    <string name="partner_country_required">请选择国籍</string>
     <string name="partner_choose_country">选择国籍</string>
     <string name="partner_sex">性别</string>
     <string name="partner_sex_male">男</string>
@@ -32,13 +26,11 @@
     <string name="partner_sex_private">保密</string>
     <string name="partner_birthday_hint">生日，例如 2000-01-01</string>
     <string name="partner_native_language_hint">母语，例如 MY</string>
+    <string name="partner_native_language_required">请填写母语</string>
     <string name="partner_learning_language_hint">在学语言，例如 ZH EN</string>
+    <string name="partner_learning_language_required">请填写在学语言</string>
     <string name="partner_language_edit_tip">语言统一用大写代码，多个用空格分开，例如：MY 或 ZH EN。</string>
     <string name="partner_intro_hint">介绍一下你自己、想练什么语言、喜欢聊什么</string>
-    <string name="partner_tags_hint">标签，例如 音乐 旅行 美食</string>
-    <string name="partner_cover_hint">背景墙图片地址，上传功能下一版接入</string>
-    <string name="partner_images_hint">语伴图片地址，多个用空格分开</string>
-    <string name="partner_image_edit_tip">当前先保存图片地址；本地选择图片、压缩上传下一版单独接入。</string>
     <string name="partner_save">保存</string>
     <string name="partner_save_success">已保存</string>
     <string name="partner_save_failed">保存失败</string>
