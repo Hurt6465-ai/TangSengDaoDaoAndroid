@@ -1,0 +1,21 @@
+<resources>
+    <string name="partner_profile">语伴主页</string>
+    <string name="partner_edit_profile">编辑资料</string>
+    <string name="partner_edit_basic_info">头像、昵称等基础资料</string>
+    <string name="partner_edit_profile_tips">背景墙、照片墙、语言标签会在下一版接入。当前基础资料继续使用唐僧叨叨原接口。</string>
+    <string name="partner_say_hello">打招呼</string>
+    <string name="partner_hello_sent">已打招呼</string>
+    <string name="partner_send_message">发消息</string>
+    <string name="partner_hello_hint">输入一句招呼</string>
+    <string name="partner_default_hello_plain">你好，可以认识一下吗？</string>
+    <string name="partner_default_hello_with_lang">你好，我想练习 %1$s，可以认识一下吗？</string>
+    <string name="partner_intro">介绍</string>
+    <string name="partner_profile_intro_empty">这个人还没有填写介绍。</string>
+    <string name="partner_tags">标签</string>
+    <string name="partner_moments">动态</string>
+    <string name="partner_moments_empty">动态、图片和视频下一版接入</string>
+    <string name="partner_teacher">老师</string>
+    <string name="partner_admin">管理员</string>
+    <string name="partner_official">官方</string>
+    <string name="partner_service">客服</string>
+</resources>
