@@ -30,3 +30,4 @@ include ':wklogin'
 include ':wkpush'
 
 include ':wkroom'
+include ':wkpartner'
