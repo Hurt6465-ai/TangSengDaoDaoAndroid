@@ -1,7 +1,6 @@
 package com.chat.base.ui.components;
 
 import android.content.Context;
-import android.content.res.ColorStateList;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -49,7 +48,7 @@ public class AvatarView extends FrameLayout {
     public TextView defaultAvatarTv;
     public View spotView;
     public TextView onlineTv;
-    public ShapeableImageView flagIv;
+    public ImageView flagIv;
 
     private static final float FLAG_SIZE_RATIO = 0.40f;
     private static final float FLAG_EDGE_INSET_RATIO = 0.00f; // 0=嵌在头像边缘；负数=向左下角外浮
@@ -128,7 +127,7 @@ public class AvatarView extends FrameLayout {
         // 不再把“最后在线时间”压在头像右下角，聊天页/列表需要时间时放到文字区域显示。
         onlineTv.setVisibility(GONE);
 
-        flagIv = new ShapeableImageView(getContext());
+        flagIv = new ImageView(getContext());
         flagIv.setScaleType(ImageView.ScaleType.CENTER_CROP);
         flagIv.setAdjustViewBounds(false);
         applyFlagStyle();
@@ -295,19 +294,19 @@ public class AvatarView extends FrameLayout {
 
     private void applyFlagStyle() {
         if (flagIv == null) return;
-        // 使用纯国旗资源（PNG / Android vector drawable XML 均可），白边由 View 自己画。
-        // 不要再使用“带白边的图片素材”，否则不同头像大小下白边会显得不一致。
+        // 国旗资源现在使用圆形透明 PNG。这里用普通 ImageView 显示，
+        // 避免 ShapeableImageView 在部分机型/复用场景下只画出描边、不显示图片内容。
         flagIv.setAlpha(1f);
-        flagIv.setBackground(null);
         flagIv.setColorFilter(null);
-        flagIv.setPadding(0, 0, 0, 0);
         flagIv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        flagIv.setStrokeColor(ColorStateList.valueOf(0xFFFFFFFF));
-        flagIv.setStrokeWidth(AndroidUtilities.dp(FLAG_STROKE_DP));
-        flagIv.setShapeAppearanceModel(flagIv.getShapeAppearanceModel()
-                .toBuilder()
-                .setAllCorners(CornerFamily.ROUNDED, AndroidUtilities.dp(100))
-                .build());
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(0xFFFFFFFF);
+        flagIv.setBackground(bg);
+
+        int padding = AndroidUtilities.dp(FLAG_STROKE_DP);
+        flagIv.setPadding(padding, padding, padding, padding);
         flagIv.bringToFront();
     }
 
@@ -360,10 +359,6 @@ public class AvatarView extends FrameLayout {
         flagParams.leftMargin = AndroidUtilities.dp(flagEdgeInset);
         flagParams.bottomMargin = AndroidUtilities.dp(flagEdgeInset);
         flagIv.setLayoutParams(flagParams);
-        flagIv.setShapeAppearanceModel(flagIv.getShapeAppearanceModel()
-                .toBuilder()
-                .setAllCorners(CornerFamily.ROUNDED, AndroidUtilities.dp(flagSize / 2f))
-                .build());
         applyFlagStyle();
 
         int spotSize = Math.max(6, Math.round(size * 0.15f));
@@ -567,9 +562,12 @@ public class AvatarView extends FrameLayout {
             hideFlag();
             return;
         }
-        if (currentFlagResId != flagResId) {
+        // RecyclerView 复用或 hideFlag() 后，drawable 可能被清空。
+        // 即使资源 ID 没变，也要在 drawable 为空时重新设置，避免只剩白色圆底/边框。
+        if (currentFlagResId != flagResId || flagIv.getDrawable() == null) {
             flagIv.setImageResource(flagResId);
             currentFlagResId = flagResId;
+            flagIv.invalidate();
         }
         if (flagIv.getVisibility() != VISIBLE) {
             flagIv.setVisibility(VISIBLE);
