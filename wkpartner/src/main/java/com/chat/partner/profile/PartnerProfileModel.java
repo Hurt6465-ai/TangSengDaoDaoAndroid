@@ -17,7 +17,7 @@ public class PartnerProfileModel extends WKBaseModel {
     }
 
     public void getUserProfile(String uid, final Callback<PartnerProfileEntity> callback) {
-        request(createService(PartnerProfileService.class).getUserProfile(uid), new IRequestResultListener<>() {
+        request(createService(PartnerProfileService.class).getUserProfile(uid), new IRequestResultListener<PartnerProfileEntity>() {
             @Override
             public void onSuccess(PartnerProfileEntity result) {
                 if (callback != null) callback.onResult(200, "", result);
@@ -31,7 +31,7 @@ public class PartnerProfileModel extends WKBaseModel {
     }
 
     public void updateCurrentProfile(JSONObject body, final Callback<CommonResponse> callback) {
-        request(createService(PartnerProfileService.class).updateCurrentProfile(body), new IRequestResultListener<>() {
+        request(createService(PartnerProfileService.class).updateCurrentProfile(body), new IRequestResultListener<CommonResponse>() {
             @Override
             public void onSuccess(CommonResponse result) {
                 if (callback != null) callback.onResult(result.status, result.msg, result);

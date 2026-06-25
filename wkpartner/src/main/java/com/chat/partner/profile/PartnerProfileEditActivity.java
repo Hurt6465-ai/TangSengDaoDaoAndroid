@@ -14,8 +14,8 @@ import com.chat.partner.databinding.ActPartnerProfileEditBinding;
 import java.util.Locale;
 
 /**
- * 语伴主页资料编辑。
- * 这里直接编辑语伴主页需要的基础字段，不再只跳原 MyInfoActivity。
+ * 复用注册完善资料的同一套用户字段，不再做 front_profile_extra 本地副本。
+ * 保存字段统一走 /v1/user/current：name、sex、birthday、country_code、country、native_languages、learning_languages、intro。
  */
 public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfileEditBinding> {
     private static final String[][] COUNTRIES = new String[][]{
@@ -55,19 +55,18 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     @Override
     protected void initData() {
         PartnerProfileModel.getInstance().getUserProfile(WKConfig.getInstance().getUid(), (code, msg, data) -> {
-            if (code == HttpResponseCode.success && data != null) {
-                bindProfile(data);
-            } else if (!TextUtils.isEmpty(msg)) {
-                showToast(msg);
+            if (code == HttpResponseCode.success && data != null) bindProfile(data);
+            else {
+                bindProfile(new PartnerProfileEntity());
+                if (!TextUtils.isEmpty(msg)) showToast(msg);
             }
         });
     }
 
     private void bindProfile(PartnerProfileEntity data) {
-        wkVBinding.nameEt.setText(safe(data.name));
+        wkVBinding.nameEt.setText(firstNotEmpty(data.name, WKConfig.getInstance().getUserName()));
         countryCode = safe(data.country_code).toUpperCase(Locale.US);
-        countryName = safe(data.country);
-        if (TextUtils.isEmpty(countryName)) countryName = countryNameByCode(countryCode);
+        countryName = firstNotEmpty(data.country, countryNameByCode(countryCode));
         updateCountryText();
 
         sexValue = (data.sex == 0 || data.sex == 1) ? data.sex : 2;
@@ -77,9 +76,6 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         wkVBinding.nativeLangEt.setText(joinCodes(data.getNativeLanguagesSafe()));
         wkVBinding.learningLangEt.setText(joinCodes(data.getLearningLanguagesSafe()));
         wkVBinding.introEt.setText(safe(data.intro));
-        wkVBinding.tagsEt.setText(joinCodes(data.getTagsSafe()));
-        wkVBinding.coverEt.setText(safe(data.profile_cover));
-        wkVBinding.imagesEt.setText(joinCodes(data.profile_images));
     }
 
     private void saveProfile() {
@@ -88,6 +84,19 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
             showToast(getString(R.string.partner_name_required));
             return;
         }
+        if (TextUtils.isEmpty(countryCode)) {
+            showToast(getString(R.string.partner_country_required));
+            return;
+        }
+        if (TextUtils.isEmpty(valueOf(wkVBinding.nativeLangEt))) {
+            showToast(getString(R.string.partner_native_language_required));
+            return;
+        }
+        if (TextUtils.isEmpty(valueOf(wkVBinding.learningLangEt))) {
+            showToast(getString(R.string.partner_learning_language_required));
+            return;
+        }
+
         JSONObject body = new JSONObject();
         body.put("name", name);
         body.put("sex", sexValue);
@@ -97,9 +106,6 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         body.put("native_languages", normalizeCodes(valueOf(wkVBinding.nativeLangEt)));
         body.put("learning_languages", normalizeCodes(valueOf(wkVBinding.learningLangEt)));
         body.put("intro", valueOf(wkVBinding.introEt));
-        body.put("tags", normalizeFreeTextList(valueOf(wkVBinding.tagsEt)));
-        body.put("profile_cover", valueOf(wkVBinding.coverEt));
-        body.put("profile_images", normalizeFreeTextList(valueOf(wkVBinding.imagesEt)));
 
         wkVBinding.saveBtn.setEnabled(false);
         PartnerProfileModel.getInstance().updateCurrentProfile(body, (code, msg, data) -> {
@@ -115,9 +121,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
 
     private void showCountryDialog() {
         String[] items = new String[COUNTRIES.length];
-        for (int i = 0; i < COUNTRIES.length; i++) {
-            items[i] = COUNTRIES[i][1] + "  " + COUNTRIES[i][0];
-        }
+        for (int i = 0; i < COUNTRIES.length; i++) items[i] = COUNTRIES[i][1] + "  " + COUNTRIES[i][0];
         new AlertDialog.Builder(this)
                 .setTitle(R.string.partner_country)
                 .setItems(items, (dialog, which) -> {
@@ -129,11 +133,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void showSexDialog() {
-        String[] items = new String[]{
-                getString(R.string.partner_sex_male),
-                getString(R.string.partner_sex_female),
-                getString(R.string.partner_sex_private)
-        };
+        String[] items = new String[]{getString(R.string.partner_sex_male), getString(R.string.partner_sex_female), getString(R.string.partner_sex_private)};
         new AlertDialog.Builder(this)
                 .setTitle(R.string.partner_sex)
                 .setItems(items, (dialog, which) -> {
@@ -146,11 +146,8 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void updateCountryText() {
-        if (TextUtils.isEmpty(countryCode) && TextUtils.isEmpty(countryName)) {
-            wkVBinding.countryValueTv.setText(R.string.partner_choose_country);
-        } else {
-            wkVBinding.countryValueTv.setText(countryName + "  " + countryCode);
-        }
+        if (TextUtils.isEmpty(countryCode) && TextUtils.isEmpty(countryName)) wkVBinding.countryValueTv.setText(R.string.partner_choose_country);
+        else wkVBinding.countryValueTv.setText(firstNotEmpty(countryName, countryNameByCode(countryCode)) + "  " + countryCode);
     }
 
     private void updateSexText() {
@@ -181,28 +178,18 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
 
     private String normalizeCodes(String input) {
         if (TextUtils.isEmpty(input)) return "";
-        return input.replace('，', ' ')
-                .replace(',', ' ')
-                .replace('/', ' ')
-                .trim()
-                .replaceAll("\\s+", " ")
-                .toUpperCase(Locale.US);
+        return input.replace('，', ' ').replace(',', ' ').replace('/', ' ').trim().replaceAll("\\s+", " ").toUpperCase(Locale.US);
     }
 
-    private String normalizeFreeTextList(String input) {
-        if (TextUtils.isEmpty(input)) return "";
-        return input.replace('，', ' ')
-                .replace(',', ' ')
-                .replace('/', ' ')
-                .trim()
-                .replaceAll("\\s+", " ");
+    private String firstNotEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) if (!TextUtils.isEmpty(value)) return value;
+        return "";
     }
 
     private String countryNameByCode(String code) {
         if (TextUtils.isEmpty(code)) return "";
-        for (String[] item : COUNTRIES) {
-            if (item[0].equalsIgnoreCase(code)) return item[1];
-        }
+        for (String[] item : COUNTRIES) if (item[0].equalsIgnoreCase(code)) return item[1];
         return "";
     }
 }
