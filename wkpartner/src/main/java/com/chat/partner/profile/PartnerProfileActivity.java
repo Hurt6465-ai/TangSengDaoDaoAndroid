@@ -1,11 +1,18 @@
 package com.chat.partner.profile;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.content.Intent;
+import android.graphics.Color;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -22,6 +29,7 @@ import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileBinding;
 import com.chat.uikit.chat.manager.WKIMUtils;
 import com.chat.uikit.contacts.service.FriendModel;
+import com.google.android.material.appbar.AppBarLayout;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -33,6 +41,7 @@ import java.util.Locale;
 public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBinding> {
     private String uid;
     private boolean isSelf;
+    private boolean isSayHiLoading;
     private PartnerProfileEntity profile;
 
     @Override
@@ -55,26 +64,28 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void toggleStatusBarMode() {
         super.toggleStatusBarMode();
-        Window window = getWindow();
-        if (window != null) WKStatusBarUtils.setLightMode(window);
+        setupImmersiveStatusBar();
     }
 
     @Override
     protected void initView() {
-        wkVBinding.avatarView.setSize(98);
-        wkVBinding.helloBtn.getBackground().setTint(Theme.colorAccount);
+        setupImmersiveStatusBar();
+        wkVBinding.avatarView.setSize(88);
+        if (wkVBinding.helloBtnLayout.getBackground() != null) {
+            wkVBinding.helloBtnLayout.getBackground().setTint(Theme.colorAccount);
+        }
         wkVBinding.editBtn.setVisibility(isSelf ? View.VISIBLE : View.GONE);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
-        applyStatusBarSafeTop();
+        setupScrollLinkedHeader();
     }
 
     @Override
     protected void initListener() {
         wkVBinding.backBtn.setOnClickListener(v -> finish());
         wkVBinding.editBtn.setOnClickListener(v -> startActivity(new Intent(this, PartnerProfileEditActivity.class)));
-        wkVBinding.helloBtn.setOnClickListener(v -> onMainActionClick());
+        wkVBinding.helloBtnLayout.setOnClickListener(v -> onMainActionClick());
         wkVBinding.tagSection.setOnClickListener(v -> {
             if (isSelf) startActivity(new Intent(this, PartnerProfileEditActivity.class));
         });
@@ -91,6 +102,25 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (profile != null) loadProfile();
     }
 
+    private void setupImmersiveStatusBar() {
+        Window window = getWindow();
+        if (window == null) return;
+        window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+        window.setStatusBarColor(Color.TRANSPARENT);
+    }
+
+    private void setupScrollLinkedHeader() {
+        wkVBinding.appBarLayout.addOnOffsetChangedListener((AppBarLayout appBarLayout, int verticalOffset) -> {
+            int range = appBarLayout.getTotalScrollRange();
+            if (range <= 0) return;
+            float percent = Math.min(1f, Math.max(0f, Math.abs(verticalOffset) * 1f / range));
+            float glassAlpha = 1f - percent * 2f;
+            wkVBinding.headerGlassLayout.setAlpha(Math.max(0f, glassAlpha));
+            float titleAlpha = (percent - 0.58f) / 0.42f;
+            wkVBinding.toolbarTitleTv.setAlpha(Math.max(0f, Math.min(1f, titleAlpha)));
+        });
+    }
+
     private void loadProfile() {
         PartnerProfileModel.getInstance().getUserProfile(uid, (code, msg, data) -> {
             if (code == HttpResponseCode.success && data != null) {
@@ -102,24 +132,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         });
     }
 
-    private void applyStatusBarSafeTop() {
-        int statusBar = WKStatusBarUtils.getStatusBarHeight(this);
-        setTopMargin(wkVBinding.backBtn, statusBar + dp(10));
-        setTopMargin(wkVBinding.editBtn, statusBar + dp(12));
-    }
-
-    private void setTopMargin(View view, int topMargin) {
-        ViewGroup.LayoutParams lp = view.getLayoutParams();
-        if (lp instanceof ViewGroup.MarginLayoutParams) {
-            ViewGroup.MarginLayoutParams marginLp = (ViewGroup.MarginLayoutParams) lp;
-            marginLp.topMargin = topMargin;
-            view.setLayoutParams(marginLp);
-        }
-    }
-
     private void bindProfile(PartnerProfileEntity data) {
         String showName = firstNotEmpty(data.name, data.username, data.uid);
         wkVBinding.nameTv.setText(showName);
+        wkVBinding.toolbarTitleTv.setText(showName);
         String username = firstNotEmpty(data.username, data.uid);
         wkVBinding.usernameTv.setText(TextUtils.isEmpty(username) ? "" : "@" + username);
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
@@ -200,9 +216,16 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         tv.setEllipsize(TextUtils.TruncateAt.END);
         tv.setBackgroundResource(R.drawable.bg_partner_tag_unselected);
         tv.setPadding(dp(16), dp(8), dp(16), dp(8));
+        tv.setForeground(getSelectableItemBackground());
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(-2, dp(38));
         lp.rightMargin = dp(9);
         wkVBinding.tagLayout.addView(tv, lp);
+    }
+
+    private android.graphics.drawable.Drawable getSelectableItemBackground() {
+        android.util.TypedValue outValue = new android.util.TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+        return getResources().getDrawable(outValue.resourceId);
     }
 
     private void bindPhotos(PartnerProfileEntity data) {
@@ -235,12 +258,18 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         boolean isFriend = data.follow == 1 || (channel != null && channel.follow == 1);
         wkVBinding.helloBar.setVisibility(View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(View.VISIBLE);
-        wkVBinding.helloBtn.setEnabled(true);
-        wkVBinding.helloBtn.setAlpha(1f);
-        wkVBinding.helloBtn.setText(isFriend ? R.string.partner_send_message : R.string.partner_say_hello);
+        wkVBinding.helloBtnLayout.setEnabled(true);
+        wkVBinding.helloBtnLayout.setAlpha(1f);
+        wkVBinding.helloBtnText.setText(isFriend ? R.string.partner_send_message : R.string.partner_say_hello);
+        wkVBinding.helloBtnText.setAlpha(1f);
+        wkVBinding.helloBtnProgress.setAlpha(0f);
+        wkVBinding.helloBtnProgress.setVisibility(View.GONE);
+        setHelloButtonWidth(ViewGroup.LayoutParams.MATCH_PARENT);
+        isSayHiLoading = false;
     }
 
     private void onMainActionClick() {
+        if (isSayHiLoading) return;
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
         boolean isFriend = (profile != null && profile.follow == 1) || (channel != null && channel.follow == 1);
         if (isFriend) {
@@ -250,16 +279,74 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_hello_hint), defaultGreeting(), text -> {
             String remark = TextUtils.isEmpty(text) ? defaultGreeting() : text;
             String vercode = profile == null ? "" : profile.vercode;
+            animateButtonToProgress();
             FriendModel.getInstance().applyAddFriend(uid, vercode, remark, (code, msg) -> {
                 if (code == HttpResponseCode.success) {
-                    wkVBinding.helloBtn.setText(R.string.partner_hello_sent);
-                    wkVBinding.helloBtn.setEnabled(false);
-                    wkVBinding.helloBtn.setAlpha(0.45f);
-                } else if (!TextUtils.isEmpty(msg)) {
-                    showToast(msg);
+                    animateProgressToButton(true);
+                } else {
+                    animateProgressToButton(false);
+                    if (!TextUtils.isEmpty(msg)) showToast(msg);
                 }
             });
         });
+    }
+
+    private void animateButtonToProgress() {
+        isSayHiLoading = true;
+        wkVBinding.helloBtnLayout.setEnabled(false);
+        int initialWidth = wkVBinding.helloBtnLayout.getWidth();
+        if (initialWidth <= 0) initialWidth = getAvailableButtonWidth();
+        int targetWidth = dp(54);
+        wkVBinding.helloBtnText.animate().alpha(0f).setDuration(120).start();
+        wkVBinding.helloBtnProgress.setVisibility(View.VISIBLE);
+        wkVBinding.helloBtnProgress.animate().alpha(1f).setDuration(180).setStartDelay(80).start();
+        ValueAnimator anim = ValueAnimator.ofInt(initialWidth, targetWidth);
+        anim.addUpdateListener(valueAnimator -> setHelloButtonWidth((Integer) valueAnimator.getAnimatedValue()));
+        anim.setDuration(320);
+        anim.setInterpolator(new OvershootInterpolator(0.9f));
+        anim.start();
+    }
+
+    private void animateProgressToButton(boolean success) {
+        int initialWidth = wkVBinding.helloBtnLayout.getWidth();
+        if (initialWidth <= 0) initialWidth = dp(54);
+        int targetWidth = getAvailableButtonWidth();
+        wkVBinding.helloBtnProgress.animate().alpha(0f).setDuration(130).setListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                wkVBinding.helloBtnProgress.setVisibility(View.GONE);
+                wkVBinding.helloBtnProgress.animate().setListener(null);
+                wkVBinding.helloBtnText.setText(success ? R.string.partner_hello_sent : R.string.partner_say_hello);
+                wkVBinding.helloBtnText.animate().alpha(1f).setDuration(180).start();
+            }
+        }).start();
+        ValueAnimator anim = ValueAnimator.ofInt(initialWidth, targetWidth);
+        anim.addUpdateListener(valueAnimator -> setHelloButtonWidth((Integer) valueAnimator.getAnimatedValue()));
+        anim.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                setHelloButtonWidth(ViewGroup.LayoutParams.MATCH_PARENT);
+                isSayHiLoading = false;
+                wkVBinding.helloBtnLayout.setEnabled(!success);
+                wkVBinding.helloBtnLayout.setAlpha(success ? 0.55f : 1f);
+            }
+        });
+        anim.setDuration(300);
+        anim.setInterpolator(new AccelerateDecelerateInterpolator());
+        anim.start();
+    }
+
+    private int getAvailableButtonWidth() {
+        View parent = (View) wkVBinding.helloBtnLayout.getParent();
+        int width = parent == null ? 0 : parent.getWidth() - parent.getPaddingLeft() - parent.getPaddingRight();
+        if (width <= 0) width = getResources().getDisplayMetrics().widthPixels - dp(48);
+        return width;
+    }
+
+    private void setHelloButtonWidth(int width) {
+        ViewGroup.LayoutParams lp = wkVBinding.helloBtnLayout.getLayoutParams();
+        lp.width = width;
+        wkVBinding.helloBtnLayout.setLayoutParams(lp);
     }
 
     private String defaultGreeting() {
