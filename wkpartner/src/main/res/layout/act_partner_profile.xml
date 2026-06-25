@@ -112,6 +112,15 @@
                         android:textSize="13sp"
                         android:visibility="gone" />
 
+                    <TextView
+                        android:id="@+id/countryTv"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="#E6FFFFFF"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+
                     <LinearLayout
                         android:id="@+id/langLayout"
                         android:layout_width="wrap_content"
@@ -155,8 +164,7 @@
                 android:orientation="vertical"
                 android:paddingStart="14dp"
                 android:paddingTop="14dp"
-                android:paddingEnd="14dp"
-                android:paddingBottom="0dp">
+                android:paddingEnd="14dp">
 
                 <LinearLayout
                     android:id="@+id/introCard"
@@ -171,7 +179,6 @@
                     android:paddingBottom="14dp">
 
                     <TextView
-                        android:id="@+id/introTitleTv"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/partner_intro"
@@ -203,7 +210,6 @@
                     android:paddingBottom="14dp">
 
                     <TextView
-                        android:id="@+id/tagTitleTv"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/partner_tags"
@@ -212,7 +218,6 @@
                         android:textStyle="bold" />
 
                     <HorizontalScrollView
-                        android:id="@+id/tagScrollView"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
@@ -227,38 +232,6 @@
                             android:orientation="horizontal"
                             android:showDividers="middle" />
                     </HorizontalScrollView>
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/momentsCard"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_partner_card"
-                    android:elevation="1dp"
-                    android:orientation="vertical"
-                    android:paddingStart="16dp"
-                    android:paddingTop="14dp"
-                    android:paddingEnd="16dp"
-                    android:paddingBottom="14dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/partner_moments"
-                        android:textColor="#222222"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="120dp"
-                        android:layout_marginTop="10dp"
-                        android:background="@drawable/bg_partner_moments_empty"
-                        android:gravity="center"
-                        android:text="@string/partner_moments_empty"
-                        android:textColor="#999999"
-                        android:textSize="13sp" />
                 </LinearLayout>
 
                 <Space
