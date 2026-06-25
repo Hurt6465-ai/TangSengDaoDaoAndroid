@@ -10,6 +10,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.chat.base.base.WKBaseActivity;
+import com.chat.base.config.WKApiConfig;
 import com.chat.base.config.WKConfig;
 import com.chat.base.endpoint.entity.ChatViewMenu;
 import com.chat.base.glide.GlideUtils;
@@ -119,7 +120,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         showCountryFlagIfSupported(data.country_code);
         if (!TextUtils.isEmpty(data.profile_cover)) {
-            GlideUtils.getInstance().showImg(this, data.profile_cover, wkVBinding.coverIv);
+            GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(data.profile_cover), wkVBinding.coverIv);
         } else {
             wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
         }
@@ -218,7 +219,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
             iv.setBackgroundResource(R.drawable.bg_partner_photo_placeholder);
             LinearLayoutCompat.addViewCompat(wkVBinding.photoLayout, iv, dp(92), dp(92), i == 0 ? 0 : dp(8));
-            GlideUtils.getInstance().showImg(this, url, iv);
+            GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(url), iv);
         }
     }
 
@@ -292,9 +293,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         List<String> labels = new ArrayList<>();
         for (String item : list) {
             String code = normalizeLangCode(item);
-            if (!TextUtils.isEmpty(code)) labels.add(languageFlag(code) + " " + code);
+            if (!TextUtils.isEmpty(code)) labels.add(code);
         }
-        return join(labels, "  ");
+        return join(labels, " ");
     }
 
     private String normalizeCountryCode(String value) {

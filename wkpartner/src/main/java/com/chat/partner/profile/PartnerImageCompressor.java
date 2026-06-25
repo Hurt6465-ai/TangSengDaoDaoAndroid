@@ -18,28 +18,24 @@ public final class PartnerImageCompressor {
     public static File compressToWebp(File input, File outputDir, String outputName, int maxSide, int maxBytes) throws Exception {
         if (input == null || !input.exists()) throw new IllegalArgumentException("input not exists");
         if (!outputDir.exists() && !outputDir.mkdirs()) throw new IllegalStateException("mkdir failed");
-
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(input.getAbsolutePath(), bounds);
         int sample = 1;
         int longest = Math.max(bounds.outWidth, bounds.outHeight);
         while (longest / sample > maxSide) sample *= 2;
-
         BitmapFactory.Options opts = new BitmapFactory.Options();
         opts.inSampleSize = Math.max(1, sample);
         Bitmap bitmap = BitmapFactory.decodeFile(input.getAbsolutePath(), opts);
         if (bitmap == null) throw new IllegalStateException("decode failed");
-
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        int quality = 82;
+        int quality = 84;
         Bitmap.CompressFormat format = Build.VERSION.SDK_INT >= 30 ? Bitmap.CompressFormat.WEBP_LOSSY : Bitmap.CompressFormat.WEBP;
         do {
             out.reset();
             bitmap.compress(format, quality, out);
-            quality -= 8;
-        } while (out.size() > maxBytes && quality >= 50);
-
+            quality -= 7;
+        } while (out.size() > maxBytes && quality >= 45);
         File output = new File(outputDir, outputName.endsWith(".webp") ? outputName : outputName + ".webp");
         FileOutputStream fos = new FileOutputStream(output);
         fos.write(out.toByteArray());
