@@ -5,7 +5,7 @@
     android:background="#F7F7F7"
     android:orientation="vertical">
 
-    <include layout="@layout/base_title_layout" />
+    <include layout="@layout/wk_title_bar_layout" />
 
     <TextView
         android:layout_width="match_parent"
