@@ -8,10 +8,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 
-/**
- * 语伴主页图片压缩工具：背景墙/照片墙优先 WebP，默认控制在 150KB 以内。
- * 下一步接上传时直接调用 compressToWebp150KB。
- */
 public final class PartnerImageCompressor {
     private PartnerImageCompressor() {}
 

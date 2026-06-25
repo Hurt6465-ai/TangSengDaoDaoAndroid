@@ -3,11 +3,6 @@ package com.chat.partner.profile;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 语伴个人主页数据。
- * 字段和后端 /v1/users/{uid}、/v1/user/current 保持松耦合：
- * 当前后端没有返回的字段会自动为空，后端以后补字段后页面直接显示。
- */
 public class PartnerProfileEntity {
     public String uid;
     public String name;
@@ -16,7 +11,7 @@ public class PartnerProfileEntity {
     public String avatar_cache_key;
     public String country_code;
     public String country;
-    public int sex = -1; // 1 男，0 女，其他保密
+    public int sex = -1;
     public int age;
     public String birthday;
     public String intro;
@@ -31,8 +26,6 @@ public class PartnerProfileEntity {
     public List<String> learning_languages;
     public List<String> tags;
     public List<String> profile_images;
-
-    // 兼容部分后端可能返回单字符串
     public String native_language;
     public String learning_language;
 

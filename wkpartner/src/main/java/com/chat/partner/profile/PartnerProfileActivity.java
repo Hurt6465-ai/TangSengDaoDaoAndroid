@@ -10,10 +10,11 @@ import android.widget.TextView;
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.config.WKConfig;
 import com.chat.base.endpoint.entity.ChatViewMenu;
+import com.chat.base.glide.GlideUtils;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.ui.Theme;
-import com.chat.base.utils.systembar.WKStatusBarUtils;
 import com.chat.base.utils.WKDialogUtils;
+import com.chat.base.utils.systembar.WKStatusBarUtils;
 import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileBinding;
 import com.chat.uikit.chat.manager.WKIMUtils;
@@ -27,10 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * 独立语伴个人主页插件。
- * 不改唐僧叨叨原 UserDetailActivity，后续语伴页、发现页、聊天头像入口都可以跳这里。
- */
 public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBinding> {
     private String uid;
     private boolean isSelf;
@@ -57,9 +54,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     protected void toggleStatusBarMode() {
         super.toggleStatusBarMode();
         Window window = getWindow();
-        if (window != null) {
-            WKStatusBarUtils.setLightMode(window);
-        }
+        if (window != null) WKStatusBarUtils.setLightMode(window);
     }
 
     @Override
@@ -115,10 +110,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String showName = firstNotEmpty(data.name, data.username, data.uid);
         wkVBinding.nameTv.setText(showName);
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
-        if (!TextUtils.isEmpty(data.country_code)) {
-            wkVBinding.avatarView.showFlag(data.country_code);
+        showCountryFlagIfSupported(data.country_code);
+        if (!TextUtils.isEmpty(data.profile_cover)) {
+            GlideUtils.getInstance().showImg(this, data.profile_cover, wkVBinding.coverIv);
         }
-
         bindRole(data);
         bindSexAge(data);
         bindLanguages(data);
@@ -127,14 +122,20 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         bindActionButton(data);
     }
 
+
+    private void showCountryFlagIfSupported(String countryCode) {
+        if (TextUtils.isEmpty(countryCode)) return;
+        try {
+            wkVBinding.avatarView.getClass().getMethod("showFlag", String.class).invoke(wkVBinding.avatarView, countryCode);
+        } catch (Exception ignored) {
+            // 当前工程如果还没接头像国旗版 AvatarView，这里不阻塞语伴主页编译。
+        }
+    }
+
     private void bindRole(PartnerProfileEntity data) {
         String roleText = getRoleText(data);
-        if (TextUtils.isEmpty(roleText)) {
-            wkVBinding.roleTv.setVisibility(View.GONE);
-        } else {
-            wkVBinding.roleTv.setText(roleText);
-            wkVBinding.roleTv.setVisibility(View.VISIBLE);
-        }
+        wkVBinding.roleTv.setVisibility(TextUtils.isEmpty(roleText) ? View.GONE : View.VISIBLE);
+        wkVBinding.roleTv.setText(roleText);
     }
 
     private void bindSexAge(PartnerProfileEntity data) {
@@ -158,11 +159,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     }
 
     private void bindIntro(PartnerProfileEntity data) {
-        if (TextUtils.isEmpty(data.intro)) {
-            wkVBinding.introTv.setText(R.string.partner_profile_intro_empty);
-        } else {
-            wkVBinding.introTv.setText(data.intro);
-        }
+        wkVBinding.introTv.setText(TextUtils.isEmpty(data.intro) ? getString(R.string.partner_profile_intro_empty) : data.intro);
     }
 
     private void bindTags(PartnerProfileEntity data) {
@@ -173,8 +170,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             return;
         }
         wkVBinding.tagCard.setVisibility(View.VISIBLE);
-        wkVBinding.tagTitleTv.setVisibility(View.VISIBLE);
-        wkVBinding.tagLayout.setVisibility(View.VISIBLE);
         for (String tag : tags) {
             if (TextUtils.isEmpty(tag)) continue;
             TextView tv = new TextView(this);
@@ -198,7 +193,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             return;
         }
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
-        boolean isFriend = (data.follow == 1) || (channel != null && channel.follow == 1);
+        boolean isFriend = data.follow == 1 || (channel != null && channel.follow == 1);
         wkVBinding.helloBar.setVisibility(View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(View.VISIBLE);
         wkVBinding.helloBtn.setEnabled(true);
@@ -217,9 +212,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     }
 
     private void showGreetingDialog() {
-        String title = getString(R.string.partner_say_hello);
-        String hint = getString(R.string.partner_hello_hint);
-        WKDialogUtils.getInstance().showInputDialog(this, title, hint, defaultGreeting(), hint, 40, text -> {
+        WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_say_hello), getString(R.string.partner_hello_hint), defaultGreeting(), getString(R.string.partner_hello_hint), 40, text -> {
             String remark = TextUtils.isEmpty(text) ? defaultGreeting() : text;
             String vercode = profile == null ? "" : profile.vercode;
             FriendModel.getInstance().applyAddFriend(uid, vercode, remark, (code, msg) -> {
@@ -296,9 +289,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private String firstNotEmpty(String... values) {
         if (values == null) return "";
-        for (String value : values) {
-            if (!TextUtils.isEmpty(value)) return value;
-        }
+        for (String value : values) if (!TextUtils.isEmpty(value)) return value;
         return "";
     }
 
