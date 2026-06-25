@@ -18,4 +18,28 @@
     <string name="partner_admin">管理员</string>
     <string name="partner_official">官方</string>
     <string name="partner_service">客服</string>
+
+    <string name="partner_basic_profile">基础资料</string>
+    <string name="partner_language_profile">语言资料</string>
+    <string name="partner_page_profile">主页资料</string>
+    <string name="partner_name">昵称</string>
+    <string name="partner_name_required">昵称不能为空</string>
+    <string name="partner_country">国籍</string>
+    <string name="partner_choose_country">选择国籍</string>
+    <string name="partner_sex">性别</string>
+    <string name="partner_sex_male">男</string>
+    <string name="partner_sex_female">女</string>
+    <string name="partner_sex_private">保密</string>
+    <string name="partner_birthday_hint">生日，例如 2000-01-01</string>
+    <string name="partner_native_language_hint">母语，例如 MY</string>
+    <string name="partner_learning_language_hint">在学语言，例如 ZH EN</string>
+    <string name="partner_language_edit_tip">语言统一用大写代码，多个用空格分开，例如：MY 或 ZH EN。</string>
+    <string name="partner_intro_hint">介绍一下你自己、想练什么语言、喜欢聊什么</string>
+    <string name="partner_tags_hint">标签，例如 音乐 旅行 美食</string>
+    <string name="partner_cover_hint">背景墙图片地址，上传功能下一版接入</string>
+    <string name="partner_images_hint">语伴图片地址，多个用空格分开</string>
+    <string name="partner_image_edit_tip">当前先保存图片地址；本地选择图片、压缩上传下一版单独接入。</string>
+    <string name="partner_save">保存</string>
+    <string name="partner_save_success">已保存</string>
+    <string name="partner_save_failed">保存失败</string>
 </resources>
