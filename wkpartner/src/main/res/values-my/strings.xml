@@ -18,4 +18,28 @@
     <string name="partner_admin">အက်ဒမင်</string>
     <string name="partner_official">တရားဝင်</string>
     <string name="partner_service">ဝန်ဆောင်မှု</string>
+
+    <string name="partner_basic_profile">အခြေခံ ပရိုဖိုင်</string>
+    <string name="partner_language_profile">ဘာသာစကား ပရိုဖိုင်</string>
+    <string name="partner_page_profile">ပရိုဖိုင် စာမျက်နှာ</string>
+    <string name="partner_name">နာမည်</string>
+    <string name="partner_name_required">နာမည် မဖြစ်မနေ လိုအပ်သည်</string>
+    <string name="partner_country">နိုင်ငံ</string>
+    <string name="partner_choose_country">နိုင်ငံရွေးပါ</string>
+    <string name="partner_sex">ကျား/မ</string>
+    <string name="partner_sex_male">ကျား</string>
+    <string name="partner_sex_female">မ</string>
+    <string name="partner_sex_private">မပြပါ</string>
+    <string name="partner_birthday_hint">မွေးနေ့၊ ဥပမာ 2000-01-01</string>
+    <string name="partner_native_language_hint">မိခင်ဘာသာ၊ ဥပမာ MY</string>
+    <string name="partner_learning_language_hint">လေ့လာနေသော ဘာသာ၊ ဥပမာ ZH EN</string>
+    <string name="partner_language_edit_tip">ဘာသာစကား code ကို အကြီးစာလုံးဖြင့် ရေးပါ။ အများကြီးဆို space ဖြင့် ခွဲပါ။</string>
+    <string name="partner_intro_hint">ကိုယ့်အကြောင်း၊ လေ့ကျင့်ချင်သော ဘာသာနှင့် စကားပြောချင်သော အကြောင်းအရာများ</string>
+    <string name="partner_tags_hint">Tag များ၊ ဥပမာ music travel food</string>
+    <string name="partner_cover_hint">Cover image URL။ Upload ကို နောက်ဗားရှင်းတွင် ချိတ်ဆက်မည်။</string>
+    <string name="partner_images_hint">ပုံ URL များကို space ဖြင့် ခွဲပါ</string>
+    <string name="partner_image_edit_tip">ယခုဗားရှင်းတွင် image URL များသာ သိမ်းမည်။ ပုံရွေး/ချုံ့/တင်ခြင်းကို နောက်ဗားရှင်းတွင် ချိတ်ဆက်မည်။</string>
+    <string name="partner_save">သိမ်းမည်</string>
+    <string name="partner_save_success">သိမ်းပြီးပါပြီ</string>
+    <string name="partner_save_failed">သိမ်းမရပါ</string>
 </resources>
