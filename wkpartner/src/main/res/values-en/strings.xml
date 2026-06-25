@@ -1,0 +1,21 @@
+<resources>
+    <string name="partner_profile">Partner Profile</string>
+    <string name="partner_edit_profile">Edit Profile</string>
+    <string name="partner_edit_basic_info">Avatar, name and basic info</string>
+    <string name="partner_edit_profile_tips">Cover, gallery and language tags will be connected in the next version. Basic info still uses the original TangSengDaoDao APIs.</string>
+    <string name="partner_say_hello">Say Hello</string>
+    <string name="partner_hello_sent">Sent</string>
+    <string name="partner_send_message">Message</string>
+    <string name="partner_hello_hint">Write a greeting</string>
+    <string name="partner_default_hello_plain">Hi, can we get to know each other?</string>
+    <string name="partner_default_hello_with_lang">Hi, I want to practice %1$s. Can we get to know each other?</string>
+    <string name="partner_intro">Intro</string>
+    <string name="partner_profile_intro_empty">No intro yet.</string>
+    <string name="partner_tags">Tags</string>
+    <string name="partner_moments">Moments</string>
+    <string name="partner_moments_empty">Moments, photos and videos will be connected later.</string>
+    <string name="partner_teacher">Teacher</string>
+    <string name="partner_admin">Admin</string>
+    <string name="partner_official">Official</string>
+    <string name="partner_service">Service</string>
+</resources>
