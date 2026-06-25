@@ -273,10 +273,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
         boolean isFriend = (profile != null && profile.follow == 1) || (channel != null && channel.follow == 1);
         if (isFriend) {
-            WKIMUtils.getInstance().startChatActivity(new ChatViewMenu(uid, WKChannelType.PERSONAL, firstNotEmpty(profile == null ? "" : profile.name, uid)));
+            WKIMUtils.getInstance().startChatActivity(new ChatViewMenu(this, uid, WKChannelType.PERSONAL, 0, false));
             return;
         }
-        WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_hello_hint), defaultGreeting(), text -> {
+        WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_hello_hint), "", defaultGreeting(), defaultGreeting(), 40, text -> {
             String remark = TextUtils.isEmpty(text) ? defaultGreeting() : text;
             String vercode = profile == null ? "" : profile.vercode;
             animateButtonToProgress();
