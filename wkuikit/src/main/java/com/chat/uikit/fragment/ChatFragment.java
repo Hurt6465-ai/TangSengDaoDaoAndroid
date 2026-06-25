@@ -145,6 +145,11 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
 
         Theme.setPressedBackground(wkVBinding.deviceIv);
         Theme.setPressedBackground(wkVBinding.searchIv);
+        if (wkVBinding.profileAvatarView != null) {
+            wkVBinding.profileAvatarView.setSize(38);
+            Theme.setPressedBackground(wkVBinding.profileAvatarView);
+            refreshTopProfileAvatar();
+        }
         wkVBinding.rightIv.setBackgroundColor(Color.TRANSPARENT);
         Theme.setPressedBackground(wkVBinding.messageTabTv);
         Theme.setPressedBackground(wkVBinding.roomTabTv);
@@ -266,6 +271,9 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     @Override
     protected void initListener() {
         wkVBinding.rightIv.setOnClickListener(view -> openSideMenu());
+        if (wkVBinding.profileAvatarView != null) {
+            wkVBinding.profileAvatarView.setOnClickListener(view -> openPartnerProfile());
+        }
         wkVBinding.sideMenuMask.setOnClickListener(view -> closeSideMenu());
         wkVBinding.messageTabTv.setOnClickListener(view -> showHomePage(PAGE_MESSAGES));
         wkVBinding.roomTabTv.setOnClickListener(view -> showHomePage(PAGE_TOPIC_ROOMS));
@@ -1240,6 +1248,23 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                 });
     }
 
+    private void openPartnerProfile() {
+        try {
+            Intent intent = new Intent();
+            intent.setClassName(requireContext(), "com.chat.partner.profile.PartnerProfileActivity");
+            intent.putExtra("uid", WKConfig.getInstance().getUid());
+            startActivity(intent);
+        } catch (Exception ignored) {
+            startActivity(new Intent(getActivity(), MyInfoActivity.class));
+        }
+    }
+
+    private void refreshTopProfileAvatar() {
+        if (wkVBinding == null || wkVBinding.profileAvatarView == null) return;
+        wkVBinding.profileAvatarView.setSize(38);
+        wkVBinding.profileAvatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
+    }
+
     private void initSideMenuListeners() {
         SingleClickUtil.onSingleClick(wkVBinding.sideProfileLayout, view -> {
             closeSideMenu();
@@ -1414,6 +1439,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     public void onResume() {
         super.onResume();
         refreshSideMenuUserInfo();
+        refreshTopProfileAvatar();
         updateContactsBadge();
         startTopicRoomExpireWatcher();
         cleanupExpiredTopicRoomConversations();
