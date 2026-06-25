@@ -43,4 +43,11 @@
     <string name="partner_save_failed">保存失败</string>
     <string name="partner_confirm">确定</string>
     <string name="partner_cancel">取消</string>
+<string name="partner_choose_tags">选择标签</string>
+    <string name="partner_tag_selector">选择标签</string>
+    <string name="partner_upload_cover">从手机上传背景墙</string>
+    <string name="partner_add_photo">从手机添加照片</string>
+    <string name="partner_uploading">正在上传...</string>
+    <string name="partner_upload_success">上传成功</string>
+    <string name="partner_upload_failed">上传失败</string>
 </resources>
