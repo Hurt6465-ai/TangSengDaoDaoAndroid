@@ -79,6 +79,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         loadProfile();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (profile != null) loadProfile();
+    }
+
     private void loadProfile() {
         PartnerProfileModel.getInstance().getUserProfile(uid, (code, msg, data) -> {
             if (code == HttpResponseCode.success && data != null) {
@@ -115,12 +121,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         }
         bindRole(data);
         bindSexAge(data);
+        bindCountry(data);
         bindLanguages(data);
         bindIntro(data);
         bindTags(data);
         bindActionButton(data);
     }
-
 
     private void showCountryFlagIfSupported(String countryCode) {
         if (TextUtils.isEmpty(countryCode)) return;
@@ -146,6 +152,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String text = join(parts, "  ");
         wkVBinding.sexAgeTv.setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
         wkVBinding.sexAgeTv.setText(text);
+    }
+
+
+    private void bindCountry(PartnerProfileEntity data) {
+        String text = firstNotEmpty(data.country, data.country_code);
+        wkVBinding.countryTv.setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
+        wkVBinding.countryTv.setText(text);
     }
 
     private void bindLanguages(PartnerProfileEntity data) {
@@ -284,6 +297,31 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         } catch (Exception ignored) {
             return 0;
         }
+    }
+
+    private List<String> splitText(String input) {
+        List<String> list = new ArrayList<>();
+        if (TextUtils.isEmpty(input)) return list;
+        String[] arr = input.replace('，', ' ').replace(',', ' ').replace('/', ' ').trim().split("\\s+");
+        for (String item : arr) if (!TextUtils.isEmpty(item)) list.add(item.trim());
+        return list;
+    }
+
+    private String countryCodeFromText(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        String v = value.toUpperCase(Locale.US);
+        if (v.contains("MM") || v.contains("MYANMAR") || v.contains("缅甸") || v.contains("မြန်မာ")) return "MM";
+        if (v.contains("CN") || v.contains("CHINA") || v.contains("中国")) return "CN";
+        if (v.contains("TH") || v.contains("THAI") || v.contains("泰国")) return "TH";
+        if (v.contains("JP") || v.contains("JAPAN") || v.contains("日本")) return "JP";
+        if (v.contains("KR") || v.contains("KOREA") || v.contains("韩国")) return "KR";
+        if (v.contains("VN") || v.contains("VIETNAM") || v.contains("越南")) return "VN";
+        if (v.contains("LA") || v.contains("LAOS") || v.contains("老挝")) return "LA";
+        if (v.contains("KH") || v.contains("CAMBODIA") || v.contains("柬埔寨")) return "KH";
+        if (v.contains("MY") || v.contains("MALAYSIA") || v.contains("马来西亚")) return "MY";
+        if (v.contains("SG") || v.contains("SINGAPORE") || v.contains("新加坡")) return "SG";
+        if (v.contains("US") || v.contains("UNITED STATES") || v.contains("美国")) return "US";
+        return "";
     }
 
     private String firstNotEmpty(String... values) {
