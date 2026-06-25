@@ -1,22 +1,27 @@
 package com.chat.partner.profile;
 
+import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Typeface;
+import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.chat.base.base.WKBaseActivity;
 import com.chat.partner.R;
-import com.chat.partner.databinding.ActPartnerTagSelectorBinding;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 
-public class PartnerTagSelectorActivity extends WKBaseActivity<ActPartnerTagSelectorBinding> {
+public class PartnerTagSelectorActivity extends Activity {
     public static final String EXTRA_TAGS = "tags";
 
     private final LinkedHashSet<String> selected = new LinkedHashSet<>();
+    private LinearLayout groupContainer;
+    private TextView saveBtn;
 
     private final String[][] groups = new String[][]{
             {"语言能力", "母语者", "流利交流", "中高级", "初学者", "零基础"},
@@ -33,48 +38,81 @@ public class PartnerTagSelectorActivity extends WKBaseActivity<ActPartnerTagSele
     };
 
     @Override
-    protected ActPartnerTagSelectorBinding getViewBinding() {
-        return ActPartnerTagSelectorBinding.inflate(getLayoutInflater());
-    }
-
-    @Override
-    protected void setTitle(TextView titleTv) {
-        titleTv.setText(R.string.partner_tag_selector);
-    }
-
-    @Override
-    protected void initView() {
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
         selected.addAll(split(getIntent().getStringExtra(EXTRA_TAGS)));
+        buildContentView();
         renderGroups();
     }
 
-    @Override
-    protected void initListener() {
-        wkVBinding.saveBtn.setOnClickListener(v -> {
-            Intent data = new Intent();
-            data.putExtra(EXTRA_TAGS, joinSelected());
-            setResult(RESULT_OK, data);
-            finish();
-        });
+    private void buildContentView() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(0xFFF7F7F7);
+        root.setLayoutParams(new LinearLayout.LayoutParams(-1, -1));
+
+        LinearLayout titleBar = new LinearLayout(this);
+        titleBar.setOrientation(LinearLayout.HORIZONTAL);
+        titleBar.setGravity(Gravity.CENTER_VERTICAL);
+        titleBar.setPadding(dp(8), dp(28), dp(16), 0);
+        root.addView(titleBar, new LinearLayout.LayoutParams(-1, dp(78)));
+
+        TextView back = new TextView(this);
+        back.setText("‹");
+        back.setGravity(Gravity.CENTER);
+        back.setTextSize(36);
+        back.setTextColor(0xFF222222);
+        titleBar.addView(back, new LinearLayout.LayoutParams(dp(48), -1));
+        back.setOnClickListener(v -> finish());
+
+        TextView title = new TextView(this);
+        title.setText(R.string.partner_tag_selector);
+        title.setTextSize(18);
+        title.setTextColor(0xFF222222);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        titleBar.addView(title, new LinearLayout.LayoutParams(0, -1, 1f));
+
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        groupContainer = new LinearLayout(this);
+        groupContainer.setOrientation(LinearLayout.VERTICAL);
+        groupContainer.setPadding(dp(16), dp(6), dp(16), dp(20));
+        scrollView.addView(groupContainer, new ScrollView.LayoutParams(-1, -2));
+        root.addView(scrollView, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        saveBtn = new TextView(this);
+        saveBtn.setText(R.string.partner_save);
+        saveBtn.setTextSize(16);
+        saveBtn.setTextColor(0xFFFFFFFF);
+        saveBtn.setTypeface(Typeface.DEFAULT_BOLD);
+        saveBtn.setGravity(Gravity.CENTER);
+        saveBtn.setBackgroundResource(R.drawable.bg_partner_hello_button);
+        LinearLayout.LayoutParams saveLp = new LinearLayout.LayoutParams(-1, dp(48));
+        saveLp.setMargins(dp(16), dp(10), dp(16), dp(18));
+        root.addView(saveBtn, saveLp);
+        saveBtn.setOnClickListener(v -> saveAndFinish());
+
+        setContentView(root);
     }
 
     private void renderGroups() {
-        wkVBinding.groupContainer.removeAllViews();
+        if (groupContainer == null) return;
+        groupContainer.removeAllViews();
         for (String[] group : groups) {
             TextView title = new TextView(this);
             title.setText(group[0]);
             title.setTextSize(16);
             title.setTextColor(0xFF222222);
             title.setPadding(0, dp(18), 0, dp(8));
-            title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
-            wkVBinding.groupContainer.addView(title, new LinearLayout.LayoutParams(-1, -2));
+            title.setTypeface(Typeface.DEFAULT_BOLD);
+            groupContainer.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
             LinearLayout row = null;
             for (int i = 1; i < group.length; i++) {
                 if (row == null || row.getChildCount() >= 3) {
                     row = new LinearLayout(this);
                     row.setOrientation(LinearLayout.HORIZONTAL);
-                    wkVBinding.groupContainer.addView(row, new LinearLayout.LayoutParams(-1, -2));
+                    groupContainer.addView(row, new LinearLayout.LayoutParams(-1, -2));
                 }
                 row.addView(makeChip(group[i]));
             }
@@ -85,12 +123,14 @@ public class PartnerTagSelectorActivity extends WKBaseActivity<ActPartnerTagSele
         TextView tv = new TextView(this);
         tv.setText(text);
         tv.setTextSize(14);
-        tv.setGravity(android.view.Gravity.CENTER);
-        tv.setPadding(dp(10), dp(9), dp(10), dp(9));
-        refreshChip(tv, selected.contains(text));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
+        tv.setGravity(Gravity.CENTER);
+        tv.setSingleLine(true);
+        tv.setEllipsize(TextUtils.TruncateAt.END);
+        tv.setPadding(dp(8), dp(9), dp(8), dp(9));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(42), 1f);
         lp.setMargins(dp(4), dp(4), dp(4), dp(4));
         tv.setLayoutParams(lp);
+        refreshChip(tv, selected.contains(text));
         tv.setOnClickListener(v -> {
             if (selected.contains(text)) selected.remove(text);
             else selected.add(text);
@@ -104,11 +144,21 @@ public class PartnerTagSelectorActivity extends WKBaseActivity<ActPartnerTagSele
         tv.setBackgroundResource(checked ? R.drawable.bg_partner_tag_selected : R.drawable.bg_partner_tag_unselected);
     }
 
+    private void saveAndFinish() {
+        Intent data = new Intent();
+        data.putExtra(EXTRA_TAGS, joinSelected());
+        setResult(RESULT_OK, data);
+        finish();
+    }
+
     private ArrayList<String> split(String text) {
         ArrayList<String> out = new ArrayList<>();
         if (TextUtils.isEmpty(text)) return out;
         String[] parts = text.replace('，', ' ').replace(',', ' ').replace('/', ' ').trim().split("\\s+");
-        for (String item : parts) if (!TextUtils.isEmpty(item) && !out.contains(item.trim())) out.add(item.trim());
+        for (String item : parts) {
+            String clean = item == null ? "" : item.trim();
+            if (!TextUtils.isEmpty(clean) && !out.contains(clean)) out.add(clean);
+        }
         return out;
     }
 
@@ -122,5 +172,7 @@ public class PartnerTagSelectorActivity extends WKBaseActivity<ActPartnerTagSele
         return sb.toString();
     }
 
-    private int dp(float value) { return (int) (value * getResources().getDisplayMetrics().density + 0.5f); }
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
 }

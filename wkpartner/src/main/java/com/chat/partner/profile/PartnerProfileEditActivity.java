@@ -43,9 +43,9 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     };
 
     private static final String[][] LANGS = new String[][]{
-            {"MY", "缅甸语 MY"}, {"ZH", "中文 ZH"}, {"EN", "英语 EN"},
-            {"TH", "泰语 TH"}, {"JA", "日语 JA"}, {"KO", "韩语 KO"},
-            {"VI", "越南语 VI"}, {"ID", "印尼语 ID"}, {"MS", "马来语 MS"}
+            {"MY", "🇲🇲 缅甸语  MY"}, {"ZH", "🇨🇳 中文  ZH"}, {"EN", "🇺🇸 英语  EN"},
+            {"TH", "🇹🇭 泰语  TH"}, {"JA", "🇯🇵 日语  JA"}, {"KO", "🇰🇷 韩语  KO"},
+            {"VI", "🇻🇳 越南语  VI"}, {"ID", "🇮🇩 印尼语  ID"}, {"MS", "🇲🇾 马来语  MS"}
     };
 
     private String countryCode = "";
@@ -53,10 +53,12 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     private int sexValue = 2; // 1 男，0 女，2 保密
     private String birthday = "";
     private String profileCover = "";
+    private String localCoverPreview = "";
     private final ArrayList<String> nativeCodes = new ArrayList<>();
     private final ArrayList<String> learningCodes = new ArrayList<>();
     private final ArrayList<String> tags = new ArrayList<>();
     private final ArrayList<String> profileImages = new ArrayList<>();
+    private final ArrayList<String> localPhotoPreviews = new ArrayList<>();
 
     @Override
     protected ActPartnerProfileEditBinding getViewBinding() {
@@ -261,23 +263,32 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         }
         Uri uri = data.getData();
         if (uri == null) return;
+        if (requestCode == REQ_COVER) {
+            localCoverPreview = uri.toString();
+        } else {
+            String local = uri.toString();
+            if (!localPhotoPreviews.contains(local)) localPhotoPreviews.add(local);
+        }
+        updateCoverPreview();
+        updatePhotoPreview();
         uploadPickedImage(uri, requestCode == REQ_COVER);
     }
 
     private void uploadPickedImage(Uri uri, boolean cover) {
+        final String localPreview = uri.toString();
         showToast(getString(R.string.partner_uploading));
         new Thread(() -> {
             try {
                 File source = copyUriToCache(uri, cover ? "partner_cover_src" : "partner_photo_src");
                 File webp = PartnerImageCompressor.compressToWebp150KB(source, getCacheDir(), cover ? "partner_cover.webp" : ("partner_photo_" + System.currentTimeMillis() + ".webp"));
-                runOnUiThread(() -> uploadCompressedFile(webp, cover));
+                runOnUiThread(() -> uploadCompressedFile(webp, cover, localPreview));
             } catch (Exception e) {
                 runOnUiThread(() -> showToast(getString(R.string.partner_upload_failed)));
             }
         }).start();
     }
 
-    private void uploadCompressedFile(File file, boolean cover) {
+    private void uploadCompressedFile(File file, boolean cover, String localPreview) {
         WKUploader.getInstance().getUploadFileUrl(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL, file.getAbsolutePath(), (url, fileUrl) -> {
             if (TextUtils.isEmpty(url)) {
                 showToast(getString(R.string.partner_upload_failed));
@@ -288,8 +299,10 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
                 public void onSuccess(String ignore) {
                     if (cover) {
                         profileCover = fileUrl;
+                        if (TextUtils.equals(localCoverPreview, localPreview)) localCoverPreview = "";
                         updateCoverPreview();
                     } else {
+                        localPhotoPreviews.remove(localPreview);
                         if (!profileImages.contains(fileUrl)) profileImages.add(fileUrl);
                         updatePhotoPreview();
                     }
@@ -335,8 +348,8 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void updateLanguageText() {
-        wkVBinding.nativeLangValueTv.setText(nativeCodes.isEmpty() ? getString(R.string.partner_choose_native_language) : joinPlain(nativeCodes));
-        wkVBinding.learningLangValueTv.setText(learningCodes.isEmpty() ? getString(R.string.partner_choose_learning_language) : joinPlain(learningCodes));
+        wkVBinding.nativeLangValueTv.setText(nativeCodes.isEmpty() ? getString(R.string.partner_choose_native_language) : joinLanguageWithFlag(nativeCodes));
+        wkVBinding.learningLangValueTv.setText(learningCodes.isEmpty() ? getString(R.string.partner_choose_learning_language) : joinLanguageWithFlag(learningCodes));
     }
 
     private void updateTagsText() {
@@ -344,25 +357,34 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void updateCoverPreview() {
-        if (TextUtils.isEmpty(profileCover)) {
-            wkVBinding.coverPreviewIv.setImageResource(R.drawable.bg_partner_cover_default);
-        } else {
+        if (!TextUtils.isEmpty(localCoverPreview)) {
+            wkVBinding.coverPreviewIv.setImageURI(Uri.parse(localCoverPreview));
+        } else if (!TextUtils.isEmpty(profileCover)) {
             GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(profileCover), wkVBinding.coverPreviewIv);
+        } else {
+            wkVBinding.coverPreviewIv.setImageResource(R.drawable.bg_partner_cover_default);
         }
     }
 
     private void updatePhotoPreview() {
         wkVBinding.imagePreviewLayout.removeAllViews();
-        int count = Math.min(profileImages.size(), 6);
+        ArrayList<String> all = new ArrayList<>();
+        all.addAll(localPhotoPreviews);
+        all.addAll(profileImages);
+        int count = Math.min(all.size(), 6);
         for (int i = 0; i < count; i++) {
-            String path = profileImages.get(i);
+            String path = all.get(i);
             ImageView imageView = new ImageView(this);
             imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
             imageView.setBackgroundResource(R.drawable.bg_partner_photo_placeholder);
-            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(dp(58), dp(58));
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(dp(64), dp(64));
             if (i > 0) lp.leftMargin = dp(8);
             wkVBinding.imagePreviewLayout.addView(imageView, lp);
-            GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(path), imageView);
+            if (!TextUtils.isEmpty(path) && (path.startsWith("content:") || path.startsWith("file:"))) {
+                imageView.setImageURI(Uri.parse(path));
+            } else {
+                GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(path), imageView);
+            }
         }
     }
 
@@ -397,6 +419,18 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private String safe(String value) { return value == null ? "" : value.trim(); }
+
+    private String joinLanguageWithFlag(List<String> values) {
+        if (values == null || values.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (String value : values) {
+            String code = normalizeLangCode(value);
+            if (TextUtils.isEmpty(code)) continue;
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(languageFlag(code)).append(' ').append(code);
+        }
+        return sb.toString();
+    }
 
     private String joinPlain(List<String> values) {
         if (values == null || values.isEmpty()) return "";
@@ -434,6 +468,21 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
                 String only = v.replaceAll("[^A-Za-z]", "");
                 if (only.length() >= 2) return only.substring(0, Math.min(3, only.length())).toUpperCase(Locale.US);
                 return v.toUpperCase(Locale.US);
+        }
+    }
+
+    private String languageFlag(String code) {
+        switch (code) {
+            case "ZH": return "🇨🇳";
+            case "EN": return "🇺🇸";
+            case "MY": return "🇲🇲";
+            case "TH": return "🇹🇭";
+            case "JA": return "🇯🇵";
+            case "KO": return "🇰🇷";
+            case "VI": return "🇻🇳";
+            case "ID": return "🇮🇩";
+            case "MS": return "🇲🇾";
+            default: return "🌐";
         }
     }
 

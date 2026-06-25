@@ -61,12 +61,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     @Override
     protected void initView() {
-        wkVBinding.avatarView.setSize(78);
+        wkVBinding.avatarView.setSize(92);
         wkVBinding.helloBtn.getBackground().setTint(Theme.colorAccount);
         wkVBinding.editBtn.setVisibility(isSelf ? View.VISIBLE : View.GONE);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
+        wkVBinding.countryTv.setVisibility(View.GONE);
         applyStatusBarSafeTop();
     }
 
@@ -75,6 +76,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.backBtn.setOnClickListener(v -> finish());
         wkVBinding.editBtn.setOnClickListener(v -> startActivity(new Intent(this, PartnerProfileEditActivity.class)));
         wkVBinding.helloBtn.setOnClickListener(v -> onMainActionClick());
+        wkVBinding.tagCard.setOnClickListener(v -> {
+            if (isSelf) startActivity(new Intent(this, PartnerProfileEditActivity.class));
+        });
     }
 
     @Override
@@ -101,8 +105,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void applyStatusBarSafeTop() {
         int statusBar = WKStatusBarUtils.getStatusBarHeight(this);
-        setTopMargin(wkVBinding.backBtn, statusBar + dp(12));
-        setTopMargin(wkVBinding.editBtn, statusBar + dp(14));
+        setTopMargin(wkVBinding.backBtn, statusBar + dp(10));
+        setTopMargin(wkVBinding.editBtn, statusBar + dp(12));
     }
 
     private void setTopMargin(View view, int topMargin) {
@@ -117,16 +121,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void bindProfile(PartnerProfileEntity data) {
         String showName = firstNotEmpty(data.name, data.username, data.uid);
         wkVBinding.nameTv.setText(showName);
+        String username = firstNotEmpty(data.username, data.uid);
+        wkVBinding.usernameTv.setText(TextUtils.isEmpty(username) ? "" : "@" + username);
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         showCountryFlagIfSupported(data.country_code);
-        if (!TextUtils.isEmpty(data.profile_cover)) {
-            GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(data.profile_cover), wkVBinding.coverIv);
-        } else {
-            wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
-        }
+        bindCover(data.profile_cover);
         bindRole(data);
         bindSexAge(data);
-        bindCountry(data);
         bindLanguages(data);
         bindIntro(data);
         bindTags(data);
@@ -134,12 +135,19 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         bindActionButton(data);
     }
 
+    private void bindCover(String cover) {
+        if (!TextUtils.isEmpty(cover)) {
+            GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(cover), wkVBinding.coverIv);
+        } else {
+            wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
+        }
+    }
+
     private void showCountryFlagIfSupported(String countryCode) {
         if (TextUtils.isEmpty(countryCode)) return;
         try {
-            wkVBinding.avatarView.getClass().getMethod("showFlag", String.class).invoke(wkVBinding.avatarView, countryCode);
+            wkVBinding.avatarView.getClass().getMethod("showFlag", String.class).invoke(wkVBinding.avatarView, normalizeCountryCode(countryCode));
         } catch (Exception ignored) {
-            // 兼容还没有接国旗版 AvatarView 的工程。
         }
     }
 
@@ -155,15 +163,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         else if (data.sex == 0) parts.add("♀");
         int age = data.age > 0 ? data.age : ageFromBirthday(data.birthday);
         if (age > 0) parts.add(String.valueOf(age));
-        String text = join(parts, "  ");
+        String text = join(parts, " ");
         wkVBinding.sexAgeTv.setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
         wkVBinding.sexAgeTv.setText(text);
-    }
-
-    private void bindCountry(PartnerProfileEntity data) {
-        String text = formatCountry(data.country_code, data.country);
-        wkVBinding.countryTv.setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
-        wkVBinding.countryTv.setText(text);
     }
 
     private void bindLanguages(PartnerProfileEntity data) {
@@ -176,7 +178,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     }
 
     private void bindIntro(PartnerProfileEntity data) {
-        wkVBinding.introTv.setText(TextUtils.isEmpty(data.intro) ? getString(R.string.partner_profile_intro_empty) : data.intro);
+        String intro = TextUtils.isEmpty(data.intro) ? getString(R.string.partner_profile_intro_empty) : data.intro;
+        wkVBinding.introTv.setText(intro);
     }
 
     private void bindTags(PartnerProfileEntity data) {
@@ -187,20 +190,24 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             return;
         }
         wkVBinding.tagCard.setVisibility(View.VISIBLE);
-        for (String tag : tags) addChip(tag);
+        int max = Math.min(tags.size(), 16);
+        for (int i = 0; i < max; i++) addChip(tags.get(i));
     }
 
     private void addChip(String text) {
         if (TextUtils.isEmpty(text)) return;
         TextView tv = new TextView(this);
         tv.setText(text);
-        tv.setTextSize(12);
-        tv.setTextColor(0xFFFFFFFF);
+        tv.setTextSize(13);
+        tv.setTextColor(0xFF777777);
+        tv.setGravity(Gravity.CENTER);
         tv.setMaxLines(1);
         tv.setEllipsize(TextUtils.TruncateAt.END);
-        tv.setBackgroundResource(R.drawable.bg_partner_glass_chip);
-        tv.setPadding(dp(10), dp(5), dp(10), dp(5));
-        wkVBinding.tagLayout.addView(tv);
+        tv.setBackgroundResource(R.drawable.bg_partner_tag_unselected);
+        tv.setPadding(dp(13), dp(7), dp(13), dp(7));
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(-2, dp(36));
+        lp.rightMargin = dp(8);
+        wkVBinding.tagLayout.addView(tv, lp);
     }
 
     private void bindPhotos(PartnerProfileEntity data) {
@@ -281,21 +288,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         return "";
     }
 
-    private String formatCountry(String code, String name) {
-        String safeCode = normalizeCountryCode(code);
-        String label = firstNotEmpty(name, countryNameByCode(safeCode));
-        if (TextUtils.isEmpty(safeCode) && TextUtils.isEmpty(label)) return "";
-        return countryFlag(safeCode) + " " + firstNotEmpty(label, safeCode);
-    }
-
     private String formatLanguageLabels(List<String> list) {
         if (list == null || list.isEmpty()) return "";
         List<String> labels = new ArrayList<>();
         for (String item : list) {
             String code = normalizeLangCode(item);
-            if (!TextUtils.isEmpty(code)) labels.add(code);
+            if (!TextUtils.isEmpty(code) && !labels.contains(code)) labels.add(code);
         }
-        return join(labels, " ");
+        return join(labels, "/");
     }
 
     private String normalizeCountryCode(String value) {
@@ -326,68 +326,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         }
     }
 
-    private String languageFlag(String code) {
-        switch (code) {
-            case "ZH": return "🇨🇳";
-            case "EN": return "🇺🇸";
-            case "MY": return "🇲🇲";
-            case "TH": return "🇹🇭";
-            case "JA": return "🇯🇵";
-            case "KO": return "🇰🇷";
-            case "VI": return "🇻🇳";
-            case "ID": return "🇮🇩";
-            case "MS": return "🇲🇾";
-            default: return "🏳️";
-        }
-    }
-
-    private String countryFlag(String code) {
-        switch (code) {
-            case "MM": return "🇲🇲";
-            case "CN": return "🇨🇳";
-            case "TH": return "🇹🇭";
-            case "JP": return "🇯🇵";
-            case "KR": return "🇰🇷";
-            case "VN": return "🇻🇳";
-            case "LA": return "🇱🇦";
-            case "KH": return "🇰🇭";
-            case "MY": return "🇲🇾";
-            case "SG": return "🇸🇬";
-            case "US": return "🇺🇸";
-            default: return "🌐";
-        }
-    }
-
-    private String countryNameByCode(String code) {
-        if (TextUtils.isEmpty(code)) return "";
-        switch (code) {
-            case "MM": return "缅甸";
-            case "CN": return "中国";
-            case "TH": return "泰国";
-            case "JP": return "日本";
-            case "KR": return "韩国";
-            case "VN": return "越南";
-            case "LA": return "老挝";
-            case "KH": return "柬埔寨";
-            case "MY": return "马来西亚";
-            case "SG": return "新加坡";
-            case "US": return "美国";
-            default: return "";
-        }
-    }
-
-    private int ageFromBirthday(String birthday) {
-        if (TextUtils.isEmpty(birthday) || birthday.length() < 4) return 0;
-        try {
-            int year = Integer.parseInt(birthday.substring(0, 4));
-            int current = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR);
-            int age = current - year;
-            return age > 0 && age < 120 ? age : 0;
-        } catch (Exception ignored) {
-            return 0;
-        }
-    }
-
     private String countryCodeFromText(String value) {
         if (TextUtils.isEmpty(value)) return "";
         String v = value.toUpperCase(Locale.US);
@@ -403,6 +341,18 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (v.contains("SG") || v.contains("SINGAPORE") || v.contains("新加坡")) return "SG";
         if (v.contains("US") || v.contains("UNITED STATES") || v.contains("美国")) return "US";
         return "";
+    }
+
+    private int ageFromBirthday(String birthday) {
+        if (TextUtils.isEmpty(birthday) || birthday.length() < 4) return 0;
+        try {
+            int year = Integer.parseInt(birthday.substring(0, 4));
+            int current = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR);
+            int age = current - year;
+            return age > 0 && age < 120 ? age : 0;
+        } catch (Exception ignored) {
+            return 0;
+        }
     }
 
     private String firstNotEmpty(String... values) {
