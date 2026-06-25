@@ -10,7 +10,6 @@ import android.widget.TextView;
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.config.WKConfig;
 import com.chat.base.endpoint.entity.ChatViewMenu;
-import com.chat.base.glide.GlideUtils;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.ui.Theme;
 import com.chat.base.utils.WKDialogUtils;
@@ -116,15 +115,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.nameTv.setText(showName);
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         showCountryFlagIfSupported(data.country_code);
-        if (!TextUtils.isEmpty(data.profile_cover)) {
-            GlideUtils.getInstance().showImg(this, data.profile_cover, wkVBinding.coverIv);
-        }
         bindRole(data);
         bindSexAge(data);
         bindCountry(data);
         bindLanguages(data);
         bindIntro(data);
-        bindTags(data);
+        hideUnusedPartnerOnlyCards();
         bindActionButton(data);
     }
 
@@ -174,28 +170,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.introTv.setText(TextUtils.isEmpty(data.intro) ? getString(R.string.partner_profile_intro_empty) : data.intro);
     }
 
-    private void bindTags(PartnerProfileEntity data) {
-        wkVBinding.tagLayout.removeAllViews();
-        List<String> tags = data.getTagsSafe();
-        if (tags.isEmpty()) {
-            wkVBinding.tagCard.setVisibility(View.GONE);
-            return;
-        }
-        wkVBinding.tagCard.setVisibility(View.VISIBLE);
-        for (String tag : tags) {
-            if (TextUtils.isEmpty(tag)) continue;
-            TextView tv = new TextView(this);
-            tv.setText(tag);
-            tv.setTextSize(12);
-            tv.setTextColor(0xFF333333);
-            tv.setMaxLines(1);
-            tv.setEllipsize(TextUtils.TruncateAt.END);
-            tv.setBackgroundResource(R.drawable.bg_partner_tag);
-            int hPad = dp(10);
-            int vPad = dp(5);
-            tv.setPadding(hPad, vPad, hPad, vPad);
-            wkVBinding.tagLayout.addView(tv);
-        }
+    private void hideUnusedPartnerOnlyCards() {
+        // 现在语伴主页复用注册完善资料字段；tags/profile_cover/profile_images 不是注册字段，
+        // 这里不要再读取不存在的字段，否则会和 PartnerProfileEntity 不一致。
+        wkVBinding.tagCard.setVisibility(View.GONE);
     }
 
     private void bindActionButton(PartnerProfileEntity data) {
