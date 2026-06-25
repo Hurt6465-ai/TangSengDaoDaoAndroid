@@ -1,8 +1,7 @@
 <resources>
     <string name="partner_profile">Partner Profile</string>
     <string name="partner_edit_profile">Edit Profile</string>
-    <string name="partner_edit_basic_info">Avatar, name and basic info</string>
-    <string name="partner_edit_profile_tips">Cover, gallery and language tags will be connected in the next version. Basic info still uses the original TangSengDaoDao APIs.</string>
+    <string name="partner_edit_profile_tips">This page reuses the same profile fields as registration: country, native language, learning language and intro are saved to the user profile, not a separate copy.</string>
     <string name="partner_say_hello">Say Hello</string>
     <string name="partner_hello_sent">Sent</string>
     <string name="partner_send_message">Message</string>
@@ -12,19 +11,14 @@
     <string name="partner_intro">Intro</string>
     <string name="partner_profile_intro_empty">No intro yet.</string>
     <string name="partner_tags">Tags</string>
-    <string name="partner_moments">Moments</string>
-    <string name="partner_moments_empty">Moments, photos and videos will be connected later.</string>
     <string name="partner_teacher">Teacher</string>
     <string name="partner_admin">Admin</string>
     <string name="partner_official">Official</string>
     <string name="partner_service">Service</string>
-
-    <string name="partner_basic_profile">Basic Profile</string>
-    <string name="partner_language_profile">Language Profile</string>
-    <string name="partner_page_profile">Profile Page</string>
     <string name="partner_name">Name</string>
     <string name="partner_name_required">Name is required</string>
     <string name="partner_country">Country</string>
+    <string name="partner_country_required">Please choose a country</string>
     <string name="partner_choose_country">Choose country</string>
     <string name="partner_sex">Gender</string>
     <string name="partner_sex_male">Male</string>
@@ -32,13 +26,11 @@
     <string name="partner_sex_private">Private</string>
     <string name="partner_birthday_hint">Birthday, e.g. 2000-01-01</string>
     <string name="partner_native_language_hint">Native language, e.g. MY</string>
+    <string name="partner_native_language_required">Native language is required</string>
     <string name="partner_learning_language_hint">Learning languages, e.g. ZH EN</string>
+    <string name="partner_learning_language_required">Learning language is required</string>
     <string name="partner_language_edit_tip">Use uppercase language codes. Separate multiple codes with spaces, e.g. MY or ZH EN.</string>
     <string name="partner_intro_hint">Introduce yourself, what language you want to practice, and what you like to talk about.</string>
-    <string name="partner_tags_hint">Tags, e.g. music travel food</string>
-    <string name="partner_cover_hint">Cover image URL. Upload will be connected later.</string>
-    <string name="partner_images_hint">Partner image URLs, separated by spaces</string>
-    <string name="partner_image_edit_tip">This version saves image URLs only. Local image picking, compression and upload will be connected later.</string>
     <string name="partner_save">Save</string>
     <string name="partner_save_success">Saved</string>
     <string name="partner_save_failed">Save failed</string>
