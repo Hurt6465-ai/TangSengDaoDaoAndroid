@@ -70,7 +70,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void initView() {
         setupImmersiveStatusBar();
-        wkVBinding.avatarView.setSize(88);
+        wkVBinding.avatarView.setSize(94);
         if (wkVBinding.helloBtnLayout.getBackground() != null) {
             wkVBinding.helloBtnLayout.getBackground().setTint(Theme.colorAccount);
         }
@@ -114,10 +114,16 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             int range = appBarLayout.getTotalScrollRange();
             if (range <= 0) return;
             float percent = Math.min(1f, Math.max(0f, Math.abs(verticalOffset) * 1f / range));
-            float glassAlpha = 1f - percent * 2f;
-            wkVBinding.headerGlassLayout.setAlpha(Math.max(0f, glassAlpha));
-            float titleAlpha = (percent - 0.58f) / 0.42f;
+
+            float glassAlpha = 1.0f - (percent * 2.0f);
+            wkVBinding.headerGlassLayout.setAlpha(Math.max(0f, Math.min(1f, glassAlpha)));
+
+            float titleAlpha = (percent - 0.60f) / 0.40f;
             wkVBinding.toolbarTitleTv.setAlpha(Math.max(0f, Math.min(1f, titleAlpha)));
+
+            float scale = 1f + (0.035f * (1f - percent));
+            wkVBinding.coverIv.setScaleX(scale);
+            wkVBinding.coverIv.setScaleY(scale);
         });
     }
 
@@ -137,7 +143,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.nameTv.setText(showName);
         wkVBinding.toolbarTitleTv.setText(showName);
         String username = firstNotEmpty(data.username, data.uid);
-        wkVBinding.usernameTv.setText(TextUtils.isEmpty(username) ? "" : "@" + username);
+        wkVBinding.usernameTv.setText(TextUtils.isEmpty(username) ? "" : "@" + compactUserName(username));
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         showCountryFlagIfSupported(data.country_code);
         bindCover(data.profile_cover);
@@ -420,6 +426,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         } catch (Exception ignored) {
             return 0;
         }
+    }
+
+
+    private String compactUserName(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        String v = value.trim();
+        if (v.length() <= 22) return v;
+        return v.substring(0, 10) + "..." + v.substring(v.length() - 5);
     }
 
     private String firstNotEmpty(String... values) {
