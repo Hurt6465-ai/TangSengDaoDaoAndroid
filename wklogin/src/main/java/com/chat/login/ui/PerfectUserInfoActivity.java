@@ -134,39 +134,25 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         }
 
         String name = Objects.requireNonNull(wkVBinding.nameEt.getText()).toString().trim();
-        JSONObject profileJson = new JSONObject();
-        profileJson.put("name", name);
-        profileJson.put("country", selectedCountry);
-        profileJson.put("country_code", countryCodeFromSelection(selectedCountry));
-
         loadingPopup.show();
-        LoginModel.getInstance().updateUserInfo(profileJson, (code, msg) -> {
+
+        // 不能只保存昵称和本地资料。国籍必须提交到服务端 user.country_code，
+        // 聊天室列表才会返回 creator_country_code / reply_users[].country_code，头像才会显示国旗。
+        JSONObject profile = new JSONObject();
+        profile.put("name", name);
+        profile.put("country_code", getCountryCode(selectedCountry));
+        profile.put("country", getCountryName(selectedCountry));
+
+        LoginModel.getInstance().updateUserInfo(profile, (code, msg) -> {
             if (code == HttpResponseCode.success) {
                 saveLocalUserName(name);
                 saveLocalExtraProfile();
                 uploadAvatarAfterNameSaved();
             } else {
                 loadingPopup.dismiss();
+                if (!TextUtils.isEmpty(msg)) showToast(msg);
             }
         });
-    }
-
-    private String countryCodeFromSelection(String country) {
-        if (TextUtils.isEmpty(country)) return "";
-        String value = country.trim().toLowerCase(Locale.US);
-        if (country.contains("🇲🇲") || country.contains("缅甸") || country.contains("緬甸") || value.contains("myanmar") || value.contains("burma") || country.contains("မြန်မာ")) return "MM";
-        if (country.contains("🇨🇳") || country.contains("中国") || country.contains("中國") || value.contains("china") || country.contains("တရုတ်")) return "CN";
-        if (country.contains("🇹🇭") || country.contains("泰国") || country.contains("泰國") || value.contains("thailand") || country.contains("ထိုင်း")) return "TH";
-        if (country.contains("🇯🇵") || country.contains("日本") || value.contains("japan") || country.contains("ဂျပန်")) return "JP";
-        if (country.contains("🇰🇷") || country.contains("韩国") || country.contains("韓國") || value.contains("korea") || country.contains("ကိုရီးယား")) return "KR";
-        if (country.contains("🇻🇳") || country.contains("越南") || value.contains("vietnam") || country.contains("ဗီယက်နမ်")) return "VN";
-        if (country.contains("🇱🇦") || country.contains("老挝") || country.contains("老撾") || country.contains("寮國") || value.contains("laos") || country.contains("လာအို")) return "LA";
-        if (country.contains("🇰🇭") || country.contains("柬埔寨") || value.contains("cambodia") || value.contains("khmer") || country.contains("ကမ္ဘောဒီးယား")) return "KH";
-        if (country.contains("🇲🇾") || country.contains("马来西亚") || country.contains("馬來西亞") || value.contains("malaysia") || country.contains("မလေး")) return "MY";
-        if (country.contains("🇸🇬") || country.contains("新加坡") || value.contains("singapore") || country.contains("စင်ကာပူ")) return "SG";
-        if (country.contains("🇺🇸") || country.contains("美国") || country.contains("美國") || value.contains("united states") || value.contains("america") || country.contains("အမေရိကန်")) return "US";
-        if (country.contains("🌍") || country.contains("其他") || country.contains("其它") || value.contains("other") || country.contains("အခြား")) return "OTHER";
-        return "";
     }
 
     private boolean isEmptyText(CharSequence text) {
@@ -254,6 +240,42 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             builder.append(value);
         }
         return builder.toString();
+    }
+
+    private String getCountryCode(String country) {
+        if (TextUtils.isEmpty(country)) return "";
+        if (country.contains("🇲🇲")) return "MM";
+        if (country.contains("🇨🇳")) return "CN";
+        if (country.contains("🇹🇭")) return "TH";
+        if (country.contains("🇯🇵")) return "JP";
+        if (country.contains("🇰🇷")) return "KR";
+        if (country.contains("🇻🇳")) return "VN";
+        if (country.contains("🇱🇦")) return "LA";
+        if (country.contains("🇰🇭")) return "KH";
+        if (country.contains("🇲🇾")) return "MY";
+        if (country.contains("🇸🇬")) return "SG";
+        if (country.contains("🇺🇸")) return "US";
+        return "";
+    }
+
+    private String getCountryName(String country) {
+        if (TextUtils.isEmpty(country)) return "";
+        String value = country.trim();
+        // 去掉开头的国旗 emoji 和多余空格，只把可读国家名保存到服务端 country。
+        if (value.length() >= 2 && Character.isSurrogate(value.charAt(0))) {
+            int offset = 0;
+            while (offset < value.length()) {
+                int cp = value.codePointAt(offset);
+                if (cp >= 0x1F1E6 && cp <= 0x1F1FF) {
+                    offset += Character.charCount(cp);
+                    continue;
+                }
+                break;
+            }
+            value = value.substring(offset).trim();
+        }
+        if (value.startsWith("🌍")) value = value.substring("🌍".length()).trim();
+        return value;
     }
 
     private void showBirthdayPicker() {
