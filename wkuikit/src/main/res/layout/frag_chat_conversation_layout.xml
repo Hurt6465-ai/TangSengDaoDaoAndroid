@@ -41,8 +41,16 @@
             android:id="@+id/chatRoomTabLayout"
             android:layout_width="match_parent"
             android:layout_height="56dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:paddingStart="14dp"
             android:paddingEnd="14dp">
+
+            <com.chat.base.ui.components.AvatarView
+                android:id="@+id/profileAvatarView"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_gravity="start|center_vertical" />
 
             <LinearLayout
                 android:id="@+id/chatHomeTabGroup"
