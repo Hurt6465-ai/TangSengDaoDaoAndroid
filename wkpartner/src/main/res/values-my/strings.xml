@@ -1,0 +1,21 @@
+<resources>
+    <string name="partner_profile">ဘာသာဖက် ပရိုဖိုင်</string>
+    <string name="partner_edit_profile">ပရိုဖိုင်ပြင်ရန်</string>
+    <string name="partner_edit_basic_info">ပရိုဖိုင်ပုံ၊ နာမည်နှင့် အခြေခံအချက်အလက်</string>
+    <string name="partner_edit_profile_tips">Cover၊ ဓာတ်ပုံများနှင့် ဘာသာစကား tag များကို နောက်ဗားရှင်းတွင် ချိတ်ဆက်ပါမည်။ အခြေခံအချက်အလက်များသည် မူလ TangSengDaoDao API ကို ဆက်သုံးသည်။</string>
+    <string name="partner_say_hello">နှုတ်ဆက်မည်</string>
+    <string name="partner_hello_sent">ပို့ပြီး</string>
+    <string name="partner_send_message">စာပို့မည်</string>
+    <string name="partner_hello_hint">နှုတ်ဆက်စာရေးပါ</string>
+    <string name="partner_default_hello_plain">မင်္ဂလာပါ၊ မိတ်ဆက်လို့ရမလား?</string>
+    <string name="partner_default_hello_with_lang">မင်္ဂလာပါ၊ %1$s လေ့ကျင့်ချင်ပါတယ်။ မိတ်ဆက်လို့ရမလား?</string>
+    <string name="partner_intro">မိတ်ဆက်</string>
+    <string name="partner_profile_intro_empty">မိတ်ဆက်စာ မရေးရသေးပါ။</string>
+    <string name="partner_tags">Tag များ</string>
+    <string name="partner_moments">လှုပ်ရှားမှု</string>
+    <string name="partner_moments_empty">လှုပ်ရှားမှု၊ ဓာတ်ပုံနှင့် ဗီဒီယိုများကို နောက်ပိုင်း ချိတ်ဆက်ပါမည်။</string>
+    <string name="partner_teacher">ဆရာ/ဆရာမ</string>
+    <string name="partner_admin">အက်ဒမင်</string>
+    <string name="partner_official">တရားဝင်</string>
+    <string name="partner_service">ဝန်ဆောင်မှု</string>
+</resources>
