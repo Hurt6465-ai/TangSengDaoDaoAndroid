@@ -3,6 +3,8 @@ package com.chat.partner.profile;
 import android.content.Intent;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.TextView;
 
 import com.chat.base.base.WKBaseActivity;
@@ -10,6 +12,7 @@ import com.chat.base.config.WKConfig;
 import com.chat.base.endpoint.entity.ChatViewMenu;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.ui.Theme;
+import com.chat.base.utils.systembar.WKStatusBarUtils;
 import com.chat.base.utils.WKDialogUtils;
 import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileBinding;
@@ -51,12 +54,23 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     }
 
     @Override
+    protected void toggleStatusBarMode() {
+        super.toggleStatusBarMode();
+        Window window = getWindow();
+        if (window != null) {
+            WKStatusBarUtils.setLightMode(window);
+        }
+    }
+
+    @Override
     protected void initView() {
         wkVBinding.avatarView.setSize(92);
         wkVBinding.helloBtn.getBackground().setTint(Theme.colorAccount);
         wkVBinding.editBtn.setVisibility(isSelf ? View.VISIBLE : View.GONE);
-        wkVBinding.helloBtn.setVisibility(isSelf ? View.GONE : View.VISIBLE);
+        wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
+        wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
+        applyStatusBarSafeTop();
     }
 
     @Override
@@ -80,6 +94,21 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
                 showToast(msg);
             }
         });
+    }
+
+    private void applyStatusBarSafeTop() {
+        int statusBar = WKStatusBarUtils.getStatusBarHeight(this);
+        setTopMargin(wkVBinding.backBtn, statusBar + dp(12));
+        setTopMargin(wkVBinding.editBtn, statusBar + dp(14));
+    }
+
+    private void setTopMargin(View view, int topMargin) {
+        ViewGroup.LayoutParams lp = view.getLayoutParams();
+        if (lp instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams marginLp = (ViewGroup.MarginLayoutParams) lp;
+            marginLp.topMargin = topMargin;
+            view.setLayoutParams(marginLp);
+        }
     }
 
     private void bindProfile(PartnerProfileEntity data) {
@@ -140,10 +169,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.tagLayout.removeAllViews();
         List<String> tags = data.getTagsSafe();
         if (tags.isEmpty()) {
-            wkVBinding.tagTitleTv.setVisibility(View.GONE);
-            wkVBinding.tagLayout.setVisibility(View.GONE);
+            wkVBinding.tagCard.setVisibility(View.GONE);
             return;
         }
+        wkVBinding.tagCard.setVisibility(View.VISIBLE);
         wkVBinding.tagTitleTv.setVisibility(View.VISIBLE);
         wkVBinding.tagLayout.setVisibility(View.VISIBLE);
         for (String tag : tags) {
@@ -152,7 +181,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             tv.setText(tag);
             tv.setTextSize(12);
             tv.setTextColor(0xFF333333);
-            tv.setSingleLine(true);
+            tv.setMaxLines(1);
+            tv.setEllipsize(TextUtils.TruncateAt.END);
             tv.setBackgroundResource(R.drawable.bg_partner_tag);
             int hPad = dp(10);
             int vPad = dp(5);
@@ -163,12 +193,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void bindActionButton(PartnerProfileEntity data) {
         if (isSelf) {
-            wkVBinding.helloBtn.setVisibility(View.GONE);
+            wkVBinding.helloBar.setVisibility(View.GONE);
+            wkVBinding.bottomActionSpace.setVisibility(View.GONE);
             return;
         }
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
         boolean isFriend = (data.follow == 1) || (channel != null && channel.follow == 1);
-        wkVBinding.helloBtn.setVisibility(View.VISIBLE);
+        wkVBinding.helloBar.setVisibility(View.VISIBLE);
+        wkVBinding.bottomActionSpace.setVisibility(View.VISIBLE);
         wkVBinding.helloBtn.setEnabled(true);
         wkVBinding.helloBtn.setAlpha(1f);
         wkVBinding.helloBtn.setText(isFriend ? R.string.partner_send_message : R.string.partner_say_hello);
