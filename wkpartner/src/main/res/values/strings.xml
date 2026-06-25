@@ -1,7 +1,7 @@
 <resources>
     <string name="partner_profile">语伴主页</string>
     <string name="partner_edit_profile">编辑资料</string>
-    <string name="partner_edit_profile_tips">这里复用注册完善资料的同一套字段：国籍、母语、在学语言、介绍都会保存到用户资料，不再另存一份。</string>
+    <string name="partner_edit_profile_tips">资料和注册完善资料共用同一套后端字段；国籍、语言、生日使用选择器，标签和图片保存到服务器字段。</string>
     <string name="partner_say_hello">打招呼</string>
     <string name="partner_hello_sent">已打招呼</string>
     <string name="partner_send_message">发消息</string>
@@ -11,6 +11,7 @@
     <string name="partner_intro">介绍</string>
     <string name="partner_profile_intro_empty">这个人还没有填写介绍。</string>
     <string name="partner_tags">标签</string>
+    <string name="partner_photos">照片</string>
     <string name="partner_teacher">老师</string>
     <string name="partner_admin">管理员</string>
     <string name="partner_official">官方</string>
@@ -18,20 +19,28 @@
     <string name="partner_name">昵称</string>
     <string name="partner_name_required">昵称不能为空</string>
     <string name="partner_country">国籍</string>
-    <string name="partner_country_required">请选择国籍</string>
     <string name="partner_choose_country">选择国籍</string>
+    <string name="partner_country_required">请选择国籍</string>
     <string name="partner_sex">性别</string>
     <string name="partner_sex_male">男</string>
     <string name="partner_sex_female">女</string>
     <string name="partner_sex_private">保密</string>
-    <string name="partner_birthday_hint">生日，例如 2000-01-01</string>
-    <string name="partner_native_language_hint">母语，例如 MY</string>
-    <string name="partner_native_language_required">请填写母语</string>
-    <string name="partner_learning_language_hint">在学语言，例如 ZH EN</string>
-    <string name="partner_learning_language_required">请填写在学语言</string>
-    <string name="partner_language_edit_tip">语言统一用大写代码，多个用空格分开，例如：MY 或 ZH EN。</string>
+    <string name="partner_birthday">生日</string>
+    <string name="partner_choose_birthday">选择生日</string>
+    <string name="partner_native_language">母语</string>
+    <string name="partner_learning_language">在学语言</string>
+    <string name="partner_choose_native_language">选择母语</string>
+    <string name="partner_choose_learning_language">选择在学语言</string>
+    <string name="partner_native_language_required">请选择母语</string>
+    <string name="partner_learning_language_required">请选择在学语言</string>
     <string name="partner_intro_hint">介绍一下你自己、想练什么语言、喜欢聊什么</string>
+    <string name="partner_tags_hint">标签，例如 音乐 旅行 美食</string>
+    <string name="partner_cover_hint">背景墙图片地址</string>
+    <string name="partner_images_hint">照片地址，多个用空格分开</string>
+    <string name="partner_server_image_tip">当前保存到服务器 profile_cover/profile_images 字段；本地选择上传下一包单独接文件上传接口。</string>
     <string name="partner_save">保存</string>
     <string name="partner_save_success">已保存</string>
     <string name="partner_save_failed">保存失败</string>
+    <string name="partner_confirm">确定</string>
+    <string name="partner_cancel">取消</string>
 </resources>
