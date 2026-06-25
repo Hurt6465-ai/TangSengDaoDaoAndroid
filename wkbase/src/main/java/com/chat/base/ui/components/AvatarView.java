@@ -59,15 +59,12 @@ public class AvatarView extends FrameLayout {
     private static final float FLAG_CUTOUT_EXTRA_DP = 0.75f;
     private static final int FLAG_MIN_SIZE_DP = 15;
     private static final int FLAG_DEFAULT_SIZE_DP = 16;
-    private static final float ONLINE_SPOT_SIZE_RATIO = 0.22f;
-    private static final float ONLINE_SPOT_EDGE_INSET_RATIO = 0.04f;
-    private static final float ONLINE_SPOT_CUTOUT_EXTRA_DP = 0.75f;
-    private static final int ONLINE_SPOT_MIN_SIZE_DP = 8;
     private static final String PROFILE_EXTRA_PREF = "front_profile_extra";
 
     private static final Object COUNTRY_FETCH_LOCK = new Object();
     private static final int FETCHED_PERSONAL_COUNTRY_MAX_SIZE = 3000;
-    private static final long PERSONAL_COUNTRY_FETCH_RETRY_INTERVAL_MS = 60L * 1000L;
+    private static final int FAILED_PERSONAL_COUNTRY_MAX_SIZE = 3000;
+    private static final long COUNTRY_FETCH_FAIL_RETRY_MS = 60_000L;
     private static final Set<String> FETCHING_PERSONAL_COUNTRY_KEYS = Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
     private static final Map<String, Boolean> FETCHED_PERSONAL_COUNTRY_KEYS = new LinkedHashMap<String, Boolean>(128, 0.75f, true) {
         @Override
@@ -75,11 +72,13 @@ public class AvatarView extends FrameLayout {
             return size() > FETCHED_PERSONAL_COUNTRY_MAX_SIZE;
         }
     };
-    private static final Map<String, Long> FAILED_PERSONAL_COUNTRY_FETCH_TIME = new ConcurrentHashMap<>();
+    private static final Map<String, Long> FAILED_PERSONAL_COUNTRY_FETCH_TIME = new LinkedHashMap<String, Long>(128, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Long> eldest) {
+            return size() > FAILED_PERSONAL_COUNTRY_MAX_SIZE;
+        }
+    };
     private static final Map<String, Integer> FLAG_RES_CACHE = new ConcurrentHashMap<>();
-
-    private final Paint cutoutPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private boolean drawingWithoutEmbeddedOverlays = false;
 
     private String forcedFlagCountry = "";
     private volatile String boundChannelKey = "";
@@ -88,6 +87,8 @@ public class AvatarView extends FrameLayout {
     private String defaultAvatarSeed = "";
     private String lastDefaultBgKey = "";
     private int currentFlagResId = 0;
+    private final Paint flagCutoutPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private boolean drawingWithoutFlagForEmbed = false;
     private boolean sizeInited = false;
     private float avatarSize = 40f;
     private float avatarCornerSize = 20f;
@@ -108,11 +109,12 @@ public class AvatarView extends FrameLayout {
     }
 
     private void init() {
+        flagCutoutPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
+
         // 跟 Web 版 .cp-avatar-stack / .wkconv-avatar-flag-wrap 一样：
         // 头像自己裁圆，国旗作为左下角浮层，允许边缘探出一点。
         setClipChildren(false);
         setClipToPadding(false);
-        cutoutPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
 
         imageView = new ShapeableImageView(getContext());
 //        imageView.setStrokeColorResource(R.color.borderColor);
@@ -308,79 +310,58 @@ public class AvatarView extends FrameLayout {
 
     private void applyFlagStyle() {
         if (flagIv == null) return;
-        // 国旗资源使用圆形透明 PNG；不要再加白色圆底或 padding，
-        // 透明边缘由 dispatchDraw() 里的 Canvas 挖孔负责。
+        // 真正镶嵌方案：国旗本身只显示圆形透明 PNG。
+        // 这里不能再设置白色圆底和 padding，否则视觉上会退回“白底贴片”。
         flagIv.setAlpha(1f);
         flagIv.setColorFilter(null);
-        flagIv.setScaleType(ImageView.ScaleType.CENTER_CROP);
         flagIv.setBackground(null);
         flagIv.setPadding(0, 0, 0, 0);
+        flagIv.setScaleType(ImageView.ScaleType.CENTER_CROP);
         flagIv.bringToFront();
     }
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        boolean embedFlag = shouldEmbedFlag();
-        boolean embedSpot = shouldEmbedSpot();
-        if (!embedFlag && !embedSpot) {
+        if (!shouldDrawEmbeddedFlag()) {
             super.dispatchDraw(canvas);
             return;
         }
 
-        int saveCount = canvas.saveLayer(0, 0, getWidth(), getHeight(), null);
-        try {
-            boolean oldDrawingWithoutEmbeddedOverlays = drawingWithoutEmbeddedOverlays;
-            drawingWithoutEmbeddedOverlays = true;
-            try {
-                // 先画头像、默认字母、在线文字等基础内容；flagIv/spotView 暂时跳过。
-                super.dispatchDraw(canvas);
-            } finally {
-                drawingWithoutEmbeddedOverlays = oldDrawingWithoutEmbeddedOverlays;
-            }
+        int saveCount = canvas.saveLayer(0f, 0f, getWidth(), getHeight(), null);
+        drawingWithoutFlagForEmbed = true;
+        super.dispatchDraw(canvas);
+        drawingWithoutFlagForEmbed = false;
 
-            // 在头像已绘制的像素上挖洞，再把对应 overlay 单独画回去，形成真正的“镶嵌”。
-            if (embedFlag) {
-                clearChildCircle(canvas, flagIv, FLAG_CUTOUT_EXTRA_DP);
-                drawChild(canvas, flagIv, getDrawingTime());
-            }
-            if (embedSpot) {
-                clearChildCircle(canvas, spotView, ONLINE_SPOT_CUTOUT_EXTRA_DP);
-                drawChild(canvas, spotView, getDrawingTime());
-            }
-        } finally {
-            canvas.restoreToCount(saveCount);
-        }
+        drawFlagCutout(canvas);
+        drawChild(canvas, flagIv, getDrawingTime());
+        canvas.restoreToCount(saveCount);
     }
 
     @Override
     protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
-        if (drawingWithoutEmbeddedOverlays && (child == flagIv || child == spotView)) {
+        if (drawingWithoutFlagForEmbed && child == flagIv) {
             return true;
         }
         return super.drawChild(canvas, child, drawingTime);
     }
 
-    private boolean shouldEmbedFlag() {
+    private boolean shouldDrawEmbeddedFlag() {
         return flagIv != null
                 && flagIv.getVisibility() == VISIBLE
                 && currentFlagResId != 0
                 && flagIv.getDrawable() != null
                 && flagIv.getWidth() > 0
-                && flagIv.getHeight() > 0;
+                && flagIv.getHeight() > 0
+                && getWidth() > 0
+                && getHeight() > 0;
     }
 
-    private boolean shouldEmbedSpot() {
-        return spotView != null
-                && spotView.getVisibility() == VISIBLE
-                && spotView.getWidth() > 0
-                && spotView.getHeight() > 0;
-    }
-
-    private void clearChildCircle(Canvas canvas, View child, float extraDp) {
-        float cx = child.getLeft() + child.getWidth() / 2f;
-        float cy = child.getTop() + child.getHeight() / 2f;
-        float radius = Math.max(child.getWidth(), child.getHeight()) / 2f + AndroidUtilities.dp(extraDp);
-        canvas.drawCircle(cx, cy, radius, cutoutPaint);
+    private void drawFlagCutout(Canvas canvas) {
+        float cx = flagIv.getLeft() + flagIv.getWidth() / 2f;
+        float cy = flagIv.getTop() + flagIv.getHeight() / 2f;
+        float radius = Math.max(flagIv.getWidth(), flagIv.getHeight()) / 2f
+                + AndroidUtilities.dp(FLAG_CUTOUT_EXTRA_DP);
+        canvas.drawCircle(cx, cy, radius, flagCutoutPaint);
     }
 
     public void setStrokeWidth(float width) {
@@ -434,13 +415,14 @@ public class AvatarView extends FrameLayout {
         flagIv.setLayoutParams(flagParams);
         applyFlagStyle();
 
-        int spotSize = Math.max(ONLINE_SPOT_MIN_SIZE_DP, Math.round(size * ONLINE_SPOT_SIZE_RATIO));
-        int spotInset = Math.max(1, Math.round(size * ONLINE_SPOT_EDGE_INSET_RATIO));
+        int spotSize = Math.max(6, Math.round(size * 0.15f));
+        int spotInset = Math.max(2, Math.round(size * 0.06f));
         FrameLayout.LayoutParams spotParams = (FrameLayout.LayoutParams) spotView.getLayoutParams();
         spotParams.width = AndroidUtilities.dp(spotSize);
         spotParams.height = AndroidUtilities.dp(spotSize);
         spotParams.gravity = Gravity.TOP | Gravity.END;
-        // 在线绿点放大并压进头像右上角边缘内，再由 dispatchDraw() 挖孔镶嵌，避免边缘漏头像像素。
+        // 头像尺寸变大后，绿点不能贴到容器外沿，否则在 32dp/44dp 卡片头像里会看起来“跑出去”。
+        // 这里按头像尺寸给一点内缩，保证绿点始终压在头像右上角里面。
         spotParams.rightMargin = AndroidUtilities.dp(spotInset);
         spotParams.topMargin = AndroidUtilities.dp(spotInset);
         spotView.setLayoutParams(spotParams);
@@ -465,9 +447,9 @@ public class AvatarView extends FrameLayout {
 
         prepareImageAvatar();
         clearForcedFlagAndHide();
-        String country = channel != null ? getChannelCountry(channel) : getLocalSavedCountry(channelID);
+        String country = channel != null ? getChannelCountry(channel) : firstFlagResolvable(getLocalSavedCountry(channelID));
         updateFlagByCountry(country);
-        if (countryToFlagRes(country) == 0) {
+        if (TextUtils.isEmpty(country)) {
             tryFetchPersonalChannelCountry(channelID, channelType);
         }
         String url = getAvatarURL(channelID, channelType);
@@ -487,9 +469,9 @@ public class AvatarView extends FrameLayout {
             setDefaultAvatarInternal(channelID, channelID, false);
         } else {
             prepareImageAvatar();
-            String country = getLocalSavedCountry(channelID);
+            String country = firstFlagResolvable(getLocalSavedCountry(channelID));
             updateFlagByCountry(country);
-            if (countryToFlagRes(country) == 0) {
+            if (TextUtils.isEmpty(country)) {
                 tryFetchPersonalChannelCountry(channelID, channelType);
             }
             String url = getAvatarURL(channelID, channelType);
@@ -510,9 +492,9 @@ public class AvatarView extends FrameLayout {
             setDefaultAvatarInternal(channelID, channelID, false);
         } else {
             prepareImageAvatar();
-            String country = getLocalSavedCountry(channelID);
+            String country = firstFlagResolvable(getLocalSavedCountry(channelID));
             updateFlagByCountry(country);
-            if (countryToFlagRes(country) == 0) {
+            if (TextUtils.isEmpty(country)) {
                 tryFetchPersonalChannelCountry(channelID, channelType);
             }
             String url = getAvatarURL(channelID, channelType);
@@ -548,7 +530,7 @@ public class AvatarView extends FrameLayout {
 
         String country = getChannelCountry(channel);
         updateFlagByCountry(country);
-        if (countryToFlagRes(country) == 0) {
+        if (TextUtils.isEmpty(country)) {
             tryFetchPersonalChannelCountry(channel.channelID, channel.channelType);
         }
 
@@ -645,6 +627,7 @@ public class AvatarView extends FrameLayout {
             flagIv.setVisibility(VISIBLE);
         }
         flagIv.bringToFront();
+        invalidate();
     }
 
     /**
@@ -676,6 +659,7 @@ public class AvatarView extends FrameLayout {
             if (flagIv.getVisibility() != GONE) {
                 flagIv.setVisibility(GONE);
             }
+            invalidate();
         }
     }
 
@@ -1002,38 +986,33 @@ public class AvatarView extends FrameLayout {
         long now = System.currentTimeMillis();
         synchronized (COUNTRY_FETCH_LOCK) {
             if (FETCHED_PERSONAL_COUNTRY_KEYS.containsKey(key)) return;
-            Long failedTime = FAILED_PERSONAL_COUNTRY_FETCH_TIME.get(key);
-            if (failedTime != null && now - failedTime < PERSONAL_COUNTRY_FETCH_RETRY_INTERVAL_MS) return;
+            Long lastFailedTime = FAILED_PERSONAL_COUNTRY_FETCH_TIME.get(key);
+            if (lastFailedTime != null && now - lastFailedTime < COUNTRY_FETCH_FAIL_RETRY_MS) return;
             if (!FETCHING_PERSONAL_COUNTRY_KEYS.add(key)) return;
         }
 
         WKCommonModel.getInstance().getChannel(channelID, channelType, (code, msg, entity) -> {
-            String country = "";
-            if (entity instanceof WKChannel) {
-                country = getChannelCountry((WKChannel) entity);
-            }
-            if (TextUtils.isEmpty(country)) {
-                WKChannel refreshed = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
-                country = getChannelCountry(refreshed);
-            }
+            WKChannel refreshed = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
+            String country = firstFlagResolvable(
+                    getChannelCountry(refreshed),
+                    getChannelCountry(entity)
+            );
+            int flagResId = countryToFlagRes(country);
 
-            boolean success = countryToFlagRes(country) != 0;
-            long finishTime = System.currentTimeMillis();
             synchronized (COUNTRY_FETCH_LOCK) {
                 FETCHING_PERSONAL_COUNTRY_KEYS.remove(key);
-                if (success) {
+                if (flagResId != 0) {
                     FETCHED_PERSONAL_COUNTRY_KEYS.put(key, true);
                     FAILED_PERSONAL_COUNTRY_FETCH_TIME.remove(key);
                 } else {
-                    FAILED_PERSONAL_COUNTRY_FETCH_TIME.put(key, finishTime);
+                    FAILED_PERSONAL_COUNTRY_FETCH_TIME.put(key, System.currentTimeMillis());
                 }
             }
 
-            if (!success) return;
-            String finalCountry = country;
+            if (flagResId == 0) return;
             post(() -> {
                 if (TextUtils.equals(key, boundChannelKey)) {
-                    updateFlagByCountry(finalCountry);
+                    updateFlagByCountry(country);
                 }
             });
         });
