@@ -10,6 +10,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.chat.partner.R;
 
@@ -18,10 +19,11 @@ import java.util.LinkedHashSet;
 
 public class PartnerTagSelectorActivity extends Activity {
     public static final String EXTRA_TAGS = "tags";
+    private static final int MAX_TAGS = 20;
 
     private final LinkedHashSet<String> selected = new LinkedHashSet<>();
     private LinearLayout groupContainer;
-    private TextView saveBtn;
+    private TextView countTv;
 
     private final String[][] groups = new String[][]{
             {"语言能力", "母语者", "流利交流", "中高级", "初学者", "零基础"},
@@ -43,6 +45,7 @@ public class PartnerTagSelectorActivity extends Activity {
         selected.addAll(split(getIntent().getStringExtra(EXTRA_TAGS)));
         buildContentView();
         renderGroups();
+        updateCount();
     }
 
     private void buildContentView() {
@@ -72,6 +75,11 @@ public class PartnerTagSelectorActivity extends Activity {
         title.setTypeface(Typeface.DEFAULT_BOLD);
         titleBar.addView(title, new LinearLayout.LayoutParams(0, -1, 1f));
 
+        countTv = new TextView(this);
+        countTv.setTextSize(13);
+        countTv.setTextColor(0xFF777777);
+        titleBar.addView(countTv, new LinearLayout.LayoutParams(-2, -1));
+
         ScrollView scrollView = new ScrollView(this);
         scrollView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         groupContainer = new LinearLayout(this);
@@ -80,7 +88,7 @@ public class PartnerTagSelectorActivity extends Activity {
         scrollView.addView(groupContainer, new ScrollView.LayoutParams(-1, -2));
         root.addView(scrollView, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        saveBtn = new TextView(this);
+        TextView saveBtn = new TextView(this);
         saveBtn.setText(R.string.partner_save);
         saveBtn.setTextSize(16);
         saveBtn.setTextColor(0xFFFFFFFF);
@@ -132,9 +140,17 @@ public class PartnerTagSelectorActivity extends Activity {
         tv.setLayoutParams(lp);
         refreshChip(tv, selected.contains(text));
         tv.setOnClickListener(v -> {
-            if (selected.contains(text)) selected.remove(text);
-            else selected.add(text);
+            if (selected.contains(text)) {
+                selected.remove(text);
+            } else {
+                if (selected.size() >= MAX_TAGS) {
+                    Toast.makeText(this, R.string.partner_tag_max_tip, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                selected.add(text);
+            }
             refreshChip(tv, selected.contains(text));
+            updateCount();
         });
         return tv;
     }
@@ -142,6 +158,10 @@ public class PartnerTagSelectorActivity extends Activity {
     private void refreshChip(TextView tv, boolean checked) {
         tv.setTextColor(checked ? 0xFFFFFFFF : 0xFF555555);
         tv.setBackgroundResource(checked ? R.drawable.bg_partner_tag_selected : R.drawable.bg_partner_tag_unselected);
+    }
+
+    private void updateCount() {
+        if (countTv != null) countTv.setText(selected.size() + "/" + MAX_TAGS);
     }
 
     private void saveAndFinish() {
@@ -157,7 +177,7 @@ public class PartnerTagSelectorActivity extends Activity {
         String[] parts = text.replace('，', ' ').replace(',', ' ').replace('/', ' ').trim().split("\\s+");
         for (String item : parts) {
             String clean = item == null ? "" : item.trim();
-            if (!TextUtils.isEmpty(clean) && !out.contains(clean)) out.add(clean);
+            if (!TextUtils.isEmpty(clean) && !out.contains(clean) && out.size() < MAX_TAGS) out.add(clean);
         }
         return out;
     }

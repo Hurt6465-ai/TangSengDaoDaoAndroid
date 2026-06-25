@@ -61,13 +61,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     @Override
     protected void initView() {
-        wkVBinding.avatarView.setSize(92);
+        wkVBinding.avatarView.setSize(98);
         wkVBinding.helloBtn.getBackground().setTint(Theme.colorAccount);
         wkVBinding.editBtn.setVisibility(isSelf ? View.VISIBLE : View.GONE);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
-        wkVBinding.countryTv.setVisibility(View.GONE);
         applyStatusBarSafeTop();
     }
 
@@ -76,7 +75,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.backBtn.setOnClickListener(v -> finish());
         wkVBinding.editBtn.setOnClickListener(v -> startActivity(new Intent(this, PartnerProfileEditActivity.class)));
         wkVBinding.helloBtn.setOnClickListener(v -> onMainActionClick());
-        wkVBinding.tagCard.setOnClickListener(v -> {
+        wkVBinding.tagSection.setOnClickListener(v -> {
             if (isSelf) startActivity(new Intent(this, PartnerProfileEditActivity.class));
         });
     }
@@ -126,7 +125,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         showCountryFlagIfSupported(data.country_code);
         bindCover(data.profile_cover);
-        bindRole(data);
         bindSexAge(data);
         bindLanguages(data);
         bindIntro(data);
@@ -151,19 +149,16 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         }
     }
 
-    private void bindRole(PartnerProfileEntity data) {
-        String roleText = getRoleText(data);
-        wkVBinding.roleTv.setVisibility(TextUtils.isEmpty(roleText) ? View.GONE : View.VISIBLE);
-        wkVBinding.roleTv.setText(roleText);
-    }
-
     private void bindSexAge(PartnerProfileEntity data) {
-        List<String> parts = new ArrayList<>();
-        if (data.sex == 1) parts.add("♂");
-        else if (data.sex == 0) parts.add("♀");
         int age = data.age > 0 ? data.age : ageFromBirthday(data.birthday);
-        if (age > 0) parts.add(String.valueOf(age));
-        String text = join(parts, " ");
+        String gender;
+        if (data.sex == 1) gender = "♂";
+        else if (data.sex == 0) gender = "♀";
+        else gender = "";
+        String text = "";
+        if (!TextUtils.isEmpty(gender) && age > 0) text = gender + " " + age;
+        else if (!TextUtils.isEmpty(gender)) text = gender;
+        else if (age > 0) text = String.valueOf(age);
         wkVBinding.sexAgeTv.setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
         wkVBinding.sexAgeTv.setText(text);
     }
@@ -186,11 +181,11 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.tagLayout.removeAllViews();
         List<String> tags = data.getTagsSafe();
         if (tags.isEmpty()) {
-            wkVBinding.tagCard.setVisibility(View.GONE);
+            wkVBinding.tagSection.setVisibility(View.GONE);
             return;
         }
-        wkVBinding.tagCard.setVisibility(View.VISIBLE);
-        int max = Math.min(tags.size(), 16);
+        wkVBinding.tagSection.setVisibility(View.VISIBLE);
+        int max = Math.min(tags.size(), 20);
         for (int i = 0; i < max; i++) addChip(tags.get(i));
     }
 
@@ -198,15 +193,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (TextUtils.isEmpty(text)) return;
         TextView tv = new TextView(this);
         tv.setText(text);
-        tv.setTextSize(13);
+        tv.setTextSize(15);
         tv.setTextColor(0xFF777777);
         tv.setGravity(Gravity.CENTER);
         tv.setMaxLines(1);
         tv.setEllipsize(TextUtils.TruncateAt.END);
         tv.setBackgroundResource(R.drawable.bg_partner_tag_unselected);
-        tv.setPadding(dp(13), dp(7), dp(13), dp(7));
-        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(-2, dp(36));
-        lp.rightMargin = dp(8);
+        tv.setPadding(dp(16), dp(8), dp(16), dp(8));
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(-2, dp(38));
+        lp.rightMargin = dp(9);
         wkVBinding.tagLayout.addView(tv, lp);
     }
 
@@ -218,14 +213,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             return;
         }
         wkVBinding.photoCard.setVisibility(View.VISIBLE);
-        int max = Math.min(photos.size(), 9);
+        int max = Math.min(photos.size(), 5);
         for (int i = 0; i < max; i++) {
             String url = photos.get(i);
             if (TextUtils.isEmpty(url)) continue;
             ImageView iv = new ImageView(this);
             iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
             iv.setBackgroundResource(R.drawable.bg_partner_photo_placeholder);
-            LinearLayoutCompat.addViewCompat(wkVBinding.photoLayout, iv, dp(92), dp(92), i == 0 ? 0 : dp(8));
+            addViewCompat(wkVBinding.photoLayout, iv, dp(106), dp(106), i == 0 ? 0 : dp(9));
             GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(url), iv);
         }
     }
@@ -249,14 +244,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
         boolean isFriend = (profile != null && profile.follow == 1) || (channel != null && channel.follow == 1);
         if (isFriend) {
-            WKIMUtils.getInstance().startChatActivity(new ChatViewMenu(this, uid, WKChannelType.PERSONAL, 0, true));
+            WKIMUtils.getInstance().startChatActivity(new ChatViewMenu(uid, WKChannelType.PERSONAL, firstNotEmpty(profile == null ? "" : profile.name, uid)));
             return;
         }
-        showGreetingDialog();
-    }
-
-    private void showGreetingDialog() {
-        WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_say_hello), getString(R.string.partner_hello_hint), defaultGreeting(), getString(R.string.partner_hello_hint), 40, text -> {
+        WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_hello_hint), defaultGreeting(), text -> {
             String remark = TextUtils.isEmpty(text) ? defaultGreeting() : text;
             String vercode = profile == null ? "" : profile.vercode;
             FriendModel.getInstance().applyAddFriend(uid, vercode, remark, (code, msg) -> {
@@ -275,17 +266,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String learning = profile == null ? "" : formatLanguageLabels(profile.getLearningLanguagesSafe());
         if (TextUtils.isEmpty(learning)) return getString(R.string.partner_default_hello_plain);
         return String.format(getString(R.string.partner_default_hello_with_lang), learning);
-    }
-
-    private String getRoleText(PartnerProfileEntity data) {
-        String raw = firstNotEmpty(data.role, data.category);
-        if (TextUtils.isEmpty(raw)) return "";
-        String role = raw.toLowerCase(Locale.US);
-        if (role.contains("teacher")) return getString(R.string.partner_teacher);
-        if (role.contains("admin")) return getString(R.string.partner_admin);
-        if (role.contains("official") || role.contains("system")) return getString(R.string.partner_official);
-        if (role.contains("service") || role.contains("customer")) return getString(R.string.partner_service);
-        return "";
     }
 
     private String formatLanguageLabels(List<String> list) {
@@ -372,16 +352,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         return sb.toString();
     }
 
-    private int dp(float value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    private void addViewCompat(android.widget.LinearLayout parent, View child, int width, int height, int marginStart) {
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(width, height);
+        lp.gravity = Gravity.CENTER_VERTICAL;
+        lp.leftMargin = marginStart;
+        parent.addView(child, lp);
     }
 
-    private static class LinearLayoutCompat {
-        static void addViewCompat(android.widget.LinearLayout parent, View child, int width, int height, int marginStart) {
-            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(width, height);
-            lp.gravity = Gravity.CENTER_VERTICAL;
-            lp.leftMargin = marginStart;
-            parent.addView(child, lp);
-        }
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 }
