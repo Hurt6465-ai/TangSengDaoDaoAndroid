@@ -18,4 +18,28 @@
     <string name="partner_admin">Admin</string>
     <string name="partner_official">Official</string>
     <string name="partner_service">Service</string>
+
+    <string name="partner_basic_profile">Basic Profile</string>
+    <string name="partner_language_profile">Language Profile</string>
+    <string name="partner_page_profile">Profile Page</string>
+    <string name="partner_name">Name</string>
+    <string name="partner_name_required">Name is required</string>
+    <string name="partner_country">Country</string>
+    <string name="partner_choose_country">Choose country</string>
+    <string name="partner_sex">Gender</string>
+    <string name="partner_sex_male">Male</string>
+    <string name="partner_sex_female">Female</string>
+    <string name="partner_sex_private">Private</string>
+    <string name="partner_birthday_hint">Birthday, e.g. 2000-01-01</string>
+    <string name="partner_native_language_hint">Native language, e.g. MY</string>
+    <string name="partner_learning_language_hint">Learning languages, e.g. ZH EN</string>
+    <string name="partner_language_edit_tip">Use uppercase language codes. Separate multiple codes with spaces, e.g. MY or ZH EN.</string>
+    <string name="partner_intro_hint">Introduce yourself, what language you want to practice, and what you like to talk about.</string>
+    <string name="partner_tags_hint">Tags, e.g. music travel food</string>
+    <string name="partner_cover_hint">Cover image URL. Upload will be connected later.</string>
+    <string name="partner_images_hint">Partner image URLs, separated by spaces</string>
+    <string name="partner_image_edit_tip">This version saves image URLs only. Local image picking, compression and upload will be connected later.</string>
+    <string name="partner_save">Save</string>
+    <string name="partner_save_success">Saved</string>
+    <string name="partner_save_failed">Save failed</string>
 </resources>
