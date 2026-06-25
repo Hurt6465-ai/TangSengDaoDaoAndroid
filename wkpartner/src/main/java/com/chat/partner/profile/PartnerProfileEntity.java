@@ -21,10 +21,14 @@ public class PartnerProfileEntity {
     public int status;
     public String vercode;
 
-    public List<String> native_languages;
-    public List<String> learning_languages;
+    // 后端 user 表里这些字段可能是字符串，也可能后续改成数组。用 Object 兼容两种返回。
+    public Object native_languages;
+    public Object learning_languages;
+    public Object tags;
+    public String profile_cover;
+    public Object profile_images;
 
-    // 兼容旧字段/后端字符串字段。真正资料仍复用注册完善资料字段。
+    // 兼容旧字段/注册旧版本字段。
     public String native_language;
     public String learning_language;
 
@@ -36,14 +40,38 @@ public class PartnerProfileEntity {
         return safeList(learning_languages, learning_language);
     }
 
-    private List<String> safeList(List<String> list, String fallback) {
-        if (list != null && !list.isEmpty()) return list;
+    public List<String> getTagsSafe() {
+        return safeList(tags, "");
+    }
+
+    public List<String> getProfileImagesSafe() {
+        return safeList(profile_images, "");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> safeList(Object value, String fallback) {
         ArrayList<String> result = new ArrayList<>();
-        if (fallback == null || fallback.trim().length() == 0) return result;
-        String[] parts = fallback.split("[,，/\\s]+");
-        for (String item : parts) {
-            if (item != null && item.trim().length() > 0) result.add(item.trim());
+        if (value instanceof List) {
+            for (Object item : (List<Object>) value) {
+                addSplitItems(result, item == null ? "" : String.valueOf(item));
+            }
+            if (!result.isEmpty()) return result;
+        } else if (value != null) {
+            addSplitItems(result, String.valueOf(value));
+            if (!result.isEmpty()) return result;
         }
+        addSplitItems(result, fallback);
         return result;
+    }
+
+    private void addSplitItems(ArrayList<String> out, String text) {
+        if (text == null) return;
+        String clean = text.trim();
+        if (clean.length() == 0 || "null".equalsIgnoreCase(clean)) return;
+        clean = clean.replace("[", " ").replace("]", " ").replace("\"", " ");
+        String[] parts = clean.split("[,，/\\s]+");
+        for (String item : parts) {
+            if (item != null && item.trim().length() > 0) out.add(item.trim());
+        }
     }
 }

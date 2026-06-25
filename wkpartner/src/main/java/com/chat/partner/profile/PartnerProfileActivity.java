@@ -2,14 +2,17 @@ package com.chat.partner.profile;
 
 import android.content.Intent;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.config.WKConfig;
 import com.chat.base.endpoint.entity.ChatViewMenu;
+import com.chat.base.glide.GlideUtils;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.ui.Theme;
 import com.chat.base.utils.WKDialogUtils;
@@ -57,7 +60,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     @Override
     protected void initView() {
-        wkVBinding.avatarView.setSize(92);
+        wkVBinding.avatarView.setSize(78);
         wkVBinding.helloBtn.getBackground().setTint(Theme.colorAccount);
         wkVBinding.editBtn.setVisibility(isSelf ? View.VISIBLE : View.GONE);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
@@ -115,12 +118,18 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.nameTv.setText(showName);
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         showCountryFlagIfSupported(data.country_code);
+        if (!TextUtils.isEmpty(data.profile_cover)) {
+            GlideUtils.getInstance().showImg(this, data.profile_cover, wkVBinding.coverIv);
+        } else {
+            wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
+        }
         bindRole(data);
         bindSexAge(data);
         bindCountry(data);
         bindLanguages(data);
         bindIntro(data);
-        hideUnusedPartnerOnlyCards();
+        bindTags(data);
+        bindPhotos(data);
         bindActionButton(data);
     }
 
@@ -129,7 +138,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         try {
             wkVBinding.avatarView.getClass().getMethod("showFlag", String.class).invoke(wkVBinding.avatarView, countryCode);
         } catch (Exception ignored) {
-            // 当前工程如果还没接头像国旗版 AvatarView，这里不阻塞语伴主页编译。
+            // 兼容还没有接国旗版 AvatarView 的工程。
         }
     }
 
@@ -150,16 +159,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.sexAgeTv.setText(text);
     }
 
-
     private void bindCountry(PartnerProfileEntity data) {
-        String text = firstNotEmpty(data.country, data.country_code);
+        String text = formatCountry(data.country_code, data.country);
         wkVBinding.countryTv.setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
         wkVBinding.countryTv.setText(text);
     }
 
     private void bindLanguages(PartnerProfileEntity data) {
-        String nativeText = formatLanguageCodes(data.getNativeLanguagesSafe());
-        String learningText = formatLanguageCodes(data.getLearningLanguagesSafe());
+        String nativeText = formatLanguageLabels(data.getNativeLanguagesSafe());
+        String learningText = formatLanguageLabels(data.getLearningLanguagesSafe());
         boolean show = !TextUtils.isEmpty(nativeText) || !TextUtils.isEmpty(learningText);
         wkVBinding.langLayout.setVisibility(show ? View.VISIBLE : View.GONE);
         wkVBinding.nativeLangTv.setText(nativeText);
@@ -170,10 +178,48 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.introTv.setText(TextUtils.isEmpty(data.intro) ? getString(R.string.partner_profile_intro_empty) : data.intro);
     }
 
-    private void hideUnusedPartnerOnlyCards() {
-        // 现在语伴主页复用注册完善资料字段；tags/profile_cover/profile_images 不是注册字段，
-        // 这里不要再读取不存在的字段，否则会和 PartnerProfileEntity 不一致。
-        wkVBinding.tagCard.setVisibility(View.GONE);
+    private void bindTags(PartnerProfileEntity data) {
+        wkVBinding.tagLayout.removeAllViews();
+        List<String> tags = data.getTagsSafe();
+        if (tags.isEmpty()) {
+            wkVBinding.tagCard.setVisibility(View.GONE);
+            return;
+        }
+        wkVBinding.tagCard.setVisibility(View.VISIBLE);
+        for (String tag : tags) addChip(tag);
+    }
+
+    private void addChip(String text) {
+        if (TextUtils.isEmpty(text)) return;
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextSize(12);
+        tv.setTextColor(0xFFFFFFFF);
+        tv.setMaxLines(1);
+        tv.setEllipsize(TextUtils.TruncateAt.END);
+        tv.setBackgroundResource(R.drawable.bg_partner_glass_chip);
+        tv.setPadding(dp(10), dp(5), dp(10), dp(5));
+        wkVBinding.tagLayout.addView(tv);
+    }
+
+    private void bindPhotos(PartnerProfileEntity data) {
+        wkVBinding.photoLayout.removeAllViews();
+        List<String> photos = data.getProfileImagesSafe();
+        if (photos.isEmpty()) {
+            wkVBinding.photoCard.setVisibility(View.GONE);
+            return;
+        }
+        wkVBinding.photoCard.setVisibility(View.VISIBLE);
+        int max = Math.min(photos.size(), 9);
+        for (int i = 0; i < max; i++) {
+            String url = photos.get(i);
+            if (TextUtils.isEmpty(url)) continue;
+            ImageView iv = new ImageView(this);
+            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            iv.setBackgroundResource(R.drawable.bg_partner_photo_placeholder);
+            LinearLayoutCompat.addViewCompat(wkVBinding.photoLayout, iv, dp(92), dp(92), i == 0 ? 0 : dp(8));
+            GlideUtils.getInstance().showImg(this, url, iv);
+        }
     }
 
     private void bindActionButton(PartnerProfileEntity data) {
@@ -218,7 +264,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     }
 
     private String defaultGreeting() {
-        String learning = profile == null ? "" : formatLanguageCodes(profile.getLearningLanguagesSafe());
+        String learning = profile == null ? "" : formatLanguageLabels(profile.getLearningLanguagesSafe());
         if (TextUtils.isEmpty(learning)) return getString(R.string.partner_default_hello_plain);
         return String.format(getString(R.string.partner_default_hello_with_lang), learning);
     }
@@ -234,14 +280,28 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         return "";
     }
 
-    private String formatLanguageCodes(List<String> list) {
+    private String formatCountry(String code, String name) {
+        String safeCode = normalizeCountryCode(code);
+        String label = firstNotEmpty(name, countryNameByCode(safeCode));
+        if (TextUtils.isEmpty(safeCode) && TextUtils.isEmpty(label)) return "";
+        return countryFlag(safeCode) + " " + firstNotEmpty(label, safeCode);
+    }
+
+    private String formatLanguageLabels(List<String> list) {
         if (list == null || list.isEmpty()) return "";
-        List<String> codes = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
         for (String item : list) {
             String code = normalizeLangCode(item);
-            if (!TextUtils.isEmpty(code)) codes.add(code);
+            if (!TextUtils.isEmpty(code)) labels.add(languageFlag(code) + " " + code);
         }
-        return join(codes, " ");
+        return join(labels, "  ");
+    }
+
+    private String normalizeCountryCode(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        String v = value.trim().toUpperCase(Locale.US);
+        if ("MY".equals(v)) return "MY";
+        return countryCodeFromText(v);
     }
 
     private String normalizeLangCode(String value) {
@@ -265,6 +325,56 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         }
     }
 
+    private String languageFlag(String code) {
+        switch (code) {
+            case "ZH": return "🇨🇳";
+            case "EN": return "🇺🇸";
+            case "MY": return "🇲🇲";
+            case "TH": return "🇹🇭";
+            case "JA": return "🇯🇵";
+            case "KO": return "🇰🇷";
+            case "VI": return "🇻🇳";
+            case "ID": return "🇮🇩";
+            case "MS": return "🇲🇾";
+            default: return "🏳️";
+        }
+    }
+
+    private String countryFlag(String code) {
+        switch (code) {
+            case "MM": return "🇲🇲";
+            case "CN": return "🇨🇳";
+            case "TH": return "🇹🇭";
+            case "JP": return "🇯🇵";
+            case "KR": return "🇰🇷";
+            case "VN": return "🇻🇳";
+            case "LA": return "🇱🇦";
+            case "KH": return "🇰🇭";
+            case "MY": return "🇲🇾";
+            case "SG": return "🇸🇬";
+            case "US": return "🇺🇸";
+            default: return "🌐";
+        }
+    }
+
+    private String countryNameByCode(String code) {
+        if (TextUtils.isEmpty(code)) return "";
+        switch (code) {
+            case "MM": return "缅甸";
+            case "CN": return "中国";
+            case "TH": return "泰国";
+            case "JP": return "日本";
+            case "KR": return "韩国";
+            case "VN": return "越南";
+            case "LA": return "老挝";
+            case "KH": return "柬埔寨";
+            case "MY": return "马来西亚";
+            case "SG": return "新加坡";
+            case "US": return "美国";
+            default: return "";
+        }
+    }
+
     private int ageFromBirthday(String birthday) {
         if (TextUtils.isEmpty(birthday) || birthday.length() < 4) return 0;
         try {
@@ -275,14 +385,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         } catch (Exception ignored) {
             return 0;
         }
-    }
-
-    private List<String> splitText(String input) {
-        List<String> list = new ArrayList<>();
-        if (TextUtils.isEmpty(input)) return list;
-        String[] arr = input.replace('，', ' ').replace(',', ' ').replace('/', ' ').trim().split("\\s+");
-        for (String item : arr) if (!TextUtils.isEmpty(item)) list.add(item.trim());
-        return list;
     }
 
     private String countryCodeFromText(String value) {
@@ -321,5 +423,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private int dp(float value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private static class LinearLayoutCompat {
+        static void addViewCompat(android.widget.LinearLayout parent, View child, int width, int height, int marginStart) {
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(width, height);
+            lp.gravity = Gravity.CENTER_VERTICAL;
+            lp.leftMargin = marginStart;
+            parent.addView(child, lp);
+        }
     }
 }
