@@ -32,7 +32,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
                 android:layout_marginTop="16dp"
-                android:background="#FFFFFFFF"
+                android:background="@drawable/bg_partner_edit_field"
                 android:hint="@string/partner_name"
                 android:maxLines="1"
                 android:paddingStart="14dp"
@@ -46,7 +46,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
                 android:layout_marginTop="10dp"
-                android:background="#FFFFFFFF"
+                android:background="@drawable/bg_partner_edit_field"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="14dp"
@@ -73,7 +73,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
                 android:layout_marginTop="10dp"
-                android:background="#FFFFFFFF"
+                android:background="@drawable/bg_partner_edit_field"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="14dp"
@@ -95,13 +95,113 @@
                     android:textSize="14sp" />
             </LinearLayout>
 
-            <EditText
-                android:id="@+id/birthdayEt"
+            <LinearLayout
+                android:id="@+id/birthdayRow"
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
                 android:layout_marginTop="10dp"
-                android:background="#FFFFFFFF"
-                android:hint="@string/partner_birthday_hint"
+                android:background="@drawable/bg_partner_edit_field"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/partner_birthday"
+                    android:textColor="#222222"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/birthdayValueTv"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#666666"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/nativeLangRow"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_partner_edit_field"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/partner_native_language"
+                    android:textColor="#222222"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/nativeLangValueTv"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxWidth="180dp"
+                    android:maxLines="1"
+                    android:textColor="#666666"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/learningLangRow"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_partner_edit_field"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/partner_learning_language"
+                    android:textColor="#222222"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/learningLangValueTv"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxWidth="180dp"
+                    android:maxLines="1"
+                    android:textColor="#666666"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/introEt"
+                android:layout_width="match_parent"
+                android:layout_height="96dp"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_partner_edit_field"
+                android:gravity="top|start"
+                android:hint="@string/partner_intro_hint"
+                android:padding="14dp"
+                android:textColor="#222222"
+                android:textColorHint="#999999"
+                android:textSize="15sp" />
+
+            <EditText
+                android:id="@+id/tagsEt"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_partner_edit_field"
+                android:hint="@string/partner_tags_hint"
                 android:maxLines="1"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
@@ -110,31 +210,29 @@
                 android:textSize="15sp" />
 
             <EditText
-                android:id="@+id/nativeLangEt"
+                android:id="@+id/coverEt"
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
                 android:layout_marginTop="10dp"
-                android:background="#FFFFFFFF"
-                android:hint="@string/partner_native_language_hint"
+                android:background="@drawable/bg_partner_edit_field"
+                android:hint="@string/partner_cover_hint"
                 android:maxLines="1"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
-                android:textAllCaps="true"
                 android:textColor="#222222"
                 android:textColorHint="#999999"
                 android:textSize="15sp" />
 
             <EditText
-                android:id="@+id/learningLangEt"
+                android:id="@+id/imagesEt"
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
                 android:layout_marginTop="10dp"
-                android:background="#FFFFFFFF"
-                android:hint="@string/partner_learning_language_hint"
+                android:background="@drawable/bg_partner_edit_field"
+                android:hint="@string/partner_images_hint"
                 android:maxLines="1"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
-                android:textAllCaps="true"
                 android:textColor="#222222"
                 android:textColorHint="#999999"
                 android:textSize="15sp" />
@@ -143,22 +241,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="@string/partner_language_edit_tip"
+                android:text="@string/partner_server_image_tip"
                 android:textColor="#999999"
                 android:textSize="12sp" />
-
-            <EditText
-                android:id="@+id/introEt"
-                android:layout_width="match_parent"
-                android:layout_height="96dp"
-                android:layout_marginTop="10dp"
-                android:background="#FFFFFFFF"
-                android:gravity="top|start"
-                android:hint="@string/partner_intro_hint"
-                android:padding="14dp"
-                android:textColor="#222222"
-                android:textColorHint="#999999"
-                android:textSize="15sp" />
 
             <TextView
                 android:id="@+id/saveBtn"
