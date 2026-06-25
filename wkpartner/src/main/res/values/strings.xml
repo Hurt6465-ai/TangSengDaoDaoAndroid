@@ -1,7 +1,7 @@
 <resources>
     <string name="partner_profile">语伴主页</string>
     <string name="partner_edit_profile">编辑资料</string>
-    <string name="partner_edit_profile_tips">资料和注册完善资料共用同一套后端字段；国籍、语言、生日使用选择器，标签和图片保存到服务器字段。</string>
+    <string name="partner_edit_profile_tips">资料和注册完善资料共用同一套后端字段；语言带国旗选择，生日使用系统选择器，标签和图片保存到服务器。</string>
     <string name="partner_say_hello">打招呼</string>
     <string name="partner_hello_sent">已打招呼</string>
     <string name="partner_send_message">发消息</string>
@@ -37,7 +37,7 @@
     <string name="partner_tags_hint">标签，例如 音乐 旅行 美食</string>
     <string name="partner_cover_hint">背景墙图片地址</string>
     <string name="partner_images_hint">照片地址，多个用空格分开</string>
-    <string name="partner_server_image_tip">当前保存到服务器 profile_cover/profile_images 字段；本地选择上传下一包单独接文件上传接口。</string>
+    <string name="partner_server_image_tip">图片从手机选择后会压缩上传服务器，并保存到 profile_cover/profile_images 字段。</string>
     <string name="partner_save">保存</string>
     <string name="partner_save_success">已保存</string>
     <string name="partner_save_failed">保存失败</string>
