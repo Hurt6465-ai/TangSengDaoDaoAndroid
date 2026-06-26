@@ -135,30 +135,31 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     }
 
     private void setupEntranceAnimation() {
+        // 由于 contentSheetLayout 包含了头像，统一做滑入动画，视觉效果极佳
         wkVBinding.contentSheetLayout.setAlpha(0f);
-        wkVBinding.contentSheetLayout.setTranslationY(dp(32));
+        wkVBinding.contentSheetLayout.setTranslationY(dp(40));
     }
 
     private void playEntranceAnimation() {
         if (hasAnimatedEntrance) return;
         hasAnimatedEntrance = true;
+        
         wkVBinding.contentSheetLayout.animate()
                 .alpha(1f)
                 .translationY(0f)
-                .setDuration(380)
+                .setDuration(450)
                 .setInterpolator(new DecelerateInterpolator(1.4f))
                 .start();
 
-        wkVBinding.avatarGlowLayout.setScaleX(0.75f);
-        wkVBinding.avatarGlowLayout.setScaleY(0.75f);
-        wkVBinding.avatarGlowLayout.setAlpha(0f);
+        // 伴随滑入，头像做一个 Q弹 的跳出特效
+        wkVBinding.avatarGlowLayout.setScaleX(0.6f);
+        wkVBinding.avatarGlowLayout.setScaleY(0.6f);
         wkVBinding.avatarGlowLayout.animate()
                 .scaleX(1f)
                 .scaleY(1f)
-                .alpha(1f)
-                .setDuration(420)
-                .setStartDelay(120)
-                .setInterpolator(new OvershootInterpolator(1.0f))
+                .setDuration(500)
+                .setStartDelay(100)
+                .setInterpolator(new OvershootInterpolator(1.2f))
                 .start();
     }
 
@@ -240,10 +241,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.sexAgeTv.setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
         wkVBinding.sexAgeTv.setText(text);
         if (data.sex == 1) {
-            wkVBinding.sexAgeTv.setTextColor(0xFF4A8FD9);
+            wkVBinding.sexAgeTv.setTextColor(0xFF4A8FD9); // 蓝色
             tintBackground(wkVBinding.sexAgeTv, 0xFFEEF5FF);
         } else {
-            wkVBinding.sexAgeTv.setTextColor(0xFFE05C9E);
+            wkVBinding.sexAgeTv.setTextColor(0xFFE05C9E); // 粉色
             tintBackground(wkVBinding.sexAgeTv, 0xFFFFF1F8);
         }
     }
@@ -300,22 +301,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.tagLayout.removeAllViews();
         // 主页先不展示标签，标签仍然在编辑页选择和保存。
         wkVBinding.tagSection.setVisibility(View.GONE);
-    }
-
-    private void addChip(String text, boolean isPlaceholder) {
-        if (TextUtils.isEmpty(text)) return;
-        TextView tv = new TextView(this);
-        tv.setText(text);
-        tv.setTextSize(14);
-        tv.setTextColor(isPlaceholder ? 0xFFAAAAAA : 0xFF6C4DFF);
-        tv.setGravity(Gravity.CENTER);
-        tv.setMaxLines(1);
-        tv.setEllipsize(TextUtils.TruncateAt.END);
-        tv.setBackgroundResource(isPlaceholder ? R.drawable.bg_partner_tag_unselected : R.drawable.bg_partner_tag_chip);
-        tv.setPadding(dp(16), dp(8), dp(16), dp(8));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36));
-        lp.rightMargin = dp(8);
-        wkVBinding.tagLayout.addView(tv, lp);
     }
 
     private void bindPhotos(PartnerProfileEntity data) {
