@@ -53,6 +53,11 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private boolean introExpanded;
     private boolean introCanExpand;
     private boolean hasAnimatedEntrance;
+    private boolean introBaseVisible;
+    private boolean tagBaseVisible;
+    private boolean langBaseVisible;
+    private boolean profileLastOnlineBaseVisible;
+    private float currentCollapsePercent;
     private PartnerProfileEntity profile;
 
     @Override
@@ -89,6 +94,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         applyToolbarStyle(0f);
         setupScrollLinkedHeader();
         setupEntranceAnimation();
+        resetInitialScrollState();
     }
 
     @Override
@@ -116,6 +122,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     protected void onResume() {
         super.onResume();
         if (profile != null) loadProfile();
+    }
+
+    private void resetInitialScrollState() {
+        wkVBinding.appBarLayout.post(() -> {
+            wkVBinding.appBarLayout.setExpanded(true, false);
+            wkVBinding.nestedScrollView.scrollTo(0, 0);
+            applyToolbarStyle(0f);
+            applyProfileContentVisibility(0f);
+        });
     }
 
     private void setupImmersiveStatusBar() {
@@ -160,8 +175,40 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             wkVBinding.coverIv.setScaleX(scale);
             wkVBinding.coverIv.setScaleY(scale);
 
+            currentCollapsePercent = percent;
             applyToolbarStyle(percent);
+            applyProfileContentVisibility(percent);
         });
+    }
+
+    private void applyProfileContentVisibility(float percent) {
+        // When the cover is pushed up, the white toolbar should be the only
+        // thing left above the feed area. The profile header, intro and tags
+        // fade out and stop drawing before the toolbar becomes fully white.
+        float contentAlpha = clamp01((0.92f - percent) / 0.20f);
+        boolean fullyCollapsed = percent >= 0.985f;
+        applyFoldedVisibility(wkVBinding.profileHeaderLayout, true, contentAlpha, fullyCollapsed);
+        applyFoldedVisibility(wkVBinding.langLayout, langBaseVisible, contentAlpha, fullyCollapsed);
+        applyFoldedVisibility(wkVBinding.introSection, introBaseVisible, contentAlpha, fullyCollapsed);
+        applyFoldedVisibility(wkVBinding.tagSection, tagBaseVisible, contentAlpha, fullyCollapsed);
+        float lift = -dp(12) * percent;
+        wkVBinding.profileHeaderLayout.setTranslationY(lift);
+        wkVBinding.introSection.setTranslationY(lift);
+        wkVBinding.tagSection.setTranslationY(lift);
+        if (introCanExpand && introBaseVisible) {
+            wkVBinding.introMoreTv.setVisibility(fullyCollapsed ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    private void applyFoldedVisibility(View view, boolean baseVisible, float alpha, boolean fullyCollapsed) {
+        if (view == null) return;
+        if (!baseVisible || fullyCollapsed) {
+            view.setVisibility(View.GONE);
+            view.setAlpha(1f);
+            return;
+        }
+        view.setAlpha(alpha);
+        view.setVisibility(View.VISIBLE);
     }
 
     private void applyToolbarStyle(float percent) {
@@ -300,11 +347,17 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String lastOnline = formatLastOnline(data);
         boolean hasCountry = !TextUtils.isEmpty(country);
         boolean hasLastOnline = !TextUtils.isEmpty(lastOnline);
+
         wkVBinding.toolbarMetaLayout.setVisibility(hasCountry || hasLastOnline ? View.VISIBLE : View.GONE);
         wkVBinding.toolbarCountryGroup.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
         wkVBinding.toolbarLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
         wkVBinding.toolbarCountryTv.setText(country);
         wkVBinding.toolbarLastOnlineTv.setText(lastOnline);
+
+        profileLastOnlineBaseVisible = hasLastOnline;
+        wkVBinding.profileLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
+        wkVBinding.profileLastOnlineTv.setText(lastOnline);
+        applyProfileContentVisibility(currentCollapsePercent);
     }
 
     private String formatLastOnline(PartnerProfileEntity data) {
@@ -393,12 +446,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String learningText = formatLanguageLetters(data.getLearningLanguagesSafe());
         boolean showNative = !TextUtils.isEmpty(nativeText);
         boolean showLearning = !TextUtils.isEmpty(learningText);
-        wkVBinding.langLayout.setVisibility(showNative || showLearning ? View.VISIBLE : View.GONE);
+        langBaseVisible = showNative || showLearning;
+        wkVBinding.langLayout.setVisibility(langBaseVisible ? View.VISIBLE : View.GONE);
         wkVBinding.nativeLangTv.setVisibility(showNative ? View.VISIBLE : View.GONE);
         wkVBinding.learningLangTv.setVisibility(showLearning ? View.VISIBLE : View.GONE);
         wkVBinding.langToTv.setVisibility(showNative && showLearning ? View.VISIBLE : View.GONE);
         wkVBinding.nativeLangTv.setText(nativeText);
         wkVBinding.learningLangTv.setText(learningText);
+        applyProfileContentVisibility(currentCollapsePercent);
     }
 
     private void bindIntro(PartnerProfileEntity data) {
@@ -407,13 +462,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String intro = data == null ? "" : data.intro;
         if (intro != null) intro = intro.trim();
         if (TextUtils.isEmpty(intro) || "null".equalsIgnoreCase(intro)) {
+            introBaseVisible = false;
             wkVBinding.introSection.setVisibility(View.GONE);
             wkVBinding.introMoreTv.setVisibility(View.GONE);
             return;
         }
+        introBaseVisible = true;
         wkVBinding.introSection.setVisibility(View.VISIBLE);
         wkVBinding.introTv.setText(intro);
-        wkVBinding.introTv.setMaxLines(3);
+        wkVBinding.introTv.setMaxLines(2);
         wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
         wkVBinding.introMoreTv.setText("展开全部");
         wkVBinding.introMoreTv.setVisibility(View.GONE);
@@ -424,8 +481,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
         wkVBinding.introTv.post(() -> {
             android.text.Layout layout = wkVBinding.introTv.getLayout();
-            introCanExpand = layout != null && layout.getLineCount() >= 3 && layout.getEllipsisCount(2) > 0;
-            wkVBinding.introMoreTv.setVisibility(introCanExpand ? View.VISIBLE : View.GONE);
+            introCanExpand = layout != null && layout.getLineCount() >= 2 && layout.getEllipsisCount(1) > 0;
+            wkVBinding.introMoreTv.setVisibility(introCanExpand && currentCollapsePercent < 0.985f ? View.VISIBLE : View.GONE);
+            applyProfileContentVisibility(currentCollapsePercent);
         });
     }
 
@@ -437,7 +495,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             wkVBinding.introTv.setEllipsize(null);
             wkVBinding.introMoreTv.setText("收起");
         } else {
-            wkVBinding.introTv.setMaxLines(3);
+            wkVBinding.introTv.setMaxLines(2);
             wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
             wkVBinding.introMoreTv.setText("展开全部");
         }
@@ -447,12 +505,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.tagLayout.removeAllViews();
         List<String> tags = data.getTagsSafe();
         if (tags.isEmpty()) {
+            tagBaseVisible = false;
             wkVBinding.tagSection.setVisibility(View.GONE);
             return;
         }
+        tagBaseVisible = true;
         wkVBinding.tagSection.setVisibility(View.VISIBLE);
         int max = Math.min(tags.size(), 20);
         for (int i = 0; i < max; i++) addChip(tags.get(i), false);
+        applyProfileContentVisibility(currentCollapsePercent);
     }
 
     private void addChip(String text, boolean isPlaceholder) {
