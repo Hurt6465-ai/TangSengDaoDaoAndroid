@@ -33,7 +33,7 @@
                 android:contentDescription="@string/partner_profile"
                 android:fitsSystemWindows="false"
                 android:scaleType="centerCrop"
-                android:src="@drawable/bj01"
+                android:src="@drawable/bg_partner_cover_default"
                 app:layout_collapseMode="parallax"
                 app:layout_collapseParallaxMultiplier="0.7" />
 
@@ -277,23 +277,6 @@
                         android:layout_height="1dp"
                         android:layout_weight="1" />
 
-                    <TextView
-                        android:id="@+id/profileSelfEditChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="26dp"
-                        android:layout_marginStart="8dp"
-                        android:layout_marginTop="1dp"
-                        android:background="@drawable/bg_partner_glass_chip"
-                        android:gravity="center"
-                        android:minWidth="58dp"
-                        android:paddingStart="10dp"
-                        android:paddingEnd="10dp"
-                        android:text="@string/partner_edit_profile"
-                        android:textColor="#666672"
-                        android:textSize="12sp"
-                        android:textStyle="bold"
-                        android:visibility="gone" />
-
                     <LinearLayout
                         android:id="@+id/profileLastOnlineGroup"
                         android:layout_width="wrap_content"
@@ -390,7 +373,7 @@
                     android:layout_height="30dp"
                     android:layout_marginTop="2dp"
                     android:gravity="center_vertical"
-                    android:text="@string/partner_expand_all"
+                    android:text="展开全部"
                     android:textColor="#6C4DFF"
                     android:textSize="13sp"
                     android:textStyle="bold"
@@ -435,7 +418,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="24dp"
-                    android:text="@string/partner_album"
+                    android:text="@string/partner_photos"
                     android:textColor="#1A1A2E"
                     android:textSize="18sp"
                     android:textStyle="bold" />
