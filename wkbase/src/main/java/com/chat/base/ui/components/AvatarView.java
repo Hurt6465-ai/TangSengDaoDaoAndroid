@@ -40,6 +40,8 @@ import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -88,6 +90,11 @@ public class AvatarView extends FrameLayout {
     };
 
     private static final Map<String, Integer> FLAG_RES_CACHE = new ConcurrentHashMap<>();
+
+    // Reflection is used only because WKChannel/entity fields are not stable across versions.
+    // Cache both hits and misses so RecyclerView scrolling does not repeatedly throw reflection exceptions.
+    private static final Object REFLECT_MISS = new Object();
+    private static final Map<String, Object> REFLECT_ACCESSOR_CACHE = new ConcurrentHashMap<>();
 
     private String forcedFlagCountry = "";
     private volatile String boundChannelKey = "";
@@ -1054,26 +1061,49 @@ public class AvatarView extends FrameLayout {
 
     private Object getObjectValue(Object target, String name) {
         if (target == null || TextUtils.isEmpty(name)) return null;
+        Class<?> clazz = target.getClass();
+        String cacheKey = clazz.getName() + "#" + name;
+
+        Object accessor = REFLECT_ACCESSOR_CACHE.get(cacheKey);
+        if (accessor == null) {
+            accessor = resolveReflectAccessor(clazz, name);
+            REFLECT_ACCESSOR_CACHE.put(cacheKey, accessor);
+        }
+        if (accessor == REFLECT_MISS) return null;
+
         try {
-            java.lang.reflect.Field field = target.getClass().getField(name);
+            if (accessor instanceof Field) {
+                return ((Field) accessor).get(target);
+            }
+            if (accessor instanceof Method) {
+                return ((Method) accessor).invoke(target);
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    private Object resolveReflectAccessor(Class<?> clazz, String name) {
+        try {
+            Field field = clazz.getField(name);
             field.setAccessible(true);
-            return field.get(target);
+            return field;
         } catch (Exception ignored) {
         }
         try {
-            java.lang.reflect.Field field = target.getClass().getDeclaredField(name);
+            Field field = clazz.getDeclaredField(name);
             field.setAccessible(true);
-            return field.get(target);
+            return field;
         } catch (Exception ignored) {
         }
         String suffix = name.substring(0, 1).toUpperCase(Locale.US) + name.substring(1);
         try {
-            java.lang.reflect.Method method = target.getClass().getMethod("get" + suffix);
+            Method method = clazz.getMethod("get" + suffix);
             method.setAccessible(true);
-            return method.invoke(target);
+            return method;
         } catch (Exception ignored) {
         }
-        return null;
+        return REFLECT_MISS;
     }
 
     @SuppressWarnings("unchecked")
