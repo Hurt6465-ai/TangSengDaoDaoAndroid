@@ -16,7 +16,6 @@ import android.view.Window;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -37,7 +36,6 @@ import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -78,9 +76,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void initView() {
         setupImmersiveStatusBar();
-        wkVBinding.avatarView.setSize(90);
-        wkVBinding.toolbarAvatarView.setSize(26);
-        wkVBinding.backBtn.setVisibility(View.GONE);
+        wkVBinding.avatarView.setSize(96);
+        wkVBinding.toolbarAvatarView.setSize(30);
         wkVBinding.editBtn.setVisibility(isSelf ? View.VISIBLE : View.GONE);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
@@ -91,6 +88,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     @Override
     protected void initListener() {
+        wkVBinding.backBtn.setOnClickListener(v -> pressAndRun(v, this::finish));
         wkVBinding.editBtn.setOnClickListener(v -> pressAndRun(v, () -> startActivity(new Intent(this, PartnerProfileEditActivity.class))));
         wkVBinding.helloBtnLayout.setOnClickListener(v -> onMainActionClick());
         wkVBinding.tagSection.setOnClickListener(v -> {
@@ -122,20 +120,19 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             if (range <= 0) return;
             float percent = Math.min(1f, Math.max(0f, Math.abs(verticalOffset) * 1f / range));
 
-            float titleAlpha = (percent - 0.58f) / 0.42f;
+            float titleAlpha = (percent - 0.55f) / 0.45f;
             wkVBinding.toolbarTitleLayout.setAlpha(Math.max(0f, Math.min(1f, titleAlpha)));
 
-            float scale = 1f + (0.035f * (1f - percent));
+            float scale = 1f + (0.04f * (1f - percent));
             wkVBinding.coverIv.setScaleX(scale);
             wkVBinding.coverIv.setScaleY(scale);
 
-            int scrimAlpha = (int) (Math.max(0f, (percent - 0.72f) / 0.28f) * 210);
+            int scrimAlpha = (int) (Math.max(0f, (percent - 0.7f) / 0.3f) * 230);
             wkVBinding.toolbar.setBackgroundColor(Color.argb(scrimAlpha, 108, 77, 255));
         });
     }
 
     private void setupEntranceAnimation() {
-        // 由于 contentSheetLayout 包含了头像，统一做滑入动画，视觉效果极佳
         wkVBinding.contentSheetLayout.setAlpha(0f);
         wkVBinding.contentSheetLayout.setTranslationY(dp(40));
     }
@@ -143,24 +140,34 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void playEntranceAnimation() {
         if (hasAnimatedEntrance) return;
         hasAnimatedEntrance = true;
-        
         wkVBinding.contentSheetLayout.animate()
                 .alpha(1f)
                 .translationY(0f)
                 .setDuration(450)
-                .setInterpolator(new DecelerateInterpolator(1.4f))
+                .setInterpolator(new DecelerateInterpolator(1.5f))
                 .start();
 
-        // 伴随滑入，头像做一个 Q弹 的跳出特效
-        wkVBinding.avatarGlowLayout.setScaleX(0.6f);
-        wkVBinding.avatarGlowLayout.setScaleY(0.6f);
+        wkVBinding.avatarGlowLayout.setScaleX(0.5f);
+        wkVBinding.avatarGlowLayout.setScaleY(0.5f);
+        wkVBinding.avatarGlowLayout.setAlpha(0f);
         wkVBinding.avatarGlowLayout.animate()
                 .scaleX(1f)
                 .scaleY(1f)
+                .alpha(1f)
                 .setDuration(500)
-                .setStartDelay(100)
+                .setStartDelay(120)
                 .setInterpolator(new OvershootInterpolator(1.2f))
                 .start();
+
+        if (wkVBinding.helloBar.getVisibility() == View.VISIBLE) {
+            wkVBinding.helloBar.setTranslationY(dp(80));
+            wkVBinding.helloBar.animate()
+                    .translationY(0f)
+                    .setDuration(400)
+                    .setStartDelay(220)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .start();
+        }
     }
 
     private void loadProfile() {
@@ -184,7 +191,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         wkVBinding.toolbarAvatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         showCountryFlagIfSupported(data.country_code);
-        tuneProfileAvatarBadges();
         bindCover(data.profile_cover);
         bindSexAge(data);
         bindLanguages(data);
@@ -211,47 +217,30 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         }
     }
 
-    private void tuneProfileAvatarBadges() {
-        try {
-            Field field = wkVBinding.avatarView.getClass().getDeclaredField("flagIv");
-            field.setAccessible(true);
-            Object obj = field.get(wkVBinding.avatarView);
-            if (obj instanceof ImageView) {
-                ImageView flagIv = (ImageView) obj;
-                FrameLayout.LayoutParams flagLp = new FrameLayout.LayoutParams(dp(17), dp(12), Gravity.BOTTOM | Gravity.START);
-                flagLp.leftMargin = dp(7);
-                flagLp.bottomMargin = dp(8);
-                flagIv.setLayoutParams(flagLp);
-                flagIv.setScaleType(ImageView.ScaleType.FIT_XY);
-                flagIv.bringToFront();
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
     private void bindSexAge(PartnerProfileEntity data) {
         int age = data.age > 0 ? data.age : ageFromBirthday(data.birthday);
+        String gender;
+        if (data.sex == 1) gender = "♂";
+        else if (data.sex == 0) gender = "♀";
+        else gender = "";
+
         String text = "";
-        if (data.sex == 1 && age > 0) text = "男 " + age;
-        else if (data.sex == 0 && age > 0) text = "女 " + age;
-        else if (data.sex == 1) text = "男";
-        else if (data.sex == 0) text = "女";
+        if (!TextUtils.isEmpty(gender) && age > 0) text = gender + " " + age;
+        else if (!TextUtils.isEmpty(gender)) text = gender;
         else if (age > 0) text = String.valueOf(age);
 
         wkVBinding.sexAgeTv.setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
         wkVBinding.sexAgeTv.setText(text);
         if (data.sex == 1) {
-            wkVBinding.sexAgeTv.setTextColor(0xFF4A8FD9); // 蓝色
-            tintBackground(wkVBinding.sexAgeTv, 0xFFEEF5FF);
+            wkVBinding.sexAgeTv.setTextColor(0xFF4A90D9);
+            if (wkVBinding.sexAgeTv.getBackground() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                wkVBinding.sexAgeTv.getBackground().setTint(0xFFEDF4FF);
+            }
         } else {
-            wkVBinding.sexAgeTv.setTextColor(0xFFE05C9E); // 粉色
-            tintBackground(wkVBinding.sexAgeTv, 0xFFFFF1F8);
-        }
-    }
-
-    private void tintBackground(View view, int color) {
-        if (view.getBackground() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            view.getBackground().setTint(color);
+            wkVBinding.sexAgeTv.setTextColor(0xFFE82FA2);
+            if (wkVBinding.sexAgeTv.getBackground() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                wkVBinding.sexAgeTv.getBackground().setTint(0xFFFFF0F8);
+            }
         }
     }
 
@@ -271,11 +260,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.introTv.setText(intro);
         wkVBinding.introTv.setMaxLines(3);
         wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
-        wkVBinding.introMoreTv.setVisibility(View.GONE);
         wkVBinding.introMoreTv.setText("展开全部");
+        wkVBinding.introMoreTv.setVisibility(View.GONE);
+
         View.OnClickListener toggle = v -> toggleIntroExpand();
         wkVBinding.introTv.setOnClickListener(toggle);
         wkVBinding.introMoreTv.setOnClickListener(toggle);
+
         wkVBinding.introTv.post(() -> {
             android.text.Layout layout = wkVBinding.introTv.getLayout();
             introCanExpand = layout != null && layout.getLineCount() >= 3 && layout.getEllipsisCount(2) > 0;
@@ -299,8 +290,42 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void bindTags(PartnerProfileEntity data) {
         wkVBinding.tagLayout.removeAllViews();
-        // 主页先不展示标签，标签仍然在编辑页选择和保存。
-        wkVBinding.tagSection.setVisibility(View.GONE);
+        List<String> tags = data.getTagsSafe();
+        if (tags.isEmpty()) {
+            if (isSelf) {
+                wkVBinding.tagSection.setVisibility(View.VISIBLE);
+                addChip(getString(R.string.partner_choose_tags), true);
+            } else {
+                wkVBinding.tagSection.setVisibility(View.GONE);
+            }
+            return;
+        }
+        wkVBinding.tagSection.setVisibility(View.VISIBLE);
+        int max = Math.min(tags.size(), 20);
+        for (int i = 0; i < max; i++) addChip(tags.get(i), false);
+    }
+
+    private void addChip(String text, boolean isPlaceholder) {
+        if (TextUtils.isEmpty(text)) return;
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextSize(14);
+        tv.setTextColor(isPlaceholder ? 0xFFAAAAAA : 0xFF6C4DFF);
+        tv.setGravity(Gravity.CENTER);
+        tv.setMaxLines(1);
+        tv.setEllipsize(TextUtils.TruncateAt.END);
+        tv.setBackgroundResource(isPlaceholder ? R.drawable.bg_partner_tag_unselected : R.drawable.bg_partner_tag_chip);
+        tv.setPadding(dp(16), dp(8), dp(16), dp(8));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) tv.setForeground(getSelectableItemBackground());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36));
+        lp.rightMargin = dp(8);
+        wkVBinding.tagLayout.addView(tv, lp);
+    }
+
+    private android.graphics.drawable.Drawable getSelectableItemBackground() {
+        android.util.TypedValue outValue = new android.util.TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+        return getResources().getDrawable(outValue.resourceId);
     }
 
     private void bindPhotos(PartnerProfileEntity data) {
@@ -311,18 +336,24 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             return;
         }
         wkVBinding.photoCard.setVisibility(View.VISIBLE);
-        int max = Math.min(photos.size(), 6);
+        int max = Math.min(photos.size(), 5);
         for (int i = 0; i < max; i++) {
             String url = photos.get(i);
             if (TextUtils.isEmpty(url)) continue;
             ImageView iv = new ImageView(this);
             iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            iv.setOutlineProvider(new ViewOutlineProvider() {
-                @Override public void getOutline(View view, Outline outline) { outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(14)); }
-            });
-            iv.setClipToOutline(true);
             iv.setBackgroundResource(R.drawable.bg_partner_photo_placeholder);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(112), dp(112));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                iv.setOutlineProvider(new ViewOutlineProvider() {
+                    @Override
+                    public void getOutline(View view, Outline outline) {
+                        outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(16));
+                    }
+                });
+                iv.setClipToOutline(true);
+            }
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(120), dp(120));
+            lp.gravity = Gravity.CENTER_VERTICAL;
             lp.leftMargin = i == 0 ? 0 : dp(10);
             wkVBinding.photoLayout.addView(iv, lp);
             GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(url), iv);
@@ -379,12 +410,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.helloBtnLayout.setEnabled(false);
         int initialWidth = wkVBinding.helloBtnLayout.getWidth();
         if (initialWidth <= 0) initialWidth = getAvailableButtonWidth();
-        int targetWidth = dp(54);
+        int targetWidth = dp(56);
         wkVBinding.helloBtnText.animate().alpha(0f).setDuration(120).start();
         wkVBinding.helloBtnProgress.setVisibility(View.VISIBLE);
         wkVBinding.helloBtnProgress.animate().alpha(1f).setDuration(180).setStartDelay(80).start();
         ValueAnimator anim = ValueAnimator.ofInt(initialWidth, targetWidth);
-        anim.addUpdateListener(va -> setHelloButtonWidth((Integer) va.getAnimatedValue()));
+        anim.addUpdateListener(valueAnimator -> setHelloButtonWidth((Integer) valueAnimator.getAnimatedValue()));
         anim.setDuration(320);
         anim.setInterpolator(new OvershootInterpolator(0.9f));
         anim.start();
@@ -392,10 +423,11 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void animateProgressToButton(boolean success) {
         int initialWidth = wkVBinding.helloBtnLayout.getWidth();
-        if (initialWidth <= 0) initialWidth = dp(54);
+        if (initialWidth <= 0) initialWidth = dp(56);
         int targetWidth = getAvailableButtonWidth();
         wkVBinding.helloBtnProgress.animate().alpha(0f).setDuration(130).setListener(new AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(Animator animation) {
+            @Override
+            public void onAnimationEnd(Animator animation) {
                 wkVBinding.helloBtnProgress.setVisibility(View.GONE);
                 wkVBinding.helloBtnProgress.animate().setListener(null);
                 wkVBinding.helloBtnText.setText(success ? R.string.partner_hello_sent : R.string.partner_say_hello);
@@ -403,9 +435,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             }
         }).start();
         ValueAnimator anim = ValueAnimator.ofInt(initialWidth, targetWidth);
-        anim.addUpdateListener(va -> setHelloButtonWidth((Integer) va.getAnimatedValue()));
+        anim.addUpdateListener(valueAnimator -> setHelloButtonWidth((Integer) valueAnimator.getAnimatedValue()));
         anim.addListener(new AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(Animator animation) {
+            @Override
+            public void onAnimationEnd(Animator animation) {
                 setHelloButtonWidth(ViewGroup.LayoutParams.MATCH_PARENT);
                 isSayHiLoading = false;
                 wkVBinding.helloBtnLayout.setEnabled(!success);
@@ -430,6 +463,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.helloBtnLayout.setLayoutParams(lp);
     }
 
+    private void pressAndRun(View view, Runnable runnable) {
+        if (view == null || runnable == null) return;
+        view.animate().scaleX(0.88f).scaleY(0.88f).setDuration(80).withEndAction(() -> {
+            view.animate().scaleX(1f).scaleY(1f).setDuration(90).start();
+            runnable.run();
+        }).start();
+    }
+
     private String defaultGreeting() {
         String learning = profile == null ? "" : formatLanguageLabels(profile.getLearningLanguagesSafe());
         if (TextUtils.isEmpty(learning)) return getString(R.string.partner_default_hello_plain);
@@ -443,13 +484,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             String code = normalizeLangCode(item);
             if (!TextUtils.isEmpty(code) && !labels.contains(code)) labels.add(code);
         }
-        return join(labels, " ");
+        return join(labels, " / ");
     }
 
     private String normalizeCountryCode(String value) {
         if (TextUtils.isEmpty(value)) return "";
         String v = value.trim().toUpperCase(Locale.US);
-        if ("MY".equals(v)) return "MY";
         return countryCodeFromText(v);
     }
 
@@ -458,15 +498,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String v = value.trim();
         String lower = v.toLowerCase(Locale.US);
         switch (lower) {
-            case "zh": case "cn": case "中文": case "chinese": return "ZH";
-            case "en": case "英语": case "english": return "EN";
-            case "my": case "mm": case "burmese": case "myanmar": case "缅甸语": return "MY";
-            case "th": case "thai": case "泰语": return "TH";
-            case "ja": case "jp": case "japanese": case "日语": return "JP";
-            case "ko": case "kr": case "korean": case "韩语": return "KR";
-            case "vi": case "vn": case "vietnamese": case "越南语": return "VN";
-            case "id": case "indonesian": case "印尼语": return "ID";
-            case "ms": case "malay": case "马来语": return "MS";
+            case "zh": case "cn": case "中文": case "chinese": return "中文";
+            case "en": case "英语": case "english": return "English";
+            case "my": case "mm": case "burmese": case "myanmar": case "缅甸语": return "မြန်မာ";
+            case "th": case "thai": case "泰语": return "ไทย";
+            case "ja": case "jp": case "japanese": case "日语": return "日本語";
+            case "ko": case "kr": case "korean": case "韩语": return "한국어";
+            case "vi": case "vn": case "vietnamese": case "越南语": return "Tiếng Việt";
+            case "id": case "indonesian": case "印尼语": return "Indonesia";
+            case "ms": case "malay": case "马来语": return "Malay";
             default:
                 String only = v.replaceAll("[^A-Za-z]", "");
                 if (only.length() >= 2) return only.substring(0, Math.min(3, only.length())).toUpperCase(Locale.US);
@@ -488,7 +528,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (v.contains("MY") || v.contains("MALAYSIA") || v.contains("马来西亚")) return "MY";
         if (v.contains("SG") || v.contains("SINGAPORE") || v.contains("新加坡")) return "SG";
         if (v.contains("US") || v.contains("UNITED STATES") || v.contains("美国")) return "US";
-        return "";
+        return v.length() == 2 ? v : "";
     }
 
     private int ageFromBirthday(String birthday) {
@@ -518,12 +558,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             sb.append(v);
         }
         return sb.toString();
-    }
-
-    private void pressAndRun(View view, Runnable action) {
-        view.animate().scaleX(0.95f).scaleY(0.95f).setDuration(80).withEndAction(() -> {
-            view.animate().scaleX(1f).scaleY(1f).setDuration(80).withEndAction(action).start();
-        }).start();
     }
 
     private int dp(float value) {
