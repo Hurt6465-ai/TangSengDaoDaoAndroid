@@ -217,9 +217,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             Object obj = field.get(wkVBinding.avatarView);
             if (obj instanceof ImageView) {
                 ImageView flagIv = (ImageView) obj;
-                FrameLayout.LayoutParams flagLp = new FrameLayout.LayoutParams(dp(20), dp(14), Gravity.BOTTOM | Gravity.START);
-                flagLp.leftMargin = dp(8);
-                flagLp.bottomMargin = dp(10);
+                FrameLayout.LayoutParams flagLp = new FrameLayout.LayoutParams(dp(17), dp(12), Gravity.BOTTOM | Gravity.START);
+                flagLp.leftMargin = dp(7);
+                flagLp.bottomMargin = dp(8);
                 flagIv.setLayoutParams(flagLp);
                 flagIv.setScaleType(ImageView.ScaleType.FIT_XY);
                 flagIv.bringToFront();
@@ -298,19 +298,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void bindTags(PartnerProfileEntity data) {
         wkVBinding.tagLayout.removeAllViews();
-        List<String> tags = data.getTagsSafe();
-        if (tags.isEmpty()) {
-            if (isSelf) {
-                wkVBinding.tagSection.setVisibility(View.VISIBLE);
-                addChip(getString(R.string.partner_choose_tags), true);
-            } else {
-                wkVBinding.tagSection.setVisibility(View.GONE);
-            }
-            return;
-        }
-        wkVBinding.tagSection.setVisibility(View.VISIBLE);
-        int max = Math.min(tags.size(), 20);
-        for (int i = 0; i < max; i++) addChip(tags.get(i), false);
+        // 主页先不展示标签，标签仍然在编辑页选择和保存。
+        wkVBinding.tagSection.setVisibility(View.GONE);
     }
 
     private void addChip(String text, boolean isPlaceholder) {
@@ -484,15 +473,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String v = value.trim();
         String lower = v.toLowerCase(Locale.US);
         switch (lower) {
-            case "zh": case "cn": case "中文": case "chinese": return "中文";
-            case "en": case "英语": case "english": return "English";
-            case "my": case "mm": case "burmese": case "myanmar": case "缅甸语": return "မြန်မာ";
-            case "th": case "thai": case "泰语": return "ไทย";
-            case "ja": case "jp": case "japanese": case "日语": return "日本語";
-            case "ko": case "kr": case "korean": case "韩语": return "한국어";
-            case "vi": case "vn": case "vietnamese": case "越南语": return "Tiếng Việt";
-            case "id": case "indonesian": case "印尼语": return "Indonesia";
-            case "ms": case "malay": case "马来语": return "Malay";
+            case "zh": case "cn": case "中文": case "chinese": return "ZH";
+            case "en": case "英语": case "english": return "EN";
+            case "my": case "mm": case "burmese": case "myanmar": case "缅甸语": return "MY";
+            case "th": case "thai": case "泰语": return "TH";
+            case "ja": case "jp": case "japanese": case "日语": return "JP";
+            case "ko": case "kr": case "korean": case "韩语": return "KR";
+            case "vi": case "vn": case "vietnamese": case "越南语": return "VN";
+            case "id": case "indonesian": case "印尼语": return "ID";
+            case "ms": case "malay": case "马来语": return "MS";
             default:
                 String only = v.replaceAll("[^A-Za-z]", "");
                 if (only.length() >= 2) return only.substring(0, Math.min(3, only.length())).toUpperCase(Locale.US);
