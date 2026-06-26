@@ -15,6 +15,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.Window;
+import android.view.WindowManager;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
@@ -85,6 +86,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
+        applyToolbarStyle(0f);
         setupScrollLinkedHeader();
         setupEntranceAnimation();
     }
@@ -119,8 +121,33 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void setupImmersiveStatusBar() {
         Window window = getWindow();
         if (window == null) return;
-        window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
-        window.setStatusBarColor(Color.TRANSPARENT);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            window.setStatusBarColor(Color.TRANSPARENT);
+        }
+        window.getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        );
+
+        // Let the cover image draw behind the phone status bar, then push only
+        // the toolbar content below the status-bar icons. This avoids the blue
+        // status-bar strip that looked different from the cover image.
+        int statusBarHeight = getStatusBarHeight();
+        ViewGroup.LayoutParams toolbarLp = wkVBinding.toolbar.getLayoutParams();
+        if (toolbarLp != null) {
+            toolbarLp.height = statusBarHeight + dp(56);
+            wkVBinding.toolbar.setLayoutParams(toolbarLp);
+        }
+        wkVBinding.toolbar.setPadding(0, statusBarHeight, 0, 0);
+    }
+
+    private int getStatusBarHeight() {
+        int result = 0;
+        int resId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resId > 0) result = getResources().getDimensionPixelSize(resId);
+        return result > 0 ? result : dp(24);
     }
 
     private void setupScrollLinkedHeader() {
@@ -129,15 +156,54 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             if (range <= 0) return;
             float percent = Math.min(1f, Math.max(0f, Math.abs(verticalOffset) * 1f / range));
 
-            wkVBinding.toolbarTitleLayout.setAlpha(1f);
-
             float scale = 1f + (0.04f * (1f - percent));
             wkVBinding.coverIv.setScaleX(scale);
             wkVBinding.coverIv.setScaleY(scale);
 
-            int scrimAlpha = (int) (Math.max(0f, (percent - 0.7f) / 0.3f) * 230);
-            wkVBinding.toolbar.setBackgroundColor(Color.argb(scrimAlpha, 108, 77, 255));
+            applyToolbarStyle(percent);
         });
+    }
+
+    private void applyToolbarStyle(float percent) {
+        float titleAlpha = clamp01((percent - 0.58f) / 0.28f);
+        wkVBinding.toolbarTitleLayout.setAlpha(titleAlpha);
+
+        int bgAlpha = (int) (clamp01((percent - 0.48f) / 0.42f) * 255);
+        wkVBinding.toolbar.setBackgroundColor(Color.argb(bgAlpha, 255, 255, 255));
+
+        float iconT = clamp01((percent - 0.55f) / 0.35f);
+        int iconColor = blendColor(0xFFFFFFFF, 0xFF202033, iconT);
+        wkVBinding.backBtn.setColorFilter(iconColor);
+        wkVBinding.editBtn.setColorFilter(iconColor);
+
+        wkVBinding.toolbarTitleTv.setTextColor(0xFF202033);
+        wkVBinding.toolbarCountryTv.setTextColor(0xFF8C8C99);
+        wkVBinding.toolbarLastOnlineTv.setTextColor(0xFF8C8C99);
+        setImageTint(wkVBinding.toolbarCountryIcon, 0xFF9A9AA6);
+        setImageTint(wkVBinding.toolbarTimeIcon, 0xFF9A9AA6);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+            if (percent > 0.72f) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            getWindow().getDecorView().setSystemUiVisibility(flags);
+        }
+    }
+
+    private void setImageTint(ImageView imageView, int color) {
+        if (imageView != null) imageView.setColorFilter(color);
+    }
+
+    private float clamp01(float value) {
+        return Math.min(1f, Math.max(0f, value));
+    }
+
+    private int blendColor(int from, int to, float ratio) {
+        float t = clamp01(ratio);
+        int a = (int) (Color.alpha(from) + (Color.alpha(to) - Color.alpha(from)) * t);
+        int r = (int) (Color.red(from) + (Color.red(to) - Color.red(from)) * t);
+        int g = (int) (Color.green(from) + (Color.green(to) - Color.green(from)) * t);
+        int b = (int) (Color.blue(from) + (Color.blue(to) - Color.blue(from)) * t);
+        return Color.argb(a, r, g, b);
     }
 
     private void setupEntranceAnimation() {
