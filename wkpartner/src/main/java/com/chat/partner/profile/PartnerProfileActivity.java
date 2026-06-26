@@ -5,15 +5,19 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Outline;
+import android.os.Build;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.view.Window;
 import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.chat.base.base.WKBaseActivity;
@@ -22,9 +26,7 @@ import com.chat.base.config.WKConfig;
 import com.chat.base.endpoint.entity.ChatViewMenu;
 import com.chat.base.glide.GlideUtils;
 import com.chat.base.net.HttpResponseCode;
-import com.chat.base.ui.Theme;
 import com.chat.base.utils.WKDialogUtils;
-import com.chat.base.utils.systembar.WKStatusBarUtils;
 import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileBinding;
 import com.chat.uikit.chat.manager.WKIMUtils;
@@ -35,6 +37,7 @@ import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
@@ -42,9 +45,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private String uid;
     private boolean isSelf;
     private boolean isSayHiLoading;
-    private PartnerProfileEntity profile;
     private boolean introExpanded;
     private boolean introCanExpand;
+    private boolean hasAnimatedEntrance;
+    private PartnerProfileEntity profile;
 
     @Override
     protected ActPartnerProfileBinding getViewBinding() {
@@ -72,21 +76,20 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void initView() {
         setupImmersiveStatusBar();
-        wkVBinding.avatarView.setSize(100);
-        if (wkVBinding.helloBtnLayout.getBackground() != null) {
-            wkVBinding.helloBtnLayout.getBackground().setTint(Theme.colorAccount);
-        }
+        wkVBinding.avatarView.setSize(96);
+        wkVBinding.toolbarAvatarView.setSize(30);
         wkVBinding.editBtn.setVisibility(isSelf ? View.VISIBLE : View.GONE);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
         setupScrollLinkedHeader();
+        setupEntranceAnimation();
     }
 
     @Override
     protected void initListener() {
-        wkVBinding.backBtn.setOnClickListener(v -> finish());
-        wkVBinding.editBtn.setOnClickListener(v -> startActivity(new Intent(this, PartnerProfileEditActivity.class)));
+        wkVBinding.backBtn.setOnClickListener(v -> pressAndRun(v, this::finish));
+        wkVBinding.editBtn.setOnClickListener(v -> pressAndRun(v, () -> startActivity(new Intent(this, PartnerProfileEditActivity.class))));
         wkVBinding.helloBtnLayout.setOnClickListener(v -> onMainActionClick());
         wkVBinding.tagSection.setOnClickListener(v -> {
             if (isSelf) startActivity(new Intent(this, PartnerProfileEditActivity.class));
@@ -117,13 +120,54 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             if (range <= 0) return;
             float percent = Math.min(1f, Math.max(0f, Math.abs(verticalOffset) * 1f / range));
 
-            float titleAlpha = (percent - 0.58f) / 0.42f;
-            wkVBinding.toolbarTitleTv.setAlpha(Math.max(0f, Math.min(1f, titleAlpha)));
+            float titleAlpha = (percent - 0.55f) / 0.45f;
+            wkVBinding.toolbarTitleLayout.setAlpha(Math.max(0f, Math.min(1f, titleAlpha)));
 
-            float scale = 1f + (0.035f * (1f - percent));
+            float scale = 1f + (0.04f * (1f - percent));
             wkVBinding.coverIv.setScaleX(scale);
             wkVBinding.coverIv.setScaleY(scale);
+
+            int scrimAlpha = (int) (Math.max(0f, (percent - 0.7f) / 0.3f) * 230);
+            wkVBinding.toolbar.setBackgroundColor(Color.argb(scrimAlpha, 108, 77, 255));
         });
+    }
+
+    private void setupEntranceAnimation() {
+        wkVBinding.contentSheetLayout.setAlpha(0f);
+        wkVBinding.contentSheetLayout.setTranslationY(dp(40));
+    }
+
+    private void playEntranceAnimation() {
+        if (hasAnimatedEntrance) return;
+        hasAnimatedEntrance = true;
+        wkVBinding.contentSheetLayout.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(450)
+                .setInterpolator(new DecelerateInterpolator(1.5f))
+                .start();
+
+        wkVBinding.avatarGlowLayout.setScaleX(0.5f);
+        wkVBinding.avatarGlowLayout.setScaleY(0.5f);
+        wkVBinding.avatarGlowLayout.setAlpha(0f);
+        wkVBinding.avatarGlowLayout.animate()
+                .scaleX(1f)
+                .scaleY(1f)
+                .alpha(1f)
+                .setDuration(500)
+                .setStartDelay(120)
+                .setInterpolator(new OvershootInterpolator(1.2f))
+                .start();
+
+        if (wkVBinding.helloBar.getVisibility() == View.VISIBLE) {
+            wkVBinding.helloBar.setTranslationY(dp(80));
+            wkVBinding.helloBar.animate()
+                    .translationY(0f)
+                    .setDuration(400)
+                    .setStartDelay(220)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .start();
+        }
     }
 
     private void loadProfile() {
@@ -131,8 +175,11 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             if (code == HttpResponseCode.success && data != null) {
                 profile = data;
                 bindProfile(data);
-            } else if (!TextUtils.isEmpty(msg)) {
-                showToast(msg);
+                playEntranceAnimation();
+            } else {
+                wkVBinding.contentSheetLayout.setAlpha(1f);
+                wkVBinding.contentSheetLayout.setTranslationY(0f);
+                if (!TextUtils.isEmpty(msg)) showToast(msg);
             }
         });
     }
@@ -142,6 +189,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.nameTv.setText(showName);
         wkVBinding.toolbarTitleTv.setText(showName);
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
+        wkVBinding.toolbarAvatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         showCountryFlagIfSupported(data.country_code);
         bindCover(data.profile_cover);
         bindSexAge(data);
@@ -150,6 +198,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         bindTags(data);
         bindPhotos(data);
         bindActionButton(data);
+        wkVBinding.onlineIndicator.setVisibility(data.status == 1 ? View.VISIBLE : View.GONE);
     }
 
     private void bindCover(String cover) {
@@ -174,12 +223,25 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (data.sex == 1) gender = "♂";
         else if (data.sex == 0) gender = "♀";
         else gender = "";
+
         String text = "";
         if (!TextUtils.isEmpty(gender) && age > 0) text = gender + " " + age;
         else if (!TextUtils.isEmpty(gender)) text = gender;
         else if (age > 0) text = String.valueOf(age);
+
         wkVBinding.sexAgeTv.setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
         wkVBinding.sexAgeTv.setText(text);
+        if (data.sex == 1) {
+            wkVBinding.sexAgeTv.setTextColor(0xFF4A90D9);
+            if (wkVBinding.sexAgeTv.getBackground() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                wkVBinding.sexAgeTv.getBackground().setTint(0xFFEDF4FF);
+            }
+        } else {
+            wkVBinding.sexAgeTv.setTextColor(0xFFE82FA2);
+            if (wkVBinding.sexAgeTv.getBackground() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                wkVBinding.sexAgeTv.getBackground().setTint(0xFFFFF0F8);
+            }
+        }
     }
 
     private void bindLanguages(PartnerProfileEntity data) {
@@ -198,11 +260,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.introTv.setText(intro);
         wkVBinding.introTv.setMaxLines(3);
         wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
+        wkVBinding.introMoreTv.setText("展开全部");
         wkVBinding.introMoreTv.setVisibility(View.GONE);
-        wkVBinding.introMoreTv.setText("展开");
-        View.OnClickListener toggleListener = v -> toggleIntroExpand();
-        wkVBinding.introTv.setOnClickListener(toggleListener);
-        wkVBinding.introMoreTv.setOnClickListener(toggleListener);
+
+        View.OnClickListener toggle = v -> toggleIntroExpand();
+        wkVBinding.introTv.setOnClickListener(toggle);
+        wkVBinding.introMoreTv.setOnClickListener(toggle);
+
         wkVBinding.introTv.post(() -> {
             android.text.Layout layout = wkVBinding.introTv.getLayout();
             introCanExpand = layout != null && layout.getLineCount() >= 3 && layout.getEllipsisCount(2) > 0;
@@ -220,7 +284,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         } else {
             wkVBinding.introTv.setMaxLines(3);
             wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
-            wkVBinding.introMoreTv.setText("展开");
+            wkVBinding.introMoreTv.setText("展开全部");
         }
     }
 
@@ -230,7 +294,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (tags.isEmpty()) {
             if (isSelf) {
                 wkVBinding.tagSection.setVisibility(View.VISIBLE);
-                addChip(getString(R.string.partner_choose_tags));
+                addChip(getString(R.string.partner_choose_tags), true);
             } else {
                 wkVBinding.tagSection.setVisibility(View.GONE);
             }
@@ -238,23 +302,23 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         }
         wkVBinding.tagSection.setVisibility(View.VISIBLE);
         int max = Math.min(tags.size(), 20);
-        for (int i = 0; i < max; i++) addChip(tags.get(i));
+        for (int i = 0; i < max; i++) addChip(tags.get(i), false);
     }
 
-    private void addChip(String text) {
+    private void addChip(String text, boolean isPlaceholder) {
         if (TextUtils.isEmpty(text)) return;
         TextView tv = new TextView(this);
         tv.setText(text);
-        tv.setTextSize(15);
-        tv.setTextColor(0xFF777777);
+        tv.setTextSize(14);
+        tv.setTextColor(isPlaceholder ? 0xFFAAAAAA : 0xFF6C4DFF);
         tv.setGravity(Gravity.CENTER);
         tv.setMaxLines(1);
         tv.setEllipsize(TextUtils.TruncateAt.END);
-        tv.setBackgroundResource(R.drawable.bg_partner_tag_unselected);
+        tv.setBackgroundResource(isPlaceholder ? R.drawable.bg_partner_tag_unselected : R.drawable.bg_partner_tag_chip);
         tv.setPadding(dp(16), dp(8), dp(16), dp(8));
-        tv.setForeground(getSelectableItemBackground());
-        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(-2, dp(38));
-        lp.rightMargin = dp(9);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) tv.setForeground(getSelectableItemBackground());
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36));
+        lp.rightMargin = dp(8);
         wkVBinding.tagLayout.addView(tv, lp);
     }
 
@@ -279,7 +343,19 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             ImageView iv = new ImageView(this);
             iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
             iv.setBackgroundResource(R.drawable.bg_partner_photo_placeholder);
-            addViewCompat(wkVBinding.photoLayout, iv, dp(106), dp(106), i == 0 ? 0 : dp(9));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                iv.setOutlineProvider(new ViewOutlineProvider() {
+                    @Override
+                    public void getOutline(View view, Outline outline) {
+                        outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(16));
+                    }
+                });
+                iv.setClipToOutline(true);
+            }
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(120), dp(120));
+            lp.gravity = Gravity.CENTER_VERTICAL;
+            lp.leftMargin = i == 0 ? 0 : dp(10);
+            wkVBinding.photoLayout.addView(iv, lp);
             GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(url), iv);
         }
     }
@@ -306,23 +382,25 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void onMainActionClick() {
         if (isSayHiLoading) return;
-        WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
-        boolean isFriend = (profile != null && profile.follow == 1) || (channel != null && channel.follow == 1);
-        if (isFriend) {
-            WKIMUtils.getInstance().startChatActivity(new ChatViewMenu(this, uid, WKChannelType.PERSONAL, 0, false));
-            return;
-        }
-        WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_hello_hint), "", defaultGreeting(), defaultGreeting(), 40, text -> {
-            String remark = TextUtils.isEmpty(text) ? defaultGreeting() : text;
-            String vercode = profile == null ? "" : profile.vercode;
-            animateButtonToProgress();
-            FriendModel.getInstance().applyAddFriend(uid, vercode, remark, (code, msg) -> {
-                if (code == HttpResponseCode.success) {
-                    animateProgressToButton(true);
-                } else {
-                    animateProgressToButton(false);
-                    if (!TextUtils.isEmpty(msg)) showToast(msg);
-                }
+        pressAndRun(wkVBinding.helloBtnLayout, () -> {
+            WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
+            boolean isFriend = (profile != null && profile.follow == 1) || (channel != null && channel.follow == 1);
+            if (isFriend) {
+                WKIMUtils.getInstance().startChatActivity(new ChatViewMenu(this, uid, WKChannelType.PERSONAL, 0, false));
+                return;
+            }
+            WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_hello_hint), "", defaultGreeting(), defaultGreeting(), 40, text -> {
+                String remark = TextUtils.isEmpty(text) ? defaultGreeting() : text;
+                String vercode = profile == null ? "" : profile.vercode;
+                animateButtonToProgress();
+                FriendModel.getInstance().applyAddFriend(uid, vercode, remark, (code, msg) -> {
+                    if (code == HttpResponseCode.success) {
+                        animateProgressToButton(true);
+                    } else {
+                        animateProgressToButton(false);
+                        if (!TextUtils.isEmpty(msg)) showToast(msg);
+                    }
+                });
             });
         });
     }
@@ -332,7 +410,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.helloBtnLayout.setEnabled(false);
         int initialWidth = wkVBinding.helloBtnLayout.getWidth();
         if (initialWidth <= 0) initialWidth = getAvailableButtonWidth();
-        int targetWidth = dp(54);
+        int targetWidth = dp(56);
         wkVBinding.helloBtnText.animate().alpha(0f).setDuration(120).start();
         wkVBinding.helloBtnProgress.setVisibility(View.VISIBLE);
         wkVBinding.helloBtnProgress.animate().alpha(1f).setDuration(180).setStartDelay(80).start();
@@ -345,7 +423,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void animateProgressToButton(boolean success) {
         int initialWidth = wkVBinding.helloBtnLayout.getWidth();
-        if (initialWidth <= 0) initialWidth = dp(54);
+        if (initialWidth <= 0) initialWidth = dp(56);
         int targetWidth = getAvailableButtonWidth();
         wkVBinding.helloBtnProgress.animate().alpha(0f).setDuration(130).setListener(new AnimatorListenerAdapter() {
             @Override
@@ -385,6 +463,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.helloBtnLayout.setLayoutParams(lp);
     }
 
+    private void pressAndRun(View view, Runnable runnable) {
+        if (view == null || runnable == null) return;
+        view.animate().scaleX(0.88f).scaleY(0.88f).setDuration(80).withEndAction(() -> {
+            view.animate().scaleX(1f).scaleY(1f).setDuration(90).start();
+            runnable.run();
+        }).start();
+    }
+
     private String defaultGreeting() {
         String learning = profile == null ? "" : formatLanguageLabels(profile.getLearningLanguagesSafe());
         if (TextUtils.isEmpty(learning)) return getString(R.string.partner_default_hello_plain);
@@ -398,13 +484,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             String code = normalizeLangCode(item);
             if (!TextUtils.isEmpty(code) && !labels.contains(code)) labels.add(code);
         }
-        return join(labels, "/");
+        return join(labels, " / ");
     }
 
     private String normalizeCountryCode(String value) {
         if (TextUtils.isEmpty(value)) return "";
         String v = value.trim().toUpperCase(Locale.US);
-        if ("MY".equals(v)) return "MY";
         return countryCodeFromText(v);
     }
 
@@ -413,15 +498,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String v = value.trim();
         String lower = v.toLowerCase(Locale.US);
         switch (lower) {
-            case "zh": case "cn": case "中文": case "chinese": return "ZH";
-            case "en": case "英语": case "english": return "EN";
-            case "my": case "mm": case "burmese": case "myanmar": case "缅甸语": return "MY";
-            case "th": case "thai": case "泰语": return "TH";
-            case "ja": case "jp": case "japanese": case "日语": return "JA";
-            case "ko": case "kr": case "korean": case "韩语": return "KO";
-            case "vi": case "vn": case "vietnamese": case "越南语": return "VI";
-            case "id": case "indonesian": case "印尼语": return "ID";
-            case "ms": case "malay": case "马来语": return "MS";
+            case "zh": case "cn": case "中文": case "chinese": return "中文";
+            case "en": case "英语": case "english": return "English";
+            case "my": case "mm": case "burmese": case "myanmar": case "缅甸语": return "မြန်မာ";
+            case "th": case "thai": case "泰语": return "ไทย";
+            case "ja": case "jp": case "japanese": case "日语": return "日本語";
+            case "ko": case "kr": case "korean": case "韩语": return "한국어";
+            case "vi": case "vn": case "vietnamese": case "越南语": return "Tiếng Việt";
+            case "id": case "indonesian": case "印尼语": return "Indonesia";
+            case "ms": case "malay": case "马来语": return "Malay";
             default:
                 String only = v.replaceAll("[^A-Za-z]", "");
                 if (only.length() >= 2) return only.substring(0, Math.min(3, only.length())).toUpperCase(Locale.US);
@@ -443,27 +528,19 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (v.contains("MY") || v.contains("MALAYSIA") || v.contains("马来西亚")) return "MY";
         if (v.contains("SG") || v.contains("SINGAPORE") || v.contains("新加坡")) return "SG";
         if (v.contains("US") || v.contains("UNITED STATES") || v.contains("美国")) return "US";
-        return "";
+        return v.length() == 2 ? v : "";
     }
 
     private int ageFromBirthday(String birthday) {
         if (TextUtils.isEmpty(birthday) || birthday.length() < 4) return 0;
         try {
             int year = Integer.parseInt(birthday.substring(0, 4));
-            int current = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR);
+            int current = Calendar.getInstance().get(Calendar.YEAR);
             int age = current - year;
             return age > 0 && age < 120 ? age : 0;
         } catch (Exception ignored) {
             return 0;
         }
-    }
-
-
-    private String compactUserName(String value) {
-        if (TextUtils.isEmpty(value)) return "";
-        String v = value.trim();
-        if (v.length() <= 22) return v;
-        return v.substring(0, 10) + "..." + v.substring(v.length() - 5);
     }
 
     private String firstNotEmpty(String... values) {
@@ -481,13 +558,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             sb.append(v);
         }
         return sb.toString();
-    }
-
-    private void addViewCompat(android.widget.LinearLayout parent, View child, int width, int height, int marginStart) {
-        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(width, height);
-        lp.gravity = Gravity.CENTER_VERTICAL;
-        lp.leftMargin = marginStart;
-        parent.addView(child, lp);
     }
 
     private int dp(float value) {
