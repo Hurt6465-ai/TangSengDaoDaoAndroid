@@ -16,6 +16,7 @@ import android.view.Window;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -76,8 +77,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void initView() {
         setupImmersiveStatusBar();
-        wkVBinding.avatarView.setSize(96);
-        wkVBinding.toolbarAvatarView.setSize(30);
+        wkVBinding.avatarView.setSize(88);
+        wkVBinding.toolbarAvatarView.setSize(28);
         wkVBinding.editBtn.setVisibility(isSelf ? View.VISIBLE : View.GONE);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
@@ -191,6 +192,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         wkVBinding.toolbarAvatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         showCountryFlagIfSupported(data.country_code);
+        tuneProfileAvatarBadges();
         bindCover(data.profile_cover);
         bindSexAge(data);
         bindLanguages(data);
@@ -213,6 +215,21 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (TextUtils.isEmpty(countryCode)) return;
         try {
             wkVBinding.avatarView.getClass().getMethod("showFlag", String.class).invoke(wkVBinding.avatarView, normalizeCountryCode(countryCode));
+            tuneProfileAvatarBadges();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void tuneProfileAvatarBadges() {
+        try {
+            if (wkVBinding.avatarView.flagIv != null) {
+                FrameLayout.LayoutParams flagLp = new FrameLayout.LayoutParams(dp(24), dp(16), Gravity.BOTTOM | Gravity.START);
+                flagLp.leftMargin = dp(5);
+                flagLp.bottomMargin = dp(7);
+                wkVBinding.avatarView.flagIv.setLayoutParams(flagLp);
+                wkVBinding.avatarView.flagIv.setScaleType(ImageView.ScaleType.FIT_XY);
+                wkVBinding.avatarView.flagIv.bringToFront();
+            }
         } catch (Exception ignored) {
         }
     }
@@ -290,19 +307,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void bindTags(PartnerProfileEntity data) {
         wkVBinding.tagLayout.removeAllViews();
-        List<String> tags = data.getTagsSafe();
-        if (tags.isEmpty()) {
-            if (isSelf) {
-                wkVBinding.tagSection.setVisibility(View.VISIBLE);
-                addChip(getString(R.string.partner_choose_tags), true);
-            } else {
-                wkVBinding.tagSection.setVisibility(View.GONE);
-            }
-            return;
-        }
-        wkVBinding.tagSection.setVisibility(View.VISIBLE);
-        int max = Math.min(tags.size(), 20);
-        for (int i = 0; i < max; i++) addChip(tags.get(i), false);
+        wkVBinding.tagSection.setVisibility(View.GONE);
     }
 
     private void addChip(String text, boolean isPlaceholder) {
@@ -498,15 +503,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String v = value.trim();
         String lower = v.toLowerCase(Locale.US);
         switch (lower) {
-            case "zh": case "cn": case "中文": case "chinese": return "中文";
-            case "en": case "英语": case "english": return "English";
-            case "my": case "mm": case "burmese": case "myanmar": case "缅甸语": return "မြန်မာ";
-            case "th": case "thai": case "泰语": return "ไทย";
-            case "ja": case "jp": case "japanese": case "日语": return "日本語";
-            case "ko": case "kr": case "korean": case "韩语": return "한국어";
-            case "vi": case "vn": case "vietnamese": case "越南语": return "Tiếng Việt";
-            case "id": case "indonesian": case "印尼语": return "Indonesia";
-            case "ms": case "malay": case "马来语": return "Malay";
+            case "zh": case "cn": case "中文": case "chinese": return "ZH";
+            case "en": case "英语": case "english": return "EN";
+            case "my": case "mm": case "burmese": case "myanmar": case "缅甸语": case "မြန်မာ": return "MY";
+            case "th": case "thai": case "泰语": return "TH";
+            case "ja": case "jp": case "japanese": case "日语": return "JP";
+            case "ko": case "kr": case "korean": case "韩语": return "KR";
+            case "vi": case "vn": case "vietnamese": case "越南语": return "VN";
+            case "id": case "indonesian": case "印尼语": return "ID";
+            case "ms": case "malay": case "马来语": return "MS";
             default:
                 String only = v.replaceAll("[^A-Za-z]", "");
                 if (only.length() >= 2) return only.substring(0, Math.min(3, only.length())).toUpperCase(Locale.US);
