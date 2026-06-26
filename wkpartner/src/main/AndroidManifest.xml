@@ -6,5 +6,8 @@
         <activity
             android:name=".profile.PartnerProfileEditActivity"
             android:screenOrientation="portrait" />
+        <activity
+            android:name=".profile.PartnerTagSelectorActivity"
+            android:screenOrientation="portrait" />
     </application>
 </manifest>
