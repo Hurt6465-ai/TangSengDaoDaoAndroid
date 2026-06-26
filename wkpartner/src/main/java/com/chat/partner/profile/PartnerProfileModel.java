@@ -1,9 +1,13 @@
 package com.chat.partner.profile;
 
+import android.text.TextUtils;
+
 import com.alibaba.fastjson.JSONObject;
 import com.chat.base.base.WKBaseModel;
+import com.chat.base.config.WKApiConfig;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.base.net.entity.CommonResponse;
+import com.chat.base.net.entity.UploadFileUrl;
 
 public class PartnerProfileModel extends WKBaseModel {
     private PartnerProfileModel() {}
@@ -42,6 +46,26 @@ public class PartnerProfileModel extends WKBaseModel {
             @Override
             public void onFail(int code, String msg) {
                 if (callback != null) callback.onResult(code, msg, null);
+            }
+        });
+    }
+
+    public void getProfileUploadUrl(String path, final Callback<String> callback) {
+        if (TextUtils.isEmpty(path)) {
+            if (callback != null) callback.onResult(400, "path empty", "");
+            return;
+        }
+        String safePath = path.startsWith("/") ? path : "/" + path;
+        String url = WKApiConfig.baseUrl + "file/upload?type=common&path=" + safePath;
+        request(createService(PartnerProfileService.class).getUploadUrl(url), new IRequestResultListener<UploadFileUrl>() {
+            @Override
+            public void onSuccess(UploadFileUrl result) {
+                if (callback != null) callback.onResult(200, "", result == null ? "" : result.url);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (callback != null) callback.onResult(code, msg, "");
             }
         });
     }

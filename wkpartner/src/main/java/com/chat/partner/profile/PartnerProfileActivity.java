@@ -90,7 +90,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.editBtn.setVisibility(View.VISIBLE);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
-        wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
+        wkVBinding.coverIv.setImageResource(R.drawable.bj01);
         applyToolbarStyle(0f);
         setupScrollLinkedHeader();
         setupEntranceAnimation();
@@ -104,10 +104,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             if (isSelf) {
                 startActivity(new Intent(this, PartnerProfileEditActivity.class));
             } else {
-                showToast("更多功能后续添加");
+                showToast(getString(R.string.partner_more_coming));
             }
         }));
         wkVBinding.helloBtnLayout.setOnClickListener(v -> onMainActionClick());
+        if (wkVBinding.profileSelfEditChip != null) {
+            wkVBinding.profileSelfEditChip.setOnClickListener(v -> pressAndRun(v, () -> startActivity(new Intent(this, PartnerProfileEditActivity.class))));
+        }
         wkVBinding.tagSection.setOnClickListener(v -> {
             if (isSelf) startActivity(new Intent(this, PartnerProfileEditActivity.class));
         });
@@ -338,7 +341,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (resId != 0) {
             wkVBinding.coverIv.setImageResource(resId);
         } else {
-            wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
+            wkVBinding.coverIv.setImageResource(R.drawable.bj01);
         }
     }
 
@@ -354,15 +357,22 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.toolbarCountryTv.setText(country);
         wkVBinding.toolbarLastOnlineTv.setText(lastOnline);
 
-        profileLastOnlineBaseVisible = hasLastOnline;
-        wkVBinding.profileLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
-        wkVBinding.profileLastOnlineTv.setText(lastOnline);
+        if (isSelf) {
+            wkVBinding.profileSelfEditChip.setVisibility(View.VISIBLE);
+            profileLastOnlineBaseVisible = false;
+            wkVBinding.profileLastOnlineGroup.setVisibility(View.GONE);
+        } else {
+            wkVBinding.profileSelfEditChip.setVisibility(View.GONE);
+            profileLastOnlineBaseVisible = hasLastOnline;
+            wkVBinding.profileLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
+            wkVBinding.profileLastOnlineTv.setText(lastOnline);
+        }
         applyProfileContentVisibility(currentCollapsePercent);
     }
 
     private String formatLastOnline(PartnerProfileEntity data) {
         if (data == null) return "";
-        if (data.status == 1) return "在线";
+        if (data.status == 1) return getString(R.string.partner_online);
         String raw = firstNotEmpty(data.last_online, data.last_online_time, data.last_seen, data.last_seen_at,
                 data.last_active_at, data.last_active_time, data.last_login_at, data.last_login_time);
         if (TextUtils.isEmpty(raw)) return "";
@@ -370,9 +380,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (millis > 0) {
             CharSequence relative = DateUtils.getRelativeTimeSpanString(millis, System.currentTimeMillis(),
                     DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE);
-            return "最后在线 " + relative;
+            return getString(R.string.partner_last_online_prefix) + " " + relative;
         }
-        return "最后在线 " + raw.trim();
+        return getString(R.string.partner_last_online_prefix) + " " + raw.trim();
     }
 
     private long parseTimeMillis(String raw) {
@@ -472,7 +482,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.introTv.setText(intro);
         wkVBinding.introTv.setMaxLines(2);
         wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
-        wkVBinding.introMoreTv.setText("展开全部");
+        wkVBinding.introMoreTv.setText(R.string.partner_expand_all);
         wkVBinding.introMoreTv.setVisibility(View.GONE);
 
         View.OnClickListener toggle = v -> toggleIntroExpand();
@@ -493,11 +503,11 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (introExpanded) {
             wkVBinding.introTv.setMaxLines(Integer.MAX_VALUE);
             wkVBinding.introTv.setEllipsize(null);
-            wkVBinding.introMoreTv.setText("收起");
+            wkVBinding.introMoreTv.setText(R.string.partner_collapse);
         } else {
             wkVBinding.introTv.setMaxLines(2);
             wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
-            wkVBinding.introMoreTv.setText("展开全部");
+            wkVBinding.introMoreTv.setText(R.string.partner_expand_all);
         }
     }
 
@@ -705,7 +715,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             String code = normalizeLangLetter(item);
             if (!TextUtils.isEmpty(code) && !labels.contains(code)) labels.add(code);
         }
-        return join(labels, " / ");
+        return join(labels, " ");
     }
 
     private String normalizeLangLetter(String value) {

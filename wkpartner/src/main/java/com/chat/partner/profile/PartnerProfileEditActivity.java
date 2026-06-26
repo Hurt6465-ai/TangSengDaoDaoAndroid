@@ -166,21 +166,42 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         body.put("birthday", birthday);
         body.put("country_code", countryCode);
         body.put("country", countryName);
-        body.put("native_languages", new ArrayList<>(nativeCodes));
-        body.put("learning_languages", new ArrayList<>(learningCodes));
+        body.put("native_languages", joinPlain(nativeCodes));
+        body.put("learning_languages", joinPlain(learningCodes));
         body.put("intro", valueOf(wkVBinding.introEt));
-        body.put("tags", new ArrayList<>(tags));
-        body.put("profile_cover", profileCover);
-        body.put("profile_images", new ArrayList<>(limitList(profileImages, MAX_PROFILE_IMAGES)));
+
+        // 先保存后端当前已稳定支持的核心字段，避免 tags/profile_cover/profile_images
+        // 在旧后端没有字段时拖垮生日、年龄、国家、语言这些基础资料。
         wkVBinding.saveBtn.setEnabled(false);
         PartnerProfileModel.getInstance().updateCurrentProfile(body, (code, msg, data) -> {
+            if (code == HttpResponseCode.success || code == 200 || code == 0) {
+                saveExtraProfileFieldsOrFinish();
+            } else {
+                wkVBinding.saveBtn.setEnabled(true);
+                showToast(TextUtils.isEmpty(msg) ? getString(R.string.partner_save_failed) : msg);
+            }
+        });
+    }
+
+    private void saveExtraProfileFieldsOrFinish() {
+        JSONObject extra = new JSONObject();
+        if (!tags.isEmpty()) extra.put("tags", joinPlain(tags));
+        if (!TextUtils.isEmpty(profileCover)) extra.put("profile_cover", profileCover);
+        if (!profileImages.isEmpty()) extra.put("profile_images", joinPlain(limitList(profileImages, MAX_PROFILE_IMAGES)));
+        if (extra.isEmpty()) {
+            wkVBinding.saveBtn.setEnabled(true);
+            showToast(getString(R.string.partner_save_success));
+            finish();
+            return;
+        }
+        PartnerProfileModel.getInstance().updateCurrentProfile(extra, (code, msg, data) -> {
             wkVBinding.saveBtn.setEnabled(true);
             if (code == HttpResponseCode.success || code == 200 || code == 0) {
                 showToast(getString(R.string.partner_save_success));
-                finish();
             } else {
-                showToast(TextUtils.isEmpty(msg) ? getString(R.string.partner_save_failed) : msg);
+                showToast(getString(R.string.partner_save_basic_success_extra_failed));
             }
+            finish();
         });
     }
 
@@ -329,17 +350,20 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
             public void onFail(Object progressTag, String msg) {
             }
         });
-        WKUploader.getInstance().getUploadFileUrl(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL, file.getAbsolutePath(), (url, fileUrl) -> {
-            if (TextUtils.isEmpty(url)) {
+
+        String uid = WKConfig.getInstance().getUid();
+        String path = "/profile/" + uid + "/" + (cover ? "cover" : ("photo_" + System.currentTimeMillis())) + ".webp";
+        PartnerProfileModel.getInstance().getProfileUploadUrl(path, (code, msg, uploadUrl) -> {
+            if (TextUtils.isEmpty(uploadUrl)) {
                 WKProgressManager.Companion.getInstance().unregisterProgress(tag);
                 finishOneUpload(cover, localPreview, false, "");
                 return;
             }
-            WKUploader.getInstance().upload(url, file.getAbsolutePath(), tag, new WKUploader.IUploadBack() {
+            WKUploader.getInstance().upload(uploadUrl, file.getAbsolutePath(), tag, new WKUploader.IUploadBack() {
                 @Override
-                public void onSuccess(String ignore) {
+                public void onSuccess(String uploadedPath) {
                     WKProgressManager.Companion.getInstance().unregisterProgress(tag);
-                    finishOneUpload(cover, localPreview, true, fileUrl);
+                    finishOneUpload(cover, localPreview, true, uploadedPath);
                 }
 
                 @Override
