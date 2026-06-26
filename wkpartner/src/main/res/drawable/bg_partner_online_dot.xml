@@ -5,9 +5,9 @@
             <solid android:color="#FFFFFFFF" />
         </shape>
     </item>
-    <item android:bottom="1.5dp" android:left="1.5dp" android:right="1.5dp" android:top="1.5dp">
+    <item android:left="1.5dp" android:top="1.5dp" android:right="1.5dp" android:bottom="1.5dp">
         <shape android:shape="oval">
-            <solid android:color="#22D979" />
+            <solid android:color="#48D86A" />
         </shape>
     </item>
 </layer-list>
