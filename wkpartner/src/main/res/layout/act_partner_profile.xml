@@ -231,8 +231,8 @@
                         android:layout_width="8dp"
                         android:layout_height="8dp"
                         android:layout_gravity="top|end"
-                        android:layout_marginTop="8dp"
-                        android:layout_marginEnd="8dp"
+                        android:layout_marginTop="11dp"
+                        android:layout_marginEnd="11dp"
                         android:background="@drawable/bg_partner_online_dot"
                         android:visibility="gone" />
                 </FrameLayout>
@@ -242,8 +242,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_below="@id/avatarGlowLayout"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center_vertical"
+                    android:layout_marginTop="6dp"
+                    android:gravity="top"
                     android:orientation="horizontal">
 
                     <TextView
@@ -280,8 +280,9 @@
                     <LinearLayout
                         android:id="@+id/profileLastOnlineGroup"
                         android:layout_width="wrap_content"
-                        android:layout_height="24dp"
+                        android:layout_height="20dp"
                         android:layout_marginStart="8dp"
+                        android:layout_marginTop="2dp"
                         android:gravity="center"
                         android:orientation="horizontal"
                         android:visibility="gone">
@@ -311,7 +312,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_below="@id/nameRow"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="2dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:visibility="gone">
@@ -320,28 +321,28 @@
                         android:id="@+id/nativeLangTv"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:letterSpacing="0.06"
-                        android:textColor="#6E6E7E"
-                        android:textSize="13sp" />
+                        android:letterSpacing="0.04"
+                        android:textColor="#777785"
+                        android:textSize="12sp" />
 
                     <ImageView
                         android:id="@+id/langToTv"
-                        android:layout_width="28dp"
-                        android:layout_height="16dp"
-                        android:layout_marginStart="7dp"
-                        android:layout_marginEnd="7dp"
+                        android:layout_width="22dp"
+                        android:layout_height="12dp"
+                        android:layout_marginStart="5dp"
+                        android:layout_marginEnd="5dp"
                         android:contentDescription="@string/partner_profile"
                         android:src="@drawable/ic_partner_lang_exchange_simple"
                         android:visibility="gone"
-                        app:tint="#7C5CFF" />
+                        app:tint="#B7A4FF" />
 
                     <TextView
                         android:id="@+id/learningLangTv"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:letterSpacing="0.06"
-                        android:textColor="#6E6E7E"
-                        android:textSize="13sp" />
+                        android:letterSpacing="0.04"
+                        android:textColor="#777785"
+                        android:textSize="12sp" />
                 </LinearLayout>
             </RelativeLayout>
 
@@ -364,7 +365,7 @@
                     android:maxLines="2"
                     android:padding="0dp"
                     android:textColor="#3E3E4A"
-                    android:textSize="14sp" />
+                    android:textSize="15sp" />
 
                 <TextView
                     android:id="@+id/introMoreTv"
