@@ -22,7 +22,6 @@ import com.chat.base.net.ud.WKProgressManager;
 import com.chat.base.net.ud.WKUploader;
 import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileEditBinding;
-import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -160,48 +159,38 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
             showToast(getString(R.string.partner_learning_language_required));
             return;
         }
-        JSONObject body = new JSONObject();
-        body.put("name", name);
-        body.put("sex", sexValue);
-        body.put("birthday", birthday);
-        body.put("country_code", countryCode);
-        body.put("country", countryName);
-        body.put("native_languages", joinPlain(nativeCodes));
-        body.put("learning_languages", joinPlain(learningCodes));
-        body.put("intro", valueOf(wkVBinding.introEt));
 
-        // 先保存后端当前已稳定支持的核心字段，避免 tags/profile_cover/profile_images
-        // 在旧后端没有字段时拖垮生日、年龄、国家、语言这些基础资料。
+        JSONObject coreBody = new JSONObject();
+        coreBody.put("name", name);
+        coreBody.put("sex", sexValue);
+        coreBody.put("birthday", birthday);
+        coreBody.put("country_code", countryCode);
+        coreBody.put("country", countryName);
+        coreBody.put("native_languages", new ArrayList<>(nativeCodes));
+        coreBody.put("learning_languages", new ArrayList<>(learningCodes));
+        coreBody.put("intro", valueOf(wkVBinding.introEt));
+
+        JSONObject mediaBody = new JSONObject();
+        mediaBody.put("tags", new ArrayList<>(tags));
+        mediaBody.put("profile_cover", profileCover);
+        mediaBody.put("profile_images", new ArrayList<>(limitList(profileImages, MAX_PROFILE_IMAGES)));
+
         wkVBinding.saveBtn.setEnabled(false);
-        PartnerProfileModel.getInstance().updateCurrentProfile(body, (code, msg, data) -> {
-            if (code == HttpResponseCode.success || code == 200 || code == 0) {
-                saveExtraProfileFieldsOrFinish();
-            } else {
+        PartnerProfileModel.getInstance().updateCurrentProfile(coreBody, (code, msg, data) -> {
+            if (!(code == HttpResponseCode.success || code == 200 || code == 0)) {
                 wkVBinding.saveBtn.setEnabled(true);
                 showToast(TextUtils.isEmpty(msg) ? getString(R.string.partner_save_failed) : msg);
+                return;
             }
-        });
-    }
-
-    private void saveExtraProfileFieldsOrFinish() {
-        JSONObject extra = new JSONObject();
-        if (!tags.isEmpty()) extra.put("tags", joinPlain(tags));
-        if (!TextUtils.isEmpty(profileCover)) extra.put("profile_cover", profileCover);
-        if (!profileImages.isEmpty()) extra.put("profile_images", joinPlain(limitList(profileImages, MAX_PROFILE_IMAGES)));
-        if (extra.isEmpty()) {
-            wkVBinding.saveBtn.setEnabled(true);
-            showToast(getString(R.string.partner_save_success));
-            finish();
-            return;
-        }
-        PartnerProfileModel.getInstance().updateCurrentProfile(extra, (code, msg, data) -> {
-            wkVBinding.saveBtn.setEnabled(true);
-            if (code == HttpResponseCode.success || code == 200 || code == 0) {
-                showToast(getString(R.string.partner_save_success));
-            } else {
-                showToast(getString(R.string.partner_save_basic_success_extra_failed));
-            }
-            finish();
+            PartnerProfileModel.getInstance().updateCurrentProfile(mediaBody, (mediaCode, mediaMsg, mediaData) -> {
+                wkVBinding.saveBtn.setEnabled(true);
+                if (mediaCode == HttpResponseCode.success || mediaCode == 200 || mediaCode == 0) {
+                    showToast(getString(R.string.partner_save_success));
+                    finish();
+                } else {
+                    showToast(TextUtils.isEmpty(mediaMsg) ? getString(R.string.partner_save_media_failed) : mediaMsg);
+                }
+            });
         });
     }
 
@@ -350,20 +339,18 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
             public void onFail(Object progressTag, String msg) {
             }
         });
-
-        String uid = WKConfig.getInstance().getUid();
-        String path = "/profile/" + uid + "/" + (cover ? "cover" : ("photo_" + System.currentTimeMillis())) + ".webp";
-        PartnerProfileModel.getInstance().getProfileUploadUrl(path, (code, msg, uploadUrl) -> {
-            if (TextUtils.isEmpty(uploadUrl)) {
+        PartnerProfileModel.getInstance().getProfileUploadFileUrl(WKConfig.getInstance().getUid(), file.getAbsolutePath(), cover, (code, msg, uploadUrl) -> {
+            if (uploadUrl == null || TextUtils.isEmpty(uploadUrl.url)) {
                 WKProgressManager.Companion.getInstance().unregisterProgress(tag);
                 finishOneUpload(cover, localPreview, false, "");
                 return;
             }
-            WKUploader.getInstance().upload(uploadUrl, file.getAbsolutePath(), tag, new WKUploader.IUploadBack() {
+            WKUploader.getInstance().upload(uploadUrl.url, file.getAbsolutePath(), tag, new WKUploader.IUploadBack() {
                 @Override
                 public void onSuccess(String uploadedPath) {
                     WKProgressManager.Companion.getInstance().unregisterProgress(tag);
-                    finishOneUpload(cover, localPreview, true, uploadedPath);
+                    String finalPath = TextUtils.isEmpty(uploadedPath) ? uploadUrl.path : uploadedPath;
+                    finishOneUpload(cover, localPreview, true, normalizeUploadedPath(finalPath));
                 }
 
                 @Override
@@ -373,6 +360,14 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
                 }
             });
         });
+    }
+
+    private String normalizeUploadedPath(String path) {
+        if (TextUtils.isEmpty(path)) return "";
+        String v = path.trim();
+        if (v.startsWith(WKApiConfig.baseUrl)) v = v.substring(WKApiConfig.baseUrl.length());
+        if (v.startsWith("/")) v = v.substring(1);
+        return v;
     }
 
     private void finishOneUpload(boolean cover, String localPreview, boolean success, String fileUrl) {
@@ -448,7 +443,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         } else if (!TextUtils.isEmpty(profileCover)) {
             GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(profileCover), wkVBinding.coverPreviewIv);
         } else {
-            wkVBinding.coverPreviewIv.setImageResource(R.drawable.bg_partner_cover_default);
+            wkVBinding.coverPreviewIv.setImageResource(R.drawable.bj01);
         }
     }
 

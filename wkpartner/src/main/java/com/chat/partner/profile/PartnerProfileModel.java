@@ -1,13 +1,15 @@
 package com.chat.partner.profile;
 
-import android.text.TextUtils;
-
 import com.alibaba.fastjson.JSONObject;
 import com.chat.base.base.WKBaseModel;
 import com.chat.base.config.WKApiConfig;
+import com.chat.base.net.ApiService;
+import com.chat.base.net.entity.UploadFileUrl;
+
+import java.io.File;
+import java.util.Locale;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.base.net.entity.CommonResponse;
-import com.chat.base.net.entity.UploadFileUrl;
 
 public class PartnerProfileModel extends WKBaseModel {
     private PartnerProfileModel() {}
@@ -50,24 +52,42 @@ public class PartnerProfileModel extends WKBaseModel {
         });
     }
 
-    public void getProfileUploadUrl(String path, final Callback<String> callback) {
-        if (TextUtils.isEmpty(path)) {
-            if (callback != null) callback.onResult(400, "path empty", "");
+    public void getProfileUploadFileUrl(String uid, String localPath, boolean cover, final Callback<ProfileUploadUrl> callback) {
+        String safeUid = uid == null ? "" : uid.trim();
+        if (safeUid.length() == 0) {
+            if (callback != null) callback.onResult(400, "uid is empty", null);
             return;
         }
-        String safePath = path.startsWith("/") ? path : "/" + path;
-        String url = WKApiConfig.baseUrl + "file/upload?type=common&path=" + safePath;
-        request(createService(PartnerProfileService.class).getUploadUrl(url), new IRequestResultListener<UploadFileUrl>() {
+        String suffix = "webp";
+        File file = new File(localPath == null ? "" : localPath);
+        String fileName = file.getName();
+        int dot = fileName.lastIndexOf('.');
+        if (dot >= 0 && dot < fileName.length() - 1) {
+            String ext = fileName.substring(dot + 1).toLowerCase(Locale.US);
+            if (ext.length() > 0) suffix = ext;
+        }
+        String prefix = cover ? "cover_" : "photo_";
+        String path = "/profile/" + safeUid + "/" + prefix + System.currentTimeMillis() + "." + suffix;
+        String requestUrl = WKApiConfig.baseUrl + "file/upload?type=common&path=" + path;
+        request(createService(ApiService.class).getUploadFileUrl(requestUrl), new IRequestResultListener<>() {
             @Override
             public void onSuccess(UploadFileUrl result) {
-                if (callback != null) callback.onResult(200, "", result == null ? "" : result.url);
+                ProfileUploadUrl uploadUrl = new ProfileUploadUrl();
+                uploadUrl.url = result == null ? "" : result.url;
+                uploadUrl.path = path;
+                if (callback != null) callback.onResult(200, "", uploadUrl);
             }
 
             @Override
             public void onFail(int code, String msg) {
-                if (callback != null) callback.onResult(code, msg, "");
+                if (callback != null) callback.onResult(code, msg, null);
             }
         });
+    }
+
+    public static class ProfileUploadUrl {
+        public String url;
+        public String path;
     }
 
     public interface Callback<T> {
