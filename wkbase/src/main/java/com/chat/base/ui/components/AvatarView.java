@@ -749,7 +749,7 @@ public class AvatarView extends FrameLayout {
         if (!TextUtils.isEmpty(flagCode)) {
             return countryCodeToFlagRes(flagCode);
         }
-        if (value.startsWith("馃實") || value.startsWith("馃寧") || value.startsWith("馃審")) {
+        if (value.startsWith("🌍") || value.startsWith("🌎") || value.startsWith("🌏")) {
             return R.drawable.ic_flag_other;
         }
 
@@ -759,53 +759,53 @@ public class AvatarView extends FrameLayout {
                 .replace(" ", "")
                 .replace("/", "");
 
-        if (isCountry(normalized, "cn", "chn", "china", "chinese", "prc") || value.contains("涓浗") || value.contains("涓湅") || value.contains("涓枃") || value.contains("醼愥�涐��愥��")) return R.drawable.ic_flag_cn;
-        if (isCountry(normalized, "us", "usa", "unitedstates", "unitedstatesofamerica", "america", "american", "english") || value.contains("缇庡浗") || value.contains("缇庡湅") || value.contains("鑻辫") || value.contains("鑻辫獮") || value.contains("醼♂�欋�贬�涐���醼斸��") || value.contains("醼♂�勧�横�贯�傖�溼��曖��")) return R.drawable.ic_flag_us;
-        if (isCountry(normalized, "jp", "jpn", "japan", "japanese") || value.contains("鏃ユ湰") || value.contains("醼傖�会�曖�斸��")) return R.drawable.ic_flag_jp;
-        if (isCountry(normalized, "kr", "kor", "korea", "southkorea", "republicofkorea", "korean") || value.contains("闊╁浗") || value.contains("闊撳湅") || value.contains("醼�醼��涐��羔�氠���")) return R.drawable.ic_flag_kr;
+        if (isCountry(normalized, "cn", "chn", "china", "chinese", "prc") || value.contains("中国") || value.contains("中國") || value.contains("中文") || value.contains("တရုတ်")) return R.drawable.ic_flag_cn;
+        if (isCountry(normalized, "us", "usa", "unitedstates", "unitedstatesofamerica", "america", "american", "english") || value.contains("美国") || value.contains("美國") || value.contains("英语") || value.contains("英語") || value.contains("အမေရိကန်") || value.contains("အင်္ဂလိပ်")) return R.drawable.ic_flag_us;
+        if (isCountry(normalized, "jp", "jpn", "japan", "japanese") || value.contains("日本") || value.contains("ဂျပန်")) return R.drawable.ic_flag_jp;
+        if (isCountry(normalized, "kr", "kor", "korea", "southkorea", "republicofkorea", "korean") || value.contains("韩国") || value.contains("韓國") || value.contains("ကိုရီးယား")) return R.drawable.ic_flag_kr;
 
-        if (isCountry(normalized, "mm", "mya", "myanmar", "burma", "burmese") || value.contains("缂呯敻") || value.contains("绶敻") || value.contains("醼欋�坚�斸�横�欋��")) return R.drawable.ic_flag_mm;
-        if (isCountry(normalized, "th", "tha", "thailand", "thai") || value.contains("娉板浗") || value.contains("娉板湅") || value.contains("娉拌獮") || value.contains("娉拌") || value.contains("醼戓���勧�横��")) return R.drawable.ic_flag_th;
-        if (isCountry(normalized, "vn", "vnm", "vietnam", "vietnamese") || value.contains("瓒婂崡") || value.contains("醼椺��氠��醼横�斸�欋��")) return R.drawable.ic_flag_vn;
-        if (isCountry(normalized, "la", "lao", "laos") || value.contains("鑰佹対") || value.contains("鑰佹捑") || value.contains("瀵湅") || value.contains("醼溼��♂���")) return R.drawable.ic_flag_la;
-        if (isCountry(normalized, "kh", "khm", "cambodia", "khmer") || value.contains("鏌煍瀵�") || value.contains("楂樻") || value.contains("醼�醼欋�贯�樶�贬��掅��羔�氠���") || value.contains("醼佱�欋��")) return R.drawable.ic_flag_kh;
-        if (isCountry(normalized, "my", "mys", "malaysia", "malay") || value.contains("椹潵瑗夸簹") || value.contains("棣締瑗夸簽") || value.contains("椹潵璇�") || value.contains("棣締瑾�") || value.contains("醼欋�溼�贬��")) return R.drawable.ic_flag_my;
-        if (isCountry(normalized, "sg", "sgp", "singapore") || value.contains("鏂板姞鍧�") || value.contains("醼呩�勧�横��醼�曖��")) return R.drawable.ic_flag_sg;
-        if (isCountry(normalized, "id", "idn", "indonesia", "indonesian") || value.contains("鍗板害灏艰タ浜�") || value.contains("鍗板凹")) return R.drawable.ic_flag_id;
-        if (isCountry(normalized, "ph", "phl", "philippines", "filipino", "tagalog") || value.contains("鑿插緥瀹�") || value.contains("鑿插緥璩�") || value.contains("浠栧姞绂�")) return R.drawable.ic_flag_ph;
-        if (isCountry(normalized, "bn", "brn", "brunei", "bruneian") || value.contains("鏂囪幈") || value.contains("姹惰悐")) return R.drawable.ic_flag_bn;
+        if (isCountry(normalized, "mm", "mya", "myanmar", "burma", "burmese") || value.contains("缅甸") || value.contains("緬甸") || value.contains("မြန်မာ")) return R.drawable.ic_flag_mm;
+        if (isCountry(normalized, "th", "tha", "thailand", "thai") || value.contains("泰国") || value.contains("泰國") || value.contains("泰語") || value.contains("泰语") || value.contains("ထိုင်း")) return R.drawable.ic_flag_th;
+        if (isCountry(normalized, "vn", "vnm", "vietnam", "vietnamese") || value.contains("越南") || value.contains("ဗီယက်နမ်")) return R.drawable.ic_flag_vn;
+        if (isCountry(normalized, "la", "lao", "laos") || value.contains("老挝") || value.contains("老撾") || value.contains("寮國") || value.contains("လာအို")) return R.drawable.ic_flag_la;
+        if (isCountry(normalized, "kh", "khm", "cambodia", "khmer") || value.contains("柬埔寨") || value.contains("高棉") || value.contains("ကမ္ဘောဒီးယား") || value.contains("ခမာ")) return R.drawable.ic_flag_kh;
+        if (isCountry(normalized, "my", "mys", "malaysia", "malay") || value.contains("马来西亚") || value.contains("馬來西亞") || value.contains("马来语") || value.contains("馬來語") || value.contains("မလေး")) return R.drawable.ic_flag_my;
+        if (isCountry(normalized, "sg", "sgp", "singapore") || value.contains("新加坡") || value.contains("စင်ကာပူ")) return R.drawable.ic_flag_sg;
+        if (isCountry(normalized, "id", "idn", "indonesia", "indonesian") || value.contains("印度尼西亚") || value.contains("印尼")) return R.drawable.ic_flag_id;
+        if (isCountry(normalized, "ph", "phl", "philippines", "filipino", "tagalog") || value.contains("菲律宾") || value.contains("菲律賓") || value.contains("他加禄")) return R.drawable.ic_flag_ph;
+        if (isCountry(normalized, "bn", "brn", "brunei", "bruneian") || value.contains("文莱") || value.contains("汶萊")) return R.drawable.ic_flag_bn;
 
-        if (isCountry(normalized, "gb", "gbr", "uk", "unitedkingdom", "greatbritain", "britain", "british", "england") || value.contains("鑻卞浗") || value.contains("鑻卞湅") || value.contains("涓嶅垪棰�")) return R.drawable.ic_flag_gb;
-        if (isCountry(normalized, "fr", "fra", "france", "french") || value.contains("娉曞浗") || value.contains("娉曞湅") || value.contains("娉曡") || value.contains("娉曡獮")) return R.drawable.ic_flag_fr;
-        if (isCountry(normalized, "de", "deu", "ger", "germany", "german", "deutschland") || value.contains("寰峰浗") || value.contains("寰峰湅") || value.contains("寰疯") || value.contains("寰疯獮")) return R.drawable.ic_flag_de;
-        if (isCountry(normalized, "it", "ita", "italy", "italian") || value.contains("鎰忓ぇ鍒�") || value.contains("缇╁ぇ鍒�") || value.contains("鎰忚") || value.contains("鎰忚獮")) return R.drawable.ic_flag_it;
-        if (isCountry(normalized, "es", "esp", "spain", "spanish") || value.contains("瑗跨彮鐗�") || value.contains("瑗胯") || value.contains("瑗胯獮")) return R.drawable.ic_flag_es;
-        if (isCountry(normalized, "ru", "rus", "russia", "russian") || value.contains("淇勭綏鏂�") || value.contains("淇勭緟鏂�") || value.contains("淇勮") || value.contains("淇勮獮")) return R.drawable.ic_flag_ru;
-        if (isCountry(normalized, "nl", "nld", "netherlands", "holland", "dutch") || value.contains("鑽峰叞") || value.contains("鑽疯槶")) return R.drawable.ic_flag_nl;
-        if (isCountry(normalized, "ua", "ukr", "ukraine", "ukrainian") || value.contains("涔屽厠鍏�") || value.contains("鐑忓厠铇�")) return R.drawable.ic_flag_ua;
-        if (isCountry(normalized, "tr", "tur", "turkey", "turkiye", "t眉rkiye", "turkish") || value.contains("鍦熻�冲叾")) return R.drawable.ic_flag_tr;
-        if (isCountry(normalized, "pl", "pol", "poland", "polish") || value.contains("娉㈠叞") || value.contains("娉㈣槶")) return R.drawable.ic_flag_pl;
-        if (isCountry(normalized, "gr", "grc", "greece", "greek") || value.contains("甯岃厞") || value.contains("甯岃嚇")) return R.drawable.ic_flag_gr;
+        if (isCountry(normalized, "gb", "gbr", "uk", "unitedkingdom", "greatbritain", "britain", "british", "england") || value.contains("英国") || value.contains("英國") || value.contains("不列颠")) return R.drawable.ic_flag_gb;
+        if (isCountry(normalized, "fr", "fra", "france", "french") || value.contains("法国") || value.contains("法國") || value.contains("法语") || value.contains("法語")) return R.drawable.ic_flag_fr;
+        if (isCountry(normalized, "de", "deu", "ger", "germany", "german", "deutschland") || value.contains("德国") || value.contains("德國") || value.contains("德语") || value.contains("德語")) return R.drawable.ic_flag_de;
+        if (isCountry(normalized, "it", "ita", "italy", "italian") || value.contains("意大利") || value.contains("義大利") || value.contains("意语") || value.contains("意語")) return R.drawable.ic_flag_it;
+        if (isCountry(normalized, "es", "esp", "spain", "spanish") || value.contains("西班牙") || value.contains("西语") || value.contains("西語")) return R.drawable.ic_flag_es;
+        if (isCountry(normalized, "ru", "rus", "russia", "russian") || value.contains("俄罗斯") || value.contains("俄羅斯") || value.contains("俄语") || value.contains("俄語")) return R.drawable.ic_flag_ru;
+        if (isCountry(normalized, "nl", "nld", "netherlands", "holland", "dutch") || value.contains("荷兰") || value.contains("荷蘭")) return R.drawable.ic_flag_nl;
+        if (isCountry(normalized, "ua", "ukr", "ukraine", "ukrainian") || value.contains("乌克兰") || value.contains("烏克蘭")) return R.drawable.ic_flag_ua;
+        if (isCountry(normalized, "tr", "tur", "turkey", "turkiye", "türkiye", "turkish") || value.contains("土耳其")) return R.drawable.ic_flag_tr;
+        if (isCountry(normalized, "pl", "pol", "poland", "polish") || value.contains("波兰") || value.contains("波蘭")) return R.drawable.ic_flag_pl;
+        if (isCountry(normalized, "gr", "grc", "greece", "greek") || value.contains("希腊") || value.contains("希臘")) return R.drawable.ic_flag_gr;
 
-        if (isCountry(normalized, "ae", "are", "uae", "unitedarabemirates", "emirates") || value.contains("闃胯仈閰�") || value.contains("闃胯伅閰�")) return R.drawable.ic_flag_ae;
-        if (isCountry(normalized, "sa", "sau", "saudi", "saudiarabia", "arabia") || value.contains("娌欑壒")) return R.drawable.ic_flag_sa;
-        if (isCountry(normalized, "qa", "qat", "qatar", "qatari") || value.contains("鍗″灏�") || value.contains("鍗″鐖�")) return R.drawable.ic_flag_qa;
-        if (isCountry(normalized, "ir", "irn", "iran", "iranian", "persian") || value.contains("浼婃湕") || value.contains("娉㈡柉")) return R.drawable.ic_flag_ir;
-        if (isCountry(normalized, "il", "isr", "israel", "israeli", "hebrew") || value.contains("浠ヨ壊鍒�") || value.contains("甯屼集鏉�") || value.contains("甯屼集渚�")) return R.drawable.ic_flag_il;
-        if (isCountry(normalized, "kw", "kwt", "kuwait", "kuwaiti") || value.contains("绉戝▉鐗�")) return R.drawable.ic_flag_kw;
-        if (isCountry(normalized, "eg", "egy", "egypt", "egyptian") || value.contains("鍩冨強")) return R.drawable.ic_flag_eg;
-        if (isCountry(normalized, "jo", "jor", "jordan", "jordanian") || value.contains("绾︽棪") || value.contains("绱勬棪")) return R.drawable.ic_flag_jo;
+        if (isCountry(normalized, "ae", "are", "uae", "unitedarabemirates", "emirates") || value.contains("阿联酋") || value.contains("阿聯酋")) return R.drawable.ic_flag_ae;
+        if (isCountry(normalized, "sa", "sau", "saudi", "saudiarabia", "arabia") || value.contains("沙特")) return R.drawable.ic_flag_sa;
+        if (isCountry(normalized, "qa", "qat", "qatar", "qatari") || value.contains("卡塔尔") || value.contains("卡塔爾")) return R.drawable.ic_flag_qa;
+        if (isCountry(normalized, "ir", "irn", "iran", "iranian", "persian") || value.contains("伊朗") || value.contains("波斯")) return R.drawable.ic_flag_ir;
+        if (isCountry(normalized, "il", "isr", "israel", "israeli", "hebrew") || value.contains("以色列") || value.contains("希伯来") || value.contains("希伯來")) return R.drawable.ic_flag_il;
+        if (isCountry(normalized, "kw", "kwt", "kuwait", "kuwaiti") || value.contains("科威特")) return R.drawable.ic_flag_kw;
+        if (isCountry(normalized, "eg", "egy", "egypt", "egyptian") || value.contains("埃及")) return R.drawable.ic_flag_eg;
+        if (isCountry(normalized, "jo", "jor", "jordan", "jordanian") || value.contains("约旦") || value.contains("約旦")) return R.drawable.ic_flag_jo;
 
-        if (isCountry(normalized, "br", "bra", "brazil", "brazilian", "portuguese") || value.contains("宸磋タ") || value.contains("钁¤悇鐗欒") || value.contains("钁¤悇鐗欒獮")) return R.drawable.ic_flag_br;
-        if (isCountry(normalized, "ar", "arg", "argentina", "argentine", "argentinian") || value.contains("闃挎牴寤�")) return R.drawable.ic_flag_ar;
-        if (isCountry(normalized, "cl", "chl", "chile", "chilean") || value.contains("鏅哄埄")) return R.drawable.ic_flag_cl;
-        if (isCountry(normalized, "pe", "per", "peru", "peruvian") || value.contains("绉橀瞾") || value.contains("绉橀")) return R.drawable.ic_flag_pe;
-        if (isCountry(normalized, "co", "col", "colombia", "colombian") || value.contains("鍝ヤ鸡姣斾簹") || value.contains("鍝ュ�瘮浜�")) return R.drawable.ic_flag_co;
-        if (isCountry(normalized, "ve", "ven", "venezuela", "venezuelan") || value.contains("濮斿唴鐟炴媺") || value.contains("濮斿収鐟炴媺")) return R.drawable.ic_flag_ve;
-        if (isCountry(normalized, "mx", "mex", "mexico", "mexican") || value.contains("澧ㄨタ鍝�")) return R.drawable.ic_flag_mx;
-        if (isCountry(normalized, "uy", "ury", "uruguay", "uruguayan") || value.contains("涔屾媺鍦�") || value.contains("鐑忔媺鍦�")) return R.drawable.ic_flag_uy;
+        if (isCountry(normalized, "br", "bra", "brazil", "brazilian", "portuguese") || value.contains("巴西") || value.contains("葡萄牙语") || value.contains("葡萄牙語")) return R.drawable.ic_flag_br;
+        if (isCountry(normalized, "ar", "arg", "argentina", "argentine", "argentinian") || value.contains("阿根廷")) return R.drawable.ic_flag_ar;
+        if (isCountry(normalized, "cl", "chl", "chile", "chilean") || value.contains("智利")) return R.drawable.ic_flag_cl;
+        if (isCountry(normalized, "pe", "per", "peru", "peruvian") || value.contains("秘鲁") || value.contains("秘魯")) return R.drawable.ic_flag_pe;
+        if (isCountry(normalized, "co", "col", "colombia", "colombian") || value.contains("哥伦比亚") || value.contains("哥倫比亞")) return R.drawable.ic_flag_co;
+        if (isCountry(normalized, "ve", "ven", "venezuela", "venezuelan") || value.contains("委内瑞拉") || value.contains("委內瑞拉")) return R.drawable.ic_flag_ve;
+        if (isCountry(normalized, "mx", "mex", "mexico", "mexican") || value.contains("墨西哥")) return R.drawable.ic_flag_mx;
+        if (isCountry(normalized, "uy", "ury", "uruguay", "uruguayan") || value.contains("乌拉圭") || value.contains("烏拉圭")) return R.drawable.ic_flag_uy;
 
-        if (isCountry(normalized, "other", "others") || value.contains("鍏朵粬") || value.contains("鍏跺畠") || value.contains("醼♂�佱�坚���")) return R.drawable.ic_flag_other;
+        if (isCountry(normalized, "other", "others") || value.contains("其他") || value.contains("其它") || value.contains("အခြား")) return R.drawable.ic_flag_other;
 
         if (normalized.length() == 2 || normalized.length() == 3) {
             int flagRes = countryCodeToFlagRes(normalized.toUpperCase(Locale.US));
@@ -1119,17 +1119,11 @@ public class AvatarView extends FrameLayout {
         resetStatusViews();
         if (!showOnlineStatus || channel == null) return;
 
+        // 只保留右上角在线绿点，彻底隐藏头像右下角“最后在线时间”。
+        // 这样即使外部调用 showAvatar(channel, true)，离线状态也不会再显示旧时间。
         if (channel.online == 1) {
             spotView.setVisibility(VISIBLE);
             spotView.bringToFront();
-            return;
-        }
-
-        String lastOnlineText = getLastOnlineText(channel);
-        if (!TextUtils.isEmpty(lastOnlineText)) {
-            onlineTv.setText(lastOnlineText);
-            onlineTv.setVisibility(VISIBLE);
-            onlineTv.bringToFront();
         }
     }
 
@@ -1192,7 +1186,7 @@ public class AvatarView extends FrameLayout {
             return formatOnlineTimestamp(timestamp);
         }
 
-        // Do not display raw cached strings such as "鏄ㄥぉ", "3灏忔椂鍓�" or "online_text".
+        // Do not display raw cached strings such as "昨天", "3小时前" or "online_text".
         // Those strings have no reliable timestamp, so a cached channel can make them appear forever.
         return "";
     }
@@ -1244,11 +1238,11 @@ public class AvatarView extends FrameLayout {
         long hour = 60L * minute;
         long day = 24L * hour;
 
-        if (diff < minute) return "鍒氬垰";
-        if (diff < hour) return (diff / minute) + "鍒嗛挓鍓�";
-        if (diff < day) return (diff / hour) + "灏忔椂鍓�";
-        if (diff < 2L * day) return "鏄ㄥぉ";
-        if (diff < 7L * day) return (diff / day) + "澶╁墠";
+        if (diff < minute) return "刚刚";
+        if (diff < hour) return (diff / minute) + "分钟前";
+        if (diff < day) return (diff / hour) + "小时前";
+        if (diff < 2L * day) return "昨天";
+        if (diff < 7L * day) return (diff / day) + "天前";
         return "";
     }
 
