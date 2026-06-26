@@ -19,6 +19,14 @@ public class PartnerProfileEntity {
     public String role;
     public int follow;
     public int status;
+    public String last_online;
+    public String last_online_time;
+    public String last_seen;
+    public String last_seen_at;
+    public String last_active_at;
+    public String last_active_time;
+    public String last_login_at;
+    public String last_login_time;
     public String vercode;
 
     // 后端 user 表里这些字段可能是字符串，也可能后续改成数组。用 Object 兼容两种返回。
