@@ -6,8 +6,10 @@ import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Outline;
+import android.graphics.Typeface;
 import android.os.Build;
 import android.text.TextUtils;
+import android.text.format.DateUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -36,9 +38,11 @@ import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Date;
 import java.util.Locale;
 
 public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBinding> {
@@ -77,8 +81,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     protected void initView() {
         setupImmersiveStatusBar();
         wkVBinding.avatarView.setSize(96);
-        wkVBinding.toolbarAvatarView.setSize(30);
-        wkVBinding.editBtn.setVisibility(isSelf ? View.VISIBLE : View.GONE);
+        wkVBinding.editBtn.setVisibility(View.VISIBLE);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
@@ -89,7 +92,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void initListener() {
         wkVBinding.backBtn.setOnClickListener(v -> pressAndRun(v, this::finish));
-        wkVBinding.editBtn.setOnClickListener(v -> pressAndRun(v, () -> startActivity(new Intent(this, PartnerProfileEditActivity.class))));
+        wkVBinding.editBtn.setOnClickListener(v -> pressAndRun(v, () -> {
+            if (isSelf) {
+                startActivity(new Intent(this, PartnerProfileEditActivity.class));
+            } else {
+                showToast("更多功能后续添加");
+            }
+        }));
         wkVBinding.helloBtnLayout.setOnClickListener(v -> onMainActionClick());
         wkVBinding.tagSection.setOnClickListener(v -> {
             if (isSelf) startActivity(new Intent(this, PartnerProfileEditActivity.class));
@@ -120,8 +129,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             if (range <= 0) return;
             float percent = Math.min(1f, Math.max(0f, Math.abs(verticalOffset) * 1f / range));
 
-            float titleAlpha = (percent - 0.55f) / 0.45f;
-            wkVBinding.toolbarTitleLayout.setAlpha(Math.max(0f, Math.min(1f, titleAlpha)));
+            wkVBinding.toolbarTitleLayout.setAlpha(1f);
 
             float scale = 1f + (0.04f * (1f - percent));
             wkVBinding.coverIv.setScaleX(scale);
@@ -188,9 +196,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String showName = firstNotEmpty(data.name, data.username, data.uid);
         wkVBinding.nameTv.setText(showName);
         wkVBinding.toolbarTitleTv.setText(showName);
+        bindToolbarMeta(data);
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
-        wkVBinding.toolbarAvatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
-        showCountryFlagIfSupported(data.country_code);
+        showCountryFlagIfSupported(firstNotEmpty(data.country_code, data.country));
         bindCover(data.profile_cover);
         bindSexAge(data);
         bindLanguages(data);
@@ -205,8 +213,71 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (!TextUtils.isEmpty(cover)) {
             GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(cover), wkVBinding.coverIv);
         } else {
+            bindRandomDefaultCover();
+        }
+    }
+
+    private void bindRandomDefaultCover() {
+        String seed = TextUtils.isEmpty(uid) ? "partner" : uid;
+        int index = (int) (Math.abs((long) seed.hashCode()) % 20L) + 1;
+        String name = String.format(Locale.US, "bj%02d", index);
+        int resId = getResources().getIdentifier(name, "drawable", getPackageName());
+        if (resId != 0) {
+            wkVBinding.coverIv.setImageResource(resId);
+        } else {
             wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
         }
+    }
+
+    private void bindToolbarMeta(PartnerProfileEntity data) {
+        String country = firstNotEmpty(data.country, countryNameFromCode(data.country_code));
+        String lastOnline = formatLastOnline(data);
+        boolean hasCountry = !TextUtils.isEmpty(country);
+        boolean hasLastOnline = !TextUtils.isEmpty(lastOnline);
+        wkVBinding.toolbarMetaLayout.setVisibility(hasCountry || hasLastOnline ? View.VISIBLE : View.GONE);
+        wkVBinding.toolbarCountryGroup.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
+        wkVBinding.toolbarLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
+        wkVBinding.toolbarCountryTv.setText(country);
+        wkVBinding.toolbarLastOnlineTv.setText(lastOnline);
+    }
+
+    private String formatLastOnline(PartnerProfileEntity data) {
+        if (data == null) return "";
+        if (data.status == 1) return "在线";
+        String raw = firstNotEmpty(data.last_online, data.last_online_time, data.last_seen, data.last_seen_at,
+                data.last_active_at, data.last_active_time, data.last_login_at, data.last_login_time);
+        if (TextUtils.isEmpty(raw)) return "";
+        long millis = parseTimeMillis(raw);
+        if (millis > 0) {
+            CharSequence relative = DateUtils.getRelativeTimeSpanString(millis, System.currentTimeMillis(),
+                    DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE);
+            return "最后在线 " + relative;
+        }
+        return "最后在线 " + raw.trim();
+    }
+
+    private long parseTimeMillis(String raw) {
+        if (TextUtils.isEmpty(raw)) return 0L;
+        String v = raw.trim();
+        if (v.matches("^\\d{10,13}$")) {
+            try {
+                long number = Long.parseLong(v);
+                return v.length() == 10 ? number * 1000L : number;
+            } catch (Exception ignored) {
+                return 0L;
+            }
+        }
+        String clean = v.replace("T", " ").replace("Z", "");
+        String[] patterns = new String[]{"yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy/MM/dd HH:mm:ss", "yyyy/MM/dd HH:mm"};
+        for (String pattern : patterns) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat(pattern, Locale.getDefault());
+                Date date = sdf.parse(clean);
+                if (date != null) return date.getTime();
+            } catch (Exception ignored) {
+            }
+        }
+        return 0L;
     }
 
     private void showCountryFlagIfSupported(String countryCode) {
@@ -225,30 +296,41 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         else gender = "";
 
         String text = "";
-        if (!TextUtils.isEmpty(gender) && age > 0) text = gender + " " + age;
-        else if (!TextUtils.isEmpty(gender)) text = gender;
+        if (!TextUtils.isEmpty(gender) && age > 0) text = age + " " + gender;
         else if (age > 0) text = String.valueOf(age);
+        else if (!TextUtils.isEmpty(gender)) text = gender;
 
         wkVBinding.sexAgeTv.setVisibility(TextUtils.isEmpty(text) ? View.GONE : View.VISIBLE);
         wkVBinding.sexAgeTv.setText(text);
+        wkVBinding.sexAgeTv.setTypeface(Typeface.DEFAULT_BOLD);
+        wkVBinding.sexAgeTv.getPaint().setFakeBoldText(true);
         if (data.sex == 1) {
-            wkVBinding.sexAgeTv.setTextColor(0xFF4A90D9);
+            wkVBinding.sexAgeTv.setTextColor(0xFF347BCD);
             if (wkVBinding.sexAgeTv.getBackground() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                wkVBinding.sexAgeTv.getBackground().setTint(0xFFEDF4FF);
+                wkVBinding.sexAgeTv.getBackground().setTint(0xFFDDEEFF);
+            }
+        } else if (data.sex == 0) {
+            wkVBinding.sexAgeTv.setTextColor(0xFFD92D93);
+            if (wkVBinding.sexAgeTv.getBackground() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                wkVBinding.sexAgeTv.getBackground().setTint(0xFFFFE1F1);
             }
         } else {
-            wkVBinding.sexAgeTv.setTextColor(0xFFE82FA2);
+            wkVBinding.sexAgeTv.setTextColor(0xFF6E6E7E);
             if (wkVBinding.sexAgeTv.getBackground() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                wkVBinding.sexAgeTv.getBackground().setTint(0xFFFFF0F8);
+                wkVBinding.sexAgeTv.getBackground().setTint(0xFFEDEDF5);
             }
         }
     }
 
     private void bindLanguages(PartnerProfileEntity data) {
-        String nativeText = formatLanguageLabels(data.getNativeLanguagesSafe());
-        String learningText = formatLanguageLabels(data.getLearningLanguagesSafe());
-        boolean show = !TextUtils.isEmpty(nativeText) || !TextUtils.isEmpty(learningText);
-        wkVBinding.langLayout.setVisibility(show ? View.VISIBLE : View.GONE);
+        String nativeText = formatLanguageLetters(data.getNativeLanguagesSafe());
+        String learningText = formatLanguageLetters(data.getLearningLanguagesSafe());
+        boolean showNative = !TextUtils.isEmpty(nativeText);
+        boolean showLearning = !TextUtils.isEmpty(learningText);
+        wkVBinding.langLayout.setVisibility(showNative || showLearning ? View.VISIBLE : View.GONE);
+        wkVBinding.nativeLangTv.setVisibility(showNative ? View.VISIBLE : View.GONE);
+        wkVBinding.learningLangTv.setVisibility(showLearning ? View.VISIBLE : View.GONE);
+        wkVBinding.langToTv.setVisibility(showNative && showLearning ? View.VISIBLE : View.GONE);
         wkVBinding.nativeLangTv.setText(nativeText);
         wkVBinding.learningLangTv.setText(learningText);
     }
@@ -256,7 +338,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void bindIntro(PartnerProfileEntity data) {
         introExpanded = false;
         introCanExpand = false;
-        String intro = TextUtils.isEmpty(data.intro) ? getString(R.string.partner_profile_intro_empty) : data.intro;
+        String intro = data == null ? "" : data.intro;
+        if (intro != null) intro = intro.trim();
+        if (TextUtils.isEmpty(intro) || "null".equalsIgnoreCase(intro)) {
+            wkVBinding.introSection.setVisibility(View.GONE);
+            wkVBinding.introMoreTv.setVisibility(View.GONE);
+            return;
+        }
+        wkVBinding.introSection.setVisibility(View.VISIBLE);
         wkVBinding.introTv.setText(intro);
         wkVBinding.introTv.setMaxLines(3);
         wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
@@ -292,12 +381,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.tagLayout.removeAllViews();
         List<String> tags = data.getTagsSafe();
         if (tags.isEmpty()) {
-            if (isSelf) {
-                wkVBinding.tagSection.setVisibility(View.VISIBLE);
-                addChip(getString(R.string.partner_choose_tags), true);
-            } else {
-                wkVBinding.tagSection.setVisibility(View.GONE);
-            }
+            wkVBinding.tagSection.setVisibility(View.GONE);
             return;
         }
         wkVBinding.tagSection.setVisibility(View.VISIBLE);
@@ -309,15 +393,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (TextUtils.isEmpty(text)) return;
         TextView tv = new TextView(this);
         tv.setText(text);
-        tv.setTextSize(14);
-        tv.setTextColor(isPlaceholder ? 0xFFAAAAAA : 0xFF6C4DFF);
+        tv.setTextSize(13);
+        tv.setTextColor(isPlaceholder ? 0xFF9999A8 : 0xFF5B3FE6);
         tv.setGravity(Gravity.CENTER);
         tv.setMaxLines(1);
         tv.setEllipsize(TextUtils.TruncateAt.END);
         tv.setBackgroundResource(isPlaceholder ? R.drawable.bg_partner_tag_unselected : R.drawable.bg_partner_tag_chip);
-        tv.setPadding(dp(16), dp(8), dp(16), dp(8));
+        tv.setPadding(dp(14), dp(7), dp(14), dp(7));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) tv.setForeground(getSelectableItemBackground());
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(32));
         lp.rightMargin = dp(8);
         wkVBinding.tagLayout.addView(tv, lp);
     }
@@ -485,6 +569,56 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             if (!TextUtils.isEmpty(code) && !labels.contains(code)) labels.add(code);
         }
         return join(labels, " / ");
+    }
+
+    private String formatLanguageLetters(List<String> list) {
+        if (list == null || list.isEmpty()) return "";
+        List<String> labels = new ArrayList<>();
+        for (String item : list) {
+            String code = normalizeLangLetter(item);
+            if (!TextUtils.isEmpty(code) && !labels.contains(code)) labels.add(code);
+        }
+        return join(labels, " / ");
+    }
+
+    private String normalizeLangLetter(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        String v = value.trim();
+        String lower = v.toLowerCase(Locale.US);
+        switch (lower) {
+            case "zh": case "cn": case "中文": case "chinese": return "ZH";
+            case "en": case "英语": case "english": return "EN";
+            case "my": case "mm": case "burmese": case "myanmar": case "缅甸语": case "မြန်မာ": return "MY";
+            case "th": case "thai": case "泰语": case "ไทย": return "TH";
+            case "ja": case "jp": case "japanese": case "日语": case "日本語": return "JA";
+            case "ko": case "kr": case "korean": case "韩语": case "한국어": return "KO";
+            case "vi": case "vn": case "vietnamese": case "越南语": return "VI";
+            case "id": case "indonesian": case "印尼语": return "ID";
+            case "ms": case "malay": case "马来语": return "MS";
+            default:
+                String only = v.replaceAll("[^A-Za-z]", "");
+                if (only.length() >= 2) return only.substring(0, Math.min(3, only.length())).toUpperCase(Locale.US);
+                return v.toUpperCase(Locale.US);
+        }
+    }
+
+    private String countryNameFromCode(String value) {
+        String code = normalizeCountryCode(value);
+        if (TextUtils.isEmpty(code)) return "";
+        switch (code) {
+            case "MM": return "缅甸";
+            case "CN": return "中国";
+            case "TH": return "泰国";
+            case "JP": return "日本";
+            case "KR": return "韩国";
+            case "VN": return "越南";
+            case "LA": return "老挝";
+            case "KH": return "柬埔寨";
+            case "MY": return "马来西亚";
+            case "SG": return "新加坡";
+            case "US": return "美国";
+            default: return code;
+        }
     }
 
     private String normalizeCountryCode(String value) {
