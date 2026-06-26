@@ -43,6 +43,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private boolean isSelf;
     private boolean isSayHiLoading;
     private PartnerProfileEntity profile;
+    private boolean introExpanded;
+    private boolean introCanExpand;
 
     @Override
     protected ActPartnerProfileBinding getViewBinding() {
@@ -70,7 +72,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void initView() {
         setupImmersiveStatusBar();
-        wkVBinding.avatarView.setSize(94);
+        wkVBinding.avatarView.setSize(100);
         if (wkVBinding.helloBtnLayout.getBackground() != null) {
             wkVBinding.helloBtnLayout.getBackground().setTint(Theme.colorAccount);
         }
@@ -115,10 +117,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             if (range <= 0) return;
             float percent = Math.min(1f, Math.max(0f, Math.abs(verticalOffset) * 1f / range));
 
-            float glassAlpha = 1.0f - (percent * 2.0f);
-            wkVBinding.headerGlassLayout.setAlpha(Math.max(0f, Math.min(1f, glassAlpha)));
-
-            float titleAlpha = (percent - 0.60f) / 0.40f;
+            float titleAlpha = (percent - 0.58f) / 0.42f;
             wkVBinding.toolbarTitleTv.setAlpha(Math.max(0f, Math.min(1f, titleAlpha)));
 
             float scale = 1f + (0.035f * (1f - percent));
@@ -142,8 +141,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         String showName = firstNotEmpty(data.name, data.username, data.uid);
         wkVBinding.nameTv.setText(showName);
         wkVBinding.toolbarTitleTv.setText(showName);
-        String username = firstNotEmpty(data.username, data.uid);
-        wkVBinding.usernameTv.setText(TextUtils.isEmpty(username) ? "" : "@" + compactUserName(username));
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         showCountryFlagIfSupported(data.country_code);
         bindCover(data.profile_cover);
@@ -195,15 +192,48 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     }
 
     private void bindIntro(PartnerProfileEntity data) {
+        introExpanded = false;
+        introCanExpand = false;
         String intro = TextUtils.isEmpty(data.intro) ? getString(R.string.partner_profile_intro_empty) : data.intro;
         wkVBinding.introTv.setText(intro);
+        wkVBinding.introTv.setMaxLines(3);
+        wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
+        wkVBinding.introMoreTv.setVisibility(View.GONE);
+        wkVBinding.introMoreTv.setText("展开");
+        View.OnClickListener toggleListener = v -> toggleIntroExpand();
+        wkVBinding.introTv.setOnClickListener(toggleListener);
+        wkVBinding.introMoreTv.setOnClickListener(toggleListener);
+        wkVBinding.introTv.post(() -> {
+            android.text.Layout layout = wkVBinding.introTv.getLayout();
+            introCanExpand = layout != null && layout.getLineCount() >= 3 && layout.getEllipsisCount(2) > 0;
+            wkVBinding.introMoreTv.setVisibility(introCanExpand ? View.VISIBLE : View.GONE);
+        });
+    }
+
+    private void toggleIntroExpand() {
+        if (!introCanExpand) return;
+        introExpanded = !introExpanded;
+        if (introExpanded) {
+            wkVBinding.introTv.setMaxLines(Integer.MAX_VALUE);
+            wkVBinding.introTv.setEllipsize(null);
+            wkVBinding.introMoreTv.setText("收起");
+        } else {
+            wkVBinding.introTv.setMaxLines(3);
+            wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
+            wkVBinding.introMoreTv.setText("展开");
+        }
     }
 
     private void bindTags(PartnerProfileEntity data) {
         wkVBinding.tagLayout.removeAllViews();
         List<String> tags = data.getTagsSafe();
         if (tags.isEmpty()) {
-            wkVBinding.tagSection.setVisibility(View.GONE);
+            if (isSelf) {
+                wkVBinding.tagSection.setVisibility(View.VISIBLE);
+                addChip(getString(R.string.partner_choose_tags));
+            } else {
+                wkVBinding.tagSection.setVisibility(View.GONE);
+            }
             return;
         }
         wkVBinding.tagSection.setVisibility(View.VISIBLE);
