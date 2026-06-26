@@ -53,4 +53,12 @@
     <string name="partner_image_max_tip">语伴图片最多 5 张</string>
     <string name="partner_language_max_tip">语言最多选择 5 个</string>
     <string name="partner_tag_max_tip">标签最多选择 20 个</string>
+    <string name="partner_save_basic_success_extra_failed">基础资料已保存，标签或图片需要后端字段支持</string>
+
+    <string name="partner_more_coming">更多功能后续添加</string>
+    <string name="partner_online">在线</string>
+    <string name="partner_last_online_prefix">最后在线</string>
+    <string name="partner_expand_all">展开全部</string>
+    <string name="partner_collapse">收起</string>
+    <string name="partner_album">相册</string>
 </resources>
