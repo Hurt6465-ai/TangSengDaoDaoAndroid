@@ -4,7 +4,6 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.NotificationManager;
 import android.content.Context;
-import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -209,15 +208,15 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private void initFragments() {
         fragments.clear();
         fragments.add(new ChatFragment());
-        fragments.add(PlaceholderTabFragment.newInstance("语伴", "点击底部语伴进入全屏语伴"));
-        fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_VIDEO_URL)));
+        fragments.add(PlaceholderTabFragment.newInstance("语伴", "语伴模块加载失败，请重新安装或检查 wkpartnerbrowse 模块"));
+        fragments.add(PlaceholderTabFragment.newInstance("发现", "发现模块加载失败，请重新安装或检查 wkfeed 模块"));
         fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_HOME_URL)));
         fragments.add(WebTabFragment.newInstance("https://886.best"));
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
         // 底部是一级导航，只允许点击切换；横滑手势留给聊天页内部二级导航使用。
         wkVBinding.vp.setUserInputEnabled(false);
-        // 预创建发现页 WebView；语伴已改为独立全屏 Activity，不再预加载旧 NodeBB 语伴 WebView。
-        // 当前页是聊天页，offscreen=2 仍可让发现页提前创建，减少发现页白屏。
+        // 语伴/发现现在是独立原生全屏 Activity，这里只保留占位 Fragment，
+        // 用于模块缺失时显示明确提示，不再预加载旧 WebView。
         wkVBinding.vp.setOffscreenPageLimit(2);
     }
 
@@ -258,10 +257,8 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
                 switchToTab(TAB_CHAT);
             } else if (itemId == R.id.i_partner) {
                 openPartnerBrowse();
-                // 语伴现在是独立全屏页，不切换底部 ViewPager，避免旧 WebView/占位页抢焦点。
-                return false;
             } else if (itemId == R.id.i_discover) {
-                switchToTab(TAB_DISCOVER);
+                openFeedDiscover();
             } else if (itemId == R.id.i_community) {
                 switchToTab(TAB_COMMUNITY);
             } else if (itemId == R.id.i_study) {
@@ -274,21 +271,36 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     }
 
     private void openPartnerBrowse() {
-        Object result = EndpointManager.getInstance().invoke("peipe_open_partner_browse", this);
-        if (result instanceof Boolean && (Boolean) result) {
-            playAnimation(wkVBinding.vp.getCurrentItem());
-            syncBottomNavigationForCurrentTab();
-            return;
+        try {
+            Object handled = EndpointManager.getInstance().invoke("peipe_open_partner_browse", this);
+            if (handled instanceof Boolean && (Boolean) handled) return;
+        } catch (Throwable ignored) {
         }
         try {
             Class<?> clazz = Class.forName("com.chat.partnerbrowse.PartnerBrowseActivity");
-            Intent intent = new Intent(this, clazz);
+            android.content.Intent intent = new android.content.Intent(this, clazz);
             startActivity(intent);
-        } catch (Exception e) {
-            showToast("语伴模块未接入");
+        } catch (Throwable ignored) {
+            showToast("语伴模块加载失败，请检查 wkpartnerbrowse 模块");
+            switchToTab(TAB_PARTNER);
         }
-        playAnimation(wkVBinding.vp.getCurrentItem());
-        syncBottomNavigationForCurrentTab();
+    }
+
+    private void openFeedDiscover() {
+        try {
+            Object handled = EndpointManager.getInstance().invoke("peipe_open_feed_discover", this);
+            if (handled instanceof Boolean && (Boolean) handled) return;
+        } catch (Throwable ignored) {
+        }
+        try {
+            Class<?> clazz = Class.forName("com.chat.feed.browse.FeedBrowseActivity");
+            android.content.Intent intent = new android.content.Intent(this, clazz);
+            intent.putExtra("mode", "discover");
+            startActivity(intent);
+        } catch (Throwable ignored) {
+            showToast("发现模块加载失败，请检查 wkfeed 模块");
+            switchToTab(TAB_DISCOVER);
+        }
     }
 
     private void switchToTab(int index) {
