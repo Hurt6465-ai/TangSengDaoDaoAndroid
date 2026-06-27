@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feed_app_name">发现</string>
+    <string name="feed_comment_title">评论</string>
+    <string name="feed_comment_hint">留下你的精彩评论吧</string>
+    <string name="feed_comment_send">发送</string>
+    <string name="feed_no_more">没有更多了</string>
+    <string name="feed_loading">加载中...</string>
+    <string name="feed_retry">加载失败，点击重试</string>
+    <string name="feed_say_hello">打招呼</string>
+    <string name="feed_send_message">发消息</string>
+    <string name="feed_following_friend">好友</string>
+    <string name="feed_distance_within">%1$dkm内</string>
+    <string name="feed_active_online">在线</string>
+    <string name="feed_active_minutes">%1$d分钟前活跃</string>
+    <string name="feed_image_indicator">%1$d/%2$d</string>
+    <string name="feed_video_type">视频</string>
+    <string name="feed_multi_image_type">多图</string>
+    <string name="feed_comment_reply">回复</string>
+    <string name="feed_comment_sending">发送中</string>
+    <string name="feed_comment_failed">发送失败，点击重试</string>
+    <string name="feed_comment_expand_replies">展开%1$d条回复</string>
+    <string name="feed_comment_title_count">%1$d条评论</string>
+    <string name="feed_comment_reply_to">回复 %1$s</string>
+    <string name="feed_comment_me">我</string>
+    <string name="feed_empty_posts">暂无作品</string>
+    <string name="feed_publish_title">发布动态</string>
+    <string name="feed_publish_desc">图片会压缩为 WebP，目标约 100KB；视频优先压缩到 540p，最高不超过 720p。第一版先保留入口，后续接相册、拍摄和上传。</string>
+    <string name="feed_close">关闭</string>
+    <string name="feed_action_unavailable">当前操作暂不可用</string>
+    <string name="feed_hello_sent">已发送打招呼</string>
+</resources>
