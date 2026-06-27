@@ -31,6 +31,7 @@ import com.chat.base.utils.language.WKMultiLanguageUtil
 import com.chat.login.WKLoginApplication
 import com.chat.partner.profile.WKPartnerApplication
 import com.chat.partnerbrowse.WKPartnerBrowseApplication
+import com.chat.feed.WKFeedApplication
 import com.chat.push.WKPushApplication
 import com.chat.room.WKRoomApplication
 import com.chat.scan.WKScanApplication
@@ -126,6 +127,7 @@ class TSApplication : MultiDexApplication() {
         WKRoomApplication.getInstance().init(this)
         WKPartnerApplication.getInstance().init(this)
         WKPartnerBrowseApplication.getInstance().init(this)
+        WKFeedApplication.getInstance().init(this)
         addAppFrontBack()
         addListener()
     }
