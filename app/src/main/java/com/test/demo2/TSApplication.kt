@@ -124,6 +124,9 @@ class TSApplication : MultiDexApplication() {
         WKPushApplication.getInstance().init(getAppPackageName(), this)
         WKRoomApplication.getInstance().init(this)
         WKPartnerApplication.getInstance().init(this)
+        // Optional native feature modules. Reflection keeps TSApplication compilable even when
+        // a feature module is temporarily removed on another branch.
+        initOptionalModule("com.chat.partnerbrowse.WKPartnerBrowseApplication")
         initOptionalModule("com.chat.feed.WKFeedApplication")
         addAppFrontBack()
         addListener()
