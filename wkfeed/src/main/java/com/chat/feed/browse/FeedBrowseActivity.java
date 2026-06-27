@@ -7,7 +7,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.fragment.app.FragmentActivity;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
@@ -22,7 +22,7 @@ import com.chat.feed.player.FeedPlayerManager;
 import java.util.HashSet;
 import java.util.List;
 
-public class FeedBrowseActivity extends AppCompatActivity {
+public class FeedBrowseActivity extends FragmentActivity {
     public static final String EXTRA_MODE = "mode";
     public static final String EXTRA_UID = "uid";
     public static final String EXTRA_START_POSITION = "start_position";
