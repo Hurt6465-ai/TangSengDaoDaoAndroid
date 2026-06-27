@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="partnerbrowse_loading">ဘာသာဖက်များ ဖွင့်နေသည်...</string>
+    <string name="partnerbrowse_empty">ဘာသာဖက်မရှိသေးပါ</string>
+    <string name="partnerbrowse_retry">ထပ်စမ်းမည်</string>
+    <string name="partnerbrowse_retry_tip">ပရိုဖိုင် မဖွင့်နိုင်ပါ။ ထပ်စမ်းရန် နှိပ်ပါ။</string>
+    <string name="partnerbrowse_intro_empty">မိတ်ဆက်စာ မရှိသေးပါ</string>
+    <string name="partnerbrowse_send_message">စာပို့မည်</string>
+    <string name="partnerbrowse_say_hello">နှုတ်ဆက်မည်</string>
+    <string name="partnerbrowse_hello_sent">နှုတ်ဆက်ပြီးပါပြီ</string>
+    <string name="partnerbrowse_default_hello_plain">မင်္ဂလာပါ၊ ဘာသာစကား အတူလေ့ကျင့်လို့ရမလား?</string>
+</resources>
