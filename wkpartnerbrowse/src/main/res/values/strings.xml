@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="partnerbrowse_loading">语伴加载中...</string>
+    <string name="partnerbrowse_empty">暂无语伴</string>
+    <string name="partnerbrowse_retry">重试</string>
+    <string name="partnerbrowse_retry_tip">资料加载失败，点按重试</string>
+    <string name="partnerbrowse_intro_empty">还没有填写介绍</string>
+    <string name="partnerbrowse_send_message">发消息</string>
+    <string name="partnerbrowse_say_hello">打招呼</string>
+    <string name="partnerbrowse_hello_sent">已打招呼</string>
+    <string name="partnerbrowse_default_hello_plain">你好，我们可以一起练语言吗？</string>
+</resources>
