@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feed_app_name">Discover</string>
+    <string name="feed_comment_title">Comments</string>
+    <string name="feed_comment_hint">Leave a comment</string>
+    <string name="feed_comment_send">Send</string>
+    <string name="feed_no_more">No more</string>
+    <string name="feed_loading">Loading...</string>
+    <string name="feed_retry">Failed. Tap to retry</string>
+    <string name="feed_say_hello">Say hi</string>
+    <string name="feed_send_message">Message</string>
+    <string name="feed_following_friend">Friend</string>
+    <string name="feed_distance_within">within %1$dkm</string>
+    <string name="feed_active_online">Online</string>
+    <string name="feed_active_minutes">active %1$d min ago</string>
+    <string name="feed_image_indicator">%1$d/%2$d</string>
+    <string name="feed_video_type">Video</string>
+    <string name="feed_multi_image_type">Photos</string>
+    <string name="feed_comment_reply">Reply</string>
+    <string name="feed_comment_sending">Sending</string>
+    <string name="feed_comment_failed">Failed, tap to retry</string>
+    <string name="feed_comment_expand_replies">View %1$d replies</string>
+    <string name="feed_comment_title_count">%1$d comments</string>
+    <string name="feed_comment_reply_to">Reply to %1$s</string>
+    <string name="feed_comment_me">Me</string>
+    <string name="feed_empty_posts">No posts yet</string>
+    <string name="feed_publish_title">Post</string>
+    <string name="feed_publish_desc">Images are compressed to WebP around 100KB. Videos target 540p and never exceed 720p. This first version keeps the entry ready for gallery, camera, and upload.</string>
+    <string name="feed_close">Close</string>
+    <string name="feed_action_unavailable">Action unavailable</string>
+    <string name="feed_hello_sent">Greeting sent</string>
+</resources>
