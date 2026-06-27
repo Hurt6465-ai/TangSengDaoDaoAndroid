@@ -120,4 +120,5 @@ dependencies {
     implementation project(path: ':wkpush')
     implementation project(path: ':wkroom')
     implementation project(path: ':wkpartner')
+    implementation project(path: ':wkpartnerbrowse')
 }
