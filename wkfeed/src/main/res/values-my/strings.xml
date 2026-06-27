@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feed_app_name">ရှာဖွေ</string>
+    <string name="feed_comment_title">မှတ်ချက်များ</string>
+    <string name="feed_comment_hint">မှတ်ချက်ရေးပါ</string>
+    <string name="feed_comment_send">ပို့မည်</string>
+    <string name="feed_no_more">နောက်ထပ်မရှိပါ</string>
+    <string name="feed_loading">ဖွင့်နေသည်...</string>
+    <string name="feed_retry">မအောင်မြင်ပါ။ ထပ်နှိပ်ပါ</string>
+    <string name="feed_say_hello">နှုတ်ဆက်မည်</string>
+    <string name="feed_send_message">စာပို့မည်</string>
+    <string name="feed_following_friend">မိတ်ဆွေ</string>
+    <string name="feed_distance_within">%1$dkm အတွင်း</string>
+    <string name="feed_active_online">အွန်လိုင်း</string>
+    <string name="feed_active_minutes">%1$d မိနစ်အတွင်း လှုပ်ရှားခဲ့သည်</string>
+    <string name="feed_image_indicator">%1$d/%2$d</string>
+    <string name="feed_video_type">ဗီဒီယို</string>
+    <string name="feed_multi_image_type">ပုံများ</string>
+    <string name="feed_comment_reply">ပြန်ဖြေ</string>
+    <string name="feed_comment_sending">ပို့နေသည်</string>
+    <string name="feed_comment_failed">မပို့နိုင်ပါ၊ ပြန်နှိပ်ပါ</string>
+    <string name="feed_comment_expand_replies">ပြန်စာ %1$d ခုကို ဖွင့်ကြည့်ရန်</string>
+    <string name="feed_comment_title_count">မှတ်ချက် %1$d ခု</string>
+    <string name="feed_comment_reply_to">%1$s ကို ပြန်ဖြေ</string>
+    <string name="feed_comment_me">ကျွန်ုပ်</string>
+    <string name="feed_empty_posts">အကြောင်းအရာ မရှိသေးပါ</string>
+    <string name="feed_publish_title">တင်ရန်</string>
+    <string name="feed_publish_desc">ပုံများကို WebP ~100KB ခန့်အထိ ချုံ့မည်။ ဗီဒီယိုကို 540p ဦးစားပေးပြီး 720p မကျော်ပါ။</string>
+    <string name="feed_close">ပိတ်ရန်</string>
+    <string name="feed_action_unavailable">ယခုလုပ်ဆောင်၍မရသေးပါ</string>
+    <string name="feed_hello_sent">နှုတ်ဆက်ချက်ပို့ပြီးပါပြီ</string>
+</resources>
