@@ -31,3 +31,4 @@ include ':wkpush'
 
 include ':wkroom'
 include ':wkpartner'
+include ':wkpartnerbrowse'
