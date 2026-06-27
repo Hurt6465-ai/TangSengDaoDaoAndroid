@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="feed_black">#000000</color>
+    <color name="feed_white">#FFFFFFFF</color>
+    <color name="feed_text_second">#D8FFFFFF</color>
+    <color name="feed_mask_bottom">#99000000</color>
+    <color name="feed_action_red">#FFFF3B5C</color>
+    <color name="feed_sheet_bg">#FFFFFFFF</color>
+    <color name="feed_sheet_text">#111827</color>
+    <color name="feed_sheet_hint">#8A8F98</color>
+</resources>
