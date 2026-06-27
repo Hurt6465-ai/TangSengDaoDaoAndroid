@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="partnerbrowse_loading">Loading partners...</string>
+    <string name="partnerbrowse_empty">No partners yet</string>
+    <string name="partnerbrowse_retry">Retry</string>
+    <string name="partnerbrowse_retry_tip">Profile failed to load. Tap to retry.</string>
+    <string name="partnerbrowse_intro_empty">No intro yet</string>
+    <string name="partnerbrowse_send_message">Message</string>
+    <string name="partnerbrowse_say_hello">Say hello</string>
+    <string name="partnerbrowse_hello_sent">Sent</string>
+    <string name="partnerbrowse_default_hello_plain">Hi, can we practice languages together?</string>
+</resources>
