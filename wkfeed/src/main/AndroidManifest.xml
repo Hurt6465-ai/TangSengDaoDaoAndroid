@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name=".browse.FeedBrowseActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/WKFeedFullScreenTheme" />
+
+        <activity
+            android:name=".publish.FeedPublishActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/WKFeedFullScreenTheme" />
+    </application>
+</manifest>
