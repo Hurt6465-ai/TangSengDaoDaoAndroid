@@ -4,6 +4,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -208,16 +209,15 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private void initFragments() {
         fragments.clear();
         fragments.add(new ChatFragment());
-        fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_PARTNERS_SWIPE_URL)));
+        fragments.add(PlaceholderTabFragment.newInstance("语伴", "点击底部语伴进入全屏语伴"));
         fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_VIDEO_URL)));
         fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_HOME_URL)));
         fragments.add(WebTabFragment.newInstance("https://886.best"));
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
         // 底部是一级导航，只允许点击切换；横滑手势留给聊天页内部二级导航使用。
         wkVBinding.vp.setUserInputEnabled(false);
-        // 预创建并预加载底部“语伴”和“发现”两个 WebView。
-        // 当前页是聊天页，offscreen=2 会让 index 1/2 的 WebView 提前创建、登录、加载网页，
-        // 点击底部语伴/发现时直接显示已热好的页面，减少 WebView 白屏。
+        // 预创建发现页 WebView；语伴已改为独立全屏 Activity，不再预加载旧 NodeBB 语伴 WebView。
+        // 当前页是聊天页，offscreen=2 仍可让发现页提前创建，减少发现页白屏。
         wkVBinding.vp.setOffscreenPageLimit(2);
     }
 
@@ -257,7 +257,9 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
                 }
                 switchToTab(TAB_CHAT);
             } else if (itemId == R.id.i_partner) {
-                switchToTab(TAB_PARTNER);
+                openPartnerBrowse();
+                // 语伴现在是独立全屏页，不切换底部 ViewPager，避免旧 WebView/占位页抢焦点。
+                return false;
             } else if (itemId == R.id.i_discover) {
                 switchToTab(TAB_DISCOVER);
             } else if (itemId == R.id.i_community) {
@@ -269,6 +271,24 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         });
 
         EndpointManager.getInstance().setMethod("tab_activity", EndpointCategory.wkRefreshMailList, object -> null);
+    }
+
+    private void openPartnerBrowse() {
+        Object result = EndpointManager.getInstance().invoke("peipe_open_partner_browse", this);
+        if (result instanceof Boolean && (Boolean) result) {
+            playAnimation(wkVBinding.vp.getCurrentItem());
+            syncBottomNavigationForCurrentTab();
+            return;
+        }
+        try {
+            Class<?> clazz = Class.forName("com.chat.partnerbrowse.PartnerBrowseActivity");
+            Intent intent = new Intent(this, clazz);
+            startActivity(intent);
+        } catch (Exception e) {
+            showToast("语伴模块未接入");
+        }
+        playAnimation(wkVBinding.vp.getCurrentItem());
+        syncBottomNavigationForCurrentTab();
     }
 
     private void switchToTab(int index) {
