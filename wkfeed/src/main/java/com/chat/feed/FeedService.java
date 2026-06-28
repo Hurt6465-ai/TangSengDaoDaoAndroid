@@ -35,4 +35,7 @@ public interface FeedService {
 
     @POST("feed/{feed_id}/comments")
     Observable<CommonResponse> sendComment(@Path("feed_id") String feedId, @Body Map<String, Object> body);
+
+    @POST("feed/publish")
+    Observable<CommonResponse> publish(@Body Map<String, Object> body);
 }
