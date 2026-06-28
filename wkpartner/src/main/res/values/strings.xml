@@ -73,4 +73,5 @@
     <string name="partner_avatar_upload_failed">头像上传失败</string>
 
     <string name="partner_selected_count">已选 %1$d 个</string>
+    <string name="partner_works">作品</string>
 </resources>
