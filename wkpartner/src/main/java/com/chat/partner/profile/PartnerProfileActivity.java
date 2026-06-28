@@ -26,6 +26,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.fragment.app.Fragment;
+import androidx.core.widget.NestedScrollView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.alibaba.fastjson.JSONObject;
@@ -73,6 +74,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private float currentCollapsePercent;
     private PartnerProfileEntity profile;
     private boolean feedWorksAttached;
+    private Fragment feedWorksFragment;
 
     @Override
     protected ActPartnerProfileBinding getViewBinding() {
@@ -108,6 +110,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
         applyToolbarStyle(0f);
         setupScrollLinkedHeader();
+        setupWorksScrollBridge();
         setupEntranceAnimation();
         resetInitialScrollState();
     }
@@ -169,6 +172,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             wkVBinding.toolbar.setLayoutParams(toolbarLp);
         }
         wkVBinding.toolbar.setPadding(0, statusBarHeight, 0, 0);
+        clearProfileHeaderShadow();
 
         // feedStickyHeader is drawn above the scrolling content only when the
         // AppBar is fully collapsed. Keep it below the real status/toolbar area
@@ -180,6 +184,22 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
                 ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) rawLp;
                 lp.topMargin = toolbarLp == null ? statusBarHeight + dp(56) : toolbarLp.height;
                 wkVBinding.feedStickyHeader.setLayoutParams(lp);
+            }
+        }
+    }
+
+    private void clearProfileHeaderShadow() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            wkVBinding.appBarLayout.setElevation(0f);
+            wkVBinding.appBarLayout.setTranslationZ(0f);
+            wkVBinding.appBarLayout.setStateListAnimator(null);
+            wkVBinding.toolbar.setElevation(0f);
+            wkVBinding.toolbar.setTranslationZ(0f);
+            wkVBinding.toolbar.setStateListAnimator(null);
+            if (wkVBinding.feedStickyHeader != null) {
+                wkVBinding.feedStickyHeader.setElevation(0f);
+                wkVBinding.feedStickyHeader.setTranslationZ(0f);
+                wkVBinding.feedStickyHeader.setStateListAnimator(null);
             }
         }
     }
@@ -205,6 +225,25 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             applyToolbarStyle(percent);
             applyProfileContentVisibility(percent);
         });
+    }
+
+    private void setupWorksScrollBridge() {
+        wkVBinding.nestedScrollView.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener)
+                (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+                    if (scrollY > oldScrollY) maybeLoadMoreWorks();
+                });
+    }
+
+    private void maybeLoadMoreWorks() {
+        if (feedWorksFragment == null || wkVBinding.feedWorksSection.getVisibility() != View.VISIBLE) return;
+        View child = wkVBinding.nestedScrollView.getChildAt(0);
+        if (child == null) return;
+        int distanceToBottom = child.getBottom() - (wkVBinding.nestedScrollView.getScrollY() + wkVBinding.nestedScrollView.getHeight());
+        if (distanceToBottom > dp(900)) return;
+        try {
+            feedWorksFragment.getClass().getMethod("loadMoreIfNeeded").invoke(feedWorksFragment);
+        } catch (Throwable ignored) {
+        }
     }
 
     private void applyProfileContentVisibility(float percent) {
@@ -477,11 +516,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             }
             wkVBinding.feedWorksSection.setVisibility(View.VISIBLE);
             updateFeedStickyHeader(currentCollapsePercent >= 0.985f);
+            feedWorksFragment = (Fragment) fragmentObj;
             if (!feedWorksAttached) {
                 feedWorksAttached = true;
                 getSupportFragmentManager()
                         .beginTransaction()
-                        .replace(R.id.feedWorksContainer, (Fragment) fragmentObj)
+                        .replace(R.id.feedWorksContainer, feedWorksFragment)
                         .commitAllowingStateLoss();
                 // The embedded works waterfall has its own RecyclerView. If it
                 // keeps nested scrolling enabled inside this profile page, the
@@ -489,8 +529,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
                 // each other, causing the flashing/stuck pull-down feeling.
                 wkVBinding.feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 160);
                 wkVBinding.feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 480);
+                wkVBinding.feedWorksContainer.postDelayed(this::maybeLoadMoreWorks, 650);
             } else {
                 wkVBinding.feedWorksContainer.post(this::disableNestedFeedScrolling);
+                wkVBinding.feedWorksContainer.post(this::maybeLoadMoreWorks);
             }
         } catch (Throwable ignored) {
             // wkfeed 是可选模块。没有安装时不要影响个人主页。
@@ -501,6 +543,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void hideFeedWorks() {
         if (wkVBinding == null) return;
         wkVBinding.feedWorksSection.setVisibility(View.GONE);
+        feedWorksFragment = null;
         updateFeedStickyHeader(false);
     }
 
@@ -515,6 +558,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             RecyclerView recyclerView = (RecyclerView) view;
             recyclerView.setNestedScrollingEnabled(false);
             recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+            recyclerView.setHasFixedSize(false);
+            recyclerView.requestLayout();
             return;
         }
         if (view instanceof ViewGroup) {
