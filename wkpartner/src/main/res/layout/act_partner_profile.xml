@@ -390,7 +390,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:background="#FFFFFFFF"
+        android:background="@android:color/transparent"
         android:elevation="0dp"
         android:gravity="center_vertical"
         android:minHeight="56dp"
@@ -406,7 +406,7 @@
             android:background="@android:color/transparent"
             android:padding="9dp"
             android:src="@drawable/ic_partner_back"
-            app:tint="#FF202033" />
+            app:tint="#FFFFFFFF" />
 
         <LinearLayout
             android:id="@+id/topBarTitleLayout"
@@ -419,6 +419,7 @@
 
             <TextView
                 android:id="@+id/toolbarTitleTv"
+                android:alpha="0"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
@@ -430,6 +431,7 @@
 
             <LinearLayout
                 android:id="@+id/toolbarMetaLayout"
+                android:alpha="0"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
@@ -502,7 +504,7 @@
             android:background="@android:color/transparent"
             android:padding="9dp"
             android:src="@drawable/ic_partner_more_horizontal"
-            app:tint="#FF202033" />
+            app:tint="#FFFFFFFF" />
     </LinearLayout>
 
     <!--
