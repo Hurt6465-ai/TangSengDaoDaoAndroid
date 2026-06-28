@@ -75,6 +75,17 @@ public final class PartnerRepository {
             requestCursor = cursor;
         }
 
+        if (PartnerBrowseConfig.DEBUG_MOCK) {
+            List<PartnerBrowseBean> mock = PartnerBrowseMockData.create();
+            rank(mock);
+            putAll(mock);
+            synchronized (PartnerRepository.class) {
+                reachedEnd = true;
+            }
+            if (callback != null) callback.onResult(mock, "");
+            return;
+        }
+
         PartnerBrowseModel.getInstance().listPartners(requestCursor, page, limit, new IRequestResultListener<PartnerBrowseResponse>() {
             @Override
             public void onSuccess(PartnerBrowseResponse result) {
@@ -98,6 +109,16 @@ public final class PartnerRepository {
 
             @Override
             public void onFail(int code, String msg) {
+                if (PartnerBrowseConfig.FALLBACK_MOCK_ON_ERROR) {
+                    List<PartnerBrowseBean> mock = PartnerBrowseMockData.create();
+                    rank(mock);
+                    putAll(mock);
+                    synchronized (PartnerRepository.class) {
+                        reachedEnd = true;
+                    }
+                    if (callback != null) callback.onResult(mock, "");
+                    return;
+                }
                 if (callback != null) callback.onResult(new ArrayList<>(), msg);
             }
         });
