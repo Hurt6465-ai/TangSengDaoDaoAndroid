@@ -23,6 +23,8 @@ import com.chat.base.net.ud.WKUploader;
 import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileEditBinding;
 
+import com.xinbida.wukongim.entity.WKChannelType;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -79,6 +81,8 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     @Override
     protected void initView() {
         requireProfileImage = getIntent() != null && getIntent().getBooleanExtra(EXTRA_REQUIRE_PROFILE_IMAGE, false);
+        wkVBinding.editAvatarView.setSize(64);
+        wkVBinding.editAvatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
         updateCountryText();
         updateSexText();
         updateBirthdayText();
@@ -99,6 +103,8 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         wkVBinding.tagsRow.setOnClickListener(v -> openTagSelector());
         wkVBinding.coverUploadBtn.setOnClickListener(v -> pickImage(REQ_COVER));
         wkVBinding.addPhotoBtn.setOnClickListener(v -> pickImage(REQ_PHOTO));
+        wkVBinding.editAvatarBtn.setOnClickListener(v -> openAvatarEditor());
+        wkVBinding.leaveBtn.setOnClickListener(v -> finish());
         wkVBinding.saveBtn.setOnClickListener(v -> saveProfile());
     }
 
@@ -114,6 +120,8 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void bindProfile(PartnerProfileEntity data) {
+        wkVBinding.editAvatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL, data.avatar_cache_key);
+        if (!TextUtils.isEmpty(data.country_code)) wkVBinding.editAvatarView.showFlag(data.country_code);
         wkVBinding.nameEt.setText(firstNotEmpty(data.name, WKConfig.getInstance().getUserName()));
         countryCode = normalizeCountryCode(data.country_code);
         countryName = firstNotEmpty(data.country, countryNameByCode(countryCode));
@@ -196,9 +204,19 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
                     finish();
                 } else {
                     showToast(TextUtils.isEmpty(mediaMsg) ? getString(R.string.partner_save_media_failed) : mediaMsg);
+                    finish();
                 }
             });
         });
+    }
+
+    private void openAvatarEditor() {
+        try {
+            Class<?> clazz = Class.forName("com.chat.uikit.user.MyHeadPortraitActivity");
+            startActivity(new Intent(this, clazz));
+        } catch (Exception ignored) {
+            showToast(getString(R.string.partner_avatar_edit_unavailable));
+        }
     }
 
     private void showCountryDialog() {
