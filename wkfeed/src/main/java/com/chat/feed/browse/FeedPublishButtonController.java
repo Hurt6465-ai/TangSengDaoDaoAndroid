@@ -34,6 +34,16 @@ public class FeedPublishButtonController {
         scheduleShow();
     }
 
+    public void showNow() {
+        handler.removeCallbacks(showRunnable);
+        show();
+    }
+
+    public void hideNow() {
+        handler.removeCallbacks(showRunnable);
+        hide();
+    }
+
     public void destroy() {
         handler.removeCallbacks(showRunnable);
     }

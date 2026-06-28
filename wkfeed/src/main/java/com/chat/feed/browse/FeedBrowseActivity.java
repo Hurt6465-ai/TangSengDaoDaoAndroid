@@ -67,6 +67,9 @@ public class FeedBrowseActivity extends FragmentActivity {
         } else {
             publishButtonController = new FeedPublishButtonController(publishBtn);
             publishBtn.setOnClickListener(v -> FeedRoute.openPublish(this));
+            // 即使推荐接口为空/失败，也要显示发布入口。之前按钮默认 GONE，
+            // 只有 ViewPager2 触发 onPageSelected 后才会显示，空列表时就永远看不到 +。
+            publishButtonController.showNow();
         }
         adapter = new FeedPagerAdapter();
         feedPager.setOrientation(ViewPager2.ORIENTATION_VERTICAL);
@@ -183,12 +186,23 @@ public class FeedBrowseActivity extends FragmentActivity {
 
     private void hideLoading() {
         loadingView.setVisibility(View.GONE);
+        showPublishButtonIfNeeded();
     }
 
     private void showEmptyOrKeep(String text) {
-        if (adapter.getItemCount() > 0) return;
+        if (adapter.getItemCount() > 0) {
+            showPublishButtonIfNeeded();
+            return;
+        }
         stateTv.setText(text);
         stateTv.setVisibility(View.VISIBLE);
+        showPublishButtonIfNeeded();
+    }
+
+    private void showPublishButtonIfNeeded() {
+        if (publishButtonController != null && !MODE_PROFILE.equals(mode)) {
+            publishButtonController.showNow();
+        }
     }
 
     private void applyInitialPositionIfNeeded() {
@@ -207,6 +221,7 @@ public class FeedBrowseActivity extends FragmentActivity {
         if (adapter != null && pagerRecyclerView != null) {
             feedPager.post(() -> adapter.setActivePosition(pagerRecyclerView, feedPager.getCurrentItem()));
         }
+        showPublishButtonIfNeeded();
     }
 
     @Override
