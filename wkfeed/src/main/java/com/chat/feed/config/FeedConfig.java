@@ -38,15 +38,21 @@ public class FeedConfig {
     public static final int VIDEO_MAX_UPLOAD_MB = 20;
 
     /** 大于这个大小或分辨率过高，就触发手机端压缩。 */
-    public static final int VIDEO_COMPRESS_TRIGGER_MB = 8;
+    public static final int VIDEO_COMPRESS_TRIGGER_MB = 5;
 
-    /** 视频前端压缩目标：竖屏短边 540，最高短边 720。 */
+    /** 视频前端压缩目标：短边 540。竖屏约 540x960，横屏约 960x540。 */
     public static final int VIDEO_TARGET_SHORT_EDGE = 540;
-    public static final int VIDEO_MAX_SHORT_EDGE = 720;
 
-    /** 码率策略说明：Media3 Transformer 默认用硬件编码器策略，当前不强行指定码率，避免机型兼容问题。 */
-    public static final int VIDEO_TARGET_BITRATE_KBPS = 1000;
-    public static final int VIDEO_MAX_BITRATE_KBPS = 1600;
+    /** 视频码率：卡在 1.5Mbps ~ 2.0Mbps，中间值 1.8Mbps 兼顾清晰度和体积。 */
+    public static final int VIDEO_MIN_BITRATE_KBPS = 1500;
+    public static final int VIDEO_TARGET_BITRATE_KBPS = 1800;
+    public static final int VIDEO_MAX_BITRATE_KBPS = 2000;
+
+    /** 最高输出帧率。 */
+    public static final int VIDEO_MAX_FRAME_RATE = 30;
+
+    /** 音频：AAC 96Kbps。 */
+    public static final int AUDIO_TARGET_BITRATE_KBPS = 96;
 
     /** 图片前端压缩目标：WebP 单张约 100KB。 */
     public static final int IMAGE_TARGET_KB = 100;
