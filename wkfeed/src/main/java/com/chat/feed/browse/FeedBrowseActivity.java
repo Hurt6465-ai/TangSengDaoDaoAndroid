@@ -51,6 +51,7 @@ public class FeedBrowseActivity extends FragmentActivity {
     private FeedPublishButtonController publishButtonController;
     private TextView publishBtn;
     private int duplicatePageCount;
+    private boolean destroyed;
     private final HashSet<String> seenKeys = new HashSet<>();
 
     @Override
@@ -77,6 +78,7 @@ public class FeedBrowseActivity extends FragmentActivity {
         }
         adapter = new FeedPagerAdapter();
         feedPager.setOrientation(ViewPager2.ORIENTATION_VERTICAL);
+        feedPager.setOverScrollMode(View.OVER_SCROLL_NEVER);
         feedPager.setOffscreenPageLimit(1);
         feedPager.setSaveEnabled(false);
         feedPager.setAdapter(adapter);
@@ -84,6 +86,7 @@ public class FeedBrowseActivity extends FragmentActivity {
         if (child instanceof RecyclerView) {
             pagerRecyclerView = (RecyclerView) child;
             pagerRecyclerView.setItemViewCacheSize(2);
+            pagerRecyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
             if (pagerRecyclerView.getItemAnimator() != null) {
                 pagerRecyclerView.getItemAnimator().setChangeDuration(0);
             }
@@ -97,6 +100,7 @@ public class FeedBrowseActivity extends FragmentActivity {
             @Override
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
+                if (destroyed || isFinishing()) return;
                 if (publishButtonController != null) publishButtonController.onPageSelected();
                 adapter.setActivePosition(pagerRecyclerView, position);
                 preloadManager.preloadAround(FeedBrowseActivity.this, adapter.getItems(), position);
@@ -138,12 +142,13 @@ public class FeedBrowseActivity extends FragmentActivity {
     }
 
     private void loadMore(boolean first) {
-        if (loading || (!hasMore && !first)) return;
+        if (destroyed || loading || (!hasMore && !first)) return;
         loading = true;
         if (first && adapter.getItemCount() == 0) showLoading();
         IRequestResultListener<FeedListResponse> listener = new IRequestResultListener<FeedListResponse>() {
             @Override
             public void onSuccess(FeedListResponse result) {
+                if (destroyed || isFinishing()) return;
                 loading = false;
                 hideLoading();
                 if (result == null) {
@@ -173,6 +178,7 @@ public class FeedBrowseActivity extends FragmentActivity {
 
             @Override
             public void onFail(int code, String msg) {
+                if (destroyed || isFinishing()) return;
                 loading = false;
                 hideLoading();
                 showEmptyOrKeep(TextUtils.isEmpty(msg) ? getString(R.string.feed_retry) : msg);
@@ -230,14 +236,22 @@ public class FeedBrowseActivity extends FragmentActivity {
         if (!TextUtils.isEmpty(startFeedId)) start = adapter.indexOfFeedId(startFeedId);
         if (start < 0) start = Math.max(0, getIntent().getIntExtra(EXTRA_START_POSITION, 0));
         if (start < adapter.getItemCount()) feedPager.setCurrentItem(start, false);
-        feedPager.post(() -> adapter.setActivePosition(pagerRecyclerView, feedPager.getCurrentItem()));
+        feedPager.post(() -> {
+            if (!destroyed && adapter != null && feedPager != null) {
+                adapter.setActivePosition(pagerRecyclerView, feedPager.getCurrentItem());
+            }
+        });
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         if (adapter != null && pagerRecyclerView != null) {
-            feedPager.post(() -> adapter.setActivePosition(pagerRecyclerView, feedPager.getCurrentItem()));
+            feedPager.post(() -> {
+            if (!destroyed && adapter != null && feedPager != null) {
+                adapter.setActivePosition(pagerRecyclerView, feedPager.getCurrentItem());
+            }
+        });
         }
         showPublishButtonIfNeeded();
     }
@@ -251,12 +265,20 @@ public class FeedBrowseActivity extends FragmentActivity {
 
     @Override
     protected void onDestroy() {
+        destroyed = true;
         if (feedPager != null && pageChangeCallback != null) {
             try { feedPager.unregisterOnPageChangeCallback(pageChangeCallback); } catch (Exception ignored) {}
         }
+        pageChangeCallback = null;
+        if (adapter != null) {
+            try { adapter.setActivePosition(pagerRecyclerView, -1); } catch (Throwable ignored) {}
+        }
         if (publishButtonController != null) publishButtonController.destroy();
-        if (feedPager != null) feedPager.setAdapter(null);
-        FeedPlayerManager.getInstance().release();
+        publishButtonController = null;
+        if (feedPager != null) {
+            try { feedPager.setAdapter(null); } catch (Throwable ignored) {}
+        }
+        FeedPlayerManager.getInstance().stopForActivity();
         super.onDestroy();
     }
 }
