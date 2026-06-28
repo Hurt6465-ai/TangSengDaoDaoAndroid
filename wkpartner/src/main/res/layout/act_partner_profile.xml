@@ -8,6 +8,10 @@
     android:clipToPadding="false"
     android:fitsSystemWindows="false">
 
+    <!--
+        AppBarLayout 现在只承载背景墙。顶部用户名栏已经从这里移走，
+        所以背景墙怎么折叠/消失都不会影响顶栏。
+    -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
@@ -54,136 +58,6 @@
                 android:layout_height="match_parent"
                 android:background="@drawable/bg_partner_cover_mask"
                 app:layout_collapseMode="parallax" />
-
-            <androidx.appcompat.widget.Toolbar
-                android:id="@+id/toolbar"
-                android:layout_width="match_parent"
-                android:elevation="0dp"
-                android:stateListAnimator="@null"
-                android:translationZ="0dp"
-                android:layout_height="80dp"
-                android:layout_marginTop="0dp"
-                app:contentInsetLeft="0dp"
-                app:contentInsetStart="0dp"
-                app:contentInsetStartWithNavigation="0dp"
-                app:layout_collapseMode="pin">
-
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent">
-
-                    <ImageView
-                        android:id="@+id/backBtn"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
-                        android:layout_gravity="start|center_vertical"
-                        android:layout_marginStart="12dp"
-                        android:background="@android:color/transparent"
-                        android:padding="9dp"
-                        android:src="@drawable/ic_partner_back"
-                        app:tint="#FFFFFFFF" />
-
-                    <LinearLayout
-                        android:id="@+id/toolbarTitleLayout"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:layout_gravity="center"
-                        android:layout_marginStart="64dp"
-                        android:layout_marginEnd="64dp"
-                        android:alpha="0"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/toolbarTitleTv"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:gravity="center"
-                            android:maxLines="1"
-                            android:maxWidth="190dp"
-                            android:textColor="#FFFFFFFF"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <LinearLayout
-                            android:id="@+id/toolbarMetaLayout"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:gravity="center"
-                            android:orientation="horizontal"
-                            android:visibility="gone">
-
-                            <LinearLayout
-                                android:id="@+id/toolbarCountryGroup"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal"
-                                android:visibility="gone">
-
-                                <ImageView
-                                    android:id="@+id/toolbarCountryIcon"
-                                    android:layout_width="11dp"
-                                    android:layout_height="11dp"
-                                    android:src="@drawable/ic_partner_location_pin"
-                                    app:tint="#CCFFFFFF" />
-
-                                <TextView
-                                    android:id="@+id/toolbarCountryTv"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="3dp"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:maxWidth="78dp"
-                                    android:textColor="#CCFFFFFF"
-                                    android:textSize="11sp" />
-                            </LinearLayout>
-
-                            <LinearLayout
-                                android:id="@+id/toolbarLastOnlineGroup"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal"
-                                android:visibility="gone">
-
-                                <ImageView
-                                    android:id="@+id/toolbarTimeIcon"
-                                    android:layout_width="11dp"
-                                    android:layout_height="11dp"
-                                    android:src="@drawable/ic_partner_time"
-                                    app:tint="#CCFFFFFF" />
-
-                                <TextView
-                                    android:id="@+id/toolbarLastOnlineTv"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="3dp"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:maxWidth="116dp"
-                                    android:textColor="#CCFFFFFF"
-                                    android:textSize="11sp" />
-                            </LinearLayout>
-                        </LinearLayout>
-                    </LinearLayout>
-
-                    <ImageView
-                        android:id="@+id/editBtn"
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
-                        android:layout_gravity="end|center_vertical"
-                        android:layout_marginEnd="12dp"
-                        android:background="@android:color/transparent"
-                        android:padding="9dp"
-                        android:src="@drawable/ic_partner_more_horizontal"
-                        app:tint="#FFFFFFFF" />
-                </FrameLayout>
-            </androidx.appcompat.widget.Toolbar>
         </com.google.android.material.appbar.CollapsingToolbarLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -465,8 +339,6 @@
                 </HorizontalScrollView>
             </LinearLayout>
 
-
-
             <LinearLayout
                 android:id="@+id/feedWorksSection"
                 android:layout_width="match_parent"
@@ -477,6 +349,9 @@
                 android:paddingTop="14dp"
                 android:visibility="gone">
 
+                <!--
+                    内容流里的“作品”标题。吸顶时变 INVISIBLE 但保留占位，避免跳动。
+                -->
                 <TextView
                     android:id="@+id/feedWorksTitleTv"
                     android:layout_width="wrap_content"
@@ -503,8 +378,140 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
+    <!--
+        ============== 固定顶部用户名栏 ==============
+        独立 overlay，CoordinatorLayout 最外层。
+        永远显示，永不被 AppBar 折叠，永不 GONE / alpha=0。
+        白底、高度 = 状态栏 + 56dp（运行时 padding 设置）、elevation=0、无阴影。
+        包含：返回按钮 / 用户名 / 国家·在线状态 / 更多按钮。
+    -->
+    <LinearLayout
+        android:id="@+id/fixedProfileTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="#FFFFFFFF"
+        android:elevation="0dp"
+        android:gravity="center_vertical"
+        android:minHeight="56dp"
+        android:orientation="horizontal"
+        android:stateListAnimator="@null"
+        android:translationZ="0dp">
+
+        <ImageView
+            android:id="@+id/backBtn"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="12dp"
+            android:background="@android:color/transparent"
+            android:padding="9dp"
+            android:src="@drawable/ic_partner_back"
+            app:tint="#FF202033" />
+
+        <LinearLayout
+            android:id="@+id/topBarTitleLayout"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/toolbarTitleTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:maxWidth="220dp"
+                android:textColor="#FF202033"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/toolbarMetaLayout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/toolbarCountryGroup"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/toolbarCountryIcon"
+                        android:layout_width="11dp"
+                        android:layout_height="11dp"
+                        android:src="@drawable/ic_partner_location_pin"
+                        app:tint="#FF9A9AA6" />
+
+                    <TextView
+                        android:id="@+id/toolbarCountryTv"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="3dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:maxWidth="90dp"
+                        android:textColor="#FF8C8C99"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/toolbarLastOnlineGroup"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/toolbarTimeIcon"
+                        android:layout_width="11dp"
+                        android:layout_height="11dp"
+                        android:src="@drawable/ic_partner_time"
+                        app:tint="#FF9A9AA6" />
+
+                    <TextView
+                        android:id="@+id/toolbarLastOnlineTv"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="3dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:maxWidth="140dp"
+                        android:textColor="#FF8C8C99"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/editBtn"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_marginEnd="12dp"
+            android:background="@android:color/transparent"
+            android:padding="9dp"
+            android:src="@drawable/ic_partner_more_horizontal"
+            app:tint="#FF202033" />
+    </LinearLayout>
+
+    <!--
+        ============== 固定作品栏 ==============
+        位于 fixedProfileTopBar 正下方（运行时 setY 定位）。
+        吸顶时显示。无顶部阴影、无上分割线，仅底部 0.5dp 浅分割线。
+    -->
     <FrameLayout
-        android:id="@+id/feedStickyHeader"
+        android:id="@+id/fixedWorksHeader"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_gravity="top"
