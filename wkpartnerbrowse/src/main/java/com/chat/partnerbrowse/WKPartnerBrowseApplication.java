@@ -1,5 +1,6 @@
 package com.chat.partnerbrowse;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 
@@ -23,22 +24,29 @@ public class WKPartnerBrowseApplication {
     public void init(Context context) {
         if (inited) return;
         inited = true;
-        contextRef = new WeakReference<>(context.getApplicationContext());
+        contextRef = new WeakReference<>(context == null ? null : context.getApplicationContext());
         EndpointManager.getInstance().setMethod("peipe_open_partner_browse", object -> {
-            openPartnerBrowse();
+            openPartnerBrowse(object instanceof Context ? (Context) object : null);
             return true;
         });
         EndpointManager.getInstance().setMethod("partnerbrowse_open", object -> {
-            openPartnerBrowse();
+            openPartnerBrowse(object instanceof Context ? (Context) object : null);
             return true;
         });
     }
 
     public void openPartnerBrowse() {
-        Context context = contextRef == null ? null : contextRef.get();
+        openPartnerBrowse(null);
+    }
+
+    public void openPartnerBrowse(Context sourceContext) {
+        Context context = sourceContext;
+        if (context == null && contextRef != null) context = contextRef.get();
         if (context == null) return;
         Intent intent = new Intent(context, PartnerBrowseActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (!(context instanceof Activity)) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
         context.startActivity(intent);
     }
 }

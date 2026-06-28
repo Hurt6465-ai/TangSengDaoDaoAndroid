@@ -9,16 +9,15 @@ import android.view.WindowManager;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.chat.base.base.WKBaseActivity;
+import com.chat.base.config.WKConfig;
+import com.chat.base.net.HttpResponseCode;
 import com.chat.partnerbrowse.R;
-import com.chat.partnerbrowse.model.PartnerBrowseBean;
 import com.chat.partnerbrowse.databinding.ActivityWkPartnerBrowseBinding;
+import com.chat.partnerbrowse.model.PartnerBrowseBean;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,6 +27,8 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     private final ArrayList<PartnerBrowseBean> partners = new ArrayList<>();
     private PartnerOuterAdapter adapter;
     private boolean loading;
+    private boolean checkingProfile;
+    private boolean profileGatePassed;
     private boolean noMore;
     private int duplicatePageCount;
     private int page = 1;
@@ -70,33 +71,27 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         if (inner instanceof RecyclerView) {
             ((RecyclerView) inner).setItemViewCacheSize(2);
         }
-
-        ViewCompat.setOnApplyWindowInsetsListener(wkVBinding.backBtn, (v, insets) -> {
-            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setTranslationY(bars.top);
-            return insets;
-        });
         showLoading(true, "");
     }
 
     @Override
     protected void initListener() {
-        wkVBinding.backBtn.setOnClickListener(v -> finish());
         wkVBinding.retryBtn.setOnClickListener(v -> {
             page = 1;
             noMore = false;
             duplicatePageCount = 0;
+            profileGatePassed = false;
             PartnerRepository.resetPaging();
             partners.clear();
             adapter.notifyDataSetChanged();
-            loadMore(true);
+            ensureProfileThenLoad();
         });
         pageChangeCallback = new ViewPager2.OnPageChangeCallback() {
             @Override
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
                 PartnerImagePreloader.preloadNextUser(PartnerBrowseActivity.this, partners, position);
-                if (!noMore && position >= partners.size() - 3) loadMore(false);
+                if (profileGatePassed && !noMore && position >= partners.size() - 3) loadMore(false);
             }
         };
         wkVBinding.viewPagerOuter.registerOnPageChangeCallback(pageChangeCallback);
@@ -104,20 +99,57 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
 
     @Override
     protected void initData() {
-        loadMore(true);
+        ensureProfileThenLoad();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (!profileGatePassed && !checkingProfile && partners.isEmpty()) {
+            ensureProfileThenLoad();
+        }
     }
 
     @Override
     protected void onDestroy() {
-        if (wkVBinding != null && pageChangeCallback != null) {
-            wkVBinding.viewPagerOuter.unregisterOnPageChangeCallback(pageChangeCallback);
+        try {
+            if (wkVBinding != null && pageChangeCallback != null) {
+                wkVBinding.viewPagerOuter.unregisterOnPageChangeCallback(pageChangeCallback);
+            }
+            if (wkVBinding != null) wkVBinding.viewPagerOuter.setAdapter(null);
+        } catch (Throwable ignored) {
         }
         pageChangeCallback = null;
         super.onDestroy();
     }
 
+    private void ensureProfileThenLoad() {
+        if (checkingProfile || profileGatePassed) {
+            if (profileGatePassed && partners.isEmpty()) loadMore(true);
+            return;
+        }
+        checkingProfile = true;
+        showLoading(true, getString(R.string.partnerbrowse_checking_profile));
+        PartnerBrowseModel.getInstance().getPartnerProfile(WKConfig.getInstance().getUid(), (code, msg, data) -> {
+            if (isFinishing() || isDestroyed()) return;
+            checkingProfile = false;
+            if (code == HttpResponseCode.success && data != null && data.hasPartnerPhoto()) {
+                profileGatePassed = true;
+                loadMore(true);
+                return;
+            }
+            if (code == HttpResponseCode.success && data != null) {
+                showLoading(false, getString(R.string.partnerbrowse_need_photo_first));
+                showToast(getString(R.string.partnerbrowse_need_photo_first));
+                PartnerBrowseHostBridge.openProfileEdit(this);
+            } else {
+                showLoading(false, TextUtils.isEmpty(msg) ? getString(R.string.partnerbrowse_profile_check_failed) : msg);
+            }
+        });
+    }
+
     private void loadMore(boolean first) {
-        if (loading || noMore) return;
+        if (loading || noMore || !profileGatePassed) return;
         loading = true;
         if (first && partners.isEmpty()) showLoading(true, "");
         PartnerRepository.loadPartners(page, 18, (newList, errorMsg) -> {
@@ -138,7 +170,6 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
                 adapter.notifyItemRangeInserted(start, inserted);
                 showContent();
             } else {
-                // Server returned only users already shown. Avoid endless load loops.
                 duplicatePageCount++;
                 if (duplicatePageCount >= 2) noMore = true;
                 if (partners.isEmpty()) {
@@ -155,7 +186,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             if (old != null) existKeys.add(old.getStableKey());
         }
         for (PartnerBrowseBean item : list) {
-            if (item == null) continue;
+            if (item == null || !item.hasPartnerPhoto()) continue;
             String key = item.getStableKey();
             if (existKeys.add(key)) partners.add(item);
         }
@@ -170,7 +201,8 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     private void showLoading(boolean loading, String msg) {
         wkVBinding.viewPagerOuter.setVisibility(View.GONE);
         wkVBinding.loadingLayout.setVisibility(View.VISIBLE);
-        wkVBinding.loadingTv.setText(loading ? getString(R.string.partnerbrowse_loading) : msg);
+        if (TextUtils.isEmpty(msg)) msg = loading ? getString(R.string.partnerbrowse_loading) : "";
+        wkVBinding.loadingTv.setText(msg);
         wkVBinding.retryBtn.setVisibility(loading ? View.GONE : View.VISIBLE);
     }
 }

@@ -89,7 +89,7 @@ public final class PartnerRepository {
         PartnerBrowseModel.getInstance().listPartners(requestCursor, page, limit, new IRequestResultListener<PartnerBrowseResponse>() {
             @Override
             public void onSuccess(PartnerBrowseResponse result) {
-                List<PartnerBrowseBean> list = result == null ? new ArrayList<>() : result.getListSafe();
+                List<PartnerBrowseBean> list = result == null ? new ArrayList<>() : filterDisplayable(result.getListSafe());
                 synchronized (PartnerRepository.class) {
                     String newCursor = result == null ? "" : result.cursor;
                     boolean hasCursor = !TextUtils.isEmpty(newCursor);
@@ -122,6 +122,18 @@ public final class PartnerRepository {
                 if (callback != null) callback.onResult(new ArrayList<>(), msg);
             }
         });
+    }
+
+
+    private static List<PartnerBrowseBean> filterDisplayable(List<PartnerBrowseBean> source) {
+        ArrayList<PartnerBrowseBean> out = new ArrayList<>();
+        if (source == null) return out;
+        for (PartnerBrowseBean item : source) {
+            if (item == null) continue;
+            if (!item.hasPartnerPhoto()) continue;
+            out.add(item);
+        }
+        return out;
     }
 
     public static synchronized void resetRound() {

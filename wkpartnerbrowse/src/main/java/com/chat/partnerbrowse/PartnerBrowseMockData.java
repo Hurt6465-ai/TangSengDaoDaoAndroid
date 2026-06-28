@@ -42,6 +42,8 @@ final class PartnerBrowseMockData {
         b.age = age;
         b.follow = 0;
         b.vercode = "";
+        b.avatar = image;
+        b.profile_cover = image;
         b.profile_images = Arrays.asList(image);
         b.images = Arrays.asList(image);
         b.native_languages = nativeLangs;

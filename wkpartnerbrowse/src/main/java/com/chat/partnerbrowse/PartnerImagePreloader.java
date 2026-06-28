@@ -34,11 +34,15 @@ public final class PartnerImagePreloader {
     }
 
     private static void preload(Context context, String url) {
-        if (TextUtils.isEmpty(url)) return;
-        Glide.with(context)
-                .load(showUrl(url))
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                .preload();
+        if (context == null || TextUtils.isEmpty(url)) return;
+        try {
+            Context safe = context.getApplicationContext() == null ? context : context.getApplicationContext();
+            Glide.with(safe)
+                    .load(showUrl(url))
+                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .preload();
+        } catch (Throwable ignored) {
+        }
     }
 
     private static String showUrl(String url) {

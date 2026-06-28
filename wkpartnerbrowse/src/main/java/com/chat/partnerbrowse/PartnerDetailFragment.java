@@ -4,6 +4,8 @@ import android.content.Context;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -11,15 +13,13 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.viewpager2.widget.ViewPager2;
 
-import com.chat.base.endpoint.entity.ChatViewMenu;
 import com.chat.base.net.HttpResponseCode;
+import com.chat.base.utils.AndroidUtilities;
 import com.chat.partnerbrowse.databinding.FragmentWkPartnerDetailBinding;
 import com.chat.partnerbrowse.model.PartnerBrowseBean;
-import com.chat.uikit.chat.manager.WKIMUtils;
-import com.chat.uikit.contacts.service.FriendModel;
-import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.util.List;
+import java.util.Locale;
 
 public class PartnerDetailFragment extends Fragment {
     private static final String KEY_STABLE = "stable_key";
@@ -60,10 +60,13 @@ public class PartnerDetailFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
-        if (binding != null && imagePageCallback != null) {
-            binding.viewPagerInner.unregisterOnPageChangeCallback(imagePageCallback);
+        try {
+            if (binding != null && imagePageCallback != null) {
+                binding.viewPagerInner.unregisterOnPageChangeCallback(imagePageCallback);
+            }
+            if (binding != null) binding.viewPagerInner.setAdapter(null);
+        } catch (Throwable ignored) {
         }
-        if (binding != null) binding.viewPagerInner.setAdapter(null);
         imagePageCallback = null;
         binding = null;
         super.onDestroyView();
@@ -76,10 +79,14 @@ public class PartnerDetailFragment extends Fragment {
     private void bindLoadingState() {
         if (binding == null) return;
         binding.indicatorTv.setVisibility(View.GONE);
+        binding.avatarView.setVisibility(View.GONE);
         binding.nameTv.setText(R.string.partnerbrowse_loading);
-        binding.metaTv.setVisibility(View.GONE);
+        binding.ageSexTv.setVisibility(View.GONE);
         binding.nearbyGroup.setVisibility(View.GONE);
         binding.langTv.setVisibility(View.GONE);
+        binding.lastOnlineTv.setVisibility(View.GONE);
+        binding.tagRow.removeAllViews();
+        binding.tagRow.setVisibility(View.GONE);
         binding.introTv.setText(R.string.partnerbrowse_retry_tip);
         binding.actionBtn.setText(R.string.partnerbrowse_retry);
         binding.actionBtn.setEnabled(true);
@@ -90,10 +97,14 @@ public class PartnerDetailFragment extends Fragment {
     private void bindEmptyState() {
         if (binding == null) return;
         binding.indicatorTv.setVisibility(View.GONE);
+        binding.avatarView.setVisibility(View.GONE);
         binding.nameTv.setText(R.string.partnerbrowse_empty);
-        binding.metaTv.setVisibility(View.GONE);
+        binding.ageSexTv.setVisibility(View.GONE);
         binding.nearbyGroup.setVisibility(View.GONE);
         binding.langTv.setVisibility(View.GONE);
+        binding.lastOnlineTv.setVisibility(View.GONE);
+        binding.tagRow.removeAllViews();
+        binding.tagRow.setVisibility(View.GONE);
         binding.introTv.setText(R.string.partnerbrowse_intro_empty);
         binding.actionBtn.setText(R.string.partnerbrowse_retry);
         binding.actionBtn.setEnabled(true);
@@ -143,26 +154,69 @@ public class PartnerDetailFragment extends Fragment {
 
     private void bindUserInfo() {
         if (binding == null || partner == null) return;
+        binding.avatarView.setVisibility(View.VISIBLE);
+        binding.avatarView.setSize(58);
+        binding.avatarView.showAvatarUrl(partner.getAvatarPathSafe(), partner.avatar_cache_key, partner.getNameSafe(), partner.getStableKey());
+        binding.avatarView.showFlag(partner.country_code);
+
         binding.nameTv.setText(partner.getNameSafe());
-        String meta = buildMeta();
-        binding.metaTv.setText(meta);
-        binding.metaTv.setVisibility(TextUtils.isEmpty(meta) ? View.GONE : View.VISIBLE);
+        String ageSex = buildAgeSex();
+        binding.ageSexTv.setText(ageSex);
+        binding.ageSexTv.setVisibility(TextUtils.isEmpty(ageSex) ? View.GONE : View.VISIBLE);
+
         String lang = buildLanguages();
         binding.langTv.setText(lang);
         binding.langTv.setVisibility(TextUtils.isEmpty(lang) ? View.GONE : View.VISIBLE);
-        binding.introTv.setText(TextUtils.isEmpty(partner.intro) ? getString(R.string.partnerbrowse_intro_empty) : partner.intro);
+
+        String lastOnline = buildLastOnline();
+        binding.lastOnlineTv.setText(lastOnline);
+        binding.lastOnlineTv.setVisibility(TextUtils.isEmpty(lastOnline) ? View.GONE : View.VISIBLE);
+
         String nearby = partner.getNearbyLabel();
         binding.nearbyGroup.setVisibility(TextUtils.isEmpty(nearby) ? View.GONE : View.VISIBLE);
         binding.nearbyTv.setText(nearby);
+
+        bindTags(partner.getTagsSafe());
+        binding.introTv.setText(TextUtils.isEmpty(partner.intro) ? getString(R.string.partnerbrowse_intro_empty) : partner.intro);
         binding.actionBtn.setAlpha(partner.isHelloSent() ? 0.55f : 1f);
         binding.actionBtn.setText(partner.follow == 1 ? R.string.partnerbrowse_send_message : (partner.isHelloSent() ? R.string.partnerbrowse_hello_sent : R.string.partnerbrowse_say_hello));
         binding.actionBtn.setEnabled(!partner.isHelloSent() || partner.follow == 1);
         binding.actionBtn.setOnClickListener(v -> onActionClick());
+
         View.OnClickListener openProfile = v -> openProfilePage();
+        binding.avatarView.setOnClickListener(openProfile);
         binding.nameTv.setOnClickListener(openProfile);
-        binding.metaTv.setOnClickListener(openProfile);
+        binding.ageSexTv.setOnClickListener(openProfile);
         binding.langTv.setOnClickListener(openProfile);
+        binding.lastOnlineTv.setOnClickListener(openProfile);
         binding.introTv.setOnClickListener(openProfile);
+    }
+
+    private void bindTags(List<String> tags) {
+        if (binding == null) return;
+        binding.tagRow.removeAllViews();
+        if (tags == null || tags.isEmpty()) {
+            binding.tagRow.setVisibility(View.GONE);
+            return;
+        }
+        binding.tagRow.setVisibility(View.VISIBLE);
+        int max = Math.min(tags.size(), 5);
+        for (int i = 0; i < max; i++) {
+            String tag = tags.get(i);
+            if (TextUtils.isEmpty(tag)) continue;
+            TextView chip = new TextView(requireContext());
+            chip.setText(tag);
+            chip.setTextColor(0xFFFFFFFF);
+            chip.setTextSize(12f);
+            chip.setGravity(android.view.Gravity.CENTER);
+            chip.setSingleLine(true);
+            chip.setBackgroundResource(R.drawable.bg_partnerbrowse_tag_chip);
+            chip.setPadding(AndroidUtilities.dp(10), 0, AndroidUtilities.dp(10), 0);
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(24));
+            lp.rightMargin = AndroidUtilities.dp(7);
+            binding.tagRow.addView(chip, lp);
+        }
     }
 
     private void openProfilePage() {
@@ -171,15 +225,14 @@ public class PartnerDetailFragment extends Fragment {
         if (context != null) PartnerBrowseHostBridge.openProfile(context, partner.uid);
     }
 
-    private String buildMeta() {
+    private String buildAgeSex() {
         if (partner == null) return "";
-        StringBuilder sb = new StringBuilder();
-        if (partner.age > 0) sb.append(partner.age);
-        if (!TextUtils.isEmpty(partner.country_code)) {
-            if (sb.length() > 0) sb.append(" · ");
-            sb.append(partner.country_code.toUpperCase(java.util.Locale.US));
-        }
-        return sb.toString();
+        String sex = "";
+        if (partner.sex == 1) sex = "♂";
+        else if (partner.sex == 0) sex = "♀";
+        if (partner.age > 0 && !TextUtils.isEmpty(sex)) return sex + " " + partner.age;
+        if (partner.age > 0) return String.valueOf(partner.age);
+        return sex;
     }
 
     private String buildLanguages() {
@@ -189,7 +242,22 @@ public class PartnerDetailFragment extends Fragment {
         if (TextUtils.isEmpty(left) && TextUtils.isEmpty(right)) return "";
         if (TextUtils.isEmpty(left)) return right;
         if (TextUtils.isEmpty(right)) return left;
-        return left + "  ⇄  " + right;
+        return left + "  ↔  " + right;
+    }
+
+    private String buildLastOnline() {
+        if (partner == null) return "";
+        if (partner.online == 1) return getString(R.string.partnerbrowse_online_now);
+        long last = partner.getLastActiveMillisSafe();
+        if (last <= 0) return "";
+        long diff = Math.max(0, System.currentTimeMillis() - last);
+        long minute = diff / 60000L;
+        if (minute < 1) return getString(R.string.partnerbrowse_last_online_just_now);
+        if (minute < 60) return getString(R.string.partnerbrowse_last_online_format, minute + getString(R.string.partnerbrowse_minutes_ago));
+        long hour = minute / 60L;
+        if (hour < 24) return getString(R.string.partnerbrowse_last_online_format, hour + getString(R.string.partnerbrowse_hours_ago));
+        long day = hour / 24L;
+        return getString(R.string.partnerbrowse_last_online_format, day + getString(R.string.partnerbrowse_days_ago));
     }
 
     private String join(List<String> list) {
@@ -198,7 +266,7 @@ public class PartnerDetailFragment extends Fragment {
         for (String item : list) {
             if (TextUtils.isEmpty(item)) continue;
             if (sb.length() > 0) sb.append(' ');
-            sb.append(item.toUpperCase(java.util.Locale.US));
+            sb.append(item.toUpperCase(Locale.US));
         }
         return sb.toString();
     }
@@ -219,19 +287,20 @@ public class PartnerDetailFragment extends Fragment {
         if (target.follow == 1) {
             FragmentActivity activity = getActivity();
             if (activity == null) return;
-            WKIMUtils.getInstance().startChatActivity(new ChatViewMenu(activity, target.uid, WKChannelType.PERSONAL, 0, false));
+            PartnerBrowseHostBridge.openChat(activity, target.uid);
             return;
         }
         binding.actionBtn.setEnabled(false);
-        FriendModel.getInstance().applyAddFriend(target.uid, target.vercode, getString(R.string.partnerbrowse_default_hello_plain), (code, msg) -> {
+        PartnerBrowseHostBridge.applyAddFriend(requireContext(), target.uid, target.vercode, getString(R.string.partnerbrowse_default_hello_plain), (success, msg) -> {
             if (!isViewAlive() || partner != target) return;
-            if (code == HttpResponseCode.success) {
+            if (success) {
                 target.markHelloSent();
                 binding.actionBtn.setText(R.string.partnerbrowse_hello_sent);
                 binding.actionBtn.setEnabled(false);
                 binding.actionBtn.setAlpha(0.55f);
             } else {
                 binding.actionBtn.setEnabled(true);
+                if (!TextUtils.isEmpty(msg)) Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
             }
         });
     }

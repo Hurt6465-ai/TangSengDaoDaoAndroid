@@ -62,8 +62,11 @@ public class PartnerImageAdapter extends RecyclerView.Adapter<PartnerImageAdapte
 
     @Override
     public void onViewRecycled(@NonNull VH holder) {
-        Glide.with(holder.imageView).clear(holder.imageView);
-        holder.imageView.setImageDrawable(null);
+        try {
+            Glide.with(holder.imageView).clear(holder.imageView);
+            holder.imageView.setImageDrawable(null);
+        } catch (Throwable ignored) {
+        }
         super.onViewRecycled(holder);
     }
 
