@@ -5,11 +5,17 @@ import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.FrameLayout;
+import android.widget.GridLayout;
 import android.widget.TextView;
 
 import com.alibaba.fastjson.JSONObject;
@@ -22,7 +28,9 @@ import com.chat.base.net.ud.WKProgressManager;
 import com.chat.base.net.ud.WKUploader;
 import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileEditBinding;
-
+import com.chat.uikit.user.service.UserModel;
+import com.xinbida.wukongim.WKIM;
+import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.io.File;
@@ -30,15 +38,20 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfileEditBinding> {
     public static final String EXTRA_REQUIRE_PROFILE_IMAGE = "require_profile_image";
+    private static final int REQ_AVATAR = 500;
     private static final int REQ_COVER = 501;
     private static final int REQ_PHOTO = 502;
     private static final int REQ_TAGS = 503;
     private static final int MAX_PROFILE_IMAGES = 5;
+    private static final int MAX_INTRO_LENGTH = 200;
 
     private static final String[][] COUNTRIES = new String[][]{
             {"MM", "🇲🇲 缅甸", "缅甸"}, {"CN", "🇨🇳 中国", "中国"}, {"TH", "🇹🇭 泰国", "泰国"},
@@ -67,6 +80,8 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     private final ArrayList<String> tags = new ArrayList<>();
     private final ArrayList<String> profileImages = new ArrayList<>();
     private final ArrayList<String> localPhotoPreviews = new ArrayList<>();
+    private final HashMap<String, String> uploadedPhotoLocalPreviewMap = new HashMap<>();
+    private final HashSet<String> deletedLocalPhotoPreviews = new HashSet<>();
 
     @Override
     protected ActPartnerProfileEditBinding getViewBinding() {
@@ -81,8 +96,8 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     @Override
     protected void initView() {
         requireProfileImage = getIntent() != null && getIntent().getBooleanExtra(EXTRA_REQUIRE_PROFILE_IMAGE, false);
-        wkVBinding.editAvatarView.setSize(64);
-        wkVBinding.editAvatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
+        wkVBinding.avatarView.setSize(72);
+        wkVBinding.avatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
         updateCountryText();
         updateSexText();
         updateBirthdayText();
@@ -91,20 +106,19 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         updateCoverPreview();
         updatePhotoPreview();
         updateProgress(0, false);
+        setupIntroCounter();
     }
 
     @Override
     protected void initListener() {
+        wkVBinding.avatarPickerLayout.setOnClickListener(v -> pickImage(REQ_AVATAR));
         wkVBinding.countryRow.setOnClickListener(v -> showCountryDialog());
         wkVBinding.sexRow.setOnClickListener(v -> showSexDialog());
         wkVBinding.birthdayRow.setOnClickListener(v -> showBirthdayPicker());
         wkVBinding.nativeLangRow.setOnClickListener(v -> showLanguageDialog(true));
         wkVBinding.learningLangRow.setOnClickListener(v -> showLanguageDialog(false));
         wkVBinding.tagsRow.setOnClickListener(v -> openTagSelector());
-        wkVBinding.coverUploadBtn.setOnClickListener(v -> pickImage(REQ_COVER));
         wkVBinding.addPhotoBtn.setOnClickListener(v -> pickImage(REQ_PHOTO));
-        wkVBinding.editAvatarBtn.setOnClickListener(v -> openAvatarEditor());
-        wkVBinding.leaveBtn.setOnClickListener(v -> finish());
         wkVBinding.saveBtn.setOnClickListener(v -> saveProfile());
     }
 
@@ -120,8 +134,6 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void bindProfile(PartnerProfileEntity data) {
-        wkVBinding.editAvatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL, data.avatar_cache_key);
-        if (!TextUtils.isEmpty(data.country_code)) wkVBinding.editAvatarView.showFlag(data.country_code);
         wkVBinding.nameEt.setText(firstNotEmpty(data.name, WKConfig.getInstance().getUserName()));
         countryCode = normalizeCountryCode(data.country_code);
         countryName = firstNotEmpty(data.country, countryNameByCode(countryCode));
@@ -139,6 +151,8 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         profileImages.addAll(limitList(cleanList(data.getProfileImagesSafe()), MAX_PROFILE_IMAGES));
 
         wkVBinding.introEt.setText(safe(data.intro));
+        wkVBinding.avatarView.setSize(72);
+        wkVBinding.avatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
         updateCountryText();
         updateSexText();
         updateBirthdayText();
@@ -183,7 +197,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         coreBody.put("country", countryName);
         coreBody.put("native_languages", new ArrayList<>(nativeCodes));
         coreBody.put("learning_languages", new ArrayList<>(learningCodes));
-        coreBody.put("intro", valueOf(wkVBinding.introEt));
+        coreBody.put("intro", limitIntro(valueOf(wkVBinding.introEt)));
 
         JSONObject mediaBody = new JSONObject();
         mediaBody.put("tags", new ArrayList<>(tags));
@@ -204,19 +218,9 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
                     finish();
                 } else {
                     showToast(TextUtils.isEmpty(mediaMsg) ? getString(R.string.partner_save_media_failed) : mediaMsg);
-                    finish();
                 }
             });
         });
-    }
-
-    private void openAvatarEditor() {
-        try {
-            Class<?> clazz = Class.forName("com.chat.uikit.user.MyHeadPortraitActivity");
-            startActivity(new Intent(this, clazz));
-        } catch (Exception ignored) {
-            showToast(getString(R.string.partner_avatar_edit_unavailable));
-        }
     }
 
     private void showCountryDialog() {
@@ -296,7 +300,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void pickImage(int requestCode) {
-        if (requestCode == REQ_PHOTO && profileImages.size() + localPhotoPreviews.size() + uploadingPhotoCount >= MAX_PROFILE_IMAGES) {
+        if (requestCode == REQ_PHOTO && profileImages.size() + uploadingPhotoCount >= MAX_PROFILE_IMAGES) {
             showToast(getString(R.string.partner_image_max_tip));
             return;
         }
@@ -317,7 +321,58 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         }
         Uri uri = data.getData();
         if (uri == null) return;
+        if (requestCode == REQ_AVATAR) {
+            prepareAndUploadAvatar(uri);
+            return;
+        }
         prepareAndUploadPickedImage(uri, requestCode == REQ_COVER);
+    }
+
+    private void prepareAndUploadAvatar(Uri uri) {
+        showToast(getString(R.string.partner_uploading));
+        new Thread(() -> {
+            try {
+                File source = copyUriToCache(uri, "partner_avatar_src");
+                File avatarPng = makeSquareAvatarPng(source);
+                runOnUiThread(() -> UserModel.getInstance().uploadAvatar(avatarPng.getAbsolutePath(), code -> {
+                    if (code == HttpResponseCode.success) {
+                        String cacheKey = UUID.randomUUID().toString().replace("-", "");
+                        WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
+                        if (channel == null || TextUtils.isEmpty(channel.channelID)) {
+                            channel = new WKChannel(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
+                            WKIM.getInstance().getChannelManager().saveOrUpdateChannel(channel);
+                        }
+                        channel.avatarCacheKey = cacheKey;
+                        WKIM.getInstance().getChannelManager().updateAvatarCacheKey(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL, cacheKey);
+                        wkVBinding.avatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL, cacheKey);
+                        showToast(getString(R.string.partner_avatar_upload_success));
+                    } else {
+                        showToast(getString(R.string.partner_avatar_upload_failed));
+                    }
+                }));
+            } catch (Exception e) {
+                runOnUiThread(() -> showToast(getString(R.string.partner_avatar_upload_failed)));
+            }
+        }).start();
+    }
+
+    private File makeSquareAvatarPng(File source) throws Exception {
+        Bitmap src = BitmapFactory.decodeFile(source.getAbsolutePath());
+        if (src == null) throw new IllegalStateException("decode avatar failed");
+        int side = Math.min(src.getWidth(), src.getHeight());
+        int left = (src.getWidth() - side) / 2;
+        int top = (src.getHeight() - side) / 2;
+        Bitmap crop = Bitmap.createBitmap(src, left, top, side, side);
+        Bitmap scaled = Bitmap.createScaledBitmap(crop, 512, 512, true);
+        File out = new File(getCacheDir(), "partner_avatar_" + System.currentTimeMillis() + ".png");
+        FileOutputStream fos = new FileOutputStream(out);
+        scaled.compress(Bitmap.CompressFormat.PNG, 100, fos);
+        fos.flush();
+        fos.close();
+        if (scaled != crop) scaled.recycle();
+        crop.recycle();
+        src.recycle();
+        return out;
     }
 
     private void prepareAndUploadPickedImage(Uri uri, boolean cover) {
@@ -392,6 +447,8 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         String v = path.trim();
         if (v.startsWith(WKApiConfig.baseUrl)) v = v.substring(WKApiConfig.baseUrl.length());
         if (v.startsWith("/")) v = v.substring(1);
+        if (v.startsWith("common/")) return "file/preview/" + v;
+        if (v.startsWith("profile/")) return "file/preview/common/" + v;
         return v;
     }
 
@@ -402,10 +459,17 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
                 if (TextUtils.equals(localCoverPreview, localPreview)) localCoverPreview = "";
             }
         } else {
-            localPhotoPreviews.remove(localPreview);
             uploadingPhotoCount = Math.max(0, uploadingPhotoCount - 1);
-            if (success && !TextUtils.isEmpty(fileUrl) && !profileImages.contains(fileUrl) && profileImages.size() < MAX_PROFILE_IMAGES) {
+            boolean deletedBeforeFinish = deletedLocalPhotoPreviews.remove(localPreview);
+            if (success && !deletedBeforeFinish && !TextUtils.isEmpty(fileUrl) && !profileImages.contains(fileUrl) && profileImages.size() < MAX_PROFILE_IMAGES) {
                 profileImages.add(fileUrl);
+                uploadedPhotoLocalPreviewMap.put(fileUrl, localPreview);
+                localPhotoPreviews.remove(localPreview);
+            } else if (!success && !deletedBeforeFinish) {
+                // 上传失败时保留本地预览，让用户能看到是哪张图失败，并可点 X 删除后重选。
+                if (!localPhotoPreviews.contains(localPreview)) localPhotoPreviews.add(localPreview);
+            } else {
+                localPhotoPreviews.remove(localPreview);
             }
         }
         uploadingCount = Math.max(0, uploadingCount - 1);
@@ -450,7 +514,83 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void updateTagsText() {
-        wkVBinding.tagsValueTv.setText(tags.isEmpty() ? getString(R.string.partner_choose_tags) : joinPlain(tags));
+        wkVBinding.tagsValueTv.setText(tags.isEmpty() ? getString(R.string.partner_choose_tags) : getString(R.string.partner_selected_count, tags.size()));
+        renderTagChips();
+    }
+
+    private void renderTagChips() {
+        wkVBinding.tagChipContainer.removeAllViews();
+        if (tags.isEmpty()) {
+            wkVBinding.tagChipContainer.setVisibility(View.GONE);
+            return;
+        }
+        wkVBinding.tagChipContainer.setVisibility(View.VISIBLE);
+        for (String tag : new ArrayList<>(tags)) {
+            if (TextUtils.isEmpty(tag)) continue;
+            FrameLayout chip = new FrameLayout(this);
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+            lp.width = GridLayout.LayoutParams.WRAP_CONTENT;
+            lp.height = dp(34);
+            lp.setMargins(0, 0, dp(8), dp(8));
+            chip.setLayoutParams(lp);
+
+            TextView text = new TextView(this);
+            text.setText(tag);
+            text.setTextSize(12);
+            text.setTextColor(0xFF6A4DDF);
+            text.setGravity(android.view.Gravity.CENTER);
+            text.setSingleLine(true);
+            text.setMaxWidth(dp(110));
+            text.setEllipsize(TextUtils.TruncateAt.END);
+            text.setBackgroundResource(R.drawable.bg_partner_tag_chip);
+            text.setPadding(dp(12), 0, dp(24), 0);
+            chip.addView(text, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(28), android.view.Gravity.BOTTOM | android.view.Gravity.START));
+
+            TextView close = new TextView(this);
+            close.setText("×");
+            close.setTextColor(0xFFFFFFFF);
+            close.setTextSize(12);
+            close.setGravity(android.view.Gravity.CENTER);
+            close.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            close.setBackgroundResource(R.drawable.bg_partner_delete_photo);
+            FrameLayout.LayoutParams xlp = new FrameLayout.LayoutParams(dp(18), dp(18), android.view.Gravity.TOP | android.view.Gravity.END);
+            chip.addView(close, xlp);
+            close.setOnClickListener(v -> {
+                tags.remove(tag);
+                updateTagsText();
+            });
+            wkVBinding.tagChipContainer.addView(chip);
+        }
+    }
+
+    private void setupIntroCounter() {
+        updateIntroCount();
+        wkVBinding.introEt.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                updateIntroCount();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+    }
+
+    private void updateIntroCount() {
+        String intro = valueOf(wkVBinding.introEt);
+        int len = intro.length();
+        wkVBinding.introCountTv.setText(len + "/" + MAX_INTRO_LENGTH);
+        wkVBinding.introCountTv.setTextColor(len >= MAX_INTRO_LENGTH ? 0xFFFF5A7A : 0xFF999999);
+    }
+
+    private String limitIntro(String value) {
+        if (value == null) return "";
+        return value.length() > MAX_INTRO_LENGTH ? value.substring(0, MAX_INTRO_LENGTH) : value;
     }
 
     private void updateProgress(int progress, boolean show) {
@@ -474,22 +614,50 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
 
     private void updatePhotoPreview() {
         wkVBinding.imagePreviewLayout.removeAllViews();
-        ArrayList<String> all = new ArrayList<>();
-        all.addAll(localPhotoPreviews);
-        all.addAll(profileImages);
-        int count = Math.min(all.size(), MAX_PROFILE_IMAGES);
-        for (int i = 0; i < count; i++) {
-            String path = all.get(i);
-            ImageView imageView = new ImageView(this);
-            imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            imageView.setBackgroundResource(R.drawable.bg_partner_photo_placeholder);
-            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(dp(70), dp(70));
-            if (i > 0) lp.leftMargin = dp(8);
-            wkVBinding.imagePreviewLayout.addView(imageView, lp);
-            Bitmap bitmap = decodeLocalBitmap(path, 240, 240);
-            if (bitmap != null) imageView.setImageBitmap(bitmap);
-            else GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(path), imageView);
+        for (String remotePath : new ArrayList<>(profileImages)) {
+            String previewPath = uploadedPhotoLocalPreviewMap.containsKey(remotePath) ? uploadedPhotoLocalPreviewMap.get(remotePath) : remotePath;
+            addPhotoPreviewItem(previewPath, () -> {
+                profileImages.remove(remotePath);
+                uploadedPhotoLocalPreviewMap.remove(remotePath);
+                updatePhotoPreview();
+            });
         }
+        for (String localPath : new ArrayList<>(localPhotoPreviews)) {
+            addPhotoPreviewItem(localPath, () -> {
+                deletedLocalPhotoPreviews.add(localPath);
+                localPhotoPreviews.remove(localPath);
+                updatePhotoPreview();
+            });
+        }
+    }
+
+    private void addPhotoPreviewItem(String path, Runnable deleteAction) {
+        FrameLayout item = new FrameLayout(this);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(dp(78), dp(78));
+        if (wkVBinding.imagePreviewLayout.getChildCount() > 0) lp.leftMargin = dp(8);
+        wkVBinding.imagePreviewLayout.addView(item, lp);
+
+        ImageView imageView = new ImageView(this);
+        imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        imageView.setBackgroundResource(R.drawable.bg_partner_photo_placeholder);
+        item.addView(imageView, new FrameLayout.LayoutParams(dp(70), dp(70), android.view.Gravity.BOTTOM | android.view.Gravity.START));
+
+        Bitmap bitmap = decodeLocalBitmap(path, 240, 240);
+        if (bitmap != null) imageView.setImageBitmap(bitmap);
+        else GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(path), imageView);
+
+        TextView deleteTv = new TextView(this);
+        deleteTv.setText("×");
+        deleteTv.setTextColor(0xFFFFFFFF);
+        deleteTv.setTextSize(18);
+        deleteTv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        deleteTv.setGravity(android.view.Gravity.CENTER);
+        deleteTv.setBackgroundResource(R.drawable.bg_partner_delete_photo);
+        FrameLayout.LayoutParams dlp = new FrameLayout.LayoutParams(dp(28), dp(28), android.view.Gravity.TOP | android.view.Gravity.END);
+        item.addView(deleteTv, dlp);
+        deleteTv.setOnClickListener(v -> {
+            if (deleteAction != null) deleteAction.run();
+        });
     }
 
     private Bitmap decodeLocalBitmap(String path, int reqW, int reqH) {

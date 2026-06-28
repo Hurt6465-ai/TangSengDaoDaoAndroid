@@ -74,7 +74,7 @@ public class PartnerProfileModel extends WKBaseModel {
             public void onSuccess(UploadFileUrl result) {
                 ProfileUploadUrl uploadUrl = new ProfileUploadUrl();
                 uploadUrl.url = result == null ? "" : result.url;
-                uploadUrl.path = path;
+                uploadUrl.path = "file/preview/common" + path;
                 if (callback != null) callback.onResult(200, "", uploadUrl);
             }
 

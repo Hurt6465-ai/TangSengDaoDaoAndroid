@@ -53,7 +53,38 @@ public class PartnerProfileEntity {
     }
 
     public List<String> getProfileImagesSafe() {
-        return safeList(profile_images, "");
+        return safePathList(profile_images);
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private List<String> safePathList(Object value) {
+        ArrayList<String> result = new ArrayList<>();
+        if (value instanceof List) {
+            for (Object item : (List<Object>) value) addPathItem(result, item == null ? "" : String.valueOf(item));
+            return result;
+        }
+        if (value == null) return result;
+        String clean = String.valueOf(value).trim();
+        if (clean.length() == 0 || "null".equalsIgnoreCase(clean)) return result;
+        if (clean.startsWith("[")) {
+            clean = clean.replace("[", "").replace("]", "");
+            String[] parts = clean.split(",");
+            for (String part : parts) addPathItem(result, part);
+        } else {
+            String[] parts = clean.split("[,，\\s]+");
+            for (String part : parts) addPathItem(result, part);
+        }
+        return result;
+    }
+
+    private void addPathItem(ArrayList<String> out, String text) {
+        if (text == null) return;
+        String item = text.trim();
+        while (item.startsWith("\"") || item.startsWith("'")) item = item.substring(1).trim();
+        while (item.endsWith("\"") || item.endsWith("'")) item = item.substring(0, item.length() - 1).trim();
+        if (item.length() == 0 || "null".equalsIgnoreCase(item)) return;
+        if (!out.contains(item)) out.add(item);
     }
 
     @SuppressWarnings("unchecked")

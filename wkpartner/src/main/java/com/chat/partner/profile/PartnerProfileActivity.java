@@ -9,6 +9,7 @@ import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.Typeface;
 import android.os.Build;
+import android.net.Uri;
 import android.text.TextUtils;
 import android.text.format.DateUtils;
 import android.view.Gravity;
@@ -24,12 +25,14 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.alibaba.fastjson.JSONObject;
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.config.WKApiConfig;
 import com.chat.base.config.WKConfig;
 import com.chat.base.endpoint.entity.ChatViewMenu;
 import com.chat.base.glide.GlideUtils;
 import com.chat.base.net.HttpResponseCode;
+import com.chat.base.net.ud.WKUploader;
 import com.chat.base.utils.WKDialogUtils;
 import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileBinding;
@@ -41,6 +44,9 @@ import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -49,9 +55,11 @@ import java.util.Date;
 import java.util.Locale;
 
 public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBinding> {
+    private static final int REQ_CHANGE_COVER = 7201;
     private String uid;
     private boolean isSelf;
     private boolean isSayHiLoading;
+    private boolean coverUploading;
     private boolean introExpanded;
     private boolean introCanExpand;
     private boolean hasAnimatedEntrance;
@@ -89,8 +97,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     protected void initView() {
         setupImmersiveStatusBar();
         wkVBinding.avatarView.setSize(96);
-        wkVBinding.editBtn.setVisibility(View.VISIBLE);
-        wkVBinding.editBtn.setImageResource(isSelf ? R.drawable.ic_partner_edit : R.drawable.ic_partner_more_horizontal);
+        wkVBinding.editBtn.setVisibility(isSelf ? View.GONE : View.VISIBLE);
+        wkVBinding.editBtn.setImageResource(R.drawable.ic_partner_more_horizontal);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
@@ -103,16 +111,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void initListener() {
         wkVBinding.backBtn.setOnClickListener(v -> pressAndRun(v, this::finish));
-        wkVBinding.editBtn.setOnClickListener(v -> pressAndRun(v, () -> {
-            if (isSelf) {
-                startActivity(new Intent(this, PartnerProfileEditActivity.class));
-            } else {
-                showProfileMoreMenu();
-            }
-        }));
+        wkVBinding.editBtn.setOnClickListener(v -> pressAndRun(v, this::showProfileMoreMenu));
+        wkVBinding.profileSelfEditChip.setOnClickListener(v -> pressAndRun(v, () -> startActivity(new Intent(this, PartnerProfileEditActivity.class))));
         wkVBinding.helloBtnLayout.setOnClickListener(v -> onMainActionClick());
         wkVBinding.tagSection.setOnClickListener(v -> {
             if (isSelf) startActivity(new Intent(this, PartnerProfileEditActivity.class));
+        });
+        wkVBinding.coverIv.setOnClickListener(v -> {
+            if (isSelf) pickCoverImage();
         });
     }
 
@@ -308,6 +314,112 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         });
     }
 
+    private void pickCoverImage() {
+        if (coverUploading) {
+            showToast(getString(R.string.partner_wait_upload_finish));
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_PICK);
+        intent.setType("image/*");
+        startActivityForResult(intent, REQ_CHANGE_COVER);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_CHANGE_COVER && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            prepareAndUploadCover(data.getData());
+        }
+    }
+
+    private void prepareAndUploadCover(Uri uri) {
+        coverUploading = true;
+        showToast(getString(R.string.partner_uploading));
+        new Thread(() -> {
+            try {
+                File source = copyUriToCache(uri, "partner_cover_src");
+                File webp = PartnerImageCompressor.compressToWebp150KB(source, getCacheDir(), "partner_cover_" + System.currentTimeMillis() + ".webp");
+                runOnUiThread(() -> {
+                    wkVBinding.coverIv.setImageURI(Uri.fromFile(webp));
+                    uploadCoverFile(webp);
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    coverUploading = false;
+                    showToast(getString(R.string.partner_upload_failed));
+                });
+            }
+        }).start();
+    }
+
+    private void uploadCoverFile(File file) {
+        PartnerProfileModel.getInstance().getProfileUploadFileUrl(WKConfig.getInstance().getUid(), file.getAbsolutePath(), true, (code, msg, uploadUrl) -> {
+            if (uploadUrl == null || TextUtils.isEmpty(uploadUrl.url)) {
+                coverUploading = false;
+                showToast(TextUtils.isEmpty(msg) ? getString(R.string.partner_upload_failed) : msg);
+                return;
+            }
+            WKUploader.getInstance().upload(uploadUrl.url, file.getAbsolutePath(), "partner_cover_" + System.currentTimeMillis(), new WKUploader.IUploadBack() {
+                @Override
+                public void onSuccess(String uploadedPath) {
+                    String finalPath = normalizeUploadedCoverPath(TextUtils.isEmpty(uploadedPath) ? uploadUrl.path : uploadedPath);
+                    runOnUiThread(() -> saveCoverPath(finalPath));
+                }
+
+                @Override
+                public void onError() {
+                    runOnUiThread(() -> {
+                        coverUploading = false;
+                        showToast(getString(R.string.partner_upload_failed));
+                    });
+                }
+            });
+        });
+    }
+
+    private void saveCoverPath(String path) {
+        if (TextUtils.isEmpty(path)) {
+            coverUploading = false;
+            showToast(getString(R.string.partner_upload_failed));
+            return;
+        }
+        JSONObject body = new JSONObject();
+        body.put("profile_cover", path);
+        PartnerProfileModel.getInstance().updateCurrentProfile(body, (code, msg, data) -> {
+            coverUploading = false;
+            if (code == HttpResponseCode.success || code == 200 || code == 0) {
+                if (profile != null) profile.profile_cover = path;
+                showToast(getString(R.string.partner_upload_success));
+            } else {
+                showToast(TextUtils.isEmpty(msg) ? getString(R.string.partner_save_media_failed) : msg);
+            }
+        });
+    }
+
+    private String normalizeUploadedCoverPath(String path) {
+        if (TextUtils.isEmpty(path)) return "";
+        String v = path.trim();
+        if (v.startsWith(WKApiConfig.baseUrl)) v = v.substring(WKApiConfig.baseUrl.length());
+        if (v.startsWith("/")) v = v.substring(1);
+        if (v.startsWith("common/")) return "file/preview/" + v;
+        if (v.startsWith("profile/")) return "file/preview/common/" + v;
+        return v;
+    }
+
+    private File copyUriToCache(Uri uri, String prefix) throws Exception {
+        File out = new File(getCacheDir(), prefix + "_" + System.currentTimeMillis() + ".jpg");
+        InputStream input = getContentResolver().openInputStream(uri);
+        if (input == null) throw new IllegalStateException("empty uri");
+        FileOutputStream fos = new FileOutputStream(out);
+        byte[] buffer = new byte[8192];
+        int len;
+        while ((len = input.read(buffer)) > 0) fos.write(buffer, 0, len);
+        fos.flush();
+        fos.close();
+        input.close();
+        return out;
+    }
+
     private void bindProfile(PartnerProfileEntity data) {
         String showName = firstNotEmpty(data.name, data.username, data.uid);
         wkVBinding.nameTv.setText(showName);
@@ -351,15 +463,28 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         boolean hasCountry = !TextUtils.isEmpty(country);
         boolean hasLastOnline = !TextUtils.isEmpty(lastOnline);
 
-        wkVBinding.toolbarMetaLayout.setVisibility(hasCountry || hasLastOnline ? View.VISIBLE : View.GONE);
-        wkVBinding.toolbarCountryGroup.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
-        wkVBinding.toolbarLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
-        wkVBinding.toolbarCountryTv.setText(country);
-        wkVBinding.toolbarLastOnlineTv.setText(lastOnline);
+        if (isSelf) {
+            wkVBinding.toolbarMetaLayout.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
+            wkVBinding.toolbarCountryGroup.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
+            wkVBinding.toolbarLastOnlineGroup.setVisibility(View.GONE);
+            wkVBinding.toolbarCountryTv.setText(country);
+            wkVBinding.toolbarLastOnlineTv.setText("");
 
-        profileLastOnlineBaseVisible = hasLastOnline;
-        wkVBinding.profileLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
-        wkVBinding.profileLastOnlineTv.setText(lastOnline);
+            profileLastOnlineBaseVisible = false;
+            wkVBinding.profileLastOnlineGroup.setVisibility(View.GONE);
+            wkVBinding.profileSelfEditChip.setVisibility(View.VISIBLE);
+        } else {
+            wkVBinding.toolbarMetaLayout.setVisibility(hasCountry || hasLastOnline ? View.VISIBLE : View.GONE);
+            wkVBinding.toolbarCountryGroup.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
+            wkVBinding.toolbarLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
+            wkVBinding.toolbarCountryTv.setText(country);
+            wkVBinding.toolbarLastOnlineTv.setText(lastOnline);
+
+            profileLastOnlineBaseVisible = hasLastOnline;
+            wkVBinding.profileLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
+            wkVBinding.profileLastOnlineTv.setText(lastOnline);
+            wkVBinding.profileSelfEditChip.setVisibility(View.GONE);
+        }
         applyProfileContentVisibility(currentCollapsePercent);
     }
 
@@ -543,35 +668,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     }
 
     private void bindPhotos(PartnerProfileEntity data) {
+        // 主页先不展示“语伴图片”。这些图片只作为资料审核/以后动态素材，
+        // 避免主页变成空白占位。后续接发现动态时再单独做动态列表。
         wkVBinding.photoLayout.removeAllViews();
-        List<String> photos = data.getProfileImagesSafe();
-        if (photos.isEmpty()) {
-            wkVBinding.photoCard.setVisibility(View.GONE);
-            return;
-        }
-        wkVBinding.photoCard.setVisibility(View.VISIBLE);
-        int max = Math.min(photos.size(), 5);
-        for (int i = 0; i < max; i++) {
-            String url = photos.get(i);
-            if (TextUtils.isEmpty(url)) continue;
-            ImageView iv = new ImageView(this);
-            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            iv.setBackgroundResource(R.drawable.bg_partner_photo_placeholder);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                iv.setOutlineProvider(new ViewOutlineProvider() {
-                    @Override
-                    public void getOutline(View view, Outline outline) {
-                        outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(16));
-                    }
-                });
-                iv.setClipToOutline(true);
-            }
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(120), dp(120));
-            lp.gravity = Gravity.CENTER_VERTICAL;
-            lp.leftMargin = i == 0 ? 0 : dp(10);
-            wkVBinding.photoLayout.addView(iv, lp);
-            GlideUtils.getInstance().showImg(this, WKApiConfig.getShowUrl(url), iv);
-        }
+        wkVBinding.photoCard.setVisibility(View.GONE);
     }
 
     private void bindActionButton(PartnerProfileEntity data) {
