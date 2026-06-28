@@ -55,7 +55,9 @@ public class FeedWaterfallFragment extends Fragment {
         loadingView = view.findViewById(R.id.feedWaterfallLoading);
         stateTv = view.findViewById(R.id.feedWaterfallStateTv);
         StaggeredGridLayoutManager layoutManager = new StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL);
-        layoutManager.setGapStrategy(StaggeredGridLayoutManager.GAP_HANDLING_MOVE_ITEMS_BETWEEN_SPANS);
+        // 嵌入个人主页外层 NestedScrollView 时，自动跨列搬动会在父布局重新测量时闪一下。
+        // 禁用自动搬动，优先保证滚动稳定。
+        layoutManager.setGapStrategy(StaggeredGridLayoutManager.GAP_HANDLING_NONE);
         recyclerView.setLayoutManager(layoutManager);
         recyclerView.setNestedScrollingEnabled(false);
         recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
