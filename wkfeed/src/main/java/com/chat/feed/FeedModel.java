@@ -1,14 +1,24 @@
 package com.chat.feed;
 
+import android.text.TextUtils;
+
 import com.chat.base.base.WKBaseModel;
+import com.chat.base.config.WKApiConfig;
+import com.chat.base.config.WKConfig;
+import com.chat.base.net.ApiService;
+import com.chat.base.net.HttpResponseCode;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.base.net.entity.CommonResponse;
+import com.chat.base.net.entity.UploadFileUrl;
 import com.chat.feed.config.FeedConfig;
 import com.chat.feed.mock.FeedMockData;
 import com.chat.feed.model.CommentListResponse;
 import com.chat.feed.model.FeedListResponse;
 
+import java.io.File;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class FeedModel extends WKBaseModel {
@@ -111,5 +121,72 @@ public class FeedModel extends WKBaseModel {
         Map<String, Object> body = new HashMap<>();
         body.put("content", content);
         request(createService(FeedService.class).sendComment(feedId, body), listener);
+    }
+
+    public void publish(String text, List<Map<String, Object>> mediaList, IRequestResultListener<CommonResponse> listener) {
+        if (mediaList == null || mediaList.isEmpty()) {
+            if (listener != null) listener.onFail(400, "请选择图片或视频");
+            return;
+        }
+        if (FeedConfig.DEBUG_MOCK || FeedConfig.FALLBACK_MOCK_ON_ERROR) {
+            if (listener != null) listener.onSuccess(null);
+            return;
+        }
+        Map<String, Object> body = new HashMap<>();
+        body.put("text", text == null ? "" : text.trim());
+        body.put("media", mediaList);
+        request(createService(FeedService.class).publish(body), new IRequestResultListener<CommonResponse>() {
+            @Override
+            public void onSuccess(CommonResponse result) {
+                if (listener != null) listener.onSuccess(result);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (listener != null) listener.onFail(code, msg);
+            }
+        });
+    }
+
+    public void getFeedUploadFileUrl(String localPath, String mediaType, IRequestResultListener<FeedUploadUrl> listener) {
+        String ext = fileExt(localPath);
+        String uid = WKConfig.getInstance().getUid();
+        if (TextUtils.isEmpty(uid)) uid = "anonymous";
+        String typeDir = TextUtils.isEmpty(mediaType) ? "file" : mediaType.toLowerCase(Locale.US);
+        String path = "/feed/" + uid + "/" + typeDir + "_" + System.currentTimeMillis() + "_" + Math.abs(localPath == null ? 0 : localPath.hashCode()) + "." + ext;
+        String url = WKApiConfig.baseUrl + "file/upload?type=common&path=" + path;
+        request(createService(ApiService.class).getUploadFileUrl(url), new IRequestResultListener<UploadFileUrl>() {
+            @Override
+            public void onSuccess(UploadFileUrl result) {
+                FeedUploadUrl out = new FeedUploadUrl();
+                out.url = result == null ? "" : result.url;
+                out.path = path;
+                out.publicUrl = result == null ? "" : result.public_url;
+                if (listener != null) listener.onSuccess(out);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (listener != null) listener.onFail(code, msg);
+            }
+        });
+    }
+
+    private String fileExt(String localPath) {
+        if (TextUtils.isEmpty(localPath)) return "bin";
+        String name = new File(localPath).getName();
+        int dot = name.lastIndexOf('.');
+        if (dot >= 0 && dot < name.length() - 1) {
+            String ext = name.substring(dot + 1).toLowerCase(Locale.US);
+            if ("jpeg".equals(ext)) return "jpg";
+            return ext;
+        }
+        return "bin";
+    }
+
+    public static class FeedUploadUrl {
+        public String url;
+        public String path;
+        public String publicUrl;
     }
 }
