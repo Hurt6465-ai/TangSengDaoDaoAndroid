@@ -104,7 +104,7 @@ public class FeedModel extends WKBaseModel {
     }
 
     public void like(String feedId, boolean like, IRequestResultListener<CommonResponse> listener) {
-        if (FeedConfig.DEBUG_MOCK || FeedConfig.FALLBACK_MOCK_ON_ERROR) {
+        if (FeedConfig.DEBUG_MOCK) {
             if (listener != null) listener.onSuccess(null);
             return;
         }
@@ -114,7 +114,7 @@ public class FeedModel extends WKBaseModel {
     }
 
     public void sendComment(String feedId, String content, IRequestResultListener<CommonResponse> listener) {
-        if (FeedConfig.DEBUG_MOCK || FeedConfig.FALLBACK_MOCK_ON_ERROR) {
+        if (FeedConfig.DEBUG_MOCK) {
             if (listener != null) listener.onSuccess(null);
             return;
         }
@@ -128,7 +128,9 @@ public class FeedModel extends WKBaseModel {
             if (listener != null) listener.onFail(400, "请选择图片或视频");
             return;
         }
-        if (FeedConfig.DEBUG_MOCK || FeedConfig.FALLBACK_MOCK_ON_ERROR) {
+        // 发布、点赞、评论属于写操作，不能因为 FALLBACK_MOCK_ON_ERROR=true 就假装成功。
+        // 否则前端提示“发布成功”，但后端没有任何数据，别人和个人主页都刷不到。
+        if (FeedConfig.DEBUG_MOCK) {
             if (listener != null) listener.onSuccess(null);
             return;
         }
