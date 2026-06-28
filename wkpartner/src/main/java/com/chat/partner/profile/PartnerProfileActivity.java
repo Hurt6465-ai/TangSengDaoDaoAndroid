@@ -176,16 +176,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.toolbar.setPadding(0, statusBarHeight, 0, 0);
         clearProfileHeaderShadow();
 
-        // Works sticky header must stay below the pinned username toolbar.
-        // Keep the top username visible while the works tab is pinned.
-        if (wkVBinding.feedStickyHeader != null) {
-            ViewGroup.LayoutParams rawLp = wkVBinding.feedStickyHeader.getLayoutParams();
-            if (rawLp instanceof ViewGroup.MarginLayoutParams) {
-                ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) rawLp;
-                lp.topMargin = toolbarActualHeight;
-                wkVBinding.feedStickyHeader.setLayoutParams(lp);
-            }
-        }
+        // Works sticky header is positioned by screen coordinates, not by a fixed margin.
+        // This keeps it exactly below the pinned username toolbar on every status-bar height.
+        positionFeedStickyHeader();
     }
 
     private void clearProfileHeaderShadow() {
@@ -271,7 +264,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void updateFeedStickyHeader() {
         if (wkVBinding == null || wkVBinding.feedStickyHeader == null || wkVBinding.feedWorksSection == null) return;
         boolean show = isWorksPinned();
+        positionFeedStickyHeader();
         wkVBinding.feedStickyHeader.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) {
+            wkVBinding.feedStickyHeader.bringToFront();
+            wkVBinding.helloBar.bringToFront();
+        }
         if (wkVBinding.feedWorksTitleTv != null) {
             // Keep the original title space to avoid a layout jump, but let the pinned title
             // become the visible one once it reaches the toolbar.
@@ -279,13 +277,31 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         }
     }
 
+    private void positionFeedStickyHeader() {
+        if (wkVBinding == null || wkVBinding.feedStickyHeader == null || wkVBinding.toolbar == null) return;
+        int[] rootLoc = new int[2];
+        int[] toolbarLoc = new int[2];
+        wkVBinding.getRoot().getLocationOnScreen(rootLoc);
+        wkVBinding.toolbar.getLocationOnScreen(toolbarLoc);
+        int toolbarBottomInRoot = toolbarLoc[1] - rootLoc[1] + wkVBinding.toolbar.getHeight();
+        if (toolbarBottomInRoot <= 0) toolbarBottomInRoot = toolbarActualHeight > 0 ? toolbarActualHeight : dp(80);
+        wkVBinding.feedStickyHeader.setY(toolbarBottomInRoot);
+    }
+
     private boolean isWorksPinned() {
-        if (wkVBinding == null || wkVBinding.feedWorksSection == null) return false;
+        if (wkVBinding == null || wkVBinding.feedWorksSection == null || wkVBinding.feedWorksTitleTv == null) return false;
         if (wkVBinding.feedWorksSection.getVisibility() != View.VISIBLE) return false;
-        int toolbarHeight = toolbarActualHeight > 0 ? toolbarActualHeight : dp(80);
-        int scrollY = wkVBinding.nestedScrollView.getScrollY();
-        int pinStart = Math.max(0, wkVBinding.feedWorksSection.getTop() - toolbarHeight);
-        return scrollY >= pinStart;
+        if (wkVBinding.feedWorksTitleTv.getHeight() <= 0 || wkVBinding.toolbar.getHeight() <= 0) return false;
+
+        // Do not use NestedScrollView.scrollY here. In CoordinatorLayout, part of the scroll is
+        // consumed by AppBarLayout first, so scrollY alone cannot tell when the works title
+        // visually reaches the toolbar. Screen coordinates are stable and match the real UI.
+        int[] titleLoc = new int[2];
+        int[] toolbarLoc = new int[2];
+        wkVBinding.feedWorksTitleTv.getLocationOnScreen(titleLoc);
+        wkVBinding.toolbar.getLocationOnScreen(toolbarLoc);
+        int toolbarBottom = toolbarLoc[1] + wkVBinding.toolbar.getHeight();
+        return titleLoc[1] <= toolbarBottom + dp(1);
     }
 
     private void applyFoldedVisibility(View view, boolean baseVisible, float alpha, boolean fullyCollapsed) {
