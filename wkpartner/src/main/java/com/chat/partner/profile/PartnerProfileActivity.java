@@ -69,6 +69,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private boolean langBaseVisible;
     private boolean profileLastOnlineBaseVisible;
     private int topBarHeight;
+    private float currentCollapsePercent;
+    private boolean fixedTopBarSolid;
     private PartnerProfileEntity profile;
     private boolean feedWorksAttached;
     private Fragment feedWorksFragment;
@@ -191,14 +193,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
             window.setStatusBarColor(Color.TRANSPARENT);
         }
-        // 固定顶栏是白底，状态栏图标用深色。
-        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-        }
-        window.getDecorView().setSystemUiVisibility(flags);
+        // 顶部默认是透明覆盖在背景墙上，状态栏先用浅色图标；折叠后再切深色。
+        setStatusBarIconDark(false);
 
-        // 固定顶栏：白底，高度 = 状态栏 + 56dp。内容用 paddingTop 推到状态栏图标下方。
+        // 固定顶栏：高度 = 状态栏 + 56dp。内容用 paddingTop 推到状态栏图标下方。
         if (fixedProfileTopBar == null) return;
         int statusBarHeight = getStatusBarHeight();
         topBarHeight = statusBarHeight + dp(56);
@@ -243,6 +241,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             int range = appBarLayout.getTotalScrollRange();
             if (range <= 0) return;
             float percent = Math.min(1f, Math.max(0f, Math.abs(verticalOffset) * 1f / range));
+            currentCollapsePercent = percent;
             float scale = 1f + (0.04f * (1f - percent));
             wkVBinding.coverIv.setScaleX(scale);
             wkVBinding.coverIv.setScaleY(scale);
@@ -282,6 +281,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (introCanExpand && introBaseVisible) {
             wkVBinding.introMoreTv.setVisibility(View.VISIBLE);
         }
+        updateFixedTopBarAppearance(isWorksPinned());
     }
 
     // ============ 作品栏吸顶核心逻辑 ============
@@ -293,6 +293,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         positionWorksHeader();
         boolean pinned = isWorksPinned();
         fixedWorksHeader.setVisibility(pinned ? View.VISIBLE : View.GONE);
+        updateFixedTopBarAppearance(pinned);
         if (pinned) {
             fixedProfileTopBar.bringToFront();
             fixedWorksHeader.bringToFront();
@@ -333,18 +334,46 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         return viewLoc[1] - rootLoc[1];
     }
 
-    // 固定顶栏静态样式：白底、深色文字与图标、无阴影。只设置一次。
+    // 固定顶栏分两态：
+    // 1. 背景墙展开时：透明覆盖在封面上，只保留白色返回/更多，隐藏用户名，背景墙不被白面板截短。
+    // 2. 折叠/作品吸顶时：白底深色，显示用户名和国家/在线。
     private void applyFixedTopBarStyle() {
+        updateFixedTopBarAppearance(false);
+    }
+
+    private void updateFixedTopBarAppearance(boolean forceSolid) {
         ensureFixedTopBarViews();
-        if (fixedProfileTopBar == null || toolbarTitleTv == null) return;
-        fixedProfileTopBar.setBackgroundColor(0xFFFFFFFF);
-        wkVBinding.backBtn.setColorFilter(0xFF202033);
-        wkVBinding.editBtn.setColorFilter(0xFF202033);
-        toolbarTitleTv.setTextColor(0xFF202033);
+        if (fixedProfileTopBar == null) return;
+        boolean solid = forceSolid || currentCollapsePercent >= 0.72f;
+        if (fixedTopBarSolid == solid && toolbarTitleTv != null) return;
+        fixedTopBarSolid = solid;
+
+        fixedProfileTopBar.setBackgroundColor(solid ? 0xFFFFFFFF : Color.TRANSPARENT);
+        setStatusBarIconDark(solid);
+
+        int iconColor = solid ? 0xFF202033 : 0xFFFFFFFF;
+        wkVBinding.backBtn.setColorFilter(iconColor);
+        wkVBinding.editBtn.setColorFilter(iconColor);
+
+        if (toolbarTitleTv != null) {
+            toolbarTitleTv.setAlpha(solid ? 1f : 0f);
+            toolbarTitleTv.setTextColor(0xFF202033);
+        }
+        if (toolbarMetaLayout != null) toolbarMetaLayout.setAlpha(solid ? 1f : 0f);
         if (toolbarCountryTv != null) toolbarCountryTv.setTextColor(0xFF8C8C99);
         if (toolbarLastOnlineTv != null) toolbarLastOnlineTv.setTextColor(0xFF8C8C99);
         setImageTint(toolbarCountryIcon, 0xFF9A9AA6);
         setImageTint(toolbarTimeIcon, 0xFF9A9AA6);
+    }
+
+    private void setStatusBarIconDark(boolean dark) {
+        Window window = getWindow();
+        if (window == null) return;
+        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+        if (dark && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        }
+        window.getDecorView().setSystemUiVisibility(flags);
     }
 
     private void setImageTint(ImageView imageView, int color) {
