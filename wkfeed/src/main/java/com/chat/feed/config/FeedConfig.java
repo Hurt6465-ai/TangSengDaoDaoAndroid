@@ -13,11 +13,40 @@ public class FeedConfig {
 
     public static final int PAGE_SIZE = 16;
 
-    /** 视频前端压缩目标：优先 540p，最高不超过 720p。 */
-    public static final int VIDEO_TARGET_HEIGHT = 540;
-    public static final int VIDEO_MAX_HEIGHT = 720;
-    public static final int VIDEO_TARGET_BITRATE_KBPS = 1200;
-    public static final int VIDEO_MAX_BITRATE_KBPS = 1800;
+    /** 是否允许发布图片。 */
+    public static boolean ENABLE_IMAGE_PUBLISH = true;
+
+    /**
+     * 是否允许发布视频。
+     * 测试阶段可打开；上线服务器容量小时，把这里改成 false，会隐藏/禁用视频上传入口。
+     */
+    public static boolean ENABLE_VIDEO_PUBLISH = true;
+
+    /**
+     * 是否在手机端压缩视频。
+     * 使用 Media3 Transformer + 设备硬件 MediaCodec，不走服务器，也不引入 FFmpeg。
+     */
+    public static boolean ENABLE_CLIENT_VIDEO_TRANSCODE = true;
+
+    /** 图片一次最多选择数量。 */
+    public static final int IMAGE_MAX_SELECT_COUNT = 5;
+
+    /** 发布视频最长时长，控制前端耗电、流量和服务端存储。 */
+    public static final int VIDEO_MAX_DURATION_SECONDS = 60;
+
+    /** 上传最终文件大小上限。压缩后仍超过这个大小就拒绝上传。 */
+    public static final int VIDEO_MAX_UPLOAD_MB = 20;
+
+    /** 大于这个大小或分辨率过高，就触发手机端压缩。 */
+    public static final int VIDEO_COMPRESS_TRIGGER_MB = 8;
+
+    /** 视频前端压缩目标：竖屏短边 540，最高短边 720。 */
+    public static final int VIDEO_TARGET_SHORT_EDGE = 540;
+    public static final int VIDEO_MAX_SHORT_EDGE = 720;
+
+    /** 码率策略说明：Media3 Transformer 默认用硬件编码器策略，当前不强行指定码率，避免机型兼容问题。 */
+    public static final int VIDEO_TARGET_BITRATE_KBPS = 1000;
+    public static final int VIDEO_MAX_BITRATE_KBPS = 1600;
 
     /** 图片前端压缩目标：WebP 单张约 100KB。 */
     public static final int IMAGE_TARGET_KB = 100;
