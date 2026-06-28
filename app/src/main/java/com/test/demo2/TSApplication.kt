@@ -124,22 +124,8 @@ class TSApplication : MultiDexApplication() {
         WKPushApplication.getInstance().init(getAppPackageName(), this)
         WKRoomApplication.getInstance().init(this)
         WKPartnerApplication.getInstance().init(this)
-        // Optional native feature modules. Reflection keeps TSApplication compilable even when
-        // a feature module is temporarily removed on another branch.
-        initOptionalModule("com.chat.partnerbrowse.WKPartnerBrowseApplication")
-        initOptionalModule("com.chat.feed.WKFeedApplication")
         addAppFrontBack()
         addListener()
-    }
-
-    private fun initOptionalModule(className: String) {
-        try {
-            val clazz = Class.forName(className)
-            val instance = clazz.getMethod("getInstance").invoke(null)
-            clazz.getMethod("init", Context::class.java).invoke(instance, this)
-        } catch (_: Throwable) {
-            // Optional feature module is not installed or failed to initialize.
-        }
     }
 
     private fun initApi() {
