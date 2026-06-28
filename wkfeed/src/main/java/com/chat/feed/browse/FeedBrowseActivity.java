@@ -1,5 +1,6 @@
 package com.chat.feed.browse;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -14,6 +15,7 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.feed.FeedModel;
 import com.chat.feed.FeedRoute;
+import com.chat.feed.publish.FeedPublishActivity;
 import com.chat.feed.R;
 import com.chat.feed.model.FeedBean;
 import com.chat.feed.model.FeedListResponse;
@@ -23,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 
 public class FeedBrowseActivity extends FragmentActivity {
+    private static final int REQ_PUBLISH = 1201;
     public static final String EXTRA_MODE = "mode";
     public static final String EXTRA_UID = "uid";
     public static final String EXTRA_START_POSITION = "start_position";
@@ -66,7 +69,7 @@ public class FeedBrowseActivity extends FragmentActivity {
             publishBtn.setVisibility(View.GONE);
         } else {
             publishButtonController = new FeedPublishButtonController(publishBtn);
-            publishBtn.setOnClickListener(v -> FeedRoute.openPublish(this));
+            publishBtn.setOnClickListener(v -> openPublishForResult());
             // 即使推荐接口为空/失败，也要显示发布入口。之前按钮默认 GONE，
             // 只有 ViewPager2 触发 onPageSelected 后才会显示，空列表时就永远看不到 +。
             publishButtonController.showNow();
@@ -107,6 +110,20 @@ public class FeedBrowseActivity extends FragmentActivity {
         };
         feedPager.registerOnPageChangeCallback(pageChangeCallback);
         loadMore(true);
+    }
+
+
+    private void openPublishForResult() {
+        Intent intent = new Intent(this, FeedPublishActivity.class);
+        startActivityForResult(intent, REQ_PUBLISH);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_PUBLISH && resultCode == RESULT_OK) {
+            resetAndLoad();
+        }
     }
 
     private void resetAndLoad() {
