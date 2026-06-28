@@ -29,6 +29,7 @@ public class FeedWaterfallFragment extends Fragment {
     private boolean loading;
     private boolean hasMore = true;
     private FeedWaterfallAdapter adapter;
+    private RecyclerView recyclerView;
     private ProgressBar loadingView;
     private TextView stateTv;
 
@@ -50,12 +51,15 @@ public class FeedWaterfallFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         uid = getArguments() == null ? "" : getArguments().getString(ARG_UID, "");
-        RecyclerView recyclerView = view.findViewById(R.id.feedWaterfallRecyclerView);
+        recyclerView = view.findViewById(R.id.feedWaterfallRecyclerView);
         loadingView = view.findViewById(R.id.feedWaterfallLoading);
         stateTv = view.findViewById(R.id.feedWaterfallStateTv);
         StaggeredGridLayoutManager layoutManager = new StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL);
-        layoutManager.setGapStrategy(StaggeredGridLayoutManager.GAP_HANDLING_NONE);
+        layoutManager.setGapStrategy(StaggeredGridLayoutManager.GAP_HANDLING_MOVE_ITEMS_BETWEEN_SPANS);
         recyclerView.setLayoutManager(layoutManager);
+        recyclerView.setNestedScrollingEnabled(false);
+        recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        recyclerView.setHasFixedSize(false);
         if (recyclerView.getItemAnimator() != null) recyclerView.getItemAnimator().setChangeDuration(0);
         adapter = new FeedWaterfallAdapter(this::openDetail);
         recyclerView.setAdapter(adapter);
@@ -67,6 +71,15 @@ public class FeedWaterfallFragment extends Fragment {
         });
         stateTv.setOnClickListener(v -> loadMore(adapter.getItemCount() == 0));
         loadMore(true);
+    }
+
+    /**
+     * Embedded in PartnerProfileActivity inside an outer NestedScrollView. The child
+     * RecyclerView does not receive vertical scroll events there, so the profile page
+     * calls this method when the parent scroll gets close to the bottom.
+     */
+    public void loadMoreIfNeeded() {
+        loadMore(false);
     }
 
     private void loadMore(boolean first) {
@@ -81,12 +94,17 @@ public class FeedWaterfallFragment extends Fragment {
             public void onSuccess(FeedListResponse result) {
                 loading = false;
                 loadingView.setVisibility(View.GONE);
-                if (result == null) return;
+                if (result == null) {
+                    updateState(false);
+                    requestWaterfallRelayout();
+                    return;
+                }
                 cursor = result.cursor;
                 hasMore = result.has_more == 1 && !TextUtils.isEmpty(cursor);
                 if (first) adapter.submitList(result.safeList());
                 else adapter.append(result.safeList());
                 updateState(false);
+                requestWaterfallRelayout();
             }
 
             @Override
@@ -94,7 +112,18 @@ public class FeedWaterfallFragment extends Fragment {
                 loading = false;
                 loadingView.setVisibility(View.GONE);
                 updateState(true);
+                requestWaterfallRelayout();
             }
+        });
+    }
+
+    private void requestWaterfallRelayout() {
+        if (recyclerView == null) return;
+        recyclerView.post(() -> {
+            if (recyclerView == null) return;
+            recyclerView.requestLayout();
+            View parent = (View) recyclerView.getParent();
+            if (parent != null) parent.requestLayout();
         });
     }
 
