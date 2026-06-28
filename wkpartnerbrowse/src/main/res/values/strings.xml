@@ -9,4 +9,20 @@
     <string name="partnerbrowse_say_hello">打招呼</string>
     <string name="partnerbrowse_hello_sent">已打招呼</string>
     <string name="partnerbrowse_default_hello_plain">你好，我们可以一起练语言吗？</string>
+    <string name="partnerbrowse_checking_profile">检查语伴资料中...</string>
+    <string name="partnerbrowse_need_photo_first">第一次进入语伴前，至少上传一张语伴照片</string>
+    <string name="partnerbrowse_profile_check_failed">语伴资料检查失败，请重试</string>
+    <string name="partnerbrowse_online_now">在线</string>
+    <string name="partnerbrowse_active_just_now">刚刚活跃</string>
+    <string name="partnerbrowse_active_minutes">%1$d分钟前活跃</string>
+    <string name="partnerbrowse_active_hours">%1$d小时前活跃</string>
+    <string name="partnerbrowse_active_days">%1$d天前活跃</string>
+    <string name="partnerbrowse_active_suffix">活跃</string>
+    <string name="partnerbrowse_photo_required_tip">进入语伴前，请先上传至少一张语伴图片。标签可以不填，但图片必须有。</string>
+    <string name="partnerbrowse_go_upload_photo">去上传资料</string>
+    <string name="partnerbrowse_last_online_just_now">刚刚在线</string>
+    <string name="partnerbrowse_last_online_format">最后在线 %1$s</string>
+    <string name="partnerbrowse_minutes_ago">分钟前</string>
+    <string name="partnerbrowse_hours_ago">小时前</string>
+    <string name="partnerbrowse_days_ago">天前</string>
 </resources>
