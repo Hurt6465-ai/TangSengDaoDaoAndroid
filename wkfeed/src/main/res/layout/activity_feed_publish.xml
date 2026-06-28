@@ -4,6 +4,145 @@
     android:layout_height="match_parent"
     android:background="#111111">
 
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="22dp"
+            android:paddingTop="86dp"
+            android:paddingEnd="22dp"
+            android:paddingBottom="34dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/feed_publish_title"
+                android:textColor="#FFFFFFFF"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/feedPublishHintTv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:lineSpacingExtra="4dp"
+                android:text="@string/feed_publish_desc"
+                android:textColor="#BFFFFFFF"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/feedPublishTextEt"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:layout_marginTop="24dp"
+                android:background="@drawable/bg_feed_comment_input"
+                android:gravity="top|start"
+                android:hint="@string/feed_publish_text_hint"
+                android:inputType="textMultiLine|textCapSentences"
+                android:maxLength="500"
+                android:padding="14dp"
+                android:textColor="#FFFFFFFF"
+                android:textColorHint="#80FFFFFF"
+                android:textSize="15sp" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/feedPreviewRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
+            <TextView
+                android:id="@+id/feedVideoInfoTv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:ellipsize="middle"
+                android:maxLines="1"
+                android:textColor="#CCFFFFFF"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/feedPickImagesBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_feed_action_button"
+                    android:gravity="center"
+                    android:text="@string/feed_pick_images"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/feedPickVideoBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_feed_action_button"
+                    android:gravity="center"
+                    android:text="@string/feed_pick_video"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/feedUploadProgressBar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="26dp"
+                android:max="100"
+                android:progress="0"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/feedUploadProgressTv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:textColor="#BFFFFFFF"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/feedPublishSubmitBtn"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="26dp"
+                android:background="@drawable/bg_feed_publish_button"
+                android:gravity="center"
+                android:text="@string/feed_publish_submit"
+                android:textColor="#FFFFFFFF"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </ScrollView>
+
     <TextView
         android:id="@+id/feedPublishCloseTv"
         android:layout_width="wrap_content"
@@ -14,31 +153,4 @@
         android:text="@string/feed_close"
         android:textColor="#FFFFFFFF"
         android:textSize="16sp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="28dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/feed_publish_title"
-            android:textColor="#FFFFFFFF"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:gravity="center"
-            android:lineSpacingExtra="4dp"
-            android:text="@string/feed_publish_desc"
-            android:textColor="#CCFFFFFF"
-            android:textSize="14sp" />
-    </LinearLayout>
 </FrameLayout>
