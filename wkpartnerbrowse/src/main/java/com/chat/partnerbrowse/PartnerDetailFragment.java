@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.chat.base.net.HttpResponseCode;
@@ -136,6 +137,13 @@ public class PartnerDetailFragment extends Fragment {
         binding.viewPagerInner.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
         binding.viewPagerInner.setOffscreenPageLimit(1);
         binding.viewPagerInner.setSaveEnabled(false);
+        binding.viewPagerInner.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        View innerPagerRecycler = binding.viewPagerInner.getChildCount() > 0 ? binding.viewPagerInner.getChildAt(0) : null;
+        if (innerPagerRecycler instanceof RecyclerView) {
+            innerPagerRecycler.setOverScrollMode(View.OVER_SCROLL_NEVER);
+            RecyclerView.ItemAnimator animator = ((RecyclerView) innerPagerRecycler).getItemAnimator();
+            if (animator != null) animator.setChangeDuration(0);
+        }
         binding.viewPagerInner.setAdapter(imageAdapter);
         updateIndicator(0, imageAdapter.getItemCount());
         if (imagePageCallback != null) binding.viewPagerInner.unregisterOnPageChangeCallback(imagePageCallback);
