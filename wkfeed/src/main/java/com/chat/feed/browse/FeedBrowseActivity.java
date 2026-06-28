@@ -14,7 +14,6 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.chat.base.net.IRequestResultListener;
 import com.chat.feed.FeedModel;
-import com.chat.feed.FeedRoute;
 import com.chat.feed.publish.FeedPublishActivity;
 import com.chat.feed.R;
 import com.chat.feed.model.FeedBean;
@@ -255,7 +254,7 @@ public class FeedBrowseActivity extends FragmentActivity {
         }
         if (publishButtonController != null) publishButtonController.destroy();
         if (feedPager != null) feedPager.setAdapter(null);
-        FeedPlayerManager.getInstance().release();
+        FeedPlayerManager.getInstance().stopAndDetachCurrent();
         super.onDestroy();
     }
 }
