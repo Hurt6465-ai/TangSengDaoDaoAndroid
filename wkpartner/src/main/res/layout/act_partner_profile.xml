@@ -277,6 +277,23 @@
                         android:layout_height="1dp"
                         android:layout_weight="1" />
 
+                    <TextView
+                        android:id="@+id/profileSelfEditChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="26dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginTop="1dp"
+                        android:background="@drawable/bg_partner_glass_chip"
+                        android:gravity="center"
+                        android:minWidth="58dp"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:text="@string/partner_edit_profile"
+                        android:textColor="#666672"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
                     <LinearLayout
                         android:id="@+id/profileLastOnlineGroup"
                         android:layout_width="wrap_content"
@@ -373,7 +390,7 @@
                     android:layout_height="30dp"
                     android:layout_marginTop="2dp"
                     android:gravity="center_vertical"
-                    android:text="展开全部"
+                    android:text="@string/partner_expand_all"
                     android:textColor="#6C4DFF"
                     android:textSize="13sp"
                     android:textStyle="bold"
@@ -453,7 +470,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="@drawable/bg_partner_bottom_gradient"
+        android:background="@android:color/transparent"
         android:paddingStart="24dp"
         android:paddingTop="16dp"
         android:paddingEnd="24dp"
@@ -466,8 +483,8 @@
             android:layout_height="54dp"
             android:layout_gravity="bottom|center_horizontal"
             android:background="@drawable/bg_partner_hello_button"
-            android:elevation="8dp"
-            android:translationZ="8dp">
+            android:elevation="0dp"
+            android:translationZ="0dp">
 
             <TextView
                 android:id="@+id/helloBtnText"
