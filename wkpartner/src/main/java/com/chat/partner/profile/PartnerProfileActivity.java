@@ -26,6 +26,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.alibaba.fastjson.JSONObject;
 import com.chat.base.base.WKBaseActivity;
@@ -168,6 +169,19 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             wkVBinding.toolbar.setLayoutParams(toolbarLp);
         }
         wkVBinding.toolbar.setPadding(0, statusBarHeight, 0, 0);
+
+        // feedStickyHeader is drawn above the scrolling content only when the
+        // AppBar is fully collapsed. Keep it below the real status/toolbar area
+        // instead of using a hard-coded top value, otherwise different phones
+        // will show a jump or overlap.
+        if (wkVBinding.feedStickyHeader != null) {
+            ViewGroup.LayoutParams rawLp = wkVBinding.feedStickyHeader.getLayoutParams();
+            if (rawLp instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) rawLp;
+                lp.topMargin = toolbarLp == null ? statusBarHeight + dp(56) : toolbarLp.height;
+                wkVBinding.feedStickyHeader.setLayoutParams(lp);
+            }
+        }
     }
 
     private int getStatusBarHeight() {
@@ -210,6 +224,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (introCanExpand && introBaseVisible) {
             wkVBinding.introMoreTv.setVisibility(fullyCollapsed ? View.GONE : View.VISIBLE);
         }
+        updateFeedStickyHeader(fullyCollapsed);
+    }
+
+    private void updateFeedStickyHeader(boolean fullyCollapsed) {
+        if (wkVBinding == null || wkVBinding.feedStickyHeader == null || wkVBinding.feedWorksSection == null) return;
+        boolean show = fullyCollapsed && wkVBinding.feedWorksSection.getVisibility() == View.VISIBLE;
+        wkVBinding.feedStickyHeader.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     private void applyFoldedVisibility(View view, boolean baseVisible, float alpha, boolean fullyCollapsed) {
@@ -444,27 +465,63 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void bindFeedWorks() {
         if (TextUtils.isEmpty(uid)) {
-            wkVBinding.feedWorksSection.setVisibility(View.GONE);
+            hideFeedWorks();
             return;
         }
         try {
             Class<?> routeClass = Class.forName("com.chat.feed.FeedRoute");
             Object fragmentObj = routeClass.getMethod("newUserWaterfallFragment", String.class).invoke(null, uid);
             if (!(fragmentObj instanceof Fragment)) {
-                wkVBinding.feedWorksSection.setVisibility(View.GONE);
+                hideFeedWorks();
                 return;
             }
             wkVBinding.feedWorksSection.setVisibility(View.VISIBLE);
+            updateFeedStickyHeader(currentCollapsePercent >= 0.985f);
             if (!feedWorksAttached) {
                 feedWorksAttached = true;
                 getSupportFragmentManager()
                         .beginTransaction()
                         .replace(R.id.feedWorksContainer, (Fragment) fragmentObj)
                         .commitAllowingStateLoss();
+                // The embedded works waterfall has its own RecyclerView. If it
+                // keeps nested scrolling enabled inside this profile page, the
+                // parent AppBar/NestedScrollView and child RecyclerView will tug
+                // each other, causing the flashing/stuck pull-down feeling.
+                wkVBinding.feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 160);
+                wkVBinding.feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 480);
+            } else {
+                wkVBinding.feedWorksContainer.post(this::disableNestedFeedScrolling);
             }
         } catch (Throwable ignored) {
             // wkfeed 是可选模块。没有安装时不要影响个人主页。
-            wkVBinding.feedWorksSection.setVisibility(View.GONE);
+            hideFeedWorks();
+        }
+    }
+
+    private void hideFeedWorks() {
+        if (wkVBinding == null) return;
+        wkVBinding.feedWorksSection.setVisibility(View.GONE);
+        updateFeedStickyHeader(false);
+    }
+
+    private void disableNestedFeedScrolling() {
+        if (wkVBinding == null || wkVBinding.feedWorksContainer == null) return;
+        disableNestedFeedScrolling(wkVBinding.feedWorksContainer);
+    }
+
+    private void disableNestedFeedScrolling(View view) {
+        if (view == null) return;
+        if (view instanceof RecyclerView) {
+            RecyclerView recyclerView = (RecyclerView) view;
+            recyclerView.setNestedScrollingEnabled(false);
+            recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+            return;
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                disableNestedFeedScrolling(group.getChildAt(i));
+            }
         }
     }
 
