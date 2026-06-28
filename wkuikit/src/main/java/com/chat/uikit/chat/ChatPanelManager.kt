@@ -5,7 +5,6 @@ import android.app.AlertDialog
 import android.animation.ValueAnimator
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
-import android.content.Intent
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.os.Handler
@@ -99,7 +98,7 @@ import com.chat.uikit.robot.entity.WKRobotGIFEntity
 import com.chat.uikit.robot.entity.WKRobotInlineQueryResult
 import com.chat.uikit.robot.entity.WKRobotMenuEntity
 import com.chat.uikit.robot.service.WKRobotModel
-import com.chat.uikit.user.UserDetailActivity
+import com.chat.uikit.user.ProfileNavigator
 import com.chat.uikit.utils.mentionDisplay
 import com.effective.android.panel.PanelSwitchHelper
 import com.xinbida.wukongim.WKIM
@@ -766,17 +765,11 @@ class ChatPanelManager(
 
         } else {
             if (iConversationContext.chatChannelInfo.channelType != WKChannelType.CUSTOMER_SERVICE) {
-                //点击事件
-                val intent =
-                    Intent(
-                        iConversationContext.chatActivity,
-                        UserDetailActivity::class.java
-                    )
-                intent.putExtra("uid", uid)
-                if (iConversationContext.chatChannelInfo.channelType == WKChannelType.GROUP) {
-                    intent.putExtra("groupID", iConversationContext.chatChannelInfo.channelID)
-                }
-                iConversationContext.chatActivity.startActivity(intent)
+                // 点击头像统一进入新个人主页。群聊里必须带 groupID，后端才能返回加好友 vercode。
+                val groupId = if (iConversationContext.chatChannelInfo.channelType == WKChannelType.GROUP) {
+                    iConversationContext.chatChannelInfo.channelID
+                } else ""
+                ProfileNavigator.open(iConversationContext.chatActivity, uid, groupId)
             }
 
         }
