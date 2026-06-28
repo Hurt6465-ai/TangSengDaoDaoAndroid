@@ -458,6 +458,32 @@
                 </HorizontalScrollView>
             </LinearLayout>
 
+
+
+            <LinearLayout
+                android:id="@+id/feedWorksSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="24dp"
+                    android:text="@string/partner_works"
+                    android:textColor="#1A1A2E"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <FrameLayout
+                    android:id="@+id/feedWorksContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="520dp"
+                    android:layout_marginTop="8dp" />
+            </LinearLayout>
+
             <Space
                 android:id="@+id/bottomActionSpace"
                 android:layout_width="match_parent"
