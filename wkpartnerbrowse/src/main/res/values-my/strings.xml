@@ -9,4 +9,20 @@
     <string name="partnerbrowse_say_hello">နှုတ်ဆက်မည်</string>
     <string name="partnerbrowse_hello_sent">နှုတ်ဆက်ပြီးပါပြီ</string>
     <string name="partnerbrowse_default_hello_plain">မင်္ဂလာပါ၊ ဘာသာစကား အတူလေ့ကျင့်လို့ရမလား?</string>
+    <string name="partnerbrowse_checking_profile">ဘာသာဖော် ပရိုဖိုင် စစ်ဆေးနေသည်...</string>
+    <string name="partnerbrowse_need_photo_first">ဘာသာဖော်ထဲမဝင်ခင် အနည်းဆုံး ဓာတ်ပုံတစ်ပုံ တင်ပါ</string>
+    <string name="partnerbrowse_profile_check_failed">ပရိုဖိုင် စစ်ဆေးမှု မအောင်မြင်ပါ၊ ပြန်လည်ကြိုးစားပါ</string>
+    <string name="partnerbrowse_online_now">အွန်လိုင်း</string>
+    <string name="partnerbrowse_active_just_now">အခုလေးတင် လှုပ်ရှားထားသည်</string>
+    <string name="partnerbrowse_active_minutes">%1$d မိနစ်အကြာ လှုပ်ရှားထားသည်</string>
+    <string name="partnerbrowse_active_hours">%1$d နာရီအကြာ လှုပ်ရှားထားသည်</string>
+    <string name="partnerbrowse_active_days">%1$d ရက်အကြာ လှုပ်ရှားထားသည်</string>
+    <string name="partnerbrowse_active_suffix">လှုပ်ရှားထားသည်</string>
+    <string name="partnerbrowse_photo_required_tip">ဘာသာဖော်စာမျက်နှာ မကြည့်မီ ဓာတ်ပုံ အနည်းဆုံး ၁ ပုံ တင်ပါ။ Tag မဖြည့်လည်း ရပါတယ်။</string>
+    <string name="partnerbrowse_go_upload_photo">ပရိုဖိုင်တင်ရန်</string>
+    <string name="partnerbrowse_last_online_just_now">မကြာသေးမီက အွန်လိုင်း</string>
+    <string name="partnerbrowse_last_online_format">နောက်ဆုံးအွန်လိုင်း %1$s</string>
+    <string name="partnerbrowse_minutes_ago"> မိနစ်အကြာ</string>
+    <string name="partnerbrowse_hours_ago"> နာရီအကြာ</string>
+    <string name="partnerbrowse_days_ago"> ရက်အကြာ</string>
 </resources>
