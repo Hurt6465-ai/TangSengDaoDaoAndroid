@@ -44,12 +44,8 @@
     <string name="partner_confirm">OK</string>
     <string name="partner_cancel">Cancel</string>
     <string name="partner_profile_image_required">Please upload at least one partner photo</string>
+    <string name="partner_avatar_upload_success">Avatar uploaded</string>
+    <string name="partner_avatar_upload_failed">Avatar upload failed</string>
 
-    <string name="partner_username_display_name">Username / Display name</string>
-    <string name="partner_upload_phone_image">Upload phone photos</string>
-    <string name="partner_country_region">Country / Region</string>
-    <string name="partner_native_language_title">Native / I speak</string>
-    <string name="partner_leave">Leave</string>
-    <string name="partner_save_profile">Save Profile</string>
-    <string name="partner_avatar_edit_unavailable">Avatar editor is unavailable</string>
+    <string name="partner_selected_count">%1$d selected</string>
 </resources>
