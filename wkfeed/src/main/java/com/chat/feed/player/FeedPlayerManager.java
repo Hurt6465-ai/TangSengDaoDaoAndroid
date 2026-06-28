@@ -154,6 +154,39 @@ public class FeedPlayerManager {
     }
 
     /**
+     * FeedBrowseActivity 退出时使用：只停止播放、解绑当前 PlayerView、取消当前预加载，
+     * 不释放全局 ExoPlayer/SimpleCache。
+     *
+     * 之前 onDestroy 直接 release() 会把播放器、缓存、预加载线程全部释放；
+     * 某些机型从发现页返回主页或快速重进时，仍在回调/预加载的对象会碰到已释放缓存，
+     * 容易触发“程序出现异常，即将退出”。
+     */
+    public void stopAndDetachCurrent() {
+        mainHandler.post(() -> {
+            CacheWriter writer = currentPreloadWriter;
+            currentPreloadWriter = null;
+            if (writer != null) {
+                try { writer.cancel(); } catch (Exception ignored) {}
+            }
+            try {
+                if (player != null) {
+                    player.pause();
+                    player.stop();
+                    player.clearMediaItems();
+                }
+                if (attachedPlayerView != null) {
+                    attachedPlayerView.setPlayer(null);
+                }
+            } catch (Throwable ignored) {
+            } finally {
+                attachedFeedId = null;
+                attachedPlayerView = null;
+                playbackCallback = null;
+            }
+        });
+    }
+
+    /**
      * 轻量视频预缓存：只缓存下一条视频前 768KB，避免一次拉完整视频导致流量和磁盘压力过大。
      */
     public void preloadVideo(Context context, String playUrl) {
