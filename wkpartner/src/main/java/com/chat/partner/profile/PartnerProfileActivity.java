@@ -72,6 +72,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private boolean langBaseVisible;
     private boolean profileLastOnlineBaseVisible;
     private float currentCollapsePercent;
+    private int toolbarActualHeight;
     private PartnerProfileEntity profile;
     private boolean feedWorksAttached;
     private Fragment feedWorksFragment;
@@ -167,22 +168,21 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         // status-bar strip that looked different from the cover image.
         int statusBarHeight = getStatusBarHeight();
         ViewGroup.LayoutParams toolbarLp = wkVBinding.toolbar.getLayoutParams();
+        toolbarActualHeight = statusBarHeight + dp(56);
         if (toolbarLp != null) {
-            toolbarLp.height = statusBarHeight + dp(56);
+            toolbarLp.height = toolbarActualHeight;
             wkVBinding.toolbar.setLayoutParams(toolbarLp);
         }
         wkVBinding.toolbar.setPadding(0, statusBarHeight, 0, 0);
         clearProfileHeaderShadow();
 
-        // feedStickyHeader is drawn above the scrolling content only when the
-        // AppBar is fully collapsed. Keep it below the real status/toolbar area
-        // instead of using a hard-coded top value, otherwise different phones
-        // will show a jump or overlap.
+        // Works sticky header must stay below the pinned username toolbar.
+        // Keep the top username visible while the works tab is pinned.
         if (wkVBinding.feedStickyHeader != null) {
             ViewGroup.LayoutParams rawLp = wkVBinding.feedStickyHeader.getLayoutParams();
             if (rawLp instanceof ViewGroup.MarginLayoutParams) {
                 ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) rawLp;
-                lp.topMargin = toolbarLp == null ? statusBarHeight + dp(56) : toolbarLp.height;
+                lp.topMargin = toolbarActualHeight;
                 wkVBinding.feedStickyHeader.setLayoutParams(lp);
             }
         }
@@ -230,6 +230,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void setupWorksScrollBridge() {
         wkVBinding.nestedScrollView.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener)
                 (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+                    updateFeedStickyHeader();
+                    applyToolbarStyle(currentCollapsePercent);
                     if (scrollY > oldScrollY) maybeLoadMoreWorks();
                 });
     }
@@ -263,13 +265,27 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (introCanExpand && introBaseVisible) {
             wkVBinding.introMoreTv.setVisibility(fullyCollapsed ? View.GONE : View.VISIBLE);
         }
-        updateFeedStickyHeader(fullyCollapsed);
+        updateFeedStickyHeader();
     }
 
-    private void updateFeedStickyHeader(boolean fullyCollapsed) {
+    private void updateFeedStickyHeader() {
         if (wkVBinding == null || wkVBinding.feedStickyHeader == null || wkVBinding.feedWorksSection == null) return;
-        boolean show = fullyCollapsed && wkVBinding.feedWorksSection.getVisibility() == View.VISIBLE;
+        boolean show = isWorksPinned();
         wkVBinding.feedStickyHeader.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (wkVBinding.feedWorksTitleTv != null) {
+            // Keep the original title space to avoid a layout jump, but let the pinned title
+            // become the visible one once it reaches the toolbar.
+            wkVBinding.feedWorksTitleTv.setVisibility(show ? View.INVISIBLE : View.VISIBLE);
+        }
+    }
+
+    private boolean isWorksPinned() {
+        if (wkVBinding == null || wkVBinding.feedWorksSection == null) return false;
+        if (wkVBinding.feedWorksSection.getVisibility() != View.VISIBLE) return false;
+        int toolbarHeight = toolbarActualHeight > 0 ? toolbarActualHeight : dp(80);
+        int scrollY = wkVBinding.nestedScrollView.getScrollY();
+        int pinStart = Math.max(0, wkVBinding.feedWorksSection.getTop() - toolbarHeight);
+        return scrollY >= pinStart;
     }
 
     private void applyFoldedVisibility(View view, boolean baseVisible, float alpha, boolean fullyCollapsed) {
@@ -284,13 +300,16 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     }
 
     private void applyToolbarStyle(float percent) {
-        float titleAlpha = clamp01((percent - 0.58f) / 0.28f);
+        // Once works are pinned, the top username/meta bar should never disappear.
+        // Force the toolbar into its collapsed white style even if AppBar percent is not exactly 1.
+        float effectivePercent = isWorksPinned() ? 1f : percent;
+        float titleAlpha = clamp01((effectivePercent - 0.58f) / 0.28f);
         wkVBinding.toolbarTitleLayout.setAlpha(titleAlpha);
 
-        int bgAlpha = (int) (clamp01((percent - 0.48f) / 0.42f) * 255);
+        int bgAlpha = (int) (clamp01((effectivePercent - 0.48f) / 0.42f) * 255);
         wkVBinding.toolbar.setBackgroundColor(Color.argb(bgAlpha, 255, 255, 255));
 
-        float iconT = clamp01((percent - 0.55f) / 0.35f);
+        float iconT = clamp01((effectivePercent - 0.55f) / 0.35f);
         int iconColor = blendColor(0xFFFFFFFF, 0xFF202033, iconT);
         wkVBinding.backBtn.setColorFilter(iconColor);
         wkVBinding.editBtn.setColorFilter(iconColor);
@@ -303,7 +322,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
-            if (percent > 0.72f) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            if (effectivePercent > 0.72f) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
             getWindow().getDecorView().setSystemUiVisibility(flags);
         }
     }
@@ -515,7 +534,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
                 return;
             }
             wkVBinding.feedWorksSection.setVisibility(View.VISIBLE);
-            updateFeedStickyHeader(currentCollapsePercent >= 0.985f);
+            updateFeedStickyHeader();
             feedWorksFragment = (Fragment) fragmentObj;
             if (!feedWorksAttached) {
                 feedWorksAttached = true;
@@ -544,7 +563,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (wkVBinding == null) return;
         wkVBinding.feedWorksSection.setVisibility(View.GONE);
         feedWorksFragment = null;
-        updateFeedStickyHeader(false);
+        updateFeedStickyHeader();
     }
 
     private void disableNestedFeedScrolling() {
