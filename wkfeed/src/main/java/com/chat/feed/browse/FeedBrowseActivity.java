@@ -14,6 +14,7 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.chat.base.net.IRequestResultListener;
 import com.chat.feed.FeedModel;
+import com.chat.feed.FeedRoute;
 import com.chat.feed.publish.FeedPublishActivity;
 import com.chat.feed.R;
 import com.chat.feed.model.FeedBean;
@@ -56,6 +57,7 @@ public class FeedBrowseActivity extends FragmentActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_feed_browse);
+        FeedPlayerManager.getInstance().prepareForUse();
         mode = getIntent().getStringExtra(EXTRA_MODE);
         if (TextUtils.isEmpty(mode)) mode = MODE_DISCOVER;
         uid = getIntent().getStringExtra(EXTRA_UID);
@@ -254,7 +256,7 @@ public class FeedBrowseActivity extends FragmentActivity {
         }
         if (publishButtonController != null) publishButtonController.destroy();
         if (feedPager != null) feedPager.setAdapter(null);
-        FeedPlayerManager.getInstance().stopAndDetachCurrent();
+        FeedPlayerManager.getInstance().release();
         super.onDestroy();
     }
 }
