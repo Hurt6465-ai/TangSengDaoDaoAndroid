@@ -10,15 +10,13 @@ import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.view.ViewCompat;
-import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
 public class NestedScrollableHost extends FrameLayout {
     private static final int GESTURE_UNDECIDED = 0;
     private static final int GESTURE_HORIZONTAL = 1;
     private static final int GESTURE_VERTICAL = 2;
-    private static final float HORIZONTAL_LOCK_RATIO = 1.5f;
+    private static final float HORIZONTAL_LOCK_RATIO = 1.35f;
 
     private float initialX;
     private float initialY;
@@ -44,8 +42,23 @@ public class NestedScrollableHost extends FrameLayout {
         return null;
     }
 
-    private View child() {
-        return getChildCount() > 0 ? getChildAt(0) : null;
+    @Nullable
+    private ViewPager2 innerViewPager() {
+        View child = getChildCount() > 0 ? getChildAt(0) : null;
+        return child instanceof ViewPager2 ? (ViewPager2) child : null;
+    }
+
+    private boolean hasMultipleInnerPages() {
+        ViewPager2 pager = innerViewPager();
+        return pager != null && pager.getAdapter() != null && pager.getAdapter().getItemCount() > 1;
+    }
+
+    private void requestParentDisallow(boolean disallow) {
+        ViewParent parent = getParent();
+        while (parent != null) {
+            parent.requestDisallowInterceptTouchEvent(disallow);
+            parent = parent.getParent();
+        }
     }
 
     @Override
@@ -54,30 +67,18 @@ public class NestedScrollableHost extends FrameLayout {
         return super.onInterceptTouchEvent(ev);
     }
 
-    private boolean canScrollHorizontally(View view, int direction) {
-        if (view instanceof ViewPager2) {
-            ViewPager2 pager = (ViewPager2) view;
-            View rv = pager.getChildCount() > 0 ? pager.getChildAt(0) : null;
-            return rv instanceof RecyclerView && ViewCompat.canScrollHorizontally(rv, direction);
-        }
-        return ViewCompat.canScrollHorizontally(view, direction);
-    }
-
     private void handleInterceptTouch(MotionEvent ev) {
         ViewPager2 parentPager = parentViewPager();
-        View childView = child();
-        if (parentPager == null || childView == null) return;
-        if (parentPager.getOrientation() != ViewPager2.ORIENTATION_VERTICAL) return;
+        if (parentPager == null || parentPager.getOrientation() != ViewPager2.ORIENTATION_VERTICAL) return;
 
         switch (ev.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 initialX = ev.getX();
                 initialY = ev.getY();
                 gestureDirection = GESTURE_UNDECIDED;
-                // 单图/不可横滑时不要一开始拦住外层竖向 ViewPager2，竖滑切下一条才不会有延迟。
-                boolean canScrollLeft = canScrollHorizontally(childView, -1);
-                boolean canScrollRight = canScrollHorizontally(childView, 1);
-                parentPager.requestDisallowInterceptTouchEvent(canScrollLeft || canScrollRight);
+                // 参考抖音项目：先看当前场景是否需要横向容器处理。
+                // 单图/视频页没有多图横滑能力，DOWN 阶段不要抢外层竖向 ViewPager2。
+                requestParentDisallow(hasMultipleInnerPages());
                 break;
             case MotionEvent.ACTION_MOVE:
                 float dx = ev.getX() - initialX;
@@ -87,16 +88,24 @@ public class NestedScrollableHost extends FrameLayout {
                 if (absDx < touchSlop && absDy < touchSlop) return;
 
                 if (gestureDirection == GESTURE_UNDECIDED) {
-                    gestureDirection = absDx > absDy * HORIZONTAL_LOCK_RATIO ? GESTURE_HORIZONTAL : GESTURE_VERTICAL;
+                    if (hasMultipleInnerPages() && absDx > absDy * HORIZONTAL_LOCK_RATIO) {
+                        gestureDirection = GESTURE_HORIZONTAL;
+                    } else if (absDy >= absDx) {
+                        gestureDirection = GESTURE_VERTICAL;
+                    } else {
+                        // 角度不明确时继续交给内层一点点，避免 45 度附近反复抢事件。
+                        requestParentDisallow(hasMultipleInnerPages());
+                        return;
+                    }
                 }
 
-                // 一旦判定横滑，本次手势全程锁给内层。即使滑到最后一张，也不要交给外层竖滑，避免屏幕晃动。
-                parentPager.requestDisallowInterceptTouchEvent(gestureDirection == GESTURE_HORIZONTAL);
+                // 横向锁定后整次手势都不交给外层；最后一张/第一张继续横滑也不触发上下滑。
+                requestParentDisallow(gestureDirection == GESTURE_HORIZONTAL);
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 gestureDirection = GESTURE_UNDECIDED;
-                parentPager.requestDisallowInterceptTouchEvent(false);
+                requestParentDisallow(false);
                 break;
             default:
                 break;
