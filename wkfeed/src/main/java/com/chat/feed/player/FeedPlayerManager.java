@@ -26,6 +26,7 @@ import com.chat.feed.config.FeedConfig;
 import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Feed 单播放器管理器。
@@ -92,8 +93,10 @@ public class FeedPlayerManager {
     private FeedPlayerManager() {}
 
     public void attach(Context context, PlayerView playerView, String feedId, String playUrl, boolean playWhenReady, @Nullable PlaybackCallback callback) {
+        if (released) return;
         if (context == null || playerView == null || playUrl == null || playUrl.length() == 0) return;
         ExoPlayer p = ensurePlayer(context.getApplicationContext());
+        if (p == null) return;
         if (attachedPlayerView != null && attachedPlayerView != playerView) {
             attachedPlayerView.setPlayer(null);
         }
@@ -154,39 +157,6 @@ public class FeedPlayerManager {
     }
 
     /**
-     * FeedBrowseActivity 退出时使用：只停止播放、解绑当前 PlayerView、取消当前预加载，
-     * 不释放全局 ExoPlayer/SimpleCache。
-     *
-     * 之前 onDestroy 直接 release() 会把播放器、缓存、预加载线程全部释放；
-     * 某些机型从发现页返回主页或快速重进时，仍在回调/预加载的对象会碰到已释放缓存，
-     * 容易触发“程序出现异常，即将退出”。
-     */
-    public void stopAndDetachCurrent() {
-        mainHandler.post(() -> {
-            CacheWriter writer = currentPreloadWriter;
-            currentPreloadWriter = null;
-            if (writer != null) {
-                try { writer.cancel(); } catch (Exception ignored) {}
-            }
-            try {
-                if (player != null) {
-                    player.pause();
-                    player.stop();
-                    player.clearMediaItems();
-                }
-                if (attachedPlayerView != null) {
-                    attachedPlayerView.setPlayer(null);
-                }
-            } catch (Throwable ignored) {
-            } finally {
-                attachedFeedId = null;
-                attachedPlayerView = null;
-                playbackCallback = null;
-            }
-        });
-    }
-
-    /**
      * 轻量视频预缓存：只缓存下一条视频前 768KB，避免一次拉完整视频导致流量和磁盘压力过大。
      */
     public void preloadVideo(Context context, String playUrl) {
@@ -194,11 +164,14 @@ public class FeedPlayerManager {
         if (released) return;
         Context appContext = context.getApplicationContext();
         ExecutorService executor = ensurePreloadExecutor();
+        if (executor == null) return;
         executor.execute(() -> {
             if (released) return;
             CacheWriter writer = null;
             try {
-                CacheDataSource dataSource = ensureCacheDataSourceFactory(appContext).createDataSource();
+                CacheDataSource.Factory factory = ensureCacheDataSourceFactory(appContext);
+                if (factory == null || released) return;
+                CacheDataSource dataSource = factory.createDataSource();
                 DataSpec dataSpec = new DataSpec.Builder()
                         .setUri(Uri.parse(playUrl))
                         .setPosition(0)
@@ -206,6 +179,10 @@ public class FeedPlayerManager {
                         .build();
                 writer = new CacheWriter(dataSource, dataSpec, null, null);
                 currentPreloadWriter = writer;
+                if (released) {
+                    writer.cancel();
+                    return;
+                }
                 writer.cache();
             } catch (Throwable ignored) {
                 if (writer != null) writer.cancel();
@@ -216,29 +193,63 @@ public class FeedPlayerManager {
         });
     }
 
+    /**
+     * Activity 销毁时释放全局播放器。
+     * 顺序很重要：先断开回调和 PlayerView，再取消预加载并等待线程结束，最后释放 cache。
+     * 否则 CacheWriter 线程可能还在写 SimpleCache，cache.release() 后会触发异常。
+     */
     public void release() {
         released = true;
-        attachedFeedId = null;
-        attachedPlayerView = null;
+
         playbackCallback = null;
+        attachedFeedId = null;
+        if (attachedPlayerView != null) {
+            try { attachedPlayerView.setPlayer(null); } catch (Exception ignored) {}
+            attachedPlayerView = null;
+        }
+
         CacheWriter writer = currentPreloadWriter;
         currentPreloadWriter = null;
         if (writer != null) {
             try { writer.cancel(); } catch (Exception ignored) {}
         }
-        if (preloadExecutor != null) {
-            try { preloadExecutor.shutdownNow(); } catch (Exception ignored) {}
+
+        ExecutorService executor = preloadExecutor;
+        preloadExecutor = null;
+        if (executor != null) {
+            try {
+                executor.shutdownNow();
+                executor.awaitTermination(500, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (Exception ignored) {
+            }
         }
+
         if (player != null) {
-            player.removeListener(internalListener);
-            player.release();
+            try {
+                player.removeListener(internalListener);
+                player.stop();
+                player.release();
+            } catch (Exception ignored) {
+            }
             player = null;
         }
+
         cacheDataSourceFactory = null;
         if (cache != null) {
             try { cache.release(); } catch (Exception ignored) {}
             cache = null;
         }
+    }
+
+    /**
+     * 新的 FeedBrowseActivity 进入时显式复活播放器管理器。
+     * 不允许 ensurePlayer() 在销毁后的回调里偷偷把 released 改回 false。
+     */
+    public void prepareForUse() {
+        released = false;
+        ensurePreloadExecutor();
     }
 
     private boolean feedIdEquals(String feedId) {
@@ -247,34 +258,45 @@ public class FeedPlayerManager {
     }
 
 
-    private ExecutorService ensurePreloadExecutor() {
+    @Nullable
+    private synchronized ExecutorService ensurePreloadExecutor() {
+        if (released) return null;
         if (preloadExecutor == null || preloadExecutor.isShutdown() || preloadExecutor.isTerminated()) {
             preloadExecutor = Executors.newSingleThreadExecutor();
         }
         return preloadExecutor;
     }
 
-    private ExoPlayer ensurePlayer(Context context) {
-        released = false;
+    @Nullable
+    private synchronized ExoPlayer ensurePlayer(Context context) {
+        if (released) return null;
         if (player != null) return player;
+        CacheDataSource.Factory factory = ensureCacheDataSourceFactory(context);
+        if (factory == null) return null;
         player = new ExoPlayer.Builder(context)
-                .setMediaSourceFactory(new DefaultMediaSourceFactory(ensureCacheDataSourceFactory(context)))
+                .setMediaSourceFactory(new DefaultMediaSourceFactory(factory))
                 .build();
         player.addListener(internalListener);
         return player;
     }
 
-    private CacheDataSource.Factory ensureCacheDataSourceFactory(Context context) {
+    @Nullable
+    private synchronized CacheDataSource.Factory ensureCacheDataSourceFactory(Context context) {
+        if (released) return null;
         if (cacheDataSourceFactory != null) return cacheDataSourceFactory;
+        SimpleCache simpleCache = ensureCache(context);
+        if (simpleCache == null) return null;
         DataSource.Factory upstream = new DefaultDataSource.Factory(context);
         cacheDataSourceFactory = new CacheDataSource.Factory()
-                .setCache(ensureCache(context))
+                .setCache(simpleCache)
                 .setUpstreamDataSourceFactory(upstream)
                 .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);
         return cacheDataSourceFactory;
     }
 
-    private SimpleCache ensureCache(Context context) {
+    @Nullable
+    private synchronized SimpleCache ensureCache(Context context) {
+        if (released) return null;
         if (cache != null) return cache;
         File dir = new File(context.getCacheDir(), "wkfeed_media3_cache");
         cache = new SimpleCache(dir, new LeastRecentlyUsedCacheEvictor(MAX_CACHE_BYTES), new StandaloneDatabaseProvider(context));
