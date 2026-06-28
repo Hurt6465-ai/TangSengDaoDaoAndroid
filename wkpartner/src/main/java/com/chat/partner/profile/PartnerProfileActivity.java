@@ -6,7 +6,6 @@ import android.animation.ValueAnimator;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
-import android.graphics.Outline;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.net.Uri;
@@ -15,7 +14,6 @@ import android.text.format.DateUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewOutlineProvider;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.AccelerateDecelerateInterpolator;
@@ -43,7 +41,6 @@ import com.chat.partner.databinding.ActPartnerProfileBinding;
 import com.chat.uikit.chat.manager.WKIMUtils;
 import com.chat.uikit.contacts.service.FriendModel;
 import com.chat.uikit.user.service.UserModel;
-import com.google.android.material.appbar.AppBarLayout;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -71,11 +68,27 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private boolean tagBaseVisible;
     private boolean langBaseVisible;
     private boolean profileLastOnlineBaseVisible;
-    private float currentCollapsePercent;
-    private int toolbarActualHeight;
+    private int topBarHeight;
     private PartnerProfileEntity profile;
     private boolean feedWorksAttached;
     private Fragment feedWorksFragment;
+
+    // These views were moved out of the old Toolbar/AppBar collapsing area. Use findViewById
+    // instead of ViewBinding fields, so the Java file does not depend on generated binding fields
+    // that may be absent until the updated XML is compiled.
+    private View fixedProfileTopBar;
+    private View fixedWorksHeader;
+    private TextView toolbarTitleTv;
+    private View toolbarMetaLayout;
+    private View toolbarCountryGroup;
+    private ImageView toolbarCountryIcon;
+    private TextView toolbarCountryTv;
+    private View toolbarLastOnlineGroup;
+    private ImageView toolbarTimeIcon;
+    private TextView toolbarLastOnlineTv;
+    private View feedWorksSection;
+    private TextView feedWorksTitleTv;
+    private ViewGroup feedWorksContainer;
 
     @Override
     protected ActPartnerProfileBinding getViewBinding() {
@@ -102,6 +115,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     @Override
     protected void initView() {
+        ensureFixedTopBarViews();
         setupImmersiveStatusBar();
         wkVBinding.avatarView.setSize(96);
         wkVBinding.editBtn.setVisibility(isSelf ? View.GONE : View.VISIBLE);
@@ -109,8 +123,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
-        applyToolbarStyle(0f);
-        setupScrollLinkedHeader();
+        // 固定顶栏样式只设置一次。它永远是白底深色图标，不再随折叠百分比变化。
+        applyFixedTopBarStyle();
+        setupCoverParallax();
         setupWorksScrollBridge();
         setupEntranceAnimation();
         resetInitialScrollState();
@@ -145,12 +160,29 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.appBarLayout.post(() -> {
             wkVBinding.appBarLayout.setExpanded(true, false);
             wkVBinding.nestedScrollView.scrollTo(0, 0);
-            applyToolbarStyle(0f);
-            applyProfileContentVisibility(0f);
+            applyProfileContentVisibility();
+            updateWorksHeaderPin();
         });
     }
 
+    private void ensureFixedTopBarViews() {
+        if (fixedProfileTopBar == null) fixedProfileTopBar = findViewById(R.id.fixedProfileTopBar);
+        if (fixedWorksHeader == null) fixedWorksHeader = findViewById(R.id.fixedWorksHeader);
+        if (toolbarTitleTv == null) toolbarTitleTv = findViewById(R.id.toolbarTitleTv);
+        if (toolbarMetaLayout == null) toolbarMetaLayout = findViewById(R.id.toolbarMetaLayout);
+        if (toolbarCountryGroup == null) toolbarCountryGroup = findViewById(R.id.toolbarCountryGroup);
+        if (toolbarCountryIcon == null) toolbarCountryIcon = findViewById(R.id.toolbarCountryIcon);
+        if (toolbarCountryTv == null) toolbarCountryTv = findViewById(R.id.toolbarCountryTv);
+        if (toolbarLastOnlineGroup == null) toolbarLastOnlineGroup = findViewById(R.id.toolbarLastOnlineGroup);
+        if (toolbarTimeIcon == null) toolbarTimeIcon = findViewById(R.id.toolbarTimeIcon);
+        if (toolbarLastOnlineTv == null) toolbarLastOnlineTv = findViewById(R.id.toolbarLastOnlineTv);
+        if (feedWorksSection == null) feedWorksSection = findViewById(R.id.feedWorksSection);
+        if (feedWorksTitleTv == null) feedWorksTitleTv = findViewById(R.id.feedWorksTitleTv);
+        if (feedWorksContainer == null) feedWorksContainer = findViewById(R.id.feedWorksContainer);
+    }
+
     private void setupImmersiveStatusBar() {
+        ensureFixedTopBarViews();
         Window window = getWindow();
         if (window == null) return;
 
@@ -159,41 +191,42 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
             window.setStatusBarColor(Color.TRANSPARENT);
         }
-        window.getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-        );
-
-        // Let the cover image draw behind the phone status bar, then push only
-        // the toolbar content below the status-bar icons. This avoids the blue
-        // status-bar strip that looked different from the cover image.
-        int statusBarHeight = getStatusBarHeight();
-        ViewGroup.LayoutParams toolbarLp = wkVBinding.toolbar.getLayoutParams();
-        toolbarActualHeight = statusBarHeight + dp(56);
-        if (toolbarLp != null) {
-            toolbarLp.height = toolbarActualHeight;
-            wkVBinding.toolbar.setLayoutParams(toolbarLp);
+        // 固定顶栏是白底，状态栏图标用深色。
+        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
         }
-        wkVBinding.toolbar.setPadding(0, statusBarHeight, 0, 0);
-        clearProfileHeaderShadow();
+        window.getDecorView().setSystemUiVisibility(flags);
 
-        // Works sticky header is positioned by screen coordinates, not by a fixed margin.
-        // This keeps it exactly below the pinned username toolbar on every status-bar height.
-        positionFeedStickyHeader();
+        // 固定顶栏：白底，高度 = 状态栏 + 56dp。内容用 paddingTop 推到状态栏图标下方。
+        if (fixedProfileTopBar == null) return;
+        int statusBarHeight = getStatusBarHeight();
+        topBarHeight = statusBarHeight + dp(56);
+        fixedProfileTopBar.setPadding(0, statusBarHeight, 0, 0);
+        ViewGroup.LayoutParams topLp = fixedProfileTopBar.getLayoutParams();
+        if (topLp != null) {
+            topLp.height = topBarHeight;
+            fixedProfileTopBar.setLayoutParams(topLp);
+        }
+        clearOverlayShadows();
+        positionWorksHeader();
     }
 
-    private void clearProfileHeaderShadow() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            wkVBinding.appBarLayout.setElevation(0f);
-            wkVBinding.appBarLayout.setTranslationZ(0f);
-            wkVBinding.appBarLayout.setStateListAnimator(null);
-            wkVBinding.toolbar.setElevation(0f);
-            wkVBinding.toolbar.setTranslationZ(0f);
-            wkVBinding.toolbar.setStateListAnimator(null);
-            if (wkVBinding.feedStickyHeader != null) {
-                wkVBinding.feedStickyHeader.setElevation(0f);
-                wkVBinding.feedStickyHeader.setTranslationZ(0f);
-                wkVBinding.feedStickyHeader.setStateListAnimator(null);
-            }
+    private void clearOverlayShadows() {
+        ensureFixedTopBarViews();
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return;
+        wkVBinding.appBarLayout.setElevation(0f);
+        wkVBinding.appBarLayout.setTranslationZ(0f);
+        wkVBinding.appBarLayout.setStateListAnimator(null);
+        if (fixedProfileTopBar != null) {
+            fixedProfileTopBar.setElevation(0f);
+            fixedProfileTopBar.setTranslationZ(0f);
+            fixedProfileTopBar.setStateListAnimator(null);
+        }
+        if (fixedWorksHeader != null) {
+            fixedWorksHeader.setElevation(0f);
+            fixedWorksHeader.setTranslationZ(0f);
+            fixedWorksHeader.setStateListAnimator(null);
         }
     }
 
@@ -204,33 +237,31 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         return result > 0 ? result : dp(24);
     }
 
-    private void setupScrollLinkedHeader() {
-        wkVBinding.appBarLayout.addOnOffsetChangedListener((AppBarLayout appBarLayout, int verticalOffset) -> {
+    // 只保留 cover 的视差/缩放，绝不再用折叠百分比驱动顶栏。
+    private void setupCoverParallax() {
+        wkVBinding.appBarLayout.addOnOffsetChangedListener((appBarLayout, verticalOffset) -> {
             int range = appBarLayout.getTotalScrollRange();
             if (range <= 0) return;
             float percent = Math.min(1f, Math.max(0f, Math.abs(verticalOffset) * 1f / range));
-
             float scale = 1f + (0.04f * (1f - percent));
             wkVBinding.coverIv.setScaleX(scale);
             wkVBinding.coverIv.setScaleY(scale);
-
-            currentCollapsePercent = percent;
-            applyToolbarStyle(percent);
-            applyProfileContentVisibility(percent);
+            applyProfileContentVisibility();
+            updateWorksHeaderPin();
         });
     }
 
     private void setupWorksScrollBridge() {
         wkVBinding.nestedScrollView.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener)
                 (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-                    updateFeedStickyHeader();
-                    applyToolbarStyle(currentCollapsePercent);
+                    updateWorksHeaderPin();
                     if (scrollY > oldScrollY) maybeLoadMoreWorks();
                 });
     }
 
     private void maybeLoadMoreWorks() {
-        if (feedWorksFragment == null || wkVBinding.feedWorksSection.getVisibility() != View.VISIBLE) return;
+        ensureFixedTopBarViews();
+        if (feedWorksFragment == null || feedWorksSection == null || feedWorksSection.getVisibility() != View.VISIBLE) return;
         View child = wkVBinding.nestedScrollView.getChildAt(0);
         if (child == null) return;
         int distanceToBottom = child.getBottom() - (wkVBinding.nestedScrollView.getScrollY() + wkVBinding.nestedScrollView.getHeight());
@@ -241,123 +272,83 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         }
     }
 
-    private void applyProfileContentVisibility(float percent) {
-        // When the cover is pushed up, the white toolbar should be the only
-        // thing left above the feed area. The profile header, intro and tags
-        // fade out and stop drawing before the toolbar becomes fully white.
-        float contentAlpha = clamp01((0.92f - percent) / 0.20f);
-        boolean fullyCollapsed = percent >= 0.985f;
-        applyFoldedVisibility(wkVBinding.profileHeaderLayout, true, contentAlpha, fullyCollapsed);
-        applyFoldedVisibility(wkVBinding.langLayout, langBaseVisible, contentAlpha, fullyCollapsed);
-        applyFoldedVisibility(wkVBinding.introSection, introBaseVisible, contentAlpha, fullyCollapsed);
-        applyFoldedVisibility(wkVBinding.tagSection, tagBaseVisible, contentAlpha, fullyCollapsed);
-        float lift = -dp(12) * percent;
-        wkVBinding.profileHeaderLayout.setTranslationY(lift);
-        wkVBinding.introSection.setTranslationY(lift);
-        wkVBinding.tagSection.setTranslationY(lift);
+    // 只隐藏大资料区（大头像、背景墙资料、简介、标签、语言）。
+    // 绝不触碰 fixedProfileTopBar —— 它永远显示。
+    private void applyProfileContentVisibility() {
+        wkVBinding.profileHeaderLayout.setVisibility(View.VISIBLE);
+        wkVBinding.langLayout.setVisibility(langBaseVisible ? View.VISIBLE : View.GONE);
+        wkVBinding.introSection.setVisibility(introBaseVisible ? View.VISIBLE : View.GONE);
+        wkVBinding.tagSection.setVisibility(tagBaseVisible ? View.VISIBLE : View.GONE);
         if (introCanExpand && introBaseVisible) {
-            wkVBinding.introMoreTv.setVisibility(fullyCollapsed ? View.GONE : View.VISIBLE);
+            wkVBinding.introMoreTv.setVisibility(View.VISIBLE);
         }
-        updateFeedStickyHeader();
     }
 
-    private void updateFeedStickyHeader() {
-        if (wkVBinding == null || wkVBinding.feedStickyHeader == null || wkVBinding.feedWorksSection == null) return;
-        boolean show = isWorksPinned();
-        positionFeedStickyHeader();
-        wkVBinding.feedStickyHeader.setVisibility(show ? View.VISIBLE : View.GONE);
-        if (show) {
-            wkVBinding.feedStickyHeader.bringToFront();
+    // ============ 作品栏吸顶核心逻辑 ============
+    // 判断依据：内容里的“作品”标题 feedWorksTitleTv 相对 root 的 top
+    // 是否已经到达 fixedProfileTopBar 的 bottom。不使用 scrollY。
+    private void updateWorksHeaderPin() {
+        ensureFixedTopBarViews();
+        if (wkVBinding == null || fixedWorksHeader == null || feedWorksSection == null) return;
+        positionWorksHeader();
+        boolean pinned = isWorksPinned();
+        fixedWorksHeader.setVisibility(pinned ? View.VISIBLE : View.GONE);
+        if (pinned) {
+            fixedProfileTopBar.bringToFront();
+            fixedWorksHeader.bringToFront();
             wkVBinding.helloBar.bringToFront();
         }
-        if (wkVBinding.feedWorksTitleTv != null) {
-            // Keep the original title space to avoid a layout jump, but let the pinned title
-            // become the visible one once it reaches the toolbar.
-            wkVBinding.feedWorksTitleTv.setVisibility(show ? View.INVISIBLE : View.VISIBLE);
+        if (feedWorksTitleTv != null) {
+            // 隐藏内容流里的标题但保留占位，避免跳动。
+            feedWorksTitleTv.setVisibility(pinned ? View.INVISIBLE : View.VISIBLE);
         }
     }
 
-    private void positionFeedStickyHeader() {
-        if (wkVBinding == null || wkVBinding.feedStickyHeader == null || wkVBinding.toolbar == null) return;
-        int[] rootLoc = new int[2];
-        int[] toolbarLoc = new int[2];
-        wkVBinding.getRoot().getLocationOnScreen(rootLoc);
-        wkVBinding.toolbar.getLocationOnScreen(toolbarLoc);
-        int toolbarBottomInRoot = toolbarLoc[1] - rootLoc[1] + wkVBinding.toolbar.getHeight();
-        if (toolbarBottomInRoot <= 0) toolbarBottomInRoot = toolbarActualHeight > 0 ? toolbarActualHeight : dp(80);
-        wkVBinding.feedStickyHeader.setY(toolbarBottomInRoot);
+    // 把固定作品栏定位到 fixedProfileTopBar 的正下方。
+    private void positionWorksHeader() {
+        ensureFixedTopBarViews();
+        if (wkVBinding == null || fixedWorksHeader == null || fixedProfileTopBar == null) return;
+        int barBottom = topBarHeight > 0 ? topBarHeight : fixedProfileTopBar.getHeight();
+        fixedWorksHeader.setY(barBottom);
     }
 
     private boolean isWorksPinned() {
-        if (wkVBinding == null || wkVBinding.feedWorksSection == null || wkVBinding.feedWorksTitleTv == null) return false;
-        if (wkVBinding.feedWorksSection.getVisibility() != View.VISIBLE) return false;
-        if (wkVBinding.feedWorksTitleTv.getHeight() <= 0 || wkVBinding.toolbar.getHeight() <= 0) return false;
+        if (wkVBinding == null || feedWorksSection == null || feedWorksTitleTv == null) return false;
+        if (feedWorksSection.getVisibility() != View.VISIBLE) return false;
+        if (feedWorksTitleTv.getHeight() <= 0) return false;
 
-        // Do not use NestedScrollView.scrollY here. In CoordinatorLayout, part of the scroll is
-        // consumed by AppBarLayout first, so scrollY alone cannot tell when the works title
-        // visually reaches the toolbar. Screen coordinates are stable and match the real UI.
-        int[] titleLoc = new int[2];
-        int[] toolbarLoc = new int[2];
-        wkVBinding.feedWorksTitleTv.getLocationOnScreen(titleLoc);
-        wkVBinding.toolbar.getLocationOnScreen(toolbarLoc);
-        int toolbarBottom = toolbarLoc[1] + wkVBinding.toolbar.getHeight();
-        return titleLoc[1] <= toolbarBottom + dp(1);
+        // feedWorksTitleTv 相对 root 的 top vs fixedProfileTopBar 相对 root 的 bottom。
+        int titleTop = topInRoot(feedWorksTitleTv);
+        int barBottom = topInRoot(fixedProfileTopBar) + fixedProfileTopBar.getHeight();
+        if (barBottom <= 0) barBottom = topBarHeight;
+        return titleTop <= barBottom;
     }
 
-    private void applyFoldedVisibility(View view, boolean baseVisible, float alpha, boolean fullyCollapsed) {
-        if (view == null) return;
-        if (!baseVisible || fullyCollapsed) {
-            view.setVisibility(View.GONE);
-            view.setAlpha(1f);
-            return;
-        }
-        view.setAlpha(alpha);
-        view.setVisibility(View.VISIBLE);
+    private int topInRoot(View view) {
+        if (view == null) return Integer.MAX_VALUE;
+        int[] rootLoc = new int[2];
+        int[] viewLoc = new int[2];
+        wkVBinding.getRoot().getLocationInWindow(rootLoc);
+        view.getLocationInWindow(viewLoc);
+        return viewLoc[1] - rootLoc[1];
     }
 
-    private void applyToolbarStyle(float percent) {
-        // Once works are pinned, the top username/meta bar should never disappear.
-        // Force the toolbar into its collapsed white style even if AppBar percent is not exactly 1.
-        float effectivePercent = isWorksPinned() ? 1f : percent;
-        float titleAlpha = clamp01((effectivePercent - 0.58f) / 0.28f);
-        wkVBinding.toolbarTitleLayout.setAlpha(titleAlpha);
-
-        int bgAlpha = (int) (clamp01((effectivePercent - 0.48f) / 0.42f) * 255);
-        wkVBinding.toolbar.setBackgroundColor(Color.argb(bgAlpha, 255, 255, 255));
-
-        float iconT = clamp01((effectivePercent - 0.55f) / 0.35f);
-        int iconColor = blendColor(0xFFFFFFFF, 0xFF202033, iconT);
-        wkVBinding.backBtn.setColorFilter(iconColor);
-        wkVBinding.editBtn.setColorFilter(iconColor);
-
-        wkVBinding.toolbarTitleTv.setTextColor(0xFF202033);
-        wkVBinding.toolbarCountryTv.setTextColor(0xFF8C8C99);
-        wkVBinding.toolbarLastOnlineTv.setTextColor(0xFF8C8C99);
-        setImageTint(wkVBinding.toolbarCountryIcon, 0xFF9A9AA6);
-        setImageTint(wkVBinding.toolbarTimeIcon, 0xFF9A9AA6);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
-            if (effectivePercent > 0.72f) flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-            getWindow().getDecorView().setSystemUiVisibility(flags);
-        }
+    // 固定顶栏静态样式：白底、深色文字与图标、无阴影。只设置一次。
+    private void applyFixedTopBarStyle() {
+        ensureFixedTopBarViews();
+        if (fixedProfileTopBar == null || toolbarTitleTv == null) return;
+        fixedProfileTopBar.setBackgroundColor(0xFFFFFFFF);
+        wkVBinding.backBtn.setColorFilter(0xFF202033);
+        wkVBinding.editBtn.setColorFilter(0xFF202033);
+        toolbarTitleTv.setTextColor(0xFF202033);
+        if (toolbarCountryTv != null) toolbarCountryTv.setTextColor(0xFF8C8C99);
+        if (toolbarLastOnlineTv != null) toolbarLastOnlineTv.setTextColor(0xFF8C8C99);
+        setImageTint(toolbarCountryIcon, 0xFF9A9AA6);
+        setImageTint(toolbarTimeIcon, 0xFF9A9AA6);
     }
 
     private void setImageTint(ImageView imageView, int color) {
         if (imageView != null) imageView.setColorFilter(color);
-    }
-
-    private float clamp01(float value) {
-        return Math.min(1f, Math.max(0f, value));
-    }
-
-    private int blendColor(int from, int to, float ratio) {
-        float t = clamp01(ratio);
-        int a = (int) (Color.alpha(from) + (Color.alpha(to) - Color.alpha(from)) * t);
-        int r = (int) (Color.red(from) + (Color.red(to) - Color.red(from)) * t);
-        int g = (int) (Color.green(from) + (Color.green(to) - Color.green(from)) * t);
-        int b = (int) (Color.blue(from) + (Color.blue(to) - Color.blue(from)) * t);
-        return Color.argb(a, r, g, b);
     }
 
     private void setupEntranceAnimation() {
@@ -521,7 +512,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void bindProfile(PartnerProfileEntity data) {
         String showName = firstNotEmpty(data.name, data.username, data.uid);
         wkVBinding.nameTv.setText(showName);
-        wkVBinding.toolbarTitleTv.setText(showName);
+        ensureFixedTopBarViews();
+        if (toolbarTitleTv != null) toolbarTitleTv.setText(showName);
         bindToolbarMeta(data);
         wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
         showCountryFlagIfSupported(firstNotEmpty(data.country_code, data.country));
@@ -536,9 +528,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.onlineIndicator.setVisibility(data.status == 1 ? View.VISIBLE : View.GONE);
     }
 
-
     private void bindFeedWorks() {
-        if (TextUtils.isEmpty(uid)) {
+        ensureFixedTopBarViews();
+        if (TextUtils.isEmpty(uid) || feedWorksSection == null || feedWorksContainer == null) {
             hideFeedWorks();
             return;
         }
@@ -549,8 +541,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
                 hideFeedWorks();
                 return;
             }
-            wkVBinding.feedWorksSection.setVisibility(View.VISIBLE);
-            updateFeedStickyHeader();
+            feedWorksSection.setVisibility(View.VISIBLE);
+            updateWorksHeaderPin();
             feedWorksFragment = (Fragment) fragmentObj;
             if (!feedWorksAttached) {
                 feedWorksAttached = true;
@@ -558,16 +550,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
                         .beginTransaction()
                         .replace(R.id.feedWorksContainer, feedWorksFragment)
                         .commitAllowingStateLoss();
-                // The embedded works waterfall has its own RecyclerView. If it
-                // keeps nested scrolling enabled inside this profile page, the
-                // parent AppBar/NestedScrollView and child RecyclerView will tug
-                // each other, causing the flashing/stuck pull-down feeling.
-                wkVBinding.feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 160);
-                wkVBinding.feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 480);
-                wkVBinding.feedWorksContainer.postDelayed(this::maybeLoadMoreWorks, 650);
+                // 内嵌作品瀑布流自带 RecyclerView。关闭它的嵌套滚动，
+                // 由外层 NestedScrollView 统一滚动，避免父子互抢。
+                feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 160);
+                feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 480);
+                feedWorksContainer.postDelayed(this::maybeLoadMoreWorks, 650);
             } else {
-                wkVBinding.feedWorksContainer.post(this::disableNestedFeedScrolling);
-                wkVBinding.feedWorksContainer.post(this::maybeLoadMoreWorks);
+                feedWorksContainer.post(this::disableNestedFeedScrolling);
+                feedWorksContainer.post(this::maybeLoadMoreWorks);
             }
         } catch (Throwable ignored) {
             // wkfeed 是可选模块。没有安装时不要影响个人主页。
@@ -577,14 +567,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void hideFeedWorks() {
         if (wkVBinding == null) return;
-        wkVBinding.feedWorksSection.setVisibility(View.GONE);
+        if (feedWorksSection != null) feedWorksSection.setVisibility(View.GONE);
         feedWorksFragment = null;
-        updateFeedStickyHeader();
+        updateWorksHeaderPin();
     }
 
     private void disableNestedFeedScrolling() {
-        if (wkVBinding == null || wkVBinding.feedWorksContainer == null) return;
-        disableNestedFeedScrolling(wkVBinding.feedWorksContainer);
+        ensureFixedTopBarViews();
+        if (wkVBinding == null || feedWorksContainer == null) return;
+        disableNestedFeedScrolling(feedWorksContainer);
     }
 
     private void disableNestedFeedScrolling(View view) {
@@ -632,28 +623,28 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         boolean hasLastOnline = !TextUtils.isEmpty(lastOnline);
 
         if (isSelf) {
-            wkVBinding.toolbarMetaLayout.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
-            wkVBinding.toolbarCountryGroup.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
-            wkVBinding.toolbarLastOnlineGroup.setVisibility(View.GONE);
-            wkVBinding.toolbarCountryTv.setText(country);
-            wkVBinding.toolbarLastOnlineTv.setText("");
+            if (toolbarMetaLayout != null) toolbarMetaLayout.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
+            if (toolbarCountryGroup != null) toolbarCountryGroup.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
+            if (toolbarLastOnlineGroup != null) toolbarLastOnlineGroup.setVisibility(View.GONE);
+            if (toolbarCountryTv != null) toolbarCountryTv.setText(country);
+            if (toolbarLastOnlineTv != null) toolbarLastOnlineTv.setText("");
 
             profileLastOnlineBaseVisible = false;
             wkVBinding.profileLastOnlineGroup.setVisibility(View.GONE);
             wkVBinding.profileSelfEditChip.setVisibility(View.VISIBLE);
         } else {
-            wkVBinding.toolbarMetaLayout.setVisibility(hasCountry || hasLastOnline ? View.VISIBLE : View.GONE);
-            wkVBinding.toolbarCountryGroup.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
-            wkVBinding.toolbarLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
-            wkVBinding.toolbarCountryTv.setText(country);
-            wkVBinding.toolbarLastOnlineTv.setText(lastOnline);
+            if (toolbarMetaLayout != null) toolbarMetaLayout.setVisibility(hasCountry || hasLastOnline ? View.VISIBLE : View.GONE);
+            if (toolbarCountryGroup != null) toolbarCountryGroup.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
+            if (toolbarLastOnlineGroup != null) toolbarLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
+            if (toolbarCountryTv != null) toolbarCountryTv.setText(country);
+            if (toolbarLastOnlineTv != null) toolbarLastOnlineTv.setText(lastOnline);
 
             profileLastOnlineBaseVisible = hasLastOnline;
             wkVBinding.profileLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
             wkVBinding.profileLastOnlineTv.setText(lastOnline);
             wkVBinding.profileSelfEditChip.setVisibility(View.GONE);
         }
-        applyProfileContentVisibility(currentCollapsePercent);
+        applyProfileContentVisibility();
     }
 
     private String formatLastOnline(PartnerProfileEntity data) {
@@ -749,7 +740,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.langToTv.setVisibility(showNative && showLearning ? View.VISIBLE : View.GONE);
         wkVBinding.nativeLangTv.setText(nativeText);
         wkVBinding.learningLangTv.setText(learningText);
-        applyProfileContentVisibility(currentCollapsePercent);
+        applyProfileContentVisibility();
     }
 
     private void bindIntro(PartnerProfileEntity data) {
@@ -778,8 +769,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.introTv.post(() -> {
             android.text.Layout layout = wkVBinding.introTv.getLayout();
             introCanExpand = layout != null && layout.getLineCount() >= 2 && layout.getEllipsisCount(1) > 0;
-            wkVBinding.introMoreTv.setVisibility(introCanExpand && currentCollapsePercent < 0.985f ? View.VISIBLE : View.GONE);
-            applyProfileContentVisibility(currentCollapsePercent);
+            wkVBinding.introMoreTv.setVisibility(introCanExpand ? View.VISIBLE : View.GONE);
+            applyProfileContentVisibility();
         });
     }
 
@@ -809,7 +800,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.tagSection.setVisibility(View.VISIBLE);
         int max = Math.min(tags.size(), 20);
         for (int i = 0; i < max; i++) addChip(tags.get(i), false);
-        applyProfileContentVisibility(currentCollapsePercent);
+        applyProfileContentVisibility();
     }
 
     private void addChip(String text, boolean isPlaceholder) {
