@@ -43,4 +43,5 @@
     <string name="partner_save_failed">Save failed</string>
     <string name="partner_confirm">OK</string>
     <string name="partner_cancel">Cancel</string>
+    <string name="partner_profile_image_required">Please upload at least one partner photo</string>
 </resources>
