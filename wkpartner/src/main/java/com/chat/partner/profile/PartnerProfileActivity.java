@@ -3,7 +3,6 @@ package com.chat.partner.profile;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
-import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Outline;
@@ -35,7 +34,6 @@ import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileBinding;
 import com.chat.uikit.chat.manager.WKIMUtils;
 import com.chat.uikit.contacts.service.FriendModel;
-import com.chat.uikit.user.service.UserModel;
 import com.google.android.material.appbar.AppBarLayout;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
@@ -50,6 +48,7 @@ import java.util.Locale;
 
 public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBinding> {
     private String uid;
+    private String groupId;
     private boolean isSelf;
     private boolean isSayHiLoading;
     private boolean introExpanded;
@@ -70,6 +69,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void initPresenter() {
         uid = getIntent().getStringExtra(PartnerProfileRoute.EXTRA_UID);
+        groupId = getIntent().getStringExtra(PartnerProfileRoute.EXTRA_GROUP_ID);
         if (TextUtils.isEmpty(uid)) uid = WKConfig.getInstance().getUid();
         isSelf = TextUtils.equals(uid, WKConfig.getInstance().getUid());
     }
@@ -90,7 +90,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         setupImmersiveStatusBar();
         wkVBinding.avatarView.setSize(96);
         wkVBinding.editBtn.setVisibility(View.VISIBLE);
-        wkVBinding.editBtn.setImageResource(isSelf ? R.drawable.ic_partner_edit : R.drawable.ic_partner_more_horizontal);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
@@ -107,7 +106,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             if (isSelf) {
                 startActivity(new Intent(this, PartnerProfileEditActivity.class));
             } else {
-                showProfileMoreMenu();
+                showToast("更多功能后续添加");
             }
         }));
         wkVBinding.helloBtnLayout.setOnClickListener(v -> onMainActionClick());
@@ -295,7 +294,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     }
 
     private void loadProfile() {
-        PartnerProfileModel.getInstance().getUserProfile(uid, (code, msg, data) -> {
+        PartnerProfileModel.getInstance().getUserProfile(uid, groupId, (code, msg, data) -> {
             if (code == HttpResponseCode.success && data != null) {
                 profile = data;
                 bindProfile(data);
@@ -365,7 +364,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private String formatLastOnline(PartnerProfileEntity data) {
         if (data == null) return "";
-        if (data.status == 1) return getString(R.string.partner_online);
+        if (data.status == 1) return "在线";
         String raw = firstNotEmpty(data.last_online, data.last_online_time, data.last_seen, data.last_seen_at,
                 data.last_active_at, data.last_active_time, data.last_login_at, data.last_login_time);
         if (TextUtils.isEmpty(raw)) return "";
@@ -373,9 +372,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (millis > 0) {
             CharSequence relative = DateUtils.getRelativeTimeSpanString(millis, System.currentTimeMillis(),
                     DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE);
-            return getString(R.string.partner_last_online_format, relative);
+            return "最后在线 " + relative;
         }
-        return getString(R.string.partner_last_online_format, raw.trim());
+        return "最后在线 " + raw.trim();
     }
 
     private long parseTimeMillis(String raw) {
@@ -475,7 +474,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.introTv.setText(intro);
         wkVBinding.introTv.setMaxLines(2);
         wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
-        wkVBinding.introMoreTv.setText(R.string.partner_expand_all);
+        wkVBinding.introMoreTv.setText("展开全部");
         wkVBinding.introMoreTv.setVisibility(View.GONE);
 
         View.OnClickListener toggle = v -> toggleIntroExpand();
@@ -496,11 +495,11 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (introExpanded) {
             wkVBinding.introTv.setMaxLines(Integer.MAX_VALUE);
             wkVBinding.introTv.setEllipsize(null);
-            wkVBinding.introMoreTv.setText(R.string.partner_collapse);
+            wkVBinding.introMoreTv.setText("收起");
         } else {
             wkVBinding.introTv.setMaxLines(2);
             wkVBinding.introTv.setEllipsize(TextUtils.TruncateAt.END);
-            wkVBinding.introMoreTv.setText(R.string.partner_expand_all);
+            wkVBinding.introMoreTv.setText("展开全部");
         }
     }
 
@@ -580,17 +579,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             wkVBinding.bottomActionSpace.setVisibility(View.GONE);
             return;
         }
-        boolean blocked = isBlacklisted(data);
-        boolean isFriend = isFriend(data);
+        WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
+        boolean isFriend = data.follow == 1 || (channel != null && channel.follow == 1);
         wkVBinding.helloBar.setVisibility(View.VISIBLE);
         wkVBinding.bottomActionSpace.setVisibility(View.VISIBLE);
         wkVBinding.helloBtnLayout.setEnabled(true);
         wkVBinding.helloBtnLayout.setAlpha(1f);
-        if (blocked) {
-            wkVBinding.helloBtnText.setText(R.string.partner_remove_blacklist);
-        } else {
-            wkVBinding.helloBtnText.setText(isFriend ? R.string.partner_send_message : R.string.partner_say_hello);
-        }
+        wkVBinding.helloBtnText.setText(isFriend ? R.string.partner_send_message : R.string.partner_say_hello);
         wkVBinding.helloBtnText.setAlpha(1f);
         wkVBinding.helloBtnProgress.setAlpha(0f);
         wkVBinding.helloBtnProgress.setVisibility(View.GONE);
@@ -601,15 +596,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void onMainActionClick() {
         if (isSayHiLoading) return;
         pressAndRun(wkVBinding.helloBtnLayout, () -> {
-            if (isBlacklisted(profile)) {
-                removeBlackList();
-                return;
-            }
-            if (isFriend(profile)) {
+            WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
+            boolean isFriend = (profile != null && profile.follow == 1) || (channel != null && channel.follow == 1);
+            if (isFriend) {
                 WKIMUtils.getInstance().startChatActivity(new ChatViewMenu(this, uid, WKChannelType.PERSONAL, 0, false));
                 return;
             }
-            WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_say_hello), getString(R.string.partner_hello_hint), defaultGreeting(), defaultGreeting(), 40, text -> {
+            WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_hello_hint), "", defaultGreeting(), defaultGreeting(), 40, text -> {
                 String remark = TextUtils.isEmpty(text) ? defaultGreeting() : text;
                 String vercode = profile == null ? "" : profile.vercode;
                 animateButtonToProgress();
@@ -622,79 +615,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
                     }
                 });
             });
-        });
-    }
-
-    private boolean isFriend(PartnerProfileEntity data) {
-        WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
-        return (data != null && data.follow == 1) || (channel != null && channel.follow == 1);
-    }
-
-    private boolean isBlacklisted(PartnerProfileEntity data) {
-        return data != null && data.status == 2;
-    }
-
-    private void showProfileMoreMenu() {
-        ArrayList<String> items = new ArrayList<>();
-        ArrayList<Integer> actions = new ArrayList<>();
-        if (isFriend(profile)) {
-            items.add(getString(R.string.partner_delete_friend));
-            actions.add(1);
-        }
-        if (isBlacklisted(profile)) {
-            items.add(getString(R.string.partner_remove_blacklist));
-            actions.add(2);
-        } else {
-            items.add(getString(R.string.partner_add_blacklist));
-            actions.add(3);
-        }
-        items.add(getString(R.string.partner_report));
-        actions.add(4);
-        new AlertDialog.Builder(this)
-                .setItems(items.toArray(new String[0]), (dialog, which) -> handleMoreAction(actions.get(which)))
-                .show();
-    }
-
-    private void handleMoreAction(int action) {
-        if (action == 1) {
-            confirmDeleteFriend();
-        } else if (action == 2) {
-            removeBlackList();
-        } else if (action == 3) {
-            addBlackList();
-        } else {
-            showToast(getString(R.string.partner_report_coming));
-        }
-    }
-
-    private void confirmDeleteFriend() {
-        new AlertDialog.Builder(this)
-                .setMessage(R.string.partner_delete_friend_confirm)
-                .setNegativeButton(R.string.partner_cancel, null)
-                .setPositiveButton(R.string.partner_confirm, (dialog, which) -> UserModel.getInstance().deleteUser(uid, (code, msg) -> {
-                    if (code == HttpResponseCode.success) {
-                        showToast(getString(R.string.partner_delete_friend_success));
-                        loadProfile();
-                    } else if (!TextUtils.isEmpty(msg)) showToast(msg);
-                }))
-                .show();
-    }
-
-    private void addBlackList() {
-        UserModel.getInstance().addBlackList(uid, (code, msg) -> {
-            if (code == HttpResponseCode.success) {
-                showToast(getString(R.string.partner_blacklist_added));
-                loadProfile();
-            } else if (!TextUtils.isEmpty(msg)) showToast(msg);
-        });
-    }
-
-    private void removeBlackList() {
-        UserModel.getInstance().removeBlackList(uid, (code, msg) -> {
-            if (code == HttpResponseCode.success) {
-                showToast(getString(R.string.partner_blacklist_removed));
-                loadProfile();
-            } else if (!TextUtils.isEmpty(msg)) showToast(msg);
         });
     }
 
@@ -777,7 +697,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             String code = normalizeLangCode(item);
             if (!TextUtils.isEmpty(code) && !labels.contains(code)) labels.add(code);
         }
-        return join(labels, " ");
+        return join(labels, " / ");
     }
 
     private String formatLanguageLetters(List<String> list) {
@@ -787,7 +707,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             String code = normalizeLangLetter(item);
             if (!TextUtils.isEmpty(code) && !labels.contains(code)) labels.add(code);
         }
-        return join(labels, " ");
+        return join(labels, " / ");
     }
 
     private String normalizeLangLetter(String value) {
