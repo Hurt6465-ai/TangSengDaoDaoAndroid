@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Locale;
 
 public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfileEditBinding> {
+    public static final String EXTRA_REQUIRE_PROFILE_IMAGE = "require_profile_image";
     private static final int REQ_COVER = 501;
     private static final int REQ_PHOTO = 502;
     private static final int REQ_TAGS = 503;
@@ -58,6 +59,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     private String localCoverPreview = "";
     private int uploadingCount = 0;
     private int uploadingPhotoCount = 0;
+    private boolean requireProfileImage = false;
     private final ArrayList<String> nativeCodes = new ArrayList<>();
     private final ArrayList<String> learningCodes = new ArrayList<>();
     private final ArrayList<String> tags = new ArrayList<>();
@@ -76,6 +78,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
 
     @Override
     protected void initView() {
+        requireProfileImage = getIntent() != null && getIntent().getBooleanExtra(EXTRA_REQUIRE_PROFILE_IMAGE, false);
         updateCountryText();
         updateSexText();
         updateBirthdayText();
@@ -157,6 +160,10 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         }
         if (learningCodes.isEmpty()) {
             showToast(getString(R.string.partner_learning_language_required));
+            return;
+        }
+        if (requireProfileImage && profileImages.isEmpty()) {
+            showToast(getString(R.string.partner_profile_image_required));
             return;
         }
 
