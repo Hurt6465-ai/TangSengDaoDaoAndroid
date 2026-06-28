@@ -213,9 +213,10 @@ public class FeedPublishActivity extends Activity {
     private void doPublish(String text, List<Uri> images, Uri video) {
         try {
             ArrayList<Map<String, Object>> mediaList = new ArrayList<>();
-            int totalUnits = images.size() + (video == null ? 0 : 3); // 视频压缩 + 封面上传 + 视频上传
-            if (totalUnits <= 0) totalUnits = 1;
-            int[] finished = new int[]{0};
+            int calculatedTotalUnits = images.size() + (video == null ? 0 : 3); // 视频压缩 + 封面上传 + 视频上传
+            if (calculatedTotalUnits <= 0) calculatedTotalUnits = 1;
+            final int totalUnits = calculatedTotalUnits;
+            final int[] finished = new int[]{0};
 
             File cacheDir = new File(getCacheDir(), "feed_upload");
             if (!cacheDir.exists()) cacheDir.mkdirs();
