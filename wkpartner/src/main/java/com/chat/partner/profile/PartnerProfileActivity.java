@@ -25,6 +25,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.fragment.app.Fragment;
+
 import com.alibaba.fastjson.JSONObject;
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.config.WKApiConfig;
@@ -69,6 +71,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private boolean profileLastOnlineBaseVisible;
     private float currentCollapsePercent;
     private PartnerProfileEntity profile;
+    private boolean feedWorksAttached;
 
     @Override
     protected ActPartnerProfileBinding getViewBinding() {
@@ -433,8 +436,36 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         bindIntro(data);
         bindTags(data);
         bindPhotos(data);
+        bindFeedWorks();
         bindActionButton(data);
         wkVBinding.onlineIndicator.setVisibility(data.status == 1 ? View.VISIBLE : View.GONE);
+    }
+
+
+    private void bindFeedWorks() {
+        if (TextUtils.isEmpty(uid)) {
+            wkVBinding.feedWorksSection.setVisibility(View.GONE);
+            return;
+        }
+        try {
+            Class<?> routeClass = Class.forName("com.chat.feed.FeedRoute");
+            Object fragmentObj = routeClass.getMethod("newUserWaterfallFragment", String.class).invoke(null, uid);
+            if (!(fragmentObj instanceof Fragment)) {
+                wkVBinding.feedWorksSection.setVisibility(View.GONE);
+                return;
+            }
+            wkVBinding.feedWorksSection.setVisibility(View.VISIBLE);
+            if (!feedWorksAttached) {
+                feedWorksAttached = true;
+                getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.feedWorksContainer, (Fragment) fragmentObj)
+                        .commitAllowingStateLoss();
+            }
+        } catch (Throwable ignored) {
+            // wkfeed 是可选模块。没有安装时不要影响个人主页。
+            wkVBinding.feedWorksSection.setVisibility(View.GONE);
+        }
     }
 
     private void bindCover(String cover) {
