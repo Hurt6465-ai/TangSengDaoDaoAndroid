@@ -18,6 +18,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentActivity;
 import androidx.media3.ui.PlayerView;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.bumptech.glide.Glide;
@@ -97,6 +98,13 @@ public class FeedItemView extends android.widget.FrameLayout {
         imagePager.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
         imagePager.setOffscreenPageLimit(1);
         imagePager.setSaveEnabled(false);
+        imagePager.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        View innerPagerRecycler = imagePager.getChildCount() > 0 ? imagePager.getChildAt(0) : null;
+        if (innerPagerRecycler instanceof RecyclerView) {
+            innerPagerRecycler.setOverScrollMode(View.OVER_SCROLL_NEVER);
+            RecyclerView.ItemAnimator animator = ((RecyclerView) innerPagerRecycler).getItemAnimator();
+            if (animator != null) animator.setChangeDuration(0);
+        }
         gestureDetector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onDown(@NonNull MotionEvent e) {
