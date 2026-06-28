@@ -38,6 +38,11 @@ public class PartnerBrowseBean {
     public int status;
     public long last_active_millis;
     public long last_online_millis;
+    public long last_active_at;
+    public long last_online;
+    public long last_offline;
+    public String role;
+    public String category;
     public double server_score;
     public double score;
     public String recommend_reason;
@@ -58,6 +63,33 @@ public class PartnerBrowseBean {
         if (!TextUtils.isEmpty(uid)) return uid;
         if (!TextUtils.isEmpty(id)) return id;
         return "";
+    }
+
+    public String getAvatarPathSafe() {
+        if (!TextUtils.isEmpty(avatar)) return avatar;
+        if (!TextUtils.isEmpty(uid)) return "users/" + uid + "/avatar";
+        if (!TextUtils.isEmpty(id)) return "users/" + id + "/avatar";
+        return "";
+    }
+
+    public boolean hasPartnerPhoto() {
+        if (!getProfileImagesSafe().isEmpty()) return true;
+        if (!safeImageList(images).isEmpty()) return true;
+        return !TextUtils.isEmpty(profile_cover);
+    }
+
+    public long getLastActiveMillisSafe() {
+        if (last_active_millis > 0) return normalizeTime(last_active_millis);
+        if (last_active_at > 0) return normalizeTime(last_active_at);
+        if (last_online_millis > 0) return normalizeTime(last_online_millis);
+        if (last_online > 0) return normalizeTime(last_online);
+        if (last_offline > 0) return normalizeTime(last_offline);
+        return 0L;
+    }
+
+    private long normalizeTime(long value) {
+        if (value <= 0) return 0L;
+        return value < 100000000000L ? value * 1000L : value;
     }
 
     public boolean isHelloSent() {
@@ -134,6 +166,11 @@ public class PartnerBrowseBean {
         args.putBoolean("hello_sent", hello_sent);
         args.putInt("apply_status", apply_status);
         args.putInt("greeting_status", greeting_status);
+        args.putLong("last_active_millis", getLastActiveMillisSafe());
+        args.putLong("last_online_millis", last_online_millis);
+        args.putInt("online", online);
+        args.putString("role", safe(role));
+        args.putString("category", safe(category));
         args.putStringArrayList("images", new ArrayList<>(getDisplayImagesSafe()));
         args.putStringArrayList("native_languages", new ArrayList<>(getNativeLanguagesSafe()));
         args.putStringArrayList("learning_languages", new ArrayList<>(getLearningLanguagesSafe()));
@@ -163,6 +200,11 @@ public class PartnerBrowseBean {
         bean.hello_sent = args.getBoolean("hello_sent", false);
         bean.apply_status = args.getInt("apply_status", 0);
         bean.greeting_status = args.getInt("greeting_status", 0);
+        bean.last_active_millis = args.getLong("last_active_millis", 0L);
+        bean.last_online_millis = args.getLong("last_online_millis", 0L);
+        bean.online = args.getInt("online", 0);
+        bean.role = args.getString("role", "");
+        bean.category = args.getString("category", "");
         bean.images = args.getStringArrayList("images");
         bean.native_languages = args.getStringArrayList("native_languages");
         bean.learning_languages = args.getStringArrayList("learning_languages");
