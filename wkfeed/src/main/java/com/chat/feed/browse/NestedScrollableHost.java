@@ -10,14 +10,25 @@ import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.view.ViewCompat;
-import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
+/**
+ * Handles nested gesture conflict between outer vertical ViewPager2 and inner horizontal ViewPager2.
+ *
+ * Important detail:
+ * Once this gesture is judged as horizontal, keep it inside the inner pager until UP/CANCEL.
+ * Do not release to the outer vertical pager even if the inner pager reaches first/last image,
+ * otherwise the screen will shake when swiping to the last image and the vertical feed may be triggered.
+ */
 public class NestedScrollableHost extends FrameLayout {
+    private static final int GESTURE_UNDECIDED = 0;
+    private static final int GESTURE_HORIZONTAL = 1;
+    private static final int GESTURE_VERTICAL = 2;
+
     private float initialX;
     private float initialY;
     private final int touchSlop;
+    private int gestureDirection = GESTURE_UNDECIDED;
 
     public NestedScrollableHost(@NonNull Context context) {
         this(context, null);
@@ -54,27 +65,17 @@ public class NestedScrollableHost extends FrameLayout {
         return super.onTouchEvent(event);
     }
 
-    private boolean canScrollHorizontally(View view, int direction) {
-        if (view instanceof ViewPager2) {
-            ViewPager2 pager = (ViewPager2) view;
-            View rv = pager.getChildCount() > 0 ? pager.getChildAt(0) : null;
-            return rv instanceof RecyclerView && ViewCompat.canScrollHorizontally(rv, direction);
-        }
-        return ViewCompat.canScrollHorizontally(view, direction);
-    }
-
     private void handleInterceptTouch(MotionEvent ev) {
         ViewPager2 parentPager = parentViewPager();
-        View childView = child();
-        if (parentPager == null || childView == null) return;
+        if (parentPager == null || child() == null) return;
         if (parentPager.getOrientation() != ViewPager2.ORIENTATION_VERTICAL) return;
 
         switch (ev.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
                 initialX = ev.getX();
                 initialY = ev.getY();
-                // DOWN 先把事件交给内部可滑动区域，避免多图左右滑一开始就被外层竖向 ViewPager2 抢走。
-                // MOVE 再根据方向和边界释放给外层。
+                gestureDirection = GESTURE_UNDECIDED;
+                // DOWN first gives the inner horizontal pager a chance to decide.
                 parentPager.requestDisallowInterceptTouchEvent(true);
                 break;
             case MotionEvent.ACTION_MOVE:
@@ -83,16 +84,15 @@ public class NestedScrollableHost extends FrameLayout {
                 float absDx = Math.abs(dx);
                 float absDy = Math.abs(dy);
                 if (absDx < touchSlop && absDy < touchSlop) return;
-                boolean horizontalSwipe = absDx > absDy;
-                if (horizontalSwipe) {
-                    int direction = dx < 0 ? 1 : -1;
-                    parentPager.requestDisallowInterceptTouchEvent(canScrollHorizontally(childView, direction));
-                } else {
-                    parentPager.requestDisallowInterceptTouchEvent(false);
+
+                if (gestureDirection == GESTURE_UNDECIDED) {
+                    gestureDirection = absDx >= absDy ? GESTURE_HORIZONTAL : GESTURE_VERTICAL;
                 }
+                parentPager.requestDisallowInterceptTouchEvent(gestureDirection == GESTURE_HORIZONTAL);
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
+                gestureDirection = GESTURE_UNDECIDED;
                 parentPager.requestDisallowInterceptTouchEvent(false);
                 break;
             default:
