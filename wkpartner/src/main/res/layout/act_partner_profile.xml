@@ -14,6 +14,9 @@
         android:layout_height="300dp"
         android:background="@android:color/transparent"
         android:fitsSystemWindows="false"
+        android:elevation="0dp"
+        android:stateListAnimator="@null"
+        android:translationZ="0dp"
         app:elevation="0dp">
 
         <com.google.android.material.appbar.CollapsingToolbarLayout
@@ -55,6 +58,9 @@
             <androidx.appcompat.widget.Toolbar
                 android:id="@+id/toolbar"
                 android:layout_width="match_parent"
+                android:elevation="0dp"
+                android:stateListAnimator="@null"
+                android:translationZ="0dp"
                 android:layout_height="80dp"
                 android:layout_marginTop="0dp"
                 app:contentInsetLeft="0dp"
@@ -466,7 +472,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
+                android:background="#F7F8FA"
                 android:orientation="vertical"
+                android:paddingTop="14dp"
                 android:visibility="gone">
 
                 <TextView
@@ -481,8 +489,10 @@
                 <FrameLayout
                     android:id="@+id/feedWorksContainer"
                     android:layout_width="match_parent"
-                    android:layout_height="520dp"
-                    android:layout_marginTop="8dp" />
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="#F7F8FA"
+                    android:minHeight="520dp" />
             </LinearLayout>
 
             <Space
@@ -492,27 +502,33 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/feedStickyHeader"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_gravity="top"
         android:background="#FFFFFFFF"
-        android:elevation="8dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="24dp"
-        android:paddingEnd="24dp"
+        android:elevation="0dp"
+        android:stateListAnimator="@null"
+        android:translationZ="0dp"
         android:visibility="gone">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="24dp"
             android:text="@string/partner_works"
             android:textColor="#1A1A2E"
             android:textSize="17sp"
             android:textStyle="bold" />
-    </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0.5dp"
+            android:layout_gravity="bottom"
+            android:background="#EEF0F4" />
+    </FrameLayout>
 
     <FrameLayout
         android:id="@+id/helloBar"
