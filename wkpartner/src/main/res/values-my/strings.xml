@@ -68,4 +68,5 @@
     <string name="partner_report">တိုင်ကြားရန်</string>
     <string name="partner_report_coming">တိုင်ကြား 기능ကို နောက်ပိုင်း ထည့်ပါမည်</string>
     <string name="partner_save_media_failed">အခြေခံအချက်အလက် သိမ်းပြီးပါပြီ။ ပုံ သို့မဟုတ် tag သိမ်းမရပါ။ Backend တွင် profile_cover/profile_images/tags ကို ထောက်ပံ့ထားကြောင်း စစ်ပါ။</string>
+    <string name="partner_profile_image_required">ဘာသာဖော် ဓာတ်ပုံ အနည်းဆုံး တစ်ပုံ တင်ပါ</string>
 </resources>
