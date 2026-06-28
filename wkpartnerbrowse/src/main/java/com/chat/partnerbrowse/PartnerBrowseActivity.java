@@ -63,6 +63,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         PartnerRepository.resetPaging();
         adapter = new PartnerOuterAdapter(this, partners);
         wkVBinding.viewPagerOuter.setOrientation(ViewPager2.ORIENTATION_VERTICAL);
+        wkVBinding.viewPagerOuter.setOverScrollMode(View.OVER_SCROLL_NEVER);
         wkVBinding.viewPagerOuter.setOffscreenPageLimit(1);
         wkVBinding.viewPagerOuter.setSaveEnabled(false);
         wkVBinding.viewPagerOuter.setAdapter(adapter);
@@ -70,6 +71,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         View inner = wkVBinding.viewPagerOuter.getChildCount() > 0 ? wkVBinding.viewPagerOuter.getChildAt(0) : null;
         if (inner instanceof RecyclerView) {
             ((RecyclerView) inner).setItemViewCacheSize(2);
+            inner.setOverScrollMode(View.OVER_SCROLL_NEVER);
         }
         showLoading(true, "");
     }
