@@ -48,4 +48,5 @@
     <string name="partner_avatar_upload_failed">Avatar upload failed</string>
 
     <string name="partner_selected_count">%1$d selected</string>
+    <string name="partner_works">Works</string>
 </resources>
