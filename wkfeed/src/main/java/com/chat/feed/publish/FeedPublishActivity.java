@@ -451,7 +451,13 @@ public class FeedPublishActivity extends Activity {
     private String normalizeUploadedPath(String path) {
         if (TextUtils.isEmpty(path)) return "";
         String v = path.trim();
+        if (v.startsWith(com.chat.base.config.WKApiConfig.baseUrl)) {
+            v = v.substring(com.chat.base.config.WKApiConfig.baseUrl.length());
+        }
         if (v.startsWith("/")) v = v.substring(1);
+        if (v.startsWith("file/preview/")) return v;
+        if (v.startsWith("common/")) return "file/preview/" + v;
+        if (v.startsWith("feed/")) return "file/preview/common/" + v;
         return v;
     }
 
