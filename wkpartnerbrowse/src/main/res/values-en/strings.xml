@@ -9,4 +9,20 @@
     <string name="partnerbrowse_say_hello">Say hello</string>
     <string name="partnerbrowse_hello_sent">Sent</string>
     <string name="partnerbrowse_default_hello_plain">Hi, can we practice languages together?</string>
+    <string name="partnerbrowse_checking_profile">Checking partner profile...</string>
+    <string name="partnerbrowse_need_photo_first">Upload at least one partner photo before entering</string>
+    <string name="partnerbrowse_profile_check_failed">Failed to check partner profile. Please retry.</string>
+    <string name="partnerbrowse_online_now">Online</string>
+    <string name="partnerbrowse_active_just_now">Active just now</string>
+    <string name="partnerbrowse_active_minutes">Active %1$d min ago</string>
+    <string name="partnerbrowse_active_hours">Active %1$d h ago</string>
+    <string name="partnerbrowse_active_days">Active %1$d d ago</string>
+    <string name="partnerbrowse_active_suffix">active</string>
+    <string name="partnerbrowse_photo_required_tip">Upload at least one partner photo before browsing. Tags are optional, but a photo is required.</string>
+    <string name="partnerbrowse_go_upload_photo">Upload profile</string>
+    <string name="partnerbrowse_last_online_just_now">Online just now</string>
+    <string name="partnerbrowse_last_online_format">Last online %1$s</string>
+    <string name="partnerbrowse_minutes_ago"> min ago</string>
+    <string name="partnerbrowse_hours_ago"> h ago</string>
+    <string name="partnerbrowse_days_ago"> d ago</string>
 </resources>
