@@ -16,7 +16,7 @@
 
     <View
         android:layout_width="match_parent"
-        android:layout_height="260dp"
+        android:layout_height="320dp"
         android:layout_gravity="bottom"
         android:background="@drawable/bg_partnerbrowse_bottom_mask" />
 
@@ -43,68 +43,121 @@
         android:orientation="vertical"
         android:paddingStart="18dp"
         android:paddingEnd="18dp"
-        android:paddingBottom="32dp">
-
-        <TextView
-            android:id="@+id/nameTv"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="#FFFFFFFF"
-            android:textSize="26sp"
-            android:textStyle="bold" />
+        android:paddingBottom="30dp">
 
         <LinearLayout
+            android:id="@+id/headerRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="7dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/metaTv"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="#E6FFFFFF"
-                android:textSize="14sp" />
+            <com.chat.base.ui.components.AvatarView
+                android:id="@+id/avatarView"
+                android:layout_width="58dp"
+                android:layout_height="58dp" />
 
             <LinearLayout
-                android:id="@+id/nearbyGroup"
-                android:layout_width="wrap_content"
-                android:layout_height="24dp"
-                android:layout_marginStart="10dp"
-                android:background="@drawable/bg_partnerbrowse_nearby_chip"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="8dp"
-                android:paddingEnd="9dp"
-                android:visibility="gone">
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-                <ImageView
-                    android:layout_width="13dp"
-                    android:layout_height="13dp"
-                    android:src="@drawable/ic_partnerbrowse_nearby_badge" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/nameTv"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/ageSexTv"
+                        android:layout_width="wrap_content"
+                        android:layout_height="22dp"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/bg_partnerbrowse_meta_chip"
+                        android:gravity="center"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+                </LinearLayout>
 
                 <TextView
-                    android:id="@+id/nearbyTv"
+                    android:id="@+id/langTv"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:textColor="#FFFFFFFF"
-                    android:textSize="12sp"
+                    android:layout_marginTop="3dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#F2FFFFFF"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/lastOnlineTv"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="#CCFFFFFF"
+                        android:textSize="12sp" />
+
+                    <LinearLayout
+                        android:id="@+id/nearbyGroup"
+                        android:layout_width="wrap_content"
+                        android:layout_height="22dp"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/bg_partnerbrowse_nearby_chip"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="7dp"
+                        android:paddingEnd="8dp"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:layout_width="12dp"
+                            android:layout_height="12dp"
+                            android:src="@drawable/ic_partnerbrowse_nearby_badge" />
+
+                        <TextView
+                            android:id="@+id/nearbyTv"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/langTv"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:id="@+id/tagRow"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textColor="#FFFFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:layout_marginTop="12dp"
+            android:gravity="start|center_vertical"
+            android:orientation="horizontal" />
 
         <TextView
             android:id="@+id/introTv"
@@ -121,7 +174,7 @@
             android:id="@+id/actionBtn"
             android:layout_width="match_parent"
             android:layout_height="48dp"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="16dp"
             android:background="@drawable/bg_partnerbrowse_action_button"
             android:gravity="center"
             android:text="@string/partnerbrowse_say_hello"
