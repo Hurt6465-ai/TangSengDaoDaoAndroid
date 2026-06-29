@@ -66,4 +66,8 @@
     <string name="feed_report_received">တိုင်ကြားချက်ကို လက်ခံရရှိပါသည်</string>
     <string name="feed_publish_text_limit">အများဆုံး စာလုံးရေ ၂၈၀</string>
     <string name="feed_following_not_ready">Following feed ကို backend ချိတ်ပြီးမှ အသုံးပြုနိုင်ပါမည်</string>
+    <string name="feed_publish_storage_hint">နေရာချွေတာရန် ဗီဒီယိုများကို ရက် ၂၈ ပြီးလျှင် အလိုအလျောက် ဖျက်မည်။ ပုံနှင့်ဗီဒီယိုများကို ဖုန်းတွင် ချုံ့ပြီးမှ တင်မည်။</string>
+    <string name="feed_delete">ပို့စ်ဖျက်ရန်</string>
+    <string name="feed_delete_requested">ဖျက်ရန်တောင်းဆိုချက် ပေးပို့ပြီးပါပြီ</string>
+    <string name="feed_delete_not_ready">Backend ချိတ်ပြီးမှ ဖျက်ရန် API အသုံးပြုနိုင်ပါမည်</string>
 </resources>
