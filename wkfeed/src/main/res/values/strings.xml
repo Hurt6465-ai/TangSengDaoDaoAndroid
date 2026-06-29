@@ -65,4 +65,5 @@
     <string name="feed_report">举报</string>
     <string name="feed_report_received">已收到举报</string>
     <string name="feed_publish_text_limit">最多 280 字</string>
+    <string name="feed_following_not_ready">关注流后端接入后开放</string>
 </resources>
