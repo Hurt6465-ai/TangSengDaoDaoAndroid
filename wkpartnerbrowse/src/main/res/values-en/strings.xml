@@ -25,4 +25,10 @@
     <string name="partnerbrowse_minutes_ago"> min ago</string>
     <string name="partnerbrowse_hours_ago"> h ago</string>
     <string name="partnerbrowse_days_ago"> d ago</string>
+    <string name="partnerbrowse_location_prompt">Enable location to find nearby partners</string>
+    <string name="partnerbrowse_nearby_very_close">Nearby</string>
+    <string name="partnerbrowse_nearby_5km">Within 5 km</string>
+    <string name="partnerbrowse_nearby_10km">Within 10 km</string>
+    <string name="partnerbrowse_nearby_30km">Within 30 km</string>
+    <string name="partnerbrowse_nearby_70km">Within 70 km</string>
 </resources>
