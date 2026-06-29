@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.chat.base.ui.components.AvatarView;
 import com.chat.feed.R;
 import com.chat.feed.model.CommentBean;
+import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -127,7 +128,7 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
         int start = dp(holder.itemView, reply ? 62 : 15);
         holder.root.setPadding(start, holder.root.getPaddingTop(), holder.root.getPaddingRight(), holder.root.getPaddingBottom());
         holder.avatar.setSize(reply ? 28 : 38);
-        holder.avatar.showAvatarUrl(item.avatar, item.avatar_cache_key, item.name, item.uid);
+        bindCommentAvatar(holder.avatar, item);
         holder.nameTv.setText(item.name == null ? "" : item.name);
         holder.contentTv.setText(item.content == null ? "" : item.content);
         holder.timeTv.setText(item.created_at > 0 ? sdf.format(new Date(item.created_at)) : "");
@@ -167,6 +168,23 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
     @Override
     public int getItemCount() {
         return list.size();
+    }
+
+
+    private void bindCommentAvatar(AvatarView avatar, CommentBean item) {
+        if (avatar == null || item == null) return;
+        try {
+            if (item.uid != null && item.uid.length() > 0) {
+                // 评论接口有时不带 avatar 字段；用唐僧原生头像接口按 uid 拉，避免评论区全是字母头像。
+                avatar.showAvatar(item.uid, WKChannelType.PERSONAL, item.avatar_cache_key);
+            } else if (item.avatar != null && item.avatar.length() > 0) {
+                avatar.showAvatarUrl(item.avatar, item.avatar_cache_key, item.name, item.uid);
+            } else {
+                avatar.showDefaultAvatar(item.name, item.uid);
+            }
+        } catch (Throwable ignored) {
+            avatar.showDefaultAvatar(item.name, item.uid);
+        }
     }
 
     private int dp(View view, int value) {

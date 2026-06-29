@@ -32,7 +32,11 @@ import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     private static final String ARG_FEED_ID = "feed_id";
     private static final String ARG_COUNT = "count";
+    private static final String ARG_AUTHOR = "author";
+    private static final String ARG_CAPTION = "caption";
     private String feedId;
+    private String authorName = "";
+    private String caption = "";
     private String cursor = "";
     private boolean loading;
     private boolean hasMore = true;
@@ -51,10 +55,16 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     }
 
     public static FeedCommentBottomSheet newInstance(String feedId, int count) {
+        return newInstance(feedId, count, "", "");
+    }
+
+    public static FeedCommentBottomSheet newInstance(String feedId, int count, String author, String caption) {
         FeedCommentBottomSheet sheet = new FeedCommentBottomSheet();
         Bundle args = new Bundle();
         args.putString(ARG_FEED_ID, feedId);
         args.putInt(ARG_COUNT, count);
+        args.putString(ARG_AUTHOR, author == null ? "" : author);
+        args.putString(ARG_CAPTION, caption == null ? "" : caption);
         sheet.setArguments(args);
         return sheet;
     }
@@ -74,6 +84,8 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         super.onViewCreated(view, savedInstanceState);
         feedId = getArguments() == null ? "" : getArguments().getString(ARG_FEED_ID, "");
         commentCount = getArguments() == null ? 0 : getArguments().getInt(ARG_COUNT, 0);
+        authorName = getArguments() == null ? "" : getArguments().getString(ARG_AUTHOR, "");
+        caption = getArguments() == null ? "" : getArguments().getString(ARG_CAPTION, "");
         adapter = new FeedCommentAdapter();
         RecyclerView recyclerView = view.findViewById(R.id.commentRecyclerView);
         LinearLayoutManager layoutManager = new LinearLayoutManager(requireContext());
@@ -88,6 +100,16 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
             }
         });
         titleTv = view.findViewById(R.id.commentTitleTv);
+        TextView captionTv = view.findViewById(R.id.commentCaptionTv);
+        if (captionTv != null) {
+            if (TextUtils.isEmpty(caption)) {
+                captionTv.setVisibility(View.GONE);
+            } else {
+                String prefix = TextUtils.isEmpty(authorName) ? "" : "@" + authorName + "  ";
+                captionTv.setText(prefix + caption);
+                captionTv.setVisibility(View.VISIBLE);
+            }
+        }
         editText = view.findViewById(R.id.commentEditText);
         ImageButton closeBtn = view.findViewById(R.id.commentCloseBtn);
         ImageButton sendBtn = view.findViewById(R.id.commentSendBtn);
