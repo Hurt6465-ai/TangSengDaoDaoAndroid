@@ -10,9 +10,11 @@ public class PartnerGreetingResponse {
     public boolean hello_sent;
     public int greeting_status;
     public long next_allowed_at;
+    public int requester_msg_count;
+    public int max_greeting_count;
 
     public boolean isSuccessOrAlreadySent() {
-        return status == 1 || status == 200 || code == 200 || hello_sent || greeting_status == 1;
+        return status == 1 || status == 200 || code == 200 || hello_sent || greeting_status == 1 || requester_msg_count > 0;
     }
 
     public String getMessageSafe() {

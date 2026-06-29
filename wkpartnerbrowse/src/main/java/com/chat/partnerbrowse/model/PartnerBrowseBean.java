@@ -52,6 +52,9 @@ public class PartnerBrowseBean {
     public boolean hello_sent;
     public int apply_status;
     public int greeting_status;
+    public int requester_msg_count;
+    public int max_greeting_count;
+    public long next_allowed_at;
 
     public String getStableKey() {
         if (!TextUtils.isEmpty(uid)) return uid;
@@ -102,6 +105,27 @@ public class PartnerBrowseBean {
         hello_sent = true;
         if (apply_status == 0) apply_status = 1;
         if (greeting_status == 0) greeting_status = 1;
+        if (requester_msg_count <= 0) requester_msg_count = 1;
+        if (max_greeting_count <= 0) max_greeting_count = 3;
+    }
+
+    public int getMaxGreetingCountSafe() {
+        return max_greeting_count > 0 ? max_greeting_count : 3;
+    }
+
+    public boolean canSendMoreGreeting() {
+        if (follow == 1) return true;
+        if (!isHelloSent()) return true;
+        return requester_msg_count > 0 && requester_msg_count < getMaxGreetingCountSafe();
+    }
+
+    public void updateGreetingState(int count, int maxCount, long nextAllowedAt) {
+        hello_sent = true;
+        if (apply_status == 0) apply_status = 1;
+        if (greeting_status == 0) greeting_status = 1;
+        if (count > 0) requester_msg_count = count;
+        if (maxCount > 0) max_greeting_count = maxCount;
+        next_allowed_at = nextAllowedAt;
     }
 
     public int getDistanceMetersSafe() {
@@ -171,6 +195,9 @@ public class PartnerBrowseBean {
         args.putBoolean("hello_sent", hello_sent);
         args.putInt("apply_status", apply_status);
         args.putInt("greeting_status", greeting_status);
+        args.putInt("requester_msg_count", requester_msg_count);
+        args.putInt("max_greeting_count", max_greeting_count);
+        args.putLong("next_allowed_at", next_allowed_at);
         args.putLong("last_active_millis", getLastActiveMillisSafe());
         args.putLong("last_online_millis", last_online_millis);
         args.putInt("online", online);
@@ -205,6 +232,9 @@ public class PartnerBrowseBean {
         bean.hello_sent = args.getBoolean("hello_sent", false);
         bean.apply_status = args.getInt("apply_status", 0);
         bean.greeting_status = args.getInt("greeting_status", 0);
+        bean.requester_msg_count = args.getInt("requester_msg_count", 0);
+        bean.max_greeting_count = args.getInt("max_greeting_count", 0);
+        bean.next_allowed_at = args.getLong("next_allowed_at", 0L);
         bean.last_active_millis = args.getLong("last_active_millis", 0L);
         bean.last_online_millis = args.getLong("last_online_millis", 0L);
         bean.online = args.getInt("online", 0);
