@@ -12,11 +12,23 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.viewpager2.widget.ViewPager2;
 
+/**
+ * Gesture gate for an outer vertical ViewPager2 and an inner horizontal media area.
+ *
+ * duoshine/douyin does not have this exact nested horizontal pager case. Its useful rule is:
+ * vertical behavior is triggered only when the gesture is clearly vertical. Here we apply that
+ * rule more strictly, because a single image still needs to absorb left/right drags instead of
+ * letting the outer vertical pager switch pages.
+ */
 public class NestedScrollableHost extends FrameLayout {
     private static final int GESTURE_UNDECIDED = 0;
     private static final int GESTURE_HORIZONTAL = 1;
     private static final int GESTURE_VERTICAL = 2;
-    private static final float HORIZONTAL_LOCK_RATIO = 1.35f;
+
+    /** Horizontal is intentionally tolerant: left/right drags often contain small Y noise. */
+    private static final float HORIZONTAL_TOLERANCE = 0.55f;
+    /** Vertical must be clearly dominant before the outer vertical pager is released. */
+    private static final float VERTICAL_DOMINANCE = 1.35f;
 
     private float initialX;
     private float initialY;
@@ -42,17 +54,6 @@ public class NestedScrollableHost extends FrameLayout {
         return null;
     }
 
-    @Nullable
-    private ViewPager2 innerViewPager() {
-        View child = getChildCount() > 0 ? getChildAt(0) : null;
-        return child instanceof ViewPager2 ? (ViewPager2) child : null;
-    }
-
-    private boolean hasMultipleInnerPages() {
-        ViewPager2 pager = innerViewPager();
-        return pager != null && pager.getAdapter() != null && pager.getAdapter().getItemCount() > 1;
-    }
-
     private void requestParentDisallow(boolean disallow) {
         ViewParent parent = getParent();
         while (parent != null) {
@@ -76,31 +77,33 @@ public class NestedScrollableHost extends FrameLayout {
                 initialX = ev.getX();
                 initialY = ev.getY();
                 gestureDirection = GESTURE_UNDECIDED;
-                // 参考抖音项目：先看当前场景是否需要横向容器处理。
-                // 单图/视频页没有多图横滑能力，DOWN 阶段不要抢外层竖向 ViewPager2。
-                requestParentDisallow(hasMultipleInnerPages());
+                // Keep the current item protected until MOVE proves the gesture is vertical.
+                // This is what prevents a single-image left/right drag from becoming a page switch.
+                requestParentDisallow(true);
                 break;
             case MotionEvent.ACTION_MOVE:
                 float dx = ev.getX() - initialX;
                 float dy = ev.getY() - initialY;
                 float absDx = Math.abs(dx);
                 float absDy = Math.abs(dy);
-                if (absDx < touchSlop && absDy < touchSlop) return;
+                if (absDx < touchSlop && absDy < touchSlop) {
+                    requestParentDisallow(true);
+                    return;
+                }
 
                 if (gestureDirection == GESTURE_UNDECIDED) {
-                    if (hasMultipleInnerPages() && absDx > absDy * HORIZONTAL_LOCK_RATIO) {
+                    if (absDx >= touchSlop && absDx >= absDy * HORIZONTAL_TOLERANCE) {
                         gestureDirection = GESTURE_HORIZONTAL;
-                    } else if (absDy >= absDx) {
+                    } else if (absDy >= touchSlop && absDy >= absDx * VERTICAL_DOMINANCE) {
                         gestureDirection = GESTURE_VERTICAL;
                     } else {
-                        // 角度不明确时继续交给内层一点点，避免 45 度附近反复抢事件。
-                        requestParentDisallow(hasMultipleInnerPages());
+                        // Ambiguous diagonal movement: do not release to the vertical pager yet.
+                        requestParentDisallow(true);
                         return;
                     }
                 }
 
-                // 横向锁定后整次手势都不交给外层；最后一张/第一张继续横滑也不触发上下滑。
-                requestParentDisallow(gestureDirection == GESTURE_HORIZONTAL);
+                requestParentDisallow(gestureDirection != GESTURE_VERTICAL);
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
