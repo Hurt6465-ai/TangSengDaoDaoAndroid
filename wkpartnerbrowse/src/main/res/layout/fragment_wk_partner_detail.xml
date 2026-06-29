@@ -98,7 +98,7 @@
 
                 <LinearLayout
                     android:id="@+id/langGroup"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="3dp"
                     android:gravity="center_vertical"
@@ -106,34 +106,32 @@
 
                     <TextView
                         android:id="@+id/nativeLangTv"
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
+                        android:maxWidth="120dp"
                         android:ellipsize="end"
                         android:maxLines="1"
                         android:textColor="#F2FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:textSize="12sp" />
 
                     <ImageView
                         android:id="@+id/langExchangeIv"
-                        android:layout_width="22dp"
-                        android:layout_height="14dp"
-                        android:layout_marginStart="6dp"
-                        android:layout_marginEnd="6dp"
+                        android:layout_width="16dp"
+                        android:layout_height="10dp"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
                         android:alpha="0.78"
                         android:src="@drawable/ic_partnerbrowse_lang_exchange" />
 
                     <TextView
                         android:id="@+id/learningLangTv"
-                        android:layout_width="0dp"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
+                        android:maxWidth="120dp"
                         android:ellipsize="end"
                         android:maxLines="1"
                         android:textColor="#E6FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:textSize="12sp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -184,7 +182,7 @@
             android:id="@+id/tagRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="8dp"
             android:gravity="start|center_vertical"
             android:orientation="horizontal" />
 
@@ -192,7 +190,7 @@
             android:id="@+id/introTv"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             android:ellipsize="end"
             android:lineSpacingExtra="2dp"
             android:maxLines="2"
