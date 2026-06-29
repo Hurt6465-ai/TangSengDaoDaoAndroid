@@ -10,13 +10,9 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
-import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewConfiguration;
-import android.view.ViewParent;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ImageButton;
@@ -55,15 +51,12 @@ import java.util.List;
 import java.util.Set;
 
 public class FeedItemView extends android.widget.FrameLayout {
-    private static final int GESTURE_UNDECIDED = 0;
-    private static final int GESTURE_HORIZONTAL = 1;
-    private static final int GESTURE_VERTICAL = 2;
     private static final Set<String> LOCAL_FOLLOWED_UIDS = new HashSet<>();
 
+    private FeedGestureLayout feedRoot;
     private View imagePagerHost;
     private ViewPager2 imagePager;
     private PlayerView playerView;
-    private View videoGestureShield;
     private ImageView coverView;
     private ProgressBar videoLoading;
     private TextView playPauseView;
@@ -84,13 +77,8 @@ public class FeedItemView extends android.widget.FrameLayout {
     private FeedBean feed;
     private boolean active;
     private boolean descExpanded;
-    private GestureDetector gestureDetector;
     private ViewPager2.OnPageChangeCallback imagePageCallback;
 
-    private float videoGestureStartX;
-    private float videoGestureStartY;
-    private int videoGestureDirection = GESTURE_UNDECIDED;
-    private int touchSlop;
 
     public FeedItemView(@NonNull Context context) {
         this(context, null);
@@ -102,12 +90,11 @@ public class FeedItemView extends android.widget.FrameLayout {
     }
 
     private void init() {
-        touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
         LayoutInflater.from(getContext()).inflate(R.layout.view_feed_item, this, true);
+        feedRoot = findViewById(R.id.feedRoot);
         imagePagerHost = findViewById(R.id.imagePagerHost);
         imagePager = findViewById(R.id.imagePager);
         playerView = findViewById(R.id.playerView);
-        videoGestureShield = findViewById(R.id.videoGestureShield);
         coverView = findViewById(R.id.coverView);
         videoLoading = findViewById(R.id.videoLoading);
         playPauseView = findViewById(R.id.playPauseView);
@@ -137,41 +124,34 @@ public class FeedItemView extends android.widget.FrameLayout {
             if (animator != null) animator.setChangeDuration(0);
         }
 
-        gestureDetector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
-            @Override
-            public boolean onDown(@NonNull MotionEvent e) {
-                return true;
-            }
+        if (feedRoot != null) {
+            feedRoot.setGestureListener(new FeedGestureLayout.GestureListener() {
+                @Override
+                public boolean isGestureEnabled() {
+                    return feed != null;
+                }
 
-            @Override
-            public boolean onDoubleTap(@NonNull MotionEvent e) {
-                toggleLike(true);
-                showHeart(e.getX(), e.getY());
-                return true;
-            }
+                @Override
+                public boolean shouldIgnoreGesture(float x, float y) {
+                    return isPointInside(actionPanel, x, y) || isPointInside(descPanel, x, y);
+                }
 
-            @Override
-            public boolean onSingleTapConfirmed(@NonNull MotionEvent e) {
-                if (feed != null && feed.isVideo()) {
+                @Override
+                public void onSingleTap() {
+                    if (feed == null || !feed.isVideo()) return;
                     if (FeedPlayerManager.getInstance().isAttachedFeed(feed.stableKey())) {
                         FeedPlayerManager.getInstance().toggle();
                         postDelayed(() -> syncPlayPauseOverlay(true), 80);
                     } else {
                         play();
                     }
-                    return true;
                 }
-                return false;
-            }
-        });
 
-        if (videoGestureShield != null) {
-            videoGestureShield.setOnTouchListener((v, event) -> {
-                handleVideoGestureGate(event);
-                if (gestureDetector != null) {
-                    try { gestureDetector.onTouchEvent(event); } catch (Exception ignored) {}
+                @Override
+                public void onDoubleTap(float x, float y) {
+                    toggleLike(true);
+                    showHeart(x, y);
                 }
-                return true;
             });
         }
 
@@ -182,81 +162,6 @@ public class FeedItemView extends android.widget.FrameLayout {
         avatarView.setOnClickListener(v -> openProfile());
         nameTv.setOnClickListener(v -> openProfile());
         descTv.setOnClickListener(v -> toggleDescExpand());
-    }
-
-    @Override
-    public boolean dispatchTouchEvent(MotionEvent event) {
-        // 图片页继续旁路监听双击点赞；视频页由 videoGestureShield 统一处理，
-        // 避免 SurfaceView/PlayerView 触摸没有进入手势仲裁，导致左右拖动触发外层上下翻页。
-        if ((feed == null || !feed.isVideo()) && gestureDetector != null && shouldHandleMediaGesture(event)) {
-            try { gestureDetector.onTouchEvent(event); } catch (Exception ignored) {}
-        }
-        return super.dispatchTouchEvent(event);
-    }
-
-    private void handleVideoGestureGate(MotionEvent event) {
-        if (feed == null || !feed.isVideo()) return;
-        ViewPager2 parentPager = findParentViewPager();
-        if (parentPager == null || parentPager.getOrientation() != ViewPager2.ORIENTATION_VERTICAL) return;
-
-        switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                videoGestureStartX = event.getX();
-                videoGestureStartY = event.getY();
-                videoGestureDirection = GESTURE_UNDECIDED;
-                // 视频没有内层横向 ViewPager2，必须先锁住外层。否则 SurfaceView/PlayerView
-                // 的一次横向拖动会把少量 dy 交给外层竖向 ViewPager2，出现左右划触发上下翻页。
-                parentPager.requestDisallowInterceptTouchEvent(true);
-                parentPager.setUserInputEnabled(false);
-                break;
-            case MotionEvent.ACTION_MOVE:
-                float dx = event.getX() - videoGestureStartX;
-                float dy = event.getY() - videoGestureStartY;
-                float absDx = Math.abs(dx);
-                float absDy = Math.abs(dy);
-                if (absDx < touchSlop && absDy < touchSlop) {
-                    parentPager.requestDisallowInterceptTouchEvent(true);
-                    parentPager.setUserInputEnabled(false);
-                    return;
-                }
-
-                if (videoGestureDirection == GESTURE_UNDECIDED) {
-                    // 横向/斜横向都留在当前视频页；只有非常明确的竖向才交给外层翻页。
-                    if (absDy >= touchSlop && absDy >= absDx * 1.55f) {
-                        videoGestureDirection = GESTURE_VERTICAL;
-                    } else {
-                        videoGestureDirection = GESTURE_HORIZONTAL;
-                    }
-                }
-                boolean horizontal = videoGestureDirection == GESTURE_HORIZONTAL;
-                parentPager.requestDisallowInterceptTouchEvent(horizontal);
-                parentPager.setUserInputEnabled(!horizontal);
-                break;
-            case MotionEvent.ACTION_UP:
-            case MotionEvent.ACTION_CANCEL:
-                videoGestureDirection = GESTURE_UNDECIDED;
-                parentPager.requestDisallowInterceptTouchEvent(false);
-                parentPager.setUserInputEnabled(true);
-                break;
-            default:
-                break;
-        }
-    }
-
-    @Nullable
-    private ViewPager2 findParentViewPager() {
-        ViewParent parent = getParent();
-        while (parent instanceof View) {
-            if (parent instanceof ViewPager2) return (ViewPager2) parent;
-            parent = parent.getParent();
-        }
-        return null;
-    }
-
-    private boolean shouldHandleMediaGesture(MotionEvent event) {
-        float x = event.getX();
-        float y = event.getY();
-        return !isPointInside(actionPanel, x, y) && !isPointInside(descPanel, x, y);
     }
 
     private boolean isPointInside(View view, float x, float y) {
@@ -312,7 +217,6 @@ public class FeedItemView extends android.widget.FrameLayout {
         boolean video = item.isVideo();
         playerView.setVisibility(video ? VISIBLE : GONE);
         coverView.setVisibility(video ? VISIBLE : GONE);
-        if (videoGestureShield != null) videoGestureShield.setVisibility(video ? VISIBLE : GONE);
         videoLoading.setVisibility(GONE);
         playPauseView.setVisibility(GONE);
         imagePagerHost.setVisibility(video ? GONE : VISIBLE);
@@ -432,7 +336,6 @@ public class FeedItemView extends android.widget.FrameLayout {
         if (imagePager != null) imagePager.setAdapter(null);
         if (videoLoading != null) videoLoading.setVisibility(GONE);
         if (playPauseView != null) playPauseView.setVisibility(GONE);
-        if (videoGestureShield != null) videoGestureShield.setVisibility(GONE);
     }
 
     private void unregisterImageCallback() {
