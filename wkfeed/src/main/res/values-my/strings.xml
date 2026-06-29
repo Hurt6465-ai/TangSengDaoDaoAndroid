@@ -65,4 +65,5 @@
     <string name="feed_report">တိုင်ကြားရန်</string>
     <string name="feed_report_received">တိုင်ကြားချက်ကို လက်ခံရရှိပါသည်</string>
     <string name="feed_publish_text_limit">အများဆုံး စာလုံးရေ ၂၈၀</string>
+    <string name="feed_following_not_ready">Following feed ကို backend ချိတ်ပြီးမှ အသုံးပြုနိုင်ပါမည်</string>
 </resources>
