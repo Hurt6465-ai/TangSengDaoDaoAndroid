@@ -33,6 +33,14 @@
         android:scaleType="centerCrop"
         android:visibility="gone" />
 
+    <View
+        android:id="@+id/videoGestureShield"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:visibility="gone" />
+
     <ProgressBar
         android:id="@+id/videoLoading"
         style="?android:attr/progressBarStyleLarge"
@@ -44,16 +52,18 @@
 
     <TextView
         android:id="@+id/playPauseView"
-        android:layout_width="86dp"
-        android:layout_height="86dp"
+        android:layout_width="78dp"
+        android:layout_height="78dp"
         android:layout_gravity="center"
-        android:alpha="0.92"
-        android:background="@drawable/bg_feed_chip_dark"
+        android:alpha="0.96"
+        android:background="@drawable/bg_feed_play_pause"
+        android:clickable="false"
+        android:focusable="false"
         android:gravity="center"
-        android:paddingStart="6dp"
+        android:paddingStart="5dp"
         android:text="▶"
         android:textColor="#FFFFFFFF"
-        android:textSize="46sp"
+        android:textSize="42sp"
         android:visibility="gone" />
 
     <View
@@ -170,9 +180,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="30dp"
                 android:layout_marginStart="10dp"
-                android:background="@drawable/bg_feed_action_button"
+                android:background="@drawable/bg_feed_follow_button"
                 android:gravity="center"
-                android:minWidth="62dp"
+                android:minWidth="64dp"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
                 android:textColor="#FFFFFFFF"
