@@ -9,6 +9,7 @@
         <activity
             android:name=".publish.FeedPublishActivity"
             android:screenOrientation="portrait"
-            android:theme="@style/WKFeedFullScreenTheme" />
+            android:theme="@style/WKFeedFullScreenTheme"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>
