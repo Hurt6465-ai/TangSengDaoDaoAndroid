@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.OpenableColumns;
+import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.EditText;
@@ -113,19 +114,20 @@ public class FeedPublishActivity extends Activity {
         int remain = Math.max(1, FeedConfig.IMAGE_MAX_SELECT_COUNT - imageUris.size());
         Intent intent;
         if (Build.VERSION.SDK_INT >= 33) {
-            // Android 13+ Photo Picker：优先打开系统相册/照片选择器，不再直接进文件管理器。
-            intent = new Intent("android.provider.action.PICK_IMAGES");
+            // Android 13+ 直接走系统 Photo Picker，避免弹到文件管理器；支持一次多选。
+            intent = new Intent(MediaStore.ACTION_PICK_IMAGES);
             intent.setType("image/*");
-            intent.putExtra("android.provider.extra.PICK_IMAGES_MAX", remain);
+            intent.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, remain);
             intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        } else {
-            // 低版本尽量走相册类入口，同时保留多选能力；不同 ROM 可能回退到系统选择器。
-            intent = new Intent(Intent.ACTION_GET_CONTENT);
-            intent.setType("image/*");
-            intent.addCategory(Intent.CATEGORY_OPENABLE);
-            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            startActivityForResult(intent, REQ_PICK_IMAGES);
+            return;
         }
-        startActivityForResult(Intent.createChooser(intent, getString(R.string.feed_pick_images)), REQ_PICK_IMAGES);
+        // 低版本优先给相册类 App 处理，同时保留多选能力；不同 ROM 可能回退到系统选择器。
+        intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setType("image/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        startActivityForResult(intent, REQ_PICK_IMAGES);
     }
 
     private void openVideoPicker() {
@@ -134,8 +136,14 @@ public class FeedPublishActivity extends Activity {
             toast(getString(R.string.feed_publish_video_disabled));
             return;
         }
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        Intent intent;
+        if (Build.VERSION.SDK_INT >= 33) {
+            intent = new Intent(MediaStore.ACTION_PICK_IMAGES);
+            intent.setType("video/*");
+            startActivityForResult(intent, REQ_PICK_VIDEO);
+            return;
+        }
+        intent = new Intent(Intent.ACTION_PICK, MediaStore.Video.Media.EXTERNAL_CONTENT_URI);
         intent.setType("video/*");
         startActivityForResult(intent, REQ_PICK_VIDEO);
     }
