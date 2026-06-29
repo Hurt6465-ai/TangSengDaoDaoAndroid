@@ -1,13 +1,19 @@
 package com.chat.feed.browse;
 
+import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.Intent;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.GestureDetector;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
+import android.view.ViewParent;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -24,7 +30,6 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.bumptech.glide.Glide;
 import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.endpoint.EndpointSID;
-import com.chat.base.endpoint.entity.ChatViewMenu;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.base.net.entity.CommonResponse;
@@ -37,23 +42,27 @@ import com.chat.feed.model.FeedMedia;
 import com.chat.feed.model.FeedUser;
 import com.chat.feed.player.FeedPlayerManager;
 import com.chat.uikit.contacts.service.FriendModel;
-import com.chat.uikit.chat.manager.WKIMUtils;
-import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.util.List;
 
 public class FeedItemView extends android.widget.FrameLayout {
+    private static final int GESTURE_UNDECIDED = 0;
+    private static final int GESTURE_HORIZONTAL = 1;
+    private static final int GESTURE_VERTICAL = 2;
+
     private View imagePagerHost;
     private ViewPager2 imagePager;
     private PlayerView playerView;
     private ImageView coverView;
     private ProgressBar videoLoading;
+    private TextView playPauseView;
     private TextView indicatorTv;
     private AvatarView avatarView;
     private ImageButton likeBtn;
     private TextView likeCountTv;
     private ImageButton commentBtn;
     private TextView commentCountTv;
+    private ImageButton shareBtn;
     private TextView nameTv;
     private TextView metaTv;
     private TextView descTv;
@@ -63,8 +72,14 @@ public class FeedItemView extends android.widget.FrameLayout {
     private View descPanel;
     private FeedBean feed;
     private boolean active;
+    private boolean descExpanded;
     private GestureDetector gestureDetector;
     private ViewPager2.OnPageChangeCallback imagePageCallback;
+
+    private float videoGestureStartX;
+    private float videoGestureStartY;
+    private int videoGestureDirection = GESTURE_UNDECIDED;
+    private int touchSlop;
 
     public FeedItemView(@NonNull Context context) {
         this(context, null);
@@ -76,18 +91,21 @@ public class FeedItemView extends android.widget.FrameLayout {
     }
 
     private void init() {
+        touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
         LayoutInflater.from(getContext()).inflate(R.layout.view_feed_item, this, true);
         imagePagerHost = findViewById(R.id.imagePagerHost);
         imagePager = findViewById(R.id.imagePager);
         playerView = findViewById(R.id.playerView);
         coverView = findViewById(R.id.coverView);
         videoLoading = findViewById(R.id.videoLoading);
+        playPauseView = findViewById(R.id.playPauseView);
         indicatorTv = findViewById(R.id.imageIndicatorTv);
         avatarView = findViewById(R.id.avatarView);
         likeBtn = findViewById(R.id.likeBtn);
         likeCountTv = findViewById(R.id.likeCountTv);
         commentBtn = findViewById(R.id.commentBtn);
         commentCountTv = findViewById(R.id.commentCountTv);
+        shareBtn = findViewById(R.id.shareBtn);
         nameTv = findViewById(R.id.nameTv);
         metaTv = findViewById(R.id.metaTv);
         descTv = findViewById(R.id.descTv);
@@ -95,6 +113,7 @@ public class FeedItemView extends android.widget.FrameLayout {
         bigHeartView = findViewById(R.id.bigHeartView);
         actionPanel = findViewById(R.id.actionPanel);
         descPanel = findViewById(R.id.descPanel);
+
         imagePager.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
         imagePager.setOffscreenPageLimit(1);
         imagePager.setSaveEnabled(false);
@@ -105,6 +124,7 @@ public class FeedItemView extends android.widget.FrameLayout {
             RecyclerView.ItemAnimator animator = ((RecyclerView) innerPagerRecycler).getItemAnimator();
             if (animator != null) animator.setChangeDuration(0);
         }
+
         gestureDetector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onDown(@NonNull MotionEvent e) {
@@ -123,6 +143,7 @@ public class FeedItemView extends android.widget.FrameLayout {
                 if (feed != null && feed.isVideo()) {
                     if (FeedPlayerManager.getInstance().isAttachedFeed(feed.stableKey())) {
                         FeedPlayerManager.getInstance().toggle();
+                        postDelayed(() -> syncPlayPauseOverlay(true), 80);
                     } else {
                         play();
                     }
@@ -131,21 +152,74 @@ public class FeedItemView extends android.widget.FrameLayout {
                 return false;
             }
         });
+
         likeBtn.setOnClickListener(v -> toggleLike(false));
         commentBtn.setOnClickListener(v -> showComments());
+        shareBtn.setOnClickListener(v -> showShareMenu());
         actionBtn.setOnClickListener(v -> onActionClick());
         avatarView.setOnClickListener(v -> openProfile());
+        nameTv.setOnClickListener(v -> openProfile());
+        descTv.setOnClickListener(v -> toggleDescExpand());
     }
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
-        // GestureDetector 放在 dispatchTouchEvent 里“旁路监听”，不消费事件。
-        // 这样视频单击/双击更稳定，同时不会抢多图 ViewPager2 的左右滑手势，
-        // 也不会影响右侧点赞/评论按钮、底部资料区和打招呼按钮。
+        handleVideoGestureGate(event);
         if (gestureDetector != null && shouldHandleMediaGesture(event)) {
             try { gestureDetector.onTouchEvent(event); } catch (Exception ignored) {}
         }
         return super.dispatchTouchEvent(event);
+    }
+
+    private void handleVideoGestureGate(MotionEvent event) {
+        if (feed == null || !feed.isVideo() || !shouldHandleMediaGesture(event)) return;
+        ViewPager2 parentPager = findParentViewPager();
+        if (parentPager == null || parentPager.getOrientation() != ViewPager2.ORIENTATION_VERTICAL) return;
+
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                videoGestureStartX = event.getX();
+                videoGestureStartY = event.getY();
+                videoGestureDirection = GESTURE_UNDECIDED;
+                parentPager.requestDisallowInterceptTouchEvent(true);
+                break;
+            case MotionEvent.ACTION_MOVE:
+                float dx = event.getX() - videoGestureStartX;
+                float dy = event.getY() - videoGestureStartY;
+                float absDx = Math.abs(dx);
+                float absDy = Math.abs(dy);
+                if (absDx < touchSlop && absDy < touchSlop) return;
+
+                if (videoGestureDirection == GESTURE_UNDECIDED) {
+                    if (absDx >= touchSlop && absDx >= absDy * 0.55f) {
+                        videoGestureDirection = GESTURE_HORIZONTAL;
+                    } else if (absDy >= touchSlop && absDy >= absDx * 1.35f) {
+                        videoGestureDirection = GESTURE_VERTICAL;
+                    } else {
+                        parentPager.requestDisallowInterceptTouchEvent(true);
+                        return;
+                    }
+                }
+                parentPager.requestDisallowInterceptTouchEvent(videoGestureDirection == GESTURE_HORIZONTAL);
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                videoGestureDirection = GESTURE_UNDECIDED;
+                parentPager.requestDisallowInterceptTouchEvent(false);
+                break;
+            default:
+                break;
+        }
+    }
+
+    @Nullable
+    private ViewPager2 findParentViewPager() {
+        ViewParent parent = getParent();
+        while (parent instanceof View) {
+            if (parent instanceof ViewPager2) return (ViewPager2) parent;
+            parent = parent.getParent();
+        }
+        return null;
     }
 
     private boolean shouldHandleMediaGesture(MotionEvent event) {
@@ -161,27 +235,42 @@ public class FeedItemView extends android.widget.FrameLayout {
     }
 
     public void bind(FeedBean item) {
-        // 不能在 bind 里无脑 pause 全局播放器。ViewPager2 预加载下一页时也会 bind，
-        // 如果这里 pause，会把当前正在播放的页误停。
         recycleMediaOnly();
         feed = item;
+        descExpanded = false;
         if (item == null) return;
         FeedUser user = item.user;
         nameTv.setText("@" + item.userName());
         metaTv.setText(buildMeta(item));
-        descTv.setText(item.displayTitle());
+        bindDesc(item.displayTitle());
         likeCountTv.setText(formatCount(item.like_count));
         commentCountTv.setText(formatCount(item.comment_count));
         likeBtn.setImageResource(item.liked == 1 ? R.drawable.ic_feed_heart_fill : R.drawable.ic_feed_heart);
-        actionBtn.setEnabled(true);
-        actionBtn.setAlpha(1f);
+        actionBtn.setEnabled(user == null || user.follow != 1);
+        actionBtn.setAlpha(user != null && user.follow == 1 ? 0.72f : 1f);
         if (user != null) {
             bindAvatarSafely(user);
-            actionBtn.setText(user.follow == 1 ? R.string.feed_send_message : R.string.feed_say_hello);
+            actionBtn.setText(user.follow == 1 ? R.string.feed_followed : R.string.feed_follow);
         } else {
-            actionBtn.setText(R.string.feed_say_hello);
+            avatarView.showDefaultAvatar(item.userName(), item.userName());
+            actionBtn.setText(R.string.feed_follow);
         }
         bindMedia(item);
+    }
+
+    private void bindDesc(String text) {
+        String safeText = text == null ? "" : text.trim();
+        descTv.setVisibility(TextUtils.isEmpty(safeText) ? GONE : VISIBLE);
+        descTv.setText(safeText);
+        descTv.setMaxLines(4);
+        descTv.setEllipsize(TextUtils.TruncateAt.END);
+    }
+
+    private void toggleDescExpand() {
+        if (descTv == null || descTv.getVisibility() != VISIBLE) return;
+        descExpanded = !descExpanded;
+        descTv.setMaxLines(descExpanded ? Integer.MAX_VALUE : 4);
+        descTv.setEllipsize(descExpanded ? null : TextUtils.TruncateAt.END);
     }
 
     private void bindMedia(FeedBean item) {
@@ -190,13 +279,12 @@ public class FeedItemView extends android.widget.FrameLayout {
         playerView.setVisibility(video ? VISIBLE : GONE);
         coverView.setVisibility(video ? VISIBLE : GONE);
         videoLoading.setVisibility(GONE);
+        playPauseView.setVisibility(GONE);
         imagePagerHost.setVisibility(video ? GONE : VISIBLE);
         indicatorTv.setVisibility(!video && media.size() > 1 ? VISIBLE : GONE);
         if (video) {
             FeedMedia first = item.firstMedia();
-            if (first != null) {
-                Glide.with(coverView).load(first.thumbUrl()).centerCrop().dontAnimate().into(coverView);
-            }
+            if (first != null) Glide.with(coverView).load(first.thumbUrl()).centerCrop().dontAnimate().into(coverView);
             FeedPlayerManager.getInstance().detach(playerView);
             if (active) play();
         } else {
@@ -238,6 +326,7 @@ public class FeedItemView extends android.widget.FrameLayout {
         if (TextUtils.isEmpty(playUrl)) return;
         coverView.setVisibility(VISIBLE);
         videoLoading.setVisibility(VISIBLE);
+        playPauseView.setVisibility(GONE);
         String feedId = feed.stableKey();
         FeedPlayerManager.getInstance().attach(getContext(), playerView, feedId, playUrl, true, new FeedPlayerManager.PlaybackCallback() {
             @Override
@@ -251,12 +340,14 @@ public class FeedItemView extends android.widget.FrameLayout {
                 if (!isCurrentPlayback(id)) return;
                 coverView.setVisibility(GONE);
                 videoLoading.setVisibility(GONE);
+                playPauseView.setVisibility(GONE);
             }
 
             @Override
             public void onEnded(@Nullable String id) {
                 if (!isCurrentPlayback(id)) return;
                 videoLoading.setVisibility(GONE);
+                playPauseView.setVisibility(VISIBLE);
             }
 
             @Override
@@ -264,6 +355,7 @@ public class FeedItemView extends android.widget.FrameLayout {
                 if (!isCurrentPlayback(id)) return;
                 coverView.setVisibility(VISIBLE);
                 videoLoading.setVisibility(GONE);
+                playPauseView.setVisibility(VISIBLE);
             }
         });
     }
@@ -282,6 +374,15 @@ public class FeedItemView extends android.widget.FrameLayout {
         }
         if (videoLoading != null) videoLoading.setVisibility(GONE);
         if (coverView != null && feed != null && feed.isVideo()) coverView.setVisibility(VISIBLE);
+        if (playPauseView != null && feed != null && feed.isVideo()) playPauseView.setVisibility(VISIBLE);
+    }
+
+    private void syncPlayPauseOverlay(boolean userToggle) {
+        if (feed == null || !feed.isVideo() || playPauseView == null) return;
+        boolean playing = FeedPlayerManager.getInstance().isPlaying();
+        playPauseView.setVisibility(playing ? GONE : VISIBLE);
+        if (playing && coverView != null) coverView.setVisibility(GONE);
+        if (userToggle && !playing && videoLoading != null) videoLoading.setVisibility(GONE);
     }
 
     public void recycle() {
@@ -295,6 +396,7 @@ public class FeedItemView extends android.widget.FrameLayout {
         if (coverView != null) Glide.with(coverView).clear(coverView);
         if (imagePager != null) imagePager.setAdapter(null);
         if (videoLoading != null) videoLoading.setVisibility(GONE);
+        if (playPauseView != null) playPauseView.setVisibility(GONE);
     }
 
     private void unregisterImageCallback() {
@@ -404,42 +506,93 @@ public class FeedItemView extends android.widget.FrameLayout {
     private void onActionClick() {
         if (feed == null || feed.user == null || TextUtils.isEmpty(feed.user.uid)) return;
         final FeedUser target = feed.user;
-        if (target.follow == 1) {
-            try {
-                FragmentActivity activity = findFragmentActivity(getContext());
-                if (activity == null) {
-                    Toast.makeText(getContext(), R.string.feed_action_unavailable, Toast.LENGTH_SHORT).show();
-                    return;
+        if (target.follow == 1) return;
+        try {
+            actionBtn.setEnabled(false);
+            FriendModel.getInstance().applyAddFriend(target.uid, target.vercode, getResources().getString(R.string.feed_follow), (code, msg) -> {
+                if (feed == null || feed.user != target) return;
+                if (code == HttpResponseCode.success) {
+                    target.follow = 1;
+                    actionBtn.setText(R.string.feed_followed);
+                    actionBtn.setAlpha(0.72f);
+                    actionBtn.setEnabled(false);
+                } else {
+                    actionBtn.setEnabled(true);
+                    Toast.makeText(getContext(), TextUtils.isEmpty(msg) ? getResources().getString(R.string.feed_action_unavailable) : msg, Toast.LENGTH_SHORT).show();
                 }
-                WKIMUtils.getInstance().startChatActivity(new ChatViewMenu(activity, target.uid, WKChannelType.PERSONAL, 0, false));
-            } catch (Throwable ignored) {
-                Toast.makeText(getContext(), R.string.feed_action_unavailable, Toast.LENGTH_SHORT).show();
-            }
-        } else {
-            try {
-                actionBtn.setEnabled(false);
-                FriendModel.getInstance().applyAddFriend(target.uid, target.vercode, getResources().getString(R.string.feed_say_hello), (code, msg) -> {
-                    if (feed == null || feed.user != target) return;
-                    if (code == HttpResponseCode.success) {
-                        actionBtn.setText(R.string.feed_hello_sent);
-                        actionBtn.setAlpha(0.65f);
-                        actionBtn.setEnabled(false);
-                    } else {
-                        actionBtn.setEnabled(true);
-                        Toast.makeText(getContext(), TextUtils.isEmpty(msg) ? getResources().getString(R.string.feed_action_unavailable) : msg, Toast.LENGTH_SHORT).show();
-                    }
-                });
-            } catch (Throwable ignored) {
-                actionBtn.setEnabled(true);
-                Toast.makeText(getContext(), R.string.feed_action_unavailable, Toast.LENGTH_SHORT).show();
-            }
+            });
+        } catch (Throwable ignored) {
+            actionBtn.setEnabled(true);
+            Toast.makeText(getContext(), R.string.feed_action_unavailable, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showShareMenu() {
+        if (feed == null) return;
+        String[] items = new String[]{
+                getResources().getString(R.string.feed_share_to_friend),
+                getResources().getString(R.string.feed_copy_link),
+                getResources().getString(R.string.feed_report)
+        };
+        new AlertDialog.Builder(getContext())
+                .setTitle(R.string.feed_share)
+                .setItems(items, (dialog, which) -> {
+                    if (which == 0) shareToSystem();
+                    else if (which == 1) copyShareLink();
+                    else Toast.makeText(getContext(), R.string.feed_report_received, Toast.LENGTH_SHORT).show();
+                })
+                .show();
+    }
+
+    private String buildShareLink() {
+        if (feed == null) return "";
+        String base = com.chat.base.config.WKApiConfig.baseUrl;
+        if (TextUtils.isEmpty(base)) base = "";
+        if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        return base + "/web/feed/" + feed.stableKey();
+    }
+
+    private String buildShareText() {
+        StringBuilder sb = new StringBuilder();
+        if (feed != null) {
+            sb.append("@").append(feed.userName());
+            String title = feed.displayTitle();
+            if (!TextUtils.isEmpty(title)) sb.append("\n").append(title);
+            String link = buildShareLink();
+            if (!TextUtils.isEmpty(link)) sb.append("\n").append(link);
+        }
+        return sb.toString();
+    }
+
+    private void shareToSystem() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_SEND);
+            intent.setType("text/plain");
+            intent.putExtra(Intent.EXTRA_TEXT, buildShareText());
+            getContext().startActivity(Intent.createChooser(intent, getResources().getString(R.string.feed_share)));
+        } catch (Throwable ignored) {
+            Toast.makeText(getContext(), R.string.feed_action_unavailable, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void copyShareLink() {
+        try {
+            ClipboardManager manager = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            if (manager != null) manager.setPrimaryClip(ClipData.newPlainText("feed", buildShareLink()));
+            Toast.makeText(getContext(), R.string.feed_link_copied, Toast.LENGTH_SHORT).show();
+        } catch (Throwable ignored) {
+            Toast.makeText(getContext(), R.string.feed_action_unavailable, Toast.LENGTH_SHORT).show();
         }
     }
 
     private void bindAvatarSafely(FeedUser user) {
         if (user == null) return;
+        String avatar = user.avatar;
+        if (TextUtils.isEmpty(avatar) && !TextUtils.isEmpty(user.uid)) {
+            avatar = "users/" + user.uid + "/avatar";
+        }
         try {
-            avatarView.showAvatarUrl(user.avatar, user.avatar_cache_key, user.name, user.uid);
+            avatarView.showAvatarUrl(avatar, user.avatar_cache_key, user.name, user.uid);
         } catch (Throwable ignored) {
             avatarView.showDefaultAvatar(user.name, user.uid);
         }
@@ -451,11 +604,9 @@ public class FeedItemView extends android.widget.FrameLayout {
             Class<?> route = Class.forName("com.chat.partner.profile.PartnerProfileRoute");
             route.getMethod("open", Context.class, String.class).invoke(null, getContext(), feed.user.uid);
             return;
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
         try {
             EndpointManager.getInstance().invoke(EndpointSID.userDetailView, feed.user.uid);
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) {}
     }
 }
