@@ -25,4 +25,10 @@
     <string name="partnerbrowse_minutes_ago">分钟前</string>
     <string name="partnerbrowse_hours_ago">小时前</string>
     <string name="partnerbrowse_days_ago">天前</string>
+    <string name="partnerbrowse_location_prompt">打开定位，发现附近语伴</string>
+    <string name="partnerbrowse_nearby_very_close">附近</string>
+    <string name="partnerbrowse_nearby_5km">5公里内</string>
+    <string name="partnerbrowse_nearby_10km">10公里内</string>
+    <string name="partnerbrowse_nearby_30km">30公里内</string>
+    <string name="partnerbrowse_nearby_70km">70公里内</string>
 </resources>
