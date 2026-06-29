@@ -31,4 +31,7 @@
     <string name="partnerbrowse_nearby_10km">၁၀ ကီလိုမီတာအတွင်း</string>
     <string name="partnerbrowse_nearby_30km">၃၀ ကီလိုမီတာအတွင်း</string>
     <string name="partnerbrowse_nearby_70km">၇၀ ကီလိုမီတာအတွင်း</string>
+    <string name="partnerbrowse_hello_again">ထပ်မံနှုတ်ဆက်မယ်</string>
+    <string name="partnerbrowse_last_hello">နောက်ဆုံးနှုတ်ဆက်ချက်</string>
+    <string name="partnerbrowse_wait_reply">ပြန်စာစောင့်နေသည်</string>
 </resources>
