@@ -33,6 +33,7 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.bumptech.glide.Glide;
 import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.endpoint.EndpointSID;
+import com.chat.base.config.WKConfig;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.base.net.entity.CommonResponse;
@@ -78,7 +79,6 @@ public class FeedItemView extends android.widget.FrameLayout {
     private View descPanel;
     private FeedBean feed;
     private boolean active;
-    private boolean descExpanded;
     private ViewPager2.OnPageChangeCallback imagePageCallback;
 
 
@@ -158,12 +158,12 @@ public class FeedItemView extends android.widget.FrameLayout {
         }
 
         likeBtn.setOnClickListener(v -> { scaleClick(likeBtn); toggleLike(false); });
-        commentBtn.setOnClickListener(v -> { scaleClick(commentBtn); showComments(); });
+        commentBtn.setOnClickListener(v -> { scaleClick(commentBtn); showComments(false); });
         shareBtn.setOnClickListener(v -> { scaleClick(shareBtn); showShareMenu(); });
         actionBtn.setOnClickListener(v -> onActionClick());
         avatarView.setOnClickListener(v -> openProfile());
         nameTv.setOnClickListener(v -> openProfile());
-        descTv.setOnClickListener(v -> toggleDescExpand());
+        descTv.setOnClickListener(v -> showComments(true));
     }
 
     private boolean isPointInside(View view, float x, float y) {
@@ -175,7 +175,6 @@ public class FeedItemView extends android.widget.FrameLayout {
     public void bind(FeedBean item) {
         recycleMediaOnly();
         feed = item;
-        descExpanded = false;
         if (item == null) return;
         FeedUser user = item.user;
         nameTv.setText("@" + item.userName());
@@ -202,16 +201,14 @@ public class FeedItemView extends android.widget.FrameLayout {
     private void bindDesc(String text) {
         String safeText = text == null ? "" : text.trim();
         descTv.setVisibility(TextUtils.isEmpty(safeText) ? GONE : VISIBLE);
-        descTv.setText(safeText);
+        if (TextUtils.isEmpty(safeText)) {
+            descTv.setText("");
+            return;
+        }
+        // 抖音式：信息流里只折叠展示，不在原地撑开；点击文案打开评论窗口，顶部展示完整文案。
+        descTv.setText(safeText + "  ˅˅");
         descTv.setMaxLines(4);
         descTv.setEllipsize(TextUtils.TruncateAt.END);
-    }
-
-    private void toggleDescExpand() {
-        if (descTv == null || descTv.getVisibility() != VISIBLE) return;
-        descExpanded = !descExpanded;
-        descTv.setMaxLines(descExpanded ? Integer.MAX_VALUE : 4);
-        descTv.setEllipsize(descExpanded ? null : TextUtils.TruncateAt.END);
     }
 
     private void bindMedia(FeedBean item) {
@@ -421,11 +418,12 @@ public class FeedItemView extends android.widget.FrameLayout {
         bigHeartView.animate().alpha(0f).scaleX(1.5f).scaleY(1.5f).setDuration(520).withEndAction(() -> bigHeartView.setVisibility(GONE)).start();
     }
 
-    private void showComments() {
+    private void showComments(boolean fromCaption) {
         if (feed == null) return;
         FragmentActivity activity = findFragmentActivity(getContext());
         if (activity == null) return;
-        FeedCommentBottomSheet sheet = FeedCommentBottomSheet.newInstance(feed.stableKey(), feed.comment_count);
+        String caption = fromCaption ? feed.displayTitle() : "";
+        FeedCommentBottomSheet sheet = FeedCommentBottomSheet.newInstance(feed.stableKey(), feed.comment_count, feed.userName(), caption);
         sheet.setOnCommentSentListener(delta -> {
             if (feed == null) return;
             feed.comment_count += delta;
@@ -494,8 +492,8 @@ public class FeedItemView extends android.widget.FrameLayout {
         Dialog dialog = new Dialog(getContext());
         LinearLayout root = new LinearLayout(getContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(14), dp(18), dp(14));
-        root.setBackgroundResource(R.drawable.bg_feed_glass_sheet);
+        root.setPadding(dp(12), dp(10), dp(12), dp(10));
+        root.setBackgroundResource(R.drawable.bg_feed_share_dialog);
         root.addView(makeShareMenuItem(getResources().getString(R.string.feed_share_to_friend), v -> {
             dialog.dismiss();
             shareToSystem();
@@ -504,6 +502,12 @@ public class FeedItemView extends android.widget.FrameLayout {
             dialog.dismiss();
             copyShareLink();
         }));
+        if (isCreator()) {
+            root.addView(makeShareMenuItem(getResources().getString(R.string.feed_delete), v -> {
+                dialog.dismiss();
+                requestDeleteFeed();
+            }));
+        }
         root.addView(makeShareMenuItem(getResources().getString(R.string.feed_report), v -> {
             dialog.dismiss();
             Toast.makeText(getContext(), R.string.feed_report_received, Toast.LENGTH_SHORT).show();
@@ -513,26 +517,46 @@ public class FeedItemView extends android.widget.FrameLayout {
         Window window = dialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.setDimAmount(0.28f);
+            window.setDimAmount(0.48f);
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             WindowManager.LayoutParams lp = new WindowManager.LayoutParams();
             lp.copyFrom(window.getAttributes());
-            lp.width = getResources().getDisplayMetrics().widthPixels - dp(32);
+            lp.width = Math.min(getResources().getDisplayMetrics().widthPixels - dp(72), dp(360));
             lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
-            lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-            lp.y = dp(18);
+            lp.gravity = Gravity.CENTER;
             window.setAttributes(lp);
         }
+    }
+
+    private boolean isCreator() {
+        return feed != null && feed.user != null
+                && !TextUtils.isEmpty(feed.user.uid)
+                && feed.user.uid.equals(WKConfig.getInstance().getUid());
+    }
+
+    private void requestDeleteFeed() {
+        if (feed == null) return;
+        FeedModel.getInstance().delete(feed.stableKey(), new IRequestResultListener<CommonResponse>() {
+            @Override
+            public void onSuccess(CommonResponse result) {
+                Toast.makeText(getContext(), R.string.feed_delete_requested, Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                Toast.makeText(getContext(), TextUtils.isEmpty(msg) ? getResources().getString(R.string.feed_delete_not_ready) : msg, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private TextView makeShareMenuItem(String text, View.OnClickListener listener) {
         TextView item = new TextView(getContext());
         item.setText(text);
-        item.setTextColor(0xFFFFFFFF);
+        item.setTextColor(0xFF111827);
         item.setTextSize(16f);
-        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setGravity(Gravity.CENTER);
         item.setPadding(dp(18), 0, dp(18), 0);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(52));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(50));
         lp.setMargins(0, dp(2), 0, dp(2));
         item.setLayoutParams(lp);
         item.setOnClickListener(listener);
