@@ -19,7 +19,8 @@ public interface PartnerBrowseService {
     Observable<PartnerBrowseResponse> listPartners(@Query("cursor") String cursor,
                                                    @Query("page") int page,
                                                    @Query("limit") int limit,
-                                                   @Query("mode") String mode);
+                                                   @Query("mode") String mode,
+                                                   @Query("session_id") String sessionId);
 
     @GET("partners/profile/me")
     Observable<PartnerBrowseProfileMe> getPartnerProfileMe();
@@ -29,6 +30,9 @@ public interface PartnerBrowseService {
 
     @POST("partners/greetings")
     Observable<PartnerGreetingResponse> sendGreeting(@Body Map<String, Object> body);
+
+    @POST("partners/exposures")
+    Observable<Object> reportExposures(@Body Map<String, Object> body);
 
     @GET("users/{uid}")
     Observable<PartnerBrowseBean> getPartnerProfile(@Path("uid") String uid);

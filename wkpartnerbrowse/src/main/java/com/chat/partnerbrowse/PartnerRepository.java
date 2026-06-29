@@ -13,6 +13,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Repository for the fullscreen partner browser.
@@ -31,6 +32,7 @@ public final class PartnerRepository {
     };
 
     private static String cursor = "";
+    private static String sessionId = "";
     private static int round = 1;
     private static boolean reachedEnd = false;
 
@@ -39,6 +41,7 @@ public final class PartnerRepository {
 
     public static synchronized void resetPaging() {
         cursor = "";
+        sessionId = UUID.randomUUID().toString().replace("-", "");
         round = 1;
         reachedEnd = false;
     }
@@ -67,12 +70,15 @@ public final class PartnerRepository {
 
     public static void loadPartners(int page, int limit, Callback callback) {
         final String requestCursor;
+        final String requestSessionId;
         synchronized (PartnerRepository.class) {
             if (reachedEnd) {
                 if (callback != null) callback.onResult(new ArrayList<>(), "");
                 return;
             }
             requestCursor = cursor;
+            if (TextUtils.isEmpty(sessionId)) sessionId = UUID.randomUUID().toString().replace("-", "");
+            requestSessionId = sessionId;
         }
 
         if (PartnerBrowseConfig.DEBUG_MOCK) {
@@ -86,7 +92,7 @@ public final class PartnerRepository {
             return;
         }
 
-        PartnerBrowseModel.getInstance().listPartners(requestCursor, page, limit, new IRequestResultListener<PartnerBrowseResponse>() {
+        PartnerBrowseModel.getInstance().listPartners(requestCursor, page, limit, requestSessionId, new IRequestResultListener<PartnerBrowseResponse>() {
             @Override
             public void onSuccess(PartnerBrowseResponse result) {
                 List<PartnerBrowseBean> list = result == null ? new ArrayList<>() : filterDisplayable(result.getListSafe());
@@ -94,6 +100,7 @@ public final class PartnerRepository {
                     String newCursor = result == null ? "" : result.cursor;
                     boolean hasCursor = !TextUtils.isEmpty(newCursor);
                     if (hasCursor) {
+                        if (result != null && !TextUtils.isEmpty(result.session_id)) sessionId = result.session_id;
                         boolean cursorAdvanced = !TextUtils.equals(newCursor, cursor);
                         if (cursorAdvanced) cursor = newCursor;
                         if (list.isEmpty() || !cursorAdvanced) reachedEnd = true;

@@ -2,6 +2,8 @@ package com.chat.partnerbrowse;
 
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.Window;
@@ -20,10 +22,16 @@ import com.chat.partnerbrowse.databinding.ActivityWkPartnerBrowseBinding;
 import com.chat.partnerbrowse.model.PartnerBrowseBean;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrowseBinding> {
+    private static final int PAGE_LIMIT = 12;
+    private static final int EXPOSURE_DELAY_MS = 700;
+    private static final int EXPOSURE_BATCH_SIZE = 5;
+
     private final ArrayList<PartnerBrowseBean> partners = new ArrayList<>();
     private PartnerOuterAdapter adapter;
     private PartnerBrowseLocationManager locationManager;
@@ -36,6 +44,11 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     private int duplicatePageCount;
     private int page = 1;
     private ViewPager2.OnPageChangeCallback pageChangeCallback;
+    private final Handler exposureHandler = new Handler(Looper.getMainLooper());
+    private final ArrayList<Map<String, Object>> pendingExposures = new ArrayList<>();
+    private final HashSet<String> exposedKeys = new HashSet<>();
+    private int pendingExposurePosition = -1;
+    private long pendingExposureStartMs;
 
     @Override
     protected ActivityWkPartnerBrowseBinding getViewBinding() {
@@ -95,6 +108,9 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             profileRequired = false;
             profileEditOpened = false;
             PartnerRepository.resetPaging();
+            exposedKeys.clear();
+            pendingExposures.clear();
+            cancelPendingExposure();
             partners.clear();
             adapter.notifyDataSetChanged();
             ensureProfileThenLoad();
@@ -111,6 +127,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
                 PartnerImagePreloader.preloadNextUser(PartnerBrowseActivity.this, partners, position);
+                scheduleExposure(position);
                 if (profileGatePassed && !noMore && position >= partners.size() - 3) loadMore(false);
             }
         };
@@ -150,6 +167,12 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        flushExposures();
+    }
+
+    @Override
     protected void onDestroy() {
         try {
             if (wkVBinding != null && pageChangeCallback != null) {
@@ -159,6 +182,8 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         } catch (Throwable ignored) {
         }
         pageChangeCallback = null;
+        cancelPendingExposure();
+        flushExposures();
         super.onDestroy();
     }
 
@@ -217,7 +242,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         if (loading || noMore || !profileGatePassed) return;
         loading = true;
         if (first && partners.isEmpty()) showLoading(true, "");
-        PartnerRepository.loadPartners(page, 18, (newList, errorMsg) -> {
+        PartnerRepository.loadPartners(page, PAGE_LIMIT, (newList, errorMsg) -> {
             if (isFinishing() || isDestroyed()) return;
             loading = false;
             noMore = PartnerRepository.isReachedEnd();
@@ -242,6 +267,46 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
                 }
             }
         });
+    }
+
+
+    private void scheduleExposure(int position) {
+        cancelPendingExposure();
+        if (!profileGatePassed || position < 0 || position >= partners.size()) return;
+        pendingExposurePosition = position;
+        pendingExposureStartMs = System.currentTimeMillis();
+        exposureHandler.postDelayed(() -> commitExposureIfStillCurrent(position), EXPOSURE_DELAY_MS);
+    }
+
+    private void cancelPendingExposure() {
+        pendingExposurePosition = -1;
+        pendingExposureStartMs = 0L;
+        exposureHandler.removeCallbacksAndMessages(null);
+    }
+
+    private void commitExposureIfStillCurrent(int position) {
+        if (wkVBinding == null || !profileGatePassed) return;
+        if (pendingExposurePosition != position) return;
+        if (wkVBinding.viewPagerOuter.getCurrentItem() != position) return;
+        if (position < 0 || position >= partners.size()) return;
+        PartnerBrowseBean item = partners.get(position);
+        if (item == null) return;
+        String key = item.getStableKey();
+        if (TextUtils.isEmpty(key) || !exposedKeys.add(key)) return;
+        Map<String, Object> exposure = new HashMap<>();
+        exposure.put("to_uid", TextUtils.isEmpty(item.uid) ? item.id : item.uid);
+        exposure.put("seen_at", System.currentTimeMillis());
+        long duration = Math.max(EXPOSURE_DELAY_MS, System.currentTimeMillis() - pendingExposureStartMs);
+        exposure.put("duration_ms", duration);
+        pendingExposures.add(exposure);
+        if (pendingExposures.size() >= EXPOSURE_BATCH_SIZE) flushExposures();
+    }
+
+    private void flushExposures() {
+        if (pendingExposures.isEmpty()) return;
+        ArrayList<Map<String, Object>> copy = new ArrayList<>(pendingExposures);
+        pendingExposures.clear();
+        PartnerBrowseModel.getInstance().reportExposures(copy, null);
     }
 
     private int appendUnique(List<PartnerBrowseBean> list) {

@@ -9,6 +9,7 @@ import com.chat.partnerbrowse.model.PartnerBrowseResponse;
 import com.chat.partnerbrowse.model.PartnerGreetingResponse;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class PartnerBrowseModel extends WKBaseModel {
@@ -22,8 +23,8 @@ public class PartnerBrowseModel extends WKBaseModel {
         return Holder.INSTANCE;
     }
 
-    public void listPartners(String cursor, int page, int limit, IRequestResultListener<PartnerBrowseResponse> listener) {
-        request(createService(PartnerBrowseService.class).listPartners(cursor, page, limit, "browse"), listener);
+    public void listPartners(String cursor, int page, int limit, String sessionId, IRequestResultListener<PartnerBrowseResponse> listener) {
+        request(createService(PartnerBrowseService.class).listPartners(cursor, page, limit, "browse", sessionId), listener);
     }
 
     public void getPartnerProfileMe(final Callback<PartnerBrowseProfileMe> callback) {
@@ -63,6 +64,27 @@ public class PartnerBrowseModel extends WKBaseModel {
         request(createService(PartnerBrowseService.class).sendGreeting(body), new IRequestResultListener<>() {
             @Override
             public void onSuccess(PartnerGreetingResponse result) {
+                if (callback != null) callback.onResult(HttpResponseCode.success, "", result);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (callback != null) callback.onResult(code, msg, null);
+            }
+        });
+    }
+
+
+    public void reportExposures(List<Map<String, Object>> items, final Callback<Object> callback) {
+        if (items == null || items.isEmpty()) {
+            if (callback != null) callback.onResult(HttpResponseCode.success, "", null);
+            return;
+        }
+        Map<String, Object> body = new HashMap<>();
+        body.put("items", items);
+        request(createService(PartnerBrowseService.class).reportExposures(body), new IRequestResultListener<>() {
+            @Override
+            public void onSuccess(Object result) {
                 if (callback != null) callback.onResult(HttpResponseCode.success, "", result);
             }
 

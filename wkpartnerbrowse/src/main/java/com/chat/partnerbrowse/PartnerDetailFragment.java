@@ -178,7 +178,7 @@ public class PartnerDetailFragment extends Fragment {
         binding.lastOnlineTv.setText(lastOnline);
         binding.lastOnlineTv.setVisibility(TextUtils.isEmpty(lastOnline) ? View.GONE : View.VISIBLE);
 
-        String nearby = partner.getNearbyLabel();
+        String nearby = partner.getNearbyLabel(getContext());
         binding.nearbyGroup.setVisibility(TextUtils.isEmpty(nearby) ? View.GONE : View.VISIBLE);
         binding.nearbyTv.setText(nearby);
 

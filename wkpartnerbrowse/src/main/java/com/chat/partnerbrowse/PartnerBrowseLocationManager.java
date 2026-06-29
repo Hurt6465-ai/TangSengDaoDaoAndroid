@@ -223,6 +223,7 @@ public class PartnerBrowseLocationManager {
         body.put("accuracy", Math.max(0f, loc.getAccuracy()));
         body.put("radius_meters", RADIUS_METERS);
         body.put("expires_days", EXPIRES_DAYS);
+        body.put("source", TextUtils.equals(loc.getProvider(), LocationManager.GPS_PROVIDER) ? "gps" : "network");
         PartnerBrowseModel.getInstance().uploadLocation(body, (code, msg, data) -> {
             if (code == com.chat.base.net.HttpResponseCode.success || code == 200 || code == 0) {
                 markSuccess(loc);
