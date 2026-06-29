@@ -8,6 +8,7 @@ import java.util.Map;
 
 import io.reactivex.rxjava3.core.Observable;
 import retrofit2.http.Body;
+import retrofit2.http.DELETE;
 import retrofit2.http.GET;
 import retrofit2.http.POST;
 import retrofit2.http.Path;
@@ -38,4 +39,7 @@ public interface FeedService {
 
     @POST("feed/publish")
     Observable<CommonResponse> publish(@Body Map<String, Object> body);
+
+    @DELETE("feed/{feed_id}")
+    Observable<CommonResponse> delete(@Path("feed_id") String feedId);
 }

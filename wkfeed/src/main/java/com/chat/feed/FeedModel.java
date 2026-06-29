@@ -150,6 +150,18 @@ public class FeedModel extends WKBaseModel {
         });
     }
 
+    public void delete(String feedId, IRequestResultListener<CommonResponse> listener) {
+        if (TextUtils.isEmpty(feedId)) {
+            if (listener != null) listener.onFail(400, "作品不存在");
+            return;
+        }
+        if (FeedConfig.DEBUG_MOCK) {
+            if (listener != null) listener.onSuccess(null);
+            return;
+        }
+        request(createService(FeedService.class).delete(feedId), listener);
+    }
+
     public void getFeedUploadFileUrl(String localPath, String mediaType, IRequestResultListener<FeedUploadUrl> listener) {
         String ext = fileExt(localPath);
         String uid = WKConfig.getInstance().getUid();
