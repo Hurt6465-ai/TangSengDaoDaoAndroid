@@ -65,4 +65,5 @@
     <string name="feed_report">Report</string>
     <string name="feed_report_received">Report received</string>
     <string name="feed_publish_text_limit">Maximum 280 characters</string>
+    <string name="feed_following_not_ready">Following feed will be available after the backend is connected</string>
 </resources>
