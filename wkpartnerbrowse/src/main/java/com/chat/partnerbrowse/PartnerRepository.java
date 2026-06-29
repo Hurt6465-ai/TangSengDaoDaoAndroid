@@ -98,16 +98,14 @@ public final class PartnerRepository {
                 List<PartnerBrowseBean> list = result == null ? new ArrayList<>() : filterDisplayable(result.getListSafe());
                 synchronized (PartnerRepository.class) {
                     String newCursor = result == null ? "" : result.cursor;
-                    boolean hasCursor = !TextUtils.isEmpty(newCursor);
-                    if (hasCursor) {
-                        if (result != null && !TextUtils.isEmpty(result.session_id)) sessionId = result.session_id;
-                        boolean cursorAdvanced = !TextUtils.equals(newCursor, cursor);
-                        if (cursorAdvanced) cursor = newCursor;
-                        if (list.isEmpty() || !cursorAdvanced) reachedEnd = true;
-                    } else {
-                        // Page-mode backend: no cursor is normal. Use page size to infer the end.
-                        if (list.isEmpty() || (limit > 0 && list.size() < limit)) reachedEnd = true;
+                    boolean hasMore = result != null && result.has_more == 1;
+                    if (result != null && !TextUtils.isEmpty(result.session_id)) sessionId = result.session_id;
+                    if (!TextUtils.isEmpty(newCursor)) {
+                        cursor = newCursor;
                     }
+                    // New low-cost feed backend returns has_more explicitly. Do not infer endless pages
+                    // from list.size()==limit, otherwise the app may request duplicate empty pages.
+                    reachedEnd = list.isEmpty() || !hasMore;
                 }
                 rank(list);
                 putAll(list);

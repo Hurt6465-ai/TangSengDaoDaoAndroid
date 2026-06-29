@@ -259,6 +259,12 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
                 duplicatePageCount = 0;
                 adapter.notifyItemRangeInserted(start, inserted);
                 showContent();
+                int current = wkVBinding.viewPagerOuter.getCurrentItem();
+                if (current >= start && current < partners.size()) {
+                    scheduleExposure(current);
+                } else if (first && current >= 0 && current < partners.size()) {
+                    scheduleExposure(current);
+                }
             } else {
                 duplicatePageCount++;
                 if (duplicatePageCount >= 2) noMore = true;
@@ -306,7 +312,14 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         if (pendingExposures.isEmpty()) return;
         ArrayList<Map<String, Object>> copy = new ArrayList<>(pendingExposures);
         pendingExposures.clear();
-        PartnerBrowseModel.getInstance().reportExposures(copy, null);
+        PartnerBrowseModel.getInstance().reportExposures(copy, (code, msg, data) -> {
+            if (code == HttpResponseCode.success || code == 200 || code == 0) return;
+            // Network failure should not permanently lose exposure data during the same session.
+            // Keep the queue bounded so repeated failures cannot grow memory without limit.
+            if (!isFinishing() && !isDestroyed() && pendingExposures.size() < EXPOSURE_BATCH_SIZE * 2) {
+                pendingExposures.addAll(0, copy);
+            }
+        });
     }
 
     private int appendUnique(List<PartnerBrowseBean> list) {
