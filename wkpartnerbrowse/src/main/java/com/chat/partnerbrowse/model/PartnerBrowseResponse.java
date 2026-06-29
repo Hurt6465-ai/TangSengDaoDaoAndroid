@@ -8,6 +8,7 @@ public class PartnerBrowseResponse {
     public List<PartnerBrowseBean> partners;
     public List<PartnerBrowseBean> list;
     public String cursor;
+    public String session_id;
     public long server_time;
 
     public List<PartnerBrowseBean> getListSafe() {

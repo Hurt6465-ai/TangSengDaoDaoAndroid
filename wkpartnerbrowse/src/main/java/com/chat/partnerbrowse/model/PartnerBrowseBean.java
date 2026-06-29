@@ -1,11 +1,14 @@
 package com.chat.partnerbrowse.model;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.text.TextUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import com.chat.partnerbrowse.R;
 
 /**
  * Fullscreen partner-flow item. Kept inside wkpartnerbrowse so it does not collide with the
@@ -107,14 +110,14 @@ public class PartnerBrowseBean {
         return 0;
     }
 
-    public String getNearbyLabel() {
+    public String getNearbyLabel(Context context) {
         int meters = getDistanceMetersSafe();
-        if (meters <= 0 || meters > 70000) return "";
-        if (meters < 1000) return "附近";
-        if (meters < 5000) return "5公里内";
-        if (meters < 10000) return "10公里内";
-        if (meters < 30000) return "30公里内";
-        return "70公里内";
+        if (context == null || meters <= 0 || meters > 70000) return "";
+        if (meters < 1000) return context.getString(R.string.partnerbrowse_nearby_very_close);
+        if (meters < 5000) return context.getString(R.string.partnerbrowse_nearby_5km);
+        if (meters < 10000) return context.getString(R.string.partnerbrowse_nearby_10km);
+        if (meters < 30000) return context.getString(R.string.partnerbrowse_nearby_30km);
+        return context.getString(R.string.partnerbrowse_nearby_70km);
     }
 
     public List<String> getNativeLanguagesSafe() {
