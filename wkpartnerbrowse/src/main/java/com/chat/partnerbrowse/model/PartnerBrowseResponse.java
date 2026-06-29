@@ -9,6 +9,7 @@ public class PartnerBrowseResponse {
     public List<PartnerBrowseBean> list;
     public String cursor;
     public String session_id;
+    public int has_more;
     public long server_time;
 
     public List<PartnerBrowseBean> getListSafe() {
