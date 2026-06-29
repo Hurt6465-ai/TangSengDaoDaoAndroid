@@ -54,4 +54,15 @@
     <string name="feed_publish_upload_url_failed">获取上传地址失败</string>
     <string name="feed_publish_upload_failed">上传失败</string>
     <string name="feed_publish_upload_timeout">上传超时</string>
+    <string name="feed_tab_recommend">推荐</string>
+    <string name="feed_tab_following">关注</string>
+    <string name="feed_follow">关注</string>
+    <string name="feed_followed">已关注</string>
+    <string name="feed_share">分享</string>
+    <string name="feed_share_to_friend">分享给好友</string>
+    <string name="feed_copy_link">复制链接</string>
+    <string name="feed_link_copied">已复制链接</string>
+    <string name="feed_report">举报</string>
+    <string name="feed_report_received">已收到举报</string>
+    <string name="feed_publish_text_limit">最多 280 字</string>
 </resources>
