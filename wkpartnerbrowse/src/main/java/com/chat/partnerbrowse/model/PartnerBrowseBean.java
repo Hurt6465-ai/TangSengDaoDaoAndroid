@@ -74,8 +74,7 @@ public class PartnerBrowseBean {
 
     public boolean hasPartnerPhoto() {
         if (!getProfileImagesSafe().isEmpty()) return true;
-        if (!safeImageList(images).isEmpty()) return true;
-        return !TextUtils.isEmpty(profile_cover);
+        return !safeImageList(images).isEmpty();
     }
 
     public long getLastActiveMillisSafe() {
@@ -111,10 +110,11 @@ public class PartnerBrowseBean {
     public String getNearbyLabel() {
         int meters = getDistanceMetersSafe();
         if (meters <= 0 || meters > 70000) return "";
-        if (meters <= 5000) return "5km内";
-        if (meters <= 10000) return "10km内";
-        if (meters <= 30000) return "30km内";
-        return "70km内";
+        if (meters < 1000) return "附近";
+        if (meters < 5000) return "5公里内";
+        if (meters < 10000) return "10公里内";
+        if (meters < 30000) return "30公里内";
+        return "70公里内";
     }
 
     public List<String> getNativeLanguagesSafe() {
@@ -130,13 +130,15 @@ public class PartnerBrowseBean {
     }
 
     public List<String> getProfileImagesSafe() {
-        return safeStringList(profile_images, 9);
+        List<String> images = safeImageList(profile_images);
+        if (images.size() > 9) return new ArrayList<>(images.subList(0, 9));
+        return images;
     }
 
     public List<String> getDisplayImagesSafe() {
         ArrayList<String> out = new ArrayList<>();
-        addAll(out, safeImageList(images));
         addAll(out, getProfileImagesSafe());
+        addAll(out, safeImageList(images));
         if (!TextUtils.isEmpty(profile_cover)) out.add(profile_cover);
         if (!TextUtils.isEmpty(avatar)) out.add(avatar);
         ArrayList<String> deduped = dedupe(out);
