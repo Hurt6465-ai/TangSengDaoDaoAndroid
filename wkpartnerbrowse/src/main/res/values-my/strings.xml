@@ -25,4 +25,10 @@
     <string name="partnerbrowse_minutes_ago"> မိနစ်အကြာ</string>
     <string name="partnerbrowse_hours_ago"> နာရီအကြာ</string>
     <string name="partnerbrowse_days_ago"> ရက်အကြာ</string>
+    <string name="partnerbrowse_location_prompt">အနီးရှိ ဘာသာဖော်များ ရှာရန် တည်နေရာ ဖွင့်ပါ</string>
+    <string name="partnerbrowse_nearby_very_close">အနီးအနား</string>
+    <string name="partnerbrowse_nearby_5km">၅ ကီလိုမီတာအတွင်း</string>
+    <string name="partnerbrowse_nearby_10km">၁၀ ကီလိုမီတာအတွင်း</string>
+    <string name="partnerbrowse_nearby_30km">၃၀ ကီလိုမီတာအတွင်း</string>
+    <string name="partnerbrowse_nearby_70km">၇၀ ကီလိုမီတာအတွင်း</string>
 </resources>
