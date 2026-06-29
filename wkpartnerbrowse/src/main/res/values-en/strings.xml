@@ -31,4 +31,7 @@
     <string name="partnerbrowse_nearby_10km">Within 10 km</string>
     <string name="partnerbrowse_nearby_30km">Within 30 km</string>
     <string name="partnerbrowse_nearby_70km">Within 70 km</string>
+    <string name="partnerbrowse_hello_again">Say hi again</string>
+    <string name="partnerbrowse_last_hello">Last hello</string>
+    <string name="partnerbrowse_wait_reply">Waiting for reply</string>
 </resources>
