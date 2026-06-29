@@ -88,7 +88,13 @@ public class FeedGestureLayout extends FrameLayout {
             if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
                 ignoreThisGesture = listener.shouldIgnoreGesture(ev.getX(), ev.getY());
             }
-            if (!ignoreThisGesture) {
+            if (ignoreThisGesture) {
+                // Button/text areas should not trigger media single/double tap, but they still need
+                // protection from the outer vertical ViewPager2 while the click is settling.
+                // Otherwise a tiny vertical movement can steal the click, making Follow/Comment/Share
+                // feel hard to tap. Clear vertical swipes are still released to the parent.
+                handleIgnoredChildGestureGate(ev);
+            } else {
                 handleParentGestureGate(ev);
                 try {
                     gestureDetector.onTouchEvent(ev);
@@ -97,6 +103,39 @@ public class FeedGestureLayout extends FrameLayout {
             }
         }
         return super.dispatchTouchEvent(ev);
+    }
+
+    private void handleIgnoredChildGestureGate(MotionEvent ev) {
+        ViewPager2 parentPager = findParentVerticalPager();
+        if (parentPager == null) return;
+        switch (ev.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                downX = ev.getX();
+                downY = ev.getY();
+                gestureDirection = GESTURE_UNDECIDED;
+                parentPager.requestDisallowInterceptTouchEvent(true);
+                break;
+            case MotionEvent.ACTION_MOVE:
+                float dx = ev.getX() - downX;
+                float dy = ev.getY() - downY;
+                float absDx = Math.abs(dx);
+                float absDy = Math.abs(dy);
+                if (absDx < touchSlop && absDy < touchSlop) {
+                    parentPager.requestDisallowInterceptTouchEvent(true);
+                    return;
+                }
+                // If the user clearly starts a vertical swipe from the text/button area, allow page
+                // switching. Otherwise keep the child click/tap stable.
+                parentPager.requestDisallowInterceptTouchEvent(!(absDy >= touchSlop && absDy >= absDx * 1.35f));
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                gestureDirection = GESTURE_UNDECIDED;
+                parentPager.requestDisallowInterceptTouchEvent(false);
+                break;
+            default:
+                break;
+        }
     }
 
     private void handleParentGestureGate(MotionEvent ev) {

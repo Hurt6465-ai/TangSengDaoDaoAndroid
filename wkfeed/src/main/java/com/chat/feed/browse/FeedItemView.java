@@ -6,6 +6,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.text.TextUtils;
@@ -52,6 +53,7 @@ import java.util.Set;
 
 public class FeedItemView extends android.widget.FrameLayout {
     private static final Set<String> LOCAL_FOLLOWED_UIDS = new HashSet<>();
+    private static final String FOLLOW_PREF = "feed_local_follow";
 
     private FeedGestureLayout feedRoot;
     private View imagePagerHost;
@@ -155,9 +157,9 @@ public class FeedItemView extends android.widget.FrameLayout {
             });
         }
 
-        likeBtn.setOnClickListener(v -> toggleLike(false));
-        commentBtn.setOnClickListener(v -> showComments());
-        shareBtn.setOnClickListener(v -> showShareMenu());
+        likeBtn.setOnClickListener(v -> { scaleClick(likeBtn); toggleLike(false); });
+        commentBtn.setOnClickListener(v -> { scaleClick(commentBtn); showComments(); });
+        shareBtn.setOnClickListener(v -> { scaleClick(shareBtn); showShareMenu(); });
         actionBtn.setOnClickListener(v -> onActionClick());
         avatarView.setOnClickListener(v -> openProfile());
         nameTv.setOnClickListener(v -> openProfile());
@@ -445,10 +447,12 @@ public class FeedItemView extends android.widget.FrameLayout {
     private void onActionClick() {
         if (feed == null || feed.user == null || TextUtils.isEmpty(feed.user.uid)) return;
         final FeedUser target = feed.user;
-        // 这里不能再把好友关系当作关注关系。当前后端还没有真正 feed_follow 表，
-        // 前端先做本地关注态，避免“全是已关注”和按钮不可点。后端接入关注接口后，把这里替换成 /v1/feed/follow 即可。
+        scaleClick(actionBtn);
+        // 这里不能把“好友关系”当作“短视频关注关系”。当前后端还没有 feed_follow 表，
+        // 前端只保存一个本地临时关注态，避免按钮全是“已关注”或点击无响应。
+        // 后端接入后，把 setLocalFollowed(...) 换成 /v1/feed/follow 即可。
         if (!isLocalFollowed(target)) {
-            LOCAL_FOLLOWED_UIDS.add(target.uid);
+            setLocalFollowed(target.uid, true);
             target.follow = 1;
             actionBtn.setText(R.string.feed_followed);
             actionBtn.setAlpha(0.72f);
@@ -457,7 +461,32 @@ public class FeedItemView extends android.widget.FrameLayout {
     }
 
     private boolean isLocalFollowed(@Nullable FeedUser user) {
-        return user != null && !TextUtils.isEmpty(user.uid) && LOCAL_FOLLOWED_UIDS.contains(user.uid);
+        if (user == null || TextUtils.isEmpty(user.uid)) return false;
+        if (LOCAL_FOLLOWED_UIDS.contains(user.uid)) return true;
+        try {
+            return getContext().getSharedPreferences(FOLLOW_PREF, Context.MODE_PRIVATE).getBoolean(user.uid, false);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private void setLocalFollowed(String uid, boolean followed) {
+        if (TextUtils.isEmpty(uid)) return;
+        if (followed) LOCAL_FOLLOWED_UIDS.add(uid);
+        else LOCAL_FOLLOWED_UIDS.remove(uid);
+        try {
+            SharedPreferences preferences = getContext().getSharedPreferences(FOLLOW_PREF, Context.MODE_PRIVATE);
+            preferences.edit().putBoolean(uid, followed).apply();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void scaleClick(View view) {
+        if (view == null) return;
+        view.animate().cancel();
+        view.animate().scaleX(0.86f).scaleY(0.86f).setDuration(80)
+                .withEndAction(() -> view.animate().scaleX(1f).scaleY(1f).setDuration(110).start())
+                .start();
     }
 
     private void showShareMenu() {

@@ -6,6 +6,7 @@ import android.text.TextUtils;
 import android.view.View;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentActivity;
@@ -50,6 +51,9 @@ public class FeedBrowseActivity extends FragmentActivity {
     private ViewPager2.OnPageChangeCallback pageChangeCallback;
     private FeedPublishButtonController publishButtonController;
     private TextView publishBtn;
+    private View topTabs;
+    private TextView recommendTab;
+    private TextView followingTab;
     private int duplicatePageCount;
     private boolean destroyed;
     private final HashSet<String> seenKeys = new HashSet<>();
@@ -67,6 +71,10 @@ public class FeedBrowseActivity extends FragmentActivity {
         loadingView = findViewById(R.id.feedLoading);
         stateTv = findViewById(R.id.feedStateTv);
         publishBtn = findViewById(R.id.feedPublishBtn);
+        topTabs = findViewById(R.id.feedTopTabs);
+        recommendTab = findViewById(R.id.feedRecommendTab);
+        followingTab = findViewById(R.id.feedFollowingTab);
+        bindTopTabs();
         if (MODE_PROFILE.equals(mode)) {
             publishBtn.setVisibility(View.GONE);
         } else {
@@ -117,6 +125,39 @@ public class FeedBrowseActivity extends FragmentActivity {
         loadMore(true);
     }
 
+
+    private void bindTopTabs() {
+        if (topTabs == null || recommendTab == null || followingTab == null) return;
+        if (MODE_PROFILE.equals(mode)) {
+            topTabs.setVisibility(View.GONE);
+            return;
+        }
+        topTabs.setVisibility(View.VISIBLE);
+        updateTopTabState(false);
+        recommendTab.setOnClickListener(v -> {
+            if (!MODE_DISCOVER.equals(mode)) {
+                mode = MODE_DISCOVER;
+                updateTopTabState(false);
+                resetAndLoad();
+            } else {
+                updateTopTabState(false);
+            }
+        });
+        followingTab.setOnClickListener(v -> {
+            // 先不做全屏左右切换，避免和多图横滑冲突。
+            // 关注流需要后端 /v1/feed/following 接入后再真正切数据源。
+            updateTopTabState(false);
+            Toast.makeText(this, R.string.feed_following_not_ready, Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    private void updateTopTabState(boolean followingSelected) {
+        if (recommendTab == null || followingTab == null) return;
+        recommendTab.setTextColor(followingSelected ? 0x99FFFFFF : 0xFFFFFFFF);
+        recommendTab.setTextSize(followingSelected ? 16f : 17f);
+        followingTab.setTextColor(followingSelected ? 0xFFFFFFFF : 0x99FFFFFF);
+        followingTab.setTextSize(followingSelected ? 17f : 16f);
+    }
 
     private void openPublishForResult() {
         Intent intent = new Intent(this, FeedPublishActivity.class);
