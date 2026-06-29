@@ -93,13 +93,15 @@ public class FeedPublishActivity extends Activity {
     }
 
     private void bindListeners() {
-        closeTv.setOnClickListener(v -> {
-            if (uploading) {
-                toast(getString(R.string.feed_publish_wait_upload));
-                return;
-            }
-            finish();
-        });
+        if (closeTv != null) {
+            closeTv.setOnClickListener(v -> {
+                if (uploading) {
+                    toast(getString(R.string.feed_publish_wait_upload));
+                    return;
+                }
+                finish();
+            });
+        }
         pickImagesBtn.setOnClickListener(v -> openImagePicker());
         pickVideoBtn.setOnClickListener(v -> openVideoPicker());
         publishBtn.setOnClickListener(v -> startPublish());
@@ -111,7 +113,11 @@ public class FeedPublishActivity extends Activity {
             toast(getString(R.string.feed_publish_image_disabled));
             return;
         }
-        int remain = Math.max(1, FeedConfig.IMAGE_MAX_SELECT_COUNT - imageUris.size());
+        int remain = FeedConfig.IMAGE_MAX_SELECT_COUNT - imageUris.size();
+        if (remain <= 0) {
+            toast(getString(R.string.feed_publish_max_images, FeedConfig.IMAGE_MAX_SELECT_COUNT));
+            return;
+        }
         Intent intent;
         if (Build.VERSION.SDK_INT >= 33) {
             // Android 13+ 直接走系统 Photo Picker，避免弹到文件管理器；支持一次多选。
@@ -119,6 +125,7 @@ public class FeedPublishActivity extends Activity {
             intent.setType("image/*");
             intent.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, remain);
             intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivityForResult(intent, REQ_PICK_IMAGES);
             return;
         }
@@ -127,6 +134,7 @@ public class FeedPublishActivity extends Activity {
         intent.setType("image/*");
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivityForResult(intent, REQ_PICK_IMAGES);
     }
 
@@ -145,6 +153,7 @@ public class FeedPublishActivity extends Activity {
         }
         intent = new Intent(Intent.ACTION_PICK, MediaStore.Video.Media.EXTERNAL_CONTENT_URI);
         intent.setType("video/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivityForResult(intent, REQ_PICK_VIDEO);
     }
 
@@ -177,22 +186,32 @@ public class FeedPublishActivity extends Activity {
             for (int i = 0; i < clip.getItemCount(); i++) {
                 if (imageUris.size() >= FeedConfig.IMAGE_MAX_SELECT_COUNT) break;
                 Uri uri = clip.getItemAt(i).getUri();
-                if (uri != null) imageUris.add(uri);
+                addImageUriIfNeeded(uri);
             }
         } else if (data.getData() != null && imageUris.size() < FeedConfig.IMAGE_MAX_SELECT_COUNT) {
-            imageUris.add(data.getData());
+            addImageUriIfNeeded(data.getData());
         }
         if (imageUris.size() >= FeedConfig.IMAGE_MAX_SELECT_COUNT) {
             toast(getString(R.string.feed_publish_max_images, FeedConfig.IMAGE_MAX_SELECT_COUNT));
         }
     }
 
+    private void addImageUriIfNeeded(Uri uri) {
+        if (uri == null || imageUris.size() >= FeedConfig.IMAGE_MAX_SELECT_COUNT) return;
+        for (Uri old : imageUris) {
+            if (old != null && old.equals(uri)) return;
+        }
+        try {
+            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (Throwable ignored) {
+        }
+        imageUris.add(uri);
+    }
+
     private void refreshState() {
         pickVideoBtn.setVisibility(FeedConfig.ENABLE_VIDEO_PUBLISH ? View.VISIBLE : View.GONE);
         renderImagePreviews();
-        hintTv.setText(FeedConfig.ENABLE_VIDEO_PUBLISH
-                ? getString(R.string.feed_publish_hint_video_on, FeedConfig.IMAGE_MAX_SELECT_COUNT)
-                : getString(R.string.feed_publish_hint_video_off, FeedConfig.IMAGE_MAX_SELECT_COUNT));
+        hintTv.setText(getString(R.string.feed_publish_storage_hint));
         boolean hasMedia = !imageUris.isEmpty() || videoUri != null;
         publishBtn.setEnabled(hasMedia && !uploading);
         publishBtn.setAlpha(hasMedia && !uploading ? 1f : 0.45f);
