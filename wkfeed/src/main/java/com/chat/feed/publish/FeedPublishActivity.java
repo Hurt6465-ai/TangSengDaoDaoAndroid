@@ -5,6 +5,7 @@ import android.content.ClipData;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -109,11 +110,22 @@ public class FeedPublishActivity extends Activity {
             toast(getString(R.string.feed_publish_image_disabled));
             return;
         }
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("image/*");
-        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-        startActivityForResult(intent, REQ_PICK_IMAGES);
+        int remain = Math.max(1, FeedConfig.IMAGE_MAX_SELECT_COUNT - imageUris.size());
+        Intent intent;
+        if (Build.VERSION.SDK_INT >= 33) {
+            // Android 13+ Photo Picker：优先打开系统相册/照片选择器，不再直接进文件管理器。
+            intent = new Intent("android.provider.action.PICK_IMAGES");
+            intent.setType("image/*");
+            intent.putExtra("android.provider.extra.PICK_IMAGES_MAX", remain);
+            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        } else {
+            // 低版本尽量走相册类入口，同时保留多选能力；不同 ROM 可能回退到系统选择器。
+            intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("image/*");
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        }
+        startActivityForResult(Intent.createChooser(intent, getString(R.string.feed_pick_images)), REQ_PICK_IMAGES);
     }
 
     private void openVideoPicker() {
@@ -137,6 +149,7 @@ public class FeedPublishActivity extends Activity {
         } else if (requestCode == REQ_PICK_VIDEO) {
             videoUri = data.getData();
             if (videoUri != null) {
+                imageUris.clear();
                 String name = getDisplayName(videoUri);
                 videoInfoTv.setText(getString(R.string.feed_publish_video_selected, TextUtils.isEmpty(name) ? "video" : name));
                 videoInfoTv.setVisibility(View.VISIBLE);
@@ -146,6 +159,11 @@ public class FeedPublishActivity extends Activity {
     }
 
     private void addPickedImages(Intent data) {
+        videoUri = null;
+        if (videoInfoTv != null) {
+            videoInfoTv.setText("");
+            videoInfoTv.setVisibility(View.GONE);
+        }
         ClipData clip = data.getClipData();
         if (clip != null) {
             for (int i = 0; i < clip.getItemCount(); i++) {
@@ -206,8 +224,9 @@ public class FeedPublishActivity extends Activity {
         refreshState();
         List<Uri> images = new ArrayList<>(imageUris);
         Uri video = videoUri;
-        String text = textEt.getText() == null ? "" : textEt.getText().toString();
-        uploadExecutor.execute(() -> doPublish(text, images, video));
+        String rawText = textEt.getText() == null ? "" : textEt.getText().toString();
+        final String publishText = rawText.length() > 280 ? rawText.substring(0, 280) : rawText;
+        uploadExecutor.execute(() -> doPublish(publishText, images, video));
     }
 
     private void doPublish(String text, List<Uri> images, Uri video) {
