@@ -45,7 +45,7 @@
                 android:gravity="top|start"
                 android:hint="@string/feed_publish_text_hint"
                 android:inputType="textMultiLine|textCapSentences"
-                android:maxLength="500"
+                android:maxLength="280"
                 android:padding="14dp"
                 android:textColor="#FFFFFFFF"
                 android:textColorHint="#80FFFFFF"

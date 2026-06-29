@@ -42,10 +42,24 @@
         android:indeterminate="true"
         android:visibility="gone" />
 
+    <TextView
+        android:id="@+id/playPauseView"
+        android:layout_width="86dp"
+        android:layout_height="86dp"
+        android:layout_gravity="center"
+        android:alpha="0.92"
+        android:background="@drawable/bg_feed_chip_dark"
+        android:gravity="center"
+        android:paddingStart="6dp"
+        android:text="▶"
+        android:textColor="#FFFFFFFF"
+        android:textSize="46sp"
+        android:visibility="gone" />
+
     <View
         android:id="@+id/bottomMask"
         android:layout_width="match_parent"
-        android:layout_height="260dp"
+        android:layout_height="280dp"
         android:layout_gravity="bottom"
         android:background="@drawable/bg_feed_bottom_mask" />
 
@@ -69,21 +83,15 @@
         android:layout_width="64dp"
         android:layout_height="wrap_content"
         android:layout_gravity="end|bottom"
-        android:layout_marginEnd="12dp"
-        android:layout_marginBottom="98dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="92dp"
         android:gravity="center"
         android:orientation="vertical">
 
-        <com.chat.base.ui.components.AvatarView
-            android:id="@+id/avatarView"
-            android:layout_width="52dp"
-            android:layout_height="52dp" />
-
         <ImageButton
             android:id="@+id/likeBtn"
-            android:layout_width="52dp"
-            android:layout_height="52dp"
-            android:layout_marginTop="22dp"
+            android:layout_width="54dp"
+            android:layout_height="54dp"
             android:background="@null"
             android:scaleType="center"
             android:src="@drawable/ic_feed_heart" />
@@ -92,14 +100,15 @@
             android:id="@+id/likeCountTv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="-4dp"
             android:textColor="#FFFFFFFF"
             android:textSize="12sp" />
 
         <ImageButton
             android:id="@+id/commentBtn"
-            android:layout_width="52dp"
-            android:layout_height="52dp"
-            android:layout_marginTop="18dp"
+            android:layout_width="54dp"
+            android:layout_height="54dp"
+            android:layout_marginTop="14dp"
             android:background="@null"
             android:scaleType="center"
             android:src="@drawable/ic_feed_comment" />
@@ -108,8 +117,18 @@
             android:id="@+id/commentCountTv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="-4dp"
             android:textColor="#FFFFFFFF"
             android:textSize="12sp" />
+
+        <ImageButton
+            android:id="@+id/shareBtn"
+            android:layout_width="54dp"
+            android:layout_height="54dp"
+            android:layout_marginTop="14dp"
+            android:background="@null"
+            android:scaleType="center"
+            android:src="@drawable/ic_feed_share" />
     </LinearLayout>
 
     <LinearLayout
@@ -123,19 +142,49 @@
         android:paddingEnd="10dp"
         android:paddingBottom="34dp">
 
-        <TextView
-            android:id="@+id/nameTv"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:id="@+id/userRow"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#FFFFFFFF"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <com.chat.base.ui.components.AvatarView
+                android:id="@+id/avatarView"
+                android:layout_width="42dp"
+                android:layout_height="42dp" />
+
+            <TextView
+                android:id="@+id/nameTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="9dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/actionBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:layout_marginStart="10dp"
+                android:background="@drawable/bg_feed_action_button"
+                android:gravity="center"
+                android:minWidth="62dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/metaTv"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#D8FFFFFF"
@@ -147,23 +196,10 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:ellipsize="end"
-            android:maxLines="2"
+            android:lineSpacingExtra="2dp"
+            android:maxLines="4"
             android:textColor="#FFFFFFFF"
             android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/actionBtn"
-            android:layout_width="wrap_content"
-            android:layout_height="38dp"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/bg_feed_action_button"
-            android:gravity="center"
-            android:minWidth="96dp"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:textColor="#FFFFFFFF"
-            android:textSize="14sp"
-            android:textStyle="bold" />
     </LinearLayout>
 
     <ImageView
