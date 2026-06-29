@@ -11,11 +11,20 @@ import android.widget.FrameLayout;
 import androidx.annotation.Nullable;
 import androidx.viewpager2.widget.ViewPager2;
 
+/**
+ * Gesture gate for an outer vertical ViewPager2 and an inner horizontal image pager.
+ *
+ * It follows the same direction policy as the feed module: vertical paging is allowed only
+ * when the drag is clearly vertical. Horizontal and ambiguous drags stay on the current card,
+ * including single-image cards.
+ */
 public class NestedScrollableHost extends FrameLayout {
     private static final int GESTURE_UNDECIDED = 0;
     private static final int GESTURE_HORIZONTAL = 1;
     private static final int GESTURE_VERTICAL = 2;
-    private static final float HORIZONTAL_LOCK_RATIO = 1.35f;
+
+    private static final float HORIZONTAL_TOLERANCE = 0.55f;
+    private static final float VERTICAL_DOMINANCE = 1.35f;
 
     private float initialX;
     private float initialY;
@@ -33,17 +42,6 @@ public class NestedScrollableHost extends FrameLayout {
     public NestedScrollableHost(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
-    }
-
-    @Nullable
-    private ViewPager2 innerViewPager() {
-        View child = getChildCount() > 0 ? getChildAt(0) : null;
-        return child instanceof ViewPager2 ? (ViewPager2) child : null;
-    }
-
-    private boolean hasMultipleInnerPages() {
-        ViewPager2 pager = innerViewPager();
-        return pager != null && pager.getAdapter() != null && pager.getAdapter().getItemCount() > 1;
     }
 
     @Nullable
@@ -79,27 +77,30 @@ public class NestedScrollableHost extends FrameLayout {
                 initialX = e.getX();
                 initialY = e.getY();
                 gestureDirection = GESTURE_UNDECIDED;
-                requestParentDisallow(hasMultipleInnerPages());
+                requestParentDisallow(true);
                 break;
             case MotionEvent.ACTION_MOVE:
                 float dx = e.getX() - initialX;
                 float dy = e.getY() - initialY;
                 float absDx = Math.abs(dx);
                 float absDy = Math.abs(dy);
-                if (absDx < touchSlop && absDy < touchSlop) return;
+                if (absDx < touchSlop && absDy < touchSlop) {
+                    requestParentDisallow(true);
+                    return;
+                }
 
                 if (gestureDirection == GESTURE_UNDECIDED) {
-                    if (hasMultipleInnerPages() && absDx > absDy * HORIZONTAL_LOCK_RATIO) {
+                    if (absDx >= touchSlop && absDx >= absDy * HORIZONTAL_TOLERANCE) {
                         gestureDirection = GESTURE_HORIZONTAL;
-                    } else if (absDy >= absDx) {
+                    } else if (absDy >= touchSlop && absDy >= absDx * VERTICAL_DOMINANCE) {
                         gestureDirection = GESTURE_VERTICAL;
                     } else {
-                        requestParentDisallow(hasMultipleInnerPages());
+                        requestParentDisallow(true);
                         return;
                     }
                 }
 
-                requestParentDisallow(gestureDirection == GESTURE_HORIZONTAL);
+                requestParentDisallow(gestureDirection != GESTURE_VERTICAL);
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
