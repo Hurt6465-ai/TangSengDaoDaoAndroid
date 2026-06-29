@@ -66,4 +66,8 @@
     <string name="feed_report_received">已收到举报</string>
     <string name="feed_publish_text_limit">最多 280 字</string>
     <string name="feed_following_not_ready">关注流后端接入后开放</string>
+    <string name="feed_publish_storage_hint">空间有限，视频会在 28 天后自动删除；图片和视频会在手机端压缩后上传。</string>
+    <string name="feed_delete">删除作品</string>
+    <string name="feed_delete_requested">删除请求已提交</string>
+    <string name="feed_delete_not_ready">删除接口后端接入后可用</string>
 </resources>
