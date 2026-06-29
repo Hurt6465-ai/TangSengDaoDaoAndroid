@@ -31,4 +31,7 @@
     <string name="partnerbrowse_nearby_10km">10公里内</string>
     <string name="partnerbrowse_nearby_30km">30公里内</string>
     <string name="partnerbrowse_nearby_70km">70公里内</string>
+    <string name="partnerbrowse_hello_again">再打招呼</string>
+    <string name="partnerbrowse_last_hello">最后一次</string>
+    <string name="partnerbrowse_wait_reply">等待回复</string>
 </resources>
