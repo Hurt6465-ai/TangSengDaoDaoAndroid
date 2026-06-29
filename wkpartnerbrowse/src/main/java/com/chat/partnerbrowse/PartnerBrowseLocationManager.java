@@ -36,12 +36,14 @@ public class PartnerBrowseLocationManager {
     private static final String KEY_LAST_SUCCESS_MS = "last_success_ms";
     private static final String KEY_LAST_FAIL_MS = "last_fail_ms";
     private static final String KEY_LAST_PROMPT_CLOSE_MS = "last_prompt_close_ms";
+    private static final String KEY_AUTO_PERMISSION_ASKED_MS = "auto_permission_asked_ms";
     private static final String KEY_LAT = "lat";
     private static final String KEY_LNG = "lng";
 
     private static final long SUCCESS_CHECK_INTERVAL_MS = 24L * 60L * 60L * 1000L;
     private static final long FAIL_RETRY_INTERVAL_MS = 90L * 60L * 1000L;
     private static final long PROMPT_HIDE_INTERVAL_MS = 12L * 60L * 60L * 1000L;
+    private static final long AUTO_PERMISSION_REPEAT_MS = 30L * 24L * 60L * 60L * 1000L;
     private static final long ACCEPT_LAST_KNOWN_MS = 6L * 60L * 60L * 1000L;
     private static final long LOCATION_TIMEOUT_MS = 12L * 1000L;
     private static final float REUPLOAD_DISTANCE_METERS = 30_000f;
@@ -81,6 +83,25 @@ public class PartnerBrowseLocationManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             activity.requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
         }
+    }
+
+    /**
+     * Product-style first-entry permission request. Many social apps show the
+     * Android location permission dialog when the nearby page is opened, instead
+     * of asking the user to tap a small in-page prompt first.
+     *
+     * We only auto ask occasionally. If the user denies it, the soft top prompt
+     * remains as a manual fallback and we do not spam the system dialog.
+     */
+    public boolean requestPermissionOnFirstEntry(Activity activity) {
+        if (activity == null || hasLocationPermission()) return false;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false;
+        long now = System.currentTimeMillis();
+        long askedAt = sp == null ? 0L : sp.getLong(KEY_AUTO_PERMISSION_ASKED_MS, 0L);
+        if (askedAt > 0 && now - askedAt < AUTO_PERMISSION_REPEAT_MS) return false;
+        if (sp != null) sp.edit().putLong(KEY_AUTO_PERMISSION_ASKED_MS, now).apply();
+        requestPermission(activity);
+        return true;
     }
 
     public void maybeUpdateLocation(boolean userInitiated) {

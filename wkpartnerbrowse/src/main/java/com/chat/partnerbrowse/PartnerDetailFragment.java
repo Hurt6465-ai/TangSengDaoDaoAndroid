@@ -199,9 +199,30 @@ public class PartnerDetailFragment extends Fragment {
 
     private void updateActionButton() {
         if (binding == null || partner == null) return;
-        binding.actionBtn.setAlpha(partner.isHelloSent() ? 0.55f : 1f);
-        binding.actionBtn.setText(partner.follow == 1 ? R.string.partnerbrowse_send_message : (partner.isHelloSent() ? R.string.partnerbrowse_hello_sent : R.string.partnerbrowse_say_hello));
-        binding.actionBtn.setEnabled(!partner.isHelloSent() || partner.follow == 1);
+        if (partner.follow == 1) {
+            binding.actionBtn.setAlpha(1f);
+            binding.actionBtn.setText(R.string.partnerbrowse_send_message);
+            binding.actionBtn.setEnabled(true);
+            return;
+        }
+        if (!partner.isHelloSent()) {
+            binding.actionBtn.setAlpha(1f);
+            binding.actionBtn.setText(R.string.partnerbrowse_say_hello);
+            binding.actionBtn.setEnabled(true);
+            return;
+        }
+        int count = partner.requester_msg_count <= 0 ? 1 : partner.requester_msg_count;
+        int max = partner.getMaxGreetingCountSafe();
+        boolean canMore = count < max;
+        binding.actionBtn.setAlpha(canMore ? 1f : 0.55f);
+        if (!canMore) {
+            binding.actionBtn.setText(R.string.partnerbrowse_wait_reply);
+        } else if (count == max - 1) {
+            binding.actionBtn.setText(R.string.partnerbrowse_last_hello);
+        } else {
+            binding.actionBtn.setText(R.string.partnerbrowse_hello_again);
+        }
+        binding.actionBtn.setEnabled(canMore);
     }
 
     private void bindLanguages() {
@@ -317,14 +338,18 @@ public class PartnerDetailFragment extends Fragment {
             if (!isViewAlive() || partner != target) return;
             boolean success = code == HttpResponseCode.success && (data == null || data.isSuccessOrAlreadySent());
             if (success) {
-                target.markHelloSent();
+                if (data != null) {
+                    target.updateGreetingState(data.requester_msg_count, data.max_greeting_count, data.next_allowed_at);
+                } else {
+                    target.markHelloSent();
+                }
                 PartnerRepository.putOne(target);
                 updateActionButton();
                 if (data != null && !TextUtils.isEmpty(data.getMessageSafe())) {
                     Toast.makeText(requireContext(), data.getMessageSafe(), Toast.LENGTH_SHORT).show();
                 }
             } else {
-                binding.actionBtn.setEnabled(true);
+                updateActionButton();
                 String error = data == null ? msg : data.getMessageSafe();
                 if (!TextUtils.isEmpty(error)) Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show();
             }

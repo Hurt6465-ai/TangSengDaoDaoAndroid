@@ -22,6 +22,7 @@ import com.chat.partnerbrowse.databinding.ActivityWkPartnerBrowseBinding;
 import com.chat.partnerbrowse.model.PartnerBrowseBean;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +32,8 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     private static final int PAGE_LIMIT = 12;
     private static final int EXPOSURE_DELAY_MS = 700;
     private static final int EXPOSURE_BATCH_SIZE = 5;
+    private static final int LOCAL_RECYCLE_BATCH_SIZE = 12;
+    private static final int LOCAL_RECYCLE_MAX_ITEMS = 120;
 
     private final ArrayList<PartnerBrowseBean> partners = new ArrayList<>();
     private PartnerOuterAdapter adapter;
@@ -41,6 +44,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     private boolean profileRequired;
     private boolean profileEditOpened;
     private boolean noMore;
+    private boolean autoPermissionAskedThisOpen;
     private int duplicatePageCount;
     private int page = 1;
     private ViewPager2.OnPageChangeCallback pageChangeCallback;
@@ -107,6 +111,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             profileGatePassed = false;
             profileRequired = false;
             profileEditOpened = false;
+            autoPermissionAskedThisOpen = false;
             PartnerRepository.resetPaging();
             exposedKeys.clear();
             pendingExposures.clear();
@@ -128,7 +133,10 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
                 super.onPageSelected(position);
                 PartnerImagePreloader.preloadNextUser(PartnerBrowseActivity.this, partners, position);
                 scheduleExposure(position);
-                if (profileGatePassed && !noMore && position >= partners.size() - 3) loadMore(false);
+                if (profileGatePassed && position >= partners.size() - 3) {
+                    if (noMore) appendLocalCycleIfNeeded();
+                    else loadMore(false);
+                }
             }
         };
         wkVBinding.viewPagerOuter.registerOnPageChangeCallback(pageChangeCallback);
@@ -137,6 +145,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     @Override
     protected void initData() {
         ensureProfileThenLoad();
+        requestLocationPermissionOnFirstEntry();
         if (locationManager != null) locationManager.maybeUpdateLocation(false);
     }
 
@@ -201,6 +210,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             if (code == HttpResponseCode.success && data != null && data.hasPartnerPhoto()) {
                 profileGatePassed = true;
                 profileRequired = false;
+                requestLocationPermissionOnFirstEntry();
                 loadMore(true);
                 return;
             }
@@ -236,6 +246,14 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     private void updateLocationPrompt() {
         if (wkVBinding == null || locationManager == null) return;
         wkVBinding.locationPrompt.setVisibility(locationManager.shouldShowSoftPrompt() ? View.VISIBLE : View.GONE);
+    }
+
+    private void requestLocationPermissionOnFirstEntry() {
+        if (autoPermissionAskedThisOpen || locationManager == null) return;
+        autoPermissionAskedThisOpen = true;
+        if (locationManager.requestPermissionOnFirstEntry(this)) {
+            wkVBinding.locationPrompt.setVisibility(View.GONE);
+        }
     }
 
     private void loadMore(boolean first) {
@@ -334,6 +352,20 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             if (existKeys.add(key)) partners.add(item);
         }
         return partners.size() - before;
+    }
+
+
+    private void appendLocalCycleIfNeeded() {
+        if (partners.isEmpty() || partners.size() >= LOCAL_RECYCLE_MAX_ITEMS) return;
+        ArrayList<PartnerBrowseBean> copy = new ArrayList<>(partners);
+        Collections.shuffle(copy);
+        int start = partners.size();
+        int count = Math.min(LOCAL_RECYCLE_BATCH_SIZE, copy.size());
+        for (int i = 0; i < count; i++) {
+            PartnerBrowseBean item = copy.get(i);
+            if (item != null) partners.add(item);
+        }
+        if (partners.size() > start) adapter.notifyItemRangeInserted(start, partners.size() - start);
     }
 
     private void showContent() {
