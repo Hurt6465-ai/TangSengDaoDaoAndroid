@@ -8,12 +8,12 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.chat.base.base.WKBaseActivity;
-import com.chat.base.config.WKConfig;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.partnerbrowse.R;
 import com.chat.partnerbrowse.databinding.ActivityWkPartnerBrowseBinding;
@@ -26,9 +26,12 @@ import java.util.List;
 public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrowseBinding> {
     private final ArrayList<PartnerBrowseBean> partners = new ArrayList<>();
     private PartnerOuterAdapter adapter;
+    private PartnerBrowseLocationManager locationManager;
     private boolean loading;
     private boolean checkingProfile;
     private boolean profileGatePassed;
+    private boolean profileRequired;
+    private boolean profileEditOpened;
     private boolean noMore;
     private int duplicatePageCount;
     private int page = 1;
@@ -60,6 +63,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
 
     @Override
     protected void initView() {
+        locationManager = new PartnerBrowseLocationManager(this);
         PartnerRepository.resetPaging();
         adapter = new PartnerOuterAdapter(this, partners);
         wkVBinding.viewPagerOuter.setOrientation(ViewPager2.ORIENTATION_VERTICAL);
@@ -74,19 +78,33 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             inner.setOverScrollMode(View.OVER_SCROLL_NEVER);
         }
         showLoading(true, "");
+        updateLocationPrompt();
     }
 
     @Override
     protected void initListener() {
         wkVBinding.retryBtn.setOnClickListener(v -> {
+            if (profileRequired) {
+                openProfileEditOnce(true);
+                return;
+            }
             page = 1;
             noMore = false;
             duplicatePageCount = 0;
             profileGatePassed = false;
+            profileRequired = false;
+            profileEditOpened = false;
             PartnerRepository.resetPaging();
             partners.clear();
             adapter.notifyDataSetChanged();
             ensureProfileThenLoad();
+        });
+        wkVBinding.locationPrompt.setOnClickListener(v -> {
+            if (locationManager != null) locationManager.requestPermission(this);
+        });
+        wkVBinding.locationPromptClose.setOnClickListener(v -> {
+            if (locationManager != null) locationManager.suppressPromptTemporarily();
+            wkVBinding.locationPrompt.setVisibility(View.GONE);
         });
         pageChangeCallback = new ViewPager2.OnPageChangeCallback() {
             @Override
@@ -102,13 +120,32 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     @Override
     protected void initData() {
         ensureProfileThenLoad();
+        if (locationManager != null) locationManager.maybeUpdateLocation(false);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        updateLocationPrompt();
+        if (locationManager != null && locationManager.hasLocationPermission()) {
+            locationManager.maybeUpdateLocation(false);
+        }
         if (!profileGatePassed && !checkingProfile && partners.isEmpty()) {
             ensureProfileThenLoad();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PartnerBrowseLocationManager.REQUEST_LOCATION_PERMISSION && locationManager != null) {
+            updateLocationPrompt();
+            if (locationManager.hasLocationPermission()) {
+                locationManager.maybeUpdateLocation(true);
+            } else {
+                locationManager.suppressPromptTemporarily();
+                wkVBinding.locationPrompt.setVisibility(View.GONE);
+            }
         }
     }
 
@@ -131,23 +168,49 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             return;
         }
         checkingProfile = true;
+        profileRequired = false;
         showLoading(true, getString(R.string.partnerbrowse_checking_profile));
-        PartnerBrowseModel.getInstance().getPartnerProfile(WKConfig.getInstance().getUid(), (code, msg, data) -> {
+        PartnerBrowseModel.getInstance().getPartnerProfileMe((code, msg, data) -> {
             if (isFinishing() || isDestroyed()) return;
             checkingProfile = false;
             if (code == HttpResponseCode.success && data != null && data.hasPartnerPhoto()) {
                 profileGatePassed = true;
+                profileRequired = false;
                 loadMore(true);
                 return;
             }
             if (code == HttpResponseCode.success && data != null) {
-                showLoading(false, getString(R.string.partnerbrowse_need_photo_first));
-                showToast(getString(R.string.partnerbrowse_need_photo_first));
-                PartnerBrowseHostBridge.openProfileEdit(this);
+                showProfileRequiredGate(true);
             } else {
+                profileGatePassed = false;
+                profileRequired = false;
                 showLoading(false, TextUtils.isEmpty(msg) ? getString(R.string.partnerbrowse_profile_check_failed) : msg);
             }
         });
+    }
+
+    private void showProfileRequiredGate(boolean openEditor) {
+        profileGatePassed = false;
+        profileRequired = true;
+        partners.clear();
+        adapter.notifyDataSetChanged();
+        wkVBinding.viewPagerOuter.setVisibility(View.GONE);
+        wkVBinding.loadingLayout.setVisibility(View.VISIBLE);
+        wkVBinding.loadingTv.setText(R.string.partnerbrowse_photo_required_tip);
+        wkVBinding.retryBtn.setText(R.string.partnerbrowse_go_upload_photo);
+        wkVBinding.retryBtn.setVisibility(View.VISIBLE);
+        if (openEditor) openProfileEditOnce(false);
+    }
+
+    private void openProfileEditOnce(boolean force) {
+        if (!force && profileEditOpened) return;
+        profileEditOpened = true;
+        PartnerBrowseHostBridge.openProfileEdit(this);
+    }
+
+    private void updateLocationPrompt() {
+        if (wkVBinding == null || locationManager == null) return;
+        wkVBinding.locationPrompt.setVisibility(locationManager.shouldShowSoftPrompt() ? View.VISIBLE : View.GONE);
     }
 
     private void loadMore(boolean first) {
@@ -198,6 +261,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     private void showContent() {
         wkVBinding.loadingLayout.setVisibility(View.GONE);
         wkVBinding.viewPagerOuter.setVisibility(View.VISIBLE);
+        updateLocationPrompt();
     }
 
     private void showLoading(boolean loading, String msg) {
@@ -205,6 +269,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         wkVBinding.loadingLayout.setVisibility(View.VISIBLE);
         if (TextUtils.isEmpty(msg)) msg = loading ? getString(R.string.partnerbrowse_loading) : "";
         wkVBinding.loadingTv.setText(msg);
+        wkVBinding.retryBtn.setText(R.string.partnerbrowse_retry);
         wkVBinding.retryBtn.setVisibility(loading ? View.GONE : View.VISIBLE);
     }
 }

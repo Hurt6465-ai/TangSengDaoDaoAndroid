@@ -18,7 +18,9 @@ import com.chat.base.net.HttpResponseCode;
 import com.chat.base.utils.AndroidUtilities;
 import com.chat.partnerbrowse.databinding.FragmentWkPartnerDetailBinding;
 import com.chat.partnerbrowse.model.PartnerBrowseBean;
+import com.chat.partnerbrowse.model.PartnerGreetingResponse;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -83,9 +85,9 @@ public class PartnerDetailFragment extends Fragment {
         binding.avatarView.setVisibility(View.GONE);
         binding.nameTv.setText(R.string.partnerbrowse_loading);
         binding.ageSexTv.setVisibility(View.GONE);
-        binding.nearbyGroup.setVisibility(View.GONE);
-        binding.langTv.setVisibility(View.GONE);
+        binding.langGroup.setVisibility(View.GONE);
         binding.lastOnlineTv.setVisibility(View.GONE);
+        binding.nearbyGroup.setVisibility(View.GONE);
         binding.tagRow.removeAllViews();
         binding.tagRow.setVisibility(View.GONE);
         binding.introTv.setText(R.string.partnerbrowse_retry_tip);
@@ -101,9 +103,9 @@ public class PartnerDetailFragment extends Fragment {
         binding.avatarView.setVisibility(View.GONE);
         binding.nameTv.setText(R.string.partnerbrowse_empty);
         binding.ageSexTv.setVisibility(View.GONE);
-        binding.nearbyGroup.setVisibility(View.GONE);
-        binding.langTv.setVisibility(View.GONE);
+        binding.langGroup.setVisibility(View.GONE);
         binding.lastOnlineTv.setVisibility(View.GONE);
+        binding.nearbyGroup.setVisibility(View.GONE);
         binding.tagRow.removeAllViews();
         binding.tagRow.setVisibility(View.GONE);
         binding.introTv.setText(R.string.partnerbrowse_intro_empty);
@@ -168,13 +170,9 @@ public class PartnerDetailFragment extends Fragment {
         binding.avatarView.showFlag(partner.country_code);
 
         binding.nameTv.setText(partner.getNameSafe());
-        String ageSex = buildAgeSex();
-        binding.ageSexTv.setText(ageSex);
-        binding.ageSexTv.setVisibility(TextUtils.isEmpty(ageSex) ? View.GONE : View.VISIBLE);
+        binding.ageSexTv.setVisibility(View.GONE);
 
-        String lang = buildLanguages();
-        binding.langTv.setText(lang);
-        binding.langTv.setVisibility(TextUtils.isEmpty(lang) ? View.GONE : View.VISIBLE);
+        bindLanguages();
 
         String lastOnline = buildLastOnline();
         binding.lastOnlineTv.setText(lastOnline);
@@ -186,71 +184,87 @@ public class PartnerDetailFragment extends Fragment {
 
         bindTags(partner.getTagsSafe());
         binding.introTv.setText(TextUtils.isEmpty(partner.intro) ? getString(R.string.partnerbrowse_intro_empty) : partner.intro);
-        binding.actionBtn.setAlpha(partner.isHelloSent() ? 0.55f : 1f);
-        binding.actionBtn.setText(partner.follow == 1 ? R.string.partnerbrowse_send_message : (partner.isHelloSent() ? R.string.partnerbrowse_hello_sent : R.string.partnerbrowse_say_hello));
-        binding.actionBtn.setEnabled(!partner.isHelloSent() || partner.follow == 1);
+        updateActionButton();
         binding.actionBtn.setOnClickListener(v -> onActionClick());
 
         View.OnClickListener openProfile = v -> openProfilePage();
         binding.avatarView.setOnClickListener(openProfile);
         binding.nameTv.setOnClickListener(openProfile);
-        binding.ageSexTv.setOnClickListener(openProfile);
-        binding.langTv.setOnClickListener(openProfile);
+        binding.nativeLangTv.setOnClickListener(openProfile);
+        binding.learningLangTv.setOnClickListener(openProfile);
+        binding.langGroup.setOnClickListener(openProfile);
         binding.lastOnlineTv.setOnClickListener(openProfile);
         binding.introTv.setOnClickListener(openProfile);
+    }
+
+    private void updateActionButton() {
+        if (binding == null || partner == null) return;
+        binding.actionBtn.setAlpha(partner.isHelloSent() ? 0.55f : 1f);
+        binding.actionBtn.setText(partner.follow == 1 ? R.string.partnerbrowse_send_message : (partner.isHelloSent() ? R.string.partnerbrowse_hello_sent : R.string.partnerbrowse_say_hello));
+        binding.actionBtn.setEnabled(!partner.isHelloSent() || partner.follow == 1);
+    }
+
+    private void bindLanguages() {
+        if (binding == null || partner == null) return;
+        String nativeLang = join(partner.getNativeLanguagesSafe());
+        String learningLang = join(partner.getLearningLanguagesSafe());
+        boolean hasNative = !TextUtils.isEmpty(nativeLang);
+        boolean hasLearning = !TextUtils.isEmpty(learningLang);
+        binding.langGroup.setVisibility(hasNative || hasLearning ? View.VISIBLE : View.GONE);
+        binding.nativeLangTv.setText(nativeLang);
+        binding.learningLangTv.setText(learningLang);
+        binding.nativeLangTv.setVisibility(hasNative ? View.VISIBLE : View.GONE);
+        binding.learningLangTv.setVisibility(hasLearning ? View.VISIBLE : View.GONE);
+        binding.langExchangeIv.setVisibility(hasNative && hasLearning ? View.VISIBLE : View.GONE);
     }
 
     private void bindTags(List<String> tags) {
         if (binding == null) return;
         binding.tagRow.removeAllViews();
-        if (tags == null || tags.isEmpty()) {
+        List<String> clean = cleanTags(tags);
+        if (clean.isEmpty()) {
             binding.tagRow.setVisibility(View.GONE);
             return;
         }
         binding.tagRow.setVisibility(View.VISIBLE);
-        int max = Math.min(tags.size(), 5);
+        int max = Math.min(clean.size(), 3);
         for (int i = 0; i < max; i++) {
-            String tag = tags.get(i);
-            if (TextUtils.isEmpty(tag)) continue;
-            TextView chip = new TextView(requireContext());
-            chip.setText(tag);
-            chip.setTextColor(0xFFFFFFFF);
-            chip.setTextSize(12f);
-            chip.setGravity(android.view.Gravity.CENTER);
-            chip.setSingleLine(true);
-            chip.setBackgroundResource(R.drawable.bg_partnerbrowse_tag_chip);
-            chip.setPadding(AndroidUtilities.dp(10), 0, AndroidUtilities.dp(10), 0);
-            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(24));
-            lp.rightMargin = AndroidUtilities.dp(7);
-            binding.tagRow.addView(chip, lp);
+            addTagChip(clean.get(i));
         }
+        if (clean.size() > max) addTagChip("+" + (clean.size() - max));
+    }
+
+    private List<String> cleanTags(List<String> tags) {
+        ArrayList<String> out = new ArrayList<>();
+        if (tags == null) return out;
+        for (String tag : tags) {
+            if (TextUtils.isEmpty(tag)) continue;
+            String clean = tag.trim();
+            if (TextUtils.isEmpty(clean) || out.contains(clean)) continue;
+            out.add(clean);
+        }
+        return out;
+    }
+
+    private void addTagChip(String tag) {
+        TextView chip = new TextView(requireContext());
+        chip.setText(tag);
+        chip.setTextColor(0xFFFFFFFF);
+        chip.setTextSize(12f);
+        chip.setGravity(android.view.Gravity.CENTER);
+        chip.setSingleLine(true);
+        chip.setBackgroundResource(R.drawable.bg_partnerbrowse_tag_chip);
+        chip.setPadding(AndroidUtilities.dp(10), 0, AndroidUtilities.dp(10), 0);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(24));
+        lp.rightMargin = AndroidUtilities.dp(7);
+        binding.tagRow.addView(chip, lp);
     }
 
     private void openProfilePage() {
         if (!isViewAlive() || partner == null || TextUtils.isEmpty(partner.uid)) return;
         Context context = getContext();
         if (context != null) PartnerBrowseHostBridge.openProfile(context, partner.uid);
-    }
-
-    private String buildAgeSex() {
-        if (partner == null) return "";
-        String sex = "";
-        if (partner.sex == 1) sex = "♂";
-        else if (partner.sex == 0) sex = "♀";
-        if (partner.age > 0 && !TextUtils.isEmpty(sex)) return sex + " " + partner.age;
-        if (partner.age > 0) return String.valueOf(partner.age);
-        return sex;
-    }
-
-    private String buildLanguages() {
-        if (partner == null) return "";
-        String left = join(partner.getNativeLanguagesSafe());
-        String right = join(partner.getLearningLanguagesSafe());
-        if (TextUtils.isEmpty(left) && TextUtils.isEmpty(right)) return "";
-        if (TextUtils.isEmpty(left)) return right;
-        if (TextUtils.isEmpty(right)) return left;
-        return left + "  ↔  " + right;
     }
 
     private String buildLastOnline() {
@@ -299,16 +313,20 @@ public class PartnerDetailFragment extends Fragment {
             return;
         }
         binding.actionBtn.setEnabled(false);
-        PartnerBrowseHostBridge.applyAddFriend(requireContext(), target.uid, target.vercode, getString(R.string.partnerbrowse_default_hello_plain), (success, msg) -> {
+        PartnerBrowseModel.getInstance().sendGreeting(target.uid, getString(R.string.partnerbrowse_default_hello_plain), (code, msg, data) -> {
             if (!isViewAlive() || partner != target) return;
+            boolean success = code == HttpResponseCode.success && (data == null || data.isSuccessOrAlreadySent());
             if (success) {
                 target.markHelloSent();
-                binding.actionBtn.setText(R.string.partnerbrowse_hello_sent);
-                binding.actionBtn.setEnabled(false);
-                binding.actionBtn.setAlpha(0.55f);
+                PartnerRepository.putOne(target);
+                updateActionButton();
+                if (data != null && !TextUtils.isEmpty(data.getMessageSafe())) {
+                    Toast.makeText(requireContext(), data.getMessageSafe(), Toast.LENGTH_SHORT).show();
+                }
             } else {
                 binding.actionBtn.setEnabled(true);
-                if (!TextUtils.isEmpty(msg)) Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show();
+                String error = data == null ? msg : data.getMessageSafe();
+                if (!TextUtils.isEmpty(error)) Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show();
             }
         });
     }
