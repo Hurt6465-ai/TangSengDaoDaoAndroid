@@ -14,6 +14,7 @@ public class CommentBean implements Serializable {
     public String name;
     public String avatar;
     public String avatar_cache_key;
+    public String country_code;
     public String content;
     public long created_at;
     public int like_count;
