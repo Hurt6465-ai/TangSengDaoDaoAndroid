@@ -91,9 +91,20 @@ public class FeedWaterfallAdapter extends RecyclerView.Adapter<FeedWaterfallAdap
         holder.imageCountTv.setText("1/" + count);
         holder.titleTv.setText(item.displayTitle());
         FeedUser user = item.user;
+        holder.authorAvatar.setSize(22);
         if (user != null) {
-            holder.authorAvatar.showAvatarUrl(user.avatar, user.avatar_cache_key, user.name, user.uid);
-            holder.authorNameTv.setText(user.name == null ? "" : user.name);
+            String showName = firstNotEmpty(user.name, user.username, user.uid, item.userName());
+            if (user.uid != null && user.uid.length() > 0) {
+                // 作品瀑布流优先按 uid 走唐僧统一头像体系；接口没带 avatar 时也能加载头像，
+                // 不再轻易退成字母头像。
+                holder.authorAvatar.showAvatar(user.uid, com.xinbida.wukongim.entity.WKChannelType.PERSONAL, user.avatar_cache_key);
+            } else {
+                holder.authorAvatar.showAvatarUrl(user.avatar, user.avatar_cache_key, showName, showName);
+            }
+            if (user.country_code != null && user.country_code.length() > 0) {
+                holder.authorAvatar.showFlag(user.country_code);
+            }
+            holder.authorNameTv.setText(showName);
         } else {
             holder.authorAvatar.showDefaultAvatar(item.userName());
             holder.authorNameTv.setText(item.userName());
@@ -118,6 +129,14 @@ public class FeedWaterfallAdapter extends RecyclerView.Adapter<FeedWaterfallAdap
     @Override
     public int getItemCount() {
         return items.size();
+    }
+
+    private String firstNotEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && value.length() > 0) return value;
+        }
+        return "";
     }
 
     private String formatCount(int count) {
