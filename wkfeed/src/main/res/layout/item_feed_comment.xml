@@ -40,9 +40,10 @@
         <LinearLayout
             android:id="@+id/commentVoiceLayout"
             android:layout_width="wrap_content"
-            android:layout_height="44dp"
+            android:layout_height="46dp"
             android:layout_marginTop="6dp"
-            android:background="@drawable/bg_feed_comment_input"
+            android:background="@drawable/bg_feed_comment_voice_bubble"
+            android:minWidth="184dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingStart="10dp"
@@ -59,7 +60,7 @@
 
             <com.chat.uikit.view.WaveformView
                 android:id="@+id/commentVoiceWaveform"
-                android:layout_width="118dp"
+                android:layout_width="122dp"
                 android:layout_height="20dp"
                 android:layout_marginStart="7dp" />
 
