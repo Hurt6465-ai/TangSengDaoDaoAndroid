@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,6 +27,20 @@ import java.util.Locale;
 
 public class PartnerDetailFragment extends Fragment {
     private static final String KEY_STABLE = "stable_key";
+    /**
+     * 标签一行只展示真实标签，不再展示 +N。
+     * 规则：根据标签文字长度和当前可用宽度，自动显示 3~5 个。
+     * - 中文短标签估算宽度小，更容易显示到 4~5 个。
+     * - 外语长词估算宽度大，通常只显示 3 个。
+     * - 总标签数不足 3 个时按真实数量显示。
+     */
+    private static final int TAG_MIN_VISIBLE = 3;
+    private static final int TAG_MAX_VISIBLE = 5;
+    private static final int TAG_HORIZONTAL_MARGIN_DP = 7;
+    private static final int TAG_HORIZONTAL_PADDING_DP = 10;
+    private static final int TAG_HEIGHT_DP = 24;
+    private static final int TAG_MULTI_MAX_WIDTH_DP = 112;
+    private static final int TAG_SINGLE_MAX_WIDTH_DP = 150;
 
     private FragmentWkPartnerDetailBinding binding;
     private PartnerBrowseBean partner;
@@ -182,8 +197,9 @@ public class PartnerDetailFragment extends Fragment {
         binding.nearbyGroup.setVisibility(TextUtils.isEmpty(nearby) ? View.GONE : View.VISIBLE);
         binding.nearbyTv.setText(nearby);
 
-        bindTags(partner.getTagsSafe());
         binding.introTv.setText(TextUtils.isEmpty(partner.intro) ? getString(R.string.partnerbrowse_intro_empty) : partner.intro);
+        ensureIntroAboveTags();
+        bindTags(partner.getTagsSafe());
         updateActionButton();
         binding.actionBtn.setOnClickListener(v -> onActionClick());
 
@@ -248,11 +264,117 @@ public class PartnerDetailFragment extends Fragment {
             return;
         }
         binding.tagRow.setVisibility(View.VISIBLE);
-        int max = Math.min(clean.size(), 3);
-        for (int i = 0; i < max; i++) {
-            addTagChip(clean.get(i));
+
+        int availableWidth = getTagRowAvailableWidth();
+        int visibleCount = calculateVisibleTagCount(clean, availableWidth);
+        int maxChipWidth = calculateChipMaxWidth(visibleCount, availableWidth);
+
+        for (int i = 0; i < visibleCount; i++) {
+            addTagChip(clean.get(i), maxChipWidth);
         }
-        if (clean.size() > max) addTagChip("+" + (clean.size() - max));
+    }
+
+    /**
+     * 当前布局文件如果已经把 introTv 放在 tagRow 上面，这里不会做任何事。
+     * 如果旧布局里 introTv 和 tagRow 同在一个 LinearLayout/FrameLayout 等父容器，
+     * 这里会把介绍文本移动到标签前面，让视觉顺序变成：介绍 -> 标签。
+     *
+     * 注意：如果 XML 使用 ConstraintLayout 固定约束，必须同步改 XML 约束；
+     * 这个兜底方法不会破坏旧布局，也不会导致崩溃。
+     */
+    private void ensureIntroAboveTags() {
+        if (binding == null) return;
+        View introView = binding.introTv;
+        View tagView = binding.tagRow;
+        if (!(introView.getParent() instanceof ViewGroup) || introView.getParent() != tagView.getParent()) {
+            return;
+        }
+        ViewGroup parent = (ViewGroup) introView.getParent();
+        int introIndex = parent.indexOfChild(introView);
+        int tagIndex = parent.indexOfChild(tagView);
+        if (introIndex < 0 || tagIndex < 0 || introIndex < tagIndex) return;
+
+        ViewGroup.LayoutParams params = introView.getLayoutParams();
+        parent.removeView(introView);
+        int newTagIndex = parent.indexOfChild(tagView);
+        parent.addView(introView, Math.max(0, newTagIndex), params);
+    }
+
+    private int getTagRowAvailableWidth() {
+        if (binding == null) return AndroidUtilities.dp(280);
+        int width = binding.tagRow.getWidth();
+        if (width <= 0 && binding.tagRow.getParent() instanceof View) {
+            width = ((View) binding.tagRow.getParent()).getWidth();
+        }
+        if (width <= 0) {
+            // 兜底：常见手机宽度减去左右安全边距，避免首次布局前按 0 计算。
+            width = AndroidUtilities.dp(300);
+        }
+        width -= binding.tagRow.getPaddingLeft() + binding.tagRow.getPaddingRight();
+        return Math.max(AndroidUtilities.dp(120), width);
+    }
+
+    private int calculateVisibleTagCount(List<String> tags, int availableWidth) {
+        int totalCount = tags == null ? 0 : tags.size();
+        if (totalCount <= 0) return 0;
+        if (totalCount <= TAG_MIN_VISIBLE) return totalCount;
+
+        int maxCandidate = Math.min(TAG_MAX_VISIBLE, totalCount);
+        int minCandidate = Math.min(TAG_MIN_VISIBLE, totalCount);
+
+        int best = minCandidate;
+        int usedWidth = 0;
+        for (int i = 0; i < maxCandidate; i++) {
+            int estimate = estimateTagWidth(tags.get(i));
+            if (i > 0) estimate += AndroidUtilities.dp(TAG_HORIZONTAL_MARGIN_DP);
+            usedWidth += estimate;
+            if (usedWidth <= availableWidth) {
+                best = i + 1;
+            } else {
+                break;
+            }
+        }
+
+        // 至少显示 3 个真实标签。外语长标签会通过 maxWidth 省略，不会撑爆整行。
+        return Math.max(minCandidate, Math.min(best, maxCandidate));
+    }
+
+    private int calculateChipMaxWidth(int visibleCount, int availableWidth) {
+        if (visibleCount <= 0) return AndroidUtilities.dp(TAG_MULTI_MAX_WIDTH_DP);
+        int totalMargin = Math.max(0, visibleCount - 1) * AndroidUtilities.dp(TAG_HORIZONTAL_MARGIN_DP);
+        int avgWidth = (availableWidth - totalMargin) / visibleCount;
+        int hardMax = visibleCount == 1 ? AndroidUtilities.dp(TAG_SINGLE_MAX_WIDTH_DP) : AndroidUtilities.dp(TAG_MULTI_MAX_WIDTH_DP);
+        int minWidth = AndroidUtilities.dp(46);
+        return Math.max(minWidth, Math.min(avgWidth, hardMax));
+    }
+
+    private int estimateTagWidth(String tag) {
+        if (TextUtils.isEmpty(tag)) return AndroidUtilities.dp(46);
+        int textWidthDp = 0;
+        for (int i = 0; i < tag.length(); i++) {
+            char c = tag.charAt(i);
+            if (Character.isWhitespace(c)) {
+                textWidthDp += 3;
+            } else if (isCjk(c)) {
+                textWidthDp += 13;
+            } else if (c <= 0x007F) {
+                textWidthDp += 7;
+            } else {
+                textWidthDp += 9;
+            }
+        }
+        int chipWidthDp = textWidthDp + TAG_HORIZONTAL_PADDING_DP * 2;
+        int maxWidthDp = tag.length() <= 2 ? 58 : TAG_MULTI_MAX_WIDTH_DP;
+        return AndroidUtilities.dp(Math.min(Math.max(chipWidthDp, 46), maxWidthDp));
+    }
+
+    private boolean isCjk(char c) {
+        return (c >= 0x4E00 && c <= 0x9FFF)
+                || (c >= 0x3400 && c <= 0x4DBF)
+                || (c >= 0xF900 && c <= 0xFAFF)
+                || (c >= 0x3000 && c <= 0x303F)
+                || (c >= 0x3040 && c <= 0x30FF)
+                || (c >= 0xAC00 && c <= 0xD7AF);
     }
 
     private List<String> cleanTags(List<String> tags) {
@@ -267,18 +389,21 @@ public class PartnerDetailFragment extends Fragment {
         return out;
     }
 
-    private void addTagChip(String tag) {
+    private void addTagChip(String tag, int maxWidth) {
         TextView chip = new TextView(requireContext());
         chip.setText(tag);
         chip.setTextColor(0xFFFFFFFF);
         chip.setTextSize(12f);
         chip.setGravity(android.view.Gravity.CENTER);
         chip.setSingleLine(true);
+        chip.setMaxLines(1);
+        chip.setEllipsize(TextUtils.TruncateAt.END);
+        chip.setMaxWidth(maxWidth);
         chip.setBackgroundResource(R.drawable.bg_partnerbrowse_tag_chip);
-        chip.setPadding(AndroidUtilities.dp(10), 0, AndroidUtilities.dp(10), 0);
+        chip.setPadding(AndroidUtilities.dp(TAG_HORIZONTAL_PADDING_DP), 0, AndroidUtilities.dp(TAG_HORIZONTAL_PADDING_DP), 0);
         android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(24));
-        lp.rightMargin = AndroidUtilities.dp(7);
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, AndroidUtilities.dp(TAG_HEIGHT_DP));
+        lp.rightMargin = AndroidUtilities.dp(TAG_HORIZONTAL_MARGIN_DP);
         binding.tagRow.addView(chip, lp);
     }
 
