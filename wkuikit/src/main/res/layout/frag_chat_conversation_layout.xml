@@ -137,31 +137,46 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <com.scwang.smart.refresh.layout.SmartRefreshLayout
-                android:id="@+id/refreshLayout"
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/homeViewPager"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@color/homeColor">
+                android:overScrollMode="never" />
 
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recyclerView"
+            <!--
+                这三个旧页面先放在隐藏容器里，ChatFragment 初始化 ViewPager2 后会把它们
+                移到对应分页里。这样保留原消息列表、聊天室、联系人代码，不大拆 Fragment。
+            -->
+            <FrameLayout
+                android:id="@+id/homePageHoldingContainer"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone">
+
+                <com.scwang.smart.refresh.layout.SmartRefreshLayout
+                    android:id="@+id/refreshLayout"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    tools:listitem="@layout/item_chat_conv_layout" />
-            </com.scwang.smart.refresh.layout.SmartRefreshLayout>
+                    android:background="@color/homeColor">
 
-            <FrameLayout
-                android:id="@+id/roomContainer"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="gone" />
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recyclerView"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        tools:listitem="@layout/item_chat_conv_layout" />
+                </com.scwang.smart.refresh.layout.SmartRefreshLayout>
 
-            <FrameLayout
-                android:id="@+id/contactsContainer"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@color/homeColor"
-                android:visibility="gone" />
+                <FrameLayout
+                    android:id="@+id/roomContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+                <FrameLayout
+                    android:id="@+id/contactsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@color/homeColor" />
+            </FrameLayout>
         </FrameLayout>
     </LinearLayout>
 
