@@ -74,4 +74,108 @@
 
     <string name="partner_selected_count">已选 %1$d 个</string>
     <string name="partner_works">作品</string>
+    <string name="partner_self_more_menu">主页设置</string>
+
+    <string name="partner_single_choice_suffix"> · 单选</string>
+    <string name="partner_multi_choice_suffix"> · 多选</string>
+    <string-array name="partner_tag_group_titles">
+        <item>语言能力</item>
+        <item>学习目标</item>
+        <item>感情状况</item>
+        <item>性格标签</item>
+        <item>宠物兴趣</item>
+        <item>运动兴趣</item>
+        <item>影视兴趣</item>
+        <item>职业状态</item>
+        <item>学历</item>
+        <item>安全边界</item>
+        <item>学习方式</item>
+    </string-array>
+    <string-array name="partner_tag_option_labels">
+        <item>母语者</item>
+        <item>流利交流</item>
+        <item>中高级</item>
+        <item>初学者</item>
+        <item>零基础</item>
+        <item>找语伴</item>
+        <item>工作需要</item>
+        <item>兴趣爱好</item>
+        <item>交朋友</item>
+        <item>文化交流</item>
+        <item>准备留学</item>
+        <item>准备旅行</item>
+        <item>职场提升</item>
+        <item>日常练习</item>
+        <item>找对象</item>
+        <item>保密</item>
+        <item>单身</item>
+        <item>在交往</item>
+        <item>已婚</item>
+        <item>离异</item>
+        <item>有耐心</item>
+        <item>外向</item>
+        <item>安静</item>
+        <item>内向</item>
+        <item>幽默</item>
+        <item>温柔</item>
+        <item>认真</item>
+        <item>慢热</item>
+        <item>高情商</item>
+        <item>好相处</item>
+        <item>狗</item>
+        <item>猫</item>
+        <item>兔子</item>
+        <item>鸟</item>
+        <item>鱼</item>
+        <item>仓鼠</item>
+        <item>爬宠</item>
+        <item>喜欢动物</item>
+        <item>跑步</item>
+        <item>篮球</item>
+        <item>足球</item>
+        <item>羽毛球</item>
+        <item>健身</item>
+        <item>瑜伽</item>
+        <item>游泳</item>
+        <item>骑行</item>
+        <item>徒步</item>
+        <item>滑板</item>
+        <item>电影</item>
+        <item>喜剧片</item>
+        <item>爱情片</item>
+        <item>动作片</item>
+        <item>悬疑片</item>
+        <item>纪录片</item>
+        <item>电视剧</item>
+        <item>动漫</item>
+        <item>综艺</item>
+        <item>短视频</item>
+        <item>保密</item>
+        <item>在校生</item>
+        <item>普通职工</item>
+        <item>服务员</item>
+        <item>老师</item>
+        <item>警察</item>
+        <item>司机</item>
+        <item>销售</item>
+        <item>老板</item>
+        <item>自由职业</item>
+        <item>待业中</item>
+        <item>其他</item>
+        <item>保密</item>
+        <item>初中及以下</item>
+        <item>高中</item>
+        <item>本科</item>
+        <item>硕士及以上</item>
+        <item>其他</item>
+        <item>礼貌聊天</item>
+        <item>拒绝骚扰</item>
+        <item>不加联系方式</item>
+        <item>平台内沟通</item>
+        <item>互相尊重</item>
+        <item>自学</item>
+        <item>线下学</item>
+        <item>线上学</item>
+    </string-array>
+
 </resources>
