@@ -20,6 +20,7 @@ import com.chat.base.net.ud.WKUploader;
 import com.chat.base.utils.WKDeviceUtils;
 import com.chat.base.utils.WKReader;
 import com.chat.base.utils.WKTimeUtils;
+import com.chat.uikit.enity.BlacklistUser;
 import com.chat.uikit.enity.Device;
 import com.chat.uikit.enity.MailListEntity;
 import com.chat.uikit.enity.OnlineUser;
@@ -139,6 +140,53 @@ public class UserModel extends WKBaseModel {
             @Override
             public void onFail(int code, String msg) {
                 iCommonListener.onResult(code, msg);
+            }
+        });
+    }
+
+
+    public void blacklists(final IBlacklistListener listener) {
+        request(createService(UserService.class).blacklists(), new IRequestResultListener<List<BlacklistUser>>() {
+            @Override
+            public void onSuccess(List<BlacklistUser> result) {
+                if (listener != null) listener.onResult(HttpResponseCode.success, "", result);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (listener != null) listener.onResult(code, msg, null);
+            }
+        });
+    }
+
+    public interface IBlacklistListener {
+        void onResult(int code, String msg, List<BlacklistUser> list);
+    }
+
+    public void sendDestroyCode(final ICommonListener listener) {
+        request(createService(UserService.class).sendDestroyCode(), new IRequestResultListener<CommonResponse>() {
+            @Override
+            public void onSuccess(CommonResponse result) {
+                if (listener != null) listener.onResult(result.status, result.msg);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (listener != null) listener.onResult(code, msg);
+            }
+        });
+    }
+
+    public void destroyAccount(String code, final ICommonListener listener) {
+        request(createService(UserService.class).destroyAccount(code), new IRequestResultListener<CommonResponse>() {
+            @Override
+            public void onSuccess(CommonResponse result) {
+                if (listener != null) listener.onResult(result.status, result.msg);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (listener != null) listener.onResult(code, msg);
             }
         });
     }

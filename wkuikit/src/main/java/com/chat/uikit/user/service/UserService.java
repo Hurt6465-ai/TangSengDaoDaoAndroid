@@ -4,6 +4,7 @@ package com.chat.uikit.user.service;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.chat.base.net.entity.CommonResponse;
+import com.chat.uikit.enity.BlacklistUser;
 import com.chat.uikit.enity.Device;
 import com.chat.uikit.enity.MailListEntity;
 import com.chat.uikit.enity.OnlineUser;
@@ -44,6 +45,15 @@ public interface UserService {
 
     @DELETE("user/blacklist/{uid}")
     Observable<CommonResponse> removeBlackList(@Path("uid") String uid);
+
+    @GET("user/blacklists")
+    Observable<List<BlacklistUser>> blacklists();
+
+    @POST("user/sms/destroy")
+    Observable<CommonResponse> sendDestroyCode();
+
+    @DELETE("user/destroy/{code}")
+    Observable<CommonResponse> destroyAccount(@Path("code") String code);
 
     @GET("user/online")
     Observable<OnlineUserAndDevice> onlineUsers();
