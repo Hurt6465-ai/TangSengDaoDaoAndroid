@@ -34,6 +34,7 @@ public class FeedBrowseActivity extends FragmentActivity {
     public static final String MODE_DISCOVER = FeedModel.MODE_DISCOVER;
     public static final String MODE_NEARBY = FeedModel.MODE_NEARBY;
     public static final String MODE_PROFILE = FeedModel.MODE_PROFILE;
+    public static final String MODE_FOLLOWING = FeedModel.MODE_FOLLOWING;
 
     private ViewPager2 feedPager;
     private ProgressBar loadingView;
@@ -133,7 +134,7 @@ public class FeedBrowseActivity extends FragmentActivity {
             return;
         }
         topTabs.setVisibility(View.VISIBLE);
-        updateTopTabState(false);
+        updateTopTabState(MODE_FOLLOWING.equals(mode));
         recommendTab.setOnClickListener(v -> {
             if (!MODE_DISCOVER.equals(mode)) {
                 mode = MODE_DISCOVER;
@@ -144,10 +145,13 @@ public class FeedBrowseActivity extends FragmentActivity {
             }
         });
         followingTab.setOnClickListener(v -> {
-            // 先不做全屏左右切换，避免和多图横滑冲突。
-            // 关注流需要后端 /v1/feed/following 接入后再真正切数据源。
-            updateTopTabState(false);
-            Toast.makeText(this, R.string.feed_following_not_ready, Toast.LENGTH_SHORT).show();
+            if (!MODE_FOLLOWING.equals(mode)) {
+                mode = MODE_FOLLOWING;
+                updateTopTabState(true);
+                resetAndLoad();
+            } else {
+                updateTopTabState(true);
+            }
         });
     }
 
@@ -227,6 +231,8 @@ public class FeedBrowseActivity extends FragmentActivity {
         };
         if (MODE_PROFILE.equals(mode) && !TextUtils.isEmpty(uid)) {
             FeedModel.getInstance().userFeeds(uid, cursor, listener);
+        } else if (MODE_FOLLOWING.equals(mode)) {
+            FeedModel.getInstance().following(cursor, listener);
         } else {
             FeedModel.getInstance().recommend(mode, cursor, uid, listener);
         }

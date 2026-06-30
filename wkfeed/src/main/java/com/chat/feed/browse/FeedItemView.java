@@ -6,7 +6,6 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.text.TextUtils;
@@ -45,17 +44,11 @@ import com.chat.feed.model.FeedBean;
 import com.chat.feed.model.FeedMedia;
 import com.chat.feed.model.FeedUser;
 import com.chat.feed.player.FeedPlayerManager;
-import com.chat.uikit.contacts.service.FriendModel;
 import com.xinbida.wukongim.entity.WKChannelType;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public class FeedItemView extends android.widget.FrameLayout {
-    private static final Set<String> LOCAL_FOLLOWED_UIDS = new HashSet<>();
-    private static final String FOLLOW_PREF = "feed_local_follow";
-
     private FeedGestureLayout feedRoot;
     private View imagePagerHost;
     private ViewPager2 imagePager;
@@ -80,6 +73,9 @@ public class FeedItemView extends android.widget.FrameLayout {
     private FeedBean feed;
     private boolean active;
     private ViewPager2.OnPageChangeCallback imagePageCallback;
+    private long activeStartMs;
+    private String activeFeedKey = "";
+    private boolean exposedSent;
 
 
     public FeedItemView(@NonNull Context context) {
@@ -158,7 +154,7 @@ public class FeedItemView extends android.widget.FrameLayout {
         }
 
         likeBtn.setOnClickListener(v -> { scaleClick(likeBtn); toggleLike(false); });
-        commentBtn.setOnClickListener(v -> { scaleClick(commentBtn); showComments(false); });
+        commentBtn.setOnClickListener(v -> { scaleClick(commentBtn); showComments(true); });
         shareBtn.setOnClickListener(v -> { scaleClick(shareBtn); showShareMenu(); });
         actionBtn.setOnClickListener(v -> onActionClick());
         avatarView.setOnClickListener(v -> openProfile());
@@ -185,10 +181,8 @@ public class FeedItemView extends android.widget.FrameLayout {
         likeBtn.setImageResource(item.liked == 1 ? R.drawable.ic_feed_heart_fill : R.drawable.ic_feed_heart);
         if (user != null) {
             bindAvatarSafely(user);
-            boolean followed = isLocalFollowed(user);
             actionBtn.setEnabled(!TextUtils.isEmpty(user.uid));
-            actionBtn.setAlpha(followed ? 0.72f : 1f);
-            actionBtn.setText(followed ? R.string.feed_followed : R.string.feed_follow);
+            bindFollowButton(user);
         } else {
             avatarView.showDefaultAvatar(item.userName(), item.userName());
             actionBtn.setEnabled(false);
@@ -206,7 +200,7 @@ public class FeedItemView extends android.widget.FrameLayout {
             return;
         }
         // 抖音式：信息流里只折叠展示，不在原地撑开；点击文案打开评论窗口，顶部展示完整文案。
-        descTv.setText(safeText + "  ˅˅");
+        descTv.setText(safeText);
         descTv.setMaxLines(4);
         descTv.setEllipsize(TextUtils.TruncateAt.END);
     }
@@ -252,9 +246,15 @@ public class FeedItemView extends android.widget.FrameLayout {
     }
 
     public void setActive(boolean active) {
+        if (this.active == active) return;
         this.active = active;
-        if (active) play();
-        else pause();
+        if (active) {
+            startActiveEvent();
+            play();
+        } else {
+            finishActiveEvent(false);
+            pause();
+        }
     }
 
     public void play() {
@@ -284,6 +284,7 @@ public class FeedItemView extends android.widget.FrameLayout {
             @Override
             public void onEnded(@Nullable String id) {
                 if (!isCurrentPlayback(id)) return;
+                finishActiveEvent(true);
                 videoLoading.setVisibility(GONE);
                 playPauseView.setVisibility(VISIBLE);
             }
@@ -324,6 +325,7 @@ public class FeedItemView extends android.widget.FrameLayout {
     }
 
     public void recycle() {
+        finishActiveEvent(false);
         pause();
         recycleMediaOnly();
         feed = null;
@@ -346,11 +348,7 @@ public class FeedItemView extends android.widget.FrameLayout {
 
     private String buildMeta(FeedBean item) {
         StringBuilder sb = new StringBuilder();
-        FeedUser user = item.user;
-        if (user != null) {
-            if (user.age > 0) sb.append(user.age).append("  ");
-            if (!TextUtils.isEmpty(user.native_languages)) sb.append(user.native_languages).append("  ");
-        }
+        // 发现流里不要显示年龄、母语/学习语言，避免信息太杂；这些放个人主页。
         if (item.distance_meters > 0 && item.distance_meters <= 70000) {
             int km = bucketDistance(item.distance_meters);
             sb.append(getResources().getString(R.string.feed_distance_within, km)).append("  ");
@@ -445,38 +443,35 @@ public class FeedItemView extends android.widget.FrameLayout {
     private void onActionClick() {
         if (feed == null || feed.user == null || TextUtils.isEmpty(feed.user.uid)) return;
         final FeedUser target = feed.user;
+        final boolean nextFollow = target.follow != 1;
+        final int oldFollow = target.follow;
         scaleClick(actionBtn);
-        // 这里不能把“好友关系”当作“短视频关注关系”。当前后端还没有 feed_follow 表，
-        // 前端只保存一个本地临时关注态，避免按钮全是“已关注”或点击无响应。
-        // 后端接入后，把 setLocalFollowed(...) 换成 /v1/feed/follow 即可。
-        if (!isLocalFollowed(target)) {
-            setLocalFollowed(target.uid, true);
-            target.follow = 1;
-            actionBtn.setText(R.string.feed_followed);
-            actionBtn.setAlpha(0.72f);
-            Toast.makeText(getContext(), R.string.feed_followed, Toast.LENGTH_SHORT).show();
-        }
+        actionBtn.setEnabled(false);
+        target.follow = nextFollow ? 1 : 0;
+        bindFollowButton(target);
+        FeedModel.getInstance().follow(target.uid, nextFollow, new IRequestResultListener<CommonResponse>() {
+            @Override
+            public void onSuccess(CommonResponse result) {
+                actionBtn.setEnabled(true);
+                bindFollowButton(target);
+                Toast.makeText(getContext(), nextFollow ? R.string.feed_followed : R.string.feed_unfollowed, Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                target.follow = oldFollow;
+                actionBtn.setEnabled(true);
+                bindFollowButton(target);
+                Toast.makeText(getContext(), TextUtils.isEmpty(msg) ? getResources().getString(R.string.feed_action_unavailable) : msg, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
-    private boolean isLocalFollowed(@Nullable FeedUser user) {
-        if (user == null || TextUtils.isEmpty(user.uid)) return false;
-        if (LOCAL_FOLLOWED_UIDS.contains(user.uid)) return true;
-        try {
-            return getContext().getSharedPreferences(FOLLOW_PREF, Context.MODE_PRIVATE).getBoolean(user.uid, false);
-        } catch (Throwable ignored) {
-            return false;
-        }
-    }
-
-    private void setLocalFollowed(String uid, boolean followed) {
-        if (TextUtils.isEmpty(uid)) return;
-        if (followed) LOCAL_FOLLOWED_UIDS.add(uid);
-        else LOCAL_FOLLOWED_UIDS.remove(uid);
-        try {
-            SharedPreferences preferences = getContext().getSharedPreferences(FOLLOW_PREF, Context.MODE_PRIVATE);
-            preferences.edit().putBoolean(uid, followed).apply();
-        } catch (Throwable ignored) {
-        }
+    private void bindFollowButton(FeedUser user) {
+        if (user == null) return;
+        boolean followed = user.follow == 1;
+        actionBtn.setAlpha(followed ? 0.72f : 1f);
+        actionBtn.setText(followed ? R.string.feed_followed : R.string.feed_follow);
     }
 
     private void scaleClick(View view) {
@@ -496,10 +491,12 @@ public class FeedItemView extends android.widget.FrameLayout {
         root.setBackgroundResource(R.drawable.bg_feed_share_dialog);
         root.addView(makeShareMenuItem(getResources().getString(R.string.feed_share_to_friend), v -> {
             dialog.dismiss();
+            reportShareEvent();
             shareToSystem();
         }));
         root.addView(makeShareMenuItem(getResources().getString(R.string.feed_copy_link), v -> {
             dialog.dismiss();
+            reportShareEvent();
             copyShareLink();
         }));
         if (isCreator()) {
@@ -510,7 +507,7 @@ public class FeedItemView extends android.widget.FrameLayout {
         }
         root.addView(makeShareMenuItem(getResources().getString(R.string.feed_report), v -> {
             dialog.dismiss();
-            Toast.makeText(getContext(), R.string.feed_report_received, Toast.LENGTH_SHORT).show();
+            reportFeed();
         }));
         dialog.setContentView(root);
         dialog.show();
@@ -561,6 +558,63 @@ public class FeedItemView extends android.widget.FrameLayout {
         item.setLayoutParams(lp);
         item.setOnClickListener(listener);
         return item;
+    }
+
+    private void reportShareEvent() {
+        if (feed == null) return;
+        FeedModel.getInstance().share(feed.stableKey(), new IRequestResultListener<CommonResponse>() {
+            @Override public void onSuccess(CommonResponse result) {
+                if (feed != null) feed.share_count++;
+            }
+            @Override public void onFail(int code, String msg) {}
+        });
+    }
+
+    private void reportFeed() {
+        if (feed == null) return;
+        FeedModel.getInstance().report(feed.stableKey(), "normal", new IRequestResultListener<CommonResponse>() {
+            @Override public void onSuccess(CommonResponse result) {
+                Toast.makeText(getContext(), R.string.feed_report_received, Toast.LENGTH_SHORT).show();
+            }
+            @Override public void onFail(int code, String msg) {
+                Toast.makeText(getContext(), TextUtils.isEmpty(msg) ? getResources().getString(R.string.feed_action_unavailable) : msg, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void startActiveEvent() {
+        if (feed == null) return;
+        activeFeedKey = feed.stableKey();
+        activeStartMs = System.currentTimeMillis();
+        exposedSent = false;
+        sendFeedEvent("expose", 0, 0, 0);
+        exposedSent = true;
+    }
+
+    private void finishActiveEvent(boolean complete) {
+        if (TextUtils.isEmpty(activeFeedKey) || activeStartMs <= 0 || feed == null) return;
+        long watchMs = Math.max(0, System.currentTimeMillis() - activeStartMs);
+        if (watchMs < 600) {
+            activeStartMs = 0;
+            return;
+        }
+        long durationMs = 0;
+        int percent = 0;
+        FeedMedia media = feed.firstMedia();
+        if (media != null && media.duration_ms > 0) {
+            durationMs = media.duration_ms;
+            percent = (int) Math.min(100, Math.max(0, watchMs * 100L / Math.max(1L, durationMs)));
+        }
+        String type = complete || percent >= 85 ? "complete" : "watch";
+        sendFeedEvent(type, watchMs, durationMs, percent);
+        activeStartMs = 0;
+    }
+
+    private void sendFeedEvent(String type, long watchMs, long durationMs, int percent) {
+        if (feed == null || TextUtils.isEmpty(type)) return;
+        FeedMedia media = feed.firstMedia();
+        String mediaType = media == null ? "" : media.type;
+        FeedModel.getInstance().event(feed.stableKey(), type, watchMs, durationMs, percent, mediaType, null);
     }
 
     private String buildShareLink() {
