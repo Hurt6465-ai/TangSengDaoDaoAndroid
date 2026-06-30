@@ -26,6 +26,9 @@
 
         <activity android:name=".contacts.NewFriendsActivity" />
         <activity android:name=".setting.SettingActivity" />
+        <activity android:name=".setting.BlacklistActivity" />
+        <activity android:name=".setting.AccountDestroyActivity" />
+        <activity android:name=".setting.SecurityPrivacyActivity" />
         <activity android:name=".group.GroupQrActivity" />
         <activity android:name=".search.SearchAllActivity" />
         <activity android:name=".user.MyInfoActivity" />
