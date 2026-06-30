@@ -49,108 +49,19 @@
 
     <string name="partner_selected_count">%1$d selected</string>
     <string name="partner_works">Works</string>
-    <string name="partner_self_more_menu">Profile Settings</string>
 
-    <string name="partner_single_choice_suffix"> · Single</string>
-    <string name="partner_multi_choice_suffix"> · Multi</string>
     <string-array name="partner_tag_group_titles">
-        <item>Language level</item>
-        <item>Learning goals</item>
-        <item>Relationship</item>
-        <item>Personality</item>
-        <item>Pets</item>
-        <item>Sports</item>
-        <item>Movies &amp; shows</item>
-        <item>Work status</item>
-        <item>Education</item>
-        <item>Safety boundaries</item>
-        <item>Learning style</item>
+        <item>Language level</item><item>Learning goals</item><item>Relationship</item><item>Personality</item><item>Pets</item><item>Sports</item><item>Movies &amp; shows</item><item>Work status</item><item>Education</item><item>Safety boundaries</item><item>Learning style</item>
     </string-array>
-    <string-array name="partner_tag_option_labels">
-        <item>Native</item>
-        <item>Fluent</item>
-        <item>Upper-mid</item>
-        <item>Beginner</item>
-        <item>Zero base</item>
-        <item>Language partner</item>
-        <item>Work need</item>
-        <item>Hobby</item>
-        <item>Make friends</item>
-        <item>Culture exchange</item>
-        <item>Study abroad</item>
-        <item>Travel prep</item>
-        <item>Career boost</item>
-        <item>Daily practice</item>
-        <item>Dating</item>
-        <item>Private</item>
-        <item>Single</item>
-        <item>In relationship</item>
-        <item>Married</item>
-        <item>Divorced</item>
-        <item>Patient</item>
-        <item>Outgoing</item>
-        <item>Quiet</item>
-        <item>Introvert</item>
-        <item>Humorous</item>
-        <item>Gentle</item>
-        <item>Serious</item>
-        <item>Slow warm-up</item>
-        <item>High EQ</item>
-        <item>Easygoing</item>
-        <item>Dog</item>
-        <item>Cat</item>
-        <item>Rabbit</item>
-        <item>Bird</item>
-        <item>Fish</item>
-        <item>Hamster</item>
-        <item>Reptile</item>
-        <item>Animal lover</item>
-        <item>Running</item>
-        <item>Basketball</item>
-        <item>Football</item>
-        <item>Badminton</item>
-        <item>Fitness</item>
-        <item>Yoga</item>
-        <item>Swimming</item>
-        <item>Cycling</item>
-        <item>Hiking</item>
-        <item>Skateboard</item>
-        <item>Movies</item>
-        <item>Comedy</item>
-        <item>Romance</item>
-        <item>Action</item>
-        <item>Mystery</item>
-        <item>Documentary</item>
-        <item>TV series</item>
-        <item>Anime</item>
-        <item>Variety shows</item>
-        <item>Short videos</item>
-        <item>Private</item>
-        <item>Student</item>
-        <item>Employee</item>
-        <item>Waiter</item>
-        <item>Teacher</item>
-        <item>Police</item>
-        <item>Driver</item>
-        <item>Sales</item>
-        <item>Boss</item>
-        <item>Freelance</item>
-        <item>Unemployed</item>
-        <item>Other</item>
-        <item>Private</item>
-        <item>Junior or below</item>
-        <item>High school</item>
-        <item>Bachelor</item>
-        <item>Master+</item>
-        <item>Other</item>
-        <item>Polite chat</item>
-        <item>No harassment</item>
-        <item>No contact exchange</item>
-        <item>In-app only</item>
-        <item>Mutual respect</item>
-        <item>Self-study</item>
-        <item>Offline class</item>
-        <item>Online class</item>
-    </string-array>
-
+    <string-array name="partner_tags_language_level"><item>Native speaker</item><item>Fluent</item><item>Upper intermediate</item><item>Beginner</item><item>Zero base</item></string-array>
+    <string-array name="partner_tags_learning_goal"><item>Language partner</item><item>Work needs</item><item>Hobby</item><item>Make friends</item><item>Culture exchange</item><item>Study abroad</item><item>Travel prep</item><item>Career growth</item><item>Daily practice</item><item>Dating</item></string-array>
+    <string-array name="partner_tags_relationship"><item>Private</item><item>Single</item><item>Dating</item><item>Married</item><item>Divorced</item></string-array>
+    <string-array name="partner_tags_personality"><item>Patient</item><item>Outgoing</item><item>Quiet</item><item>Introvert</item><item>Funny</item><item>Gentle</item><item>Serious</item><item>Slow to warm</item><item>High EQ</item><item>Easygoing</item></string-array>
+    <string-array name="partner_tags_pets"><item>Dogs</item><item>Cats</item><item>Rabbits</item><item>Birds</item><item>Fish</item><item>Hamsters</item><item>Reptiles</item><item>Animal lover</item></string-array>
+    <string-array name="partner_tags_sports"><item>Running</item><item>Basketball</item><item>Football</item><item>Badminton</item><item>Fitness</item><item>Yoga</item><item>Swimming</item><item>Cycling</item><item>Hiking</item><item>Skateboard</item></string-array>
+    <string-array name="partner_tags_movies"><item>Movies</item><item>Comedy</item><item>Romance</item><item>Action</item><item>Mystery</item><item>Documentary</item><item>TV series</item><item>Anime</item><item>Variety shows</item><item>Short videos</item></string-array>
+    <string-array name="partner_tags_job"><item>Private</item><item>Student</item><item>Employee</item><item>Waiter</item><item>Teacher</item><item>Police</item><item>Driver</item><item>Sales</item><item>Boss</item><item>Freelancer</item><item>Unemployed</item><item>Other</item></string-array>
+    <string-array name="partner_tags_education"><item>Private</item><item>Middle school or below</item><item>High school</item><item>Bachelor</item><item>Master or above</item><item>Other</item></string-array>
+    <string-array name="partner_tags_safety"><item>Polite chat</item><item>No harassment</item><item>No contact exchange</item><item>In-app chat</item><item>Mutual respect</item></string-array>
+    <string-array name="partner_tags_study_way"><item>Self-study</item><item>Offline learning</item><item>Online learning</item></string-array>
 </resources>
