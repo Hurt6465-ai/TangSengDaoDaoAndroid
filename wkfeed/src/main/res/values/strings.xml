@@ -70,4 +70,8 @@
     <string name="feed_delete">删除作品</string>
     <string name="feed_delete_requested">删除请求已提交</string>
     <string name="feed_delete_not_ready">删除接口后端接入后可用</string>
+    <string name="feed_unfollowed">已取消关注</string>
+    <string name="feed_comment_voice_hold">按住说话</string>
+    <string name="feed_comment_voice_recording">松开发送，左滑取消</string>
+    <string name="feed_comment_voice_release_cancel">松开取消</string>
 </resources>
