@@ -1,5 +1,8 @@
 package com.chat.feed.comment;
 
+import android.media.MediaPlayer;
+import android.net.Uri;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -9,11 +12,13 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.chat.base.config.WKApiConfig;
 import com.chat.base.ui.components.AvatarView;
 import com.chat.feed.R;
 import com.chat.feed.model.CommentBean;
 import com.xinbida.wukongim.entity.WKChannelType;
 
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -130,7 +135,7 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
         holder.avatar.setSize(reply ? 28 : 38);
         bindCommentAvatar(holder.avatar, item);
         holder.nameTv.setText(item.name == null ? "" : item.name);
-        holder.contentTv.setText(item.content == null ? "" : item.content);
+        bindContent(holder.contentTv, item);
         holder.timeTv.setText(item.created_at > 0 ? sdf.format(new Date(item.created_at)) : "");
         holder.likeTv.setText(item.like_count > 0 ? String.valueOf(item.like_count) : "");
 
@@ -182,8 +187,64 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
             } else {
                 avatar.showDefaultAvatar(item.name, item.uid);
             }
+            if (!TextUtils.isEmpty(item.country_code)) {
+                avatar.showFlag(item.country_code);
+            }
         } catch (Throwable ignored) {
             avatar.showDefaultAvatar(item.name, item.uid);
+        }
+    }
+
+    private void bindContent(TextView contentTv, CommentBean item) {
+        if (contentTv == null || item == null) return;
+        String content = item.content == null ? "" : item.content;
+        if (isVoiceContent(content)) {
+            int seconds = parseVoiceSeconds(content);
+            contentTv.setText("🎤 语音消息" + (seconds > 0 ? " " + seconds + "s" : ""));
+            contentTv.setTextColor(0xFF111827);
+            contentTv.setOnClickListener(v -> playVoice(contentTv.getContext(), content));
+        } else {
+            contentTv.setText(content);
+            contentTv.setTextColor(0xFF111827);
+            contentTv.setOnClickListener(null);
+        }
+    }
+
+    private boolean isVoiceContent(String content) {
+        return !TextUtils.isEmpty(content) && (content.startsWith("voice:") || content.startsWith("voice_local:"));
+    }
+
+    private int parseVoiceSeconds(String content) {
+        if (TextUtils.isEmpty(content)) return 0;
+        int sep = content.lastIndexOf('|');
+        if (sep < 0 || sep >= content.length() - 1) return 0;
+        try { return Math.max(1, Integer.parseInt(content.substring(sep + 1))); } catch (Exception ignored) { return 0; }
+    }
+
+    private String parseVoicePath(String content) {
+        if (TextUtils.isEmpty(content)) return "";
+        String prefix = content.startsWith("voice_local:") ? "voice_local:" : "voice:";
+        String value = content.substring(prefix.length());
+        int sep = value.lastIndexOf('|');
+        if (sep >= 0) value = value.substring(0, sep);
+        return value;
+    }
+
+    private void playVoice(android.content.Context context, String content) {
+        try {
+            String path = parseVoicePath(content);
+            if (TextUtils.isEmpty(path)) return;
+            Uri uri;
+            if (content.startsWith("voice_local:")) {
+                uri = Uri.fromFile(new File(path));
+            } else {
+                uri = Uri.parse(WKApiConfig.getShowUrl(path));
+            }
+            MediaPlayer player = MediaPlayer.create(context, uri);
+            if (player == null) return;
+            player.setOnCompletionListener(MediaPlayer::release);
+            player.start();
+        } catch (Throwable ignored) {
         }
     }
 

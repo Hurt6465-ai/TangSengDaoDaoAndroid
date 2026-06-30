@@ -1,26 +1,34 @@
 package com.chat.feed.comment;
 
+import android.Manifest;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.media.MediaRecorder;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
-import android.content.Context;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.chat.base.config.WKConfig;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.base.net.entity.CommonResponse;
+import com.chat.base.net.ud.WKUploader;
 import com.chat.feed.FeedModel;
 import com.chat.feed.R;
 import com.chat.feed.model.CommentBean;
@@ -29,11 +37,21 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 
+import java.io.File;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
 public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     private static final String ARG_FEED_ID = "feed_id";
     private static final String ARG_COUNT = "count";
     private static final String ARG_AUTHOR = "author";
     private static final String ARG_CAPTION = "caption";
+    private static final int REQ_RECORD_AUDIO = 6101;
+
     private String feedId;
     private String authorName = "";
     private String caption = "";
@@ -44,7 +62,15 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     private FeedCommentAdapter adapter;
     private EditText editText;
     private TextView titleTv;
+    private TextView voiceBtn;
     private OnCommentSentListener onCommentSentListener;
+
+    private MediaRecorder recorder;
+    private File recordingFile;
+    private long recordingStartMs;
+    private boolean recordingCancel;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final ExecutorService voiceExecutor = Executors.newSingleThreadExecutor();
 
     public interface OnCommentSentListener {
         void onCommentSent(int delta);
@@ -111,10 +137,12 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
             }
         }
         editText = view.findViewById(R.id.commentEditText);
+        voiceBtn = view.findViewById(R.id.commentVoiceBtn);
         ImageButton closeBtn = view.findViewById(R.id.commentCloseBtn);
         ImageButton sendBtn = view.findViewById(R.id.commentSendBtn);
         closeBtn.setOnClickListener(v -> dismissAllowingStateLoss());
         sendBtn.setOnClickListener(v -> sendCommentFromInput());
+        bindVoiceButton();
         adapter.setActionListener(new FeedCommentAdapter.CommentActionListener() {
             @Override
             public void onReplyClick(CommentBean item, int position) {
@@ -138,6 +166,94 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         });
         updateTitle();
         loadComments(true);
+    }
+
+    private void bindVoiceButton() {
+        if (voiceBtn == null) return;
+        voiceBtn.setOnTouchListener((v, event) -> {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    if (!hasAudioPermission()) {
+                        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_RECORD_AUDIO);
+                        return true;
+                    }
+                    startVoiceRecord();
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    if (recorder != null) {
+                        recordingCancel = event.getX() < -dp(70) || event.getY() < -dp(50);
+                        voiceBtn.setText(recordingCancel ? R.string.feed_comment_voice_release_cancel : R.string.feed_comment_voice_recording);
+                    }
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    finishVoiceRecord(!recordingCancel);
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    finishVoiceRecord(false);
+                    return true;
+                default:
+                    return true;
+            }
+        });
+    }
+
+    private boolean hasAudioPermission() {
+        return ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void startVoiceRecord() {
+        try {
+            recordingCancel = false;
+            File dir = new File(requireContext().getCacheDir(), "feed_voice");
+            if (!dir.exists()) dir.mkdirs();
+            recordingFile = new File(dir, "voice_" + System.currentTimeMillis() + ".m4a");
+            recorder = new MediaRecorder();
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            recorder.setAudioEncodingBitRate(32000);
+            recorder.setAudioSamplingRate(16000);
+            recorder.setOutputFile(recordingFile.getAbsolutePath());
+            recorder.prepare();
+            recorder.start();
+            recordingStartMs = System.currentTimeMillis();
+            voiceBtn.setText(R.string.feed_comment_voice_recording);
+        } catch (Throwable e) {
+            cleanupRecorder();
+            if (voiceBtn != null) voiceBtn.setText(R.string.feed_comment_voice_hold);
+        }
+    }
+
+    private void finishVoiceRecord(boolean send) {
+        File file = recordingFile;
+        long durationMs = Math.max(0, System.currentTimeMillis() - recordingStartMs);
+        cleanupRecorder();
+        if (voiceBtn != null) voiceBtn.setText(R.string.feed_comment_voice_hold);
+        if (!send || file == null || !file.exists()) {
+            if (file != null) //noinspection ResultOfMethodCallIgnored
+                file.delete();
+            return;
+        }
+        if (durationMs < 700) {
+            //noinspection ResultOfMethodCallIgnored
+            file.delete();
+            return;
+        }
+        sendVoiceComment(file, Math.max(1, (int) Math.ceil(durationMs / 1000.0)));
+    }
+
+    private void cleanupRecorder() {
+        try {
+            if (recorder != null) {
+                try { recorder.stop(); } catch (Throwable ignored) {}
+                try { recorder.release(); } catch (Throwable ignored) {}
+            }
+        } finally {
+            recorder = null;
+            recordingFile = null;
+            recordingStartMs = 0;
+            recordingCancel = false;
+        }
     }
 
     @Override
@@ -198,6 +314,89 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         sendLocalComment(local, true);
     }
 
+    private void sendVoiceComment(File file, int durationSeconds) {
+        if (file == null || TextUtils.isEmpty(feedId)) return;
+        CommentBean local = createLocalComment("voice_local:" + file.getAbsolutePath() + "|" + durationSeconds, null);
+        adapter.addFirst(local);
+        commentCount++;
+        updateTitle();
+        if (onCommentSentListener != null) onCommentSentListener.onCommentSent(1);
+        voiceExecutor.execute(() -> {
+            try {
+                String path = uploadVoice(file);
+                local.content = "voice:" + path + "|" + durationSeconds;
+                mainHandler.post(() -> sendLocalComment(local, true));
+            } catch (Throwable e) {
+                mainHandler.post(() -> {
+                    adapter.markLocalFailed(local.comment_id);
+                    commentCount = Math.max(0, commentCount - 1);
+                    updateTitle();
+                    if (onCommentSentListener != null) onCommentSentListener.onCommentSent(-1);
+                });
+            }
+        });
+    }
+
+    private String uploadVoice(File file) throws Exception {
+        FeedModel.FeedUploadUrl uploadUrl = awaitUploadUrl(file.getAbsolutePath());
+        if (uploadUrl == null || TextUtils.isEmpty(uploadUrl.url)) throw new IllegalStateException("upload url empty");
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> resultPath = new AtomicReference<>("");
+        AtomicReference<Exception> error = new AtomicReference<>();
+        String tag = "feed_voice_" + UUID.randomUUID();
+        WKUploader.getInstance().upload(uploadUrl.url, file.getAbsolutePath(), tag, new WKUploader.IUploadBack() {
+            @Override
+            public void onSuccess(String uploadedPath) {
+                resultPath.set(TextUtils.isEmpty(uploadedPath) ? uploadUrl.path : uploadedPath);
+                latch.countDown();
+            }
+
+            @Override
+            public void onError() {
+                error.set(new IllegalStateException("upload failed"));
+                latch.countDown();
+            }
+        });
+        if (!latch.await(90, TimeUnit.SECONDS)) throw new IllegalStateException("upload timeout");
+        if (error.get() != null) throw error.get();
+        return normalizeUploadedPath(resultPath.get());
+    }
+
+    private FeedModel.FeedUploadUrl awaitUploadUrl(String localPath) throws Exception {
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<FeedModel.FeedUploadUrl> result = new AtomicReference<>();
+        AtomicReference<Exception> error = new AtomicReference<>();
+        FeedModel.getInstance().getFeedUploadFileUrl(localPath, "audio", new IRequestResultListener<FeedModel.FeedUploadUrl>() {
+            @Override
+            public void onSuccess(FeedModel.FeedUploadUrl data) {
+                result.set(data);
+                latch.countDown();
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                error.set(new IllegalStateException(TextUtils.isEmpty(msg) ? "upload url failed" : msg));
+                latch.countDown();
+            }
+        });
+        if (!latch.await(30, TimeUnit.SECONDS)) throw new IllegalStateException("upload url timeout");
+        if (error.get() != null) throw error.get();
+        return result.get();
+    }
+
+    private String normalizeUploadedPath(String path) {
+        if (TextUtils.isEmpty(path)) return "";
+        String v = path.trim();
+        if (v.startsWith(com.chat.base.config.WKApiConfig.baseUrl)) {
+            v = v.substring(com.chat.base.config.WKApiConfig.baseUrl.length());
+        }
+        if (v.startsWith("/")) v = v.substring(1);
+        if (v.startsWith("file/preview/")) return v;
+        if (v.startsWith("common/")) return "file/preview/" + v;
+        if (v.startsWith("feed/")) return "file/preview/common/" + v;
+        return v;
+    }
+
     private void retryLocalComment(CommentBean local) {
         if (local == null || TextUtils.isEmpty(local.content)) return;
         local.local_sending = true;
@@ -222,18 +421,36 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         FeedModel.getInstance().sendComment(feedId, local.content, new IRequestResultListener<CommonResponse>() {
             @Override
             public void onSuccess(CommonResponse result) {
-                adapter.markLocalSent(local.comment_id);
+                mainHandler.post(() -> adapter.markLocalSent(local.comment_id));
             }
 
             @Override
             public void onFail(int code, String msg) {
-                adapter.markLocalFailed(local.comment_id);
-                if (countRollbackOnFail) {
-                    commentCount = Math.max(0, commentCount - 1);
-                    updateTitle();
-                    if (onCommentSentListener != null) onCommentSentListener.onCommentSent(-1);
-                }
+                mainHandler.post(() -> {
+                    adapter.markLocalFailed(local.comment_id);
+                    if (countRollbackOnFail) {
+                        commentCount = Math.max(0, commentCount - 1);
+                        updateTitle();
+                        if (onCommentSentListener != null) onCommentSentListener.onCommentSent(-1);
+                    }
+                });
             }
         });
+    }
+
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    @Override
+    public void onDestroyView() {
+        cleanupRecorder();
+        super.onDestroyView();
+    }
+
+    @Override
+    public void onDestroy() {
+        voiceExecutor.shutdownNow();
+        super.onDestroy();
     }
 }
