@@ -20,14 +20,12 @@ import com.chat.base.utils.singleclick.SingleClickUtil;
 import com.chat.uikit.R;
 import com.chat.uikit.WKUIKitApplication;
 import com.chat.uikit.databinding.ActSettingLayoutBinding;
-import com.chat.uikit.message.BackupRestoreMessageActivity;
 import com.chat.uikit.user.service.UserModel;
-import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannelType;
 
 /**
- * 2020-03-22 21:11
- * 设置页面
+ * 设置页面。
+ * 二开版本只保留通用系统设置入口。
  */
 public class SettingActivity extends WKBaseActivity<ActSettingLayoutBinding> {
     private String str;
@@ -57,20 +55,21 @@ public class SettingActivity extends WKBaseActivity<ActSettingLayoutBinding> {
 
     @Override
     protected void initListener() {
-        String wk_theme_pref = Theme.getTheme();
-        if (wk_theme_pref.equals(Theme.DARK_MODE)) {
+        String wkThemePref = Theme.getTheme();
+        if (wkThemePref.equals(Theme.DARK_MODE)) {
             wkVBinding.darkStatusTv.setText(R.string.enabled);
         } else {
             wkVBinding.darkStatusTv.setText(R.string.disabled);
         }
-        wkVBinding.loginOutTv.setOnClickListener(v -> WKDialogUtils.getInstance().showDialog(this, getString(R.string.login_out), getString(R.string.login_out_dialog), true, "", getString(R.string.login_out), 0, 0, index -> {
-            if (index == 1) {
-                UserModel.getInstance().quit(null);
-                WKUIKitApplication.getInstance().exitLogin(0);
-            }
-        }));
-        SingleClickUtil.onSingleClick(wkVBinding.languageLayout, view1 -> startActivity(new Intent(this, WKLanguageActivity.class)));
-        SingleClickUtil.onSingleClick(wkVBinding.darkLayout, view1 -> startActivity(new Intent(this, WKThemeSettingActivity.class)));
+
+        SingleClickUtil.onSingleClick(wkVBinding.msgNoticesLayout, view -> startActivity(new Intent(this, MsgNoticesSettingActivity.class)));
+        SingleClickUtil.onSingleClick(wkVBinding.languageLayout, view -> startActivity(new Intent(this, WKLanguageActivity.class)));
+        SingleClickUtil.onSingleClick(wkVBinding.darkLayout, view -> startActivity(new Intent(this, WKThemeSettingActivity.class)));
+        SingleClickUtil.onSingleClick(wkVBinding.fontSizeLayout, view -> startActivity(new Intent(this, WKSetFontSizeActivity.class)));
+        SingleClickUtil.onSingleClick(wkVBinding.safetyLayout, view -> startActivity(new Intent(this, SecurityPrivacyActivity.class)));
+        SingleClickUtil.onSingleClick(wkVBinding.blacklistLayout, view -> startActivity(new Intent(this, BlacklistActivity.class)));
+        SingleClickUtil.onSingleClick(wkVBinding.aboutLayout, view -> startActivity(new Intent(this, WKAboutActivity.class)));
+
         wkVBinding.clearImgCacheLayout.setOnClickListener(v -> showDialog(getString(R.string.clear_img_cache_tips), index -> {
             if (index == 1) {
                 DataCleanManager.clearAllCache(SettingActivity.this);
@@ -78,15 +77,22 @@ public class SettingActivity extends WKBaseActivity<ActSettingLayoutBinding> {
                 wkVBinding.imageCacheTv.setText(str);
             }
         }));
-        wkVBinding.clearChatMsgLayout.setOnClickListener(v -> showDialog(getString(R.string.clear_all_msg_tips), index -> {
+
+        wkVBinding.destroyAccountTv.setOnClickListener(v -> startActivity(new Intent(this, AccountDestroyActivity.class)));
+
+        wkVBinding.loginOutTv.setOnClickListener(v -> WKDialogUtils.getInstance().showDialog(this, getString(R.string.login_out), getString(R.string.login_out_dialog), true, "", getString(R.string.login_out), 0, 0, index -> {
             if (index == 1) {
-                WKIM.getInstance().getConversationManager().clearAll();
-                WKIM.getInstance().getMsgManager().clearAll();
+                UserModel.getInstance().quit(null);
+                WKUIKitApplication.getInstance().exitLogin(0);
             }
         }));
-        SingleClickUtil.onSingleClick(wkVBinding.moduleLayout, view1 -> startActivity(new Intent(this, AppModulesActivity.class)));
-        SingleClickUtil.onSingleClick(wkVBinding.aboutLayout, view1 -> startActivity(new Intent(this, WKAboutActivity.class)));
-        SingleClickUtil.onSingleClick(wkVBinding.fontSizeLayout, view1 -> startActivity(new Intent(this, WKSetFontSizeActivity.class)));
+
+        SingleClickUtil.onSingleClick(wkVBinding.thirdShareLayout, view -> {
+            Intent intent = new Intent(this, WKWebViewActivity.class);
+            intent.putExtra("url", WKApiConfig.baseWebUrl + "sdkinfo.html");
+            startActivity(intent);
+        });
+
         WKCommonModel.getInstance().getAppNewVersion(false, version -> {
             if (version != null && !TextUtils.isEmpty(version.download_url)) {
                 wkVBinding.newVersionIv.setVisibility(View.VISIBLE);
@@ -94,28 +100,9 @@ public class SettingActivity extends WKBaseActivity<ActSettingLayoutBinding> {
                 wkVBinding.newVersionIv.setVisibility(View.GONE);
             }
         });
-
-        SingleClickUtil.onSingleClick(wkVBinding.msgBackupLayout, view1 -> {
-            Intent intent = new Intent(this, BackupRestoreMessageActivity.class);
-            intent.putExtra("handle_type", 1);
-            startActivity(intent);
-        });
-        SingleClickUtil.onSingleClick(wkVBinding.msgRecoveryLayout, view1 -> {
-            Intent intent = new Intent(this, BackupRestoreMessageActivity.class);
-            intent.putExtra("handle_type", 2);
-            startActivity(intent);
-        });
-        SingleClickUtil.onSingleClick(wkVBinding.thirdShareLayout, view1 -> {
-            Intent intent = new Intent(this, WKWebViewActivity.class);
-            intent.putExtra("url", WKApiConfig.baseWebUrl + "sdkinfo.html");
-            startActivity(intent);
-        });
-        SingleClickUtil.onSingleClick(wkVBinding.errorLogLayout, view1 -> startActivity(new Intent(this, ErrorLogsActivity.class)));
-
     }
 
-
-    //获取缓存大小
+    // 获取缓存大小
     private void getCacheSize() {
         new Thread(() -> {
             try {
@@ -128,7 +115,5 @@ public class SettingActivity extends WKBaseActivity<ActSettingLayoutBinding> {
                 WKLogUtils.e("获取图片缓存大小错误");
             }
         }).start();
-
     }
-
 }
