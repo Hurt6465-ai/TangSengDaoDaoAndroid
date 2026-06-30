@@ -74,4 +74,7 @@
     <string name="feed_voice_record_failed">Recording failed</string>
     <string name="feed_voice_upload_failed">Voice upload failed</string>
     <string name="feed_voice_permission_required">Microphone permission is required to send voice</string>
+    <string name="feed_voice_recording_title">Recording</string>
+    <string name="feed_voice_release_send">Release to send</string>
+    <string name="feed_voice_drag_cancel">Slide left or up to cancel</string>
 </resources>
