@@ -449,6 +449,33 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         return String.format(java.util.Locale.getDefault(), "%02d:%02d", sec / 60, sec % 60);
     }
 
+
+    private void finishRecord(boolean cancel) {
+        if (!recording) return;
+        recording = false;
+        mainHandler.removeCallbacks(maxRecordRunnable);
+        mainHandler.removeCallbacks(recordTickRunnable);
+        long durationMs = Math.max(0, System.currentTimeMillis() - recordStartTime);
+        String file = recordPath;
+        byte[] waveform = AudioRecordManager.getInstance().getDbs();
+        recordWaveform = Base64.encodeToString(waveform == null ? new byte[0] : waveform, Base64.NO_WRAP);
+        if (cancel) {
+            AudioRecordManager.getInstance().cancelRecord();
+            hideRecordHint();
+            if (!TextUtils.isEmpty(file)) new File(file).delete();
+            return;
+        }
+        AudioRecordManager.getInstance().stopRecord();
+        hideRecordHint();
+        if (durationMs < MIN_RECORD_MS) {
+            if (!TextUtils.isEmpty(file)) new File(file).delete();
+            Toast.makeText(requireContext(), R.string.feed_voice_too_short, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int seconds = Math.max(1, (int) Math.ceil(durationMs / 1000.0));
+        sendVoiceComment(file, seconds, recordWaveform);
+    }
+
     private void hideRecordHint() {
         mainHandler.removeCallbacks(recordTickRunnable);
         if (recordWaveView != null) recordWaveView.stopRecord();
