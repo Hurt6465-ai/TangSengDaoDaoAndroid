@@ -70,8 +70,12 @@
     <string name="feed_delete">ပို့စ်ဖျက်ရန်</string>
     <string name="feed_delete_requested">ဖျက်ရန်တောင်းဆိုချက် ပေးပို့ပြီးပါပြီ</string>
     <string name="feed_delete_not_ready">Backend ချိတ်ပြီးမှ ဖျက်ရန် API အသုံးပြုနိုင်ပါမည်</string>
-    <string name="feed_unfollowed">Follow ဖြုတ်ပြီး</string>
-    <string name="feed_comment_voice_hold">အသံဖမ်းရန် ဖိထားပါ</string>
-    <string name="feed_comment_voice_recording">လွှတ်ပါ ပို့မည်၊ ဘယ်သို့ဆွဲပါ ပယ်ဖျက်မည်</string>
-    <string name="feed_comment_voice_release_cancel">လွှတ်ပါ ပယ်ဖျက်မည်</string>
+    <string name="feed_voice_hold_short">အသံ</string>
+    <string name="feed_voice_hold_to_talk">ဖိထားပြီး ပြောပါ</string>
+    <string name="feed_voice_slide_cancel">ဘယ်ဘက်သို့ရွှေ့လျှင် ပယ်ဖျက်မည်</string>
+    <string name="feed_voice_release_cancel">လွှတ်ပါက ပယ်ဖျက်မည်</string>
+    <string name="feed_voice_too_short">အသံတိုလွန်းသည်</string>
+    <string name="feed_voice_record_failed">အသံဖမ်း မအောင်မြင်ပါ</string>
+    <string name="feed_voice_upload_failed">အသံတင်ခြင်း မအောင်မြင်ပါ</string>
+    <string name="feed_voice_permission_required">အသံပို့ရန် မိုက်ခွင့်ပြုချက်လိုအပ်သည်</string>
 </resources>
