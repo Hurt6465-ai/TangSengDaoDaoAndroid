@@ -50,7 +50,7 @@
                 android:id="@+id/profileAvatarView"
                 android:layout_width="38dp"
                 android:layout_height="38dp"
-                android:layout_gravity="start|center_vertical" />
+                android:layout_gravity="end|center_vertical" />
 
             <LinearLayout
                 android:id="@+id/chatHomeTabGroup"
@@ -65,9 +65,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:gravity="center"
-                    android:minWidth="64dp"
-                    android:paddingStart="6dp"
-                    android:paddingEnd="6dp"
+                    android:minWidth="54dp"
+                    android:paddingStart="3dp"
+                    android:paddingEnd="3dp"
                     android:text="@string/peipe_chat_tab_message"
                     android:textColor="@color/colorDark"
                     android:textSize="22sp"
@@ -77,11 +77,11 @@
                     android:id="@+id/roomTabTv"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_marginStart="14dp"
+                    android:layout_marginStart="8dp"
                     android:gravity="center"
-                    android:minWidth="82dp"
-                    android:paddingStart="6dp"
-                    android:paddingEnd="6dp"
+                    android:minWidth="62dp"
+                    android:paddingStart="3dp"
+                    android:paddingEnd="3dp"
                     android:text="@string/peipe_chat_tab_room"
                     android:textColor="#6B7280"
                     android:textSize="18sp"
@@ -91,8 +91,8 @@
                     android:id="@+id/contactsTabLayout"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_marginStart="14dp"
-                    android:minWidth="72dp">
+                    android:layout_marginStart="8dp"
+                    android:minWidth="62dp">
 
                     <TextView
                         android:id="@+id/contactsTabTv"
@@ -100,9 +100,9 @@
                         android:layout_height="match_parent"
                         android:layout_gravity="center"
                         android:gravity="center"
-                        android:minWidth="72dp"
-                        android:paddingStart="6dp"
-                        android:paddingEnd="6dp"
+                        android:minWidth="62dp"
+                        android:paddingStart="3dp"
+                        android:paddingEnd="3dp"
                         android:text="@string/peipe_chat_tab_contacts"
                         android:textColor="#6B7280"
                         android:textSize="18sp"
@@ -128,7 +128,8 @@
                 android:background="@android:color/transparent"
                 android:padding="9dp"
                 android:src="@drawable/ic_home_more_vert"
-                android:tint="#6B7280" />
+                android:tint="#6B7280"
+                android:visibility="gone" />
         </FrameLayout>
 
         <FrameLayout
