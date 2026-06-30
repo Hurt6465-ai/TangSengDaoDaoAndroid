@@ -134,7 +134,7 @@ public class FeedBrowseActivity extends FragmentActivity {
             return;
         }
         topTabs.setVisibility(View.VISIBLE);
-        updateTopTabState(MODE_FOLLOWING.equals(mode));
+        updateTopTabState(false);
         recommendTab.setOnClickListener(v -> {
             if (!MODE_DISCOVER.equals(mode)) {
                 mode = MODE_DISCOVER;
