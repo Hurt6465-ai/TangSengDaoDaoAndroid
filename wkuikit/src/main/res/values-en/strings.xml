@@ -254,7 +254,7 @@
     <string name="backup_message_desc">1.To migrate local chat records,you need to upload your chat records to the server to support new device downloads;\n2.Chat records are stored on the server anonymously encrypted;\n3.To prevent information leakage,the server will delete the chat records uploaded by users at 0:00 everyday.\n4.In order to prevent information leakage,the server will delete chat records uploaded by users at 0:00 everyday;\n5.Users are advised to confirm that chat records are migrated before deleting chat records on the original device;\n6.Any undesirable consequences caused by this function shall be borne by the users themselves;
 </string>
     <string name="recovery_msg_fail">Recovery messages fail</string>
-    <string name="choose_module">Choose Module</string>
+    <string name="choose_module">Modules</string>
     <string name="third_party_sharing_list">Third party sharing list</string>
     <string name="error_data">Development logs</string>
     <string name="call_blacklist_group">You have been pulled into the group blacklist and cannot chat with audio and video</string>
@@ -305,5 +305,24 @@
     <string name="peipe_chat_tab_message">Chats</string>
     <string name="peipe_chat_tab_room">Rooms</string>
     <string name="peipe_chat_tab_contacts">Contacts</string>
+<string name="security_and_privacy">Security &amp; Privacy</string>
+    <string name="privacy_policy">Privacy Policy</string>
+    <string name="user_agreement">User Agreement</string>
+    <string name="blacklist">Blocked users</string>
+    <string name="blacklist_empty">No blocked users</string>
+    <string name="remove_from_blacklist">Unblock</string>
+    <string name="remove_from_blacklist_tips">After unblocking, this user can send you messages again.</string>
+    <string name="removed_from_blacklist">Removed from blocked users</string>
+    <string name="destroy_account">Delete account</string>
+    <string name="destroy_account_warning_title">You will not be able to keep using this account</string>
+    <string name="destroy_account_warning_content">After deletion, this account will be marked as deleted and the phone number and username will be released. Your profile, language partner profile and other private profile data will be cleared. The UID is kept as a placeholder to avoid breaking old conversations.</string>
+    <string name="send_destroy_code">Get delete code</string>
+    <string name="input_destroy_code">Enter delete code</string>
+    <string name="confirm_destroy_account">Delete account</string>
+    <string name="destroy_code_sent">Verification code sent</string>
+    <string name="destroy_account_confirm_tips">Account deletion cannot be recovered. Continue?</string>
+    <string name="destroy_account_success">Account deleted</string>
+    <string name="resend_after_seconds">Resend in %1$d s</string>
+    <string name="operation_failed">Operation failed</string>
 </resources>
 
