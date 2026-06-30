@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/commentRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -35,6 +36,41 @@
             android:layout_marginTop="4dp"
             android:textColor="#111827"
             android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/commentVoiceLayout"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/bg_feed_comment_input"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="12dp"
+            android:visibility="gone">
+
+            <com.chat.uikit.view.CircleProgress
+                android:id="@+id/commentVoicePlayBtn"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                app:shadowColor="#FFFFFFFF"
+                app:progressColor="#E91E63"
+                app:playColor="#E91E63" />
+
+            <com.chat.uikit.view.WaveformView
+                android:id="@+id/commentVoiceWaveform"
+                android:layout_width="118dp"
+                android:layout_height="20dp"
+                android:layout_marginStart="7dp" />
+
+            <TextView
+                android:id="@+id/commentVoiceTimeTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:textColor="#6B7280"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="wrap_content"
