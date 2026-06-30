@@ -199,14 +199,22 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
         holder.voiceLayout.setOnClickListener(v -> {
             String path = voice.playPath();
             if (TextUtils.isEmpty(path)) return;
+            attachVoicePlayListener(holder, key);
             if (WKPlayVoiceUtils.getInstance().isPlaying() && TextUtils.equals(WKPlayVoiceUtils.getInstance().getPlayKey(), key)) {
                 WKPlayVoiceUtils.getInstance().onPause();
                 holder.voicePlayBtn.setPlay();
+                holder.voiceWaveform.setProgress(0f);
                 return;
             }
             WKPlayVoiceUtils.getInstance().playVoice(path, key);
             holder.voicePlayBtn.setPause();
         });
+        if (TextUtils.equals(WKPlayVoiceUtils.getInstance().getPlayKey(), key)) {
+            attachVoicePlayListener(holder, key);
+        }
+    }
+
+    private void attachVoicePlayListener(@NonNull VH holder, String key) {
         WKPlayVoiceUtils.getInstance().setPlayListener(new WKPlayVoiceUtils.IPlayListener() {
             @Override
             public void onCompletion(String playKey) {

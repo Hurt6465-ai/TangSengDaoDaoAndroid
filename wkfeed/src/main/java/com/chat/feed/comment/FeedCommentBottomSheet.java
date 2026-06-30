@@ -3,6 +3,7 @@ package com.chat.feed.comment;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -10,12 +11,16 @@ import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Base64;
+import android.view.HapticFeedbackConstants;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -40,6 +45,7 @@ import com.chat.feed.R;
 import com.chat.feed.model.CommentBean;
 import com.chat.feed.model.CommentListResponse;
 import com.chat.uikit.view.voice.AudioRecordManager;
+import com.chat.uikit.view.voice.LineWaveVoiceView;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
@@ -81,10 +87,19 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     private boolean hasMore = true;
     private int commentCount;
     private FeedCommentAdapter adapter;
+    private View rootView;
+    private RecyclerView commentRecyclerView;
+    private View inputBar;
+    private ViewTreeObserver.OnGlobalLayoutListener keyboardListener;
+    private int recyclerBasePaddingBottom;
     private EditText editText;
     private TextView titleTv;
-    private TextView actionBtn;
+    private ImageButton actionBtn;
     private TextView recordHintTv;
+    private View recordPanel;
+    private LineWaveVoiceView recordWaveView;
+    private TextView recordTimerTv;
+    private TextView recordCancelTv;
     private TextView authorFollowTv;
     private OnCommentSentListener onCommentSentListener;
 
@@ -93,10 +108,19 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     private boolean recording;
     private boolean recordCancel;
     private float recordStartX;
+    private float recordStartY;
     private long recordStartTime;
     private String recordPath;
     private String recordWaveform;
     private final Runnable maxRecordRunnable = () -> finishRecord(false);
+    private final Runnable recordTickRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!recording) return;
+            updateRecordTimer();
+            mainHandler.postDelayed(this, 200L);
+        }
+    };
 
     public interface OnCommentSentListener {
         void onCommentSent(int delta);
@@ -154,13 +178,15 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         authorFollowed = args != null && args.getBoolean(ARG_AUTHOR_FOLLOWED, false);
         caption = args == null ? "" : args.getString(ARG_CAPTION, "");
 
+        rootView = view;
         bindHeader(view);
         adapter = new FeedCommentAdapter();
-        RecyclerView recyclerView = view.findViewById(R.id.commentRecyclerView);
+        commentRecyclerView = view.findViewById(R.id.commentRecyclerView);
+        recyclerBasePaddingBottom = commentRecyclerView.getPaddingBottom();
         LinearLayoutManager layoutManager = new LinearLayoutManager(requireContext());
-        recyclerView.setLayoutManager(layoutManager);
-        recyclerView.setAdapter(adapter);
-        recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+        commentRecyclerView.setLayoutManager(layoutManager);
+        commentRecyclerView.setAdapter(adapter);
+        commentRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
                 if (!hasMore || loading) return;
@@ -171,10 +197,16 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         titleTv = view.findViewById(R.id.commentTitleTv);
         editText = view.findViewById(R.id.commentEditText);
         actionBtn = view.findViewById(R.id.commentSendBtn);
+        inputBar = view.findViewById(R.id.commentInputBar);
         recordHintTv = view.findViewById(R.id.commentRecordHintTv);
+        recordPanel = view.findViewById(R.id.commentRecordPanel);
+        recordWaveView = view.findViewById(R.id.commentRecordWaveView);
+        recordTimerTv = view.findViewById(R.id.commentRecordTimerTv);
+        recordCancelTv = view.findViewById(R.id.commentRecordCancelTv);
         ImageButton closeBtn = view.findViewById(R.id.commentCloseBtn);
         closeBtn.setOnClickListener(v -> dismissAllowingStateLoss());
         bindInputBar();
+        setupKeyboardAvoidance();
         adapter.setActionListener(new FeedCommentAdapter.CommentActionListener() {
             @Override
             public void onReplyClick(CommentBean item, int position) {
@@ -254,6 +286,33 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         });
     }
 
+    private void setupKeyboardAvoidance() {
+        if (rootView == null || inputBar == null) return;
+        keyboardListener = () -> {
+            if (rootView == null || inputBar == null) return;
+            Rect rect = new Rect();
+            rootView.getWindowVisibleDisplayFrame(rect);
+            int rootHeight = rootView.getRootView() == null ? rootView.getHeight() : rootView.getRootView().getHeight();
+            int keyboardHeight = Math.max(0, rootHeight - rect.bottom);
+            boolean keyboardVisible = keyboardHeight > dp(140);
+            int offset = keyboardVisible ? keyboardHeight : 0;
+            inputBar.setTranslationY(-offset);
+            if (recordHintTv != null) recordHintTv.setTranslationY(-offset);
+            if (commentRecyclerView != null) {
+                int bottom = recyclerBasePaddingBottom + (keyboardVisible ? keyboardHeight + dp(58) : 0);
+                if (commentRecyclerView.getPaddingBottom() != bottom) {
+                    commentRecyclerView.setPadding(
+                            commentRecyclerView.getPaddingLeft(),
+                            commentRecyclerView.getPaddingTop(),
+                            commentRecyclerView.getPaddingRight(),
+                            bottom
+                    );
+                }
+            }
+        };
+        rootView.getViewTreeObserver().addOnGlobalLayoutListener(keyboardListener);
+    }
+
     private void bindInputBar() {
         updateActionButton();
         actionBtn.setOnClickListener(v -> {
@@ -266,7 +325,7 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
                     return startRecord(event);
                 case MotionEvent.ACTION_MOVE:
                     if (!recording) return true;
-                    recordCancel = recordStartX - event.getRawX() > dp(76);
+                    recordCancel = recordStartX - event.getRawX() > dp(72) || recordStartY - event.getRawY() > dp(96);
                     updateRecordHint();
                     return true;
                 case MotionEvent.ACTION_UP:
@@ -279,6 +338,24 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
                     return true;
             }
         });
+        editText.setSingleLine(false);
+        editText.setImeOptions(EditorInfo.IME_ACTION_SEND | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        editText.setOnEditorActionListener((v, actionId, event) -> {
+            boolean imeSend = actionId == EditorInfo.IME_ACTION_SEND;
+            boolean enterSend = event != null
+                    && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                    && event.getAction() == KeyEvent.ACTION_DOWN
+                    && !event.isShiftPressed();
+            if ((imeSend || enterSend) && hasInputText()) {
+                sendCommentFromInput();
+                return true;
+            }
+            return false;
+        });
+        editText.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) expandCommentSheet(true);
+        });
+        editText.setOnClickListener(v -> expandCommentSheet(true));
         editText.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) { updateActionButton(); }
@@ -293,9 +370,13 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     private void updateActionButton() {
         if (actionBtn == null) return;
         if (hasInputText()) {
-            actionBtn.setText(R.string.feed_comment_send);
+            actionBtn.setImageResource(R.drawable.ic_feed_send_white);
+            actionBtn.setBackgroundResource(R.drawable.bg_feed_comment_send_button);
+            actionBtn.setContentDescription(getString(R.string.feed_comment_send));
         } else {
-            actionBtn.setText(R.string.feed_voice_hold_short);
+            actionBtn.setImageResource(R.drawable.ic_feed_mic_white);
+            actionBtn.setBackgroundResource(R.drawable.bg_feed_comment_voice_button);
+            actionBtn.setContentDescription(getString(R.string.feed_voice_hold_to_talk));
         }
     }
 
@@ -303,79 +384,128 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_RECORD_AUDIO);
             Toast.makeText(requireContext(), R.string.feed_voice_permission_required, Toast.LENGTH_SHORT).show();
-            return false;
+            return true;
         }
         try {
+            hideKeyboard();
+            expandCommentSheet(true);
             File dir = new File(requireContext().getExternalCacheDir(), "feed_voice");
             if (!dir.exists()) dir.mkdirs();
             recordPath = new File(dir, "comment_" + System.currentTimeMillis() + ".amr").getAbsolutePath();
             recordStartX = event.getRawX();
+            recordStartY = event.getRawY();
             recordStartTime = System.currentTimeMillis();
             recordCancel = false;
             recording = true;
+            if (actionBtn != null) {
+                actionBtn.setSelected(true);
+                actionBtn.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            }
             AudioRecordManager.getInstance().init(recordPath);
             AudioRecordManager.getInstance().startRecord();
+            if (recordWaveView != null) {
+                recordWaveView.setText(getString(R.string.feed_voice_recording_title));
+                recordWaveView.startRecord();
+            }
             updateRecordHint();
+            updateRecordTimer();
+            mainHandler.post(recordTickRunnable);
             mainHandler.postDelayed(maxRecordRunnable, MAX_RECORD_MS);
             return true;
         } catch (Throwable e) {
             recording = false;
+            hideRecordHint();
             Toast.makeText(requireContext(), R.string.feed_voice_record_failed, Toast.LENGTH_SHORT).show();
-            return false;
+            return true;
         }
     }
 
     private void updateRecordHint() {
-        if (recordHintTv == null) return;
-        recordHintTv.setVisibility(View.VISIBLE);
-        recordHintTv.setText(recordCancel ? R.string.feed_voice_release_cancel : R.string.feed_voice_slide_cancel);
-        recordHintTv.setTextColor(recordCancel ? 0xFFEF4444 : 0xFF6B7280);
+        if (recordPanel != null) recordPanel.setVisibility(View.VISIBLE);
+        if (recordHintTv != null) {
+            recordHintTv.setVisibility(View.VISIBLE);
+            recordHintTv.setText(recordCancel ? R.string.feed_voice_release_cancel : R.string.feed_voice_slide_cancel);
+            recordHintTv.setTextColor(recordCancel ? 0xFFEF4444 : 0xFF6B7280);
+        }
+        if (recordCancelTv != null) {
+            recordCancelTv.setText(recordCancel ? R.string.feed_voice_release_cancel : R.string.feed_voice_drag_cancel);
+            recordCancelTv.setTextColor(recordCancel ? 0xFFFFFFFF : 0xFFEF4444);
+            recordCancelTv.setBackgroundResource(recordCancel ? R.drawable.bg_feed_comment_record_cancel_active : R.drawable.bg_feed_comment_record_cancel);
+        }
+        if (recordWaveView != null) {
+            recordWaveView.setText(recordCancel ? getString(R.string.feed_voice_release_cancel) : getString(R.string.feed_voice_release_send));
+        }
     }
 
-    private void finishRecord(boolean cancel) {
-        if (!recording) return;
-        recording = false;
-        mainHandler.removeCallbacks(maxRecordRunnable);
+    private void updateRecordTimer() {
+        if (recordTimerTv == null || !recording) return;
         long durationMs = Math.max(0, System.currentTimeMillis() - recordStartTime);
-        String file = recordPath;
-        byte[] waveform = AudioRecordManager.getInstance().getDbs();
-        recordWaveform = Base64.encodeToString(waveform == null ? new byte[0] : waveform, Base64.NO_WRAP);
-        if (cancel) {
-            AudioRecordManager.getInstance().cancelRecord();
-            hideRecordHint();
-            return;
-        }
-        AudioRecordManager.getInstance().stopRecord();
-        hideRecordHint();
-        if (durationMs < MIN_RECORD_MS) {
-            if (!TextUtils.isEmpty(file)) new File(file).delete();
-            Toast.makeText(requireContext(), R.string.feed_voice_too_short, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        int seconds = Math.max(1, (int) Math.ceil(durationMs / 1000.0));
-        sendVoiceComment(file, seconds, recordWaveform);
+        int sec = Math.min((int) Math.ceil(durationMs / 1000.0), (int) (MAX_RECORD_MS / 1000L));
+        recordTimerTv.setText(formatRecordTime(sec) + " / 01:00");
+    }
+
+    private String formatRecordTime(int seconds) {
+        int sec = Math.max(0, seconds);
+        return String.format(java.util.Locale.getDefault(), "%02d:%02d", sec / 60, sec % 60);
     }
 
     private void hideRecordHint() {
+        mainHandler.removeCallbacks(recordTickRunnable);
+        if (recordWaveView != null) recordWaveView.stopRecord();
+        if (recordPanel != null) recordPanel.setVisibility(View.GONE);
         if (recordHintTv != null) recordHintTv.setVisibility(View.GONE);
+        if (actionBtn != null) actionBtn.setSelected(false);
+    }
+
+    private void hideKeyboard() {
+        try {
+            if (editText != null) editText.clearFocus();
+            InputMethodManager imm = (InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null && getView() != null) imm.hideSoftInputFromWindow(getView().getWindowToken(), 0);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void expandCommentSheet(boolean forceFull) {
+        BottomSheetDialog dialog = (BottomSheetDialog) getDialog();
+        if (dialog == null) return;
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE | WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED);
+        }
+        View bottomSheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+        if (bottomSheet == null) return;
+        int height = calculateSheetHeight(forceFull);
+        ViewGroup.LayoutParams lp = bottomSheet.getLayoutParams();
+        if (lp != null && lp.height != height) {
+            lp.height = height;
+            bottomSheet.setLayoutParams(lp);
+        }
+        BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
+        behavior.setSkipCollapsed(true);
+        behavior.setPeekHeight(height);
+        behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+    }
+
+    private int calculateSheetHeight(boolean forceFull) {
+        int screen = getResources().getDisplayMetrics().heightPixels;
+        int full = Math.max(dp(560), screen - getStatusBarHeight());
+        int loadedCount = adapter == null ? 0 : adapter.getItemCount();
+        boolean contentNeedsFull = commentCount >= 4 || loadedCount >= 4 || (!TextUtils.isEmpty(caption) && caption.length() > 60);
+        if (forceFull || contentNeedsFull) return full;
+        int compact = (int) (screen * 0.84f);
+        return Math.min(full, Math.max(compact, dp(560)));
+    }
+
+    private int getStatusBarHeight() {
+        int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        return id > 0 ? getResources().getDimensionPixelSize(id) : dp(24);
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        BottomSheetDialog dialog = (BottomSheetDialog) getDialog();
-        if (dialog != null) {
-            Window window = dialog.getWindow();
-            if (window != null) window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-            View bottomSheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
-            if (bottomSheet != null) {
-                int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.74f);
-                bottomSheet.getLayoutParams().height = height;
-                BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
-                behavior.setPeekHeight(height);
-                behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-            }
-        }
+        expandCommentSheet(false);
     }
 
     private void updateTitle() {
@@ -396,6 +526,7 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
                 hasMore = result.has_more == 1 && !TextUtils.isEmpty(cursor);
                 if (first) adapter.submitList(result.safeList());
                 else adapter.appendList(result.safeList());
+                expandCommentSheet(false);
             }
 
             @Override
@@ -559,6 +690,10 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     public void onDestroyView() {
         if (recording) finishRecord(true);
         mainHandler.removeCallbacks(maxRecordRunnable);
+        mainHandler.removeCallbacks(recordTickRunnable);
+        if (rootView != null && keyboardListener != null && rootView.getViewTreeObserver().isAlive()) {
+            rootView.getViewTreeObserver().removeOnGlobalLayoutListener(keyboardListener);
+        }
         voiceExecutor.shutdownNow();
         super.onDestroyView();
     }
