@@ -78,4 +78,7 @@
     <string name="feed_voice_record_failed">အသံဖမ်း မအောင်မြင်ပါ</string>
     <string name="feed_voice_upload_failed">အသံတင်ခြင်း မအောင်မြင်ပါ</string>
     <string name="feed_voice_permission_required">အသံပို့ရန် မိုက်ခွင့်ပြုချက်လိုအပ်သည်</string>
+    <string name="feed_voice_recording_title">အသံဖမ်းနေသည်</string>
+    <string name="feed_voice_release_send">လွှတ်ပါက ပို့မည်</string>
+    <string name="feed_voice_drag_cancel">ဘယ်ဘက် သို့မဟုတ် အပေါ်သို့ရွှေ့လျှင် ပယ်ဖျက်မည်</string>
 </resources>
