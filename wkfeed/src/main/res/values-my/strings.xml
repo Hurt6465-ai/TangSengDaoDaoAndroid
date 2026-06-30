@@ -70,4 +70,8 @@
     <string name="feed_delete">ပို့စ်ဖျက်ရန်</string>
     <string name="feed_delete_requested">ဖျက်ရန်တောင်းဆိုချက် ပေးပို့ပြီးပါပြီ</string>
     <string name="feed_delete_not_ready">Backend ချိတ်ပြီးမှ ဖျက်ရန် API အသုံးပြုနိုင်ပါမည်</string>
+    <string name="feed_unfollowed">Follow ဖြုတ်ပြီး</string>
+    <string name="feed_comment_voice_hold">အသံဖမ်းရန် ဖိထားပါ</string>
+    <string name="feed_comment_voice_recording">လွှတ်ပါ ပို့မည်၊ ဘယ်သို့ဆွဲပါ ပယ်ဖျက်မည်</string>
+    <string name="feed_comment_voice_release_cancel">လွှတ်ပါ ပယ်ဖျက်မည်</string>
 </resources>
