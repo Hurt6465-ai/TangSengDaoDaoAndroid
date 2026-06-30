@@ -21,13 +21,13 @@ public interface FeedService {
                                            @Query("limit") int limit,
                                            @Query("uid") String uid);
 
+    @GET("feed/following")
+    Observable<FeedListResponse> following(@Query("cursor") String cursor,
+                                           @Query("limit") int limit);
+
     @GET("feed/user/{uid}")
     Observable<FeedListResponse> userFeeds(@Path("uid") String uid,
                                            @Query("cursor") String cursor,
-                                           @Query("limit") int limit);
-
-    @GET("feed/following")
-    Observable<FeedListResponse> following(@Query("cursor") String cursor,
                                            @Query("limit") int limit);
 
     @GET("feed/{feed_id}/comments")
@@ -44,15 +44,6 @@ public interface FeedService {
     @DELETE("feed/follow")
     Observable<CommonResponse> unfollow(@Query("uid") String uid);
 
-    @POST("feed/{feed_id}/share")
-    Observable<CommonResponse> share(@Path("feed_id") String feedId, @Body Map<String, Object> body);
-
-    @POST("feed/{feed_id}/report")
-    Observable<CommonResponse> report(@Path("feed_id") String feedId, @Body Map<String, Object> body);
-
-    @POST("feed/{feed_id}/event")
-    Observable<CommonResponse> event(@Path("feed_id") String feedId, @Body Map<String, Object> body);
-
     @POST("feed/{feed_id}/comments")
     Observable<CommonResponse> sendComment(@Path("feed_id") String feedId, @Body Map<String, Object> body);
 
@@ -61,4 +52,13 @@ public interface FeedService {
 
     @DELETE("feed/{feed_id}")
     Observable<CommonResponse> delete(@Path("feed_id") String feedId);
+
+    @POST("feed/{feed_id}/share")
+    Observable<CommonResponse> share(@Path("feed_id") String feedId, @Body Map<String, Object> body);
+
+    @POST("feed/{feed_id}/report")
+    Observable<CommonResponse> report(@Path("feed_id") String feedId, @Body Map<String, Object> body);
+
+    @POST("feed/{feed_id}/event")
+    Observable<CommonResponse> event(@Path("feed_id") String feedId, @Body Map<String, Object> body);
 }
