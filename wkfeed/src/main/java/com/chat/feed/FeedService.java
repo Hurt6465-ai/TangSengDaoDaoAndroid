@@ -26,6 +26,10 @@ public interface FeedService {
                                            @Query("cursor") String cursor,
                                            @Query("limit") int limit);
 
+    @GET("feed/following")
+    Observable<FeedListResponse> following(@Query("cursor") String cursor,
+                                           @Query("limit") int limit);
+
     @GET("feed/{feed_id}/comments")
     Observable<CommentListResponse> comments(@Path("feed_id") String feedId,
                                              @Query("cursor") String cursor,
@@ -33,6 +37,21 @@ public interface FeedService {
 
     @POST("feed/{feed_id}/like")
     Observable<CommonResponse> like(@Path("feed_id") String feedId, @Body Map<String, Object> body);
+
+    @POST("feed/follow")
+    Observable<CommonResponse> follow(@Body Map<String, Object> body);
+
+    @DELETE("feed/follow")
+    Observable<CommonResponse> unfollow(@Query("uid") String uid);
+
+    @POST("feed/{feed_id}/share")
+    Observable<CommonResponse> share(@Path("feed_id") String feedId, @Body Map<String, Object> body);
+
+    @POST("feed/{feed_id}/report")
+    Observable<CommonResponse> report(@Path("feed_id") String feedId, @Body Map<String, Object> body);
+
+    @POST("feed/{feed_id}/event")
+    Observable<CommonResponse> event(@Path("feed_id") String feedId, @Body Map<String, Object> body);
 
     @POST("feed/{feed_id}/comments")
     Observable<CommonResponse> sendComment(@Path("feed_id") String feedId, @Body Map<String, Object> body);

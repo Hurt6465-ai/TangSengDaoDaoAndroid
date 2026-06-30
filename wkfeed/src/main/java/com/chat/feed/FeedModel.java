@@ -26,6 +26,7 @@ public class FeedModel extends WKBaseModel {
     public static final String MODE_DISCOVER = "discover";
     public static final String MODE_NEARBY = "nearby";
     public static final String MODE_PROFILE = "profile";
+    public static final String MODE_FOLLOWING = "following";
 
     private FeedModel() {}
 
@@ -55,6 +56,24 @@ public class FeedModel extends WKBaseModel {
                 } else if (listener != null) {
                     listener.onFail(code, msg);
                 }
+            }
+        });
+    }
+
+    public void following(String cursor, IRequestResultListener<FeedListResponse> listener) {
+        if (FeedConfig.DEBUG_MOCK) {
+            if (listener != null) listener.onSuccess(FeedMockData.feeds(MODE_DISCOVER, cursor, "", PAGE_SIZE));
+            return;
+        }
+        request(createService(FeedService.class).following(cursor, PAGE_SIZE), new IRequestResultListener<FeedListResponse>() {
+            @Override
+            public void onSuccess(FeedListResponse result) {
+                if (listener != null) listener.onSuccess(result);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (listener != null) listener.onFail(code, msg);
             }
         });
     }
@@ -121,6 +140,70 @@ public class FeedModel extends WKBaseModel {
         Map<String, Object> body = new HashMap<>();
         body.put("content", content);
         request(createService(FeedService.class).sendComment(feedId, body), listener);
+    }
+
+    public void follow(String uid, boolean follow, IRequestResultListener<CommonResponse> listener) {
+        if (TextUtils.isEmpty(uid)) {
+            if (listener != null) listener.onFail(400, "用户不存在");
+            return;
+        }
+        if (FeedConfig.DEBUG_MOCK) {
+            if (listener != null) listener.onSuccess(null);
+            return;
+        }
+        if (follow) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("uid", uid);
+            body.put("following_uid", uid);
+            request(createService(FeedService.class).follow(body), listener);
+        } else {
+            request(createService(FeedService.class).unfollow(uid), listener);
+        }
+    }
+
+    public void share(String feedId, IRequestResultListener<CommonResponse> listener) {
+        if (TextUtils.isEmpty(feedId)) {
+            if (listener != null) listener.onFail(400, "作品不存在");
+            return;
+        }
+        if (FeedConfig.DEBUG_MOCK) {
+            if (listener != null) listener.onSuccess(null);
+            return;
+        }
+        request(createService(FeedService.class).share(feedId, new HashMap<>()), listener);
+    }
+
+    public void report(String feedId, String reason, IRequestResultListener<CommonResponse> listener) {
+        if (TextUtils.isEmpty(feedId)) {
+            if (listener != null) listener.onFail(400, "作品不存在");
+            return;
+        }
+        if (FeedConfig.DEBUG_MOCK) {
+            if (listener != null) listener.onSuccess(null);
+            return;
+        }
+        Map<String, Object> body = new HashMap<>();
+        body.put("reason", TextUtils.isEmpty(reason) ? "normal" : reason);
+        request(createService(FeedService.class).report(feedId, body), listener);
+    }
+
+    public void event(String feedId, String eventType, long watchMs, long durationMs, int percent, String mediaType, IRequestResultListener<CommonResponse> listener) {
+        if (TextUtils.isEmpty(feedId) || TextUtils.isEmpty(eventType)) return;
+        if (FeedConfig.DEBUG_MOCK) {
+            if (listener != null) listener.onSuccess(null);
+            return;
+        }
+        Map<String, Object> body = new HashMap<>();
+        body.put("event_type", eventType);
+        body.put("watch_ms", watchMs);
+        body.put("duration_ms", durationMs);
+        body.put("percent", percent);
+        body.put("media_type", TextUtils.isEmpty(mediaType) ? "" : mediaType);
+        IRequestResultListener<CommonResponse> safeListener = listener == null ? new IRequestResultListener<CommonResponse>() {
+            @Override public void onSuccess(CommonResponse result) {}
+            @Override public void onFail(int code, String msg) {}
+        } : listener;
+        request(createService(FeedService.class).event(feedId, body), safeListener);
     }
 
     public void publish(String text, List<Map<String, Object>> mediaList, IRequestResultListener<CommonResponse> listener) {
