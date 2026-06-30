@@ -57,13 +57,18 @@ import org.telegram.ui.Components.RLottieImageView;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 2019-11-15 13:46
  * 会话记录适配器
  */
 public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMsg, BaseViewHolder> {
+    private static final long CHANNEL_INFO_FETCH_INTERVAL_MS = 5L * 60L * 1000L;
+    private static final Map<String, Long> CHANNEL_INFO_FETCH_TIME_MAP = new ConcurrentHashMap<>();
+
     private IListener iListener;
 
     public ChatConversationAdapter(@Nullable List<ChatConversationMsg> data) {
@@ -426,7 +431,7 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
             if (TextUtils.isEmpty(showName)) {
                 showName = getContext().getString(R.string.chat);
 //                if (!isScrolling)
-                WKIM.getInstance().getChannelManager().fetchChannelInfo(item.channelID, item.channelType);
+                maybeFetchChannelInfo(item.channelID, item.channelType);
             }
             LinearLayout categoryLayout = helper.getView(R.id.categoryLayout);
             categoryLayout.removeAllViews();
@@ -479,21 +484,27 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
             helper.getView(R.id.otherLayout).setVisibility(View.GONE);
             if (TextUtils.isEmpty(showName))
                 showName = getContext().getString(R.string.chat);
-            avatarView.defaultAvatarTv.setVisibility(View.GONE);
-            avatarView.imageView.setVisibility(View.VISIBLE);
             if (isTopicRoom) {
                 avatarView.showDefaultAvatar(showName);
             } else {
-                avatarView.imageView.setImageResource(R.drawable.default_view_bg);
+                avatarView.showCachedAvatar(item.channelID, item.channelType, showName);
             }
-            //消息头像
-//            avatarView.showAvatar(item.channelID, item.channelType);
-//            GlideUtils.getInstance().showAvatarImg(getContext(), item.channelID, item.channelType, "", helper.getView(R.id.avatarIv));
-            //重新获取频道信息
-//            if (!isScrolling)
-            WKIM.getInstance().getChannelManager().fetchChannelInfo(item.channelID, item.channelType);
+            // 重新获取频道信息只做低频补全，头像本身先走本地缓存，避免 RecyclerView 反复请求服务器。
+            maybeFetchChannelInfo(item.channelID, item.channelType);
         }
         helper.setText(R.id.nameTv, showName);
+    }
+
+    private void maybeFetchChannelInfo(String channelID, byte channelType) {
+        if (TextUtils.isEmpty(channelID)) return;
+        String key = WKConfig.getInstance().getUid() + "_" + channelType + "_" + channelID;
+        long now = System.currentTimeMillis();
+        Long lastFetchTime = CHANNEL_INFO_FETCH_TIME_MAP.get(key);
+        if (lastFetchTime != null && now - lastFetchTime < CHANNEL_INFO_FETCH_INTERVAL_MS) {
+            return;
+        }
+        CHANNEL_INFO_FETCH_TIME_MAP.put(key, now);
+        WKIM.getInstance().getChannelManager().fetchChannelInfo(channelID, channelType);
     }
 
     private void showTopicBadge(@NotNull BaseViewHolder helper, boolean isTopicRoom) {
