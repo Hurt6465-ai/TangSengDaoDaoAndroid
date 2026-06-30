@@ -257,7 +257,7 @@
 5. ပြောင်းရွှေ့ပြီးမှ စက်ဟောင်းမှဖျက်ပါ။
 6. အသုံးပြုသူတာဝန်ယူရမည်။</string>
     <string name="recovery_msg_fail">မှတ်တမ်းပြန်ယူမှု မအောင်မြင်ပါ</string>
-    <string name="choose_module">လုပ်ငန်းသုံးမော်ဂျူး</string>
+    <string name="choose_module">မော်ဂျူး</string>
     <string name="third_party_sharing_list">တတိယပါတီမျှဝေမှုစာရင်း</string>
     <string name="error_data">ဖွံ့ဖြိုးရေးမှတ်တမ်း</string>
     <string name="call_blacklist_group">အုပ်စုအမည်ပျက်စာရင်းထဲရှိ၍ ခေါ်ဆိုမှုမရပါ</string>
@@ -310,4 +310,23 @@
     <string name="peipe_chat_tab_message">မက်ဆေ့ချ်</string>
     <string name="peipe_chat_tab_room">စကားခန်း</string>
     <string name="peipe_chat_tab_contacts">အဆက်အသွယ်</string>
+<string name="security_and_privacy">လုံခြုံရေးနှင့် သီးသန့်မှု</string>
+    <string name="privacy_policy">သီးသန့်ရေးရာ မူဝါဒ</string>
+    <string name="user_agreement">အသုံးပြုသူ သဘောတူညီချက်</string>
+    <string name="blacklist">ပိတ်ဆို့ထားသူများ</string>
+    <string name="blacklist_empty">ပိတ်ဆို့ထားသူ မရှိသေးပါ</string>
+    <string name="remove_from_blacklist">ပိတ်ဆို့မှု ဖယ်ရှားမည်</string>
+    <string name="remove_from_blacklist_tips">ဖယ်ရှားပြီးနောက်၊ ထိုသူသည် သင့်ထံ မက်ဆေ့ချ်ပြန်ပို့နိုင်ပါသည်။</string>
+    <string name="removed_from_blacklist">ပိတ်ဆို့စာရင်းမှ ဖယ်ရှားပြီးပါပြီ</string>
+    <string name="destroy_account">အကောင့်ဖျက်မည်</string>
+    <string name="destroy_account_warning_title">ဤအကောင့်ကို ဆက်လက်အသုံးပြုနိုင်တော့မည်မဟုတ်ပါ</string>
+    <string name="destroy_account_warning_content">အကောင့်ဖျက်ပြီးနောက်၊ ဤအကောင့်ကို ဖျက်ပြီးအကောင့်အဖြစ် မှတ်သားပြီး ဖုန်းနံပါတ်နှင့် အသုံးပြုသူအမည်ကို ပြန်လွှတ်မည်။ ကိုယ်ရေးအချက်အလက်၊ ဘာသာစကားမိတ်ဖက်ပရိုဖိုင်နှင့် သီးသန့်အချက်အလက်များကို ရှင်းလင်းမည်။ စကားပြောမှတ်တမ်း မပျက်စီးစေရန် UID ကိုနေရာခံအဖြစ် ထိန်းထားမည်။</string>
+    <string name="send_destroy_code">ဖျက်ရန်ကုဒ် ရယူမည်</string>
+    <string name="input_destroy_code">ဖျက်ရန်ကုဒ် ထည့်ပါ</string>
+    <string name="confirm_destroy_account">အကောင့်ဖျက်ရန် အတည်ပြုမည်</string>
+    <string name="destroy_code_sent">အတည်ပြုကုဒ် ပို့ပြီးပါပြီ</string>
+    <string name="destroy_account_confirm_tips">အကောင့်ဖျက်ပြီးပါက ပြန်ယူ၍မရပါ။ ဆက်လုပ်မလား။</string>
+    <string name="destroy_account_success">အကောင့်ဖျက်ပြီးပါပြီ</string>
+    <string name="resend_after_seconds">%1$d စက္ကန့်နောက် ပြန်ပို့မည်</string>
+    <string name="operation_failed">လုပ်ဆောင်မှု မအောင်မြင်ပါ</string>
 </resources>
