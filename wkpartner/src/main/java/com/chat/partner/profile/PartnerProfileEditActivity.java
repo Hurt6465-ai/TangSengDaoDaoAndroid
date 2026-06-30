@@ -146,7 +146,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         learningCodes.clear();
         learningCodes.addAll(normalizeCodeList(data.getLearningLanguagesSafe()));
         tags.clear();
-        tags.addAll(cleanList(data.getTagsSafe()));
+        tags.addAll(PartnerTagLocalizer.normalizeKeys(data.getTagsSafe()));
         profileImages.clear();
         profileImages.addAll(limitList(cleanList(data.getProfileImagesSafe()), MAX_PROFILE_IMAGES));
 
@@ -200,7 +200,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         coreBody.put("intro", limitIntro(valueOf(wkVBinding.introEt)));
 
         JSONObject mediaBody = new JSONObject();
-        mediaBody.put("tags", new ArrayList<>(tags));
+        mediaBody.put("tags", new ArrayList<>(PartnerTagLocalizer.normalizeKeys(tags)));
         mediaBody.put("profile_cover", profileCover);
         mediaBody.put("profile_images", new ArrayList<>(limitList(profileImages, MAX_PROFILE_IMAGES)));
 
@@ -315,7 +315,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         if (resultCode != RESULT_OK || data == null) return;
         if (requestCode == REQ_TAGS) {
             tags.clear();
-            tags.addAll(splitText(data.getStringExtra(PartnerTagSelectorActivity.EXTRA_TAGS)));
+            tags.addAll(PartnerTagLocalizer.normalizeKeys(splitText(data.getStringExtra(PartnerTagSelectorActivity.EXTRA_TAGS))));
             updateTagsText();
             return;
         }
@@ -535,7 +535,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
             chip.setLayoutParams(lp);
 
             TextView text = new TextView(this);
-            text.setText(tag);
+            text.setText(PartnerTagLocalizer.label(this, tag));
             text.setTextSize(12);
             text.setTextColor(0xFF6A4DDF);
             text.setGravity(android.view.Gravity.CENTER);
