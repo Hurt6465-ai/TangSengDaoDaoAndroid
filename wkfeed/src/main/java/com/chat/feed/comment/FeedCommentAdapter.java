@@ -1,11 +1,11 @@
 package com.chat.feed.comment;
 
-import android.media.MediaPlayer;
-import android.net.Uri;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -16,9 +16,11 @@ import com.chat.base.config.WKApiConfig;
 import com.chat.base.ui.components.AvatarView;
 import com.chat.feed.R;
 import com.chat.feed.model.CommentBean;
+import com.chat.uikit.view.CircleProgress;
+import com.chat.uikit.view.WKPlayVoiceUtils;
+import com.chat.uikit.view.WaveformView;
 import com.xinbida.wukongim.entity.WKChannelType;
 
-import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -111,6 +113,13 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
         notifyItemChanged(index);
     }
 
+    public void updateLocalContent(String commentId, String content) {
+        int index = indexOf(commentId);
+        if (index < 0) return;
+        list.get(index).content = content;
+        notifyItemChanged(index);
+    }
+
     private int indexOf(String commentId) {
         if (commentId == null) return -1;
         for (int i = 0; i < list.size(); i++) {
@@ -135,9 +144,19 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
         holder.avatar.setSize(reply ? 28 : 38);
         bindCommentAvatar(holder.avatar, item);
         holder.nameTv.setText(item.name == null ? "" : item.name);
-        bindContent(holder.contentTv, item);
-        holder.timeTv.setText(item.created_at > 0 ? sdf.format(new Date(item.created_at)) : "");
+        holder.timeTv.setText(item.created_at > 0 ? sdf.format(new Date(normalizeTime(item.created_at))) : "");
         holder.likeTv.setText(item.like_count > 0 ? String.valueOf(item.like_count) : "");
+
+        VoicePayload voice = VoicePayload.parse(item.content);
+        if (voice != null) {
+            holder.contentTv.setVisibility(View.GONE);
+            holder.voiceLayout.setVisibility(View.VISIBLE);
+            bindVoice(holder, item, voice);
+        } else {
+            holder.voiceLayout.setVisibility(View.GONE);
+            holder.contentTv.setVisibility(View.VISIBLE);
+            holder.contentTv.setText(item.content == null ? "" : item.content);
+        }
 
         if (item.local_sending) {
             holder.stateTv.setVisibility(View.VISIBLE);
@@ -165,6 +184,56 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
         });
     }
 
+    private void bindVoice(@NonNull VH holder, CommentBean item, VoicePayload voice) {
+        String key = item.comment_id == null ? String.valueOf(item.stableId()) : item.comment_id;
+        holder.voicePlayBtn.setBindId(key);
+        holder.voiceTimeTv.setText(formatVoiceTime(voice.durationSec));
+        holder.voiceWaveform.setBind(key);
+        holder.voiceWaveform.setWaveform(voice.waveformBytes());
+        if (TextUtils.equals(WKPlayVoiceUtils.getInstance().getPlayKey(), key) && WKPlayVoiceUtils.getInstance().isPlaying()) {
+            holder.voicePlayBtn.setPause();
+        } else {
+            holder.voicePlayBtn.setPlay();
+            holder.voiceWaveform.setProgress(0f);
+        }
+        holder.voiceLayout.setOnClickListener(v -> {
+            String path = voice.playPath();
+            if (TextUtils.isEmpty(path)) return;
+            if (WKPlayVoiceUtils.getInstance().isPlaying() && TextUtils.equals(WKPlayVoiceUtils.getInstance().getPlayKey(), key)) {
+                WKPlayVoiceUtils.getInstance().onPause();
+                holder.voicePlayBtn.setPlay();
+                return;
+            }
+            WKPlayVoiceUtils.getInstance().playVoice(path, key);
+            holder.voicePlayBtn.setPause();
+        });
+        WKPlayVoiceUtils.getInstance().setPlayListener(new WKPlayVoiceUtils.IPlayListener() {
+            @Override
+            public void onCompletion(String playKey) {
+                if (TextUtils.equals(playKey, key)) {
+                    holder.voiceWaveform.setProgress(0f);
+                    holder.voicePlayBtn.setPlay();
+                }
+            }
+
+            @Override
+            public void onProgress(String playKey, float progress) {
+                if (TextUtils.equals(playKey, key)) {
+                    holder.voiceWaveform.setProgress(progress);
+                    holder.voicePlayBtn.setPause();
+                }
+            }
+
+            @Override
+            public void onStop(String playKey) {
+                if (TextUtils.equals(playKey, key)) {
+                    holder.voiceWaveform.setProgress(0f);
+                    holder.voicePlayBtn.setPlay();
+                }
+            }
+        });
+    }
+
     @Override
     public long getItemId(int position) {
         return list.get(position).stableId();
@@ -175,14 +244,12 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
         return list.size();
     }
 
-
     private void bindCommentAvatar(AvatarView avatar, CommentBean item) {
         if (avatar == null || item == null) return;
         try {
-            if (item.uid != null && item.uid.length() > 0) {
-                // 评论接口有时不带 avatar 字段；用唐僧原生头像接口按 uid 拉，避免评论区全是字母头像。
+            if (!TextUtils.isEmpty(item.uid)) {
                 avatar.showAvatar(item.uid, WKChannelType.PERSONAL, item.avatar_cache_key);
-            } else if (item.avatar != null && item.avatar.length() > 0) {
+            } else if (!TextUtils.isEmpty(item.avatar)) {
                 avatar.showAvatarUrl(item.avatar, item.avatar_cache_key, item.name, item.uid);
             } else {
                 avatar.showDefaultAvatar(item.name, item.uid);
@@ -195,61 +262,64 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
         }
     }
 
-    private void bindContent(TextView contentTv, CommentBean item) {
-        if (contentTv == null || item == null) return;
-        String content = item.content == null ? "" : item.content;
-        if (isVoiceContent(content)) {
-            int seconds = parseVoiceSeconds(content);
-            contentTv.setText("🎤 语音消息" + (seconds > 0 ? " " + seconds + "s" : ""));
-            contentTv.setTextColor(0xFF111827);
-            contentTv.setOnClickListener(v -> playVoice(contentTv.getContext(), content));
-        } else {
-            contentTv.setText(content);
-            contentTv.setTextColor(0xFF111827);
-            contentTv.setOnClickListener(null);
-        }
+    private long normalizeTime(long time) {
+        return time < 100000000000L ? time * 1000L : time;
     }
 
-    private boolean isVoiceContent(String content) {
-        return !TextUtils.isEmpty(content) && (content.startsWith("voice:") || content.startsWith("voice_local:"));
-    }
-
-    private int parseVoiceSeconds(String content) {
-        if (TextUtils.isEmpty(content)) return 0;
-        int sep = content.lastIndexOf('|');
-        if (sep < 0 || sep >= content.length() - 1) return 0;
-        try { return Math.max(1, Integer.parseInt(content.substring(sep + 1))); } catch (Exception ignored) { return 0; }
-    }
-
-    private String parseVoicePath(String content) {
-        if (TextUtils.isEmpty(content)) return "";
-        String prefix = content.startsWith("voice_local:") ? "voice_local:" : "voice:";
-        String value = content.substring(prefix.length());
-        int sep = value.lastIndexOf('|');
-        if (sep >= 0) value = value.substring(0, sep);
-        return value;
-    }
-
-    private void playVoice(android.content.Context context, String content) {
-        try {
-            String path = parseVoicePath(content);
-            if (TextUtils.isEmpty(path)) return;
-            Uri uri;
-            if (content.startsWith("voice_local:")) {
-                uri = Uri.fromFile(new File(path));
-            } else {
-                uri = Uri.parse(WKApiConfig.getShowUrl(path));
-            }
-            MediaPlayer player = MediaPlayer.create(context, uri);
-            if (player == null) return;
-            player.setOnCompletionListener(MediaPlayer::release);
-            player.start();
-        } catch (Throwable ignored) {
-        }
+    private String formatVoiceTime(int sec) {
+        if (sec <= 0) sec = 1;
+        int m = sec / 60;
+        int s = sec % 60;
+        return String.format(Locale.getDefault(), "%02d:%02d", m, s);
     }
 
     private int dp(View view, int value) {
         return (int) (view.getResources().getDisplayMetrics().density * value + 0.5f);
+    }
+
+    static class VoicePayload {
+        final boolean local;
+        final String path;
+        final int durationSec;
+        final String waveform;
+
+        VoicePayload(boolean local, String path, int durationSec, String waveform) {
+            this.local = local;
+            this.path = path;
+            this.durationSec = durationSec;
+            this.waveform = waveform;
+        }
+
+        static VoicePayload parse(String content) {
+            if (TextUtils.isEmpty(content)) return null;
+            boolean local = content.startsWith("voice_local:");
+            boolean remote = content.startsWith("voice:");
+            if (!local && !remote) return null;
+            String body = content.substring(local ? "voice_local:".length() : "voice:".length());
+            String[] parts = body.split("\\|", -1);
+            String path = parts.length > 0 ? parts[0] : "";
+            int duration = 1;
+            if (parts.length > 1) {
+                try { duration = Math.max(1, Integer.parseInt(parts[1])); } catch (Exception ignored) {}
+            }
+            String waveform = parts.length > 2 ? parts[2] : "";
+            return new VoicePayload(local, path, duration, waveform);
+        }
+
+        String playPath() {
+            if (TextUtils.isEmpty(path)) return "";
+            if (local || path.startsWith("/") || path.startsWith("file://") || path.startsWith("http://") || path.startsWith("https://")) {
+                return path;
+            }
+            return WKApiConfig.getShowUrl(path);
+        }
+
+        byte[] waveformBytes() {
+            if (!TextUtils.isEmpty(waveform)) {
+                try { return Base64.decode(waveform, Base64.NO_WRAP); } catch (Exception ignored) {}
+            }
+            return new byte[]{6, 10, 14, 18, 12, 9, 16, 22, 13, 7, 15, 20, 11, 8, 17, 12, 9, 6};
+        }
     }
 
     static class VH extends RecyclerView.ViewHolder {
@@ -257,6 +327,10 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
         AvatarView avatar;
         TextView nameTv;
         TextView contentTv;
+        LinearLayout voiceLayout;
+        CircleProgress voicePlayBtn;
+        WaveformView voiceWaveform;
+        TextView voiceTimeTv;
         TextView timeTv;
         TextView replyTv;
         TextView stateTv;
@@ -268,6 +342,10 @@ public class FeedCommentAdapter extends RecyclerView.Adapter<FeedCommentAdapter.
             avatar = itemView.findViewById(R.id.commentAvatar);
             nameTv = itemView.findViewById(R.id.commentNameTv);
             contentTv = itemView.findViewById(R.id.commentContentTv);
+            voiceLayout = itemView.findViewById(R.id.commentVoiceLayout);
+            voicePlayBtn = itemView.findViewById(R.id.commentVoicePlayBtn);
+            voiceWaveform = itemView.findViewById(R.id.commentVoiceWaveform);
+            voiceTimeTv = itemView.findViewById(R.id.commentVoiceTimeTv);
             timeTv = itemView.findViewById(R.id.commentTimeTv);
             replyTv = itemView.findViewById(R.id.commentReplyTv);
             stateTv = itemView.findViewById(R.id.commentStateTv);
