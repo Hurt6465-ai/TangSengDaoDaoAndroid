@@ -225,8 +225,8 @@
 
                     <ImageView
                         android:id="@+id/langToTv"
-                        android:layout_width="22dp"
-                        android:layout_height="12dp"
+                        android:layout_width="16dp"
+                        android:layout_height="10dp"
                         android:layout_marginStart="5dp"
                         android:layout_marginEnd="5dp"
                         android:contentDescription="@string/partner_profile"
@@ -412,20 +412,17 @@
             android:id="@+id/topBarTitleLayout"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:layout_marginStart="4dp"
             android:layout_marginEnd="4dp"
-            android:layout_weight="1"
-            android:gravity="center"
             android:orientation="vertical">
 
             <TextView
                 android:id="@+id/toolbarTitleTv"
+                android:alpha="0"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:alpha="0"
                 android:ellipsize="end"
-                android:gravity="center"
                 android:maxLines="1"
                 android:maxWidth="220dp"
                 android:textColor="#FF202033"
@@ -434,12 +431,11 @@
 
             <LinearLayout
                 android:id="@+id/toolbarMetaLayout"
+                android:alpha="0"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
                 android:layout_marginTop="1dp"
-                android:alpha="0"
-                android:gravity="center"
+                android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:visibility="gone">
 
@@ -447,7 +443,7 @@
                     android:id="@+id/toolbarCountryGroup"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:gravity="center"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:visibility="gone">
 
@@ -464,7 +460,6 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="3dp"
                         android:ellipsize="end"
-                        android:gravity="center"
                         android:maxLines="1"
                         android:maxWidth="90dp"
                         android:textColor="#FF8C8C99"
@@ -476,7 +471,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:gravity="center"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:visibility="gone">
 
@@ -493,7 +488,6 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="3dp"
                         android:ellipsize="end"
-                        android:gravity="center"
                         android:maxLines="1"
                         android:maxWidth="140dp"
                         android:textColor="#FF8C8C99"
