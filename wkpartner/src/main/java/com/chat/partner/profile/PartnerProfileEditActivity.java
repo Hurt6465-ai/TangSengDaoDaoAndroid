@@ -146,7 +146,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         learningCodes.clear();
         learningCodes.addAll(normalizeCodeList(data.getLearningLanguagesSafe()));
         tags.clear();
-        tags.addAll(PartnerTagLocalizer.normalizeKeys(data.getTagsSafe()));
+        tags.addAll(PartnerTagLocalizer.toKeyList(data.getTagsSafe()));
         profileImages.clear();
         profileImages.addAll(limitList(cleanList(data.getProfileImagesSafe()), MAX_PROFILE_IMAGES));
 
@@ -200,7 +200,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         coreBody.put("intro", limitIntro(valueOf(wkVBinding.introEt)));
 
         JSONObject mediaBody = new JSONObject();
-        mediaBody.put("tags", new ArrayList<>(PartnerTagLocalizer.normalizeKeys(tags)));
+        mediaBody.put("tags", new ArrayList<>(tags));
         mediaBody.put("profile_cover", profileCover);
         mediaBody.put("profile_images", new ArrayList<>(limitList(profileImages, MAX_PROFILE_IMAGES)));
 
@@ -315,7 +315,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         if (resultCode != RESULT_OK || data == null) return;
         if (requestCode == REQ_TAGS) {
             tags.clear();
-            tags.addAll(PartnerTagLocalizer.normalizeKeys(splitText(data.getStringExtra(PartnerTagSelectorActivity.EXTRA_TAGS))));
+            tags.addAll(PartnerTagLocalizer.toKeyList(splitText(data.getStringExtra(PartnerTagSelectorActivity.EXTRA_TAGS))));
             updateTagsText();
             return;
         }
@@ -530,21 +530,22 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
             FrameLayout chip = new FrameLayout(this);
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
             lp.width = GridLayout.LayoutParams.WRAP_CONTENT;
-            lp.height = dp(34);
+            lp.height = dp(40);
             lp.setMargins(0, 0, dp(8), dp(8));
             chip.setLayoutParams(lp);
 
             TextView text = new TextView(this);
-            text.setText(PartnerTagLocalizer.label(this, tag));
+            text.setText(PartnerTagLocalizer.tagText(this, tag));
             text.setTextSize(12);
             text.setTextColor(0xFF6A4DDF);
             text.setGravity(android.view.Gravity.CENTER);
-            text.setSingleLine(true);
-            text.setMaxWidth(dp(110));
-            text.setEllipsize(TextUtils.TruncateAt.END);
+            text.setSingleLine(false);
+            text.setMaxLines(2);
+            text.setMaxWidth(dp(160));
+            text.setEllipsize(null);
             text.setBackgroundResource(R.drawable.bg_partner_tag_chip);
             text.setPadding(dp(12), 0, dp(24), 0);
-            chip.addView(text, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(28), android.view.Gravity.BOTTOM | android.view.Gravity.START));
+            chip.addView(text, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(34), android.view.Gravity.BOTTOM | android.view.Gravity.START));
 
             TextView close = new TextView(this);
             close.setText("×");

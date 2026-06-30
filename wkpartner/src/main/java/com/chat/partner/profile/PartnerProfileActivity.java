@@ -39,8 +39,8 @@ import com.chat.base.utils.WKDialogUtils;
 import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileBinding;
 import com.chat.uikit.chat.manager.WKIMUtils;
-import com.chat.uikit.setting.SettingActivity;
 import com.chat.uikit.contacts.service.FriendModel;
+import com.chat.uikit.setting.SettingActivity;
 import com.chat.uikit.user.service.UserModel;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
@@ -138,8 +138,11 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     protected void initListener() {
         wkVBinding.backBtn.setOnClickListener(v -> pressAndRun(v, this::finish));
         wkVBinding.editBtn.setOnClickListener(v -> pressAndRun(v, () -> {
-            if (isSelf) showSelfSystemMenu();
-            else showProfileMoreMenu();
+            if (isSelf) {
+                startActivity(new Intent(this, SettingActivity.class));
+            } else {
+                showProfileMoreMenu();
+            }
         }));
         wkVBinding.profileSelfEditChip.setOnClickListener(v -> pressAndRun(v, () -> startActivity(new Intent(this, PartnerProfileEditActivity.class))));
         wkVBinding.helloBtnLayout.setOnClickListener(v -> onMainActionClick());
@@ -558,7 +561,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         bindPhotos(data);
         bindFeedWorks();
         bindActionButton(data);
-        wkVBinding.onlineIndicator.setVisibility(data.status == 1 ? View.VISIBLE : View.GONE);
+        wkVBinding.onlineIndicator.setVisibility(!isSelf && data.status == 1 ? View.VISIBLE : View.GONE);
     }
 
     private void bindFeedWorks() {
@@ -656,15 +659,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         boolean hasLastOnline = !TextUtils.isEmpty(lastOnline);
 
         if (isSelf) {
-            if (toolbarMetaLayout != null) toolbarMetaLayout.setVisibility(hasCountry || hasLastOnline ? View.VISIBLE : View.GONE);
+            if (toolbarMetaLayout != null) toolbarMetaLayout.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
             if (toolbarCountryGroup != null) toolbarCountryGroup.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
-            if (toolbarLastOnlineGroup != null) toolbarLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
+            if (toolbarLastOnlineGroup != null) toolbarLastOnlineGroup.setVisibility(View.GONE);
             if (toolbarCountryTv != null) toolbarCountryTv.setText(country);
-            if (toolbarLastOnlineTv != null) toolbarLastOnlineTv.setText(lastOnline);
+            if (toolbarLastOnlineTv != null) toolbarLastOnlineTv.setText("");
 
-            profileLastOnlineBaseVisible = hasLastOnline;
-            wkVBinding.profileLastOnlineGroup.setVisibility(hasLastOnline ? View.VISIBLE : View.GONE);
-            wkVBinding.profileLastOnlineTv.setText(lastOnline);
+            profileLastOnlineBaseVisible = false;
+            wkVBinding.profileLastOnlineGroup.setVisibility(View.GONE);
             wkVBinding.profileSelfEditChip.setVisibility(View.VISIBLE);
         } else {
             if (toolbarMetaLayout != null) toolbarMetaLayout.setVisibility(hasCountry || hasLastOnline ? View.VISIBLE : View.GONE);
@@ -824,7 +826,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void bindTags(PartnerProfileEntity data) {
         wkVBinding.tagLayout.removeAllViews();
-        List<String> tags = data.getTagsSafe();
+        List<String> tags = PartnerTagLocalizer.toDisplayList(this, data.getTagsSafe());
         if (tags.isEmpty()) {
             tagBaseVisible = false;
             wkVBinding.tagSection.setVisibility(View.GONE);
@@ -833,7 +835,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         tagBaseVisible = true;
         wkVBinding.tagSection.setVisibility(View.VISIBLE);
         int max = Math.min(tags.size(), 20);
-        for (int i = 0; i < max; i++) addChip(PartnerTagLocalizer.label(this, tags.get(i)), false);
+        for (int i = 0; i < max; i++) addChip(tags.get(i), false);
         applyProfileContentVisibility();
     }
 
@@ -842,14 +844,16 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         TextView tv = new TextView(this);
         tv.setText(text);
         tv.setTextSize(13);
-        tv.setTextColor(isPlaceholder ? 0xFF8A8A96 : 0xFF626270);
+        tv.setTextColor(isPlaceholder ? 0xFF9999A8 : 0xFF5B3FE6);
         tv.setGravity(Gravity.CENTER);
-        tv.setMaxLines(1);
-        tv.setEllipsize(TextUtils.TruncateAt.END);
+        tv.setMaxLines(2);
+        tv.setEllipsize(null);
+        tv.setMaxWidth(dp(180));
         tv.setBackgroundResource(isPlaceholder ? R.drawable.bg_partner_tag_unselected : R.drawable.bg_partner_tag_chip);
         tv.setPadding(dp(14), dp(7), dp(14), dp(7));
+        tv.setIncludeFontPadding(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) tv.setForeground(getSelectableItemBackground());
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(32));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.rightMargin = dp(8);
         wkVBinding.tagLayout.addView(tv, lp);
     }
@@ -925,11 +929,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private boolean isBlacklisted(PartnerProfileEntity data) {
         return data != null && data.status == 2;
-    }
-
-
-    private void showSelfSystemMenu() {
-        startActivity(new Intent(this, SettingActivity.class));
     }
 
     private void showProfileMoreMenu() {

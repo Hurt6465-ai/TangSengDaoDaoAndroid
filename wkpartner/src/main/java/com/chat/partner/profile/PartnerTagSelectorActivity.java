@@ -3,7 +3,6 @@ package com.chat.partner.profile;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -20,26 +19,15 @@ import java.util.LinkedHashSet;
 
 public class PartnerTagSelectorActivity extends Activity {
     public static final String EXTRA_TAGS = "tags";
-    private static final int MAX_TAGS = 20;
 
     private final LinkedHashSet<String> selected = new LinkedHashSet<>();
     private LinearLayout groupContainer;
     private TextView countTv;
 
-    private final PartnerTagLocalizer.Group[] groups = PartnerTagLocalizer.groups();
-
-
-
-    private boolean isTagInGroup(String tag, PartnerTagLocalizer.Group group) {
-        String key = PartnerTagLocalizer.normalizeKey(tag);
-        return group != null && group.containsKey(key);
-    }
-
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        selected.addAll(PartnerTagLocalizer.normalizeKeys(split(getIntent().getStringExtra(EXTRA_TAGS))));
+        selected.addAll(PartnerTagLocalizer.toKeyList(split(getIntent().getStringExtra(EXTRA_TAGS))));
         buildContentView();
         renderGroups();
         updateCount();
@@ -103,9 +91,9 @@ public class PartnerTagSelectorActivity extends Activity {
     private void renderGroups() {
         if (groupContainer == null) return;
         groupContainer.removeAllViews();
-        for (PartnerTagLocalizer.Group group : groups) {
+        for (int groupIndex = 0; groupIndex < PartnerTagLocalizer.TAG_KEYS.length; groupIndex++) {
             TextView title = new TextView(this);
-            title.setText(group.title(this) + (group.singleChoice ? getString(R.string.partner_single_choice_suffix) : getString(R.string.partner_multi_choice_suffix)));
+            title.setText(PartnerTagLocalizer.groupTitle(this, groupIndex));
             title.setTextSize(16);
             title.setTextColor(0xFF222222);
             title.setPadding(0, dp(18), 0, dp(8));
@@ -113,26 +101,26 @@ public class PartnerTagSelectorActivity extends Activity {
             groupContainer.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
             LinearLayout row = null;
-            for (String key : group.keys) {
-                if (row == null || row.getChildCount() >= 3) {
+            for (int i = 0; i < PartnerTagLocalizer.TAG_KEYS[groupIndex].length; i++) {
+                if (row == null || row.getChildCount() >= 2) {
                     row = new LinearLayout(this);
                     row.setOrientation(LinearLayout.HORIZONTAL);
                     groupContainer.addView(row, new LinearLayout.LayoutParams(-1, -2));
                 }
-                row.addView(makeChip(key, group));
+                row.addView(makeChip(groupIndex, PartnerTagLocalizer.TAG_KEYS[groupIndex][i]));
             }
         }
     }
 
-    private TextView makeChip(String key, PartnerTagLocalizer.Group group) {
+    private TextView makeChip(int groupIndex, String key) {
         TextView tv = new TextView(this);
-        tv.setText(PartnerTagLocalizer.label(this, key));
+        tv.setText(PartnerTagLocalizer.tagText(this, key));
         tv.setTextSize(14);
         tv.setGravity(Gravity.CENTER);
-        tv.setSingleLine(true);
-        tv.setEllipsize(TextUtils.TruncateAt.END);
-        tv.setPadding(dp(8), dp(9), dp(8), dp(9));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(42), 1f);
+        tv.setMaxLines(2);
+        tv.setEllipsize(null);
+        tv.setPadding(dp(8), dp(7), dp(8), dp(7));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(48), 1f);
         lp.setMargins(dp(4), dp(4), dp(4), dp(4));
         tv.setLayoutParams(lp);
         refreshChip(tv, selected.contains(key));
@@ -140,16 +128,12 @@ public class PartnerTagSelectorActivity extends Activity {
             if (selected.contains(key)) {
                 selected.remove(key);
             } else {
-                if (group.singleChoice) {
-                    ArrayList<String> removeList = new ArrayList<>();
-                    for (String item : selected) {
-                        if (isTagInGroup(item, group)) removeList.add(item);
-                    }
-                    selected.removeAll(removeList);
-                }
-                if (selected.size() >= MAX_TAGS) {
+                if (selected.size() >= PartnerTagLocalizer.MAX_TAGS) {
                     Toast.makeText(this, R.string.partner_tag_max_tip, Toast.LENGTH_SHORT).show();
                     return;
+                }
+                if (PartnerTagLocalizer.isSingleGroup(groupIndex)) {
+                    removeGroupSelections(groupIndex);
                 }
                 selected.add(key);
             }
@@ -159,18 +143,21 @@ public class PartnerTagSelectorActivity extends Activity {
         return tv;
     }
 
+    private void removeGroupSelections(int groupIndex) {
+        ArrayList<String> remove = new ArrayList<>();
+        for (String key : selected) {
+            if (PartnerTagLocalizer.groupIndexOf(key) == groupIndex) remove.add(key);
+        }
+        selected.removeAll(remove);
+    }
+
     private void refreshChip(TextView tv, boolean checked) {
-        tv.setTextColor(checked ? 0xFF5F48D9 : 0xFF555566);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(dp(14));
-        bg.setColor(checked ? 0xE8FFFFFF : 0xBFFFFFFF);
-        bg.setStroke(dp(1), checked ? 0x998E78FF : 0x55FFFFFF);
-        tv.setBackground(bg);
-        tv.setTypeface(checked ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        tv.setTextColor(checked ? 0xFF5B3FE6 : 0xFF555555);
+        tv.setBackgroundResource(checked ? R.drawable.bg_partner_tag_selected : R.drawable.bg_partner_tag_unselected);
     }
 
     private void updateCount() {
-        if (countTv != null) countTv.setText(selected.size() + "/" + MAX_TAGS);
+        if (countTv != null) countTv.setText(selected.size() + "/" + PartnerTagLocalizer.MAX_TAGS);
     }
 
     private void saveAndFinish() {
@@ -186,7 +173,7 @@ public class PartnerTagSelectorActivity extends Activity {
         String[] parts = text.replace('，', ' ').replace(',', ' ').replace('/', ' ').trim().split("\\s+");
         for (String item : parts) {
             String clean = item == null ? "" : item.trim();
-            if (!TextUtils.isEmpty(clean) && !out.contains(clean) && out.size() < MAX_TAGS) out.add(clean);
+            if (!TextUtils.isEmpty(clean) && !out.contains(clean) && out.size() < PartnerTagLocalizer.MAX_TAGS) out.add(clean);
         }
         return out;
     }
