@@ -22,15 +22,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:lineSpacingExtra="3dp"
-                android:text="@string/partner_edit_profile_tips"
-                android:textColor="#666666"
-                android:textSize="14sp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="0dp"
                 android:text="@string/partner_name"
                 android:textColor="#30303A"
                 android:textSize="18sp"
@@ -83,6 +75,60 @@
                     android:textColor="#222222"
                     android:textColorHint="#999999"
                     android:textSize="15sp" />
+            </LinearLayout>
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/imagePreviewLayout"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
+            <TextView
+                android:id="@+id/addPhotoBtn"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_partner_edit_field"
+                android:gravity="center"
+                android:text="@string/partner_add_photo"
+                android:textColor="#5B4BFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/uploadProgressLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_partner_edit_field"
+                android:orientation="vertical"
+                android:padding="12dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/uploadProgressTv"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/partner_uploading_percent"
+                    android:textColor="#666666"
+                    android:textSize="13sp" />
+
+                <ProgressBar
+                    android:id="@+id/uploadProgressBar"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="6dp"
+                    android:layout_marginTop="8dp"
+                    android:max="100"
+                    android:progress="0" />
             </LinearLayout>
 
             <LinearLayout
@@ -321,68 +367,6 @@
                 android:textColor="#5B4BFF"
                 android:textSize="15sp"
                 android:textStyle="bold" />
-
-            <HorizontalScrollView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:overScrollMode="never"
-                android:scrollbars="none">
-
-                <LinearLayout
-                    android:id="@+id/imagePreviewLayout"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal" />
-            </HorizontalScrollView>
-
-            <TextView
-                android:id="@+id/addPhotoBtn"
-                android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_partner_edit_field"
-                android:gravity="center"
-                android:text="@string/partner_add_photo"
-                android:textColor="#5B4BFF"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:id="@+id/uploadProgressLayout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_partner_edit_field"
-                android:orientation="vertical"
-                android:padding="12dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:id="@+id/uploadProgressTv"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/partner_uploading_percent"
-                    android:textColor="#666666"
-                    android:textSize="13sp" />
-
-                <ProgressBar
-                    android:id="@+id/uploadProgressBar"
-                    style="?android:attr/progressBarStyleHorizontal"
-                    android:layout_width="match_parent"
-                    android:layout_height="6dp"
-                    android:layout_marginTop="8dp"
-                    android:max="100"
-                    android:progress="0" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/partner_server_image_tip"
-                android:textColor="#999999"
-                android:textSize="12sp" />
 
             <TextView
                 android:id="@+id/saveBtn"
