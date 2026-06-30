@@ -6,9 +6,13 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Build;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.MotionEvent;
+import android.view.ViewConfiguration;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import androidx.core.app.ActivityOptionsCompat;
@@ -18,6 +22,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.chat.base.base.WKBaseFragment;
 import com.chat.base.common.WKCommonModel;
@@ -105,8 +110,13 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     private boolean isShowingTopicRooms = false;
     private boolean topicRoomFragmentLoaded = false;
     private boolean contactsFragmentLoaded = false;
-    private float topicSwipeStartX = 0f;
-    private float topicSwipeStartY = 0f;
+    private ViewPager2.OnPageChangeCallback homePagerCallback;
+    private int homePagerScrollState = ViewPager2.SCROLL_STATE_IDLE;
+    private long ignoreConversationClickUntilMs = 0L;
+    private float conversationTouchStartX = 0f;
+    private float conversationTouchStartY = 0f;
+    private boolean conversationHorizontalDragging = false;
+    private int conversationTouchSlop = 0;
     // 定时清理消息会话列表里已经过期的话题聊天室，避免后端删除后本地会话仍残留。
     private Disposable topicRoomExpireDisposable;
     private static final long TOPIC_ROOM_EXPIRE_CHECK_SECONDS = 60L;
@@ -154,7 +164,9 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         Theme.setPressedBackground(wkVBinding.messageTabTv);
         Theme.setPressedBackground(wkVBinding.roomTabTv);
         Theme.setPressedBackground(wkVBinding.contactsTabLayout);
-        showHomePage(PAGE_MESSAGES);
+        conversationTouchSlop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
+        setupHomeViewPager();
+        showHomePage(PAGE_MESSAGES, false);
         updateContactsBadge();
     }
 
@@ -162,21 +174,58 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         showHomePage(showRooms ? PAGE_TOPIC_ROOMS : PAGE_MESSAGES);
     }
 
+    private void setupHomeViewPager() {
+        if (wkVBinding.homeViewPager == null || wkVBinding.homeViewPager.getAdapter() != null) return;
+        wkVBinding.homeViewPager.setOffscreenPageLimit(2);
+        wkVBinding.homeViewPager.setAdapter(new HomePagerAdapter());
+        homePagerCallback = new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageScrollStateChanged(int state) {
+                homePagerScrollState = state;
+                if (state != ViewPager2.SCROLL_STATE_IDLE) {
+                    suppressConversationClick(260L);
+                }
+            }
+
+            @Override
+            public void onPageSelected(int position) {
+                updateSelectedHomePage(position);
+                suppressConversationClick(220L);
+            }
+        };
+        wkVBinding.homeViewPager.registerOnPageChangeCallback(homePagerCallback);
+    }
+
     private void showHomePage(int page) {
-        if (page < PAGE_MESSAGES) {
-            page = PAGE_MESSAGES;
-        } else if (page > PAGE_CONTACTS) {
-            page = PAGE_CONTACTS;
+        showHomePage(page, true);
+    }
+
+    private void showHomePage(int page, boolean smoothScroll) {
+        page = normalizeHomePage(page);
+        if (wkVBinding != null && wkVBinding.homeViewPager != null && wkVBinding.homeViewPager.getAdapter() != null) {
+            if (wkVBinding.homeViewPager.getCurrentItem() != page) {
+                wkVBinding.homeViewPager.setCurrentItem(page, smoothScroll);
+            } else {
+                updateSelectedHomePage(page);
+            }
+        } else {
+            updateSelectedHomePage(page);
         }
+    }
+
+    private int normalizeHomePage(int page) {
+        if (page < PAGE_MESSAGES) return PAGE_MESSAGES;
+        if (page > PAGE_CONTACTS) return PAGE_CONTACTS;
+        return page;
+    }
+
+    private void updateSelectedHomePage(int page) {
+        page = normalizeHomePage(page);
         currentHomePage = page;
         isShowingTopicRooms = page == PAGE_TOPIC_ROOMS;
         boolean showMessages = page == PAGE_MESSAGES;
         boolean showRooms = page == PAGE_TOPIC_ROOMS;
         boolean showContacts = page == PAGE_CONTACTS;
-
-        wkVBinding.refreshLayout.setVisibility(showMessages ? View.VISIBLE : View.GONE);
-        wkVBinding.roomContainer.setVisibility(showRooms ? View.VISIBLE : View.GONE);
-        wkVBinding.contactsContainer.setVisibility(showContacts ? View.VISIBLE : View.GONE);
 
         updateHomeTabStyle(wkVBinding.messageTabTv, showMessages);
         updateHomeTabStyle(wkVBinding.roomTabTv, showRooms);
@@ -187,6 +236,103 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         } else if (showContacts) {
             ensureContactsFragment();
         }
+    }
+
+    private View getHomePageView(int page) {
+        if (page == PAGE_TOPIC_ROOMS) return wkVBinding.roomContainer;
+        if (page == PAGE_CONTACTS) return wkVBinding.contactsContainer;
+        return wkVBinding.refreshLayout;
+    }
+
+    private class HomePagerAdapter extends RecyclerView.Adapter<HomePageViewHolder> {
+        @Override
+        public HomePageViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+            FrameLayout page = new FrameLayout(parent.getContext());
+            page.setLayoutParams(new RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+            ));
+            return new HomePageViewHolder(page);
+        }
+
+        @Override
+        public void onBindViewHolder(HomePageViewHolder holder, int position) {
+            holder.bind(getHomePageView(position));
+        }
+
+        @Override
+        public int getItemCount() {
+            return 3;
+        }
+    }
+
+    private static class HomePageViewHolder extends RecyclerView.ViewHolder {
+        private final FrameLayout container;
+
+        HomePageViewHolder(FrameLayout itemView) {
+            super(itemView);
+            container = itemView;
+        }
+
+        void bind(View pageView) {
+            if (pageView == null) return;
+            ViewGroup oldParent = pageView.getParent() instanceof ViewGroup ? (ViewGroup) pageView.getParent() : null;
+            if (oldParent != container) {
+                if (oldParent != null) {
+                    oldParent.removeView(pageView);
+                }
+                container.removeAllViews();
+                container.addView(pageView, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                ));
+            }
+            pageView.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void suppressConversationClick(long durationMs) {
+        long until = SystemClock.uptimeMillis() + durationMs;
+        if (until > ignoreConversationClickUntilMs) {
+            ignoreConversationClickUntilMs = until;
+        }
+    }
+
+    private void trackConversationTouch(MotionEvent event) {
+        if (event == null) return;
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                conversationTouchStartX = event.getRawX();
+                conversationTouchStartY = event.getRawY();
+                conversationHorizontalDragging = false;
+                break;
+            case MotionEvent.ACTION_MOVE:
+                float dx = event.getRawX() - conversationTouchStartX;
+                float dy = event.getRawY() - conversationTouchStartY;
+                float absDx = Math.abs(dx);
+                float absDy = Math.abs(dy);
+                if (absDx > Math.max(conversationTouchSlop, AndroidUtilities.dp(8)) && absDx > absDy * 1.2f) {
+                    conversationHorizontalDragging = true;
+                    suppressConversationClick(260L);
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                if (conversationHorizontalDragging) {
+                    suppressConversationClick(260L);
+                }
+                conversationHorizontalDragging = false;
+                break;
+            default:
+                break;
+        }
+    }
+
+    private boolean shouldIgnoreConversationClick() {
+        return currentHomePage != PAGE_MESSAGES
+                || homePagerScrollState != ViewPager2.SCROLL_STATE_IDLE
+                || conversationHorizontalDragging
+                || SystemClock.uptimeMillis() < ignoreConversationClickUntilMs;
     }
 
     private void updateHomeTabStyle(TextView tabView, boolean selected) {
@@ -241,32 +387,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                 .commitAllowingStateLoss();
     }
 
-    private boolean handleTopicSwipe(MotionEvent event) {
-        if (event == null) return false;
-        switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                topicSwipeStartX = event.getRawX();
-                topicSwipeStartY = event.getRawY();
-                return false;
-            case MotionEvent.ACTION_UP:
-                float dx = event.getRawX() - topicSwipeStartX;
-                float dy = event.getRawY() - topicSwipeStartY;
-                if (Math.abs(dx) > AndroidUtilities.dp(70) && Math.abs(dx) > Math.abs(dy) * 1.5f) {
-                    if (dx < 0 && currentHomePage < PAGE_CONTACTS) {
-                        showHomePage(currentHomePage + 1);
-                        return true;
-                    }
-                    if (dx > 0 && currentHomePage > PAGE_MESSAGES) {
-                        showHomePage(currentHomePage - 1);
-                        return true;
-                    }
-                }
-                return false;
-            default:
-                return false;
-        }
-    }
-
     @SuppressLint("ClickableViewAccessibility")
     @Override
     protected void initListener() {
@@ -294,11 +414,13 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             updateContactsBadge();
             return null;
         });
-        wkVBinding.chatRoomTabLayout.setOnTouchListener((view, event) -> handleTopicSwipe(event));
-        wkVBinding.chatPageContainer.setOnTouchListener((view, event) -> handleTopicSwipe(event));
-        wkVBinding.recyclerView.setOnTouchListener((view, event) -> handleTopicSwipe(event));
-        wkVBinding.roomContainer.setOnTouchListener((view, event) -> handleTopicSwipe(event));
-        wkVBinding.contactsContainer.setOnTouchListener((view, event) -> handleTopicSwipe(event));
+        wkVBinding.recyclerView.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+            @Override
+            public boolean onInterceptTouchEvent(RecyclerView rv, MotionEvent event) {
+                trackConversationTouch(event);
+                return false;
+            }
+        });
 
         wkVBinding.deviceIv.setOnClickListener(v -> EndpointManager.getInstance().invoke("show_pc_login_view", getActivity()));
         wkVBinding.searchIv.setOnClickListener(view1 -> {
@@ -311,6 +433,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         });
         chatConversationAdapter.addChildClickViewIds(R.id.contentLayout);
         chatConversationAdapter.setOnItemChildClickListener((adapter, view, position) -> SingleClickUtil.determineTriggerSingleClick(view, v -> {
+            if (shouldIgnoreConversationClick()) return;
             ChatConversationMsg uiConversationMsg = (ChatConversationMsg) adapter.getItem(position);
             if (uiConversationMsg != null && uiConversationMsg.uiConversationMsg != null) {
                 if (view.getId() == R.id.contentLayout) {
@@ -1407,8 +1530,20 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         });
     }
 
+    private void releaseHomeViewPager() {
+        if (wkVBinding != null && wkVBinding.homeViewPager != null) {
+            if (homePagerCallback != null) {
+                wkVBinding.homeViewPager.unregisterOnPageChangeCallback(homePagerCallback);
+            }
+            wkVBinding.homeViewPager.setAdapter(null);
+        }
+        homePagerCallback = null;
+        homePagerScrollState = ViewPager2.SCROLL_STATE_IDLE;
+    }
+
     @Override
     public void onDestroy() {
+        releaseHomeViewPager();
         super.onDestroy();
         if (disposable != null) {
             disposable.dispose();
