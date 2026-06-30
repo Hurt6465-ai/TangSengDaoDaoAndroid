@@ -74,4 +74,108 @@
 
     <string name="partner_selected_count">%1$d ခု ရွေးပြီး</string>
     <string name="partner_works">လက်ရာများ</string>
+    <string name="partner_self_more_menu">ပရိုဖိုင် ဆက်တင်</string>
+
+    <string name="partner_single_choice_suffix"> · တစ်ခုရွေး</string>
+    <string name="partner_multi_choice_suffix"> · အများရွေး</string>
+    <string-array name="partner_tag_group_titles">
+        <item>ဘာသာစွမ်းရည်</item>
+        <item>လေ့လာရည်ရွယ်ချက်</item>
+        <item>ဆက်ဆံရေးအခြေအနေ</item>
+        <item>ပင်ကိုယ်စရိုက်</item>
+        <item>အိမ်မွေးတိရစ္ဆာန်</item>
+        <item>အားကစား</item>
+        <item>ရုပ်ရှင်နှင့်ရှိုး</item>
+        <item>အလုပ်အခြေအနေ</item>
+        <item>ပညာရေး</item>
+        <item>လုံခြုံရေးကန့်သတ်ချက်</item>
+        <item>လေ့လာနည်း</item>
+    </string-array>
+    <string-array name="partner_tag_option_labels">
+        <item>မိခင်ဘာသာ</item>
+        <item>ကျွမ်းကျင်</item>
+        <item>အလယ်အထက်</item>
+        <item>စတင်သူ</item>
+        <item>အခြေခံမရှိ</item>
+        <item>ဘာသာဖော်ရှာ</item>
+        <item>အလုပ်အတွက်</item>
+        <item>ဝါသနာ</item>
+        <item>မိတ်ဆွေရှာ</item>
+        <item>ယဉ်ကျေးမှုဖလှယ်</item>
+        <item>နိုင်ငံခြားပညာရေး</item>
+        <item>ခရီးသွားပြင်</item>
+        <item>အလုပ်တိုးတက်</item>
+        <item>နေ့စဉ်လေ့ကျင့်</item>
+        <item>ချစ်သူရှာ</item>
+        <item>မပြောပါ</item>
+        <item>တစ်ကိုယ်တည်း</item>
+        <item>တွဲနေသည်</item>
+        <item>အိမ်ထောင်ရှိ</item>
+        <item>ကွာရှင်း</item>
+        <item>စိတ်ရှည်</item>
+        <item>ဖော်ရွေ</item>
+        <item>ငြိမ်သက်</item>
+        <item>အတွင်းကျ</item>
+        <item>ဟာသ</item>
+        <item>နူးညံ့</item>
+        <item>အလေးထား</item>
+        <item>နှေးနွေး</item>
+        <item>EQ မြင့်</item>
+        <item>လွယ်ကူဆက်ဆံ</item>
+        <item>ခွေး</item>
+        <item>ကြောင်</item>
+        <item>ယုန်</item>
+        <item>ငှက်</item>
+        <item>ငါး</item>
+        <item>ဟမ်စတာ</item>
+        <item>တွားသွားတိရစ္ဆာန်</item>
+        <item>တိရစ္ဆာန်ချစ်</item>
+        <item>ပြေး</item>
+        <item>ဘတ်စကက်ဘော</item>
+        <item>ဘောလုံး</item>
+        <item>ဘက်မင်တန်</item>
+        <item>ဖစ်နက်</item>
+        <item>ယောဂ</item>
+        <item>ရေကူး</item>
+        <item>စက်ဘီး</item>
+        <item>တောင်တက်</item>
+        <item>စကိတ်ဘုတ်</item>
+        <item>ရုပ်ရှင်</item>
+        <item>ဟာသကား</item>
+        <item>အချစ်ကား</item>
+        <item>အက်ရှင်</item>
+        <item>စုံထောက်</item>
+        <item>မှတ်တမ်းရုပ်ရှင်</item>
+        <item>ဇာတ်လမ်းတွဲ</item>
+        <item>အန်နီမေး</item>
+        <item>ရှိုး</item>
+        <item>ဗီဒီယိုတို</item>
+        <item>မပြောပါ</item>
+        <item>ကျောင်းသား</item>
+        <item>ဝန်ထမ်း</item>
+        <item>စားပွဲထိုး</item>
+        <item>ဆရာ</item>
+        <item>ရဲ</item>
+        <item>ယာဉ်မောင်း</item>
+        <item>အရောင်း</item>
+        <item>ပိုင်ရှင်</item>
+        <item>အလွတ်တန်း</item>
+        <item>အလုပ်မရှိ</item>
+        <item>အခြား</item>
+        <item>မပြောပါ</item>
+        <item>အလယ်တန်းအောက်</item>
+        <item>အထက်တန်း</item>
+        <item>ဘွဲ့</item>
+        <item>မဟာဘွဲ့+</item>
+        <item>အခြား</item>
+        <item>ယဉ်ကျေးစွာပြော</item>
+        <item>နှောင့်ယှက်ခြင်းမလုပ်</item>
+        <item>ဆက်သွယ်ရန်မပေး</item>
+        <item>App ထဲတွင်သာ</item>
+        <item>အပြန်အလှန်လေးစား</item>
+        <item>ကိုယ်တိုင်လေ့လာ</item>
+        <item>အပြင်သင်တန်း</item>
+        <item>အွန်လိုင်းသင်တန်း</item>
+    </string-array>
+
 </resources>
