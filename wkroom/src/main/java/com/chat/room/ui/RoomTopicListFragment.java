@@ -4,9 +4,11 @@ import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Color;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
@@ -49,16 +51,8 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     private static final String EXTRA_CREATOR_UID = "creator_uid";
     private static final String EXTRA_CREATOR_COUNTRY_CODE = "creator_country_code";
     private static final String EXTRA_COUNTRY_CODE = "country_code";
-    private static final String ENDPOINT_SHOW_TOPIC_ROOMS = "peipe_show_topic_rooms";
-    private static final String ENDPOINT_SWITCH_HOME_PAGE = "peipe_switch_home_page";
-    private static final int PAGE_MESSAGES = 0;
-    private static final int PAGE_CONTACTS = 2;
     private static final String DEFAULT_LANGUAGE = "中文";
     private static final String TAG_PREFIX = "# ";
-    private static final int EDGE_SWIPE_MAX_START_DP = 32;
-    private static final int SWIPE_TRIGGER_DP = 90;
-    private static final int SWIPE_CANCEL_VERTICAL_DP = 18;
-    private static final float SWIPE_HORIZONTAL_RATIO = 2.0f;
 
     private FragmentRoomTopicListBinding binding;
     private RecyclerView recyclerView;
@@ -68,13 +62,14 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     private RoomTopicAdapter adapter;
     private AlertDialog createDialog;
     private AlertDialog cardMenuDialog;
-    private float swipeStartX = 0f;
-    private float swipeStartY = 0f;
     private boolean firstResume = true;
     private String openingChannelId = null;
     private boolean refreshOnNextResume = false;
-    private boolean trackingBackSwipe = false;
-    private boolean backSwipeTriggered = false;
+    private float roomTouchStartX = 0f;
+    private float roomTouchStartY = 0f;
+    private boolean roomHorizontalDragging = false;
+    private long ignoreRoomClickUntilMs = 0L;
+    private int roomTouchSlop = 0;
 
     public static RoomTopicListFragment newInstance() {
         return new RoomTopicListFragment();
@@ -106,6 +101,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         }
         refreshLayout.setEnableLoadMore(false);
         refreshLayout.setEnableRefresh(true);
+        roomTouchSlop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -115,6 +111,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         refreshLayout.setOnRefreshListener(layout -> loadRooms(true));
         createBtn.setOnClickListener(v -> showCreateDialog());
         adapter.setOnItemClickListener((adapter1, view, position) -> {
+            if (shouldIgnoreRoomClick()) return;
             if (!isValidAdapterPosition(position)) return;
             openTopic(adapter.getItem(position));
         });
@@ -124,11 +121,11 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
             }
             return true;
         });
-        binding.getRoot().setOnTouchListener((view, event) -> handleBackSwipe(event, false));
         recyclerView.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
             @Override
             public boolean onInterceptTouchEvent(RecyclerView rv, MotionEvent event) {
-                return handleBackSwipe(event, true);
+                trackRoomTouch(event);
+                return false;
             }
         });
     }
@@ -155,8 +152,6 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     public void onDestroyView() {
         dismissDialogs();
         openingChannelId = null;
-        trackingBackSwipe = false;
-        backSwipeTriggered = false;
         super.onDestroyView();
         binding = null;
         recyclerView = null;
@@ -180,49 +175,45 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         return adapter != null && position >= 0 && position < adapter.getData().size();
     }
 
-    private boolean handleBackSwipe(MotionEvent event, boolean fromRecyclerView) {
-        if (event == null) return false;
+    private void suppressRoomClick(long durationMs) {
+        long until = SystemClock.uptimeMillis() + durationMs;
+        if (until > ignoreRoomClickUntilMs) {
+            ignoreRoomClickUntilMs = until;
+        }
+    }
+
+    private void trackRoomTouch(MotionEvent event) {
+        if (event == null) return;
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                swipeStartX = event.getRawX();
-                swipeStartY = event.getRawY();
-                // 聊天首页的二级页签是：消息(0) -> 聊天室(1) -> 联系人(2)。
-                // 这里不要只跟踪左边缘返回手势，否则聊天室列表/空白区会吃掉事件，导致无法继续左滑到联系人。
-                trackingBackSwipe = true;
-                backSwipeTriggered = false;
-                return !fromRecyclerView;
+                roomTouchStartX = event.getRawX();
+                roomTouchStartY = event.getRawY();
+                roomHorizontalDragging = false;
+                break;
             case MotionEvent.ACTION_MOVE:
-                if (!trackingBackSwipe || backSwipeTriggered) return backSwipeTriggered;
-                float dx = event.getRawX() - swipeStartX;
-                float dy = event.getRawY() - swipeStartY;
+                float dx = event.getRawX() - roomTouchStartX;
+                float dy = event.getRawY() - roomTouchStartY;
                 float absDx = Math.abs(dx);
                 float absDy = Math.abs(dy);
-                if (absDy > AndroidUtilities.dp(SWIPE_CANCEL_VERTICAL_DP) && absDy > absDx) {
-                    trackingBackSwipe = false;
-                    return false;
+                if (absDx > Math.max(roomTouchSlop, AndroidUtilities.dp(8)) && absDx > absDy * 1.2f) {
+                    roomHorizontalDragging = true;
+                    suppressRoomClick(260L);
                 }
-                if (absDx > AndroidUtilities.dp(SWIPE_TRIGGER_DP) && absDx > absDy * SWIPE_HORIZONTAL_RATIO) {
-                    backSwipeTriggered = true;
-                    trackingBackSwipe = false;
-                    if (dx > 0) {
-                        // 聊天室右滑回消息。保留旧 Endpoint 兼容老逻辑。
-                        EndpointManager.getInstance().invoke(ENDPOINT_SHOW_TOPIC_ROOMS, false);
-                    } else {
-                        // 聊天室左滑到联系人。原代码缺这一段，所以联系人页切不过去。
-                        EndpointManager.getInstance().invoke(ENDPOINT_SWITCH_HOME_PAGE, PAGE_CONTACTS);
-                    }
-                    return true;
-                }
-                return !fromRecyclerView && absDx > AndroidUtilities.dp(8);
+                break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
-                boolean consume = backSwipeTriggered;
-                trackingBackSwipe = false;
-                backSwipeTriggered = false;
-                return consume;
+                if (roomHorizontalDragging) {
+                    suppressRoomClick(260L);
+                }
+                roomHorizontalDragging = false;
+                break;
             default:
-                return false;
+                break;
         }
+    }
+
+    private boolean shouldIgnoreRoomClick() {
+        return roomHorizontalDragging || SystemClock.uptimeMillis() < ignoreRoomClickUntilMs;
     }
 
     private void loadRooms(boolean showError) {
