@@ -5,47 +5,103 @@
     android:background="@drawable/bg_feed_sheet_top"
     android:orientation="vertical">
 
-    <FrameLayout
+    <LinearLayout
+        android:id="@+id/commentAuthorHeader"
         android:layout_width="match_parent"
-        android:layout_height="48dp">
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingTop="14dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="10dp">
 
-        <TextView
-            android:id="@+id/commentTitleTv"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:text="@string/feed_comment_title"
-            android:textColor="#111827"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+        <com.chat.base.ui.components.AvatarView
+            android:id="@+id/commentAuthorAvatar"
+            android:layout_width="42dp"
+            android:layout_height="42dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/commentAuthorNameTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#111827"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/commentAuthorDotTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="7dp"
+                android:paddingEnd="7dp"
+                android:text="·"
+                android:textColor="#9CA3AF"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/commentAuthorFollowTv"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:background="@drawable/bg_feed_follow_button"
+                android:gravity="center"
+                android:minWidth="60dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:text="@string/feed_follow"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <ImageButton
             android:id="@+id/commentCloseBtn"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_gravity="end|center_vertical"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:background="@null"
             android:src="@drawable/ic_feed_close" />
-    </FrameLayout>
+    </LinearLayout>
 
     <TextView
         android:id="@+id/commentCaptionTv"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="8dp"
-        android:background="#F7F8FA"
-        android:lineSpacingExtra="3dp"
-        android:maxLines="6"
-        android:paddingStart="14dp"
-        android:paddingTop="10dp"
-        android:paddingEnd="14dp"
-        android:paddingBottom="10dp"
+        android:paddingStart="16dp"
+        android:paddingTop="0dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="12dp"
         android:textColor="#111827"
         android:textSize="14sp"
+        android:lineSpacingExtra="3dp"
         android:visibility="gone" />
+
+    <View
+        android:id="@+id/commentCaptionDivider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#EEF0F3"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/commentTitleTv"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:text="@string/feed_comment_title"
+        android:textColor="#6B7280"
+        android:textSize="13sp" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/commentRecyclerView"
@@ -54,7 +110,18 @@
         android:layout_weight="1"
         android:overScrollMode="never" />
 
+    <TextView
+        android:id="@+id/commentRecordHintTv"
+        android:layout_width="match_parent"
+        android:layout_height="34dp"
+        android:gravity="center"
+        android:text="@string/feed_voice_hold_to_talk"
+        android:textColor="#6B7280"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <LinearLayout
+        android:id="@+id/commentInputBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
@@ -63,17 +130,6 @@
         android:paddingTop="8dp"
         android:paddingEnd="10dp"
         android:paddingBottom="10dp">
-
-        <TextView
-            android:id="@+id/commentVoiceBtn"
-            android:layout_width="86dp"
-            android:layout_height="42dp"
-            android:layout_marginEnd="6dp"
-            android:background="@drawable/bg_feed_comment_input"
-            android:gravity="center"
-            android:text="@string/feed_comment_voice_hold"
-            android:textColor="#374151"
-            android:textSize="13sp" />
 
         <EditText
             android:id="@+id/commentEditText"
@@ -89,12 +145,16 @@
             android:textColorHint="#8A8F98"
             android:textSize="14sp" />
 
-        <ImageButton
+        <TextView
             android:id="@+id/commentSendBtn"
-            android:layout_width="46dp"
+            android:layout_width="64dp"
             android:layout_height="42dp"
             android:layout_marginStart="6dp"
-            android:background="@null"
-            android:src="@drawable/ic_feed_send" />
+            android:background="@drawable/bg_feed_action_button"
+            android:gravity="center"
+            android:text="@string/feed_voice_hold_short"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>
