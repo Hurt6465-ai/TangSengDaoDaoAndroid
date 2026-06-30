@@ -19,9 +19,10 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:background="@color/homeColor"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:paddingBottom="30dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -29,6 +30,18 @@
                     android:layout_marginTop="20dp"
                     android:background="@color/white"
                     android:orientation="vertical">
+
+                    <LinearLayout
+                        android:id="@+id/msgNoticesLayout"
+                        style="@style/layoutBg">
+
+                        <TextView
+                            style="@style/leftTextView"
+                            android:layout_weight="1"
+                            android:text="@string/new_msg_notification" />
+
+                        <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
+                    </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/darkLayout"
@@ -67,7 +80,6 @@
                             android:layout_weight="1"
                             android:text="@string/language" />
 
-
                         <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
                     </LinearLayout>
 
@@ -79,7 +91,6 @@
                             style="@style/leftTextView"
                             android:layout_weight="1"
                             android:text="@string/font_size" />
-
 
                         <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
                     </LinearLayout>
@@ -94,54 +105,6 @@
                         android:layout_width="match_parent"
                         android:layout_height="10dp"
                         android:background="@color/homeColor" />
-
-
-                    <LinearLayout
-                        android:id="@+id/msgBackupLayout"
-                        style="@style/layoutBg"
-                        android:visibility="gone">
-
-                        <TextView
-                            style="@style/leftTextView"
-                            android:layout_weight="1"
-                            android:text="@string/backup_message" />
-
-
-                        <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/msgRecoveryLayout"
-                        style="@style/layoutBg"
-                        android:visibility="gone">
-
-                        <TextView
-                            style="@style/leftTextView"
-                            android:layout_weight="1"
-                            android:text="@string/recovery_message" />
-
-
-                        <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="10dp"
-                        android:background="@color/homeColor"
-                        android:visibility="gone" />
-
-                    <LinearLayout
-                        android:id="@+id/clearChatMsgLayout"
-                        style="@style/layoutBg"
-                        android:visibility="gone">
-
-                        <TextView
-                            style="@style/leftTextView"
-                            android:layout_weight="1"
-                            android:text="@string/clear_msg" />
-
-                        <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
-                    </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/clearImgCacheLayout"
@@ -168,25 +131,31 @@
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="10dp"
-                        android:visibility="visible"
                         android:background="@color/homeColor" />
 
-
                     <LinearLayout
-                        android:id="@+id/moduleLayout"
+                        android:id="@+id/safetyLayout"
                         style="@style/layoutBg">
 
                         <TextView
                             style="@style/leftTextView"
-                            android:text="@string/choose_module" />
+                            android:layout_weight="1"
+                            android:text="@string/security_and_privacy" />
 
                         <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
                     </LinearLayout>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="10dp"
-                        android:background="@color/homeColor" />
+                    <LinearLayout
+                        android:id="@+id/blacklistLayout"
+                        style="@style/layoutBg">
+
+                        <TextView
+                            style="@style/leftTextView"
+                            android:layout_weight="1"
+                            android:text="@string/blacklist" />
+
+                        <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
+                    </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/thirdShareLayout"
@@ -194,28 +163,11 @@
 
                         <TextView
                             style="@style/leftTextView"
+                            android:layout_weight="1"
                             android:text="@string/third_party_sharing_list" />
 
                         <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
-
                     </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/errorLogLayout"
-                        style="@style/layoutBg">
-
-                        <TextView
-                            style="@style/leftTextView"
-                            android:text="@string/error_data" />
-
-                        <androidx.appcompat.widget.AppCompatImageView style="@style/arrow_right_iv" />
-
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="10dp"
-                        android:background="@color/homeColor" />
 
                     <LinearLayout
                         android:id="@+id/aboutLayout"
@@ -223,6 +175,7 @@
 
                         <TextView
                             style="@style/leftTextView"
+                            android:layout_weight="1"
                             android:text="@string/about" />
 
                         <androidx.appcompat.widget.AppCompatImageView
@@ -242,6 +195,16 @@
                         android:background="@color/homeColor" />
 
                     <TextView
+                        android:id="@+id/destroyAccountTv"
+                        style="@style/layoutBg"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="@string/destroy_account"
+                        android:textColor="@color/red"
+                        android:textSize="@dimen/font_size_16" />
+
+                    <TextView
                         android:id="@+id/loginOutTv"
                         style="@style/layoutBg"
                         android:layout_width="match_parent"
@@ -251,10 +214,6 @@
                         android:textColor="@color/red"
                         android:textSize="@dimen/font_size_16" />
                 </LinearLayout>
-
-                <Space
-                    android:layout_width="match_parent"
-                    android:layout_height="30dp" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
     </com.scwang.smart.refresh.layout.SmartRefreshLayout>
