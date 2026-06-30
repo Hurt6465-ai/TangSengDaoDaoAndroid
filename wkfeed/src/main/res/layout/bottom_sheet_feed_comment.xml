@@ -64,6 +64,17 @@
         android:paddingEnd="10dp"
         android:paddingBottom="10dp">
 
+        <TextView
+            android:id="@+id/commentVoiceBtn"
+            android:layout_width="86dp"
+            android:layout_height="42dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_feed_comment_input"
+            android:gravity="center"
+            android:text="@string/feed_comment_voice_hold"
+            android:textColor="#374151"
+            android:textSize="13sp" />
+
         <EditText
             android:id="@+id/commentEditText"
             android:layout_width="0dp"
