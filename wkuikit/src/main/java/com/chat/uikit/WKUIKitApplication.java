@@ -106,9 +106,6 @@ import com.chat.uikit.search.AddFriendsActivity;
 import com.chat.uikit.setting.MsgNoticesSettingActivity;
 import com.chat.uikit.setting.SettingActivity;
 import com.chat.uikit.user.UserDetailActivity;
-import com.chat.uikit.rtc.RtcCallManager;
-import com.chat.uikit.rtc.RtcSignalManager;
-import com.chat.uikit.rtc.RtcWukongSignalTransport;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -137,7 +134,6 @@ public class WKUIKitApplication {
     public String chattingChannelID;
     public SensitiveWords sensitiveWords;
     public boolean isRefreshChatActivityMessage = false;
-    private boolean rtcSignalListenerAdded = false;
     private boolean imConnectionStateListenerAdded = false;
     private volatile int lastConnectionStatus = -1;
 
@@ -161,7 +157,6 @@ public class WKUIKitApplication {
         //初始化im事件及监听
         WKIMUtils.getInstance().initIMListener();
         initKitModuleListener();
-        initRtcSignalModule();
         String json = WKSharedPreferencesUtil.getInstance().getSP("wk_sensitive_words");
         if (!TextUtils.isEmpty(json)) {
             sensitiveWords = JSON.parseObject(json, SensitiveWords.class);
@@ -216,23 +211,6 @@ public class WKUIKitApplication {
         lastConnectionStatus = -1;
         EndpointManager.getInstance().invoke("push_update_device_badge", totalMsgCount);
         WKIM.getInstance().getConnectionManager().disconnect(false);
-    }
-
-    private void initRtcSignalModule() {
-        String uid = WKConfig.getInstance().getUid();
-        if (!TextUtils.isEmpty(uid)) {
-            RtcCallManager.get().configure(getContext(), uid, new RtcWukongSignalTransport());
-        }
-        if (rtcSignalListenerAdded) return;
-        rtcSignalListenerAdded = true;
-        WKIM.getInstance().getMsgManager().addOnNewMsgListener("cp_harmony_rtc_global", list -> {
-            String currentUid = WKConfig.getInstance().getUid();
-            if (TextUtils.isEmpty(currentUid) || list == null || list.isEmpty()) return;
-            RtcCallManager.get().configure(getContext(), currentUid, new RtcWukongSignalTransport());
-            for (WKMsg msg : list) {
-                RtcSignalManager.get().tryHandleIncomingMsg(msg);
-            }
-        });
     }
 
     private void initKitModuleListener() {
@@ -478,7 +456,7 @@ public class WKUIKitApplication {
             //初始化im
             WKUIKitApplication.getInstance().initIM();
             WKUIKitApplication.getInstance().initIMConnectionStateListener();
-            WKUIKitApplication.getInstance().initRtcSignalModule();
+            EndpointManager.getInstance().invoke("rtc_init", null);
             //初始化密钥
 //            WKIM.getInstance().getSignalProtocolManager().init();
             UserInfoEntity userInfo = WKConfig.getInstance().getUserInfo();
