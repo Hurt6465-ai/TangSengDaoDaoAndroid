@@ -20,7 +20,7 @@
     <application>
         <activity
             android:name="com.chat.rtc.RtcCallActivity"
-            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize"
             android:excludeFromRecents="true"
             android:launchMode="singleTop"
             android:screenOrientation="portrait"
