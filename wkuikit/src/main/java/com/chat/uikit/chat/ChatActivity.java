@@ -112,9 +112,6 @@ import com.chat.uikit.group.GroupDetailActivity;
 import com.chat.uikit.group.service.GroupModel;
 import com.chat.uikit.message.MsgModel;
 import com.chat.uikit.robot.service.WKRobotModel;
-import com.chat.uikit.rtc.RtcCallManager;
-import com.chat.uikit.rtc.RtcSignalManager;
-import com.chat.uikit.rtc.RtcWukongSignalTransport;
 import com.chat.uikit.user.service.UserModel;
 import com.chat.uikit.view.WKPlayVoiceUtils;
 import com.effective.android.panel.PanelSwitchHelper;
@@ -853,23 +850,21 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private void initRtcCallModule() {
-        RtcCallManager.get().configure(getApplicationContext(), loginUID, new RtcWukongSignalTransport());
+        EndpointManager.getInstance().invoke("rtc_init", null);
     }
 
     private boolean isRtcSignalMessage(WKMsg msg, boolean dispatch) {
         if (msg == null) return false;
         boolean signal = false;
         try {
-            signal = RtcSignalManager.isSignalMsg(msg);
+            Object result = EndpointManager.getInstance().invoke("rtc_is_signal_msg", msg);
+            signal = result instanceof Boolean && (Boolean) result;
         } catch (Exception ignored) {
-        }
-        if (!signal) {
-            signal = looksLikeRtcSignalPayload(msg);
         }
         if (!signal) return false;
         if (dispatch) {
             try {
-                RtcSignalManager.get().tryHandleIncomingMsg(msg);
+                EndpointManager.getInstance().invoke("rtc_handle_signal_msg", msg);
             } catch (Exception e) {
                 Log.e("ChatActivity", "handle rtc signal failed", e);
             }
@@ -908,86 +903,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 && type != WKContentType.spanEmptyView
                 && type != WKContentType.typing
                 && type != WKContentType.noRelation;
-    }
-
-    private boolean looksLikeRtcSignalPayload(WKMsg msg) {
-        if (msg == null || msg.type != WKContentType.WK_TEXT) return false;
-        String payload = getMessagePayloadText(msg);
-        if (TextUtils.isEmpty(payload)) return false;
-        String trimmed = payload.trim();
-        if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return false;
-        String lower = trimmed.toLowerCase(Locale.US);
-
-        boolean hasSignalWord = lower.contains("\"offer\"")
-                || lower.contains("\"answer\"")
-                || lower.contains("\"candidate\"")
-                || lower.contains("\"ice\"")
-                || lower.contains("\"invite\"")
-                || lower.contains("\"hangup\"")
-                || lower.contains("\"cancel\"")
-                || lower.contains("\"reject\"")
-                || lower.contains("\"busy\"")
-                || lower.contains("\"accept\"");
-        boolean hasRtcField = lower.contains("rtc")
-                || lower.contains("webrtc")
-                || lower.contains("call_id")
-                || lower.contains("callid")
-                || lower.contains("room_id")
-                || lower.contains("roomid")
-                || lower.contains("\"sdp\"")
-                || lower.contains("\"candidate\"");
-        if (hasSignalWord && hasRtcField) return true;
-
-        try {
-            JSONObject json = new JSONObject(trimmed);
-            String type = json.optString("type") + " " + json.optString("cmd") + " " + json.optString("action");
-            String typeLower = type.toLowerCase(Locale.US);
-            boolean signalType = typeLower.contains("offer")
-                    || typeLower.contains("answer")
-                    || typeLower.contains("candidate")
-                    || typeLower.contains("ice")
-                    || typeLower.contains("invite")
-                    || typeLower.contains("hangup")
-                    || typeLower.contains("cancel")
-                    || typeLower.contains("reject")
-                    || typeLower.contains("busy")
-                    || typeLower.contains("accept");
-            boolean rtcShape = json.has("sdp")
-                    || json.has("candidate")
-                    || json.has("call_id")
-                    || json.has("callId")
-                    || json.has("room_id")
-                    || json.has("roomId")
-                    || json.has("rtc")
-                    || json.has("webrtc");
-            return signalType && rtcShape;
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
-    private String getMessagePayloadText(WKMsg msg) {
-        if (msg == null) return "";
-        if (msg.baseContentMsgModel != null) {
-            try {
-                String display = msg.baseContentMsgModel.getDisplayContent();
-                if (!TextUtils.isEmpty(display)) return display;
-            } catch (Exception ignored) {
-            }
-            try {
-                JSONObject jsonObject = msg.baseContentMsgModel.encodeMsg();
-                if (jsonObject != null) {
-                    String content = jsonObject.optString("content");
-                    if (!TextUtils.isEmpty(content)) return content;
-                    String text = jsonObject.optString("text");
-                    if (!TextUtils.isEmpty(text)) return text;
-                    return jsonObject.toString();
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        if (!TextUtils.isEmpty(msg.content)) return msg.content;
-        return "";
     }
 
     private boolean isSameMessage(WKMsg first, WKMsg second) {
@@ -1031,7 +946,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             return;
         }
         initRtcCallModule();
-        RtcCallManager.get().startOutgoing(this, channelId, getRtcPeerName(), getRtcPeerAvatar(), callType);
+        Object handled = EndpointManager.getInstance().invoke("wk_p2p_call", new RTCMenu(this, callType));
+        if (!(handled instanceof Boolean) || !((Boolean) handled)) {
+            WKToastUtils.getInstance().showToast("通话插件未初始化");
+        }
     }
 
     private void toggleStatusBarMode() {
