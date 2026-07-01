@@ -53,6 +53,8 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     private static final String EXTRA_COUNTRY_CODE = "country_code";
     private static final String DEFAULT_LANGUAGE = "中文";
     private static final String TAG_PREFIX = "# ";
+    private static final int ROOM_LIST_LIMIT = 30;
+
 
     private FragmentRoomTopicListBinding binding;
     private RecyclerView recyclerView;
@@ -70,6 +72,10 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     private boolean roomHorizontalDragging = false;
     private long ignoreRoomClickUntilMs = 0L;
     private int roomTouchSlop = 0;
+    private String nextCursor = "";
+    private boolean hasMoreRooms = false;
+    private boolean loadingRooms = false;
+    private int roomListRequestSeq = 0;
 
     public static RoomTopicListFragment newInstance() {
         return new RoomTopicListFragment();
@@ -109,6 +115,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     protected void initListener() {
         if (!canUpdateUi()) return;
         refreshLayout.setOnRefreshListener(layout -> loadRooms(true));
+        refreshLayout.setOnLoadMoreListener(layout -> loadMoreRooms());
         createBtn.setOnClickListener(v -> showCreateDialog());
         adapter.setOnItemClickListener((adapter1, view, position) -> {
             if (shouldIgnoreRoomClick()) return;
@@ -152,6 +159,8 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     public void onDestroyView() {
         dismissDialogs();
         openingChannelId = null;
+        roomListRequestSeq++;
+        loadingRooms = false;
         super.onDestroyView();
         binding = null;
         recyclerView = null;
@@ -217,26 +226,89 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     }
 
     private void loadRooms(boolean showError) {
-        RoomTopicModel.getInstance().listRooms(new IRequestResultListener<RoomTopicListResponse>() {
+        requestRooms(true, showError);
+    }
+
+    private void loadMoreRooms() {
+        if (!hasMoreRooms || TextUtils.isEmpty(nextCursor)) {
+            if (refreshLayout != null) {
+                refreshLayout.finishLoadMore(true);
+                refreshLayout.setEnableLoadMore(false);
+            }
+            return;
+        }
+        requestRooms(false, true);
+    }
+
+    private void requestRooms(boolean refresh, boolean showError) {
+        if (!canUpdateUi()) return;
+        if (loadingRooms) {
+            if (refresh) refreshLayout.finishRefresh(false);
+            else refreshLayout.finishLoadMore(false);
+            return;
+        }
+        loadingRooms = true;
+        int requestSeq = ++roomListRequestSeq;
+        String cursor = refresh ? "" : nextCursor;
+        if (refresh) {
+            nextCursor = "";
+            hasMoreRooms = false;
+            refreshLayout.setEnableLoadMore(false);
+        }
+
+        RoomTopicModel.getInstance().listRooms(cursor, ROOM_LIST_LIMIT, new IRequestResultListener<RoomTopicListResponse>() {
             @Override
             public void onSuccess(RoomTopicListResponse result) {
-                if (!canUpdateUi()) return;
-                refreshLayout.finishRefresh(true);
-                List<RoomTopicEntity> rooms = result == null ? null : result.rooms;
+                if (requestSeq != roomListRequestSeq || !canUpdateUi()) return;
+                loadingRooms = false;
+                finishRoomListLoading(refresh, true);
+
+                List<RoomTopicEntity> rooms = result == null ? null : result.getRoomList();
                 if (rooms == null) rooms = new ArrayList<>();
-                RoomTopicStore.sortRooms(rooms);
-                adapter.setList(rooms);
+                if (refresh) {
+                    adapter.setList(rooms);
+                } else {
+                    appendRooms(rooms);
+                }
+
+                nextCursor = result == null ? "" : result.cursor;
+                hasMoreRooms = result != null && result.hasMore();
+                refreshLayout.setEnableLoadMore(hasMoreRooms);
                 updateEmpty();
             }
 
             @Override
             public void onFail(int code, String msg) {
-                if (!canUpdateUi()) return;
-                refreshLayout.finishRefresh(false);
-                updateEmpty();
+                if (requestSeq != roomListRequestSeq || !canUpdateUi()) return;
+                loadingRooms = false;
+                finishRoomListLoading(refresh, false);
+                if (refresh) updateEmpty();
                 if (showError) showToast(msg);
             }
         });
+    }
+
+    private void finishRoomListLoading(boolean refresh, boolean success) {
+        if (refresh) refreshLayout.finishRefresh(success);
+        else refreshLayout.finishLoadMore(success);
+    }
+
+    private void appendRooms(List<RoomTopicEntity> rooms) {
+        if (adapter == null || rooms == null || rooms.isEmpty()) return;
+        List<RoomTopicEntity> data = adapter.getData();
+        for (RoomTopicEntity next : rooms) {
+            if (next == null) continue;
+            normalizeRoomForOpen(next);
+            int index = adapter.indexOfRoom(next.getRoomId(), next.getChannelId());
+            if (index >= 0 && index < data.size()) {
+                RoomTopicEntity old = data.get(index);
+                if (old == null) data.set(index, next);
+                else old.mergeFrom(next);
+            } else {
+                data.add(next);
+            }
+        }
+        adapter.notifyDataSetChanged();
     }
 
     private void openTopic(RoomTopicEntity room) {
@@ -544,7 +616,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
             public void onSuccess(RoomTopicListResponse result) {
                 if (!canUpdateUi() || !isActiveCreateDialog(dialog)) return;
                 publish.setEnabled(true);
-                List<RoomTopicEntity> rooms = result == null ? null : result.rooms;
+                List<RoomTopicEntity> rooms = result == null ? null : result.getRoomList();
                 if (rooms == null) rooms = new ArrayList<>();
                 RoomTopicStore.sortRooms(rooms);
                 adapter.setList(rooms);
