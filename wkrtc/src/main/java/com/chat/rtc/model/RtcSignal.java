@@ -10,7 +10,6 @@ import org.json.JSONObject;
 public class RtcSignal {
     public static final String INVITE = "invite";
     public static final String ACCEPT = "accept";
-    /** Callee received INVITE and is showing ringing UI. */
     public static final String RINGING = "ringing";
     public static final String REJECT = "reject";
     public static final String BUSY = "busy";
