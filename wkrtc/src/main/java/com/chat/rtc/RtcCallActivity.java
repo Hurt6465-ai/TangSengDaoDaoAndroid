@@ -75,6 +75,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private boolean weakMode;
     private boolean foregroundServiceStarted;
     private boolean recordReported;
+    private boolean visibleRecordSent;
     private String closeReason = "";
 
     private EglBase eglBase;
@@ -391,6 +392,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         RtcCallNotification.cancelIncoming(this);
         if (TextUtils.isEmpty(closeReason)) closeReason = "rejected";
         try { RtcSignalManager.get().sendSimple(RtcSignal.REJECT, callId, peerUid); } catch (Exception ignored) {}
+        sendVisibleCallRecordIfNeeded(closeReason);
         reportCallRecordIfNeeded(closeReason);
         RtcCallManager.get().markClosed(callId);
         RtcCallNotification.cancelIncoming(this);
@@ -430,12 +432,14 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         if (RtcSignal.BUSY.equals(s.type)) {
             closeReason = "busy";
             toast(getString(R.string.rtc_busy));
+            sendVisibleCallRecordIfNeeded(closeReason);
             endCall(true);
             return;
         }
         if (RtcSignal.TIMEOUT.equals(s.type)) {
             closeReason = "no_answer";
             toast(getString(R.string.rtc_no_answer));
+            sendVisibleCallRecordIfNeeded(closeReason);
             endCall(true);
             return;
         }
@@ -526,12 +530,28 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         }
         if (!remoteEnded) {
             try { RtcSignalManager.get().sendSimple(connected ? RtcSignal.END : RtcSignal.CANCEL, callId, peerUid); } catch (Exception ignored) {}
+            if (shouldSendVisibleRecordForLocalEnd()) {
+                sendVisibleCallRecordIfNeeded(closeReason);
+            }
         }
         reportCallRecordIfNeeded(closeReason);
         RtcCallManager.get().markClosed(callId);
         RtcCallNotification.cancelIncoming(this);
         RtcCallForegroundService.stop(this);
         finish();
+    }
+
+    private boolean shouldSendVisibleRecordForLocalEnd() {
+        if (TextUtils.isEmpty(peerUid)) return false;
+        if (connected) return true;
+        if (!incoming) return true;
+        return accepted;
+    }
+
+    private void sendVisibleCallRecordIfNeeded(String reason) {
+        if (visibleRecordSent) return;
+        visibleRecordSent = true;
+        RtcCallRecordMessageSender.send(peerUid, callType, reason, connectedAt);
     }
 
     private void reportCallRecordIfNeeded(String reason) {
