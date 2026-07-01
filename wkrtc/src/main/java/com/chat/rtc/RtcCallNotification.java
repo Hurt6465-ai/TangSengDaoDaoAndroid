@@ -34,7 +34,7 @@ public final class RtcCallNotification {
         String text = RtcConstants.isVideo(callType) ? app.getString(R.string.rtc_invite_video) : app.getString(R.string.rtc_invite_audio);
         PendingIntent fullScreen = callActivityIntent(app, signal, title, peerAvatar, callType, false);
         PendingIntent answer = callActivityIntent(app, signal, title, peerAvatar, callType, true);
-        PendingIntent reject = rejectIntent(app, signal);
+        PendingIntent reject = rejectIntent(app, signal, title, callType);
 
         Notification.Builder builder = new Notification.Builder(app)
                 .setSmallIcon(android.R.drawable.stat_sys_phone_call)
@@ -117,11 +117,13 @@ public final class RtcCallNotification {
         return PendingIntent.getActivity(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
-    private static PendingIntent rejectIntent(Context context, RtcSignal signal) {
+    private static PendingIntent rejectIntent(Context context, RtcSignal signal, String peerName, int callType) {
         Intent intent = new Intent(context, RtcCallActionReceiver.class);
         intent.setAction(RtcConstants.ACTION_REJECT_CALL);
         intent.putExtra(RtcConstants.EXTRA_CALL_ID, signal.callId);
         intent.putExtra(RtcConstants.EXTRA_PEER_UID, signal.fromUid);
+        intent.putExtra(RtcConstants.EXTRA_PEER_NAME, peerName);
+        intent.putExtra(RtcConstants.EXTRA_CALL_TYPE, callType);
         return PendingIntent.getBroadcast(context, 7613, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 

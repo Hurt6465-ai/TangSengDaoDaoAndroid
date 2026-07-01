@@ -30,6 +30,9 @@ public class RtcCallManager implements RtcSignalDelegate {
     private final Map<String, List<RtcSignal>> pending = new HashMap<>();
     private final Map<String, Long> closed = new HashMap<>();
     private final Map<String, Long> incomingSeen = new HashMap<>();
+    // Keep the original incoming INVITE until a terminal signal arrives.
+    // This lets us write a missed/cancelled record even if Android blocks the Activity.
+    private final Map<String, RtcSignal> incomingInviteMap = new HashMap<>();
     private String currentCallId = "";
     private long currentCallStartedAt = 0L;
 
@@ -101,6 +104,7 @@ public class RtcCallManager implements RtcSignalDelegate {
     private void cleanupStaleCurrentLocked() {
         if (isCurrentCallStaleLocked()) {
             incomingSeen.remove(currentCallId);
+            incomingInviteMap.remove(currentCallId);
             pending.remove(currentCallId);
             currentCallId = "";
             currentCallStartedAt = 0L;
@@ -128,6 +132,7 @@ public class RtcCallManager implements RtcSignalDelegate {
         if (!TextUtils.isEmpty(callId)) {
             closed.put(callId, System.currentTimeMillis());
             incomingSeen.remove(callId);
+            incomingInviteMap.remove(callId);
             pending.remove(callId);
             if (TextUtils.equals(currentCallId, callId)) {
                 currentCallId = "";
@@ -160,7 +165,9 @@ public class RtcCallManager implements RtcSignalDelegate {
         }
 
         if (isTerminalSignal(signal)) {
+            RtcSignal invite;
             synchronized (this) {
+                invite = incomingInviteMap.remove(signal.callId);
                 pending.remove(signal.callId);
                 incomingSeen.remove(signal.callId);
                 if (TextUtils.equals(currentCallId, signal.callId)) {
@@ -169,6 +176,7 @@ public class RtcCallManager implements RtcSignalDelegate {
                 }
                 closed.put(signal.callId, System.currentTimeMillis());
             }
+            saveIncomingTerminalRecordIfNeeded(invite, signal);
             return;
         }
 
@@ -190,6 +198,7 @@ public class RtcCallManager implements RtcSignalDelegate {
                     return;
                 }
                 incomingSeen.put(signal.callId, System.currentTimeMillis());
+                incomingInviteMap.put(signal.callId, signal);
                 currentCallId = signal.callId;
                 currentCallStartedAt = System.currentTimeMillis();
             }
@@ -244,10 +253,47 @@ public class RtcCallManager implements RtcSignalDelegate {
         try { appContext.startActivity(i); } catch (Exception ignored) {}
     }
 
-    public void rejectIncomingFromNotification(Context context, String callId, String peerUid) {
-        try { RtcSignalManager.get().sendSimple(RtcSignal.REJECT, callId, peerUid); } catch (Exception ignored) {}
+    public void rejectIncomingFromNotification(Context context, String callId, String peerUid, String peerName, int callType) {
+        RtcSignal invite;
+        synchronized (this) {
+            invite = incomingInviteMap.remove(callId);
+        }
+        String safePeerUid = TextUtils.isEmpty(peerUid) && invite != null ? invite.fromUid : peerUid;
+        String safePeerName = TextUtils.isEmpty(peerName) && invite != null ? getDisplayName(invite) : peerName;
+        int safeCallType = callType == RtcConstants.VIDEO || callType == RtcConstants.AUDIO
+                ? callType
+                : (invite == null ? RtcConstants.AUDIO : RtcConstants.typeOf(invite.mode));
+
+        try { RtcSignalManager.get().sendSimple(RtcSignal.REJECT, callId, safePeerUid); } catch (Exception ignored) {}
+        RtcCallRecordMessageSender.saveLocal(callId, safePeerUid, safePeerName, safeCallType, true, "rejected", 0L);
+        RtcCallRecordReporter.report(callId, safePeerUid, safePeerName, safeCallType, true, "rejected", 0L);
         markClosed(callId);
         RtcCallNotification.cancelIncoming(context);
+    }
+
+    /**
+     * Terminal signals can arrive while the Activity was never opened, for example when
+     * background-start restrictions block the incoming UI and the caller cancels from their side.
+     * In that case the Activity will not have a chance to write the local missed-call record.
+     */
+    private void saveIncomingTerminalRecordIfNeeded(RtcSignal invite, RtcSignal terminal) {
+        if (invite == null || terminal == null || TextUtils.isEmpty(invite.fromUid)) return;
+        String reason;
+        if (RtcSignal.CANCEL.equals(terminal.type) || RtcSignal.END.equals(terminal.type)) {
+            reason = "remote_cancelled";
+        } else if (RtcSignal.TIMEOUT.equals(terminal.type)) {
+            reason = "missed";
+        } else if (RtcSignal.REJECT.equals(terminal.type)) {
+            reason = "rejected";
+        } else if (RtcSignal.BUSY.equals(terminal.type)) {
+            reason = "busy";
+        } else {
+            return;
+        }
+        int callType = RtcConstants.typeOf(invite.mode);
+        String name = getDisplayName(invite);
+        RtcCallRecordMessageSender.saveLocal(terminal.callId, invite.fromUid, name, callType, true, reason, 0L);
+        RtcCallRecordReporter.report(terminal.callId, invite.fromUid, name, callType, true, reason, 0L);
     }
 
     private String getDisplayName(RtcSignal signal) {

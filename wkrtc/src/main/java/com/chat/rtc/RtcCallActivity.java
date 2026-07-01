@@ -164,7 +164,10 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     @Override protected void onDestroy() {
-        if (!ending && !TextUtils.isEmpty(callId)) {
+        // Do not turn a framework configuration rebuild into a hangup/reject.
+        // The Activity is locked to portrait and declares configChanges, but this guard keeps
+        // abnormal framework recreations from producing a false missed/cancelled call record.
+        if (!ending && !isChangingConfigurations() && !TextUtils.isEmpty(callId)) {
             closeReason = connected ? "ended" : (incoming ? "missed" : "cancelled");
             try { RtcSignalManager.get().sendSimple(connected ? RtcSignal.END : (incoming ? RtcSignal.REJECT : RtcSignal.CANCEL), callId, peerUid); } catch (Exception ignored) {}
             reportCallRecordIfNeeded(closeReason);
@@ -212,7 +215,14 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     @Override public void onError(String message, Throwable error) {
-        runOnUiThread(() -> { toast(message == null ? getString(R.string.rtc_call_error) : message); endCall(true); });
+        runOnUiThread(() -> {
+            if (ending) return;
+            toast(message == null ? getString(R.string.rtc_call_error) : message);
+            closeReason = "connect_failed";
+            // Local WebRTC/camera/SDP failure must notify the peer. Passing remoteEnded=true
+            // would leave the other side ringing until timeout and can create fake busy states.
+            endCall(false);
+        });
     }
 
     private void readIntent() {
@@ -353,7 +363,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             scheduleOutgoingInviteTimeout();
         } catch (Exception e) {
             toast(getString(R.string.rtc_signal_not_ready));
-            endCall(true);
+            closeReason = "connect_failed";
+            endCall(false);
         }
     }
 

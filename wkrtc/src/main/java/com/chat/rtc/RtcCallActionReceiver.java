@@ -13,8 +13,10 @@ public class RtcCallActionReceiver extends BroadcastReceiver {
         if (RtcConstants.ACTION_REJECT_CALL.equals(action)) {
             String callId = intent.getStringExtra(RtcConstants.EXTRA_CALL_ID);
             String peerUid = intent.getStringExtra(RtcConstants.EXTRA_PEER_UID);
+            String peerName = intent.getStringExtra(RtcConstants.EXTRA_PEER_NAME);
+            int callType = intent.getIntExtra(RtcConstants.EXTRA_CALL_TYPE, RtcConstants.AUDIO);
             if (!TextUtils.isEmpty(callId)) {
-                RtcCallManager.get().rejectIncomingFromNotification(context, callId, peerUid);
+                RtcCallManager.get().rejectIncomingFromNotification(context, callId, peerUid, peerName, callType);
             }
         }
     }
