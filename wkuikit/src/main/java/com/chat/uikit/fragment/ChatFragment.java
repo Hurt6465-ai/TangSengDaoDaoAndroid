@@ -63,7 +63,6 @@ import com.xinbida.wukongim.entity.WKCMDKeys;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelState;
 import com.xinbida.wukongim.entity.WKChannelType;
-import com.xinbida.wukongim.entity.WKMsg;
 import com.xinbida.wukongim.entity.WKReminder;
 import com.xinbida.wukongim.entity.WKUIConversationMsg;
 import com.xinbida.wukongim.message.type.WKConnectReason;
@@ -92,7 +91,6 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
  * 会话
  */
 public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBinding> {
-    private static final String RTC_SIGNAL_PREFIX = "__cp_harmony_rtc__:";
 
     private ChatConversationAdapter chatConversationAdapter;
     private Disposable disposable;
@@ -704,7 +702,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                         deleteExpiredTopicRoomLocal(uiConversationMsg);
                         continue;
                     }
-                    sanitizeRtcConversation(uiConversationMsg);
                     uiList.add(new ChatConversationMsg(uiConversationMsg));
                 }
                 sortMsg(uiList);
@@ -719,7 +716,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                     removeConversationIfExists(uiConversationMsg.channelID, uiConversationMsg.channelType);
                     continue;
                 }
-                sanitizeRtcConversation(uiConversationMsg);
                 boolean isAdd = true;
                 for (int i = 0, size = chatConversationAdapter.getData().size(); i < size; i++) {
                     if (!TextUtils.isEmpty(chatConversationAdapter.getData().get(i).uiConversationMsg.channelID) && !TextUtils.isEmpty(uiConversationMsg.channelID) && chatConversationAdapter.getData().get(i).uiConversationMsg.channelID.equals(uiConversationMsg.channelID) && chatConversationAdapter.getData().get(i).uiConversationMsg.channelType == uiConversationMsg.channelType) {
@@ -894,7 +890,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                         deleteExpiredTopicRoomLocal(conversation);
                         continue;
                     }
-                    sanitizeRtcConversation(conversation);
                     tempList.add(new ChatConversationMsg(conversation));
                 }
             }
@@ -1164,6 +1159,17 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         }
     }
 
+    private boolean isStrictTopicRoomChannel(String channelID, byte channelType) {
+        if (TextUtils.isEmpty(channelID) || channelType != WKChannelType.GROUP) return false;
+        if (channelID.startsWith("topic_")) return true;
+        try {
+            WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
+            return isTopicRoomChannel(channel);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
     private void deleteExpiredTopicRoomLocal(WKUIConversationMsg item) {
         if (item == null) return;
         deleteExpiredTopicRoomLocal(item.channelID, item.channelType, item.unreadCount);
@@ -1171,6 +1177,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
 
     private void deleteExpiredTopicRoomLocal(String channelID, byte channelType, int unreadCount) {
         if (TextUtils.isEmpty(channelID)) return;
+        if (!isStrictTopicRoomChannel(channelID, channelType)) return;
         List<WKReminder> reminders = WKIM.getInstance().getReminderManager().getReminders(channelID, channelType);
         if (WKReader.isNotEmpty(reminders)) {
             List<Long> reminderIds = new ArrayList<>();
@@ -1187,7 +1194,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         }
         MsgModel.getInstance().clearUnread(channelID, channelType, 0, null);
         WKIM.getInstance().getConversationManager().deleteWitchChannel(channelID, channelType);
-        WKIM.getInstance().getMsgManager().clearWithChannel(channelID, channelType);
+        // Never clear message history here. A wrong topic-room flag must not wipe normal chats.
     }
 
     private void removeConversationIfExists(String channelID, byte channelType) {
@@ -1198,48 +1205,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         rebuildIndexCache();
         if (unreadChanged) markUnreadCountDirty();
         setAllCount();
-    }
-
-
-    private void sanitizeRtcConversation(WKUIConversationMsg uiConversationMsg) {
-        if (uiConversationMsg == null || !isRtcSignalMsg(uiConversationMsg.getWkMsg())) return;
-        if (uiConversationMsg.unreadCount > 0) {
-            MsgModel.getInstance().clearUnread(uiConversationMsg.channelID, uiConversationMsg.channelType, 0, null);
-            markUnreadCountDirty();
-        }
-        uiConversationMsg.unreadCount = 0;
-    }
-
-    private boolean isRtcSignalMsg(WKMsg msg) {
-        if (msg == null) return false;
-        if (isRtcSignalText(msg.content)) return true;
-        try {
-            if (msg.baseContentMsgModel != null) {
-                org.json.JSONObject jsonObject = msg.baseContentMsgModel.encodeMsg();
-                if (jsonObject != null) {
-                    if (isRtcSignalText(jsonObject.optString("content", ""))) return true;
-                    if (isRtcSignalText(jsonObject.optString("text", ""))) return true;
-                }
-                return isRtcSignalText(msg.baseContentMsgModel.getDisplayContent());
-            }
-        } catch (Exception ignored) {
-        }
-        return false;
-    }
-
-    private boolean isRtcSignalText(String raw) {
-        if (TextUtils.isEmpty(raw)) return false;
-        String text = raw.trim();
-        if (text.startsWith(RTC_SIGNAL_PREFIX)) return true;
-        if (text.startsWith("{") && text.endsWith("}")) {
-            try {
-                org.json.JSONObject object = new org.json.JSONObject(text);
-                String content = object.optString("content", object.optString("text", ""));
-                return !TextUtils.isEmpty(content) && content.trim().startsWith(RTC_SIGNAL_PREFIX);
-            } catch (Exception ignored) {
-            }
-        }
-        return false;
     }
 
     private int msgCount = 0;
@@ -1269,7 +1234,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             resetChildData(uiConversationMsg, isEnd);
             return;
         }
-        sanitizeRtcConversation(uiConversationMsg);
         boolean isAdd = true;
         int index = -1;
         boolean isSort = false;
