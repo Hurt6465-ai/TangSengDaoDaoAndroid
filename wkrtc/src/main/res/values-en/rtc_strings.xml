@@ -31,6 +31,7 @@
     <string name="rtc_wait_accept_video">Waiting for answer…</string>
     <string name="rtc_calling_audio">Calling…</string>
     <string name="rtc_connecting">Connecting…</string>
+    <string name="rtc_peer_ringing">Ringing…</string>
     <string name="rtc_peer_accepted">Accepted, connecting…</string>
     <string name="rtc_connect_failed">Connection failed. Check your network.</string>
     <string name="rtc_no_answer">No answer</string>
