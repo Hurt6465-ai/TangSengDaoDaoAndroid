@@ -10,7 +10,12 @@ import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.endpoint.entity.CreateVideoCallMenu;
 import com.chat.base.endpoint.entity.RTCMenu;
 import com.chat.base.msg.IConversationContext;
+import com.chat.base.msgitem.WKContentType;
+import com.chat.base.msgitem.WKMsgItemViewManager;
+import com.chat.rtc.model.RtcCallRecordContent;
 import com.chat.rtc.model.RtcSignal;
+import com.chat.rtc.model.RtcSignalContent;
+import com.chat.rtc.provider.RtcCallRecordProvider;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -24,6 +29,7 @@ public class WKRTCApplication {
     private WeakReference<Application> appRef = new WeakReference<>(null);
     private boolean endpointsRegistered = false;
     private boolean signalListenerAdded = false;
+    private boolean contentRegistered = false;
 
     private WKRTCApplication() {}
 
@@ -33,6 +39,7 @@ public class WKRTCApplication {
 
     public void init(Application app) {
         appRef = new WeakReference<>(app);
+        registerContentAndProvider();
         registerEndpoints();
         initRtcSignalModule();
         if (app != null) {
@@ -44,6 +51,14 @@ public class WKRTCApplication {
     public Context getContext() {
         Application app = appRef.get();
         return app == null ? null : app.getApplicationContext();
+    }
+
+    private synchronized void registerContentAndProvider() {
+        if (contentRegistered) return;
+        contentRegistered = true;
+        try { WKIM.getInstance().getMsgManager().registerContentMsg(RtcSignalContent.class); } catch (Exception ignored) {}
+        try { WKIM.getInstance().getMsgManager().registerContentMsg(RtcCallRecordContent.class); } catch (Exception ignored) {}
+        try { WKMsgItemViewManager.getInstance().addChatItemViewProvider(WKContentType.WK_RTC_CALL_RECORD, new RtcCallRecordProvider()); } catch (Exception ignored) {}
     }
 
     public void initRtcSignalModule() {
@@ -105,10 +120,6 @@ public class WKRTCApplication {
         });
 
         EndpointManager.getInstance().setMethod("rtc_handle_signal_msg", object -> {
-            // The app may have registered endpoints before login, when uid was still empty.
-            // Reconfigure here before consuming any RTC packet; otherwise a valid invite can be
-            // hidden from chat but not delivered to RtcCallManager.
-            initRtcSignalModule();
             if (object instanceof WKMsg) {
                 return RtcSignalManager.get().tryHandleIncomingMsg((WKMsg) object);
             }

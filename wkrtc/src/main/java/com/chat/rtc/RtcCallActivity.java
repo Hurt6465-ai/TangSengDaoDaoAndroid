@@ -75,7 +75,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private boolean weakMode;
     private boolean foregroundServiceStarted;
     private boolean recordReported;
-    private boolean visibleRecordSent;
     private String closeReason = "";
 
     private EglBase eglBase;
@@ -165,12 +164,14 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     @Override protected void onDestroy() {
-        super.onDestroy();
-        RtcCallManager.get().clearActiveCallListener(this);
-        // Activity destruction must never leave a stale busy lock.
-        if (!TextUtils.isEmpty(callId) && !connected && !ending) {
+        if (!ending && !TextUtils.isEmpty(callId)) {
+            closeReason = connected ? "ended" : (incoming ? "missed" : "cancelled");
+            try { RtcSignalManager.get().sendSimple(connected ? RtcSignal.END : (incoming ? RtcSignal.REJECT : RtcSignal.CANCEL), callId, peerUid); } catch (Exception ignored) {}
+            reportCallRecordIfNeeded(closeReason);
             RtcCallManager.get().markClosed(callId);
         }
+        super.onDestroy();
+        RtcCallManager.get().clearActiveCallListener(this);
         cleanup();
     }
 
@@ -392,7 +393,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         RtcCallNotification.cancelIncoming(this);
         if (TextUtils.isEmpty(closeReason)) closeReason = "rejected";
         try { RtcSignalManager.get().sendSimple(RtcSignal.REJECT, callId, peerUid); } catch (Exception ignored) {}
-        sendVisibleCallRecordIfNeeded(closeReason);
         reportCallRecordIfNeeded(closeReason);
         RtcCallManager.get().markClosed(callId);
         RtcCallNotification.cancelIncoming(this);
@@ -432,21 +432,18 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         if (RtcSignal.BUSY.equals(s.type)) {
             closeReason = "busy";
             toast(getString(R.string.rtc_busy));
-            sendVisibleCallRecordIfNeeded(closeReason);
             endCall(true);
             return;
         }
         if (RtcSignal.TIMEOUT.equals(s.type)) {
             closeReason = "no_answer";
             toast(getString(R.string.rtc_no_answer));
-            sendVisibleCallRecordIfNeeded(closeReason);
             endCall(true);
             return;
         }
         if (RtcSignal.RINGING.equals(s.type)) {
-            if (!peerAccepted && !connected) {
-                statusText.setText(getString(R.string.rtc_peer_ringing));
-            }
+            statusText.setText(getString(R.string.rtc_peer_ringing));
+            ringPlayer.playOutgoing();
             return;
         }
         if (RtcSignal.ACCEPT.equals(s.type)) {
@@ -530,9 +527,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         }
         if (!remoteEnded) {
             try { RtcSignalManager.get().sendSimple(connected ? RtcSignal.END : RtcSignal.CANCEL, callId, peerUid); } catch (Exception ignored) {}
-            if (shouldSendVisibleRecordForLocalEnd()) {
-                sendVisibleCallRecordIfNeeded(closeReason);
-            }
         }
         reportCallRecordIfNeeded(closeReason);
         RtcCallManager.get().markClosed(callId);
@@ -541,22 +535,10 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         finish();
     }
 
-    private boolean shouldSendVisibleRecordForLocalEnd() {
-        if (TextUtils.isEmpty(peerUid)) return false;
-        if (connected) return true;
-        if (!incoming) return true;
-        return accepted;
-    }
-
-    private void sendVisibleCallRecordIfNeeded(String reason) {
-        if (visibleRecordSent) return;
-        visibleRecordSent = true;
-        RtcCallRecordMessageSender.send(peerUid, callType, reason, connectedAt);
-    }
-
     private void reportCallRecordIfNeeded(String reason) {
         if (recordReported) return;
         recordReported = true;
+        RtcCallRecordMessageSender.saveLocal(callId, peerUid, peerName, callType, incoming, reason, connectedAt);
         RtcCallRecordReporter.report(callId, peerUid, peerName, callType, incoming, reason, connectedAt);
     }
 
@@ -566,7 +548,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         try { RtcCallNotification.cancelIncoming(this); } catch (Exception ignored) {}
         try { RtcCallForegroundService.stop(this); foregroundServiceStarted = false; } catch (Exception ignored) {}
         try { if (ringPlayer != null) ringPlayer.stop(); } catch (Exception ignored) {}
-        try { if (peerClient != null) peerClient.close(); } catch (Exception ignored) {}
+        try { if (peerClient != null) peerClient.closeBlocking(1200L); } catch (Exception ignored) {}
         try { if (audioManager != null) audioManager.stop(); } catch (Exception ignored) {}
         try { if (localRenderer != null) localRenderer.release(); } catch (Exception ignored) {}
         try { if (remoteRenderer != null) remoteRenderer.release(); } catch (Exception ignored) {}

@@ -39,6 +39,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public class RtcPeerClient {
     private static final String TAG = "RtcPeerClient";
@@ -257,6 +259,17 @@ public class RtcPeerClient {
     }
 
     public void close() { rtcHandler.post(this::closeInternal); }
+
+    public void closeBlocking(long timeoutMs) {
+        CountDownLatch latch = new CountDownLatch(1);
+        try {
+            rtcHandler.post(() -> {
+                try { closeInternal(); } finally { latch.countDown(); }
+            });
+            latch.await(Math.max(100L, timeoutMs), TimeUnit.MILLISECONDS);
+        } catch (Exception ignored) {
+        }
+    }
 
     private void startInternal(List<PeerConnection.IceServer> servers) {
         try {

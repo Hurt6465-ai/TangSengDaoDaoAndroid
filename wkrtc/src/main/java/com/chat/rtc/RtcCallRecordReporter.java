@@ -3,6 +3,7 @@ package com.chat.rtc;
 import android.text.TextUtils;
 
 import com.chat.base.endpoint.EndpointManager;
+import com.chat.rtc.model.RtcCallRecordContent;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -37,7 +38,7 @@ public final class RtcCallRecordReporter {
         event.put("reason", normalizedReason);
         event.put("result", resultOf(normalizedReason));
         event.put("duration_seconds", duration);
-        event.put("display_text", buildDisplayText(callType, normalizedReason, duration));
+        event.put("display_text", RtcCallRecordContent.buildDisplayText(callType, normalizedReason, incoming, duration));
         event.put("timestamp", System.currentTimeMillis());
         try {
             EndpointManager.getInstance().invoke(ENDPOINT, event);
@@ -55,7 +56,7 @@ public final class RtcCallRecordReporter {
         return reason;
     }
 
-    public static String buildDisplayText(int callType, String reason, long duration) {
+    private static String buildDisplayText(int callType, String reason, long duration) {
         String prefix = RtcConstants.isVideo(callType) ? "视频通话" : "语音通话";
         if ("ended".equals(reason) || "remote_ended".equals(reason)) {
             return prefix + " " + formatDuration(duration);

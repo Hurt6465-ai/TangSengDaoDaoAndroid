@@ -3,43 +3,44 @@ package com.chat.rtc;
 import android.text.TextUtils;
 
 import com.chat.base.config.WKConfig;
+import com.chat.base.msgitem.WKContentType;
+import com.chat.rtc.model.RtcCallRecordContent;
 import com.xinbida.wukongim.WKIM;
-import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
-import com.xinbida.wukongim.entity.WKSendOptions;
-import com.xinbida.wukongim.msgmodel.WKTextContent;
+import com.xinbida.wukongim.entity.WKMsg;
+import com.xinbida.wukongim.message.type.WKSendMsgResult;
 
 /**
- * Sends a real, user-visible call record as a normal chat message.
+ * Saves one visible, local call-record message.
  *
- * RTC packets themselves are transient control messages and must not appear in chat history,
- * unread counters or conversation cover text. Tinode keeps call controls separate from
- * visible history; this class is the lightweight TangSeng equivalent for the final record.
+ * This is intentionally local-only: each side writes its own result when the call ends.
+ * Control signals are not used as chat history, so SDP/ICE/END never pollute the conversation list.
  */
 public final class RtcCallRecordMessageSender {
     private RtcCallRecordMessageSender() {}
 
-    public static void send(String peerUid, int callType, String reason, long connectedAt) {
+    public static void saveLocal(String callId, String peerUid, String peerName, int callType,
+                                 boolean incoming, String reason, long connectedAt) {
         if (TextUtils.isEmpty(peerUid)) return;
-        String myUid = WKConfig.getInstance().getUid();
-        if (!TextUtils.isEmpty(myUid) && TextUtils.equals(myUid, peerUid)) return;
-
         long duration = connectedAt > 0 ? Math.max(0L, (System.currentTimeMillis() - connectedAt) / 1000L) : 0L;
-        String text = RtcCallRecordReporter.buildDisplayText(callType, reason, duration);
-        if (TextUtils.isEmpty(text)) return;
+        RtcCallRecordContent content = RtcCallRecordContent.create(callId, peerUid, peerName, callType, incoming, reason, duration);
 
+        WKMsg msg = new WKMsg();
+        msg.channelID = peerUid;
+        msg.channelType = WKChannelType.PERSONAL;
+        msg.type = WKContentType.WK_RTC_CALL_RECORD;
+        msg.baseContentMsgModel = content;
+        msg.content = content.encodeMsg().toString();
+        msg.timestamp = System.currentTimeMillis() / 1000L;
+        msg.fromUID = incoming ? peerUid : WKConfig.getInstance().getUid();
+        msg.status = WKSendMsgResult.send_success;
         try {
-            WKTextContent content = new WKTextContent(text);
-            WKChannel channel = new WKChannel(peerUid, WKChannelType.PERSONAL);
-            WKSendOptions options = new WKSendOptions();
-            try {
-                if (options.setting != null) {
-                    options.setting.receipt = 0;
-                    options.setting.stream = 0;
-                }
-            } catch (Exception ignored) {
-            }
-            WKIM.getInstance().getMsgManager().sendWithOptions(content, channel, options);
+            long orderSeq = WKIM.getInstance().getMsgManager().getMessageOrderSeq(0, peerUid, WKChannelType.PERSONAL);
+            msg.orderSeq = orderSeq + 1;
+        } catch (Exception ignored) {
+        }
+        try {
+            WKIM.getInstance().getMsgManager().saveAndUpdateConversationMsg(msg, false);
         } catch (Exception ignored) {
         }
     }

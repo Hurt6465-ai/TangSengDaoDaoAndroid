@@ -4,6 +4,7 @@ import android.text.TextUtils;
 
 import com.chat.base.msgitem.WKContentType;
 import com.chat.rtc.model.RtcSignal;
+import com.chat.rtc.model.RtcSignalContent;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -51,7 +52,11 @@ public class RtcSignalManager {
     }
 
     public static String extractSignalText(WKMsg msg) {
-        if (msg == null || (msg.type != WKContentType.WK_TEXT && msg.type != WKContentType.WK_INSIDE_MSG)) return "";
+        if (msg == null) return "";
+        if (msg.type == WKContentType.WK_RTC_SIGNAL && msg.baseContentMsgModel instanceof RtcSignalContent) {
+            return pickValidSignalText(((RtcSignalContent) msg.baseContentMsgModel).payload);
+        }
+        if (msg.type != WKContentType.WK_TEXT && msg.type != WKContentType.WK_INSIDE_MSG && msg.type != WKContentType.WK_RTC_SIGNAL) return "";
 
         // 1) Prefer raw SDK content. Do not inspect media payloads or generic display text.
         String text = pickValidSignalText(msg.content);
@@ -62,6 +67,8 @@ public class RtcSignalManager {
             if (msg.baseContentMsgModel != null) {
                 JSONObject jsonObject = msg.baseContentMsgModel.encodeMsg();
                 if (jsonObject != null) {
+                    text = pickValidSignalText(jsonObject.optString("payload", ""));
+                    if (!TextUtils.isEmpty(text)) return text;
                     text = pickValidSignalText(jsonObject.optString("content", ""));
                     if (!TextUtils.isEmpty(text)) return text;
                     text = pickValidSignalText(jsonObject.optString("text", ""));
@@ -94,7 +101,7 @@ public class RtcSignalManager {
         if (text.startsWith("{") && text.endsWith("}")) {
             try {
                 JSONObject object = new JSONObject(text);
-                String content = object.optString("content", object.optString("text", ""));
+                String content = object.optString("payload", object.optString("content", object.optString("text", "")));
                 if (!TextUtils.isEmpty(content)) {
                     content = content.trim();
                     if (content.startsWith(RtcConstants.SIGNAL_PREFIX) && isValidSignalText(content)) {
@@ -121,8 +128,8 @@ public class RtcSignalManager {
 
     private static boolean isAllowedType(String type) {
         return RtcSignal.INVITE.equals(type)
-                || RtcSignal.RINGING.equals(type)
                 || RtcSignal.ACCEPT.equals(type)
+                || RtcSignal.RINGING.equals(type)
                 || RtcSignal.REJECT.equals(type)
                 || RtcSignal.BUSY.equals(type)
                 || RtcSignal.CANCEL.equals(type)
@@ -182,12 +189,9 @@ public class RtcSignalManager {
     }
 
     public void send(RtcSignal signal) throws Exception {
-        if (signal == null) return;
         if (transport == null) throw new IllegalStateException("RtcSignalTransport not configured");
         if (TextUtils.isEmpty(signal.fromUid)) signal.fromUid = myUid;
         if (TextUtils.isEmpty(signal.toUid)) return;
-        // Self-call protection. Local echoes are hidden in tryHandleIncomingText(), but sending a
-        // signal to myself can still create a fake busy state. Block it at the transport edge too.
         if (!TextUtils.isEmpty(myUid) && TextUtils.equals(signal.toUid, myUid)) return;
         transport.sendSignal(signal.toUid, signal.toTransportText());
     }
