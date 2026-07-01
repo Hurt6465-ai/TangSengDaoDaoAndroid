@@ -72,6 +72,7 @@ import java.util.UUID;
  * im监听相关处理
  */
 public class WKIMUtils {
+    private static final String RTC_SIGNAL_PREFIX = "__cp_harmony_rtc__:";
 
     private WKIMUtils() {
     }
@@ -513,6 +514,39 @@ public class WKIMUtils {
     }
 
 
+
+    private boolean isRtcSignalMsg(WKMsg msg) {
+        if (msg == null) return false;
+        if (isRtcSignalText(msg.content)) return true;
+        try {
+            if (msg.baseContentMsgModel != null) {
+                JSONObject jsonObject = msg.baseContentMsgModel.encodeMsg();
+                if (jsonObject != null) {
+                    if (isRtcSignalText(jsonObject.optString("content", ""))) return true;
+                    if (isRtcSignalText(jsonObject.optString("text", ""))) return true;
+                }
+                return isRtcSignalText(msg.baseContentMsgModel.getDisplayContent());
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
+    private boolean isRtcSignalText(String raw) {
+        if (TextUtils.isEmpty(raw)) return false;
+        String text = raw.trim();
+        if (text.startsWith(RTC_SIGNAL_PREFIX)) return true;
+        if (text.startsWith("{") && text.endsWith("}")) {
+            try {
+                JSONObject object = new JSONObject(text);
+                String content = object.optString("content", object.optString("text", ""));
+                return !TextUtils.isEmpty(content) && content.trim().startsWith(RTC_SIGNAL_PREFIX);
+            } catch (Exception ignored) {
+            }
+        }
+        return false;
+    }
+
     /**
      * 显示聊天
      *
@@ -552,6 +586,11 @@ public class WKIMUtils {
         if (conversationMsg != null) {
             redDot = conversationMsg.unreadCount;
             msg = WKIM.getInstance().getMsgManager().getWithClientMsgNO(conversationMsg.lastClientMsgNO);
+            if (isRtcSignalMsg(msg)) {
+                redDot = 0;
+                MsgModel.getInstance().clearUnread(chatViewMenu.channelID, chatViewMenu.channelType, 0, null);
+                msg = null;
+            }
             if (msg != null) {
                 aroundMsgSeq = msg.orderSeq;
             }
