@@ -10,10 +10,14 @@ import io.reactivex.rxjava3.core.Observable;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
 import retrofit2.http.POST;
+import retrofit2.http.Query;
 
 interface RoomTopicService {
     @GET("chatrooms/list")
     Observable<RoomTopicListResponse> listRooms();
+
+    @GET("chatrooms/list")
+    Observable<RoomTopicListResponse> listRooms(@Query("limit") int limit, @Query("cursor") String cursor);
 
     @POST("chatrooms/create")
     Observable<RoomTopicEntity> createRoom(@Body CreateRoomTopicRequest request);
