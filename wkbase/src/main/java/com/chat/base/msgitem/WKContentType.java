@@ -31,6 +31,12 @@ public class WKContentType extends WKMsgContentType {
     public final static int emptyView = -12;
     public final static int spanEmptyView = -13;
 
+
+    // RTC 1v1 P2P signaling packet. Hidden from chat UI/history preview.
+    public final static int WK_RTC_SIGNAL = 9301;
+    // Visible RTC call record, e.g. video call 00:31 / no answer / busy.
+    public final static int WK_RTC_CALL_RECORD = 9302;
+
     // 富文本
     public final static int richText = 14;
     //群聊加人
