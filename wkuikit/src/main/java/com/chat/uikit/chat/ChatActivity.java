@@ -2,7 +2,6 @@ package com.chat.uikit.chat;
 
 import static androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE;
 
-import android.Manifest;
 import android.widget.TextView;
 import android.widget.Switch;
 import android.widget.LinearLayout;
@@ -89,7 +88,6 @@ import com.chat.base.utils.LayoutHelper;
 import com.chat.base.utils.SoftKeyboardUtils;
 import com.chat.base.utils.UserUtils;
 import com.chat.base.utils.WKDialogUtils;
-import com.chat.base.utils.WKPermissions;
 import com.chat.base.utils.WKPlaySound;
 import com.chat.base.utils.WKReader;
 import com.chat.base.utils.WKTimeUtils;
@@ -1207,44 +1205,37 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 WKToastUtils.getInstance().showToast(getString(R.string.can_not_call_forbidden));
                 return;
             }
-            String desc = String.format(getString(R.string.microphone_permissions_des), getString(R.string.app_name));
-            WKPermissions.getInstance().checkPermissions(new WKPermissions.IPermissionResult() {
-                @Override
-                public void onResult(boolean result) {
-                    if (result) {
-                        if (channelType == WKChannelType.PERSONAL) {
-                            if (UserUtils.getInstance().checkMyFriendDelete(channelId) || UserUtils.getInstance().checkFriendRelation(channelId)) {
-                                showToast(R.string.non_friend_relationship);
-                                return;
-                            }
-                            if (UserUtils.getInstance().checkBlacklist(channelId)) {
-                                showToast(R.string.call_be_blacklist);
-                                return;
-                            }
-                            if (getChatChannelInfo().status == WKChannelStatus.statusBlacklist) {
-                                showToast(R.string.call_blacklist);
-                                return;
-                            }
-                            showCallPopupMenuLower(view);
-                        } else {
-                            WKChannelMember channelMember = WKIM.getInstance().getChannelMembersManager().getMember(channelId, channelType, loginUID);
-                            if (channelMember != null && channelMember.status == WKChannelStatus.statusBlacklist) {
-                                showToast(R.string.call_blacklist_group);
-                                return;
-                            }
-                            Intent intent = new Intent(ChatActivity.this, ChooseVideoCallMembersActivity.class);
-                            intent.putExtra("channelID", channelId);
-                            intent.putExtra("channelType", channelType);
-                            intent.putExtra("isCreate", true);
-                            startActivity(intent);
-                        }
-                    }
-                }
 
-                @Override
-                public void clickResult(boolean isCancel) {
+            if (channelType == WKChannelType.PERSONAL) {
+                if (UserUtils.getInstance().checkMyFriendDelete(channelId) || UserUtils.getInstance().checkFriendRelation(channelId)) {
+                    showToast(R.string.non_friend_relationship);
+                    return;
                 }
-            }, this, desc, Manifest.permission.RECORD_AUDIO);
+                if (UserUtils.getInstance().checkBlacklist(channelId)) {
+                    showToast(R.string.call_be_blacklist);
+                    return;
+                }
+                if (getChatChannelInfo().status == WKChannelStatus.statusBlacklist) {
+                    showToast(R.string.call_blacklist);
+                    return;
+                }
+                // 顶部通话按钮只展示语音/视频选择面板，不在这里提前申请麦克风权限。
+                // 真正点击“视频/语音”后，由 wkrtc 的 RtcCallActivity 按通话类型申请 CAMERA/RECORD_AUDIO，
+                // 避免出现“点按钮弹一次权限，点视频/语音又弹一次权限”的重复体验。
+                showCallPopupMenuLower(view);
+                return;
+            }
+
+            WKChannelMember channelMember = WKIM.getInstance().getChannelMembersManager().getMember(channelId, channelType, loginUID);
+            if (channelMember != null && channelMember.status == WKChannelStatus.statusBlacklist) {
+                showToast(R.string.call_blacklist_group);
+                return;
+            }
+            Intent intent = new Intent(ChatActivity.this, ChooseVideoCallMembersActivity.class);
+            intent.putExtra("channelID", channelId);
+            intent.putExtra("channelType", channelType);
+            intent.putExtra("isCreate", true);
+            startActivity(intent);
         });
 
         WKDialogUtils.getInstance().setViewLongClickPopup(wkVBinding.chatUnreadLayout.groupApproveLayout, getGroupApprovePopupItems());
