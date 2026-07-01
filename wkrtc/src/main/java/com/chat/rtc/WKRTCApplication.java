@@ -105,6 +105,10 @@ public class WKRTCApplication {
         });
 
         EndpointManager.getInstance().setMethod("rtc_handle_signal_msg", object -> {
+            // The app may have registered endpoints before login, when uid was still empty.
+            // Reconfigure here before consuming any RTC packet; otherwise a valid invite can be
+            // hidden from chat but not delivered to RtcCallManager.
+            initRtcSignalModule();
             if (object instanceof WKMsg) {
                 return RtcSignalManager.get().tryHandleIncomingMsg((WKMsg) object);
             }

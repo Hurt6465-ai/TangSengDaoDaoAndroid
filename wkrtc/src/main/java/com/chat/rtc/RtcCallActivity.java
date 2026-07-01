@@ -165,6 +165,12 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
 
     @Override protected void onDestroy() {
         super.onDestroy();
+        // If the Activity is destroyed without passing through endCall()/reject/timeout
+        // (process pressure, task removal, OEM quirks), release the busy lock. Otherwise the
+        // next incoming call can be incorrectly answered with BUSY.
+        if (!ending && !TextUtils.isEmpty(callId)) {
+            RtcCallManager.get().forceClearCurrentCall(callId);
+        }
         RtcCallManager.get().clearActiveCallListener(this);
         cleanup();
     }

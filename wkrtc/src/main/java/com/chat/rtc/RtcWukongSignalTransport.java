@@ -21,7 +21,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Implementation notes:
  * - Keep payload as WK_TEXT. Do not switch to WK_INSIDE_MSG here; some SDK/server combinations
  *   do not deliver inside messages through the listener used by the RTC module.
- * - header.noPersist = true: online signaling, do not store as normal chat history.
+ * - Keep noPersist=false for reliability: the peer can still receive the invite after a short
+ *   reconnect/sync window. ChatActivity hides packets by the strict RTC prefix, so they do not
+ *   become visible bubbles.
  * - header.redDot = false: do not increase unread/red-dot count.
  * - Reflection uses getDeclaredField across the inheritance chain. getField only sees public
  *   fields and can fail on SDK variants or obfuscation.
@@ -64,8 +66,10 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
 
         try {
             if (options.header != null) {
-                // Online delivery, no local/remote chat cache pollution.
-                options.header.noPersist = true;
+                // Reliable delivery is more important than pure online-only signaling.
+                // Do NOT set noPersist=true here. Some server/SDK combinations drop no-persist
+                // packets when the peer is reconnecting, which makes incoming calls unreliable.
+                options.header.noPersist = false;
                 // WKMsgHeader's real unread/red-dot switch.
                 options.header.redDot = false;
                 // Do not set syncOnce. Multi-device users should still be able to receive calls.
@@ -91,8 +95,9 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         if (object == null) return;
 
         // Header-like fields.
-        setFieldValue(object, "noPersist", true);
-        setFieldValue(object, "no_persist", true);
+        // Keep persisted for short-window reliability. The UI filters RTC packets by prefix.
+        setFieldValue(object, "noPersist", false);
+        setFieldValue(object, "no_persist", false);
         setFieldValue(object, "redDot", false);
         setFieldValue(object, "red_dot", false);
 
@@ -104,9 +109,9 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         setFieldValue(object, "unread", false);
         setFieldValue(object, "needRedDot", false);
         setFieldValue(object, "need_red_dot", false);
-        setFieldValue(object, "persist", false);
-        setFieldValue(object, "isPersist", false);
-        setFieldValue(object, "is_persist", false);
+        setFieldValue(object, "persist", true);
+        setFieldValue(object, "isPersist", true);
+        setFieldValue(object, "is_persist", true);
 
         // Setting-like fields.
         setFieldValue(object, "receipt", 0);

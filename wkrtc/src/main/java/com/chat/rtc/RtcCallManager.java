@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.UUID;
 
 public class RtcCallManager implements RtcSignalDelegate {
+    private static final long MIN_STALE_CALL_MS = 90_000L;
+    private static final long MAX_STALE_CALL_MS = 3 * 60_000L;
     public interface ActiveCallListener {
         String getActiveCallId();
         void onSignalForActiveCall(RtcSignal signal);
@@ -80,6 +82,7 @@ public class RtcCallManager implements RtcSignalDelegate {
 
     public synchronized boolean isCalling() {
         cleanupOld(closed, 10 * 60 * 1000L);
+        cleanupStaleCurrentLocked();
         if (!TextUtils.isEmpty(currentCallId) && !closed.containsKey(currentCallId)) return true;
         ActiveCallListener listener = activeListener.get();
         return listener != null && !TextUtils.isEmpty(listener.getActiveCallId());
@@ -87,6 +90,7 @@ public class RtcCallManager implements RtcSignalDelegate {
 
     public synchronized void clearActiveCallListener(ActiveCallListener listener) {
         if (activeListener.get() == listener) activeListener.clear();
+        cleanupStaleCurrentLocked();
     }
 
     public synchronized List<RtcSignal> consumePending(String callId) {
@@ -119,6 +123,7 @@ public class RtcCallManager implements RtcSignalDelegate {
         synchronized (this) {
             cleanupOld(closed, 10 * 60 * 1000L);
             cleanupOld(incomingSeen, 2 * 60 * 1000L);
+            cleanupStaleCurrentLocked();
             if (closed.containsKey(signal.callId)) return;
             listener = activeListener.get();
         }
@@ -155,6 +160,28 @@ public class RtcCallManager implements RtcSignalDelegate {
             }
             list.add(signal);
         }
+    }
+
+    private synchronized void cleanupStaleCurrentLocked() {
+        if (TextUtils.isEmpty(currentCallId) || currentCallStartedAt <= 0L) return;
+        ActiveCallListener listener = activeListener.get();
+        if (listener != null && TextUtils.equals(listener.getActiveCallId(), currentCallId)) return;
+
+        long staleMs = Math.max(MIN_STALE_CALL_MS,
+                RtcConfigManager.getInviteTimeoutMs() + RtcConfigManager.getConnectTimeoutMs() + 15_000L);
+        staleMs = Math.min(staleMs, MAX_STALE_CALL_MS);
+        if (System.currentTimeMillis() - currentCallStartedAt > staleMs) {
+            closed.put(currentCallId, System.currentTimeMillis());
+            pending.remove(currentCallId);
+            incomingSeen.remove(currentCallId);
+            currentCallId = "";
+            currentCallStartedAt = 0L;
+        }
+    }
+
+    public synchronized void forceClearCurrentCall(String callId) {
+        if (TextUtils.isEmpty(callId)) return;
+        markClosed(callId);
     }
 
     private synchronized void cleanupOld(Map<String, Long> map, long ttlMs) {
