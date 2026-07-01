@@ -1,0 +1,39 @@
+<resources>
+    <style name="WKRTCCallTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+
+    <style name="WKRTCBottomButton">
+        <item name="android:layout_width">84dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_marginLeft">4dp</item>
+        <item name="android:layout_marginRight">4dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">#EEFFFFFF</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:lines">1</item>
+        <item name="android:paddingTop">5dp</item>
+        <item name="android:paddingBottom">3dp</item>
+    </style>
+
+    <style name="WKRTCSideButton">
+        <item name="android:layout_width">64dp</item>
+        <item name="android:layout_height">60dp</item>
+        <item name="android:layout_marginTop">4dp</item>
+        <item name="android:layout_marginBottom">4dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">#EEFFFFFF</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:lines">1</item>
+        <item name="android:paddingTop">5dp</item>
+        <item name="android:paddingBottom">3dp</item>
+    </style>
+
+    <!-- Kept for backward compatibility with older layouts. -->
+    <style name="WKRTCCircleButton" parent="WKRTCBottomButton" />
+</resources>
