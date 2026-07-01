@@ -32,6 +32,7 @@ import com.chat.login.WKLoginApplication
 import com.chat.partner.profile.WKPartnerApplication
 import com.chat.push.WKPushApplication
 import com.chat.room.WKRoomApplication
+import com.chat.rtc.WKRTCApplication
 import com.chat.scan.WKScanApplication
 import com.chat.uikit.TabActivity
 import com.chat.uikit.WKUIKitApplication
@@ -121,6 +122,8 @@ class TSApplication : MultiDexApplication() {
         WKLoginApplication.getInstance().init(this)
         WKScanApplication.getInstance().init(this)
         WKUIKitApplication.getInstance().init(this)
+        // 初始化独立 wkrtc 插件：注册通话 Endpoint、全局信令监听、通知渠道和 RTC 配置。
+        WKRTCApplication.getInstance().init(this)
         WKPushApplication.getInstance().init(getAppPackageName(), this)
         WKRoomApplication.getInstance().init(this)
         WKPartnerApplication.getInstance().init(this)
