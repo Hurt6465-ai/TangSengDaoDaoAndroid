@@ -165,13 +165,11 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
 
     @Override protected void onDestroy() {
         super.onDestroy();
-        // If the Activity is destroyed without passing through endCall()/reject/timeout
-        // (process pressure, task removal, OEM quirks), release the busy lock. Otherwise the
-        // next incoming call can be incorrectly answered with BUSY.
-        if (!ending && !TextUtils.isEmpty(callId)) {
-            RtcCallManager.get().forceClearCurrentCall(callId);
-        }
         RtcCallManager.get().clearActiveCallListener(this);
+        // Activity destruction must never leave a stale busy lock.
+        if (!TextUtils.isEmpty(callId) && !connected && !ending) {
+            RtcCallManager.get().markClosed(callId);
+        }
         cleanup();
     }
 
@@ -439,6 +437,12 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             closeReason = "no_answer";
             toast(getString(R.string.rtc_no_answer));
             endCall(true);
+            return;
+        }
+        if (RtcSignal.RINGING.equals(s.type)) {
+            if (!peerAccepted && !connected) {
+                statusText.setText(getString(R.string.rtc_peer_ringing));
+            }
             return;
         }
         if (RtcSignal.ACCEPT.equals(s.type)) {

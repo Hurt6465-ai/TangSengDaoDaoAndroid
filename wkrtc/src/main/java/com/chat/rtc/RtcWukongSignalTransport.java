@@ -2,6 +2,7 @@ package com.chat.rtc;
 
 import android.text.TextUtils;
 
+import com.chat.base.config.WKConfig;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -14,19 +15,12 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * WuKong IM transport for WebRTC signaling.
  *
- * Key requirements:
- * 1) The peer must receive invite / offer / answer / ice through the normal online message flow.
- * 2) Signaling packets must not become chat bubbles, unread badges, or cache pollution.
+ * The old in-module call was more reliable because it did not over-own the busy state.
+ * For delivery reliability, this transport now sends RTC packets through normal personal
+ * messaging, but marks them silent/no-red-dot. ChatActivity hides packets by exact prefix.
  *
- * Implementation notes:
- * - Keep payload as WK_TEXT. Do not switch to WK_INSIDE_MSG here; some SDK/server combinations
- *   do not deliver inside messages through the listener used by the RTC module.
- * - Keep noPersist=false for reliability: the peer can still receive the invite after a short
- *   reconnect/sync window. ChatActivity hides packets by the strict RTC prefix, so they do not
- *   become visible bubbles.
- * - header.redDot = false: do not increase unread/red-dot count.
- * - Reflection uses getDeclaredField across the inheritance chain. getField only sees public
- *   fields and can fail on SDK variants or obfuscation.
+ * Do NOT force noPersist=true here. Some devices/server combinations drop online-only
+ * packets when the callee is reconnecting or backgrounded, which makes the peer never ring.
  */
 public class RtcWukongSignalTransport implements RtcSignalTransport {
     private static final int SIGNAL_EXPIRE_SECONDS = 5 * 60;
@@ -47,32 +41,33 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
     @Override
     public void sendSignal(String peerUid, String payload) throws Exception {
         if (TextUtils.isEmpty(peerUid) || TextUtils.isEmpty(payload)) return;
+        String myUid = WKConfig.getInstance().getUid();
+        if (!TextUtils.isEmpty(myUid) && TextUtils.equals(myUid, peerUid)) {
+            // Never send RTC packets to myself. This is the main cause of fake busy state.
+            return;
+        }
 
         WKTextContent content = new WKTextContent(payload);
         WKChannel channel = new WKChannel(peerUid, WKChannelType.PERSONAL);
         WKSendOptions options = new WKSendOptions();
 
-        applyRealtimeSignalOptions(options);
-        // Some SDK versions copy no-persist/unread flags from content rather than options.
-        // Mark both sides so RTC packets never become visible chat bubbles.
-        markByReflection(content);
+        applyReliableSilentSignalOptions(options);
+        // Some SDK versions copy unread/red-dot flags from content rather than options.
+        markSilentOnly(content);
         WKIM.getInstance().getMsgManager().sendWithOptions(content, channel, options);
     }
 
-    private void applyRealtimeSignalOptions(WKSendOptions options) {
+    private void applyReliableSilentSignalOptions(WKSendOptions options) {
         if (options == null) return;
 
         options.expire = SIGNAL_EXPIRE_SECONDS;
 
         try {
             if (options.header != null) {
-                // Reliable delivery is more important than pure online-only signaling.
-                // Do NOT set noPersist=true here. Some server/SDK combinations drop no-persist
-                // packets when the peer is reconnecting, which makes incoming calls unreliable.
+                // Reliable delivery: keep persist false/online-only OFF. The chat page hides the
+                // payload by prefix, so a short-lived persisted signal is safer than a lost invite.
                 options.header.noPersist = false;
-                // WKMsgHeader's real unread/red-dot switch.
                 options.header.redDot = false;
-                // Do not set syncOnce. Multi-device users should still be able to receive calls.
             }
         } catch (Exception ignored) {
         }
@@ -85,23 +80,28 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         } catch (Exception ignored) {
         }
 
-        // Reflection fallback for older/newer SDK variants or non-public fields.
-        markByReflection(options);
-        markByReflection(getFieldValue(options, "header"));
-        markByReflection(getFieldValue(options, "setting"));
+        markReliableSilent(options);
+        markReliableSilent(getFieldValue(options, "header"));
+        markSilentOnly(getFieldValue(options, "setting"));
     }
 
-    private void markByReflection(Object object) {
+    /** Marks packet as reliable/persistable but silent. */
+    private void markReliableSilent(Object object) {
         if (object == null) return;
-
-        // Header-like fields.
-        // Keep persisted for short-window reliability. The UI filters RTC packets by prefix.
         setFieldValue(object, "noPersist", false);
         setFieldValue(object, "no_persist", false);
+        setFieldValue(object, "persist", true);
+        setFieldValue(object, "isPersist", true);
+        setFieldValue(object, "is_persist", true);
+        markSilentOnly(object);
+    }
+
+    /** Marks packet as no unread/no red dot without forcing noPersist. */
+    private void markSilentOnly(Object object) {
+        if (object == null) return;
+
         setFieldValue(object, "redDot", false);
         setFieldValue(object, "red_dot", false);
-
-        // SDK variants may use different names for unread/red-dot behavior.
         setFieldValue(object, "noUnread", true);
         setFieldValue(object, "no_unread", true);
         setFieldValue(object, "showUnread", false);
@@ -109,16 +109,10 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         setFieldValue(object, "unread", false);
         setFieldValue(object, "needRedDot", false);
         setFieldValue(object, "need_red_dot", false);
-        setFieldValue(object, "persist", true);
-        setFieldValue(object, "isPersist", true);
-        setFieldValue(object, "is_persist", true);
 
-        // Setting-like fields.
         setFieldValue(object, "receipt", 0);
         setFieldValue(object, "stream", 0);
         setFieldValue(object, "expire", SIGNAL_EXPIRE_SECONDS);
-
-        // Do not set syncOnce=true here. It can make multi-device or background invite delivery unreliable.
     }
 
     private Object getFieldValue(Object object, String fieldName) {

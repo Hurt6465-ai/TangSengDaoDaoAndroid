@@ -2,6 +2,8 @@ package com.chat.rtc;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 
 import com.chat.rtc.model.RtcSignal;
@@ -17,15 +19,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * RTC call state manager.
+ *
+ * This class intentionally keeps the busy check close to Tinode's model:
+ * - Only a live RtcCallActivity/listener is treated as a real active call.
+ * - A leftover callId without a live Activity is treated as stale and is cleared.
+ * - Incoming INVITE immediately replies RINGING, so the caller knows the callee received it.
+ * - CANCEL/END/REJECT/TIMEOUT always release local state, even if the call UI is not alive.
+ */
 public class RtcCallManager implements RtcSignalDelegate {
-    private static final long MIN_STALE_CALL_MS = 90_000L;
-    private static final long MAX_STALE_CALL_MS = 3 * 60_000L;
     public interface ActiveCallListener {
         String getActiveCallId();
         void onSignalForActiveCall(RtcSignal signal);
     }
 
+    private static final long CLOSED_TTL_MS = 10 * 60 * 1000L;
+    private static final long INCOMING_SEEN_TTL_MS = 2 * 60 * 1000L;
+    private static final long STALE_LOCK_MS = 45 * 1000L;
+
     private static final RtcCallManager INSTANCE = new RtcCallManager();
+
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private Context appContext;
     private WeakReference<ActiveCallListener> activeListener = new WeakReference<>(null);
     private final Map<String, List<RtcSignal>> pending = new HashMap<>();
@@ -42,15 +57,25 @@ public class RtcCallManager implements RtcSignalDelegate {
     }
 
     public void startOutgoing(Context context, String peerUid, String peerName, String peerAvatar, int callType) {
-        if (TextUtils.isEmpty(peerUid)) return;
-        String nextCallId = createCallId();
+        if (context == null || TextUtils.isEmpty(peerUid)) return;
+        String myUid = RtcSignalManager.get().myUid();
+        if (!TextUtils.isEmpty(myUid) && TextUtils.equals(myUid, peerUid)) {
+            // Never start a self call. It creates local busy locks and the peer never rings.
+            return;
+        }
+
+        ActiveCallListener listener;
         synchronized (this) {
-            if (!TextUtils.isEmpty(currentCallId)) {
+            cleanupLocked();
+            listener = activeListener.get();
+            if (isLiveListener(listener)) {
                 return;
             }
-            currentCallId = nextCallId;
-            currentCallStartedAt = System.currentTimeMillis();
+            // A previous activity died without a clean END/CANCEL. Do not let this block a new call.
+            clearCurrentLocked();
         }
+
+        String nextCallId = createCallId();
         Intent i = new Intent(context, RtcCallActivity.class);
         i.putExtra(RtcConstants.EXTRA_CALL_ID, nextCallId);
         i.putExtra(RtcConstants.EXTRA_PEER_UID, peerUid);
@@ -67,7 +92,7 @@ public class RtcCallManager implements RtcSignalDelegate {
 
     public synchronized void setActiveCallListener(ActiveCallListener listener) {
         activeListener = new WeakReference<>(listener);
-        if (listener != null && !TextUtils.isEmpty(listener.getActiveCallId())) {
+        if (isLiveListener(listener)) {
             currentCallId = listener.getActiveCallId();
             currentCallStartedAt = System.currentTimeMillis();
         }
@@ -81,16 +106,13 @@ public class RtcCallManager implements RtcSignalDelegate {
     }
 
     public synchronized boolean isCalling() {
-        cleanupOld(closed, 10 * 60 * 1000L);
-        cleanupStaleCurrentLocked();
-        if (!TextUtils.isEmpty(currentCallId) && !closed.containsKey(currentCallId)) return true;
+        cleanupLocked();
         ActiveCallListener listener = activeListener.get();
-        return listener != null && !TextUtils.isEmpty(listener.getActiveCallId());
+        return isLiveListener(listener);
     }
 
     public synchronized void clearActiveCallListener(ActiveCallListener listener) {
         if (activeListener.get() == listener) activeListener.clear();
-        cleanupStaleCurrentLocked();
     }
 
     public synchronized List<RtcSignal> consumePending(String callId) {
@@ -104,14 +126,17 @@ public class RtcCallManager implements RtcSignalDelegate {
             incomingSeen.remove(callId);
             pending.remove(callId);
             if (TextUtils.equals(currentCallId, callId)) {
-                currentCallId = "";
-                currentCallStartedAt = 0L;
+                clearCurrentLocked();
             }
         }
     }
 
+    public synchronized void forceClearCurrentCall() {
+        clearCurrentLocked();
+    }
+
     public synchronized boolean isClosed(String callId) {
-        cleanupOld(closed, 10 * 60 * 1000L);
+        cleanupOld(closed, CLOSED_TTL_MS);
         Long ts = closed.get(callId);
         return ts != null;
     }
@@ -119,11 +144,16 @@ public class RtcCallManager implements RtcSignalDelegate {
     @Override
     public void onRtcSignal(RtcSignal signal) {
         if (signal == null || TextUtils.isEmpty(signal.callId)) return;
+
+        String myUid = RtcSignalManager.get().myUid();
+        if (!TextUtils.isEmpty(signal.fromUid) && TextUtils.equals(signal.fromUid, myUid)) {
+            // Local echo of our own RTC packet. Hide from chat, but never dispatch to the call manager.
+            return;
+        }
+
         ActiveCallListener listener;
         synchronized (this) {
-            cleanupOld(closed, 10 * 60 * 1000L);
-            cleanupOld(incomingSeen, 2 * 60 * 1000L);
-            cleanupStaleCurrentLocked();
+            cleanupLocked();
             if (closed.containsKey(signal.callId)) return;
             listener = activeListener.get();
         }
@@ -133,22 +163,14 @@ public class RtcCallManager implements RtcSignalDelegate {
             return;
         }
 
+        if (isTerminalSignal(signal)) {
+            // The UI may not be alive yet. Still release pending/current lock immediately.
+            markClosed(signal.callId);
+            return;
+        }
+
         if (RtcSignal.INVITE.equals(signal.type)) {
-            if (listener != null && !TextUtils.isEmpty(listener.getActiveCallId())) {
-                try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception ignored) {}
-                return;
-            }
-            synchronized (this) {
-                if (!TextUtils.isEmpty(currentCallId) && !TextUtils.equals(currentCallId, signal.callId)) {
-                    try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception ignored) {}
-                    return;
-                }
-                if (incomingSeen.containsKey(signal.callId)) return;
-                incomingSeen.put(signal.callId, System.currentTimeMillis());
-                currentCallId = signal.callId;
-                currentCallStartedAt = System.currentTimeMillis();
-            }
-            openIncoming(signal);
+            handleInvite(signal, listener);
             return;
         }
 
@@ -162,26 +184,72 @@ public class RtcCallManager implements RtcSignalDelegate {
         }
     }
 
-    private synchronized void cleanupStaleCurrentLocked() {
-        if (TextUtils.isEmpty(currentCallId) || currentCallStartedAt <= 0L) return;
-        ActiveCallListener listener = activeListener.get();
-        if (listener != null && TextUtils.equals(listener.getActiveCallId(), currentCallId)) return;
+    private void handleInvite(RtcSignal signal, ActiveCallListener listener) {
+        if (signal.isExpired()) {
+            markClosed(signal.callId);
+            return;
+        }
 
-        long staleMs = Math.max(MIN_STALE_CALL_MS,
-                RtcConfigManager.getInviteTimeoutMs() + RtcConfigManager.getConnectTimeoutMs() + 15_000L);
-        staleMs = Math.min(staleMs, MAX_STALE_CALL_MS);
-        if (System.currentTimeMillis() - currentCallStartedAt > staleMs) {
-            closed.put(currentCallId, System.currentTimeMillis());
-            pending.remove(currentCallId);
-            incomingSeen.remove(currentCallId);
-            currentCallId = "";
-            currentCallStartedAt = 0L;
+        if (isLiveListener(listener)) {
+            // Same call would have been handled above. A different live call means real busy.
+            try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception ignored) {}
+            return;
+        }
+
+        synchronized (this) {
+            cleanupOld(incomingSeen, INCOMING_SEEN_TTL_MS);
+            if (incomingSeen.containsKey(signal.callId)) {
+                try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception ignored) {}
+                return;
+            }
+            incomingSeen.put(signal.callId, System.currentTimeMillis());
+            currentCallId = signal.callId;
+            currentCallStartedAt = System.currentTimeMillis();
+        }
+
+        // Tinode-like ack: tell caller that callee actually received the invite and is ringing.
+        try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception ignored) {}
+
+        openIncoming(signal);
+        scheduleStaleIncomingClear(signal.callId);
+    }
+
+    private void scheduleStaleIncomingClear(String callId) {
+        long delay = Math.max(RtcConfigManager.getCallTimeoutMs() + 10_000L, STALE_LOCK_MS);
+        mainHandler.postDelayed(() -> {
+            synchronized (RtcCallManager.this) {
+                ActiveCallListener listener = activeListener.get();
+                if (!TextUtils.equals(currentCallId, callId)) return;
+                if (isLiveListener(listener)) return;
+                markClosed(callId);
+            }
+        }, delay);
+    }
+
+    private boolean isTerminalSignal(RtcSignal signal) {
+        return RtcSignal.CANCEL.equals(signal.type)
+                || RtcSignal.END.equals(signal.type)
+                || RtcSignal.REJECT.equals(signal.type)
+                || RtcSignal.TIMEOUT.equals(signal.type);
+    }
+
+    private synchronized void cleanupLocked() {
+        cleanupOld(closed, CLOSED_TTL_MS);
+        cleanupOld(incomingSeen, INCOMING_SEEN_TTL_MS);
+        ActiveCallListener listener = activeListener.get();
+        if (!isLiveListener(listener) && !TextUtils.isEmpty(currentCallId)
+                && System.currentTimeMillis() - currentCallStartedAt > STALE_LOCK_MS) {
+            clearCurrentLocked();
         }
     }
 
-    public synchronized void forceClearCurrentCall(String callId) {
-        if (TextUtils.isEmpty(callId)) return;
-        markClosed(callId);
+    private boolean isLiveListener(ActiveCallListener listener) {
+        return listener != null && !TextUtils.isEmpty(listener.getActiveCallId());
+    }
+
+    private void clearCurrentLocked() {
+        currentCallId = "";
+        currentCallStartedAt = 0L;
     }
 
     private synchronized void cleanupOld(Map<String, Long> map, long ttlMs) {
@@ -198,13 +266,10 @@ public class RtcCallManager implements RtcSignalDelegate {
         String name = getDisplayName(signal);
         String avatar = getDisplayAvatar(signal);
         int type = RtcConstants.typeOf(signal.mode);
-        boolean notified = RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
-        if (!notified) {
-            // If notification permission is missing, still try to open the call screen.
-            // Android may block this while fully backgrounded, so the host app should also
-            // prompt users to enable notification/full-screen call permission through endpoints.
-            tryOpenIncomingActivity(signal, name, avatar, type, false);
-        }
+        // Show notification for lock screen/background.
+        try { RtcCallNotification.showIncoming(appContext, signal, name, avatar, type); } catch (Exception ignored) {}
+        // Also try to bring up the call UI directly. This is what made the old in-app call feel reliable.
+        tryOpenIncomingActivity(signal, name, avatar, type, false);
     }
 
     private void tryOpenIncomingActivity(RtcSignal signal, String name, String avatar, int type, boolean autoAccept) {
