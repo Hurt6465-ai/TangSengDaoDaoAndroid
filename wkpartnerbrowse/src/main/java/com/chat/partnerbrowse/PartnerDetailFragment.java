@@ -225,18 +225,11 @@ public class PartnerDetailFragment extends Fragment {
             binding.actionBtn.setEnabled(true);
             return;
         }
-        int count = partner.requester_msg_count <= 0 ? 1 : partner.requester_msg_count;
-        int max = partner.getMaxGreetingCountSafe();
-        boolean canMore = count < max;
-        binding.actionBtn.setAlpha(canMore ? 1f : 0.55f);
-        if (!canMore) {
-            binding.actionBtn.setText(R.string.partnerbrowse_wait_reply);
-        } else if (count == max - 1) {
-            binding.actionBtn.setText(R.string.partnerbrowse_last_hello);
-        } else {
-            binding.actionBtn.setText(R.string.partnerbrowse_hello_again);
-        }
-        binding.actionBtn.setEnabled(canMore);
+        // 语伴流只负责第一条随机招呼。已打过招呼后，后续最多两条在聊天窗口继续发，
+        // 不在沉浸式语伴卡片里继续追发，避免用户感觉被重复骚扰。
+        binding.actionBtn.setAlpha(1f);
+        binding.actionBtn.setText(R.string.partnerbrowse_send_message);
+        binding.actionBtn.setEnabled(true);
     }
 
     private void bindLanguages() {
@@ -443,7 +436,7 @@ public class PartnerDetailFragment extends Fragment {
     private void onActionClick() {
         if (!isViewAlive() || partner == null || TextUtils.isEmpty(partner.uid)) return;
         final PartnerBrowseBean target = partner;
-        if (target.follow == 1) {
+        if (target.follow == 1 || target.isHelloSent()) {
             FragmentActivity activity = getActivity();
             if (activity == null) return;
             PartnerBrowseHostBridge.openChat(activity, target.uid);

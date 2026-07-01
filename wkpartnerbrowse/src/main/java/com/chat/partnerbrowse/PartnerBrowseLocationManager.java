@@ -36,14 +36,15 @@ public class PartnerBrowseLocationManager {
     private static final String KEY_LAST_SUCCESS_MS = "last_success_ms";
     private static final String KEY_LAST_FAIL_MS = "last_fail_ms";
     private static final String KEY_LAST_PROMPT_CLOSE_MS = "last_prompt_close_ms";
-    private static final String KEY_AUTO_PERMISSION_ASKED_MS = "auto_permission_asked_ms";
+    private static final String KEY_LAST_PERMISSION_REQUEST_MS = "last_permission_request_ms";
+    private static final String KEY_PERMISSION_DENIED_MS = "permission_denied_ms";
     private static final String KEY_LAT = "lat";
     private static final String KEY_LNG = "lng";
 
     private static final long SUCCESS_CHECK_INTERVAL_MS = 24L * 60L * 60L * 1000L;
     private static final long FAIL_RETRY_INTERVAL_MS = 90L * 60L * 1000L;
     private static final long PROMPT_HIDE_INTERVAL_MS = 12L * 60L * 60L * 1000L;
-    private static final long AUTO_PERMISSION_REPEAT_MS = 30L * 24L * 60L * 60L * 1000L;
+    private static final long AUTO_PERMISSION_REQUEST_INTERVAL_MS = 7L * 24L * 60L * 60L * 1000L;
     private static final long ACCEPT_LAST_KNOWN_MS = 6L * 60L * 60L * 1000L;
     private static final long LOCATION_TIMEOUT_MS = 12L * 1000L;
     private static final float REUPLOAD_DISTANCE_METERS = 30_000f;
@@ -69,7 +70,9 @@ public class PartnerBrowseLocationManager {
 
     public boolean shouldShowSoftPrompt() {
         if (hasLocationPermission()) return false;
-        if (sp == null) return true;
+        if (sp == null) return false;
+        long deniedAt = sp.getLong(KEY_PERMISSION_DENIED_MS, 0L);
+        if (deniedAt <= 0) return false;
         long closedAt = sp.getLong(KEY_LAST_PROMPT_CLOSE_MS, 0L);
         return System.currentTimeMillis() - closedAt >= PROMPT_HIDE_INTERVAL_MS;
     }
@@ -79,29 +82,47 @@ public class PartnerBrowseLocationManager {
     }
 
     public void requestPermission(Activity activity) {
-        if (activity == null || hasLocationPermission()) return;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            activity.requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
-        }
+        requestPermissionInternal(activity);
     }
 
     /**
-     * Product-style first-entry permission request. Many social apps show the
-     * Android location permission dialog when the nearby page is opened, instead
-     * of asking the user to tap a small in-page prompt first.
-     *
-     * We only auto ask occasionally. If the user denies it, the soft top prompt
-     * remains as a manual fallback and we do not spam the system dialog.
+     * 语伴页允许首次自动请求一次定位权限，但绝不每次进页面都弹。
+     * 用户拒绝、忽略或最近刚问过时，7 天内不再自动弹系统权限，只走顶部弱提示。
      */
     public boolean requestPermissionOnFirstEntry(Activity activity) {
-        if (activity == null || hasLocationPermission()) return false;
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false;
+        if (activity == null || hasLocationPermission() || sp == null) return false;
         long now = System.currentTimeMillis();
-        long askedAt = sp == null ? 0L : sp.getLong(KEY_AUTO_PERMISSION_ASKED_MS, 0L);
-        if (askedAt > 0 && now - askedAt < AUTO_PERMISSION_REPEAT_MS) return false;
-        if (sp != null) sp.edit().putLong(KEY_AUTO_PERMISSION_ASKED_MS, now).apply();
-        requestPermission(activity);
-        return true;
+        long lastRequest = sp.getLong(KEY_LAST_PERMISSION_REQUEST_MS, 0L);
+        if (lastRequest > 0 && now - lastRequest < AUTO_PERMISSION_REQUEST_INTERVAL_MS) return false;
+        return requestPermissionInternal(activity);
+    }
+
+    private boolean requestPermissionInternal(Activity activity) {
+        if (activity == null || hasLocationPermission() || sp == null) return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            sp.edit().putLong(KEY_LAST_PERMISSION_REQUEST_MS, System.currentTimeMillis()).apply();
+            activity.requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_LOCATION_PERMISSION);
+            return true;
+        }
+        return false;
+    }
+
+    public void markPermissionGranted() {
+        if (sp != null) {
+            sp.edit()
+                    .putLong(KEY_PERMISSION_DENIED_MS, 0L)
+                    .putLong(KEY_LAST_PROMPT_CLOSE_MS, 0L)
+                    .apply();
+        }
+    }
+
+    public void markPermissionDenied() {
+        if (sp != null) {
+            sp.edit()
+                    .putLong(KEY_PERMISSION_DENIED_MS, System.currentTimeMillis())
+                    .putLong(KEY_LAST_PERMISSION_REQUEST_MS, System.currentTimeMillis())
+                    .apply();
+        }
     }
 
     public void maybeUpdateLocation(boolean userInitiated) {

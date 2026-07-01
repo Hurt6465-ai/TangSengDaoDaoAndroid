@@ -44,7 +44,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     private boolean profileRequired;
     private boolean profileEditOpened;
     private boolean noMore;
-    private boolean autoPermissionAskedThisOpen;
+    private boolean autoPermissionCheckedThisOpen;
     private int duplicatePageCount;
     private int page = 1;
     private ViewPager2.OnPageChangeCallback pageChangeCallback;
@@ -111,7 +111,6 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             profileGatePassed = false;
             profileRequired = false;
             profileEditOpened = false;
-            autoPermissionAskedThisOpen = false;
             PartnerRepository.resetPaging();
             exposedKeys.clear();
             pendingExposures.clear();
@@ -145,7 +144,6 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     @Override
     protected void initData() {
         ensureProfileThenLoad();
-        requestLocationPermissionOnFirstEntry();
         if (locationManager != null) locationManager.maybeUpdateLocation(false);
     }
 
@@ -165,13 +163,15 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PartnerBrowseLocationManager.REQUEST_LOCATION_PERMISSION && locationManager != null) {
-            updateLocationPrompt();
             if (locationManager.hasLocationPermission()) {
+                locationManager.markPermissionGranted();
                 locationManager.maybeUpdateLocation(true);
             } else {
+                locationManager.markPermissionDenied();
+                // 用户这次明确拒绝后，本次和短时间内都不要继续顶着提示打扰。
                 locationManager.suppressPromptTemporarily();
-                wkVBinding.locationPrompt.setVisibility(View.GONE);
             }
+            updateLocationPrompt();
         }
     }
 
@@ -210,7 +210,10 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             if (code == HttpResponseCode.success && data != null && data.hasPartnerPhoto()) {
                 profileGatePassed = true;
                 profileRequired = false;
-                requestLocationPermissionOnFirstEntry();
+                requestLocationPermissionOnEntryIfAllowed();
+                if (locationManager != null && locationManager.hasLocationPermission()) {
+                    locationManager.maybeUpdateLocation(false);
+                }
                 loadMore(true);
                 return;
             }
@@ -248,11 +251,19 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         wkVBinding.locationPrompt.setVisibility(locationManager.shouldShowSoftPrompt() ? View.VISIBLE : View.GONE);
     }
 
-    private void requestLocationPermissionOnFirstEntry() {
-        if (autoPermissionAskedThisOpen || locationManager == null) return;
-        autoPermissionAskedThisOpen = true;
+    /**
+     * 语伴页只允许“受控自动弹一次”：
+     * 1. 已授权：不弹，后台静默定位。
+     * 2. 首次未授权：可以自动弹一次系统权限。
+     * 3. 拒绝过或近期问过：冷却期内不再自动弹，只显示顶部弱提示。
+     */
+    private void requestLocationPermissionOnEntryIfAllowed() {
+        if (autoPermissionCheckedThisOpen || locationManager == null) return;
+        autoPermissionCheckedThisOpen = true;
         if (locationManager.requestPermissionOnFirstEntry(this)) {
             wkVBinding.locationPrompt.setVisibility(View.GONE);
+        } else {
+            updateLocationPrompt();
         }
     }
 
