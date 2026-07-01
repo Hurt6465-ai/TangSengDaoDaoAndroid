@@ -31,6 +31,7 @@
     <string name="rtc_wait_accept_video">等待对方接听…</string>
     <string name="rtc_calling_audio">正在呼叫…</string>
     <string name="rtc_connecting">连接中…</string>
+    <string name="rtc_peer_ringing">对方正在响铃…</string>
     <string name="rtc_peer_accepted">对方已接听，连接中…</string>
     <string name="rtc_connect_failed">连接失败，请检查网络</string>
     <string name="rtc_no_answer">对方无应答</string>
