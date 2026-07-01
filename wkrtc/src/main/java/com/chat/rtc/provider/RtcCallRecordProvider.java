@@ -9,6 +9,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.chat.base.msgitem.WKChatBaseProvider;
+import com.chat.base.msgitem.WKContentType;
 import com.chat.base.msgitem.WKChatIteMsgFromType;
 import com.chat.base.msgitem.WKUIChatMsgItemEntity;
 import com.chat.rtc.RtcConstants;
@@ -53,6 +54,11 @@ public class RtcCallRecordProvider extends WKChatBaseProvider {
             text = uiChatMsgItemEntity.wkMsg.baseContentMsgModel.getDisplayContent();
         }
         tv.setText(text);
+    }
+
+    @Override
+    public int getItemViewType() {
+        return WKContentType.WK_RTC_CALL_RECORD;
     }
 
     private int dp(float value) {
