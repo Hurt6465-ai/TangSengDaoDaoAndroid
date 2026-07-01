@@ -40,6 +40,7 @@
     <string name="rtc_wait_accept_video">တစ်ဖက်မှ လက်ခံရန် စောင့်နေသည်…</string>
     <string name="rtc_calling_audio">ခေါ်ဆိုနေသည်…</string>
     <string name="rtc_connecting">ချိတ်ဆက်နေသည်…</string>
+    <string name="rtc_peer_ringing">ဖုန်းမြည်နေသည်…</string>
     <string name="rtc_peer_accepted">လက်ခံပြီးပါပြီ၊ ချိတ်ဆက်နေသည်…</string>
 
     <string name="rtc_connect_failed">ချိတ်ဆက်မှု မအောင်မြင်ပါ။ ကွန်ရက်ကို စစ်ဆေးပါ</string>
