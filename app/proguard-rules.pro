@@ -309,3 +309,7 @@
 -keep public enum com.bumptech.glide.load.resource.bitmap.ImageHeaderParser$** {
   **[] $VALUES;  public *;
 }
+
+# WKRTC plugin
+-keep class com.chat.rtc.** { *; }
+-dontwarn com.chat.rtc.**
