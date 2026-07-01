@@ -135,25 +135,34 @@ public final class RtcCallNotification {
 
     public static void ensureChannel(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context == null) return;
-        NotificationManager nm = context.getApplicationContext().getSystemService(NotificationManager.class);
-        if (nm == null) return false;
-        if (!RtcPermissionHelper.hasPostNotificationPermission(app)) return false;
-        boolean allowFullScreen = RtcPermissionHelper.canUseFullScreenIntent(app);
+
+        Context app = context.getApplicationContext();
+        NotificationManager nm = app.getSystemService(NotificationManager.class);
+        if (nm == null) return;
+
         NotificationChannel existing = nm.getNotificationChannel(WKConstants.newRTCChannelID);
         if (existing != null) return;
-        CharSequence name = context.getString(R.string.new_rtc_notification);
-        String description = context.getString(R.string.new_rtc_notification_desc);
-        NotificationChannel channel = new NotificationChannel(WKConstants.newRTCChannelID, name, NotificationManager.IMPORTANCE_HIGH);
+
+        CharSequence name = app.getString(R.string.new_rtc_notification);
+        String description = app.getString(R.string.new_rtc_notification_desc);
+        NotificationChannel channel = new NotificationChannel(
+                WKConstants.newRTCChannelID,
+                name,
+                NotificationManager.IMPORTANCE_HIGH
+        );
         channel.setDescription(description);
         channel.enableVibration(true);
         channel.setVibrationPattern(new long[]{0, 320, 120, 320, 900});
+
         try {
-            Uri sound = Uri.parse("android.resource://" + context.getPackageName() + "/" + R.raw.wkrtc_newrtc);
+            Uri sound = Uri.parse("android.resource://" + app.getPackageName() + "/" + R.raw.wkrtc_newrtc);
             channel.setSound(sound, new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build());
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
+
         nm.createNotificationChannel(channel);
     }
 
