@@ -52,6 +52,7 @@ import com.xinbida.wukongim.entity.WKUIConversationMsg;
 import com.xinbida.wukongim.message.type.WKSendMsgResult;
 
 import org.jetbrains.annotations.NotNull;
+import org.json.JSONObject;
 import org.telegram.ui.Components.RLottieDrawable;
 import org.telegram.ui.Components.RLottieImageView;
 
@@ -66,6 +67,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 会话记录适配器
  */
 public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMsg, BaseViewHolder> {
+    private static final String RTC_SIGNAL_PREFIX = "__cp_harmony_rtc__:";
     private static final long CHANNEL_INFO_FETCH_INTERVAL_MS = 5L * 60L * 1000L;
     private static final Map<String, Long> CHANNEL_INFO_FETCH_TIME_MAP = new ConcurrentHashMap<>();
 
@@ -170,6 +172,8 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
     private String getContent(WKMsg msg) {
         String content = "";
         if (msg == null || msg.isDeleted == 1) return content;
+        String rtcContent = getRtcSignalDisplayContent(msg);
+        if (!TextUtils.isEmpty(rtcContent)) return rtcContent;
         if (msg.baseContentMsgModel != null) {
             content = msg.baseContentMsgModel.getDisplayContent();
         }
@@ -207,6 +211,72 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
         return content;
     }
 
+
+    private boolean isRtcSignalMsg(WKMsg msg) {
+        return !TextUtils.isEmpty(extractRtcSignalPayload(msg));
+    }
+
+    private String getRtcSignalDisplayContent(WKMsg msg) {
+        String payload = extractRtcSignalPayload(msg);
+        if (TextUtils.isEmpty(payload)) return "";
+        try {
+            JSONObject o = new JSONObject(payload.substring(RTC_SIGNAL_PREFIX.length()));
+            String displayText = o.optString("display_text");
+            if (!TextUtils.isEmpty(displayText)) return displayText;
+            String mode = o.optString("mode", "audio");
+            String prefix = "video".equalsIgnoreCase(mode) ? "视频通话" : "语音通话";
+            String type = o.optString("type");
+            if ("end".equals(type)) return prefix + " 已结束";
+            if ("cancel".equals(type)) return prefix + " 已取消";
+            if ("reject".equals(type)) return prefix + " 已拒绝";
+            if ("busy".equals(type)) return prefix + " 对方忙线";
+            if ("timeout".equals(type)) return prefix + " 对方无应答";
+            if ("invite".equals(type)) return prefix + " 邀请";
+            if ("ringing".equals(type)) return prefix + " 正在响铃";
+            return prefix + " 通话中";
+        } catch (Exception ignored) {
+            return "通话记录";
+        }
+    }
+
+    private String extractRtcSignalPayload(WKMsg msg) {
+        if (msg == null) return "";
+        String payload = pickRtcSignalPayload(msg.content);
+        if (!TextUtils.isEmpty(payload)) return payload;
+        try {
+            if (msg.baseContentMsgModel != null) {
+                JSONObject jsonObject = msg.baseContentMsgModel.encodeMsg();
+                if (jsonObject != null) {
+                    payload = pickRtcSignalPayload(jsonObject.optString("content", ""));
+                    if (!TextUtils.isEmpty(payload)) return payload;
+                    payload = pickRtcSignalPayload(jsonObject.optString("text", ""));
+                    if (!TextUtils.isEmpty(payload)) return payload;
+                }
+                payload = pickRtcSignalPayload(msg.baseContentMsgModel.getDisplayContent());
+                if (!TextUtils.isEmpty(payload)) return payload;
+            }
+        } catch (Exception ignored) {
+        }
+        return "";
+    }
+
+    private String pickRtcSignalPayload(String raw) {
+        if (TextUtils.isEmpty(raw)) return "";
+        String text = raw.trim();
+        if (text.startsWith(RTC_SIGNAL_PREFIX)) return text;
+        if (text.startsWith("{") && text.endsWith("}")) {
+            try {
+                JSONObject object = new JSONObject(text);
+                String content = object.optString("content", object.optString("text", ""));
+                if (!TextUtils.isEmpty(content) && content.trim().startsWith(RTC_SIGNAL_PREFIX)) {
+                    return content.trim();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return "";
+    }
+
     private String getShowContent(String contentJson) {
         return StringUtils.getShowContent(getContext(), contentJson);
     }
@@ -220,6 +290,7 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
             status = item.getWkMsg().status;
         }
         boolean isSend = item.getWkMsg() != null && item.getWkMsg().isDeleted == 0 && !TextUtils.isEmpty(item.getWkMsg().fromUID) && item.getWkMsg().fromUID.equals(WKConfig.getInstance().getUid());
+        if (isRtcSignalMsg(item.getWkMsg())) isSend = false;
         if (isSend) {
             boolean isSingle = true;
             sendingMsgIv.setVisibility(View.VISIBLE);
@@ -302,9 +373,10 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
             isMute = item.uiConversationMsg.getWkChannel().mute == 1;
         } else isMute = false;
         counterView.setColors(R.color.white, isMute ? R.color.color999 : R.color.reminderColor);
-        counterView.setCount(item.getUnReadCount(), isAnimated);
+        int unreadCount = isRtcSignalMsg(item.uiConversationMsg.getWkMsg()) ? 0 : item.getUnReadCount();
+        counterView.setCount(unreadCount, isAnimated);
         counterView.setGravity(Gravity.END);
-        counterView.setVisibility(item.getUnReadCount() > 0 ? View.VISIBLE : View.GONE);
+        counterView.setVisibility(unreadCount > 0 ? View.VISIBLE : View.GONE);
     }
 
     private void showTime(@NotNull BaseViewHolder helper, WKUIConversationMsg item) {
