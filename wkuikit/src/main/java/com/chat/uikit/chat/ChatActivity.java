@@ -757,7 +757,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             root.setPadding(AndroidUtilities.dp(8f), AndroidUtilities.dp(8f), AndroidUtilities.dp(8f), AndroidUtilities.dp(8f));
             GradientDrawable bg = new GradientDrawable(
                     GradientDrawable.Orientation.TL_BR,
-                    new int[]{Color.argb(244, 255, 255, 255), Color.argb(232, 245, 248, 255), Color.argb(236, 238, 246, 255)}
+                    new int[]{Color.WHITE, Color.rgb(250, 251, 255), Color.WHITE}
             );
             bg.setCornerRadius(AndroidUtilities.dp(18f));
             root.setBackground(bg);
@@ -830,14 +830,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private View createCallPopupDimView() {
-        try {
-            View dim = new View(this);
-            dim.setBackgroundColor(Color.argb(58, 8, 12, 20));
-            dim.setClickable(true);
-            return dim;
-        } catch (Exception ignored) {
-            return null;
-        }
+        // 通话菜单不要加半透明遮罩。PopupWindow 已设置 outsideTouchable，点击外部仍可关闭。
+        return null;
     }
 
     private void removeCallPopupDimView(View dimView) {
