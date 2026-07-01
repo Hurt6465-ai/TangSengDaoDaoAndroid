@@ -3,6 +3,7 @@ package com.chat.rtc;
 import android.text.TextUtils;
 
 import com.chat.base.config.WKConfig;
+import com.chat.rtc.model.RtcSignal;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -16,11 +17,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * WuKong IM transport for WebRTC signaling.
  *
  * The old in-module call was more reliable because it did not over-own the busy state.
- * For delivery reliability, this transport now sends RTC packets through normal personal
- * messaging, but marks them silent/no-red-dot. ChatActivity hides packets by exact prefix.
- *
- * Do NOT force noPersist=true here. Some devices/server combinations drop online-only
- * packets when the callee is reconnecting or backgrounded, which makes the peer never ring.
+ * RTC packets are control messages. Keep SDP/ICE/end-state packets transient and silent so
+ * they never pollute chat history, conversation cover text or unread counters. INVITE is the
+ * only packet allowed to persist briefly because it is the one packet that must survive weak
+ * reconnect/background timing. The final user-visible call record is sent separately by
+ * RtcCallRecordMessageSender, just like Tinode separates call control events from visible history.
  */
 public class RtcWukongSignalTransport implements RtcSignalTransport {
     private static final int SIGNAL_EXPIRE_SECONDS = 5 * 60;
@@ -50,23 +51,22 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         WKTextContent content = new WKTextContent(payload);
         WKChannel channel = new WKChannel(peerUid, WKChannelType.PERSONAL);
         WKSendOptions options = new WKSendOptions();
+        boolean persistForDelivery = shouldPersistForDelivery(payload);
 
-        applyReliableSilentSignalOptions(options);
+        applyReliableSilentSignalOptions(options, persistForDelivery);
         // Some SDK versions copy unread/red-dot flags from content rather than options.
         markSilentOnly(content);
         WKIM.getInstance().getMsgManager().sendWithOptions(content, channel, options);
     }
 
-    private void applyReliableSilentSignalOptions(WKSendOptions options) {
+    private void applyReliableSilentSignalOptions(WKSendOptions options, boolean persistForDelivery) {
         if (options == null) return;
 
         options.expire = SIGNAL_EXPIRE_SECONDS;
 
         try {
             if (options.header != null) {
-                // Reliable delivery: keep persist false/online-only OFF. The chat page hides the
-                // payload by prefix, so a short-lived persisted signal is safer than a lost invite.
-                options.header.noPersist = false;
+                options.header.noPersist = !persistForDelivery;
                 options.header.redDot = false;
             }
         } catch (Exception ignored) {
@@ -80,23 +80,32 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         } catch (Exception ignored) {
         }
 
-        markReliableSilent(options);
-        markReliableSilent(getFieldValue(options, "header"));
+        markReliableSilent(options, persistForDelivery);
+        markReliableSilent(getFieldValue(options, "header"), persistForDelivery);
         markSilentOnly(getFieldValue(options, "setting"));
     }
 
-    /** Marks packet as reliable/persistable but silent. */
-    private void markReliableSilent(Object object) {
+    private boolean shouldPersistForDelivery(String payload) {
+        try {
+            RtcSignal signal = RtcSignal.fromTransportText(payload);
+            return signal != null && RtcSignal.INVITE.equals(signal.type);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    /** Marks packet as silent; only INVITE is persisted briefly for delivery reliability. */
+    private void markReliableSilent(Object object, boolean persistForDelivery) {
         if (object == null) return;
-        setFieldValue(object, "noPersist", false);
-        setFieldValue(object, "no_persist", false);
-        setFieldValue(object, "persist", true);
-        setFieldValue(object, "isPersist", true);
-        setFieldValue(object, "is_persist", true);
+        setFieldValue(object, "noPersist", !persistForDelivery);
+        setFieldValue(object, "no_persist", !persistForDelivery);
+        setFieldValue(object, "persist", persistForDelivery);
+        setFieldValue(object, "isPersist", persistForDelivery);
+        setFieldValue(object, "is_persist", persistForDelivery);
         markSilentOnly(object);
     }
 
-    /** Marks packet as no unread/no red dot without forcing noPersist. */
+    /** Marks packet as no unread/no red dot. */
     private void markSilentOnly(Object object) {
         if (object == null) return;
 

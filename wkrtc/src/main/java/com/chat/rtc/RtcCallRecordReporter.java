@@ -55,7 +55,7 @@ public final class RtcCallRecordReporter {
         return reason;
     }
 
-    private static String buildDisplayText(int callType, String reason, long duration) {
+    public static String buildDisplayText(int callType, String reason, long duration) {
         String prefix = RtcConstants.isVideo(callType) ? "视频通话" : "语音通话";
         if ("ended".equals(reason) || "remote_ended".equals(reason)) {
             return prefix + " " + formatDuration(duration);
