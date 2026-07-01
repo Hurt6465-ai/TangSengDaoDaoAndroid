@@ -17,6 +17,9 @@ import java.util.Map;
  * 所有开放话题房走服务端专用 /v1/chatrooms/* 接口。
  */
 public class RoomTopicModel extends WKBaseModel {
+    private static final int DEFAULT_ROOM_LIST_LIMIT = 30;
+    private static final int MAX_ROOM_LIST_LIMIT = 50;
+
     private RoomTopicModel() {
     }
 
@@ -29,7 +32,13 @@ public class RoomTopicModel extends WKBaseModel {
     }
 
     public void listRooms(IRequestResultListener<RoomTopicListResponse> listener) {
-        request(createService(RoomTopicService.class).listRooms(), listener);
+        listRooms("", DEFAULT_ROOM_LIST_LIMIT, listener);
+    }
+
+    public void listRooms(String cursor, int limit, IRequestResultListener<RoomTopicListResponse> listener) {
+        int safeLimit = limit <= 0 ? DEFAULT_ROOM_LIST_LIMIT : Math.min(limit, MAX_ROOM_LIST_LIMIT);
+        String safeCursor = TextUtils.isEmpty(cursor) ? null : cursor;
+        request(createService(RoomTopicService.class).listRooms(safeLimit, safeCursor), listener);
     }
 
     public void createRoom(String title, String tag, String language, IRequestResultListener<RoomTopicEntity> listener) {
