@@ -1,6 +1,8 @@
 package com.chat.feed.browse;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
@@ -28,12 +30,16 @@ public class NestedScrollableHost extends FrameLayout {
     /** Horizontal is intentionally tolerant: left/right drags often contain small Y noise. */
     private static final float HORIZONTAL_TOLERANCE = 0.55f;
     /** Vertical must be clearly dominant before the outer vertical pager is released. */
-    private static final float VERTICAL_DOMINANCE = 1.35f;
+    private static final float VERTICAL_DOMINANCE = 1.45f;
+    private static final long RESTORE_PARENT_DELAY_MS = 180L;
 
     private float initialX;
     private float initialY;
     private final int touchSlop;
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private int gestureDirection = GESTURE_UNDECIDED;
+    private ViewPager2 lockedParentPager;
+    private final Runnable restoreParentRunnable = this::restoreParentNow;
 
     public NestedScrollableHost(@NonNull Context context) {
         this(context, null);
@@ -74,6 +80,8 @@ public class NestedScrollableHost extends FrameLayout {
 
         switch (ev.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                handler.removeCallbacks(restoreParentRunnable);
+                lockedParentPager = parentPager;
                 initialX = ev.getX();
                 initialY = ev.getY();
                 gestureDirection = GESTURE_UNDECIDED;
@@ -103,15 +111,44 @@ public class NestedScrollableHost extends FrameLayout {
                     }
                 }
 
-                requestParentDisallow(gestureDirection != GESTURE_VERTICAL);
+                if (gestureDirection == GESTURE_HORIZONTAL) {
+                    setParentPagerInputEnabled(false);
+                    requestParentDisallow(true);
+                } else {
+                    setParentPagerInputEnabled(true);
+                    requestParentDisallow(false);
+                }
                 break;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 gestureDirection = GESTURE_UNDECIDED;
-                requestParentDisallow(false);
+                handler.removeCallbacks(restoreParentRunnable);
+                handler.postDelayed(restoreParentRunnable, RESTORE_PARENT_DELAY_MS);
                 break;
             default:
                 break;
         }
+    }
+
+    private void setParentPagerInputEnabled(boolean enabled) {
+        ViewPager2 pager = lockedParentPager != null ? lockedParentPager : parentViewPager();
+        if (pager == null) return;
+        try {
+            if (pager.isUserInputEnabled() != enabled) pager.setUserInputEnabled(enabled);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void restoreParentNow() {
+        setParentPagerInputEnabled(true);
+        requestParentDisallow(false);
+        lockedParentPager = null;
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        handler.removeCallbacks(restoreParentRunnable);
+        restoreParentNow();
+        super.onDetachedFromWindow();
     }
 }

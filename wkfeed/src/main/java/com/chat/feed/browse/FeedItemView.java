@@ -10,6 +10,7 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -46,7 +47,10 @@ import com.chat.feed.model.FeedUser;
 import com.chat.feed.player.FeedPlayerManager;
 import com.xinbida.wukongim.entity.WKChannelType;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 
 public class FeedItemView extends android.widget.FrameLayout {
     private FeedGestureLayout feedRoot;
@@ -70,9 +74,15 @@ public class FeedItemView extends android.widget.FrameLayout {
     private ImageView bigHeartView;
     private View actionPanel;
     private View descPanel;
+    private View bottomMask;
+    private final Random animationRandom = new Random();
     private FeedBean feed;
     private boolean active;
     private ViewPager2.OnPageChangeCallback imagePageCallback;
+    private String activeFeedKey = "";
+    private long activeStartAtMs;
+    private boolean exposureReported;
+    private boolean completeReported;
 
 
     public FeedItemView(@NonNull Context context) {
@@ -107,6 +117,7 @@ public class FeedItemView extends android.widget.FrameLayout {
         bigHeartView = findViewById(R.id.bigHeartView);
         actionPanel = findViewById(R.id.actionPanel);
         descPanel = findViewById(R.id.descPanel);
+        bottomMask = findViewById(R.id.bottomMask);
 
         imagePager.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
         imagePager.setOffscreenPageLimit(1);
@@ -167,6 +178,8 @@ public class FeedItemView extends android.widget.FrameLayout {
 
     public void bind(FeedBean item) {
         recycleMediaOnly();
+        resetEventState();
+        applyCommentTransform(0f);
         feed = item;
         if (item == null) return;
         FeedUser user = item.user;
@@ -245,9 +258,19 @@ public class FeedItemView extends android.widget.FrameLayout {
     }
 
     public void setActive(boolean active) {
+        if (this.active == active && active) return;
+        if (!active) reportExitEvent(false);
         this.active = active;
-        if (active) play();
-        else pause();
+        if (active) {
+            activeFeedKey = feed == null ? "" : feed.stableKey();
+            activeStartAtMs = System.currentTimeMillis();
+            exposureReported = false;
+            completeReported = false;
+            reportExposeIfNeeded();
+            if (feed != null && feed.isVideo()) play();
+        } else {
+            pause();
+        }
     }
 
     public void play() {
@@ -272,6 +295,7 @@ public class FeedItemView extends android.widget.FrameLayout {
                 coverView.setVisibility(GONE);
                 videoLoading.setVisibility(GONE);
                 playPauseView.setVisibility(GONE);
+                reportExposeIfNeeded();
             }
 
             @Override
@@ -279,6 +303,7 @@ public class FeedItemView extends android.widget.FrameLayout {
                 if (!isCurrentPlayback(id)) return;
                 videoLoading.setVisibility(GONE);
                 playPauseView.setVisibility(VISIBLE);
+                reportExitEvent(true);
             }
 
             @Override
@@ -316,9 +341,70 @@ public class FeedItemView extends android.widget.FrameLayout {
         if (userToggle && !playing && videoLoading != null) videoLoading.setVisibility(GONE);
     }
 
+    private void resetEventState() {
+        activeFeedKey = "";
+        activeStartAtMs = 0L;
+        exposureReported = false;
+        completeReported = false;
+    }
+
+    private void reportExposeIfNeeded() {
+        if (feed == null || exposureReported || !active) return;
+        String key = feed.stableKey();
+        if (TextUtils.isEmpty(key)) return;
+        exposureReported = true;
+        Map<String, Object> body = new HashMap<>();
+        body.put("media_type", feed.isVideo() ? "video" : "image");
+        FeedModel.getInstance().event(key, "expose", body, null);
+    }
+
+    private void reportExitEvent(boolean completed) {
+        if (feed == null || TextUtils.isEmpty(activeFeedKey)) return;
+        if (!activeFeedKey.equals(feed.stableKey())) return;
+        long watchMs = activeStartAtMs <= 0 ? 0L : Math.max(0L, System.currentTimeMillis() - activeStartAtMs);
+        if (completed) {
+            completeReported = true;
+            reportWatchEvent("complete", Math.max(watchMs, mediaDurationMs()), 100);
+            resetEventState();
+            return;
+        }
+        if (watchMs < 800L) {
+            resetEventState();
+            return;
+        }
+        long duration = mediaDurationMs();
+        int percent = duration > 0 ? (int) Math.min(100L, Math.max(0L, watchMs * 100L / duration)) : 0;
+        if (feed.isVideo() && !completeReported && watchMs <= 1500L && percent <= 10) {
+            reportWatchEvent("skip", watchMs, percent);
+        } else {
+            reportWatchEvent("watch", watchMs, percent);
+        }
+        resetEventState();
+    }
+
+    private long mediaDurationMs() {
+        FeedMedia media = feed == null ? null : feed.firstMedia();
+        return media == null ? 0L : Math.max(0L, media.duration_ms);
+    }
+
+    private void reportWatchEvent(String type, long watchMs, int percent) {
+        if (feed == null || TextUtils.isEmpty(type)) return;
+        String key = feed.stableKey();
+        if (TextUtils.isEmpty(key)) return;
+        Map<String, Object> body = new HashMap<>();
+        body.put("watch_ms", Math.max(0L, watchMs));
+        body.put("duration_ms", mediaDurationMs());
+        body.put("percent", Math.max(0, Math.min(100, percent)));
+        body.put("media_type", feed.isVideo() ? "video" : "image");
+        FeedModel.getInstance().event(key, type, body, null);
+    }
+
     public void recycle() {
+        reportExitEvent(false);
         pause();
         recycleMediaOnly();
+        resetEventState();
+        applyCommentTransform(0f);
         feed = null;
     }
 
@@ -396,14 +482,31 @@ public class FeedItemView extends android.widget.FrameLayout {
     }
 
     private void showHeart(float x, float y) {
+        if (bigHeartView == null) return;
         bigHeartView.animate().cancel();
+        int width = bigHeartView.getWidth() > 0 ? bigHeartView.getWidth() : dp(120);
+        int height = bigHeartView.getHeight() > 0 ? bigHeartView.getHeight() : dp(120);
+        float rotation = -12f + animationRandom.nextFloat() * 24f;
         bigHeartView.setVisibility(VISIBLE);
-        bigHeartView.setX(x - bigHeartView.getWidth() / 2f);
-        bigHeartView.setY(y - bigHeartView.getHeight() / 2f);
-        bigHeartView.setAlpha(1f);
-        bigHeartView.setScaleX(0.6f);
-        bigHeartView.setScaleY(0.6f);
-        bigHeartView.animate().alpha(0f).scaleX(1.5f).scaleY(1.5f).setDuration(520).withEndAction(() -> bigHeartView.setVisibility(GONE)).start();
+        bigHeartView.setX(x - width / 2f);
+        bigHeartView.setY(y - height / 2f);
+        bigHeartView.setTranslationY(0f);
+        bigHeartView.setRotation(rotation);
+        bigHeartView.setAlpha(0.98f);
+        bigHeartView.setScaleX(0.42f);
+        bigHeartView.setScaleY(0.42f);
+        bigHeartView.animate()
+                .alpha(0f)
+                .scaleX(1.72f)
+                .scaleY(1.72f)
+                .translationY(-dp(42))
+                .setInterpolator(new AccelerateDecelerateInterpolator())
+                .setDuration(620)
+                .withEndAction(() -> {
+                    bigHeartView.setVisibility(GONE);
+                    bigHeartView.setTranslationY(0f);
+                })
+                .start();
     }
 
     private void showComments(boolean fromCaption) {
@@ -429,7 +532,47 @@ public class FeedItemView extends android.widget.FrameLayout {
             if (feed.comment_count < 0) feed.comment_count = 0;
             commentCountTv.setText(formatCount(feed.comment_count));
         });
+        sheet.setOnSheetTransformListener(new FeedCommentBottomSheet.OnSheetTransformListener() {
+            @Override
+            public void onSheetProgress(float progress) {
+                applyCommentTransform(progress);
+            }
+
+            @Override
+            public void onSheetClosed() {
+                applyCommentTransform(0f);
+            }
+        });
         sheet.show(activity.getSupportFragmentManager(), "feed_comments");
+    }
+
+    private void applyCommentTransform(float progress) {
+        progress = Math.max(0f, Math.min(1f, progress));
+        float scale = 1f - 0.10f * progress;
+        float translateY = -getHeight() * 0.045f * progress;
+        applyMediaTransform(imagePagerHost, scale, translateY);
+        applyMediaTransform(playerView, scale, translateY);
+        applyMediaTransform(coverView, scale, translateY);
+        float overlayAlpha = 1f - 0.82f * progress;
+        applyOverlayAlpha(actionPanel, overlayAlpha);
+        applyOverlayAlpha(descPanel, overlayAlpha);
+        applyOverlayAlpha(bottomMask, 1f - 0.72f * progress);
+    }
+
+    private void applyMediaTransform(View view, float scale, float translateY) {
+        if (view == null) return;
+        view.animate().cancel();
+        view.setPivotX(view.getWidth() / 2f);
+        view.setPivotY(0f);
+        view.setScaleX(scale);
+        view.setScaleY(scale);
+        view.setTranslationY(translateY);
+    }
+
+    private void applyOverlayAlpha(View view, float alpha) {
+        if (view == null) return;
+        view.animate().cancel();
+        view.setAlpha(Math.max(0f, Math.min(1f, alpha)));
     }
 
     private FragmentActivity findFragmentActivity(Context context) {

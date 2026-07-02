@@ -295,10 +295,10 @@ public class FeedBrowseActivity extends FragmentActivity {
         super.onResume();
         if (adapter != null && pagerRecyclerView != null) {
             feedPager.post(() -> {
-            if (!destroyed && adapter != null && feedPager != null) {
-                adapter.setActivePosition(pagerRecyclerView, feedPager.getCurrentItem());
-            }
-        });
+                if (!destroyed && adapter != null && feedPager != null) {
+                    adapter.setActivePosition(pagerRecyclerView, feedPager.getCurrentItem());
+                }
+            });
         }
         showPublishButtonIfNeeded();
     }

@@ -1,6 +1,9 @@
 package com.chat.feed.browse;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
@@ -26,6 +29,8 @@ public class FeedGestureLayout extends FrameLayout {
     private static final int GESTURE_UNDECIDED = 0;
     private static final int GESTURE_HORIZONTAL = 1;
     private static final int GESTURE_VERTICAL = 2;
+    private static final long RESTORE_PARENT_DELAY_MS = 180L;
+    private static final long BLOCK_TAP_AFTER_SCROLL_MS = 220L;
 
     public interface GestureListener {
         boolean isGestureEnabled();
@@ -41,7 +46,11 @@ public class FeedGestureLayout extends FrameLayout {
     private float downY;
     private int gestureDirection = GESTURE_UNDECIDED;
     private boolean ignoreThisGesture;
+    private boolean gestureMoved;
+    private long blockTapUntilMs;
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private ViewPager2 lockedVerticalPager;
+    private final Runnable restoreParentRunnable = this::restoreParentNow;
 
     public FeedGestureLayout(@NonNull Context context) {
         this(context, null);
@@ -60,7 +69,7 @@ public class FeedGestureLayout extends FrameLayout {
             @Override
             public boolean onSingleTapConfirmed(@NonNull MotionEvent e) {
                 GestureListener listener = gestureListener;
-                if (listener != null && listener.isGestureEnabled() && !ignoreThisGesture) {
+                if (listener != null && listener.isGestureEnabled() && canDispatchMediaTap()) {
                     listener.onSingleTap();
                     return true;
                 }
@@ -70,7 +79,7 @@ public class FeedGestureLayout extends FrameLayout {
             @Override
             public boolean onDoubleTap(@NonNull MotionEvent e) {
                 GestureListener listener = gestureListener;
-                if (listener != null && listener.isGestureEnabled() && !ignoreThisGesture) {
+                if (listener != null && listener.isGestureEnabled() && canDispatchMediaTap()) {
                     listener.onDoubleTap(e.getX(), e.getY());
                     return true;
                 }
@@ -83,13 +92,21 @@ public class FeedGestureLayout extends FrameLayout {
         this.gestureListener = listener;
     }
 
+    private boolean canDispatchMediaTap() {
+        return !ignoreThisGesture
+                && SystemClock.uptimeMillis() >= blockTapUntilMs
+                && !gestureMoved
+                && gestureDirection == GESTURE_UNDECIDED;
+    }
+
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
         GestureListener listener = gestureListener;
         if (listener != null && listener.isGestureEnabled()) {
             int action = ev.getActionMasked();
             if (action == MotionEvent.ACTION_DOWN) {
-                ignoreThisGesture = listener.shouldIgnoreGesture(ev.getX(), ev.getY());
+                ignoreThisGesture = listener.shouldIgnoreGesture(ev.getX(), ev.getY())
+                        || SystemClock.uptimeMillis() < blockTapUntilMs;
             }
             handleParentGestureGate(ev, ignoreThisGesture);
             if (!ignoreThisGesture) {
@@ -107,10 +124,12 @@ public class FeedGestureLayout extends FrameLayout {
         if (parentPager == null) return;
         switch (ev.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                handler.removeCallbacks(restoreParentRunnable);
                 lockedVerticalPager = parentPager;
                 downX = ev.getX();
                 downY = ev.getY();
                 gestureDirection = GESTURE_UNDECIDED;
+                gestureMoved = false;
                 // The direct parent is usually ViewPager2's internal RecyclerView. Protect the
                 // entire parent chain immediately, otherwise the outer vertical pager may steal
                 // video horizontal drags before this item receives enough MOVE events.
@@ -126,6 +145,7 @@ public class FeedGestureLayout extends FrameLayout {
                     requestAllParentsDisallow(true);
                     return;
                 }
+                gestureMoved = true;
                 if (gestureDirection == GESTURE_UNDECIDED) {
                     // Media area: horizontal/diagonal-horizontal should stay on current item.
                     // Button/text area: same protection, but no single/double tap callback.
@@ -156,7 +176,18 @@ public class FeedGestureLayout extends FrameLayout {
     }
 
     private void resetParentGestureGate() {
+        if (gestureMoved || gestureDirection != GESTURE_UNDECIDED) {
+            blockTapUntilMs = SystemClock.uptimeMillis() + BLOCK_TAP_AFTER_SCROLL_MS;
+        }
         gestureDirection = GESTURE_UNDECIDED;
+        gestureMoved = false;
+        // Delayed restore avoids the classic ViewPager2 issue where ACTION_UP immediately
+        // hands a diagonal tail to the outer vertical pager and causes a small page shake.
+        handler.removeCallbacks(restoreParentRunnable);
+        handler.postDelayed(restoreParentRunnable, RESTORE_PARENT_DELAY_MS);
+    }
+
+    private void restoreParentNow() {
         setOuterPagerInputEnabled(true);
         requestAllParentsDisallow(false);
         lockedVerticalPager = null;
@@ -201,7 +232,8 @@ public class FeedGestureLayout extends FrameLayout {
 
     @Override
     protected void onDetachedFromWindow() {
-        resetParentGestureGate();
+        handler.removeCallbacks(restoreParentRunnable);
+        restoreParentNow();
         super.onDetachedFromWindow();
     }
 }
