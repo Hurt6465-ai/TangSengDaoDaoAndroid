@@ -3,6 +3,8 @@ package com.chat.partner.profile;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.content.Intent;
+import android.content.ClipData;
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -13,6 +15,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageView;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
@@ -22,10 +25,14 @@ import com.alibaba.fastjson.JSONObject;
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.config.WKApiConfig;
 import com.chat.base.config.WKConfig;
+import com.chat.base.endpoint.EndpointCategory;
+import com.chat.base.endpoint.EndpointManager;
+import com.chat.base.endpoint.entity.LoginMenu;
 import com.chat.base.glide.GlideUtils;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.net.ud.WKProgressManager;
 import com.chat.base.net.ud.WKUploader;
+import com.chat.base.utils.WKReader;
 import com.chat.partner.R;
 import com.chat.partner.databinding.ActPartnerProfileEditBinding;
 import com.chat.uikit.user.service.UserModel;
@@ -46,6 +53,10 @@ import java.util.UUID;
 
 public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfileEditBinding> {
     public static final String EXTRA_REQUIRE_PROFILE_IMAGE = "require_profile_image";
+    public static final String EXTRA_FROM_REGISTER = "from_register";
+    public static final String EXTRA_FORCE_COMPLETE = "force_complete";
+    public static final String EXTRA_HIDE_BACK = "hide_back";
+    public static final String EXTRA_HIDE_SKIP = "hide_skip";
     private static final int REQ_AVATAR = 500;
     private static final int REQ_COVER = 501;
     private static final int REQ_PHOTO = 502;
@@ -75,6 +86,10 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     private int uploadingCount = 0;
     private int uploadingPhotoCount = 0;
     private boolean requireProfileImage = false;
+    private boolean fromRegister = false;
+    private boolean forceComplete = false;
+    private boolean hideBack = false;
+    private boolean hideSkip = false;
     private final ArrayList<String> nativeCodes = new ArrayList<>();
     private final ArrayList<String> learningCodes = new ArrayList<>();
     private final ArrayList<String> tags = new ArrayList<>();
@@ -83,6 +98,41 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     private final HashMap<String, String> uploadedPhotoLocalPreviewMap = new HashMap<>();
     private final HashSet<String> deletedLocalPhotoPreviews = new HashSet<>();
 
+    private boolean isRegisterCompleteMode() {
+        Intent intent = getIntent();
+        return intent != null && (intent.getBooleanExtra(EXTRA_FROM_REGISTER, false)
+                || intent.getBooleanExtra(EXTRA_FORCE_COMPLETE, false));
+    }
+
+    @Override
+    public boolean supportSlideBack() {
+        return !isRegisterCompleteMode();
+    }
+
+    @Override
+    protected boolean isHiddenBackLayout() {
+        Intent intent = getIntent();
+        return intent != null && (intent.getBooleanExtra(EXTRA_HIDE_BACK, false) || isRegisterCompleteMode());
+    }
+
+    @Override
+    protected void backListener(int type) {
+        if (fromRegister || forceComplete || isRegisterCompleteMode()) {
+            showToast(getString(R.string.partner_complete_profile_first));
+            return;
+        }
+        super.backListener(type);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (fromRegister || forceComplete || isRegisterCompleteMode()) {
+            showToast(getString(R.string.partner_complete_profile_first));
+            return;
+        }
+        super.onBackPressed();
+    }
+
     @Override
     protected ActPartnerProfileEditBinding getViewBinding() {
         return ActPartnerProfileEditBinding.inflate(getLayoutInflater());
@@ -90,13 +140,20 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
 
     @Override
     protected void setTitle(TextView titleTv) {
-        titleTv.setText(R.string.partner_edit_profile);
+        titleTv.setText(fromRegister || forceComplete || isRegisterCompleteMode()
+                ? R.string.partner_complete_profile
+                : R.string.partner_edit_profile);
     }
 
     @Override
     protected void initView() {
-        requireProfileImage = getIntent() != null && getIntent().getBooleanExtra(EXTRA_REQUIRE_PROFILE_IMAGE, false);
-        wkVBinding.avatarView.setSize(72);
+        Intent intent = getIntent();
+        fromRegister = intent != null && intent.getBooleanExtra(EXTRA_FROM_REGISTER, false);
+        forceComplete = intent != null && intent.getBooleanExtra(EXTRA_FORCE_COMPLETE, false);
+        hideBack = intent != null && intent.getBooleanExtra(EXTRA_HIDE_BACK, false);
+        hideSkip = intent != null && intent.getBooleanExtra(EXTRA_HIDE_SKIP, false);
+        requireProfileImage = intent != null && (intent.getBooleanExtra(EXTRA_REQUIRE_PROFILE_IMAGE, false) || forceComplete || fromRegister);
+        wkVBinding.avatarView.setSize(88);
         wkVBinding.avatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
         updateCountryText();
         updateSexText();
@@ -111,15 +168,42 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
 
     @Override
     protected void initListener() {
-        wkVBinding.avatarPickerLayout.setOnClickListener(v -> pickImage(REQ_AVATAR));
-        wkVBinding.countryRow.setOnClickListener(v -> showCountryDialog());
-        wkVBinding.sexRow.setOnClickListener(v -> showSexDialog());
-        wkVBinding.birthdayRow.setOnClickListener(v -> showBirthdayPicker());
-        wkVBinding.nativeLangRow.setOnClickListener(v -> showLanguageDialog(true));
-        wkVBinding.learningLangRow.setOnClickListener(v -> showLanguageDialog(false));
-        wkVBinding.tagsRow.setOnClickListener(v -> openTagSelector());
-        wkVBinding.addPhotoBtn.setOnClickListener(v -> pickImage(REQ_PHOTO));
-        wkVBinding.saveBtn.setOnClickListener(v -> saveProfile());
+        wkVBinding.avatarPickerLayout.setOnClickListener(v -> {
+            hideKeyboard();
+            pickImage(REQ_AVATAR);
+        });
+        wkVBinding.countryRow.setOnClickListener(v -> {
+            hideKeyboard();
+            showCountryDialog();
+        });
+        wkVBinding.sexRow.setOnClickListener(v -> {
+            hideKeyboard();
+            showSexDialog();
+        });
+        wkVBinding.birthdayRow.setOnClickListener(v -> {
+            hideKeyboard();
+            showBirthdayPicker();
+        });
+        wkVBinding.nativeLangRow.setOnClickListener(v -> {
+            hideKeyboard();
+            showLanguageDialog(true);
+        });
+        wkVBinding.learningLangRow.setOnClickListener(v -> {
+            hideKeyboard();
+            showLanguageDialog(false);
+        });
+        wkVBinding.tagsRow.setOnClickListener(v -> {
+            hideKeyboard();
+            openTagSelector();
+        });
+        wkVBinding.addPhotoBtn.setOnClickListener(v -> {
+            hideKeyboard();
+            pickImage(REQ_PHOTO);
+        });
+        wkVBinding.saveBtn.setOnClickListener(v -> {
+            hideKeyboard();
+            saveProfile();
+        });
     }
 
     @Override
@@ -151,7 +235,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         profileImages.addAll(limitList(cleanList(data.getProfileImagesSafe()), MAX_PROFILE_IMAGES));
 
         wkVBinding.introEt.setText(safe(data.intro));
-        wkVBinding.avatarView.setSize(72);
+        wkVBinding.avatarView.setSize(88);
         wkVBinding.avatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
         updateCountryText();
         updateSexText();
@@ -215,12 +299,27 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
                 wkVBinding.saveBtn.setEnabled(true);
                 if (mediaCode == HttpResponseCode.success || mediaCode == 200 || mediaCode == 0) {
                     showToast(getString(R.string.partner_save_success));
-                    finish();
+                    finishAfterProfileSaved();
                 } else {
                     showToast(TextUtils.isEmpty(mediaMsg) ? getString(R.string.partner_save_media_failed) : mediaMsg);
                 }
             });
         });
+    }
+
+    private void finishAfterProfileSaved() {
+        if (fromRegister || forceComplete) {
+            List<LoginMenu> list = EndpointManager.getInstance().invokes(EndpointCategory.loginMenus, null);
+            if (WKReader.isNotEmpty(list)) {
+                for (LoginMenu menu : list) {
+                    if (menu != null && menu.iMenuClick != null) menu.iMenuClick.onClick();
+                }
+            } else {
+                EndpointManager.getInstance().invoke("show_tab_main", null);
+            }
+            setResult(RESULT_OK);
+        }
+        finish();
     }
 
     private void showCountryDialog() {
@@ -300,13 +399,27 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void pickImage(int requestCode) {
-        if (requestCode == REQ_PHOTO && profileImages.size() + uploadingPhotoCount >= MAX_PROFILE_IMAGES) {
+        if (requestCode == REQ_PHOTO && currentProfileImageSlotCount() >= MAX_PROFILE_IMAGES) {
             showToast(getString(R.string.partner_image_max_tip));
             return;
         }
-        Intent intent = new Intent(Intent.ACTION_PICK);
+        Intent intent;
+        if (requestCode == REQ_PHOTO) {
+            intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("image/*");
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            startActivityForResult(Intent.createChooser(intent, getString(R.string.partner_add_photo)), requestCode);
+            return;
+        }
+        intent = new Intent(Intent.ACTION_PICK);
         intent.setType("image/*");
         startActivityForResult(intent, requestCode);
+    }
+
+    private int currentProfileImageSlotCount() {
+        int pendingWithoutPreview = Math.max(0, uploadingPhotoCount - localPhotoPreviews.size());
+        return profileImages.size() + localPhotoPreviews.size() + pendingWithoutPreview;
     }
 
     @Override
@@ -319,6 +432,10 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
             updateTagsText();
             return;
         }
+        if (requestCode == REQ_PHOTO) {
+            handlePickedProfileImages(data);
+            return;
+        }
         Uri uri = data.getData();
         if (uri == null) return;
         if (requestCode == REQ_AVATAR) {
@@ -326,6 +443,40 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
             return;
         }
         prepareAndUploadPickedImage(uri, requestCode == REQ_COVER);
+    }
+
+    private void handlePickedProfileImages(Intent data) {
+        int remain = MAX_PROFILE_IMAGES - currentProfileImageSlotCount();
+        if (remain <= 0) {
+            showToast(getString(R.string.partner_image_max_tip));
+            return;
+        }
+        ArrayList<Uri> uris = new ArrayList<>();
+        HashSet<String> uriKeys = new HashSet<>();
+        ClipData clipData = data.getClipData();
+        if (clipData != null) {
+            for (int i = 0; i < clipData.getItemCount(); i++) {
+                Uri uri = clipData.getItemAt(i).getUri();
+                if (uri == null) continue;
+                String key = uri.toString();
+                if (!uriKeys.contains(key)) {
+                    uriKeys.add(key);
+                    uris.add(uri);
+                }
+            }
+        } else if (data.getData() != null) {
+            uris.add(data.getData());
+        }
+        if (uris.isEmpty()) return;
+        int added = 0;
+        for (Uri uri : uris) {
+            if (added >= remain) break;
+            prepareAndUploadPickedImage(uri, false);
+            added++;
+        }
+        if (uris.size() > remain) {
+            showToast(getString(R.string.partner_image_max_tip));
+        }
     }
 
     private void prepareAndUploadAvatar(Uri uri) {
@@ -615,33 +766,71 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
 
     private void updatePhotoPreview() {
         wkVBinding.imagePreviewLayout.removeAllViews();
+        int slotCount = 0;
         for (String remotePath : new ArrayList<>(profileImages)) {
+            if (slotCount >= MAX_PROFILE_IMAGES) break;
             String previewPath = uploadedPhotoLocalPreviewMap.containsKey(remotePath) ? uploadedPhotoLocalPreviewMap.get(remotePath) : remotePath;
-            addPhotoPreviewItem(previewPath, () -> {
+            addPhotoPreviewSlot(previewPath, false, () -> {
                 profileImages.remove(remotePath);
                 uploadedPhotoLocalPreviewMap.remove(remotePath);
                 updatePhotoPreview();
             });
+            slotCount++;
         }
         for (String localPath : new ArrayList<>(localPhotoPreviews)) {
-            addPhotoPreviewItem(localPath, () -> {
+            if (slotCount >= MAX_PROFILE_IMAGES) break;
+            addPhotoPreviewSlot(localPath, false, () -> {
                 deletedLocalPhotoPreviews.add(localPath);
                 localPhotoPreviews.remove(localPath);
                 updatePhotoPreview();
             });
+            slotCount++;
+        }
+        while (slotCount < MAX_PROFILE_IMAGES) {
+            addPhotoPreviewSlot("", true, () -> pickImage(REQ_PHOTO));
+            slotCount++;
         }
     }
 
-    private void addPhotoPreviewItem(String path, Runnable deleteAction) {
+    private int getPhotoSlotSize() {
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int horizontalPadding = dp(16 * 2);
+        int gap = dp(8 * (MAX_PROFILE_IMAGES - 1));
+        int slot = (screenWidth - horizontalPadding - gap) / MAX_PROFILE_IMAGES;
+        return Math.max(dp(56), Math.min(dp(72), slot));
+    }
+
+    private void addPhotoPreviewSlot(String path, boolean placeholder, Runnable action) {
+        int slot = getPhotoSlotSize();
         FrameLayout item = new FrameLayout(this);
-        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(dp(78), dp(78));
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(slot, slot + dp(8));
         if (wkVBinding.imagePreviewLayout.getChildCount() > 0) lp.leftMargin = dp(8);
         wkVBinding.imagePreviewLayout.addView(item, lp);
 
         ImageView imageView = new ImageView(this);
         imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
         imageView.setBackgroundResource(R.drawable.bg_partner_photo_placeholder);
-        item.addView(imageView, new FrameLayout.LayoutParams(dp(70), dp(70), android.view.Gravity.BOTTOM | android.view.Gravity.START));
+        item.addView(imageView, new FrameLayout.LayoutParams(slot, slot, android.view.Gravity.BOTTOM | android.view.Gravity.START));
+
+        if (placeholder) {
+            imageView.setImageDrawable(null);
+            TextView plus = new TextView(this);
+            plus.setText("+");
+            plus.setTextSize(28);
+            plus.setTextColor(0xFF7A6CFF);
+            plus.setGravity(android.view.Gravity.CENTER);
+            plus.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            item.addView(plus, new FrameLayout.LayoutParams(slot, slot, android.view.Gravity.BOTTOM | android.view.Gravity.START));
+            item.setOnClickListener(v -> {
+                hideKeyboard();
+                if (action != null) action.run();
+            });
+            imageView.setOnClickListener(v -> {
+                hideKeyboard();
+                if (action != null) action.run();
+            });
+            return;
+        }
 
         Bitmap bitmap = decodeLocalBitmap(path, 240, 240);
         if (bitmap != null) imageView.setImageBitmap(bitmap);
@@ -654,10 +843,11 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         deleteTv.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         deleteTv.setGravity(android.view.Gravity.CENTER);
         deleteTv.setBackgroundResource(R.drawable.bg_partner_delete_photo);
-        FrameLayout.LayoutParams dlp = new FrameLayout.LayoutParams(dp(28), dp(28), android.view.Gravity.TOP | android.view.Gravity.END);
+        FrameLayout.LayoutParams dlp = new FrameLayout.LayoutParams(dp(26), dp(26), android.view.Gravity.TOP | android.view.Gravity.END);
         item.addView(deleteTv, dlp);
         deleteTv.setOnClickListener(v -> {
-            if (deleteAction != null) deleteAction.run();
+            hideKeyboard();
+            if (action != null) action.run();
         });
     }
 
@@ -709,6 +899,19 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         String[] parts = text.replace('，', ' ').replace(',', ' ').replace('/', ' ').trim().split("\\s+");
         for (String p : parts) if (!TextUtils.isEmpty(p) && !out.contains(p.trim())) out.add(p.trim());
         return out;
+    }
+
+    private void hideKeyboard() {
+        try {
+            View view = getCurrentFocus();
+            if (view == null) view = wkVBinding.getRoot();
+            InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null && view != null) {
+                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                view.clearFocus();
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private String valueOf(TextView textView) {
