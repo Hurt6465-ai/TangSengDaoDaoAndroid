@@ -3,6 +3,7 @@ package com.chat.login.ui;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.content.SharedPreferences;
+import android.content.Intent;
 import android.net.Uri;
 import android.text.TextUtils;
 import android.view.View;
@@ -43,6 +44,14 @@ import java.util.Objects;
 public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLayoutBinding> {
 
     private static final int MAX_LANGUAGE_SELECT_COUNT = 5;
+    private static final String PARTNER_PROFILE_EDIT_ACTIVITY = "com.chat.partner.profile.PartnerProfileEditActivity";
+    private static final String EXTRA_FROM_REGISTER = "from_register";
+    private static final String EXTRA_FORCE_COMPLETE = "force_complete";
+    private static final String EXTRA_HIDE_BACK = "hide_back";
+    private static final String EXTRA_HIDE_SKIP = "hide_skip";
+    private static final String EXTRA_REQUIRE_PROFILE_IMAGE = "require_profile_image";
+    private boolean routedToPartnerProfileEdit = false;
+
 
     String path;
     private String selectedCountry = "";
@@ -61,8 +70,38 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
         titleTv.setText(R.string.wklogin_perfect_userinfo);
     }
 
+
+    /**
+     * 注册 / 首次登录的旧完善资料页只作为兜底中转。
+     * 只要 wkpartner 已接入，就直接打开新的个人主页编辑页，避免用户看到旧页面。
+     */
+    private boolean openPartnerProfileEditFromRegister() {
+        if (routedToPartnerProfileEdit) return true;
+        routedToPartnerProfileEdit = true;
+        try {
+            Class<?> cls = Class.forName(PARTNER_PROFILE_EDIT_ACTIVITY);
+            Intent intent = new Intent(this, cls);
+            intent.putExtra(EXTRA_FROM_REGISTER, true);
+            intent.putExtra(EXTRA_FORCE_COMPLETE, true);
+            intent.putExtra(EXTRA_HIDE_BACK, true);
+            intent.putExtra(EXTRA_HIDE_SKIP, true);
+            intent.putExtra(EXTRA_REQUIRE_PROFILE_IMAGE, true);
+            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(intent);
+            finish();
+            overridePendingTransition(0, 0);
+            return true;
+        } catch (Throwable ignored) {
+            // wkpartner 模块未接入或类名变化时，保留旧完善资料页兜底，避免注册流程中断。
+            return false;
+        }
+    }
+
     @Override
     protected void initView() {
+        if (openPartnerProfileEditFromRegister()) {
+            return;
+        }
         wkVBinding.avatarView.setSize(120);
         wkVBinding.avatarView.setStrokeWidth(0);
         wkVBinding.avatarView.imageView.setImageResource(R.mipmap.icon_default_header);
