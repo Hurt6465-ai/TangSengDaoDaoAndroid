@@ -11,6 +11,7 @@ import android.graphics.Canvas;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.TextUtils;
@@ -25,6 +26,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.config.WKApiConfig;
 import com.chat.base.config.WKConfig;
+import com.chat.base.config.WKConstants;
 import com.chat.base.endpoint.EndpointCategory;
 import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.endpoint.entity.LoginMenu;
@@ -41,6 +43,7 @@ import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -90,6 +93,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     private boolean forceComplete = false;
     private boolean hideBack = false;
     private boolean hideSkip = false;
+    private long avatarUploadSeq = 0L;
     private final ArrayList<String> nativeCodes = new ArrayList<>();
     private final ArrayList<String> learningCodes = new ArrayList<>();
     private final ArrayList<String> tags = new ArrayList<>();
@@ -403,18 +407,30 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
             showToast(getString(R.string.partner_image_max_tip));
             return;
         }
-        Intent intent;
-        if (requestCode == REQ_PHOTO) {
-            intent = new Intent(Intent.ACTION_GET_CONTENT);
+        try {
+            Intent intent;
+            if (requestCode == REQ_PHOTO) {
+                intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.setType("image/*");
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                startActivityForResult(Intent.createChooser(intent, getString(R.string.partner_add_photo)), requestCode);
+                return;
+            }
+            intent = new Intent(Intent.ACTION_PICK);
             intent.setType("image/*");
-            intent.addCategory(Intent.CATEGORY_OPENABLE);
-            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
-            startActivityForResult(Intent.createChooser(intent, getString(R.string.partner_add_photo)), requestCode);
-            return;
+            startActivityForResult(intent, requestCode);
+        } catch (Exception e) {
+            try {
+                Intent fallback = new Intent(Intent.ACTION_GET_CONTENT);
+                fallback.setType("image/*");
+                fallback.addCategory(Intent.CATEGORY_OPENABLE);
+                if (requestCode == REQ_PHOTO) fallback.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                startActivityForResult(fallback, requestCode);
+            } catch (Exception ignored) {
+                showToast(getString(R.string.partner_upload_failed));
+            }
         }
-        intent = new Intent(Intent.ACTION_PICK);
-        intent.setType("image/*");
-        startActivityForResult(intent, requestCode);
     }
 
     private int currentProfileImageSlotCount() {
@@ -480,53 +496,240 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void prepareAndUploadAvatar(Uri uri) {
+        if (uri == null) return;
+        final long requestSeq = ++avatarUploadSeq;
         showToast(getString(R.string.partner_uploading));
         new Thread(() -> {
             try {
                 File source = copyUriToCache(uri, "partner_avatar_src");
-                File avatarPng = makeSquareAvatarPng(source);
-                runOnUiThread(() -> UserModel.getInstance().uploadAvatar(avatarPng.getAbsolutePath(), code -> {
-                    if (code == HttpResponseCode.success) {
-                        String cacheKey = UUID.randomUUID().toString().replace("-", "");
-                        WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
-                        if (channel == null || TextUtils.isEmpty(channel.channelID)) {
-                            channel = new WKChannel(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
-                            WKIM.getInstance().getChannelManager().saveOrUpdateChannel(channel);
-                        }
-                        channel.avatarCacheKey = cacheKey;
-                        WKIM.getInstance().getChannelManager().updateAvatarCacheKey(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL, cacheKey);
-                        wkVBinding.avatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL, cacheKey);
-                        showToast(getString(R.string.partner_avatar_upload_success));
-                    } else {
-                        showToast(getString(R.string.partner_avatar_upload_failed));
-                    }
-                }));
+                File avatarFile = makeSquareAvatarWebp(source);
+                File fallbackJpg = null;
+                if (avatarFile == null || !avatarFile.exists() || avatarFile.length() <= 0) {
+                    avatarFile = makeSquareAvatarJpg(source);
+                } else {
+                    // 少数旧后端或对象存储如果不接受 WebP 头像，失败时自动用 JPG 兜底。
+                    fallbackJpg = makeSquareAvatarJpg(source);
+                }
+                File finalAvatarFile = avatarFile;
+                File finalFallbackJpg = fallbackJpg;
+                runOnUiThread(() -> {
+                    if (requestSeq != avatarUploadSeq) return;
+                    showAvatarLocalPreview(finalAvatarFile.getAbsolutePath());
+                    uploadPreparedAvatar(finalAvatarFile, finalFallbackJpg, requestSeq);
+                });
             } catch (Exception e) {
-                runOnUiThread(() -> showToast(getString(R.string.partner_avatar_upload_failed)));
+                runOnUiThread(() -> {
+                    if (requestSeq == avatarUploadSeq) showToast(getString(R.string.partner_avatar_upload_failed));
+                });
             }
         }).start();
     }
 
-    private File makeSquareAvatarPng(File source) throws Exception {
-        Bitmap src = BitmapFactory.decodeFile(source.getAbsolutePath());
+    private void uploadPreparedAvatar(File avatarFile, File fallbackJpg, long requestSeq) {
+        if (avatarFile == null || !avatarFile.exists() || avatarFile.length() <= 0) {
+            showToast(getString(R.string.partner_avatar_upload_failed));
+            return;
+        }
+        try {
+            UserModel.getInstance().uploadAvatar(avatarFile.getAbsolutePath(), code -> runOnUiThread(() -> {
+                if (requestSeq != avatarUploadSeq) return;
+                if (code == HttpResponseCode.success) {
+                    finishAvatarUploadSuccess(avatarFile);
+                } else if (fallbackJpg != null && fallbackJpg.exists() && fallbackJpg.length() > 0) {
+                    uploadFallbackAvatarJpg(fallbackJpg, requestSeq);
+                } else {
+                    showToast(getString(R.string.partner_avatar_upload_failed));
+                }
+            }));
+        } catch (Exception e) {
+            if (fallbackJpg != null && fallbackJpg.exists() && fallbackJpg.length() > 0) {
+                uploadFallbackAvatarJpg(fallbackJpg, requestSeq);
+            } else {
+                showToast(getString(R.string.partner_avatar_upload_failed));
+            }
+        }
+    }
+
+    private void uploadFallbackAvatarJpg(File fallbackJpg, long requestSeq) {
+        try {
+            UserModel.getInstance().uploadAvatar(fallbackJpg.getAbsolutePath(), code -> runOnUiThread(() -> {
+                if (requestSeq != avatarUploadSeq) return;
+                if (code == HttpResponseCode.success) {
+                    finishAvatarUploadSuccess(fallbackJpg);
+                } else {
+                    showToast(getString(R.string.partner_avatar_upload_failed));
+                }
+            }));
+        } catch (Exception e) {
+            showToast(getString(R.string.partner_avatar_upload_failed));
+        }
+    }
+
+    private void finishAvatarUploadSuccess(File avatarFile) {
+        String cacheKey = "local_" + UUID.randomUUID().toString().replace("-", "");
+        persistLocalAvatarCache(avatarFile, cacheKey);
+        updateCurrentChannelAvatarCacheKey(cacheKey);
+        showAvatarLocalPreview(avatarFile.getAbsolutePath());
+        showToast(getString(R.string.partner_avatar_upload_success));
+    }
+
+    /**
+     * 头像也统一走压缩 WebP：512x512，质量 82。
+     * 语伴图片已经是 WebP；头像之前为了兼容用 JPG，这里改成优先 WebP，上传失败再兜底 JPG。
+     */
+    private File makeSquareAvatarWebp(File source) throws Exception {
+        Bitmap src = decodeBitmapFileForAvatar(source, 1600);
         if (src == null) throw new IllegalStateException("decode avatar failed");
         int side = Math.min(src.getWidth(), src.getHeight());
-        int left = (src.getWidth() - side) / 2;
-        int top = (src.getHeight() - side) / 2;
+        int left = Math.max(0, (src.getWidth() - side) / 2);
+        int top = Math.max(0, (src.getHeight() - side) / 2);
         Bitmap crop = Bitmap.createBitmap(src, left, top, side, side);
         Bitmap scaled = Bitmap.createScaledBitmap(crop, 512, 512, true);
-        File out = new File(getCacheDir(), "partner_avatar_" + System.currentTimeMillis() + ".png");
+        File out = new File(getCacheDir(), "partner_avatar_" + System.currentTimeMillis() + "_" + Math.abs(System.nanoTime()) + ".webp");
         FileOutputStream fos = new FileOutputStream(out);
-        scaled.compress(Bitmap.CompressFormat.PNG, 100, fos);
-        fos.flush();
-        fos.close();
+        try {
+            boolean ok = scaled.compress(getWebpCompressFormat(), 82, fos);
+            fos.flush();
+            if (!ok || out.length() <= 0) {
+                throw new IllegalStateException("compress avatar webp failed");
+            }
+        } finally {
+            try { fos.close(); } catch (Exception ignored) { }
+            if (scaled != crop) scaled.recycle();
+            if (crop != src) crop.recycle();
+            src.recycle();
+        }
+        return out;
+    }
+
+    private Bitmap.CompressFormat getWebpCompressFormat() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                return Bitmap.CompressFormat.valueOf("WEBP_LOSSY");
+            } catch (Exception ignored) {
+            }
+        }
+        //noinspection deprecation
+        return Bitmap.CompressFormat.WEBP;
+    }
+
+    private File makeSquareAvatarJpg(File source) throws Exception {
+        Bitmap src = decodeBitmapFileForAvatar(source, 1600);
+        if (src == null) throw new IllegalStateException("decode avatar failed");
+        int side = Math.min(src.getWidth(), src.getHeight());
+        int left = Math.max(0, (src.getWidth() - side) / 2);
+        int top = Math.max(0, (src.getHeight() - side) / 2);
+        Bitmap crop = Bitmap.createBitmap(src, left, top, side, side);
+        Bitmap scaled = Bitmap.createScaledBitmap(crop, 512, 512, true);
+        File out = new File(getCacheDir(), "partner_avatar_" + System.currentTimeMillis() + "_" + Math.abs(System.nanoTime()) + ".jpg");
+        FileOutputStream fos = new FileOutputStream(out);
+        try {
+            scaled.compress(Bitmap.CompressFormat.JPEG, 88, fos);
+            fos.flush();
+        } finally {
+            try { fos.close(); } catch (Exception ignored) { }
+        }
         if (scaled != crop) scaled.recycle();
-        crop.recycle();
+        if (crop != src) crop.recycle();
         src.recycle();
         return out;
     }
 
+    private Bitmap decodeBitmapFileForAvatar(File source, int maxSide) {
+        if (source == null || !source.exists()) return null;
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(source.getAbsolutePath(), bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+            int sample = 1;
+            while (bounds.outWidth / sample > maxSide || bounds.outHeight / sample > maxSide) {
+                sample *= 2;
+            }
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = Math.max(1, sample);
+            options.inPreferredConfig = Bitmap.Config.RGB_565;
+            return BitmapFactory.decodeFile(source.getAbsolutePath(), options);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private void showAvatarLocalPreview(String localPath) {
+        if (TextUtils.isEmpty(localPath) || wkVBinding == null || wkVBinding.avatarView == null) return;
+        try {
+            Bitmap bitmap = decodeLocalBitmap(localPath, 256, 256);
+            if (bitmap != null) {
+                wkVBinding.avatarView.imageView.setVisibility(View.VISIBLE);
+                wkVBinding.avatarView.defaultAvatarTv.setVisibility(View.GONE);
+                wkVBinding.avatarView.imageView.setImageBitmap(bitmap);
+            } else {
+                wkVBinding.avatarView.imageView.setVisibility(View.VISIBLE);
+                wkVBinding.avatarView.defaultAvatarTv.setVisibility(View.GONE);
+                wkVBinding.avatarView.imageView.setImageURI(Uri.fromFile(new File(localPath)));
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void persistLocalAvatarCache(File avatarFile, String cacheKey) {
+        if (avatarFile == null || TextUtils.isEmpty(cacheKey)) return;
+        String uid = WKConfig.getInstance().getUid();
+        if (TextUtils.isEmpty(uid)) return;
+        File target = new File(WKConstants.avatarCacheDir + WKChannelType.PERSONAL + "_" + uid);
+        File parent = target.getParentFile();
+        if (parent != null && !parent.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            parent.mkdirs();
+        }
+        File tmp = new File(target.getAbsolutePath() + ".tmp");
+        FileInputStream input = null;
+        FileOutputStream output = null;
+        try {
+            input = new FileInputStream(avatarFile);
+            output = new FileOutputStream(tmp);
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = input.read(buffer)) > 0) output.write(buffer, 0, len);
+            output.flush();
+            if (target.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                target.delete();
+            }
+            //noinspection ResultOfMethodCallIgnored
+            tmp.renameTo(target);
+            getSharedPreferences("avatar_cache_meta", MODE_PRIVATE)
+                    .edit()
+                    .putString("avatar_key_" + WKChannelType.PERSONAL + "_" + uid, cacheKey)
+                    .apply();
+        } catch (Exception ignored) {
+        } finally {
+            try { if (input != null) input.close(); } catch (Exception ignored) { }
+            try { if (output != null) output.close(); } catch (Exception ignored) { }
+            if (tmp.exists() && tmp.length() <= 0) {
+                //noinspection ResultOfMethodCallIgnored
+                tmp.delete();
+            }
+        }
+    }
+
+    private void updateCurrentChannelAvatarCacheKey(String cacheKey) {
+        String uid = WKConfig.getInstance().getUid();
+        if (TextUtils.isEmpty(uid) || TextUtils.isEmpty(cacheKey)) return;
+        try {
+            WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(uid, WKChannelType.PERSONAL);
+            if (channel == null || TextUtils.isEmpty(channel.channelID)) {
+                channel = new WKChannel(uid, WKChannelType.PERSONAL);
+                WKIM.getInstance().getChannelManager().saveOrUpdateChannel(channel);
+            }
+            channel.avatarCacheKey = cacheKey;
+            WKIM.getInstance().getChannelManager().updateAvatarCacheKey(uid, WKChannelType.PERSONAL, cacheKey);
+        } catch (Exception ignored) {
+        }
+    }
+
     private void prepareAndUploadPickedImage(Uri uri, boolean cover) {
+        if (uri == null) return;
         uploadingCount++;
         if (!cover) uploadingPhotoCount++;
         updateProgress(0, true);
@@ -534,7 +737,12 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         new Thread(() -> {
             try {
                 File source = copyUriToCache(uri, cover ? "partner_cover_src" : "partner_photo_src");
-                File webp = PartnerImageCompressor.compressToWebp150KB(source, getCacheDir(), cover ? "partner_cover.webp" : ("partner_photo_" + System.currentTimeMillis() + ".webp"));
+                String outName = (cover ? "partner_cover_" : "partner_photo_")
+                        + System.currentTimeMillis() + "_" + Math.abs(System.nanoTime()) + ".webp";
+                File webp = PartnerImageCompressor.compressToWebp150KB(source, getCacheDir(), outName);
+                if (webp == null || !webp.exists() || webp.length() <= 0) {
+                    throw new IllegalStateException("compress image failed");
+                }
                 String localPath = webp.getAbsolutePath();
                 runOnUiThread(() -> {
                     if (cover) localCoverPreview = localPath;
@@ -548,6 +756,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
                     if (!cover) uploadingPhotoCount = Math.max(0, uploadingPhotoCount - 1);
                     uploadingCount = Math.max(0, uploadingCount - 1);
                     updateProgress(0, uploadingCount > 0);
+                    updatePhotoPreview();
                     showToast(getString(R.string.partner_upload_failed));
                 });
             }
@@ -555,42 +764,59 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void uploadCompressedFile(File file, boolean cover, String localPreview) {
-        String tag = "partner_profile_" + System.currentTimeMillis() + "_" + Math.abs(file.getAbsolutePath().hashCode());
-        WKProgressManager.Companion.getInstance().registerProgress(tag, new WKProgressManager.IProgress() {
-            @Override
-            public void onProgress(Object progressTag, int progress) {
-                runOnUiThread(() -> updateProgress(progress, true));
-            }
-
-            @Override
-            public void onSuccess(Object progressTag, String path) {
-            }
-
-            @Override
-            public void onFail(Object progressTag, String msg) {
-            }
-        });
-        PartnerProfileModel.getInstance().getProfileUploadFileUrl(WKConfig.getInstance().getUid(), file.getAbsolutePath(), cover, (code, msg, uploadUrl) -> {
-            if (uploadUrl == null || TextUtils.isEmpty(uploadUrl.url)) {
-                WKProgressManager.Companion.getInstance().unregisterProgress(tag);
-                finishOneUpload(cover, localPreview, false, "");
-                return;
-            }
-            WKUploader.getInstance().upload(uploadUrl.url, file.getAbsolutePath(), tag, new WKUploader.IUploadBack() {
+        if (file == null || !file.exists() || file.length() <= 0) {
+            finishOneUpload(cover, localPreview, false, "");
+            return;
+        }
+        String tag = "partner_profile_" + System.currentTimeMillis() + "_" + Math.abs(file.getAbsolutePath().hashCode()) + "_" + Math.abs(System.nanoTime());
+        try {
+            WKProgressManager.Companion.getInstance().registerProgress(tag, new WKProgressManager.IProgress() {
                 @Override
-                public void onSuccess(String uploadedPath) {
-                    WKProgressManager.Companion.getInstance().unregisterProgress(tag);
-                    String finalPath = TextUtils.isEmpty(uploadedPath) ? uploadUrl.path : uploadedPath;
-                    finishOneUpload(cover, localPreview, true, normalizeUploadedPath(finalPath));
+                public void onProgress(Object progressTag, int progress) {
+                    runOnUiThread(() -> updateProgress(progress, true));
                 }
 
                 @Override
-                public void onError() {
+                public void onSuccess(Object progressTag, String path) {
+                }
+
+                @Override
+                public void onFail(Object progressTag, String msg) {
+                }
+            });
+            PartnerProfileModel.getInstance().getProfileUploadFileUrl(WKConfig.getInstance().getUid(), file.getAbsolutePath(), cover, (code, msg, uploadUrl) -> {
+                if (uploadUrl == null || TextUtils.isEmpty(uploadUrl.url)) {
+                    WKProgressManager.Companion.getInstance().unregisterProgress(tag);
+                    finishOneUpload(cover, localPreview, false, "");
+                    return;
+                }
+                try {
+                    WKUploader.getInstance().upload(uploadUrl.url, file.getAbsolutePath(), tag, new WKUploader.IUploadBack() {
+                        @Override
+                        public void onSuccess(String uploadedPath) {
+                            WKProgressManager.Companion.getInstance().unregisterProgress(tag);
+                            String finalPath = TextUtils.isEmpty(uploadedPath) ? uploadUrl.path : uploadedPath;
+                            finishOneUpload(cover, localPreview, true, normalizeUploadedPath(finalPath));
+                        }
+
+                        @Override
+                        public void onError() {
+                            WKProgressManager.Companion.getInstance().unregisterProgress(tag);
+                            finishOneUpload(cover, localPreview, false, "");
+                        }
+                    });
+                } catch (Exception e) {
                     WKProgressManager.Companion.getInstance().unregisterProgress(tag);
                     finishOneUpload(cover, localPreview, false, "");
                 }
             });
-        });
+        } catch (Exception e) {
+            try {
+                WKProgressManager.Companion.getInstance().unregisterProgress(tag);
+            } catch (Exception ignored) {
+            }
+            finishOneUpload(cover, localPreview, false, "");
+        }
     }
 
     private String normalizeUploadedPath(String path) {
@@ -604,6 +830,10 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private void finishOneUpload(boolean cover, String localPreview, boolean success, String fileUrl) {
+        if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            runOnUiThread(() -> finishOneUpload(cover, localPreview, success, fileUrl));
+            return;
+        }
         if (cover) {
             if (success) {
                 profileCover = safe(fileUrl);
@@ -631,17 +861,35 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private File copyUriToCache(Uri uri, String prefix) throws Exception {
-        File out = new File(getCacheDir(), prefix + "_" + System.currentTimeMillis() + ".jpg");
-        InputStream input = getContentResolver().openInputStream(uri);
-        if (input == null) throw new IllegalStateException("empty uri");
-        FileOutputStream fos = new FileOutputStream(out);
-        byte[] buffer = new byte[8192];
-        int len;
-        while ((len = input.read(buffer)) > 0) fos.write(buffer, 0, len);
-        fos.flush();
-        fos.close();
-        input.close();
-        return out;
+        if (uri == null) throw new IllegalStateException("empty uri");
+        String safePrefix = TextUtils.isEmpty(prefix) ? "partner_img" : prefix.replaceAll("[^a-zA-Z0-9_\-]", "_");
+        File out = new File(getCacheDir(), safePrefix + "_" + System.currentTimeMillis() + "_" + Math.abs(System.nanoTime()) + ".jpg");
+        InputStream input = null;
+        FileOutputStream fos = null;
+        try {
+            input = getContentResolver().openInputStream(uri);
+            if (input == null) throw new IllegalStateException("empty uri stream");
+            fos = new FileOutputStream(out);
+            byte[] buffer = new byte[8192];
+            int len;
+            long total = 0;
+            while ((len = input.read(buffer)) > 0) {
+                fos.write(buffer, 0, len);
+                total += len;
+            }
+            fos.flush();
+            if (total <= 0 || !out.exists() || out.length() <= 0) {
+                throw new IllegalStateException("empty copied image");
+            }
+            return out;
+        } finally {
+            if (fos != null) {
+                try { fos.close(); } catch (Exception ignored) {}
+            }
+            if (input != null) {
+                try { input.close(); } catch (Exception ignored) {}
+            }
+        }
     }
 
     private void updateCountryText() {
@@ -852,18 +1100,23 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private Bitmap decodeLocalBitmap(String path, int reqW, int reqH) {
-        if (TextUtils.isEmpty(path)) return null;
-        String realPath = path.startsWith("file://") ? path.substring(7) : path;
-        File file = new File(realPath);
-        if (!file.exists()) return null;
-        BitmapFactory.Options bounds = new BitmapFactory.Options();
-        bounds.inJustDecodeBounds = true;
-        BitmapFactory.decodeFile(realPath, bounds);
-        int sample = 1;
-        while (bounds.outWidth / sample > reqW * 2 || bounds.outHeight / sample > reqH * 2) sample *= 2;
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = Math.max(1, sample);
-        return BitmapFactory.decodeFile(realPath, options);
+        try {
+            if (TextUtils.isEmpty(path)) return null;
+            String realPath = path.startsWith("file://") ? path.substring(7) : path;
+            File file = new File(realPath);
+            if (!file.exists() || !file.isFile() || file.length() <= 0) return null;
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(realPath, bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+            int sample = 1;
+            while (bounds.outWidth / sample > reqW * 2 || bounds.outHeight / sample > reqH * 2) sample *= 2;
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = Math.max(1, sample);
+            return BitmapFactory.decodeFile(realPath, options);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private ArrayList<String> normalizeCodeList(List<String> list) {
