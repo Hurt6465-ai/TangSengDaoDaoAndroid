@@ -44,7 +44,7 @@
     <string name="partner_choose_tags">选择标签</string>
     <string name="partner_tag_selector">选择标签</string>
     <string name="partner_upload_cover">从手机上传背景墙</string>
-    <string name="partner_add_photo">从手机添加语伴图片（最多 5 张）</string>
+    <string name="partner_add_photo">批量添加语伴图片（最多 5 张）</string>
     <string name="partner_uploading">正在上传...</string>
     <string name="partner_uploading_percent">上传中 %1$d%%</string>
     <string name="partner_upload_success">上传成功</string>
@@ -89,4 +89,8 @@
     <string-array name="partner_tags_education"><item>保密</item><item>初中及以下</item><item>高中</item><item>本科</item><item>硕士及以上</item><item>其他</item></string-array>
     <string-array name="partner_tags_safety"><item>礼貌聊天</item><item>拒绝骚扰</item><item>不加联系方式</item><item>平台内沟通</item><item>互相尊重</item></string-array>
     <string-array name="partner_tags_study_way"><item>自学</item><item>线下学</item><item>线上学</item></string-array>
+    <string name="partner_complete_profile">完善个人资料</string>
+    <string name="partner_complete_profile_first">请先完善个人资料</string>
+    <string name="partner_avatar_change_hint">点击更换头像</string>
+    <string name="partner_profile_photo_batch_tip">点击下方占位图可一次选择多张，最多 5 张。</string>
 </resources>
