@@ -10,7 +10,7 @@
     <TextView
         android:id="@+id/contentTv"
         android:textSize="@dimen/font_size_14"
-        android:textColor="@color/color999"
+        android:textColor="#ffffff"
         android:layout_marginStart="55dp"
         android:layout_marginEnd="55dp"
         android:gravity="center"
