@@ -184,7 +184,7 @@ public class FeedItemView extends android.widget.FrameLayout {
         if (item == null) return;
         FeedUser user = item.user;
         nameTv.setText("@" + item.userName());
-        metaTv.setText(buildMeta(item));
+        bindMeta(item);
         bindDesc(item.displayTitle());
         likeCountTv.setText(formatCount(item.like_count));
         commentCountTv.setText(formatCount(item.comment_count));
@@ -423,15 +423,20 @@ public class FeedItemView extends android.widget.FrameLayout {
         }
     }
 
+    private void bindMeta(FeedBean item) {
+        String meta = buildMeta(item);
+        metaTv.setText(meta);
+        metaTv.setVisibility(TextUtils.isEmpty(meta) ? GONE : VISIBLE);
+    }
+
     private String buildMeta(FeedBean item) {
-        StringBuilder sb = new StringBuilder();
         if (item.distance_meters > 0 && item.distance_meters <= 70000) {
             int km = bucketDistance(item.distance_meters);
-            sb.append(getResources().getString(R.string.feed_distance_within, km)).append("  ");
+            return getResources().getString(R.string.feed_distance_within, km);
         }
-        String activeLabel = activeLabel(item.last_active_at);
-        if (!TextUtils.isEmpty(activeLabel)) sb.append(activeLabel);
-        return sb.toString().trim();
+        // 发现流没有可靠的实时在线状态。last_active_at 只能代表最近活跃/作品活跃，
+        // 不能等同“在线”，避免把离线用户错误显示为在线。
+        return "";
     }
 
     private int bucketDistance(int meters) {
@@ -442,15 +447,6 @@ public class FeedItemView extends android.widget.FrameLayout {
         return 70;
     }
 
-    private String activeLabel(long lastActiveAt) {
-        if (lastActiveAt <= 0) return "";
-        long timeMs = lastActiveAt < 100000000000L ? lastActiveAt * 1000L : lastActiveAt;
-        long diff = Math.max(0, System.currentTimeMillis() - timeMs);
-        long min = diff / 60000L;
-        if (min <= 1) return getResources().getString(R.string.feed_active_online);
-        if (min <= 60) return getResources().getString(R.string.feed_active_minutes, (int) min);
-        return "";
-    }
 
     private String formatCount(int count) {
         if (count <= 0) return "0";
