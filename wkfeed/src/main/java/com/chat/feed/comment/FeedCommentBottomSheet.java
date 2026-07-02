@@ -2,6 +2,7 @@ package com.chat.feed.comment;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.graphics.Rect;
 import android.os.Bundle;
@@ -102,6 +103,8 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     private TextView recordCancelTv;
     private TextView authorFollowTv;
     private OnCommentSentListener onCommentSentListener;
+    private OnSheetTransformListener onSheetTransformListener;
+    private BottomSheetBehavior.BottomSheetCallback sheetCallback;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService voiceExecutor = Executors.newSingleThreadExecutor();
@@ -124,6 +127,11 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
 
     public interface OnCommentSentListener {
         void onCommentSent(int delta);
+    }
+
+    public interface OnSheetTransformListener {
+        void onSheetProgress(float progress);
+        void onSheetClosed();
     }
 
     public static FeedCommentBottomSheet newInstance(String feedId) {
@@ -156,6 +164,10 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
 
     public void setOnCommentSentListener(OnCommentSentListener listener) {
         this.onCommentSentListener = listener;
+    }
+
+    public void setOnSheetTransformListener(OnSheetTransformListener listener) {
+        this.onSheetTransformListener = listener;
     }
 
     @Nullable
@@ -533,6 +545,44 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     public void onStart() {
         super.onStart();
         expandCommentSheet(false);
+        attachSheetTransformCallback();
+        if (onSheetTransformListener != null) onSheetTransformListener.onSheetProgress(1f);
+    }
+
+    private void attachSheetTransformCallback() {
+        BottomSheetDialog dialog = (BottomSheetDialog) getDialog();
+        if (dialog == null) return;
+        View bottomSheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+        if (bottomSheet == null) return;
+        BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(bottomSheet);
+        if (sheetCallback != null) {
+            try { behavior.removeBottomSheetCallback(sheetCallback); } catch (Throwable ignored) {}
+        }
+        sheetCallback = new BottomSheetBehavior.BottomSheetCallback() {
+            @Override
+            public void onStateChanged(@NonNull View sheet, int newState) {
+                if (onSheetTransformListener == null) return;
+                if (newState == BottomSheetBehavior.STATE_HIDDEN || newState == BottomSheetBehavior.STATE_COLLAPSED) {
+                    onSheetTransformListener.onSheetClosed();
+                } else if (newState == BottomSheetBehavior.STATE_EXPANDED || newState == BottomSheetBehavior.STATE_DRAGGING) {
+                    onSheetTransformListener.onSheetProgress(1f);
+                }
+            }
+
+            @Override
+            public void onSlide(@NonNull View sheet, float slideOffset) {
+                if (onSheetTransformListener == null) return;
+                float progress = Math.max(0f, Math.min(1f, slideOffset));
+                onSheetTransformListener.onSheetProgress(progress);
+            }
+        };
+        behavior.addBottomSheetCallback(sheetCallback);
+    }
+
+    @Override
+    public void onDismiss(@NonNull DialogInterface dialog) {
+        if (onSheetTransformListener != null) onSheetTransformListener.onSheetClosed();
+        super.onDismiss(dialog);
     }
 
     private void updateTitle() {
