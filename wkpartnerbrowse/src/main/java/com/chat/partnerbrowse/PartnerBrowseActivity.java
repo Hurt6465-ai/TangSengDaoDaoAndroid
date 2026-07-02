@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrowseBinding> {
     private static final int PAGE_LIMIT = 12;
@@ -236,9 +237,49 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     }
 
     private String profileRequiredMessage(PartnerBrowseProfileMe data) {
-        if (data == null || !data.hasPartnerPhoto()) return getString(R.string.partnerbrowse_photo_required_tip);
-        if (!data.hasPartnerLanguages()) return getString(R.string.partnerbrowse_language_required_tip);
-        return getString(R.string.partnerbrowse_profile_required_tip);
+        if (data == null) return localProfileRequiredTip();
+        boolean hasPhoto = data.hasPartnerPhoto();
+        boolean hasLanguages = data.hasPartnerLanguages();
+        if (!hasPhoto && !hasLanguages) return localProfileRequiredTip();
+        if (!hasPhoto) return getString(R.string.partnerbrowse_photo_required_tip);
+        if (!hasLanguages) return localLanguageRequiredTip();
+        return localProfileRequiredTip();
+    }
+
+    private String localLanguageRequiredTip() {
+        String lang = getCurrentLanguage();
+        if ("my".equals(lang) || "myanmar".equals(lang) || "burmese".equals(lang)) {
+            return "ဘာသာဖော်စာမျက်နှာ မကြည့်မီ မိခင်ဘာသာစကားနှင့် လေ့လာနေသော ဘာသာစကားကို ရွေးပါ။ Tag မဖြည့်လည်း ရပါတယ်။";
+        }
+        if ("en".equals(lang)) {
+            return "Choose your native language and learning language before browsing. Tags are optional.";
+        }
+        return "进入语伴前，请先选择母语和正在学习的语言。标签可以不填。";
+    }
+
+    private String localProfileRequiredTip() {
+        String lang = getCurrentLanguage();
+        if ("my".equals(lang) || "myanmar".equals(lang) || "burmese".equals(lang)) {
+            return "ဘာသာဖော်စာမျက်နှာ မကြည့်မီ ဓာတ်ပုံ၊ မိခင်ဘာသာစကားနှင့် လေ့လာနေသော ဘာသာစကားကို ဖြည့်ပါ။";
+        }
+        if ("en".equals(lang)) {
+            return "Complete your partner photo, native language and learning language before browsing.";
+        }
+        return "进入语伴前，请先补全语伴照片、母语和正在学习的语言。";
+    }
+
+    private String getCurrentLanguage() {
+        try {
+            Locale locale;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                locale = getResources().getConfiguration().getLocales().get(0);
+            } else {
+                locale = getResources().getConfiguration().locale;
+            }
+            return locale == null || locale.getLanguage() == null ? "" : locale.getLanguage().toLowerCase(Locale.ROOT);
+        } catch (Throwable ignored) {
+            return "";
+        }
     }
 
     private void showProfileRequiredGate(boolean openEditor, String message) {
@@ -248,7 +289,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         adapter.notifyDataSetChanged();
         wkVBinding.viewPagerOuter.setVisibility(View.GONE);
         wkVBinding.loadingLayout.setVisibility(View.VISIBLE);
-        wkVBinding.loadingTv.setText(TextUtils.isEmpty(message) ? getString(R.string.partnerbrowse_profile_required_tip) : message);
+        wkVBinding.loadingTv.setText(TextUtils.isEmpty(message) ? localProfileRequiredTip() : message);
         wkVBinding.retryBtn.setText(R.string.partnerbrowse_go_upload_photo);
         wkVBinding.retryBtn.setVisibility(View.VISIBLE);
         if (openEditor) openProfileEditOnce(false);
