@@ -44,6 +44,7 @@ public class PartnerDetailFragment extends Fragment {
     private PartnerBrowseBean partner;
     private ViewPager2.OnPageChangeCallback imagePageCallback;
     private String stableKey;
+    private int currentImageIndex;
 
     public PartnerDetailFragment() {
         super(R.layout.fragment_wk_partner_detail);
@@ -148,6 +149,7 @@ public class PartnerDetailFragment extends Fragment {
 
     private void bindImages(List<String> images) {
         if (binding == null) return;
+        currentImageIndex = 0;
         PartnerImageAdapter imageAdapter = new PartnerImageAdapter(images);
         binding.viewPagerInner.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
         binding.viewPagerInner.setOffscreenPageLimit(1);
@@ -169,6 +171,11 @@ public class PartnerDetailFragment extends Fragment {
                 if (!isViewAlive()) return;
                 Context context = getContext();
                 if (context != null) PartnerImagePreloader.preloadNextImage(context, images, position);
+                String targetUid = currentPartnerUid();
+                if (!TextUtils.isEmpty(targetUid) && position != currentImageIndex) {
+                    PartnerBrowseModel.getInstance().reportPartnerEvent(targetUid, "photo_swipe", 0, position);
+                }
+                currentImageIndex = position;
                 updateIndicator(position, imageAdapter.getItemCount());
             }
         };
@@ -391,10 +398,17 @@ public class PartnerDetailFragment extends Fragment {
         binding.tagRow.addView(chip, lp);
     }
 
+    private String currentPartnerUid() {
+        if (partner == null) return "";
+        return TextUtils.isEmpty(partner.uid) ? partner.id : partner.uid;
+    }
+
     private void openProfilePage() {
-        if (!isViewAlive() || partner == null || TextUtils.isEmpty(partner.uid)) return;
+        String targetUid = currentPartnerUid();
+        if (!isViewAlive() || partner == null || TextUtils.isEmpty(targetUid)) return;
+        PartnerBrowseModel.getInstance().reportPartnerEvent(targetUid, "profile_open", 0, currentImageIndex);
         Context context = getContext();
-        if (context != null) PartnerBrowseHostBridge.openProfile(context, partner.uid);
+        if (context != null) PartnerBrowseHostBridge.openProfile(context, targetUid);
     }
 
     private String buildLastOnline() {
@@ -453,6 +467,8 @@ public class PartnerDetailFragment extends Fragment {
                     target.markHelloSent();
                 }
                 PartnerRepository.putOne(target);
+                String targetUid = TextUtils.isEmpty(target.uid) ? target.id : target.uid;
+                PartnerBrowseModel.getInstance().reportPartnerEvent(targetUid, "hello", 0, currentImageIndex);
                 updateActionButton();
                 if (data != null && !TextUtils.isEmpty(data.getMessageSafe())) {
                     Toast.makeText(requireContext(), data.getMessageSafe(), Toast.LENGTH_SHORT).show();

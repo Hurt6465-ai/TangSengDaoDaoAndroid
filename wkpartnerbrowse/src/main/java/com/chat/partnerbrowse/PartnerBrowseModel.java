@@ -8,6 +8,7 @@ import com.chat.partnerbrowse.model.PartnerBrowseProfileMe;
 import com.chat.partnerbrowse.model.PartnerBrowseResponse;
 import com.chat.partnerbrowse.model.PartnerGreetingResponse;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,6 +94,19 @@ public class PartnerBrowseModel extends WKBaseModel {
                 if (callback != null) callback.onResult(code, msg, null);
             }
         });
+    }
+    public void reportPartnerEvent(String uid, String eventType, long durationMs, int photoIndex) {
+        if (uid == null || uid.length() == 0) return;
+        Map<String, Object> item = new HashMap<>();
+        item.put("to_uid", uid);
+        item.put("seen_at", System.currentTimeMillis());
+        item.put("duration_ms", Math.max(0L, durationMs));
+        item.put("event_type", eventType == null || eventType.length() == 0 ? "expose" : eventType);
+        item.put("source", "partner_browse");
+        item.put("photo_index", Math.max(0, photoIndex));
+        ArrayList<Map<String, Object>> list = new ArrayList<>();
+        list.add(item);
+        reportExposures(list, null);
     }
 
     public void getPartnerProfile(String uidOrKey, final Callback<PartnerBrowseBean> callback) {

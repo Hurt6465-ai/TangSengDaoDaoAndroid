@@ -135,7 +135,7 @@ public final class PartnerRepository {
         if (source == null) return out;
         for (PartnerBrowseBean item : source) {
             if (item == null) continue;
-            if (!item.hasPartnerPhoto()) continue;
+            if (!item.hasPartnerPhoto() || !item.hasPartnerLanguages()) continue;
             out.add(item);
         }
         return out;

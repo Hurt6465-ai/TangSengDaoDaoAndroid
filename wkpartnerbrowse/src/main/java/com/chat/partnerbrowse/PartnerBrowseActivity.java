@@ -20,6 +20,7 @@ import com.chat.base.net.HttpResponseCode;
 import com.chat.partnerbrowse.R;
 import com.chat.partnerbrowse.databinding.ActivityWkPartnerBrowseBinding;
 import com.chat.partnerbrowse.model.PartnerBrowseBean;
+import com.chat.partnerbrowse.model.PartnerBrowseProfileMe;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,9 +32,11 @@ import java.util.Map;
 public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrowseBinding> {
     private static final int PAGE_LIMIT = 12;
     private static final int EXPOSURE_DELAY_MS = 700;
+    private static final int MIN_SKIP_REPORT_MS = 120;
     private static final int EXPOSURE_BATCH_SIZE = 5;
-    private static final int LOCAL_RECYCLE_BATCH_SIZE = 12;
-    private static final int LOCAL_RECYCLE_MAX_ITEMS = 120;
+    private static final int LOCAL_RECYCLE_BATCH_SIZE = 8;
+    private static final int LOCAL_RECYCLE_MAX_ITEMS = 72;
+    private static final int LOCAL_RECYCLE_MIN_GAP = 20;
 
     private final ArrayList<PartnerBrowseBean> partners = new ArrayList<>();
     private PartnerOuterAdapter adapter;
@@ -51,8 +54,9 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     private final Handler exposureHandler = new Handler(Looper.getMainLooper());
     private final ArrayList<Map<String, Object>> pendingExposures = new ArrayList<>();
     private final HashSet<String> exposedKeys = new HashSet<>();
-    private int pendingExposurePosition = -1;
-    private long pendingExposureStartMs;
+    private int currentExposurePosition = -1;
+    private long currentExposureStartMs;
+    private boolean currentExposureQualified;
 
     @Override
     protected ActivityWkPartnerBrowseBinding getViewBinding() {
@@ -114,7 +118,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             PartnerRepository.resetPaging();
             exposedKeys.clear();
             pendingExposures.clear();
-            cancelPendingExposure();
+            resetExposureTracking();
             partners.clear();
             adapter.notifyDataSetChanged();
             ensureProfileThenLoad();
@@ -130,8 +134,9 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             @Override
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
+                finishCurrentExposure(false);
                 PartnerImagePreloader.preloadNextUser(PartnerBrowseActivity.this, partners, position);
-                scheduleExposure(position);
+                startExposureTracking(position);
                 if (profileGatePassed && position >= partners.size() - 3) {
                     if (noMore) appendLocalCycleIfNeeded();
                     else loadMore(false);
@@ -156,6 +161,8 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         }
         if (!profileGatePassed && !checkingProfile && partners.isEmpty()) {
             ensureProfileThenLoad();
+        } else if (profileGatePassed && currentExposurePosition < 0 && !partners.isEmpty()) {
+            startExposureTracking(wkVBinding.viewPagerOuter.getCurrentItem());
         }
     }
 
@@ -168,7 +175,6 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
                 locationManager.maybeUpdateLocation(true);
             } else {
                 locationManager.markPermissionDenied();
-                // 用户这次明确拒绝后，本次和短时间内都不要继续顶着提示打扰。
                 locationManager.suppressPromptTemporarily();
             }
             updateLocationPrompt();
@@ -177,13 +183,16 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
 
     @Override
     protected void onPause() {
-        super.onPause();
+        finishCurrentExposure(true);
         flushExposures();
+        super.onPause();
     }
 
     @Override
     protected void onDestroy() {
         try {
+            finishCurrentExposure(true);
+            flushExposures();
             if (wkVBinding != null && pageChangeCallback != null) {
                 wkVBinding.viewPagerOuter.unregisterOnPageChangeCallback(pageChangeCallback);
             }
@@ -191,8 +200,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         } catch (Throwable ignored) {
         }
         pageChangeCallback = null;
-        cancelPendingExposure();
-        flushExposures();
+        resetExposureTracking();
         super.onDestroy();
     }
 
@@ -207,7 +215,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         PartnerBrowseModel.getInstance().getPartnerProfileMe((code, msg, data) -> {
             if (isFinishing() || isDestroyed()) return;
             checkingProfile = false;
-            if (code == HttpResponseCode.success && data != null && data.hasPartnerPhoto()) {
+            if (code == HttpResponseCode.success && data != null && data.hasPartnerPhoto() && data.hasPartnerLanguages()) {
                 profileGatePassed = true;
                 profileRequired = false;
                 requestLocationPermissionOnEntryIfAllowed();
@@ -218,7 +226,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
                 return;
             }
             if (code == HttpResponseCode.success && data != null) {
-                showProfileRequiredGate(true);
+                showProfileRequiredGate(true, profileRequiredMessage(data));
             } else {
                 profileGatePassed = false;
                 profileRequired = false;
@@ -227,14 +235,20 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         });
     }
 
-    private void showProfileRequiredGate(boolean openEditor) {
+    private String profileRequiredMessage(PartnerBrowseProfileMe data) {
+        if (data == null || !data.hasPartnerPhoto()) return getString(R.string.partnerbrowse_photo_required_tip);
+        if (!data.hasPartnerLanguages()) return getString(R.string.partnerbrowse_language_required_tip);
+        return getString(R.string.partnerbrowse_profile_required_tip);
+    }
+
+    private void showProfileRequiredGate(boolean openEditor, String message) {
         profileGatePassed = false;
         profileRequired = true;
         partners.clear();
         adapter.notifyDataSetChanged();
         wkVBinding.viewPagerOuter.setVisibility(View.GONE);
         wkVBinding.loadingLayout.setVisibility(View.VISIBLE);
-        wkVBinding.loadingTv.setText(R.string.partnerbrowse_photo_required_tip);
+        wkVBinding.loadingTv.setText(TextUtils.isEmpty(message) ? getString(R.string.partnerbrowse_profile_required_tip) : message);
         wkVBinding.retryBtn.setText(R.string.partnerbrowse_go_upload_photo);
         wkVBinding.retryBtn.setVisibility(View.VISIBLE);
         if (openEditor) openProfileEditOnce(false);
@@ -290,9 +304,9 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
                 showContent();
                 int current = wkVBinding.viewPagerOuter.getCurrentItem();
                 if (current >= start && current < partners.size()) {
-                    scheduleExposure(current);
+                    startExposureTracking(current);
                 } else if (first && current >= 0 && current < partners.size()) {
-                    scheduleExposure(current);
+                    startExposureTracking(current);
                 }
             } else {
                 duplicatePageCount++;
@@ -304,37 +318,75 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         });
     }
 
-
-    private void scheduleExposure(int position) {
-        cancelPendingExposure();
+    private void startExposureTracking(int position) {
         if (!profileGatePassed || position < 0 || position >= partners.size()) return;
-        pendingExposurePosition = position;
-        pendingExposureStartMs = System.currentTimeMillis();
-        exposureHandler.postDelayed(() -> commitExposureIfStillCurrent(position), EXPOSURE_DELAY_MS);
+        if (currentExposurePosition == position && currentExposureStartMs > 0) return;
+        resetExposureTracking();
+        currentExposurePosition = position;
+        currentExposureStartMs = System.currentTimeMillis();
+        currentExposureQualified = false;
+        exposureHandler.postDelayed(() -> {
+            if (wkVBinding == null || currentExposurePosition != position) return;
+            if (wkVBinding.viewPagerOuter.getCurrentItem() == position) {
+                currentExposureQualified = true;
+            }
+        }, EXPOSURE_DELAY_MS);
     }
 
-    private void cancelPendingExposure() {
-        pendingExposurePosition = -1;
-        pendingExposureStartMs = 0L;
+    private void resetExposureTracking() {
+        currentExposurePosition = -1;
+        currentExposureStartMs = 0L;
+        currentExposureQualified = false;
         exposureHandler.removeCallbacksAndMessages(null);
     }
 
-    private void commitExposureIfStillCurrent(int position) {
-        if (wkVBinding == null || !profileGatePassed) return;
-        if (pendingExposurePosition != position) return;
-        if (wkVBinding.viewPagerOuter.getCurrentItem() != position) return;
-        if (position < 0 || position >= partners.size()) return;
+    private void finishCurrentExposure(boolean forceFlush) {
+        if (currentExposurePosition < 0 || currentExposureStartMs <= 0) {
+            if (forceFlush) flushExposures();
+            return;
+        }
+        int position = currentExposurePosition;
+        long startMs = currentExposureStartMs;
+        boolean qualified = currentExposureQualified;
+        resetExposureTracking();
+        if (position < 0 || position >= partners.size()) {
+            if (forceFlush) flushExposures();
+            return;
+        }
         PartnerBrowseBean item = partners.get(position);
-        if (item == null) return;
+        if (item == null) {
+            if (forceFlush) flushExposures();
+            return;
+        }
+        long duration = Math.max(0L, System.currentTimeMillis() - startMs);
+        if (duration < MIN_SKIP_REPORT_MS) {
+            if (forceFlush) flushExposures();
+            return;
+        }
+        String eventType = (qualified || duration >= EXPOSURE_DELAY_MS) ? "expose" : "skip";
         String key = item.getStableKey();
-        if (TextUtils.isEmpty(key) || !exposedKeys.add(key)) return;
+        if ("expose".equals(eventType)) {
+            if (TextUtils.isEmpty(key) || !exposedKeys.add(key)) {
+                if (forceFlush) flushExposures();
+                return;
+            }
+        }
+        enqueuePartnerEvent(item, startMs, duration, eventType, 0);
+        if (forceFlush || pendingExposures.size() >= EXPOSURE_BATCH_SIZE) flushExposures();
+    }
+
+    private void enqueuePartnerEvent(PartnerBrowseBean item, long seenAt, long duration, String eventType, int photoIndex) {
+        if (item == null) return;
+        String toUID = TextUtils.isEmpty(item.uid) ? item.id : item.uid;
+        if (TextUtils.isEmpty(toUID)) return;
         Map<String, Object> exposure = new HashMap<>();
-        exposure.put("to_uid", TextUtils.isEmpty(item.uid) ? item.id : item.uid);
-        exposure.put("seen_at", System.currentTimeMillis());
-        long duration = Math.max(EXPOSURE_DELAY_MS, System.currentTimeMillis() - pendingExposureStartMs);
-        exposure.put("duration_ms", duration);
+        exposure.put("to_uid", toUID);
+        exposure.put("seen_at", seenAt <= 0 ? System.currentTimeMillis() : seenAt);
+        exposure.put("duration_ms", Math.max(0L, duration));
+        exposure.put("event_type", TextUtils.isEmpty(eventType) ? "expose" : eventType);
+        exposure.put("source", "partner_browse");
+        exposure.put("photo_index", Math.max(0, photoIndex));
         pendingExposures.add(exposure);
-        if (pendingExposures.size() >= EXPOSURE_BATCH_SIZE) flushExposures();
     }
 
     private void flushExposures() {
@@ -343,8 +395,6 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         pendingExposures.clear();
         PartnerBrowseModel.getInstance().reportExposures(copy, (code, msg, data) -> {
             if (code == HttpResponseCode.success || code == 200 || code == 0) return;
-            // Network failure should not permanently lose exposure data during the same session.
-            // Keep the queue bounded so repeated failures cannot grow memory without limit.
             if (!isFinishing() && !isDestroyed() && pendingExposures.size() < EXPOSURE_BATCH_SIZE * 2) {
                 pendingExposures.addAll(0, copy);
             }
@@ -358,25 +408,47 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             if (old != null) existKeys.add(old.getStableKey());
         }
         for (PartnerBrowseBean item : list) {
-            if (item == null || !item.hasPartnerPhoto()) continue;
+            if (item == null || !item.hasPartnerPhoto() || !item.hasPartnerLanguages()) continue;
             String key = item.getStableKey();
             if (existKeys.add(key)) partners.add(item);
         }
         return partners.size() - before;
     }
 
-
     private void appendLocalCycleIfNeeded() {
         if (partners.isEmpty() || partners.size() >= LOCAL_RECYCLE_MAX_ITEMS) return;
         ArrayList<PartnerBrowseBean> copy = new ArrayList<>(partners);
         Collections.shuffle(copy);
+        int current = wkVBinding == null ? partners.size() - 1 : wkVBinding.viewPagerOuter.getCurrentItem();
         int start = partners.size();
-        int count = Math.min(LOCAL_RECYCLE_BATCH_SIZE, copy.size());
-        for (int i = 0; i < count; i++) {
-            PartnerBrowseBean item = copy.get(i);
-            if (item != null) partners.add(item);
+        int count = 0;
+        for (PartnerBrowseBean item : copy) {
+            if (item == null || item.follow == 1 || item.isHelloSent()) continue;
+            if (isInRecentWindow(item, current, LOCAL_RECYCLE_MIN_GAP)) continue;
+            partners.add(item);
+            count++;
+            if (count >= LOCAL_RECYCLE_BATCH_SIZE) break;
+        }
+        if (count == 0) {
+            for (PartnerBrowseBean item : copy) {
+                if (item == null || item.follow == 1 || item.isHelloSent()) continue;
+                partners.add(item);
+                count++;
+                if (count >= Math.min(3, LOCAL_RECYCLE_BATCH_SIZE)) break;
+            }
         }
         if (partners.size() > start) adapter.notifyItemRangeInserted(start, partners.size() - start);
+    }
+
+    private boolean isInRecentWindow(PartnerBrowseBean item, int current, int gap) {
+        if (item == null || TextUtils.isEmpty(item.getStableKey())) return false;
+        int from = Math.max(0, current - gap);
+        int to = Math.min(partners.size() - 1, current + gap);
+        for (int i = from; i <= to; i++) {
+            PartnerBrowseBean old = partners.get(i);
+            if (old != null && TextUtils.equals(old.getStableKey(), item.getStableKey())) return true;
+        }
+        return false;
     }
 
     private void showContent() {
