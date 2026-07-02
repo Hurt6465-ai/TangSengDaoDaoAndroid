@@ -862,7 +862,7 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
 
     private File copyUriToCache(Uri uri, String prefix) throws Exception {
         if (uri == null) throw new IllegalStateException("empty uri");
-        String safePrefix = TextUtils.isEmpty(prefix) ? "partner_img" : prefix.replaceAll("[^a-zA-Z0-9_\-]", "_");
+        String safePrefix = TextUtils.isEmpty(prefix) ? "partner_img" : prefix.replaceAll("[^a-zA-Z0-9_-]", "_");
         File out = new File(getCacheDir(), safePrefix + "_" + System.currentTimeMillis() + "_" + Math.abs(System.nanoTime()) + ".jpg");
         InputStream input = null;
         FileOutputStream fos = null;
