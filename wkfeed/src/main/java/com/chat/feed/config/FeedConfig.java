@@ -9,7 +9,7 @@ public class FeedConfig {
     public static boolean DEBUG_MOCK = false;
 
     /** 后端接口未完成/失败时，首版可回退 Mock，避免发现页一片空白。上线前建议改 false。 */
-    public static boolean FALLBACK_MOCK_ON_ERROR = true;
+    public static boolean FALLBACK_MOCK_ON_ERROR = false;
 
     public static final int PAGE_SIZE = 16;
 
@@ -20,7 +20,7 @@ public class FeedConfig {
      * 是否允许发布视频。
      * 测试阶段可打开；上线服务器容量小时，把这里改成 false，会隐藏/禁用视频上传入口。
      */
-    public static boolean ENABLE_VIDEO_PUBLISH = true;
+    public static boolean ENABLE_VIDEO_PUBLISH = false;
 
     /**
      * 是否在手机端压缩视频。
