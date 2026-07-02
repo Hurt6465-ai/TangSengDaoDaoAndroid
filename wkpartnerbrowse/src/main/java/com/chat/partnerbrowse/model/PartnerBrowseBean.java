@@ -83,6 +83,10 @@ public class PartnerBrowseBean {
         return !safeImageList(images).isEmpty();
     }
 
+    public boolean hasPartnerLanguages() {
+        return !getNativeLanguagesSafe().isEmpty() && !getLearningLanguagesSafe().isEmpty();
+    }
+
     public long getLastActiveMillisSafe() {
         if (last_active_millis > 0) return normalizeTime(last_active_millis);
         if (last_active_at > 0) return normalizeTime(last_active_at);
