@@ -288,7 +288,25 @@ public class FeedModel extends WKBaseModel {
         // Keep both keys: event_type is the canonical backend field, type is retained for old server compatibility.
         body.put("event_type", type);
         body.put("type", type);
-        request(createService(FeedService.class).event(feedId, body), listener);
+        // expose/watch/skip/complete are fire-and-forget analytics calls.
+        // WKBaseModel.request in the host app is not guaranteed to accept a null listener;
+        // if the network call fails and request() calls listener.onFail(), a null listener
+        // can crash the already rendered FeedBrowseActivity and trigger the global
+        // "program exception" toast. Always pass a no-op listener when caller does not care.
+        request(createService(FeedService.class).event(feedId, body), safeCommonListener(listener));
+    }
+
+    private IRequestResultListener<CommonResponse> safeCommonListener(IRequestResultListener<CommonResponse> listener) {
+        if (listener != null) return listener;
+        return new IRequestResultListener<CommonResponse>() {
+            @Override
+            public void onSuccess(CommonResponse result) {
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+            }
+        };
     }
 
     public static class FeedUploadUrl {
