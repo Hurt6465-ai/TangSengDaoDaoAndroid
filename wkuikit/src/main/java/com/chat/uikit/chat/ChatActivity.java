@@ -110,6 +110,7 @@ import com.chat.uikit.group.GroupDetailActivity;
 import com.chat.uikit.group.service.GroupModel;
 import com.chat.uikit.message.MsgModel;
 import com.chat.uikit.robot.service.WKRobotModel;
+import com.chat.uikit.user.ProfileNavigator;
 import com.chat.uikit.user.service.UserModel;
 import com.chat.uikit.view.WKPlayVoiceUtils;
 import com.effective.android.panel.PanelSwitchHelper;
@@ -1275,6 +1276,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             startActivity(intent);
         });
 
+        SingleClickUtil.onSingleClick(wkVBinding.topLayout.avatarView, view -> openTopPersonalProfile());
+        SingleClickUtil.onSingleClick(wkVBinding.topLayout.otherLayout, view -> openTopPersonalProfile());
+
         wkVBinding.recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
@@ -1637,6 +1641,16 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         setIntent(intent);
         initParam();
         initData();
+    }
+
+
+    private void openTopPersonalProfile() {
+        if (channelType != WKChannelType.PERSONAL) return;
+        if (TextUtils.isEmpty(channelId)) return;
+        if (channelType == WKChannelType.CUSTOMER_SERVICE) return;
+        WKChannelMember member = WKIM.getInstance().getChannelMembersManager().getMember(channelId, channelType, loginUID);
+        if (member != null && member.isDeleted == 1) return;
+        ProfileNavigator.open(ChatActivity.this, channelId);
     }
 
     private void initData() {
