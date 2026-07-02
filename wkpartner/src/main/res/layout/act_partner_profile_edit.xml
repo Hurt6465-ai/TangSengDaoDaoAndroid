@@ -19,40 +19,33 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/partner_name"
-                android:textColor="#30303A"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="92dp"
-                android:layout_marginTop="10dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
 
                 <FrameLayout
                     android:id="@+id/avatarPickerLayout"
-                    android:layout_width="78dp"
-                    android:layout_height="78dp"
+                    android:layout_width="104dp"
+                    android:layout_height="104dp"
                     android:clipChildren="false"
                     android:clipToPadding="false">
 
                     <com.chat.base.ui.components.AvatarView
                         android:id="@+id/avatarView"
-                        android:layout_width="72dp"
-                        android:layout_height="72dp"
+                        android:layout_width="88dp"
+                        android:layout_height="88dp"
                         android:layout_gravity="center" />
 
                     <TextView
                         android:id="@+id/avatarAddTv"
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
                         android:layout_gravity="bottom|end"
+                        android:layout_marginEnd="8dp"
+                        android:layout_marginBottom="8dp"
                         android:background="@drawable/bg_partner_avatar_add"
                         android:gravity="center"
                         android:text="+"
@@ -61,21 +54,54 @@
                         android:textStyle="bold" />
                 </FrameLayout>
 
-                <EditText
-                    android:id="@+id/nameEt"
-                    android:layout_width="0dp"
-                    android:layout_height="54dp"
-                    android:layout_marginStart="14dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_partner_edit_field"
-                    android:hint="@string/partner_name"
-                    android:maxLines="1"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:textColor="#222222"
-                    android:textColorHint="#999999"
-                    android:textSize="15sp" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/partner_avatar_change_hint"
+                    android:textColor="#888888"
+                    android:textSize="13sp" />
             </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/partner_name"
+                android:textColor="#30303A"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/nameEt"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_partner_edit_field"
+                android:hint="@string/partner_name"
+                android:maxLines="1"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:textColor="#222222"
+                android:textColorHint="#999999"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="@string/partner_photos"
+                android:textColor="#30303A"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/partner_profile_photo_batch_tip"
+                android:textColor="#888888"
+                android:textSize="13sp" />
 
             <HorizontalScrollView
                 android:layout_width="match_parent"
