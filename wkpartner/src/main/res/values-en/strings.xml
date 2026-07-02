@@ -64,4 +64,9 @@
     <string-array name="partner_tags_education"><item>Private</item><item>Middle school or below</item><item>High school</item><item>Bachelor</item><item>Master or above</item><item>Other</item></string-array>
     <string-array name="partner_tags_safety"><item>Polite chat</item><item>No harassment</item><item>No contact exchange</item><item>In-app chat</item><item>Mutual respect</item></string-array>
     <string-array name="partner_tags_study_way"><item>Self-study</item><item>Offline learning</item><item>Online learning</item></string-array>
+    <string name="partner_complete_profile">Complete Profile</string>
+    <string name="partner_complete_profile_first">Please complete your profile first.</string>
+    <string name="partner_add_photo">Batch add partner photos (up to 5)</string>
+    <string name="partner_avatar_change_hint">Tap to change avatar</string>
+    <string name="partner_profile_photo_batch_tip">Tap a placeholder to choose multiple photos at once, up to 5.</string>
 </resources>
