@@ -66,7 +66,7 @@
     <string name="partner_blacklist_added">Blacklist ထဲထည့်ပြီးပါပြီ</string>
     <string name="partner_blacklist_removed">Blacklist မှ ဖယ်ပြီးပါပြီ</string>
     <string name="partner_report">တိုင်ကြားရန်</string>
-    <string name="partner_report_coming">တိုင်ကြား 기능ကို နောက်ပိုင်း ထည့်ပါမည်</string>
+    <string name="partner_report_coming">တိုင်ကြားခြင်းလုပ်ဆောင်ချက်ကို နောက်ပိုင်းတွင် ထည့်သွင်းပါမည်。</string>
     <string name="partner_save_media_failed">အခြေခံအချက်အလက် သိမ်းပြီးပါပြီ။ ပုံ သို့မဟုတ် tag သိမ်းမရပါ။ Backend တွင် profile_cover/profile_images/tags ကို ထောက်ပံ့ထားကြောင်း စစ်ပါ။</string>
     <string name="partner_profile_image_required">ဘာသာဖော် ဓာတ်ပုံ အနည်းဆုံး တစ်ပုံ တင်ပါ</string>
     <string name="partner_avatar_upload_success">ပရိုဖိုင်ပုံ တင်ပြီးပါပြီ</string>
@@ -89,4 +89,9 @@
     <string-array name="partner_tags_education"><item>မဖော်ပြလို</item><item>အလယ်တန်းနှင့်အောက်</item><item>အထက်တန်း</item><item>ဘွဲ့</item><item>မဟာနှင့်အထက်</item><item>အခြား</item></string-array>
     <string-array name="partner_tags_safety"><item>ယဉ်ကျေးစွာပြော</item><item>နှောင့်ယှက်မှုငြင်း</item><item>ဆက်သွယ်ရန်မပေး</item><item>App အတွင်းသာ</item><item>အပြန်အလှန်လေးစား</item></string-array>
     <string-array name="partner_tags_study_way"><item>ကိုယ်တိုင်သင်</item><item>အပြင်မှာသင်</item><item>အွန်လိုင်းသင်</item></string-array>
+    <string name="partner_complete_profile">ပရိုဖိုင်ဖြည့်ရန်</string>
+    <string name="partner_complete_profile_first">ပရိုဖိုင်ကို အရင်ဖြည့်ပါ။</string>
+    <string name="partner_add_photo">ဘာသာဖက်ပုံများကို အစုလိုက် ထည့်ပါ (အများဆုံး ၅ ပုံ)</string>
+    <string name="partner_avatar_change_hint">ပရိုဖိုင်ပုံပြောင်းရန် နှိပ်ပါ</string>
+    <string name="partner_profile_photo_batch_tip">အောက်က နေရာကို နှိပ်ပြီး ပုံများကို တစ်ခါတည်း ရွေးနိုင်သည်။ အများဆုံး ၅ ပုံ။</string>
 </resources>
