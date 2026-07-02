@@ -285,6 +285,8 @@ public class FeedModel extends WKBaseModel {
             return;
         }
         Map<String, Object> body = extra == null ? new HashMap<>() : new HashMap<>(extra);
+        // Keep both keys: event_type is the canonical backend field, type is retained for old server compatibility.
+        body.put("event_type", type);
         body.put("type", type);
         request(createService(FeedService.class).event(feedId, body), listener);
     }
