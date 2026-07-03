@@ -37,6 +37,7 @@ android {
 
 dependencies {
     api project(':wkbase')
+    implementation project(':wklearning')
 
     implementation "com.mikepenz:iconics-core:5.5.0"
     implementation "com.mikepenz:fontawesome-typeface:5.13.3.1-kotlin"
