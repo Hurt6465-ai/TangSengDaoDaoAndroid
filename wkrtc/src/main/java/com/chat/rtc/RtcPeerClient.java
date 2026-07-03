@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.media.projection.MediaProjection;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.util.DisplayMetrics;
 import android.util.Log;
 
 import org.webrtc.AudioSource;
@@ -85,8 +86,8 @@ public class RtcPeerClient {
     private VideoTrack screenVideoTrack;
     private SurfaceTextureHelper screenTextureHelper;
 
-    private final RtcVideoSinkProxy localProxy = new RtcVideoSinkProxy();
-    private final RtcVideoSinkProxy remoteProxy = new RtcVideoSinkProxy();
+    private final RtcVideoSinkProxy localProxy = new RtcVideoSinkProxy("local");
+    private final RtcVideoSinkProxy remoteProxy = new RtcVideoSinkProxy("remote");
     private SurfaceViewRenderer localRenderer;
     private SurfaceViewRenderer remoteRenderer;
 
@@ -220,12 +221,22 @@ public class RtcPeerClient {
                 screenVideoTrack = nextTrack;
                 screenTextureHelper = nextHelper;
 
-                screenVideoCapturer.startCapture(RtcConstants.SCREEN_WIDTH, RtcConstants.SCREEN_HEIGHT, RtcConstants.SCREEN_FPS);
+                int[] screenSize = resolveScreenCaptureSize();
+                adaptScreenSourceOutput(screenVideoSource, screenSize[0], screenSize[1], RtcConstants.SCREEN_FPS);
+                screenVideoCapturer.startCapture(screenSize[0], screenSize[1], RtcConstants.SCREEN_FPS);
                 screenSharing = true;
                 swapRenderers(false);
-                setVideoMaxBitrate(RtcConstants.SCREEN_MAX_BITRATE_KBPS);
-                RtcDebugLogger.i("RtcPeerClient", "screen share started width=" + RtcConstants.SCREEN_WIDTH
-                        + " height=" + RtcConstants.SCREEN_HEIGHT + " fps=" + RtcConstants.SCREEN_FPS
+                setVideoBitrate(
+                        RtcConstants.SCREEN_MIN_BITRATE_KBPS,
+                        RtcConstants.SCREEN_START_BITRATE_KBPS,
+                        RtcConstants.SCREEN_MAX_BITRATE_KBPS,
+                        RtcConstants.SCREEN_FPS,
+                        true);
+                RtcDebugLogger.i("RtcPeerClient", "screen share started width=" + screenSize[0]
+                        + " height=" + screenSize[1] + " fps=" + RtcConstants.SCREEN_FPS
+                        + " minKbps=" + RtcConstants.SCREEN_MIN_BITRATE_KBPS
+                        + " startKbps=" + RtcConstants.SCREEN_START_BITRATE_KBPS
+                        + " maxKbps=" + RtcConstants.SCREEN_MAX_BITRATE_KBPS
                         + " replaceTrack=" + senderReplaced + " track=" + screenVideoTrack.id());
             } catch (Exception e) {
                 try { if (senderReplaced && videoSender != null && localVideoTrack != null) videoSender.setTrack(localVideoTrack, false); } catch (Exception ignored) {}
@@ -245,7 +256,8 @@ public class RtcPeerClient {
                 stopAndDisposeCurrentScreenObjects();
                 tryRestartCameraCapture();
                 swapRenderers(false);
-                setVideoMaxBitrate(lowQuality ? RtcConstants.VIDEO_LOW_BITRATE_KBPS : RtcConstants.VIDEO_MAX_BITRATE_KBPS);
+                if (lowQuality) setVideoBitrate(0, 0, RtcConstants.VIDEO_LOW_BITRATE_KBPS, RtcConstants.VIDEO_LOW_FPS, false);
+                else setVideoBitrate(RtcConstants.VIDEO_MIN_BITRATE_KBPS, RtcConstants.VIDEO_START_BITRATE_KBPS, RtcConstants.VIDEO_MAX_BITRATE_KBPS, RtcConstants.VIDEO_FPS, false);
                 RtcDebugLogger.i("RtcPeerClient", "screen share stopped cameraRestored=" + restored);
             } catch (Exception e) {
                 report("恢复摄像头失败", e);
@@ -257,7 +269,7 @@ public class RtcPeerClient {
         rtcHandler.post(() -> {
             if (!videoCall || closed || screenSharing) return;
             lowQuality = true;
-            setVideoMaxBitrate(RtcConstants.VIDEO_LOW_BITRATE_KBPS);
+            setVideoBitrate(0, 0, RtcConstants.VIDEO_LOW_BITRATE_KBPS, RtcConstants.VIDEO_LOW_FPS, false);
             try {
                 if (videoCapturer instanceof CameraVideoCapturer) {
                     ((CameraVideoCapturer) videoCapturer).changeCaptureFormat(
@@ -275,7 +287,7 @@ public class RtcPeerClient {
         rtcHandler.post(() -> {
             if (!videoCall || closed || screenSharing) return;
             lowQuality = false;
-            setVideoMaxBitrate(RtcConstants.VIDEO_MAX_BITRATE_KBPS);
+            setVideoBitrate(RtcConstants.VIDEO_MIN_BITRATE_KBPS, RtcConstants.VIDEO_START_BITRATE_KBPS, RtcConstants.VIDEO_MAX_BITRATE_KBPS, RtcConstants.VIDEO_FPS, false);
             try {
                 if (videoCapturer instanceof CameraVideoCapturer) {
                     ((CameraVideoCapturer) videoCapturer).changeCaptureFormat(
@@ -384,7 +396,7 @@ public class RtcPeerClient {
         surfaceTextureHelper = SurfaceTextureHelper.create("cp-video-thread", eglContext);
         videoCapturer.initialize(surfaceTextureHelper, context, videoSource.getCapturerObserver());
         videoCapturer.startCapture(RtcConstants.VIDEO_WIDTH, RtcConstants.VIDEO_HEIGHT, RtcConstants.VIDEO_FPS);
-        setVideoMaxBitrate(RtcConstants.VIDEO_MAX_BITRATE_KBPS);
+        setVideoBitrate(RtcConstants.VIDEO_MIN_BITRATE_KBPS, RtcConstants.VIDEO_START_BITRATE_KBPS, RtcConstants.VIDEO_MAX_BITRATE_KBPS, RtcConstants.VIDEO_FPS, false);
     }
 
     private void tryRestartCameraCapture() {
@@ -458,14 +470,74 @@ public class RtcPeerClient {
         queuedRemoteCandidates.clear();
     }
 
-    private void setVideoMaxBitrate(int kbps) {
+    private void setVideoBitrate(int minKbps, int startKbps, int maxKbps, Integer maxFps, boolean screenContent) {
         try {
             if (videoSender == null) return;
-            org.webrtc.RtpParameters p = videoSender.getParameters();
-            if (p == null || p.encodings == null || p.encodings.isEmpty()) return;
-            p.encodings.get(0).maxBitrateBps = kbps * 1000;
-            videoSender.setParameters(p);
+            org.webrtc.RtpParameters parameters = videoSender.getParameters();
+            if (parameters == null || parameters.encodings == null || parameters.encodings.isEmpty()) return;
+            for (org.webrtc.RtpParameters.Encoding encoding : parameters.encodings) {
+                encoding.active = true;
+                if (minKbps > 0) encoding.minBitrateBps = minKbps * 1000;
+                if (maxKbps > 0) encoding.maxBitrateBps = maxKbps * 1000;
+                if (maxFps != null && maxFps > 0) encoding.maxFramerate = maxFps;
+                try { encoding.scaleResolutionDownBy = 1.0; } catch (Throwable ignored) {}
+                try { encoding.bitratePriority = screenContent ? 4.0 : 2.0; } catch (Throwable ignored) {}
+                try { encoding.networkPriority = screenContent ? org.webrtc.Priority.HIGH : org.webrtc.Priority.MEDIUM; } catch (Throwable ignored) {}
+                try { if (screenContent) encoding.numTemporalLayers = 1; } catch (Throwable ignored) {}
+            }
+            try {
+                parameters.degradationPreference = screenContent
+                        ? org.webrtc.RtpParameters.DegradationPreference.MAINTAIN_RESOLUTION
+                        : org.webrtc.RtpParameters.DegradationPreference.BALANCED;
+            } catch (Throwable ignored) {}
+            boolean ok = videoSender.setParameters(parameters);
+            RtcDebugLogger.i("RtcPeerClient", "set video bitrate ok=" + ok
+                    + " min=" + minKbps + " start=" + startKbps + " max=" + maxKbps
+                    + " fps=" + maxFps + " screen=" + screenContent);
         } catch (Exception e) { Log.w(TAG, "bitrate", e); }
+    }
+
+    private void adaptScreenSourceOutput(VideoSource source, int width, int height, int fps) {
+        if (source == null) return;
+        try {
+            java.lang.reflect.Method method = source.getClass().getMethod(
+                    "adaptOutputFormat", int.class, int.class, int.class);
+            method.invoke(source, width, height, fps);
+            RtcDebugLogger.i("RtcPeerClient", "screen source adapted width=" + width + " height=" + height + " fps=" + fps);
+        } catch (Throwable ignored) {
+            // Some WebRTC Android builds do not expose VideoSource.adaptOutputFormat.
+            // ScreenCapturerAndroid.startCapture(width,height,fps) still applies the same target size.
+        }
+    }
+
+    private int[] resolveScreenCaptureSize() {
+        int width = RtcConstants.SCREEN_WIDTH;
+        int height = RtcConstants.SCREEN_HEIGHT;
+        try {
+            DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+            if (metrics != null && metrics.widthPixels > 0 && metrics.heightPixels > 0) {
+                width = metrics.widthPixels;
+                height = metrics.heightPixels;
+            }
+        } catch (Exception ignored) {}
+        int longEdge = Math.max(width, height);
+        int shortEdge = Math.min(width, height);
+        float scale = 1.0f;
+        if (longEdge > RtcConstants.SCREEN_MAX_LONG_EDGE) {
+            scale = Math.min(scale, (float) RtcConstants.SCREEN_MAX_LONG_EDGE / (float) longEdge);
+        }
+        if (shortEdge > RtcConstants.SCREEN_MAX_SHORT_EDGE) {
+            scale = Math.min(scale, (float) RtcConstants.SCREEN_MAX_SHORT_EDGE / (float) shortEdge);
+        }
+        int outW = makeEven(Math.round(width * scale));
+        int outH = makeEven(Math.round(height * scale));
+        outW = Math.max(2, outW);
+        outH = Math.max(2, outH);
+        return new int[]{outW, outH};
+    }
+
+    private int makeEven(int value) {
+        return value % 2 == 0 ? value : value - 1;
     }
 
     private List<PeerConnection.IceServer> defaultIceServers() { return RtcIceServers.getDefault(); }
