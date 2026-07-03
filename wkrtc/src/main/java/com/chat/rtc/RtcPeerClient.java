@@ -80,6 +80,10 @@ public class RtcPeerClient {
     private boolean videoCall;
     private boolean screenSharing;
     private boolean lowQuality;
+    private VideoCapturer screenVideoCapturer;
+    private VideoSource screenVideoSource;
+    private VideoTrack screenVideoTrack;
+    private SurfaceTextureHelper screenTextureHelper;
 
     private final RtcVideoSinkProxy localProxy = new RtcVideoSinkProxy();
     private final RtcVideoSinkProxy remoteProxy = new RtcVideoSinkProxy();
@@ -179,20 +183,54 @@ public class RtcPeerClient {
     public void startScreenShare(Intent permissionData) {
         if (permissionData == null) return;
         rtcHandler.post(() -> {
-            if (!videoCall || closed || videoSource == null) return;
+            if (!videoCall || closed || videoSender == null || localVideoTrack == null) return;
+            if (screenSharing) return;
+            VideoCapturer nextCapturer = null;
+            VideoSource nextSource = null;
+            VideoTrack nextTrack = null;
+            SurfaceTextureHelper nextHelper = null;
+            boolean senderReplaced = false;
             try {
-                ScreenCapturerAndroid screenCapturer = new ScreenCapturerAndroid(permissionData, new MediaProjection.Callback() {
+                nextCapturer = new ScreenCapturerAndroid(permissionData, new MediaProjection.Callback() {
                     @Override public void onStop() {
                         stopScreenShare();
                     }
                 });
-                switchVideoCapturer(screenCapturer, RtcConstants.SCREEN_WIDTH, RtcConstants.SCREEN_HEIGHT, RtcConstants.SCREEN_FPS, true);
+
+                // Real screen sharing must replace the sender's outbound video track.
+                // Reusing the camera VideoSource can keep sending camera frames on some WebRTC builds.
+                nextSource = factory.createVideoSource(true);
+                nextTrack = factory.createVideoTrack("CP_SCREEN_" + System.currentTimeMillis(), nextSource);
+                nextTrack.setEnabled(true);
+                nextHelper = SurfaceTextureHelper.create("cp-screen-thread", eglContext);
+                nextCapturer.initialize(nextHelper, context, nextSource.getCapturerObserver());
+
+                try {
+                    if (videoCapturer != null) videoCapturer.stopCapture();
+                    RtcDebugLogger.i("RtcPeerClient", "camera capturer stopped for screen share");
+                } catch (Exception e) {
+                    Log.w(TAG, "stop camera before screen share", e);
+                }
+
+                senderReplaced = videoSender.setTrack(nextTrack, false);
+                if (!senderReplaced) throw new IllegalStateException("replace video sender track failed");
+
+                screenVideoCapturer = nextCapturer;
+                screenVideoSource = nextSource;
+                screenVideoTrack = nextTrack;
+                screenTextureHelper = nextHelper;
+
+                screenVideoCapturer.startCapture(RtcConstants.SCREEN_WIDTH, RtcConstants.SCREEN_HEIGHT, RtcConstants.SCREEN_FPS);
                 screenSharing = true;
                 swapRenderers(false);
                 setVideoMaxBitrate(RtcConstants.SCREEN_MAX_BITRATE_KBPS);
                 RtcDebugLogger.i("RtcPeerClient", "screen share started width=" + RtcConstants.SCREEN_WIDTH
-                        + " height=" + RtcConstants.SCREEN_HEIGHT + " fps=" + RtcConstants.SCREEN_FPS);
+                        + " height=" + RtcConstants.SCREEN_HEIGHT + " fps=" + RtcConstants.SCREEN_FPS
+                        + " replaceTrack=" + senderReplaced + " track=" + screenVideoTrack.id());
             } catch (Exception e) {
+                try { if (senderReplaced && videoSender != null && localVideoTrack != null) videoSender.setTrack(localVideoTrack, false); } catch (Exception ignored) {}
+                disposeScreenObjects(nextCapturer, nextSource, nextTrack, nextHelper);
+                tryRestartCameraCapture();
                 report("屏幕共享失败", e);
             }
         });
@@ -202,15 +240,13 @@ public class RtcPeerClient {
         rtcHandler.post(() -> {
             if (!videoCall || closed || !screenSharing) return;
             try {
-                VideoCapturer camera = createCameraCapturer();
-                if (camera == null) throw new IllegalStateException("没有可用摄像头");
-                switchVideoCapturer(camera, lowQuality ? RtcConstants.VIDEO_LOW_WIDTH : RtcConstants.VIDEO_WIDTH,
-                        lowQuality ? RtcConstants.VIDEO_LOW_HEIGHT : RtcConstants.VIDEO_HEIGHT,
-                        lowQuality ? RtcConstants.VIDEO_LOW_FPS : RtcConstants.VIDEO_FPS, false);
                 screenSharing = false;
+                boolean restored = videoSender == null || localVideoTrack == null || videoSender.setTrack(localVideoTrack, false);
+                stopAndDisposeCurrentScreenObjects();
+                tryRestartCameraCapture();
                 swapRenderers(false);
                 setVideoMaxBitrate(lowQuality ? RtcConstants.VIDEO_LOW_BITRATE_KBPS : RtcConstants.VIDEO_MAX_BITRATE_KBPS);
-                RtcDebugLogger.i("RtcPeerClient", "screen share stopped cameraRestored=true");
+                RtcDebugLogger.i("RtcPeerClient", "screen share stopped cameraRestored=" + restored);
             } catch (Exception e) {
                 report("恢复摄像头失败", e);
             }
@@ -351,6 +387,40 @@ public class RtcPeerClient {
         setVideoMaxBitrate(RtcConstants.VIDEO_MAX_BITRATE_KBPS);
     }
 
+    private void tryRestartCameraCapture() {
+        try {
+            if (videoCapturer != null) {
+                videoCapturer.startCapture(
+                        lowQuality ? RtcConstants.VIDEO_LOW_WIDTH : RtcConstants.VIDEO_WIDTH,
+                        lowQuality ? RtcConstants.VIDEO_LOW_HEIGHT : RtcConstants.VIDEO_HEIGHT,
+                        lowQuality ? RtcConstants.VIDEO_LOW_FPS : RtcConstants.VIDEO_FPS);
+                RtcDebugLogger.i("RtcPeerClient", "camera capturer restarted after screen share");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "restart camera after screen share", e);
+        }
+    }
+
+    private void stopAndDisposeCurrentScreenObjects() {
+        VideoCapturer c = screenVideoCapturer;
+        VideoSource source = screenVideoSource;
+        VideoTrack track = screenVideoTrack;
+        SurfaceTextureHelper helper = screenTextureHelper;
+        screenVideoCapturer = null;
+        screenVideoSource = null;
+        screenVideoTrack = null;
+        screenTextureHelper = null;
+        disposeScreenObjects(c, source, track, helper);
+    }
+
+    private void disposeScreenObjects(VideoCapturer c, VideoSource source, VideoTrack track, SurfaceTextureHelper helper) {
+        try { if (c != null) c.stopCapture(); } catch (Exception ignored) {}
+        try { if (c != null) c.dispose(); } catch (Exception ignored) {}
+        try { if (track != null) track.dispose(); } catch (Exception ignored) {}
+        try { if (source != null) source.dispose(); } catch (Exception ignored) {}
+        try { if (helper != null) helper.dispose(); } catch (Exception ignored) {}
+    }
+
     private void switchVideoCapturer(VideoCapturer next, int width, int height, int fps, boolean nextIsScreen) throws Exception {
         if (next == null || videoSource == null) return;
         try { if (videoCapturer != null) videoCapturer.stopCapture(); } catch (Exception ignored) {}
@@ -404,6 +474,7 @@ public class RtcPeerClient {
         if (closed) return;
         closed = true;
         try { localProxy.setTarget(null); remoteProxy.setTarget(null); } catch (Exception ignored) {}
+        try { stopAndDisposeCurrentScreenObjects(); } catch (Exception ignored) {}
         try { if (videoCapturer != null) videoCapturer.stopCapture(); } catch (Exception ignored) {}
         try { if (videoCapturer != null) videoCapturer.dispose(); } catch (Exception ignored) {}
         try { if (surfaceTextureHelper != null) surfaceTextureHelper.dispose(); } catch (Exception ignored) {}

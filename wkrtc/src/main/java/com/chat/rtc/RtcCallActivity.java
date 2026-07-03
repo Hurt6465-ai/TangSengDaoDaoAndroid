@@ -656,6 +656,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
                     peerClient.startScreenShare(data);
                     toast(getString(R.string.rtc_screen_share_started));
                     RtcDebugLogger.i("RtcCallActivity", "screen share start requested callId=" + callId);
+                    handler.postDelayed(this::goHomeForRealScreenShare, 650L);
                 }
             }, 350L);
         } catch (Exception e) {
@@ -663,6 +664,22 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             applyScreenShareUi(false);
             RtcDebugLogger.e("RtcCallActivity", "start screen share failed", e);
             toast(getString(R.string.rtc_screen_share_failed));
+        }
+    }
+
+    private void goHomeForRealScreenShare() {
+        if (ending || !screenSharing) return;
+        try {
+            RtcDebugLogger.i("RtcCallActivity", "screen share move to launcher so captured content is real phone screen callId=" + callId);
+            Intent home = new Intent(Intent.ACTION_MAIN);
+            home.addCategory(Intent.CATEGORY_HOME);
+            home.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(home);
+        } catch (Exception e) {
+            RtcDebugLogger.w("RtcCallActivity", "screen share move home failed, moveTaskToBack fallback callId=" + callId);
+            try {
+                moveTaskToBack(true);
+            } catch (Exception ignored) {}
         }
     }
 
