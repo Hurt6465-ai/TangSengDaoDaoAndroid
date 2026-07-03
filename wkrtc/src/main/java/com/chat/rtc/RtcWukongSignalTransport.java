@@ -2,11 +2,12 @@ package com.chat.rtc;
 
 import android.text.TextUtils;
 
+import com.chat.base.config.WKConfig;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 import com.xinbida.wukongim.entity.WKSendOptions;
-import com.chat.rtc.model.RtcSignalContent;
+import com.xinbida.wukongim.msgmodel.WKTextContent;
 
 import org.json.JSONObject;
 
@@ -38,9 +39,16 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
     @Override
     public void sendSignal(String peerUid, String payload) throws Exception {
         if (TextUtils.isEmpty(peerUid) || TextUtils.isEmpty(payload)) return;
+        String loginUid = WKConfig.getInstance().getUid();
+        if (!TextUtils.isEmpty(loginUid) && TextUtils.equals(peerUid, loginUid)) {
+            throw new IllegalArgumentException("RTC signal target is self: " + peerUid);
+        }
 
         boolean durableInvite = isInviteSignal(payload);
-        RtcSignalContent content = new RtcSignalContent(payload);
+        // Use normal text content for signaling transport compatibility. ChatActivity hides
+        // messages by the strict __cp_harmony_rtc__: prefix, so it will not render as a bubble.
+        // Custom content types are more likely to be missed if registration is late or cache decode fails.
+        WKTextContent content = new WKTextContent(payload);
         WKChannel channel = new WKChannel(peerUid, WKChannelType.PERSONAL);
         WKSendOptions options = new WKSendOptions();
 

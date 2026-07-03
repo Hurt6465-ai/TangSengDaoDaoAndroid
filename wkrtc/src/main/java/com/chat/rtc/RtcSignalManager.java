@@ -169,8 +169,11 @@ public class RtcSignalManager {
             RtcSignal s = RtcSignal.fromTransportText(text);
             if (s == null) return false;
 
-            // It is a valid RTC packet, so hide it from chat even if it is for another uid or self.
-            if (!TextUtils.isEmpty(s.toUid) && !TextUtils.equals(s.toUid, myUid)) return true;
+            // Hide every valid RTC packet from chat, but dispatch only packets explicitly
+            // addressed to this login uid. Empty to_uid, wrong target or self-loop packets
+            // must not enter RtcCallManager, otherwise they create phantom calls and BUSY locks.
+            if (TextUtils.isEmpty(myUid)) return true;
+            if (TextUtils.isEmpty(s.toUid) || !TextUtils.equals(s.toUid, myUid)) return true;
             if (!TextUtils.isEmpty(s.fromUid) && TextUtils.equals(s.fromUid, myUid)) return true;
             if (RtcSignal.INVITE.equals(s.type) && s.isExpired()) return true;
             if (rememberSignal(s)) return true;
@@ -213,10 +216,12 @@ public class RtcSignalManager {
 
     public void send(RtcSignal signal) throws Exception {
         if (transport == null) throw new IllegalStateException("RtcSignalTransport not configured");
+        if (signal == null) throw new IllegalArgumentException("RtcSignal is null");
+        if (TextUtils.isEmpty(myUid)) throw new IllegalStateException("Rtc uid is empty");
         if (TextUtils.isEmpty(signal.fromUid)) signal.fromUid = myUid;
-        if (TextUtils.isEmpty(signal.toUid)) return;
-        // Refuse to send an RTC packet to myself. This prevents self-invite loops and fake busy locks.
-        if (TextUtils.equals(signal.toUid, myUid)) return;
+        if (TextUtils.isEmpty(signal.toUid)) throw new IllegalArgumentException("Rtc peer uid is empty");
+        if (TextUtils.equals(signal.toUid, myUid)) throw new IllegalArgumentException("Rtc self-call blocked");
+        if (TextUtils.equals(signal.fromUid, signal.toUid)) throw new IllegalArgumentException("Rtc from/to uid are same");
         transport.sendSignal(signal.toUid, signal.toTransportText());
     }
 

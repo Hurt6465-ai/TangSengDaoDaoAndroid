@@ -23,6 +23,7 @@ import com.xinbida.wukongim.entity.WKChannelType;
 import com.xinbida.wukongim.entity.WKMsg;
 
 import java.lang.ref.WeakReference;
+import java.util.Map;
 
 public class WKRTCApplication {
     private static final WKRTCApplication INSTANCE = new WKRTCApplication();
@@ -125,6 +126,10 @@ public class WKRTCApplication {
         }
     }
 
+    private String stringValue(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
     private void registerEndpoints() {
         if (endpointsRegistered) return;
         endpointsRegistered = true;
@@ -162,6 +167,7 @@ public class WKRTCApplication {
         });
 
         EndpointManager.getInstance().setMethod("rtc_handle_signal_msg", object -> {
+            initRtcSignalModule();
             if (object instanceof WKMsg) {
                 return RtcSignalManager.get().tryHandleIncomingMsg((WKMsg) object);
             }
@@ -170,19 +176,52 @@ public class WKRTCApplication {
 
         EndpointManager.getInstance().setMethod("wk_p2p_call", object -> {
             initRtcSignalModule();
-            if (!(object instanceof RTCMenu)) return false;
-            RTCMenu menu = (RTCMenu) object;
-            IConversationContext ctx = menu.iConversationContext;
-            if (ctx == null || ctx.getChatActivity() == null) return false;
-            WKChannel channel = ctx.getChatChannelInfo();
-            if (channel == null || TextUtils.isEmpty(channel.channelID)) return false;
-            if (channel.channelType != WKChannelType.PERSONAL) {
-                Toast.makeText(ctx.getChatActivity(), "群通话后续接 SFU/语音房，这个 P2P 插件先只支持单聊", Toast.LENGTH_SHORT).show();
+
+            Activity activity = null;
+            String peerUid = "";
+            String peerName = "";
+            String peerAvatar = "";
+            int callType = RtcConstants.AUDIO;
+
+            // Prefer explicit request from ChatActivity. It knows the real peer uid.
+            if (object instanceof Map) {
+                Map<?, ?> map = (Map<?, ?>) object;
+                Object a = map.get("activity");
+                if (a instanceof Activity) activity = (Activity) a;
+                peerUid = stringValue(map.get("peer_uid"));
+                peerName = stringValue(map.get("peer_name"));
+                peerAvatar = stringValue(map.get("peer_avatar"));
+                Object ct = map.get("call_type");
+                if (ct instanceof Number) callType = ((Number) ct).intValue();
+            }
+
+            // Backward-compatible path for old ChatActivity.
+            if (activity == null && object instanceof RTCMenu) {
+                RTCMenu menu = (RTCMenu) object;
+                IConversationContext ctx = menu.iConversationContext;
+                if (ctx == null || ctx.getChatActivity() == null) return false;
+                activity = ctx.getChatActivity();
+                callType = menu.callType;
+                WKChannel channel = ctx.getChatChannelInfo();
+                if (channel == null || TextUtils.isEmpty(channel.channelID)) return false;
+                if (channel.channelType != WKChannelType.PERSONAL) {
+                    Toast.makeText(activity, "群通话后续接 SFU/语音房，这个 P2P 插件先只支持单聊", Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+                peerUid = channel.channelID;
+                peerName = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
+                peerAvatar = channel.avatar;
+            }
+
+            if (activity == null || TextUtils.isEmpty(peerUid)) return false;
+            String loginUid = WKConfig.getInstance().getUid();
+            if (!TextUtils.isEmpty(loginUid) && TextUtils.equals(peerUid, loginUid)) {
+                Toast.makeText(activity, "不能给自己发起通话", Toast.LENGTH_SHORT).show();
+                RtcCallManager.get().forceClearAllZombieCalls();
                 return false;
             }
-            String name = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
-            if (TextUtils.isEmpty(name)) name = ctx.getChatActivity().getString(R.string.rtc_friend);
-            RtcCallManager.get().startOutgoing(ctx.getChatActivity(), channel.channelID, name, channel.avatar, menu.callType);
+            if (TextUtils.isEmpty(peerName)) peerName = activity.getString(R.string.rtc_friend);
+            RtcCallManager.get().startOutgoing(activity, peerUid, peerName, peerAvatar, callType);
             return true;
         });
 

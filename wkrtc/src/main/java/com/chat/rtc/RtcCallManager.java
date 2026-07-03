@@ -45,12 +45,21 @@ public class RtcCallManager implements RtcSignalDelegate {
     }
 
     public void startOutgoing(Context context, String peerUid, String peerName, String peerAvatar, int callType) {
-        if (TextUtils.isEmpty(peerUid)) return;
+        if (context == null || TextUtils.isEmpty(peerUid)) return;
+        String myUid = RtcSignalManager.get().myUid();
+        if (!TextUtils.isEmpty(myUid) && TextUtils.equals(peerUid, myUid)) {
+            forceClearAllZombieCalls();
+            return;
+        }
         String nextCallId = createCallId();
         synchronized (this) {
             cleanupStateLocked();
             if (hasLiveCallLocked()) {
-                return;
+                ActiveCallListener listener = activeListener.get();
+                if (listener != null && !TextUtils.isEmpty(listener.getActiveCallId())) {
+                    return;
+                }
+                forceClearAllZombieCallsLocked();
             }
             currentCallId = nextCallId;
             currentCallStartedAt = System.currentTimeMillis();
@@ -143,8 +152,13 @@ public class RtcCallManager implements RtcSignalDelegate {
             synchronized (this) {
                 cleanupStateLocked();
                 if (!TextUtils.isEmpty(currentCallId) && !TextUtils.equals(currentCallId, signal.callId)) {
-                    try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception ignored) {}
-                    return;
+                    ActiveCallListener active = activeListener.get();
+                    if (active != null && !TextUtils.isEmpty(active.getActiveCallId())) {
+                        try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception ignored) {}
+                        return;
+                    }
+                    // Zombie lock only, clear it and let the new invite ring.
+                    forceClearAllZombieCallsLocked();
                 }
                 if (incomingSeen.containsKey(signal.callId)) {
                     try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception ignored) {}
@@ -236,12 +250,10 @@ public class RtcCallManager implements RtcSignalDelegate {
         String name = getDisplayName(signal);
         String avatar = getDisplayAvatar(signal);
         int type = RtcConstants.typeOf(signal.mode);
-        boolean notified = RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
-        // Foreground app: open the call page immediately. Background app: let full-screen notification
-        // do its job; if notification permission/channel is unavailable, try Activity as a last fallback.
-        if (WKRTCApplication.getInstance().isAppInForeground() || !notified) {
-            tryOpenIncomingActivity(signal, name, avatar, type, false);
-        }
+        RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
+        // Restore the old stable behavior: after the invite is actually received, open the
+        // incoming call page directly. SINGLE_TOP makes duplicate notification launches harmless.
+        tryOpenIncomingActivity(signal, name, avatar, type, false);
     }
 
     private void tryOpenIncomingActivity(RtcSignal signal, String name, String avatar, int type, boolean autoAccept) {
@@ -264,6 +276,24 @@ public class RtcCallManager implements RtcSignalDelegate {
         RtcCallRecordReporter.report(callId, peerUid, TextUtils.isEmpty(peerName) ? "好友" : peerName, callType, true, "rejected", 0L);
         markClosed(callId);
         RtcCallNotification.cancelIncoming(context);
+    }
+
+
+    public synchronized void forceClearAllZombieCalls() {
+        forceClearAllZombieCallsLocked();
+        try { RtcCallNotification.cancelIncoming(appContext); } catch (Exception ignored) {}
+    }
+
+    private void forceClearAllZombieCallsLocked() {
+        if (!TextUtils.isEmpty(currentCallId)) {
+            closed.put(currentCallId, System.currentTimeMillis());
+            pending.remove(currentCallId);
+            incomingSeen.remove(currentCallId);
+            incomingInviteMap.remove(currentCallId);
+        }
+        currentCallId = "";
+        currentCallStartedAt = 0L;
+        activeListener.clear();
     }
 
     private String getDisplayName(RtcSignal signal) {
