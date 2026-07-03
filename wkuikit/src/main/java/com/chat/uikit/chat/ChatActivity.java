@@ -938,8 +938,31 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             WKToastUtils.getInstance().showToast("无法发起通话");
             return;
         }
+        if (channelType != WKChannelType.PERSONAL) {
+            WKToastUtils.getInstance().showToast("群通话后续再接，当前只支持单聊 P2P");
+            return;
+        }
+        if (TextUtils.equals(channelId, loginUID)) {
+            WKToastUtils.getInstance().showToast("不能给自己发起通话");
+            return;
+        }
+
         initRtcCallModule();
-        Object handled = EndpointManager.getInstance().invoke("wk_p2p_call", new RTCMenu(this, callType));
+
+        // 当前聊天对象只有 ChatActivity 最准确：单聊 channelId 就是对方 uid。
+        // 显式传 peer_uid，避免 wkrtc 从频道缓存/旧 context 反推错误，导致 invite 发给自己。
+        Map<String, Object> request = new HashMap<>();
+        request.put("activity", this);
+        request.put("peer_uid", channelId);
+        request.put("peer_name", getRtcPeerName());
+        request.put("peer_avatar", getRtcPeerAvatar());
+        request.put("call_type", callType);
+
+        Object handled = EndpointManager.getInstance().invoke("wk_p2p_call", request);
+        if (!(handled instanceof Boolean) || !((Boolean) handled)) {
+            // 兼容旧 wkrtc，如果没有覆盖 wkrtc 新包，退回旧 RTCMenu 调用。
+            handled = EndpointManager.getInstance().invoke("wk_p2p_call", new RTCMenu(this, callType));
+        }
         if (!(handled instanceof Boolean) || !((Boolean) handled)) {
             WKToastUtils.getInstance().showToast("通话插件未初始化");
         }
