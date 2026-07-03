@@ -203,12 +203,12 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     @Override public void onLocalDescription(SessionDescription description) {
-        try { RtcSignalManager.get().sendDescription(callId, peerUid, description); }
+        try { RtcSignalManager.get().sendDescription(callId, peerUid, description, callType); }
         catch (Exception e) { runOnUiThread(() -> toast(getString(R.string.rtc_send_sdp_failed))); }
     }
 
     @Override public void onIceCandidate(IceCandidate candidate) {
-        try { RtcSignalManager.get().sendIce(callId, peerUid, candidate); }
+        try { RtcSignalManager.get().sendIce(callId, peerUid, candidate, callType); }
         catch (Exception e) { runOnUiThread(() -> toast(getString(R.string.rtc_send_ice_failed))); }
     }
 
@@ -420,7 +420,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         flipBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
         screenBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
         ensurePermissionsThen(() -> {
-            try { RtcSignalManager.get().sendSimple(RtcSignal.ACCEPT, callId, peerUid); } catch (Exception ignored) {}
+            try { RtcSignalManager.get().sendSimple(RtcSignal.ACCEPT, callId, peerUid, callType); } catch (Exception ignored) {}
             statusText.setText(getString(R.string.rtc_connecting));
             scheduleConnectTimeout();
             startWebRtc();
@@ -433,7 +433,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         ringPlayer.stop();
         RtcCallNotification.cancelIncoming(this);
         closeReason = "missed";
-        try { RtcSignalManager.get().sendSimple(RtcSignal.TIMEOUT, callId, peerUid); } catch (Exception ignored) {}
+        try { RtcSignalManager.get().sendSimple(RtcSignal.TIMEOUT, callId, peerUid, callType); } catch (Exception ignored) {}
         reportCallRecordIfNeeded(closeReason);
         RtcCallManager.get().markClosed(callId);
         RtcCallForegroundService.stop(this);
@@ -445,7 +445,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         ringPlayer.stop();
         RtcCallNotification.cancelIncoming(this);
         if (TextUtils.isEmpty(closeReason)) closeReason = "rejected";
-        try { RtcSignalManager.get().sendSimple(RtcSignal.REJECT, callId, peerUid); } catch (Exception ignored) {}
+        try { RtcSignalManager.get().sendSimple(RtcSignal.REJECT, callId, peerUid, callType); } catch (Exception ignored) {}
         reportCallRecordIfNeeded(closeReason);
         RtcCallManager.get().markClosed(callId);
         RtcCallNotification.cancelIncoming(this);
@@ -581,6 +581,35 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         localContainer.setVisibility(cameraOn ? View.VISIBLE : View.INVISIBLE);
     }
 
+    private void applyScreenShareUi(boolean sharing) {
+        if (!RtcConstants.isVideo(callType)) return;
+        if (sharing) {
+            // Never put the local screen-capture preview full screen.
+            // Capturing the call page while showing the capture preview creates the tunnel/mirror effect.
+            localFullScreen = false;
+            if (peerClient != null) peerClient.swapRenderers(false);
+            localContainer.setEnabled(false);
+            localContainer.setClickable(false);
+            localContainer.setVisibility(View.INVISIBLE);
+            localRenderer.setMirror(false);
+            flipBtn.setVisibility(View.GONE);
+            camBtn.setEnabled(false);
+            statusText.setText(getString(R.string.rtc_screen_sharing));
+            RtcDebugLogger.i("RtcCallActivity", "screen share ui sharing=true remoteMain=true localHidden=true callId=" + callId);
+        } else {
+            localFullScreen = false;
+            if (peerClient != null) peerClient.swapRenderers(false);
+            localContainer.setEnabled(true);
+            localContainer.setClickable(true);
+            localContainer.setVisibility(cameraOn ? View.VISIBLE : View.INVISIBLE);
+            localRenderer.setMirror(true);
+            flipBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
+            camBtn.setEnabled(true);
+            RtcDebugLogger.i("RtcCallActivity", "screen share ui sharing=false remoteMain=true localVisible=" + cameraOn + " callId=" + callId);
+        }
+        updateScreenShareButton(sharing);
+    }
+
     private void toggleScreenShare() {
         if (!RtcConstants.isVideo(callType) || peerClient == null || !connected) {
             toast(getString(R.string.rtc_connecting));
@@ -620,12 +649,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         if (peerClient == null || data == null || ending) return;
         try {
             screenSharing = true;
-            updateScreenShareButton(true);
-            localRenderer.setMirror(false);
-            flipBtn.setVisibility(View.GONE);
-            camBtn.setEnabled(false);
+            applyScreenShareUi(true);
             RtcCallForegroundService.startScreenShare(this, callId, peerName, callType);
-            statusText.setText(getString(R.string.rtc_screen_sharing));
             handler.postDelayed(() -> {
                 if (!ending && peerClient != null && screenSharing) {
                     peerClient.startScreenShare(data);
@@ -635,7 +660,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             }, 350L);
         } catch (Exception e) {
             screenSharing = false;
-            updateScreenShareButton(false);
+            applyScreenShareUi(false);
             RtcDebugLogger.e("RtcCallActivity", "start screen share failed", e);
             toast(getString(R.string.rtc_screen_share_failed));
         }
@@ -646,11 +671,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         try {
             screenSharing = false;
             peerClient.stopScreenShare();
-            localRenderer.setMirror(true);
             RtcCallForegroundService.start(this, callId, peerName, callType);
-            flipBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
-            camBtn.setEnabled(true);
-            updateScreenShareButton(false);
+            applyScreenShareUi(false);
             toast(getString(R.string.rtc_screen_share_stopped));
             RtcDebugLogger.i("RtcCallActivity", "screen share stop requested callId=" + callId);
         } catch (Exception e) {
@@ -675,7 +697,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         }
         if (!remoteEnded) {
             try {
-                RtcSignalManager.get().sendSimple(connected ? RtcSignal.END : RtcSignal.CANCEL, callId, peerUid);
+                RtcSignalManager.get().sendSimple(connected ? RtcSignal.END : RtcSignal.CANCEL, callId, peerUid, callType);
                 RtcDebugLogger.i("RtcCallActivity", "send terminal ok type=" + (connected ? RtcSignal.END : RtcSignal.CANCEL)
                         + " callId=" + callId + " peer=" + RtcDebugLogger.shortUid(peerUid));
             } catch (Exception e) {
@@ -743,6 +765,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) v.getLayoutParams();
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
+                    if (screenSharing) return true;
                     down[0] = e.getRawX(); down[1] = e.getRawY();
                     start[0] = lp.leftMargin > 0 ? lp.leftMargin : root.getWidth() - v.getWidth() - lp.rightMargin;
                     start[1] = lp.topMargin; lp.gravity = Gravity.TOP | Gravity.LEFT; lp.leftMargin = (int) start[0]; lp.rightMargin = 0; v.setLayoutParams(lp); moved[0] = false; return true;
@@ -754,7 +777,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
                     v.setLayoutParams(lp); return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
-                    if (!moved[0] && peerClient != null) { localFullScreen = !localFullScreen; peerClient.swapRenderers(localFullScreen); keepControlsVisible(); }
+                    if (!screenSharing && !moved[0] && peerClient != null) { localFullScreen = !localFullScreen; peerClient.swapRenderers(localFullScreen); keepControlsVisible(); }
                     return true;
             }
             return false;

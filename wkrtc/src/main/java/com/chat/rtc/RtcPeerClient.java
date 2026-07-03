@@ -188,8 +188,10 @@ public class RtcPeerClient {
                 });
                 switchVideoCapturer(screenCapturer, RtcConstants.SCREEN_WIDTH, RtcConstants.SCREEN_HEIGHT, RtcConstants.SCREEN_FPS, true);
                 screenSharing = true;
+                swapRenderers(false);
                 setVideoMaxBitrate(RtcConstants.SCREEN_MAX_BITRATE_KBPS);
-                RtcDebugLogger.i("RtcPeerClient", "screen share started");
+                RtcDebugLogger.i("RtcPeerClient", "screen share started width=" + RtcConstants.SCREEN_WIDTH
+                        + " height=" + RtcConstants.SCREEN_HEIGHT + " fps=" + RtcConstants.SCREEN_FPS);
             } catch (Exception e) {
                 report("屏幕共享失败", e);
             }
@@ -206,8 +208,9 @@ public class RtcPeerClient {
                         lowQuality ? RtcConstants.VIDEO_LOW_HEIGHT : RtcConstants.VIDEO_HEIGHT,
                         lowQuality ? RtcConstants.VIDEO_LOW_FPS : RtcConstants.VIDEO_FPS, false);
                 screenSharing = false;
+                swapRenderers(false);
                 setVideoMaxBitrate(lowQuality ? RtcConstants.VIDEO_LOW_BITRATE_KBPS : RtcConstants.VIDEO_MAX_BITRATE_KBPS);
-                RtcDebugLogger.i("RtcPeerClient", "screen share stopped");
+                RtcDebugLogger.i("RtcPeerClient", "screen share stopped cameraRestored=true");
             } catch (Exception e) {
                 report("恢复摄像头失败", e);
             }
@@ -251,6 +254,9 @@ public class RtcPeerClient {
     }
 
     public void swapRenderers(boolean localFullScreen) {
+        // While this side is sharing the screen, never render the screen-capture track full screen.
+        // Otherwise the phone captures its own preview and creates the infinite tunnel effect.
+        if (screenSharing) localFullScreen = false;
         if (localFullScreen) {
             localProxy.setTarget(remoteRenderer);
             remoteProxy.setTarget(localRenderer);
@@ -258,6 +264,7 @@ public class RtcPeerClient {
             localProxy.setTarget(localRenderer);
             remoteProxy.setTarget(remoteRenderer);
         }
+        RtcDebugLogger.i("RtcPeerClient", "swapRenderers localFullScreen=" + localFullScreen + " screenSharing=" + screenSharing);
     }
 
     public void close() { rtcHandler.post(this::closeInternal); }
@@ -440,6 +447,7 @@ public class RtcPeerClient {
             if (t == null || t.getReceiver() == null) return;
             MediaStreamTrack track = t.getReceiver().track();
             if (track instanceof VideoTrack) {
+                RtcDebugLogger.i("RtcPeerClient", "remote video track received id=" + track.id());
                 remoteProxy.setTarget(remoteRenderer);
                 ((VideoTrack) track).addSink(remoteProxy);
                 if (events != null) events.onRemoteVideoTrack();

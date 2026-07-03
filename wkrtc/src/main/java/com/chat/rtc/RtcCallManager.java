@@ -171,7 +171,7 @@ public class RtcCallManager implements RtcSignalDelegate {
         if (RtcSignal.INVITE.equals(signal.type)) {
             if (listener != null && !TextUtils.isEmpty(listener.getActiveCallId())) {
                 RtcDebugLogger.w("RtcCallManager", "invite busy because activeListener exists active=" + listener.getActiveCallId());
-                try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception e) { RtcDebugLogger.e("RtcCallManager", "send BUSY failed", e); }
+                try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid, RtcConstants.typeOf(signal.mode)); } catch (Exception e) { RtcDebugLogger.e("RtcCallManager", "send BUSY failed", e); }
                 return;
             }
             synchronized (this) {
@@ -179,7 +179,7 @@ public class RtcCallManager implements RtcSignalDelegate {
                 if (!TextUtils.isEmpty(currentCallId) && !TextUtils.equals(currentCallId, signal.callId)) {
                     ActiveCallListener active = activeListener.get();
                     if (active != null && !TextUtils.isEmpty(active.getActiveCallId())) {
-                        try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception ignored) {}
+                        try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid, RtcConstants.typeOf(signal.mode)); } catch (Exception ignored) {}
                         return;
                     }
                     // Zombie lock only, clear it and let the new invite ring.
@@ -188,7 +188,7 @@ public class RtcCallManager implements RtcSignalDelegate {
                 }
                 if (incomingSeen.containsKey(signal.callId)) {
                     RtcDebugLogger.i("RtcCallManager", "invite duplicate, resend ringing " + signal.callId);
-                    try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception e) { RtcDebugLogger.e("RtcCallManager", "resend RINGING failed", e); }
+                    try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid, RtcConstants.typeOf(signal.mode)); } catch (Exception e) { RtcDebugLogger.e("RtcCallManager", "resend RINGING failed", e); }
                     return;
                 }
                 incomingSeen.put(signal.callId, System.currentTimeMillis());
@@ -196,7 +196,7 @@ public class RtcCallManager implements RtcSignalDelegate {
                 currentCallId = signal.callId;
                 currentCallStartedAt = System.currentTimeMillis();
             }
-            try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception e) { RtcDebugLogger.e("RtcCallManager", "send RINGING failed", e); }
+            try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid, RtcConstants.typeOf(signal.mode)); } catch (Exception e) { RtcDebugLogger.e("RtcCallManager", "send RINGING failed", e); }
             RtcDebugLogger.i("RtcCallManager", "openIncoming for " + RtcDebugLogger.signal(signal));
             openIncoming(signal);
             return;

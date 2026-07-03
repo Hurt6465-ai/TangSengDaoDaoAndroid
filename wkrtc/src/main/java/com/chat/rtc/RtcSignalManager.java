@@ -289,20 +289,36 @@ public class RtcSignalManager {
     }
 
     public void sendSimple(String type, String callId, String toUid) throws Exception {
-        send(RtcSignal.base(type, callId, myUid, toUid));
+        sendSimple(type, callId, toUid, RtcConstants.AUDIO);
+    }
+
+    public void sendSimple(String type, String callId, String toUid, int callType) throws Exception {
+        RtcSignal s = RtcSignal.base(type, callId, myUid, toUid);
+        s.mode = RtcConstants.modeOf(callType);
+        send(s);
     }
 
     public void sendDescription(String callId, String toUid, SessionDescription d) throws Exception {
+        sendDescription(callId, toUid, d, RtcConstants.AUDIO);
+    }
+
+    public void sendDescription(String callId, String toUid, SessionDescription d, int callType) throws Exception {
         String type = d.type == SessionDescription.Type.OFFER ? RtcSignal.OFFER : RtcSignal.ANSWER;
         RtcSignal s = RtcSignal.base(type, callId, myUid, toUid);
+        s.mode = RtcConstants.modeOf(callType);
         s.sdpType = d.type.canonicalForm();
         s.sdp = d.description;
         send(s);
     }
 
     public void sendIce(String callId, String toUid, IceCandidate c) throws Exception {
+        sendIce(callId, toUid, c, RtcConstants.AUDIO);
+    }
+
+    public void sendIce(String callId, String toUid, IceCandidate c, int callType) throws Exception {
         if (c == null) return;
         RtcSignal s = RtcSignal.base(RtcSignal.ICE, callId, myUid, toUid);
+        s.mode = RtcConstants.modeOf(callType);
         s.candidate = c.sdp;
         s.sdpMid = c.sdpMid;
         s.sdpMLineIndex = c.sdpMLineIndex;
