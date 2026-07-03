@@ -261,12 +261,16 @@ public class RtcPeerClient {
     public void close() { rtcHandler.post(this::closeInternal); }
 
     public void closeBlocking(long timeoutMs) {
-        CountDownLatch latch = new CountDownLatch(1);
+        final CountDownLatch latch = new CountDownLatch(1);
         try {
             rtcHandler.post(() -> {
-                try { closeInternal(); } finally { latch.countDown(); }
+                try {
+                    closeInternal();
+                } finally {
+                    latch.countDown();
+                }
             });
-            latch.await(Math.max(100L, timeoutMs), TimeUnit.MILLISECONDS);
+            latch.await(Math.max(200L, timeoutMs), TimeUnit.MILLISECONDS);
         } catch (Exception ignored) {
         }
     }

@@ -24,15 +24,15 @@ public class RtcCallManager implements RtcSignalDelegate {
     }
 
     private static final RtcCallManager INSTANCE = new RtcCallManager();
-    private static final long STALE_CALL_LOCK_MS = 45_000L;
+    private static final long CLOSED_TTL_MS = 10 * 60 * 1000L;
+    private static final long INCOMING_SEEN_TTL_MS = 2 * 60 * 1000L;
+    private static final long STALE_CALL_GUARD_MS = 2 * 60 * 1000L;
+
     private Context appContext;
     private WeakReference<ActiveCallListener> activeListener = new WeakReference<>(null);
     private final Map<String, List<RtcSignal>> pending = new HashMap<>();
     private final Map<String, Long> closed = new HashMap<>();
     private final Map<String, Long> incomingSeen = new HashMap<>();
-    // Keep the original incoming INVITE until a terminal signal arrives.
-    // This lets us write a missed/cancelled record even if Android blocks the Activity.
-    private final Map<String, RtcSignal> incomingInviteMap = new HashMap<>();
     private String currentCallId = "";
     private long currentCallStartedAt = 0L;
 
@@ -47,8 +47,8 @@ public class RtcCallManager implements RtcSignalDelegate {
         if (TextUtils.isEmpty(peerUid)) return;
         String nextCallId = createCallId();
         synchronized (this) {
-            cleanupStaleCurrentLocked();
-            if (hasLiveListenerLocked() || !TextUtils.isEmpty(currentCallId)) {
+            cleanupStateLocked();
+            if (hasLiveCallLocked()) {
                 return;
             }
             currentCallId = nextCallId;
@@ -84,43 +84,15 @@ public class RtcCallManager implements RtcSignalDelegate {
     }
 
     public synchronized boolean isCalling() {
-        cleanupOld(closed, 10 * 60 * 1000L);
-        cleanupStaleCurrentLocked();
-        return hasLiveListenerLocked() || (!TextUtils.isEmpty(currentCallId) && !closed.containsKey(currentCallId));
-    }
-
-    private boolean hasLiveListenerLocked() {
+        cleanupStateLocked();
+        if (!TextUtils.isEmpty(currentCallId) && !closed.containsKey(currentCallId)) return true;
         ActiveCallListener listener = activeListener.get();
         return listener != null && !TextUtils.isEmpty(listener.getActiveCallId());
     }
 
-    private boolean isCurrentCallStaleLocked() {
-        if (TextUtils.isEmpty(currentCallId)) return false;
-        if (closed.containsKey(currentCallId)) return true;
-        if (hasLiveListenerLocked()) return false;
-        return currentCallStartedAt <= 0 || System.currentTimeMillis() - currentCallStartedAt > STALE_CALL_LOCK_MS;
-    }
-
-    private void cleanupStaleCurrentLocked() {
-        if (isCurrentCallStaleLocked()) {
-            incomingSeen.remove(currentCallId);
-            incomingInviteMap.remove(currentCallId);
-            pending.remove(currentCallId);
-            currentCallId = "";
-            currentCallStartedAt = 0L;
-        }
-    }
-
-    private boolean isTerminalSignal(RtcSignal signal) {
-        return signal != null && (RtcSignal.CANCEL.equals(signal.type)
-                || RtcSignal.END.equals(signal.type)
-                || RtcSignal.REJECT.equals(signal.type)
-                || RtcSignal.TIMEOUT.equals(signal.type)
-                || RtcSignal.BUSY.equals(signal.type));
-    }
-
     public synchronized void clearActiveCallListener(ActiveCallListener listener) {
         if (activeListener.get() == listener) activeListener.clear();
+        cleanupStateLocked();
     }
 
     public synchronized List<RtcSignal> consumePending(String callId) {
@@ -132,7 +104,6 @@ public class RtcCallManager implements RtcSignalDelegate {
         if (!TextUtils.isEmpty(callId)) {
             closed.put(callId, System.currentTimeMillis());
             incomingSeen.remove(callId);
-            incomingInviteMap.remove(callId);
             pending.remove(callId);
             if (TextUtils.equals(currentCallId, callId)) {
                 currentCallId = "";
@@ -142,7 +113,7 @@ public class RtcCallManager implements RtcSignalDelegate {
     }
 
     public synchronized boolean isClosed(String callId) {
-        cleanupOld(closed, 10 * 60 * 1000L);
+        cleanupStateLocked();
         Long ts = closed.get(callId);
         return ts != null;
     }
@@ -152,9 +123,7 @@ public class RtcCallManager implements RtcSignalDelegate {
         if (signal == null || TextUtils.isEmpty(signal.callId)) return;
         ActiveCallListener listener;
         synchronized (this) {
-            cleanupOld(closed, 10 * 60 * 1000L);
-            cleanupOld(incomingSeen, 2 * 60 * 1000L);
-            cleanupStaleCurrentLocked();
+            cleanupStateLocked();
             if (closed.containsKey(signal.callId)) return;
             listener = activeListener.get();
         }
@@ -164,46 +133,37 @@ public class RtcCallManager implements RtcSignalDelegate {
             return;
         }
 
-        if (isTerminalSignal(signal)) {
-            RtcSignal invite;
-            synchronized (this) {
-                invite = incomingInviteMap.remove(signal.callId);
-                pending.remove(signal.callId);
-                incomingSeen.remove(signal.callId);
-                if (TextUtils.equals(currentCallId, signal.callId)) {
-                    currentCallId = "";
-                    currentCallStartedAt = 0L;
-                }
-                closed.put(signal.callId, System.currentTimeMillis());
-            }
-            saveIncomingTerminalRecordIfNeeded(invite, signal);
-            return;
-        }
-
         if (RtcSignal.INVITE.equals(signal.type)) {
+            if (listener != null && !TextUtils.isEmpty(listener.getActiveCallId())) {
+                try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception ignored) {}
+                return;
+            }
             synchronized (this) {
-                cleanupStaleCurrentLocked();
-                boolean busy = false;
-                if (hasLiveListenerLocked()) {
-                    busy = true;
-                } else if (!TextUtils.isEmpty(currentCallId) && !TextUtils.equals(currentCallId, signal.callId)) {
-                    busy = true;
-                }
-                if (busy) {
+                cleanupStateLocked();
+                if (!TextUtils.isEmpty(currentCallId) && !TextUtils.equals(currentCallId, signal.callId)) {
                     try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception ignored) {}
                     return;
                 }
-                if (incomingSeen.containsKey(signal.callId)) {
-                    try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception ignored) {}
-                    return;
-                }
+                if (incomingSeen.containsKey(signal.callId)) return;
                 incomingSeen.put(signal.callId, System.currentTimeMillis());
-                incomingInviteMap.put(signal.callId, signal);
                 currentCallId = signal.callId;
                 currentCallStartedAt = System.currentTimeMillis();
             }
             try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception ignored) {}
             openIncoming(signal);
+            return;
+        }
+
+        if (isTerminalSignal(signal)) {
+            boolean shouldRecord;
+            synchronized (this) {
+                shouldRecord = TextUtils.equals(currentCallId, signal.callId) || incomingSeen.containsKey(signal.callId);
+                markClosed(signal.callId);
+            }
+            if (shouldRecord && (RtcSignal.CANCEL.equals(signal.type) || RtcSignal.END.equals(signal.type) || RtcSignal.TIMEOUT.equals(signal.type))) {
+                int type = RtcConstants.typeOf(signal.mode);
+                RtcCallRecordReporter.report(signal.callId, signal.fromUid, getDisplayName(signal), type, true, "remote_cancelled", 0L);
+            }
             return;
         }
 
@@ -215,6 +175,41 @@ public class RtcCallManager implements RtcSignalDelegate {
             }
             list.add(signal);
         }
+    }
+
+    private boolean isTerminalSignal(RtcSignal signal) {
+        if (signal == null) return false;
+        return RtcSignal.CANCEL.equals(signal.type)
+                || RtcSignal.END.equals(signal.type)
+                || RtcSignal.REJECT.equals(signal.type)
+                || RtcSignal.BUSY.equals(signal.type)
+                || RtcSignal.TIMEOUT.equals(signal.type);
+    }
+
+    private synchronized void cleanupStateLocked() {
+        cleanupOld(closed, CLOSED_TTL_MS);
+        cleanupOld(incomingSeen, INCOMING_SEEN_TTL_MS);
+        if (!TextUtils.isEmpty(currentCallId)) {
+            boolean activeScreen = false;
+            ActiveCallListener listener = activeListener.get();
+            if (listener != null && TextUtils.equals(currentCallId, listener.getActiveCallId())) {
+                activeScreen = true;
+            }
+            boolean closedCurrent = closed.containsKey(currentCallId);
+            boolean stale = currentCallStartedAt > 0 && (System.currentTimeMillis() - currentCallStartedAt > STALE_CALL_GUARD_MS);
+            if (closedCurrent || (!activeScreen && stale)) {
+                currentCallId = "";
+                currentCallStartedAt = 0L;
+            }
+        }
+    }
+
+    private boolean hasLiveCallLocked() {
+        if (TextUtils.isEmpty(currentCallId)) return false;
+        if (closed.containsKey(currentCallId)) return false;
+        ActiveCallListener listener = activeListener.get();
+        if (listener != null) return true;
+        return currentCallStartedAt > 0 && (System.currentTimeMillis() - currentCallStartedAt) < STALE_CALL_GUARD_MS;
     }
 
     private synchronized void cleanupOld(Map<String, Long> map, long ttlMs) {
@@ -231,11 +226,10 @@ public class RtcCallManager implements RtcSignalDelegate {
         String name = getDisplayName(signal);
         String avatar = getDisplayAvatar(signal);
         int type = RtcConstants.typeOf(signal.mode);
-        RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
-        // Do not rely on notification full-screen alone. Some devices show only a heads-up card
-        // even for call notifications. Start the call Activity too; Android may block it while
-        // backgrounded, but the notification path remains as fallback.
-        tryOpenIncomingActivity(signal, name, avatar, type, false);
+        boolean notified = RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
+        if (WKRTCApplication.getInstance().isAppInForeground() || !notified) {
+            tryOpenIncomingActivity(signal, name, avatar, type, false);
+        }
     }
 
     private void tryOpenIncomingActivity(RtcSignal signal, String name, String avatar, int type, boolean autoAccept) {
@@ -254,46 +248,10 @@ public class RtcCallManager implements RtcSignalDelegate {
     }
 
     public void rejectIncomingFromNotification(Context context, String callId, String peerUid, String peerName, int callType) {
-        RtcSignal invite;
-        synchronized (this) {
-            invite = incomingInviteMap.remove(callId);
-        }
-        String safePeerUid = TextUtils.isEmpty(peerUid) && invite != null ? invite.fromUid : peerUid;
-        String safePeerName = TextUtils.isEmpty(peerName) && invite != null ? getDisplayName(invite) : peerName;
-        int safeCallType = callType == RtcConstants.VIDEO || callType == RtcConstants.AUDIO
-                ? callType
-                : (invite == null ? RtcConstants.AUDIO : RtcConstants.typeOf(invite.mode));
-
-        try { RtcSignalManager.get().sendSimple(RtcSignal.REJECT, callId, safePeerUid); } catch (Exception ignored) {}
-        RtcCallRecordMessageSender.saveLocal(callId, safePeerUid, safePeerName, safeCallType, true, "rejected", 0L);
-        RtcCallRecordReporter.report(callId, safePeerUid, safePeerName, safeCallType, true, "rejected", 0L);
+        try { RtcSignalManager.get().sendSimple(RtcSignal.REJECT, callId, peerUid); } catch (Exception ignored) {}
+        RtcCallRecordReporter.report(callId, peerUid, TextUtils.isEmpty(peerName) ? "好友" : peerName, callType, true, "rejected", 0L);
         markClosed(callId);
         RtcCallNotification.cancelIncoming(context);
-    }
-
-    /**
-     * Terminal signals can arrive while the Activity was never opened, for example when
-     * background-start restrictions block the incoming UI and the caller cancels from their side.
-     * In that case the Activity will not have a chance to write the local missed-call record.
-     */
-    private void saveIncomingTerminalRecordIfNeeded(RtcSignal invite, RtcSignal terminal) {
-        if (invite == null || terminal == null || TextUtils.isEmpty(invite.fromUid)) return;
-        String reason;
-        if (RtcSignal.CANCEL.equals(terminal.type) || RtcSignal.END.equals(terminal.type)) {
-            reason = "remote_cancelled";
-        } else if (RtcSignal.TIMEOUT.equals(terminal.type)) {
-            reason = "missed";
-        } else if (RtcSignal.REJECT.equals(terminal.type)) {
-            reason = "rejected";
-        } else if (RtcSignal.BUSY.equals(terminal.type)) {
-            reason = "busy";
-        } else {
-            return;
-        }
-        int callType = RtcConstants.typeOf(invite.mode);
-        String name = getDisplayName(invite);
-        RtcCallRecordMessageSender.saveLocal(terminal.callId, invite.fromUid, name, callType, true, reason, 0L);
-        RtcCallRecordReporter.report(terminal.callId, invite.fromUid, name, callType, true, reason, 0L);
     }
 
     private String getDisplayName(RtcSignal signal) {

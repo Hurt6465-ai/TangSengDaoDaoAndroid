@@ -28,6 +28,8 @@ public final class RtcConstants {
     public static final int NOTIFICATION_ID_INCOMING = 7601;
     public static final int NOTIFICATION_ID_ACTIVE = 7602;
 
+    public static final int CONTENT_TYPE_CALL_RECORD = 9302;
+
     public static final int CALL_TIMEOUT_MS = 30_000;
     public static final int CONNECT_TIMEOUT_MS = 35_000;
     public static final int VIDEO_WIDTH = 1280;

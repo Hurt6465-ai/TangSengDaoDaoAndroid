@@ -164,15 +164,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     @Override protected void onDestroy() {
-        // Do not turn a framework configuration rebuild into a hangup/reject.
-        // The Activity is locked to portrait and declares configChanges, but this guard keeps
-        // abnormal framework recreations from producing a false missed/cancelled call record.
-        if (!ending && !isChangingConfigurations() && !TextUtils.isEmpty(callId)) {
-            closeReason = connected ? "ended" : (incoming ? "missed" : "cancelled");
-            try { RtcSignalManager.get().sendSimple(connected ? RtcSignal.END : (incoming ? RtcSignal.REJECT : RtcSignal.CANCEL), callId, peerUid); } catch (Exception ignored) {}
-            reportCallRecordIfNeeded(closeReason);
-            RtcCallManager.get().markClosed(callId);
-        }
         super.onDestroy();
         RtcCallManager.get().clearActiveCallListener(this);
         cleanup();
@@ -219,8 +210,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             if (ending) return;
             toast(message == null ? getString(R.string.rtc_call_error) : message);
             closeReason = "connect_failed";
-            // Local WebRTC/camera/SDP failure must notify the peer. Passing remoteEnded=true
-            // would leave the other side ringing until timeout and can create fake busy states.
             endCall(false);
         });
     }
@@ -362,8 +351,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             peerClient.createOffer();
             scheduleOutgoingInviteTimeout();
         } catch (Exception e) {
-            toast(getString(R.string.rtc_signal_not_ready));
             closeReason = "connect_failed";
+            toast(getString(R.string.rtc_signal_not_ready));
             endCall(false);
         }
     }
@@ -453,8 +442,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             return;
         }
         if (RtcSignal.RINGING.equals(s.type)) {
-            statusText.setText(getString(R.string.rtc_peer_ringing));
-            ringPlayer.playOutgoing();
+            statusText.setText(getString(R.string.rtc_ringing));
             return;
         }
         if (RtcSignal.ACCEPT.equals(s.type)) {
@@ -549,7 +537,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private void reportCallRecordIfNeeded(String reason) {
         if (recordReported) return;
         recordReported = true;
-        RtcCallRecordMessageSender.saveLocal(callId, peerUid, peerName, callType, incoming, reason, connectedAt);
         RtcCallRecordReporter.report(callId, peerUid, peerName, callType, incoming, reason, connectedAt);
     }
 

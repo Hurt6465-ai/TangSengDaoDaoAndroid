@@ -1,21 +1,21 @@
 package com.chat.rtc;
 
+import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
+import android.os.Bundle;
 import android.text.TextUtils;
 import android.widget.Toast;
 
 import com.chat.base.config.WKConfig;
+import com.chat.base.endpoint.EndpointCategory;
 import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.endpoint.entity.CreateVideoCallMenu;
+import com.chat.base.endpoint.entity.MsgConfig;
 import com.chat.base.endpoint.entity.RTCMenu;
 import com.chat.base.msg.IConversationContext;
-import com.chat.base.msgitem.WKContentType;
 import com.chat.base.msgitem.WKMsgItemViewManager;
-import com.chat.rtc.model.RtcCallRecordContent;
 import com.chat.rtc.model.RtcSignal;
-import com.chat.rtc.model.RtcSignalContent;
-import com.chat.rtc.provider.RtcCallRecordProvider;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -29,7 +29,9 @@ public class WKRTCApplication {
     private WeakReference<Application> appRef = new WeakReference<>(null);
     private boolean endpointsRegistered = false;
     private boolean signalListenerAdded = false;
-    private boolean contentRegistered = false;
+    private boolean messageArtifactsRegistered = false;
+    private boolean lifecycleRegistered = false;
+    private int startedActivities = 0;
 
     private WKRTCApplication() {}
 
@@ -39,7 +41,8 @@ public class WKRTCApplication {
 
     public void init(Application app) {
         appRef = new WeakReference<>(app);
-        registerContentAndProvider();
+        registerLifecycleCallbacks(app);
+        registerRtcMessageArtifacts();
         registerEndpoints();
         initRtcSignalModule();
         if (app != null) {
@@ -53,15 +56,49 @@ public class WKRTCApplication {
         return app == null ? null : app.getApplicationContext();
     }
 
-    private synchronized void registerContentAndProvider() {
-        if (contentRegistered) return;
-        contentRegistered = true;
-        try { WKIM.getInstance().getMsgManager().registerContentMsg(RtcSignalContent.class); } catch (Exception ignored) {}
-        try { WKIM.getInstance().getMsgManager().registerContentMsg(RtcCallRecordContent.class); } catch (Exception ignored) {}
-        try { WKMsgItemViewManager.getInstance().addChatItemViewProvider(WKContentType.WK_RTC_CALL_RECORD, new RtcCallRecordProvider()); } catch (Exception ignored) {}
+    public boolean isAppInForeground() {
+        return startedActivities > 0;
+    }
+
+    private void registerLifecycleCallbacks(Application app) {
+        if (app == null || lifecycleRegistered) return;
+        lifecycleRegistered = true;
+        app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+            @Override public void onActivityCreated(Activity activity, Bundle savedInstanceState) {}
+            @Override public void onActivityStarted(Activity activity) { startedActivities++; }
+            @Override public void onActivityResumed(Activity activity) {}
+            @Override public void onActivityPaused(Activity activity) {}
+            @Override public void onActivityStopped(Activity activity) { if (startedActivities > 0) startedActivities--; }
+            @Override public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
+            @Override public void onActivityDestroyed(Activity activity) {}
+        });
+    }
+
+    private void registerRtcMessageArtifacts() {
+        if (messageArtifactsRegistered) return;
+        messageArtifactsRegistered = true;
+        try {
+            WKIM.getInstance().getMsgManager().registerContentMsg(RtcCallRecordContent.class);
+        } catch (Exception ignored) {
+        }
+        try {
+            WKMsgItemViewManager.getInstance().addChatItemViewProvider(
+                    RtcConstants.CONTENT_TYPE_CALL_RECORD,
+                    new RtcCallRecordProvider()
+            );
+        } catch (Exception ignored) {
+        }
+        try {
+            EndpointManager.getInstance().setMethod(
+                    EndpointCategory.msgConfig + RtcConstants.CONTENT_TYPE_CALL_RECORD,
+                    object -> new MsgConfig(false, false, false, false, false, false)
+            );
+        } catch (Exception ignored) {
+        }
     }
 
     public void initRtcSignalModule() {
+        registerRtcMessageArtifacts();
         Context context = getContext();
         String uid = WKConfig.getInstance().getUid();
         if (!TextUtils.isEmpty(uid)) {

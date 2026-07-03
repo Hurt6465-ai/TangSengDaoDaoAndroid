@@ -3,22 +3,17 @@ package com.chat.rtc;
 import android.text.TextUtils;
 
 import com.chat.base.endpoint.EndpointManager;
-import com.chat.rtc.model.RtcCallRecordContent;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Emits a lightweight call-result event for the host app or backend bridge.
- *
- * The plugin still does not force a persisted visible chat record because the final
- * message content type should be shared with the backend. This event is intentionally
- * stable and presentation-ready so wkuikit/server can directly turn it into records like:
- * video call 03:12, no answer, rejected, cancelled, busy, or connect failed.
+ * Emits a lightweight call-result event for the host app or backend bridge and also writes
+ * a visible chat record message using a dedicated content type.
  */
 public final class RtcCallRecordReporter {
     public static final String ENDPOINT = "rtc_call_record_event";
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 4;
 
     private RtcCallRecordReporter() {}
 
@@ -26,6 +21,7 @@ public final class RtcCallRecordReporter {
                               boolean incoming, String reason, long connectedAt) {
         long duration = connectedAt > 0 ? Math.max(0L, (System.currentTimeMillis() - connectedAt) / 1000L) : 0L;
         String normalizedReason = TextUtils.isEmpty(reason) ? "ended" : reason;
+        String displayText = buildDisplayText(callType, normalizedReason, duration);
         Map<String, Object> event = new HashMap<>();
         event.put("schema_version", SCHEMA_VERSION);
         event.put("call_id", nullToEmpty(callId));
@@ -38,12 +34,13 @@ public final class RtcCallRecordReporter {
         event.put("reason", normalizedReason);
         event.put("result", resultOf(normalizedReason));
         event.put("duration_seconds", duration);
-        event.put("display_text", RtcCallRecordContent.buildDisplayText(callType, normalizedReason, incoming, duration));
+        event.put("display_text", displayText);
         event.put("timestamp", System.currentTimeMillis());
         try {
             EndpointManager.getInstance().invoke(ENDPOINT, event);
         } catch (Exception ignored) {
         }
+        RtcCallRecordSender.send(peerUid, callId, peerName, callType, incoming, normalizedReason, duration, displayText);
     }
 
     private static String resultOf(String reason) {
@@ -61,7 +58,7 @@ public final class RtcCallRecordReporter {
         if ("ended".equals(reason) || "remote_ended".equals(reason)) {
             return prefix + " " + formatDuration(duration);
         }
-        if ("missed".equals(reason) || "no_answer".equals(reason)) return prefix + " 对方无应答";
+        if ("missed".equals(reason) || "no_answer".equals(reason)) return prefix + " 未接来电";
         if ("rejected".equals(reason)) return prefix + " 已拒绝";
         if ("busy".equals(reason)) return prefix + " 对方忙线";
         if ("connect_failed".equals(reason)) return prefix + " 连接失败";

@@ -122,7 +122,7 @@ public final class RtcCallNotification {
         intent.setAction(RtcConstants.ACTION_REJECT_CALL);
         intent.putExtra(RtcConstants.EXTRA_CALL_ID, signal.callId);
         intent.putExtra(RtcConstants.EXTRA_PEER_UID, signal.fromUid);
-        intent.putExtra(RtcConstants.EXTRA_PEER_NAME, peerName);
+        intent.putExtra(RtcConstants.EXTRA_PEER_NAME, peerName == null ? "" : peerName);
         intent.putExtra(RtcConstants.EXTRA_CALL_TYPE, callType);
         return PendingIntent.getBroadcast(context, 7613, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
