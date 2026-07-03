@@ -27,9 +27,11 @@
 
         <activity
             android:name="com.chat.rtc.RtcCallActivity"
-            android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize"
-            android:excludeFromRecents="true"
+            android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
+            android:excludeFromRecents="false"
             android:launchMode="singleTop"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true"
             android:screenOrientation="portrait"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
