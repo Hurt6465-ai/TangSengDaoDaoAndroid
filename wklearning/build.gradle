@@ -1,7 +1,7 @@
 apply plugin: 'com.android.library'
 
 android {
-    namespace 'com.chat.userscript'
+    namespace 'com.chat.learning'
     compileSdk rootProject.ext.compileSdkVersion
 
     defaultConfig {
@@ -15,11 +15,18 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
-        debug { minifyEnabled false }
+        debug {
+            minifyEnabled false
+        }
     }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    api 'androidx.appcompat:appcompat:1.7.0'
+    api project(':wkuserscript')
 }
