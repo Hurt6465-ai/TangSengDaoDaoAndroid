@@ -2,13 +2,16 @@ package com.chat.rtc;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.PictureInPictureParams;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -19,6 +22,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.util.Rational;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -84,6 +88,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private boolean remoteScreenSharing;
     private boolean foregroundServiceStarted;
     private boolean recordReported;
+    private boolean inPictureInPictureModeCompat;
     private String closeReason = "";
 
     private EglBase eglBase;
@@ -170,6 +175,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         bindViews();
         RtcCallManager.get().setActiveCallListener(this);
         RtcCallManager.get().markActivityVisible(callId);
+        updatePictureInPictureParamsCompat();
         if (incoming) {
             showIncoming();
             scheduleIncomingTimeout();
@@ -196,7 +202,26 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         cleanup();
     }
 
-    @Override public void onBackPressed() { endCall(false); }
+    @Override public void onBackPressed() {
+        if (shouldKeepCallAliveOnLeave()) {
+            enterCallPictureInPictureOrBackground();
+            return;
+        }
+        endCall(false);
+    }
+
+    @Override protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        if (shouldKeepCallAliveOnLeave() && RtcConstants.isVideo(callType)) {
+            enterCallPictureInPictureOrBackground();
+        }
+    }
+
+    @Override public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        inPictureInPictureModeCompat = isInPictureInPictureMode;
+        applyPictureInPictureUi(isInPictureInPictureMode);
+    }
     @Override public String getActiveCallId() { return callId; }
     @Override public void onSignalForActiveCall(RtcSignal signal) {
         RtcDebugLogger.i("RtcCallActivity", "onSignalForActiveCall " + RtcDebugLogger.signal(signal));
@@ -225,7 +250,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         });
     }
 
-    @Override public void onRemoteVideoTrack() { runOnUiThread(() -> { if (RtcConstants.isVideo(callType)) hideAvatar(); }); }
+    @Override public void onRemoteVideoTrack() { runOnUiThread(() -> { if (RtcConstants.isVideo(callType)) { hideAvatar(); updatePictureInPictureParamsCompat(); } }); }
 
     @Override public void onRenegotiationNeeded() {
         runOnUiThread(() -> {
@@ -240,6 +265,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             if (ending || !screenSharing) return;
             try { RtcSignalManager.get().sendScreenShareState(callId, peerUid, true, callType); } catch (Exception ignored) {}
             toast(getString(R.string.rtc_screen_share_started));
+            updatePictureInPictureParamsCompat();
             handler.postDelayed(this::goHomeForRealScreenShare, 650L);
         });
     }
@@ -251,6 +277,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             try { RtcSignalManager.get().sendScreenShareState(callId, peerUid, false, callType); } catch (Exception ignored) {}
             RtcCallForegroundService.start(this, callId, peerName, callType);
             applyScreenShareUi(false);
+            updatePictureInPictureParamsCompat();
             toast(getString(R.string.rtc_screen_share_stopped));
         });
     }
@@ -262,6 +289,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             try { RtcSignalManager.get().sendScreenShareState(callId, peerUid, false, callType); } catch (Exception ignored) {}
             RtcCallForegroundService.start(this, callId, peerName, callType);
             applyScreenShareUi(false);
+            updatePictureInPictureParamsCompat();
             toast(TextUtils.isEmpty(message) ? getString(R.string.rtc_screen_share_failed) : message);
         });
     }
@@ -273,6 +301,82 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             closeReason = "connect_failed";
             endCall(false);
         });
+    }
+
+
+    private boolean shouldKeepCallAliveOnLeave() {
+        return !ending && (connected || accepted || peerAccepted);
+    }
+
+    private boolean isInPictureInPictureCompat() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode();
+    }
+
+    private void enterCallPictureInPictureOrBackground() {
+        if (!shouldKeepCallAliveOnLeave()) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && RtcConstants.isVideo(callType)) {
+            try {
+                updatePictureInPictureParamsCompat();
+                if (!isInPictureInPictureMode()) {
+                    enterPictureInPictureMode(buildPictureInPictureParams());
+                }
+                return;
+            } catch (Exception ignored) {
+                // Fall through to background mode on devices that reject PiP.
+            }
+        }
+        try {
+            moveTaskToBack(true);
+        } catch (Exception ignored) {}
+    }
+
+    private PictureInPictureParams buildPictureInPictureParams() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null;
+        PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder()
+                .setAspectRatio(new Rational(9, 16));
+        try {
+            if (remoteRenderer != null) {
+                Rect rect = new Rect();
+                remoteRenderer.getGlobalVisibleRect(rect);
+                if (!rect.isEmpty()) builder.setSourceRectHint(rect);
+            }
+        } catch (Exception ignored) {}
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try { builder.setAutoEnterEnabled(shouldKeepCallAliveOnLeave() && RtcConstants.isVideo(callType)); } catch (Exception ignored) {}
+            try { builder.setSeamlessResizeEnabled(true); } catch (Exception ignored) {}
+        }
+        return builder.build();
+    }
+
+    private void updatePictureInPictureParamsCompat() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !RtcConstants.isVideo(callType)) return;
+        try {
+            setPictureInPictureParams(buildPictureInPictureParams());
+        } catch (Exception ignored) {}
+    }
+
+    private void applyPictureInPictureUi(boolean inPip) {
+        if (topInfo == null || controlsLayout == null || incomingLayout == null) return;
+        if (inPip) {
+            topInfo.setVisibility(View.GONE);
+            controlsLayout.setVisibility(View.GONE);
+            incomingLayout.setVisibility(View.GONE);
+            localContainer.setVisibility(View.GONE);
+            return;
+        }
+        if (ending) return;
+        if (incoming && !accepted) {
+            incomingLayout.setVisibility(View.VISIBLE);
+            controlsLayout.setVisibility(View.GONE);
+        } else {
+            incomingLayout.setVisibility(View.GONE);
+            controlsLayout.setVisibility(View.VISIBLE);
+            if (RtcConstants.isVideo(callType) && !screenSharing) {
+                localContainer.setVisibility(cameraOn ? View.VISIBLE : View.INVISIBLE);
+            }
+        }
+        topInfo.setVisibility(View.VISIBLE);
+        updatePictureInPictureParamsCompat();
     }
 
     private void readIntent() {
@@ -588,6 +692,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         connected = true;
         weakMode = false;
         connectedAt = System.currentTimeMillis();
+        updatePictureInPictureParamsCompat();
         statusText.setText("00:00");
         if (RtcConstants.isVideo(callType)) {
             hideAvatar();
@@ -732,6 +837,10 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private void goHomeForRealScreenShare() {
         if (ending || !screenSharing) return;
         try {
+            updatePictureInPictureParamsCompat();
+            enterCallPictureInPictureOrBackground();
+        } catch (Exception ignored) {}
+        try {
             RtcDebugLogger.i("RtcCallActivity", "screen share move to launcher so captured content is real phone screen callId=" + callId);
             Intent home = new Intent(Intent.ACTION_MAIN);
             home.addCategory(Intent.CATEGORY_HOME);
@@ -739,9 +848,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             startActivity(home);
         } catch (Exception e) {
             RtcDebugLogger.w("RtcCallActivity", "screen share move home failed, moveTaskToBack fallback callId=" + callId);
-            try {
-                moveTaskToBack(true);
-            } catch (Exception ignored) {}
+            try { moveTaskToBack(true); } catch (Exception ignored) {}
         }
     }
 
@@ -753,6 +860,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             try { RtcSignalManager.get().sendScreenShareState(callId, peerUid, false, callType); } catch (Exception ignored) {}
             RtcCallForegroundService.start(this, callId, peerName, callType);
             applyScreenShareUi(false);
+            updatePictureInPictureParamsCompat();
             toast(getString(R.string.rtc_screen_share_stopped));
         } catch (Exception e) {
             RtcDebugLogger.e("RtcCallActivity", "stop screen share failed", e);
