@@ -1947,7 +1947,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 isSyncLastMsg = false;
                 List<WKMsg> tempList = new ArrayList<>();
                 for (WKMsg msg : list) {
-                    if (shouldHideFromChatList(msg)) {
+                    // Message sync/history may deliver RTC INVITE while the global live listener
+                    // did not fire (background reconnect / cold start / cached sync). Do not only
+                    // hide it; dispatch it first so the incoming call page can open.
+                    if (handleRtcSignalIfNeeded(msg) || shouldHideFromChatList(msg)) {
                         continue;
                     }
                     if (isSetNewData || !chatAdapter.isExist(msg.clientMsgNO, msg.messageID)) {
@@ -1999,10 +2002,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (WKReader.isNotEmpty(msgList)) {
             long pre_msg_time = chatAdapter.getLastTimeMsg();
             for (int i = 0, size = msgList.size(); i < size; i++) {
-                if (shouldHideFromChatList(msgList.get(i))) {
+                WKMsg msg = msgList.get(i);
+                if (handleRtcSignalIfNeeded(msg) || shouldHideFromChatList(msg)) {
                     continue;
                 }
-                if (!WKTimeUtils.getInstance().isSameDay(msgList.get(i).timestamp, pre_msg_time) && msgList.get(i).type != WKContentType.emptyView && msgList.get(i).type != WKContentType.spanEmptyView) {
+                if (!WKTimeUtils.getInstance().isSameDay(msg.timestamp, pre_msg_time) && msg.type != WKContentType.emptyView && msg.type != WKContentType.spanEmptyView) {
                     WKUIChatMsgItemEntity uiChatMsgEntity = new WKUIChatMsgItemEntity(this, new WKMsg(), null);
                     uiChatMsgEntity.wkMsg.type = WKContentType.msgPromptTime;
                     uiChatMsgEntity.wkMsg.content = WKTimeUtils.getInstance().getShowDate(msgList.get(i).timestamp * 1000);
@@ -3288,7 +3292,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     private synchronized void refreshMsg(WKMsg wkMsg) {
         if (wkMsg == null) return;
-        if (shouldHideFromChatList(wkMsg)) {
+        if (handleRtcSignalIfNeeded(wkMsg) || shouldHideFromChatList(wkMsg)) {
             removeMsg(wkMsg);
             return;
         }
