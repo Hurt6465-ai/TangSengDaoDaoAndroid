@@ -33,6 +33,7 @@ public class RtcCallManager implements RtcSignalDelegate {
     private final Map<String, List<RtcSignal>> pending = new HashMap<>();
     private final Map<String, Long> closed = new HashMap<>();
     private final Map<String, Long> incomingSeen = new HashMap<>();
+    private final Map<String, RtcSignal> incomingInviteMap = new HashMap<>();
     private String currentCallId = "";
     private long currentCallStartedAt = 0L;
 
@@ -104,6 +105,7 @@ public class RtcCallManager implements RtcSignalDelegate {
         if (!TextUtils.isEmpty(callId)) {
             closed.put(callId, System.currentTimeMillis());
             incomingSeen.remove(callId);
+            incomingInviteMap.remove(callId);
             pending.remove(callId);
             if (TextUtils.equals(currentCallId, callId)) {
                 currentCallId = "";
@@ -146,6 +148,7 @@ public class RtcCallManager implements RtcSignalDelegate {
                 }
                 if (incomingSeen.containsKey(signal.callId)) return;
                 incomingSeen.put(signal.callId, System.currentTimeMillis());
+                incomingInviteMap.put(signal.callId, signal);
                 currentCallId = signal.callId;
                 currentCallStartedAt = System.currentTimeMillis();
             }
@@ -155,14 +158,18 @@ public class RtcCallManager implements RtcSignalDelegate {
         }
 
         if (isTerminalSignal(signal)) {
+            RtcSignal invite;
             boolean shouldRecord;
             synchronized (this) {
-                shouldRecord = TextUtils.equals(currentCallId, signal.callId) || incomingSeen.containsKey(signal.callId);
+                invite = incomingInviteMap.remove(signal.callId);
+                shouldRecord = invite != null || TextUtils.equals(currentCallId, signal.callId) || incomingSeen.containsKey(signal.callId);
                 markClosed(signal.callId);
             }
-            if (shouldRecord && (RtcSignal.CANCEL.equals(signal.type) || RtcSignal.END.equals(signal.type) || RtcSignal.TIMEOUT.equals(signal.type))) {
-                int type = RtcConstants.typeOf(signal.mode);
-                RtcCallRecordReporter.report(signal.callId, signal.fromUid, getDisplayName(signal), type, true, "remote_cancelled", 0L);
+            if (shouldRecord && invite != null && (RtcSignal.CANCEL.equals(signal.type) || RtcSignal.END.equals(signal.type) || RtcSignal.TIMEOUT.equals(signal.type))) {
+                int type = RtcConstants.typeOf(invite.mode);
+                String peerUid = TextUtils.isEmpty(invite.fromUid) ? signal.fromUid : invite.fromUid;
+                String reason = RtcSignal.TIMEOUT.equals(signal.type) ? "missed" : "remote_cancelled";
+                RtcCallRecordReporter.report(signal.callId, peerUid, getDisplayName(invite), type, true, reason, 0L);
             }
             return;
         }
@@ -226,10 +233,10 @@ public class RtcCallManager implements RtcSignalDelegate {
         String name = getDisplayName(signal);
         String avatar = getDisplayAvatar(signal);
         int type = RtcConstants.typeOf(signal.mode);
-        boolean notified = RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
-        if (WKRTCApplication.getInstance().isAppInForeground() || !notified) {
-            tryOpenIncomingActivity(signal, name, avatar, type, false);
-        }
+        RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
+        // Always try to open the incoming call page. If Android blocks background activity starts,
+        // the call notification/full-screen intent is still there as the fallback.
+        tryOpenIncomingActivity(signal, name, avatar, type, false);
     }
 
     private void tryOpenIncomingActivity(RtcSignal signal, String name, String avatar, int type, boolean autoAccept) {
