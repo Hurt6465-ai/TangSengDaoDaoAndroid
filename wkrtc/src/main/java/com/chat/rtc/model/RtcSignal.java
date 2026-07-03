@@ -20,6 +20,8 @@ public class RtcSignal {
     public static final String OFFER = "offer";
     public static final String ANSWER = "answer";
     public static final String ICE = "ice_candidate";
+    public static final String SCREEN_SHARE_STARTED = "screen_share_started";
+    public static final String SCREEN_SHARE_STOPPED = "screen_share_stopped";
 
     public String protocol = RtcConstants.PROTOCOL;
     public String type;
