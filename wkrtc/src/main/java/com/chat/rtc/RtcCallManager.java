@@ -146,7 +146,10 @@ public class RtcCallManager implements RtcSignalDelegate {
                     try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception ignored) {}
                     return;
                 }
-                if (incomingSeen.containsKey(signal.callId)) return;
+                if (incomingSeen.containsKey(signal.callId)) {
+                    try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception ignored) {}
+                    return;
+                }
                 incomingSeen.put(signal.callId, System.currentTimeMillis());
                 incomingInviteMap.put(signal.callId, signal);
                 currentCallId = signal.callId;
@@ -233,10 +236,12 @@ public class RtcCallManager implements RtcSignalDelegate {
         String name = getDisplayName(signal);
         String avatar = getDisplayAvatar(signal);
         int type = RtcConstants.typeOf(signal.mode);
-        RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
-        // Always try to open the incoming call page. If Android blocks background activity starts,
-        // the call notification/full-screen intent is still there as the fallback.
-        tryOpenIncomingActivity(signal, name, avatar, type, false);
+        boolean notified = RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
+        // Foreground app: open the call page immediately. Background app: let full-screen notification
+        // do its job; if notification permission/channel is unavailable, try Activity as a last fallback.
+        if (WKRTCApplication.getInstance().isAppInForeground() || !notified) {
+            tryOpenIncomingActivity(signal, name, avatar, type, false);
+        }
     }
 
     private void tryOpenIncomingActivity(RtcSignal signal, String name, String avatar, int type, boolean autoAccept) {

@@ -4,6 +4,7 @@ import android.text.TextUtils;
 
 import com.chat.base.msgitem.WKContentType;
 import com.chat.rtc.model.RtcSignal;
+import com.chat.rtc.model.RtcSignalContent;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -51,7 +52,34 @@ public class RtcSignalManager {
     }
 
     public static String extractSignalText(WKMsg msg) {
-        if (msg == null || (msg.type != WKContentType.WK_TEXT && msg.type != WKContentType.WK_INSIDE_MSG)) return "";
+        if (msg == null) return "";
+
+        // Dedicated RTC signal content. This is the preferred path and should never render as text.
+        if (msg.type == WKContentType.WK_RTC_SIGNAL) {
+            String text = pickValidSignalText(msg.content);
+            if (!TextUtils.isEmpty(text)) return text;
+            try {
+                if (msg.baseContentMsgModel instanceof RtcSignalContent) {
+                    text = pickValidSignalText(((RtcSignalContent) msg.baseContentMsgModel).payload);
+                    if (!TextUtils.isEmpty(text)) return text;
+                }
+                if (msg.baseContentMsgModel != null) {
+                    JSONObject jsonObject = msg.baseContentMsgModel.encodeMsg();
+                    if (jsonObject != null) {
+                        text = pickValidSignalText(jsonObject.optString("payload", ""));
+                        if (!TextUtils.isEmpty(text)) return text;
+                        text = pickValidSignalText(jsonObject.optString("content", ""));
+                        if (!TextUtils.isEmpty(text)) return text;
+                        text = pickValidSignalText(jsonObject.optString("text", ""));
+                        if (!TextUtils.isEmpty(text)) return text;
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+            return "";
+        }
+
+        if (msg.type != WKContentType.WK_TEXT && msg.type != WKContentType.WK_INSIDE_MSG) return "";
 
         // 1) Prefer raw SDK content. Do not inspect media payloads or generic display text.
         String text = pickValidSignalText(msg.content);
@@ -62,6 +90,8 @@ public class RtcSignalManager {
             if (msg.baseContentMsgModel != null) {
                 JSONObject jsonObject = msg.baseContentMsgModel.encodeMsg();
                 if (jsonObject != null) {
+                    text = pickValidSignalText(jsonObject.optString("payload", ""));
+                    if (!TextUtils.isEmpty(text)) return text;
                     text = pickValidSignalText(jsonObject.optString("content", ""));
                     if (!TextUtils.isEmpty(text)) return text;
                     text = pickValidSignalText(jsonObject.optString("text", ""));

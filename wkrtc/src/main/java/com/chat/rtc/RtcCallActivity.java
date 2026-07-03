@@ -54,6 +54,8 @@ import java.util.concurrent.Executors;
 public class RtcCallActivity extends Activity implements RtcPeerClient.Events, RtcCallManager.ActiveCallListener {
     private static final int REQ_PERMISSIONS = 7001;
     private static final long CONTROLS_AUTO_HIDE_MS = 2000L;
+    private static final long INVITE_RETRY_INTERVAL_MS = 3500L;
+    private static final int MAX_INVITE_RETRY_COUNT = 4;
 
     private String callId;
     private String peerUid;
@@ -66,6 +68,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     // For outgoing calls this means the callee has accepted (or answered SDP).
     // It is intentionally separate from local accepted to distinguish no-answer from connect-failed.
     private boolean peerAccepted;
+    private boolean peerRinging;
+    private int inviteRetryCount;
     private boolean connected;
     private boolean ending;
     private boolean micOn = true;
@@ -117,6 +121,20 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private final Runnable autoHideRunnable = new Runnable() {
         @Override public void run() {
             if (connected && RtcConstants.isVideo(callType) && !ending) setControlsVisible(false);
+        }
+    };
+
+    private final Runnable inviteRetryRunnable = new Runnable() {
+        @Override public void run() {
+            if (incoming || ending || connected || peerAccepted || peerRinging) return;
+            if (inviteRetryCount >= MAX_INVITE_RETRY_COUNT) return;
+            inviteRetryCount++;
+            try {
+                RtcSignalManager.get().sendInvite(callId, peerUid, peerName, peerAvatar, callType);
+            } catch (Exception ignored) {
+                return;
+            }
+            handler.postDelayed(this, INVITE_RETRY_INTERVAL_MS);
         }
     };
 
@@ -345,10 +363,13 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         accepted = true;
         startWebRtc();
         try {
+            inviteRetryCount = 0;
+            peerRinging = false;
             RtcSignalManager.get().sendInvite(callId, peerUid, peerName, peerAvatar, callType);
             statusText.setText(RtcConstants.isVideo(callType) ? getString(R.string.rtc_wait_accept_video) : getString(R.string.rtc_calling_audio));
             ringPlayer.playOutgoing();
             peerClient.createOffer();
+            handler.postDelayed(inviteRetryRunnable, INVITE_RETRY_INTERVAL_MS);
             scheduleOutgoingInviteTimeout();
         } catch (Exception e) {
             closeReason = "connect_failed";
@@ -442,11 +463,14 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             return;
         }
         if (RtcSignal.RINGING.equals(s.type)) {
+            peerRinging = true;
+            handler.removeCallbacks(inviteRetryRunnable);
             statusText.setText(getString(R.string.rtc_ringing));
             return;
         }
         if (RtcSignal.ACCEPT.equals(s.type)) {
             peerAccepted = true;
+            handler.removeCallbacks(inviteRetryRunnable);
             ringPlayer.stop();
             statusText.setText(getString(R.string.rtc_peer_accepted));
             scheduleConnectTimeout();
@@ -520,6 +544,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private void endCall(boolean remoteEnded) {
         if (ending) return;
         ending = true;
+        handler.removeCallbacks(inviteRetryRunnable);
         ringPlayer.stop();
         if (TextUtils.isEmpty(closeReason)) {
             closeReason = connected ? (remoteEnded ? "remote_ended" : "ended") : (incoming ? "missed" : "cancelled");

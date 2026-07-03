@@ -16,6 +16,7 @@ import com.chat.base.endpoint.entity.RTCMenu;
 import com.chat.base.msg.IConversationContext;
 import com.chat.base.msgitem.WKMsgItemViewManager;
 import com.chat.rtc.model.RtcSignal;
+import com.chat.rtc.model.RtcSignalContent;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -77,6 +78,10 @@ public class WKRTCApplication {
     private void registerRtcMessageArtifacts() {
         if (messageArtifactsRegistered) return;
         messageArtifactsRegistered = true;
+        try {
+            WKIM.getInstance().getMsgManager().registerContentMsg(RtcSignalContent.class);
+        } catch (Exception ignored) {
+        }
         try {
             WKIM.getInstance().getMsgManager().registerContentMsg(RtcCallRecordContent.class);
         } catch (Exception ignored) {

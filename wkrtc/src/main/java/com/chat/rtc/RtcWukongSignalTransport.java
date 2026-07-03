@@ -6,7 +6,7 @@ import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 import com.xinbida.wukongim.entity.WKSendOptions;
-import com.xinbida.wukongim.msgmodel.WKTextContent;
+import com.chat.rtc.model.RtcSignalContent;
 
 import org.json.JSONObject;
 
@@ -40,7 +40,7 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         if (TextUtils.isEmpty(peerUid) || TextUtils.isEmpty(payload)) return;
 
         boolean durableInvite = isInviteSignal(payload);
-        WKTextContent content = new WKTextContent(payload);
+        RtcSignalContent content = new RtcSignalContent(payload);
         WKChannel channel = new WKChannel(peerUid, WKChannelType.PERSONAL);
         WKSendOptions options = new WKSendOptions();
 
