@@ -181,6 +181,10 @@ public class WKIMUtils {
                 channelID = msgList.get(msgList.size() - 1).channelID;
                 channelType = msgList.get(msgList.size() - 1).channelType;
                 for (int i = 0, size = msgList.size(); i < size; i++) {
+                    Object rtcHandled = EndpointManager.getInstance().invoke("rtc_handle_signal_msg", msgList.get(i));
+                    if (rtcHandled instanceof Boolean && (Boolean) rtcHandled) {
+                        continue;
+                    }
                     if (msgList.get(i).type == WKContentType.setNewGroupAdmin) {
                         GroupModel.getInstance().groupMembersSync(msgList.get(i).channelID, null);
                     } else if (msgList.get(i).type == WKContentType.groupSystemInfo) {
