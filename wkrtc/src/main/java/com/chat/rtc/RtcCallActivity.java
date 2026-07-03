@@ -235,6 +235,15 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         });
     }
 
+    @Override public void onLocalScreenShareStarted() {
+        runOnUiThread(() -> {
+            if (ending || !screenSharing) return;
+            try { RtcSignalManager.get().sendScreenShareState(callId, peerUid, true, callType); } catch (Exception ignored) {}
+            toast(getString(R.string.rtc_screen_share_started));
+            handler.postDelayed(this::goHomeForRealScreenShare, 650L);
+        });
+    }
+
     @Override public void onLocalScreenShareStopped() {
         runOnUiThread(() -> {
             if (ending || !screenSharing) return;
@@ -243,6 +252,17 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             RtcCallForegroundService.start(this, callId, peerName, callType);
             applyScreenShareUi(false);
             toast(getString(R.string.rtc_screen_share_stopped));
+        });
+    }
+
+    @Override public void onScreenShareError(String message, Throwable error) {
+        runOnUiThread(() -> {
+            if (ending) return;
+            screenSharing = false;
+            try { RtcSignalManager.get().sendScreenShareState(callId, peerUid, false, callType); } catch (Exception ignored) {}
+            RtcCallForegroundService.start(this, callId, peerName, callType);
+            applyScreenShareUi(false);
+            toast(TextUtils.isEmpty(message) ? getString(R.string.rtc_screen_share_failed) : message);
         });
     }
 
@@ -305,8 +325,9 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         loadAvatar(peerAvatar);
 
         remoteRenderer.init(eglBase.getEglBaseContext(), null);
-        // Use FIT for the main remote renderer so phone screens shared to tablets are never cropped.
-        remoteRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
+        // Camera video should feel full-screen; remote screen sharing switches this to FIT
+        // so tablets do not crop the top or bottom of a phone screen.
+        remoteRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
         remoteRenderer.setEnableHardwareScaler(true);
         remoteRenderer.setMirror(false);
         localRenderer.init(eglBase.getEglBaseContext(), null);
@@ -615,7 +636,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             localRenderer.setMirror(false);
             flipBtn.setVisibility(View.GONE);
             camBtn.setEnabled(false);
-            remoteRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
+            applyRemoteRendererScaling();
             statusText.setText(getString(R.string.rtc_screen_sharing));
         } else {
             localFullScreen = false;
@@ -626,21 +647,26 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             localRenderer.setMirror(true);
             flipBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
             camBtn.setEnabled(true);
-            remoteRenderer.setScalingType(remoteScreenSharing ? RendererCommon.ScalingType.SCALE_ASPECT_FIT : RendererCommon.ScalingType.SCALE_ASPECT_FIT);
+            applyRemoteRendererScaling();
         }
         updateScreenShareButton(sharing);
     }
 
     private void applyRemoteScreenShareUi(boolean sharing) {
         remoteScreenSharing = sharing;
-        if (remoteRenderer != null) {
-            remoteRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
-        }
+        applyRemoteRendererScaling();
         if (sharing) {
             statusText.setText(getString(R.string.rtc_remote_screen_sharing));
         } else if (connected) {
             statusText.setText(formatDurationText());
         }
+    }
+
+    private void applyRemoteRendererScaling() {
+        if (remoteRenderer == null) return;
+        remoteRenderer.setScalingType(remoteScreenSharing
+                ? RendererCommon.ScalingType.SCALE_ASPECT_FIT
+                : RendererCommon.ScalingType.SCALE_ASPECT_FILL);
     }
 
     private String formatDurationText() {
@@ -693,9 +719,6 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             handler.postDelayed(() -> {
                 if (!ending && peerClient != null && screenSharing) {
                     peerClient.startScreenShare(data);
-                    try { RtcSignalManager.get().sendScreenShareState(callId, peerUid, true, callType); } catch (Exception ignored) {}
-                    toast(getString(R.string.rtc_screen_share_started));
-                    handler.postDelayed(this::goHomeForRealScreenShare, 650L);
                 }
             }, 350L);
         } catch (Exception e) {
