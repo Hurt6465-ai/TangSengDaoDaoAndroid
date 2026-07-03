@@ -18,6 +18,12 @@
         android:name="android.permission.BLUETOOTH_CONNECT"
         tools:targetApi="s" />
     <application>
+
+        <activity
+            android:name="com.chat.rtc.RtcDebugLogActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
         <activity
             android:name="com.chat.rtc.RtcCallActivity"
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize"
