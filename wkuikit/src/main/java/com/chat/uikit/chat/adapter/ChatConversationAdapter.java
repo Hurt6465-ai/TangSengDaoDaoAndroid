@@ -52,7 +52,6 @@ import com.xinbida.wukongim.entity.WKUIConversationMsg;
 import com.xinbida.wukongim.message.type.WKSendMsgResult;
 
 import org.jetbrains.annotations.NotNull;
-import org.json.JSONObject;
 import org.telegram.ui.Components.RLottieDrawable;
 import org.telegram.ui.Components.RLottieImageView;
 
@@ -171,9 +170,7 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
     private String getContent(WKMsg msg) {
         String content = "";
         if (msg == null || msg.isDeleted == 1) return content;
-        if (msg.type == WKContentType.WK_RTC_SIGNAL) return "";
-        String rtcPreview = getRtcSignalPreview(msg.content);
-        if (!TextUtils.isEmpty(rtcPreview)) return rtcPreview;
+        if (isRtcSignalMsg(msg)) return "";
         if (msg.baseContentMsgModel != null) {
             content = msg.baseContentMsgModel.getDisplayContent();
         }
@@ -211,38 +208,20 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
         return content;
     }
 
-    private String getRtcSignalPreview(String raw) {
-        if (TextUtils.isEmpty(raw)) return "";
-        String text = raw.trim();
-        if (text.startsWith("{")) {
-            try {
-                JSONObject wrapper = new JSONObject(text);
-                text = wrapper.optString("payload", wrapper.optString("content", wrapper.optString("text", text)));
-            } catch (Exception ignored) {
-            }
-        }
-        final String prefix = "__cp_harmony_rtc__:";
-        if (!text.startsWith(prefix)) return "";
-        try {
-            JSONObject object = new JSONObject(text.substring(prefix.length()));
-            String mode = object.optString("mode", "audio");
-            String type = object.optString("type", "");
-            String call = "video".equalsIgnoreCase(mode) ? "视频通话" : "语音通话";
-            if ("invite".equals(type) || "ringing".equals(type)) return call + " 邀请中";
-            if ("busy".equals(type)) return call + " 对方忙线";
-            if ("reject".equals(type)) return call + " 已拒绝";
-            if ("timeout".equals(type)) return call + " 对方无应答";
-            if ("cancel".equals(type)) return call + " 已取消";
-            if ("end".equals(type)) return call + " 已结束";
-            return call + " 通话中";
-        } catch (Exception ignored) {
-            return "通话状态";
-        }
-    }
-
     private String getShowContent(String contentJson) {
         return StringUtils.getShowContent(getContext(), contentJson);
     }
+
+    private boolean isRtcSignalMsg(WKMsg msg) {
+        if (msg == null) return false;
+        try {
+            Object result = EndpointManager.getInstance().invoke("rtc_is_signal_msg", msg);
+            return result instanceof Boolean && (Boolean) result;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
 
     private void setStatus(BaseViewHolder helper, WKUIConversationMsg item, boolean isPlayAnimation) {
         RLottieImageView sendingMsgIv = helper.getView(R.id.statusIV);
