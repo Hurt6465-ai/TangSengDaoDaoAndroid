@@ -4,12 +4,10 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.app.Person;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.drawable.Icon;
 import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Build;
@@ -64,22 +62,26 @@ public final class RtcCallNotification {
         Bitmap largeIcon = decodeCallIcon(app);
         if (largeIcon != null) builder.setLargeIcon(largeIcon);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Person.Builder personBuilder = new Person.Builder()
-                    .setName(title)
-                    .setKey(signal.fromUid == null ? signal.callId : signal.fromUid);
-            if (largeIcon != null) personBuilder.setIcon(Icon.createWithBitmap(largeIcon));
-            builder.setStyle(Notification.CallStyle.forIncomingCall(personBuilder.build(), reject, answer));
-        } else {
-            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, app.getString(R.string.rtc_reject), reject);
-            builder.addAction(android.R.drawable.stat_sys_phone_call, app.getString(R.string.rtc_accept), answer);
-        }
+        // Do NOT use Notification.CallStyle here.
+        // On Android 12+ CallStyle can throw at notify time unless the notification is posted
+        // by a foreground service or the system accepts its fullScreenIntent. Your log showed:
+        // "CallStyle notifications must either be for a foreground Service or use a fullScreenIntent".
+        // Once that exception is thrown, openIncoming() aborts and the call page never opens.
+        // A normal high-priority CALL notification with Answer/Reject actions is enough here,
+        // and RtcCallManager will also open RtcCallActivity directly after posting/failing it.
+        builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, app.getString(R.string.rtc_reject), reject);
+        builder.addAction(android.R.drawable.stat_sys_phone_call, app.getString(R.string.rtc_accept), answer);
 
-        Notification notification = builder.build();
-        notification.flags |= Notification.FLAG_INSISTENT;
-        nm.notify(RtcConstants.NOTIFICATION_ID_INCOMING, notification);
-        RtcDebugLogger.i("RtcNotification", "notify incoming ok " + RtcDebugLogger.signal(signal));
-        return true;
+        try {
+            Notification notification = builder.build();
+            notification.flags |= Notification.FLAG_INSISTENT;
+            nm.notify(RtcConstants.NOTIFICATION_ID_INCOMING, notification);
+            RtcDebugLogger.i("RtcNotification", "notify incoming ok " + RtcDebugLogger.signal(signal));
+            return true;
+        } catch (Throwable e) {
+            RtcDebugLogger.e("RtcNotification", "notify incoming failed, will fallback activity " + RtcDebugLogger.signal(signal), e);
+            return false;
+        }
     }
 
     public static Notification buildActive(Context context, String callId, String peerName, int callType) {

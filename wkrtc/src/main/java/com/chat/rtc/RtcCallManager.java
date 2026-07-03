@@ -282,11 +282,17 @@ public class RtcCallManager implements RtcSignalDelegate {
         String name = getDisplayName(signal);
         String avatar = getDisplayAvatar(signal);
         int type = RtcConstants.typeOf(signal.mode);
-        boolean notificationShown = RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
+        boolean notificationShown = false;
+        try {
+            notificationShown = RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
+        } catch (Throwable e) {
+            // Notification must never block the actual incoming call UI.
+            RtcDebugLogger.e("RtcCallManager", "showIncoming crashed, fallback to activity " + RtcDebugLogger.signal(signal), e);
+        }
         RtcDebugLogger.i("RtcCallManager", "showIncoming notification=" + notificationShown + " name=" + name
                 + " type=" + type + " " + RtcDebugLogger.signal(signal));
-        // Restore the old stable behavior: after the invite is actually received, open the
-        // incoming call page directly. SINGLE_TOP makes duplicate notification launches harmless.
+        // After the invite is actually received, always try opening the call page directly.
+        // The notification is only a supplement; it must not be the only incoming-call path.
         tryOpenIncomingActivity(signal, name, avatar, type, false);
     }
 
