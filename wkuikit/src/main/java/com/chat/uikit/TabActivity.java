@@ -42,6 +42,7 @@ import com.chat.base.utils.WKDialogUtils;
 import com.chat.base.utils.WKTimeUtils;
 import com.chat.base.utils.language.WKMultiLanguageUtil;
 import com.chat.base.utils.rxpermissions.RxPermissions;
+import com.chat.learning.LearningFragment;
 import com.chat.uikit.contacts.service.FriendModel;
 import com.chat.uikit.databinding.ActTabMainBinding;
 import com.chat.uikit.fragment.ChatFragment;
@@ -211,7 +212,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         fragments.add(PlaceholderTabFragment.newInstance("语伴", "语伴模块加载失败，请重新安装或检查 wkpartnerbrowse 模块"));
         fragments.add(PlaceholderTabFragment.newInstance("发现", "发现模块加载失败，请重新安装或检查 wkfeed 模块"));
         fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_HOME_URL)));
-        fragments.add(WebTabFragment.newInstance("https://886.best"));
+        fragments.add(new LearningFragment());
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
         // 底部是一级导航，只允许点击切换；横滑手势留给聊天页内部二级导航使用。
         wkVBinding.vp.setUserInputEnabled(false);
