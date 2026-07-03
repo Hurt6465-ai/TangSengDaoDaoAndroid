@@ -25,8 +25,11 @@ public final class RtcCallRecordSender {
             content.displayText = displayText;
 
             WKSendOptions options = new WKSendOptions();
+            try { options.header.redDot = false; } catch (Exception ignored) {}
+            try { options.header.noPersist = false; } catch (Exception ignored) {}
             try { options.setting.redDot = false; } catch (Exception ignored) {}
             try { options.setting.syncOnce = false; } catch (Exception ignored) {}
+            try { options.setting.receipt = 0; } catch (Exception ignored) {}
 
             WKChannel channel = new WKChannel(peerUid, WKChannelType.PERSONAL);
             WKIM.getInstance().getMsgManager().sendWithOptions(content, channel, options);

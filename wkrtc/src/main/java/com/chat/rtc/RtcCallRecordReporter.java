@@ -5,7 +5,9 @@ import android.text.TextUtils;
 import com.chat.base.endpoint.EndpointManager;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Emits a lightweight call-result event for the host app or backend bridge and also writes
@@ -13,7 +15,8 @@ import java.util.Map;
  */
 public final class RtcCallRecordReporter {
     public static final String ENDPOINT = "rtc_call_record_event";
-    public static final int SCHEMA_VERSION = 4;
+    public static final int SCHEMA_VERSION = 5;
+    private static final Set<String> REPORTED_KEYS = new HashSet<>();
 
     private RtcCallRecordReporter() {}
 
@@ -21,6 +24,7 @@ public final class RtcCallRecordReporter {
                               boolean incoming, String reason, long connectedAt) {
         long duration = connectedAt > 0 ? Math.max(0L, (System.currentTimeMillis() - connectedAt) / 1000L) : 0L;
         String normalizedReason = TextUtils.isEmpty(reason) ? "ended" : reason;
+        if (isDuplicate(callId, normalizedReason, incoming)) return;
         String displayText = buildDisplayText(callType, normalizedReason, duration);
         Map<String, Object> event = new HashMap<>();
         event.put("schema_version", SCHEMA_VERSION);
@@ -41,6 +45,17 @@ public final class RtcCallRecordReporter {
         } catch (Exception ignored) {
         }
         RtcCallRecordSender.send(peerUid, callId, peerName, callType, incoming, normalizedReason, duration, displayText);
+    }
+
+    private static synchronized boolean isDuplicate(String callId, String reason, boolean incoming) {
+        String key = nullToEmpty(callId) + "|" + reason + "|" + incoming;
+        if (REPORTED_KEYS.contains(key)) return true;
+        REPORTED_KEYS.add(key);
+        if (REPORTED_KEYS.size() > 120) {
+            REPORTED_KEYS.clear();
+            REPORTED_KEYS.add(key);
+        }
+        return false;
     }
 
     private static String resultOf(String reason) {
