@@ -12,12 +12,12 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.fragment.app.Fragment;
 
 import com.chat.userscript.AiScriptWebActivity;
 import com.chat.userscript.ScriptManagerActivity;
-import com.chat.speech.ui.SpeechSettingsActivity;
 
 public class LearningFragment extends Fragment {
     @Override
@@ -39,7 +39,7 @@ public class LearningFragment extends Fragment {
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         TextView sub = new TextView(requireContext());
-        sub.setText("第三阶段测试版：先接 DeepSeek、千问和用户脚本入口。后面再继续加课程、词汇、翻译、AI 学习工具。");
+        sub.setText("第三阶段测试版：先接 DeepSeek、千问、用户脚本和语音朗读入口。后面继续加课程、词汇、翻译、口语练习。 ");
         sub.setTextSize(14);
         sub.setTextColor(Color.rgb(107, 114, 128));
         sub.setLineSpacing(dp(2), 1f);
@@ -50,15 +50,24 @@ public class LearningFragment extends Fragment {
         root.addView(card("DeepSeek", "打开 chat.deepseek.com，支持已安装脚本注入。", "进入", () -> AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")));
         root.addView(card("千问 / Qwen", "打开 https://chat.qwen.ai/，支持已安装脚本注入。", "进入", () -> AiScriptWebActivity.open(requireContext(), "千问", "https://chat.qwen.ai/")));
         root.addView(card("添加脚本", "粘贴或导入 .user.js。脚本只允许在 DeepSeek / 千问相关域名运行。", "管理", () -> startActivity(new Intent(requireContext(), ScriptManagerActivity.class))));
-        root.addView(card("语音朗读", "独立 wkspeech 插件：系统 TTS 兜底，支持导入 MultiTTS 微软包，支持中文/缅语一句话双发音人测试。", "设置", () -> startActivity(new Intent(requireContext(), SpeechSettingsActivity.class))));
+        root.addView(card("语音朗读", "独立 wkspeech 插件：系统 TTS 兜底，支持导入 MultiTTS 微软包，支持中文/缅语一句话双发音人测试。", "设置", this::openSpeechSettings));
 
         TextView warn = new TextView(requireContext());
-        warn.setText("安全说明：当前不会把脚本接入唐僧原生聊天、语伴、发现、通话，也不会开放登录 token、联系人、相册、定位、支付、IM 发消息能力。");
+        warn.setText("安全说明：脚本不会接入唐僧原生聊天、语伴、发现、通话，也不会开放登录 token、联系人、相册、定位、支付、IM 发消息能力。语音源默认由用户自己启用，失败时可降级系统 TTS。");
         warn.setTextSize(12);
         warn.setTextColor(Color.rgb(107, 114, 128));
         warn.setPadding(dp(4), dp(14), dp(4), 0);
         root.addView(warn, new LinearLayout.LayoutParams(-1, -2));
         return scrollView;
+    }
+
+    private void openSpeechSettings() {
+        try {
+            Class<?> clazz = Class.forName("com.chat.speech.ui.SpeechSettingsActivity");
+            startActivity(new Intent(requireContext(), clazz));
+        } catch (Throwable e) {
+            Toast.makeText(requireContext(), "语音插件未安装或未加入 wkspeech 模块", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private View card(String title, String desc, String action, Runnable click) {
