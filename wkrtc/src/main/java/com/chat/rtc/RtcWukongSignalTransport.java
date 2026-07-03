@@ -3,6 +3,9 @@ package com.chat.rtc;
 import android.text.TextUtils;
 
 import com.chat.base.config.WKConfig;
+import com.chat.base.endpoint.EndpointManager;
+import com.chat.base.endpoint.EndpointSID;
+import com.chat.base.endpoint.entity.WKSendMsgMenu;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
@@ -54,6 +57,10 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
 
         applySignalOptions(options, durableInvite);
         markByReflection(content, !durableInvite);
+        // Follow the same send hook path as normal chat messages. Some host logic is attached
+        // to EndpointSID.sendMessage; bypassing it can make signaling behave differently from
+        // regular text messages on certain builds.
+        try { EndpointManager.getInstance().invokes(EndpointSID.sendMessage, new WKSendMsgMenu(channel, options)); } catch (Exception ignored) {}
         WKIM.getInstance().getMsgManager().sendWithOptions(content, channel, options);
     }
 

@@ -124,6 +124,18 @@ public class WKRTCApplication {
             });
         } catch (Exception ignored) {
         }
+        try {
+            // Some RTC INVITEs arrive through message sync after reconnect/cold start rather than
+            // through the live new-message callback. Catch refreshed/synced messages globally too,
+            // otherwise ChatActivity may hide the signal from history without ever opening the call UI.
+            WKIM.getInstance().getMsgManager().addOnRefreshMsgListener("wkrtc_global_refresh_signal", (msg, left) -> {
+                String currentUid = WKConfig.getInstance().getUid();
+                if (TextUtils.isEmpty(currentUid) || msg == null) return;
+                RtcCallManager.get().configure(getContext(), currentUid, new RtcWukongSignalTransport());
+                RtcSignalManager.get().tryHandleIncomingMsg(msg);
+            });
+        } catch (Exception ignored) {
+        }
     }
 
     private String stringValue(Object value) {
