@@ -637,16 +637,29 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private void showChatMoreDialog() {
         String[] items = new String[]{
                 getString(R.string.chat_bg_menu),
-                getString(R.string.chat_ai_settings)
+                getString(R.string.chat_ai_settings),
+                "RTC 诊断日志"
         };
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.chat_more_menu)
                 .setItems(items, (d, which) -> {
                     if (which == 0) showChatBackgroundDialog();
-                    else showChatAiSettingsDialog();
+                    else if (which == 1) showChatAiSettingsDialog();
+                    else openRtcDebugLog();
                 })
                 .show();
         applyGlassDialogStyle(dialog);
+    }
+
+    private void openRtcDebugLog() {
+        try {
+            Object ok = EndpointManager.getInstance().invoke("rtc_open_debug_log", this);
+            if (!(ok instanceof Boolean) || !((Boolean) ok)) {
+                WKToastUtils.getInstance().showToast("RTC 日志入口未初始化");
+            }
+        } catch (Exception e) {
+            WKToastUtils.getInstance().showToast("打开 RTC 日志失败");
+        }
     }
 
     private void showChatBackgroundDialog() {
@@ -846,6 +859,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         EndpointManager.getInstance().invoke("rtc_init", null);
     }
 
+    private void rtcLog(String text) {
+        try {
+            EndpointManager.getInstance().invoke("rtc_log", "ChatActivity " + text);
+        } catch (Exception ignored) {
+        }
+    }
+
     private boolean isRtcSignalMessage(WKMsg msg, boolean dispatch) {
         if (msg == null) return false;
         boolean signal = false;
@@ -855,11 +875,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         } catch (Exception ignored) {
         }
         if (!signal) return false;
+        rtcLog("rtc signal detected msgType=" + msg.type + " from=" + msg.fromUID + " channel=" + msg.channelID + " dispatch=" + dispatch);
         if (dispatch) {
             try {
-                EndpointManager.getInstance().invoke("rtc_handle_signal_msg", msg);
+                Object handled = EndpointManager.getInstance().invoke("rtc_handle_signal_msg", msg);
+                rtcLog("rtc_handle_signal_msg result=" + handled + " msgType=" + msg.type);
             } catch (Exception e) {
                 Log.e("ChatActivity", "handle rtc signal failed", e);
+                rtcLog("rtc_handle_signal_msg exception=" + e.getMessage());
             }
         }
         return true;
@@ -944,9 +967,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }
         if (TextUtils.equals(channelId, loginUID)) {
             WKToastUtils.getInstance().showToast("不能给自己发起通话");
+            rtcLog("p2pCall blocked self channelId=" + channelId);
             return;
         }
 
+        rtcLog("p2pCall click channelId=" + channelId + " login=" + loginUID + " type=" + callType);
         initRtcCallModule();
 
         // 当前聊天对象只有 ChatActivity 最准确：单聊 channelId 就是对方 uid。
@@ -959,6 +984,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         request.put("call_type", callType);
 
         Object handled = EndpointManager.getInstance().invoke("wk_p2p_call", request);
+        rtcLog("wk_p2p_call result=" + handled + " peer=" + channelId);
         if (!(handled instanceof Boolean) || !((Boolean) handled)) {
             // 兼容旧 wkrtc，如果没有覆盖 wkrtc 新包，退回旧 RTCMenu 调用。
             handled = EndpointManager.getInstance().invoke("wk_p2p_call", new RTCMenu(this, callType));
