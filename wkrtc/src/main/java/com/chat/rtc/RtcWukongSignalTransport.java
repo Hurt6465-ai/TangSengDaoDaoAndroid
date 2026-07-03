@@ -12,17 +12,17 @@ import com.xinbida.wukongim.entity.WKChannelType;
 import com.xinbida.wukongim.entity.WKSendOptions;
 import com.xinbida.wukongim.msgmodel.WKTextContent;
 
-import org.json.JSONObject;
-
 import java.lang.reflect.Field;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * WuKong IM transport for WebRTC signaling.
  *
- * INVITE is allowed to be persisted with a short expire window so the callee can still
- * receive the call during short reconnect/background sync. All other SDP/ICE/control packets
- * remain online-only and no-red-dot to avoid polluting chat history and unread counts.
+ * All RTC packets, including INVITE, are sent as online-only no-persist messages.
+ * In this app's current backend/WuKongIM deployment, terminal packets such as CANCEL/END are
+ * received reliably because they are online-only, while persisted INVITE packets may be delayed
+ * or only appear in sync/history without opening the incoming-call UI. Use the same live path
+ * for INVITE first; offline push can be added later as a separate backend feature.
  */
 public class RtcWukongSignalTransport implements RtcSignalTransport {
     private static final int SIGNAL_EXPIRE_SECONDS = 5 * 60;
@@ -47,16 +47,15 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
             throw new IllegalArgumentException("RTC signal target is self: " + peerUid);
         }
 
-        boolean durableInvite = isInviteSignal(payload);
-        // Use normal text content for signaling transport compatibility. ChatActivity hides
-        // messages by the strict __cp_harmony_rtc__: prefix, so it will not render as a bubble.
-        // Custom content types are more likely to be missed if registration is late or cache decode fails.
+        // IMPORTANT: keep INVITE on the same online-only path as CANCEL/END.
+        // The user reported that the peer can receive the hangup/cancel packet but not the
+        // incoming invite. That points to the durable/persisted INVITE path, not WebRTC/STUN.
         WKTextContent content = new WKTextContent(payload);
         WKChannel channel = new WKChannel(peerUid, WKChannelType.PERSONAL);
         WKSendOptions options = new WKSendOptions();
 
-        applySignalOptions(options, durableInvite);
-        markByReflection(content, !durableInvite);
+        applySignalOptions(options);
+        markByReflection(content, true);
         // Follow the same send hook path as normal chat messages. Some host logic is attached
         // to EndpointSID.sendMessage; bypassing it can make signaling behave differently from
         // regular text messages on certain builds.
@@ -64,27 +63,14 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         WKIM.getInstance().getMsgManager().sendWithOptions(content, channel, options);
     }
 
-    private boolean isInviteSignal(String payload) {
-        try {
-            String text = payload;
-            if (text.startsWith(RtcConstants.SIGNAL_PREFIX)) {
-                text = text.substring(RtcConstants.SIGNAL_PREFIX.length());
-            }
-            JSONObject object = new JSONObject(text);
-            return RtcSignalCompat.INVITE.equals(object.optString("type"));
-        } catch (Exception ignored) {
-            return payload.contains("\"type\":\"invite\"") || payload.contains("\"type\" : \"invite\"");
-        }
-    }
-
-    private void applySignalOptions(WKSendOptions options, boolean durableInvite) {
+    private void applySignalOptions(WKSendOptions options) {
         if (options == null) return;
 
         options.expire = SIGNAL_EXPIRE_SECONDS;
 
         try {
             if (options.header != null) {
-                options.header.noPersist = !durableInvite;
+                options.header.noPersist = true;
                 options.header.redDot = false;
             }
         } catch (Exception ignored) {
@@ -98,9 +84,9 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         } catch (Exception ignored) {
         }
 
-        markByReflection(options, !durableInvite);
-        markByReflection(getFieldValue(options, "header"), !durableInvite);
-        markByReflection(getFieldValue(options, "setting"), !durableInvite);
+        markByReflection(options, true);
+        markByReflection(getFieldValue(options, "header"), true);
+        markByReflection(getFieldValue(options, "setting"), true);
     }
 
     private void markByReflection(Object object, boolean noPersist) {
@@ -223,7 +209,5 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
     }
 
     /** Avoid importing model just for one string in this low-level transport. */
-    private static final class RtcSignalCompat {
-        private static final String INVITE = "invite";
-    }
+
 }
