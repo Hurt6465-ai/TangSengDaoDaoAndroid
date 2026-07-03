@@ -46,4 +46,10 @@
     <string name="new_rtc_notification">音视频邀请通知</string>
     <string name="new_rtc_notification_desc">接受音视频的推送通知</string>
     <string name="rtc_ringing">对方正在响铃</string>
+    <string name="rtc_remote_screen_sharing">对方正在共享屏幕</string>
+    <string name="rtc_screen_share_active">正在共享屏幕</string>
+    <string name="rtc_call_active">通话进行中</string>
+    <string name="rtc_debug_disabled_title">RTC 诊断</string>
+    <string name="rtc_debug_disabled_msg">正式版已关闭 RTC 文件日志，通话过程不会再写入诊断日志。</string>
+    <string name="rtc_close">关闭</string>
 </resources>
