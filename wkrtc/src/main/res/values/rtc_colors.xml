@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="wkrtc_call_record_bg">#546173</color>
+    <color name="wkrtc_call_record_text">#FFFFFFFF</color>
+</resources>
