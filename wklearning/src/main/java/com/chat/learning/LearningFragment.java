@@ -17,6 +17,7 @@ import androidx.fragment.app.Fragment;
 
 import com.chat.userscript.AiScriptWebActivity;
 import com.chat.userscript.ScriptManagerActivity;
+import com.chat.speech.ui.SpeechSettingsActivity;
 
 public class LearningFragment extends Fragment {
     @Override
@@ -49,6 +50,7 @@ public class LearningFragment extends Fragment {
         root.addView(card("DeepSeek", "打开 chat.deepseek.com，支持已安装脚本注入。", "进入", () -> AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")));
         root.addView(card("千问 / Qwen", "打开 https://chat.qwen.ai/，支持已安装脚本注入。", "进入", () -> AiScriptWebActivity.open(requireContext(), "千问", "https://chat.qwen.ai/")));
         root.addView(card("添加脚本", "粘贴或导入 .user.js。脚本只允许在 DeepSeek / 千问相关域名运行。", "管理", () -> startActivity(new Intent(requireContext(), ScriptManagerActivity.class))));
+        root.addView(card("语音朗读", "独立 wkspeech 插件：系统 TTS 兜底，支持导入 MultiTTS 微软包，支持中文/缅语一句话双发音人测试。", "设置", () -> startActivity(new Intent(requireContext(), SpeechSettingsActivity.class))));
 
         TextView warn = new TextView(requireContext());
         warn.setText("安全说明：当前不会把脚本接入唐僧原生聊天、语伴、发现、通话，也不会开放登录 token、联系人、相册、定位、支付、IM 发消息能力。");
