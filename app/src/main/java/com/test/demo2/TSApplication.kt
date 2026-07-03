@@ -287,7 +287,7 @@ class TSApplication : MultiDexApplication() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name: CharSequence = applicationContext.getString(R.string.new_rtc_notification)
             val description = applicationContext.getString(R.string.new_rtc_notification_desc)
-            val importance = NotificationManager.IMPORTANCE_DEFAULT
+            val importance = NotificationManager.IMPORTANCE_HIGH
             val channel = NotificationChannel(WKConstants.newRTCChannelID, name, importance)
             channel.description = description
             channel.enableVibration(true)
