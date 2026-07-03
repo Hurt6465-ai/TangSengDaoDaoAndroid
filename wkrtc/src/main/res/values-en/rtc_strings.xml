@@ -46,4 +46,10 @@
     <string name="new_rtc_notification">New call notification</string>
     <string name="new_rtc_notification_desc">Accept push notifications for new call</string>
     <string name="rtc_ringing">Ringing</string>
+    <string name="rtc_remote_screen_sharing">The other side is sharing their screen</string>
+    <string name="rtc_screen_share_active">Screen sharing in progress</string>
+    <string name="rtc_call_active">Call in progress</string>
+    <string name="rtc_debug_disabled_title">RTC diagnostics</string>
+    <string name="rtc_debug_disabled_msg">RTC file logging is disabled in the production build. Calls no longer write diagnostic logs.</string>
+    <string name="rtc_close">Close</string>
 </resources>
