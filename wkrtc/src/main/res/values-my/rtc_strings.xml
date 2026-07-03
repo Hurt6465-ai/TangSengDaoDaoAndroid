@@ -58,4 +58,10 @@
     <string name="new_rtc_notification">ခေါ်ဆိုမှုဖိတ်ကြားချက်အသိပေး</string>
     <string name="new_rtc_notification_desc">ခေါ်ဆိုမှုအတွက် push အသိပေးချက်လက်ခံမည်</string>
     <string name="rtc_ringing">ဖုန်းမြည်နေသည်</string>
+    <string name="rtc_remote_screen_sharing">တစ်ဖက်က မျက်နှာပြင်မျှဝေနေသည်</string>
+    <string name="rtc_screen_share_active">မျက်နှာပြင်မျှဝေနေသည်</string>
+    <string name="rtc_call_active">ခေါ်ဆိုမှု လုပ်ဆောင်နေသည်</string>
+    <string name="rtc_debug_disabled_title">RTC စစ်ဆေးမှု</string>
+    <string name="rtc_debug_disabled_msg">ထုတ်လုပ်ရေးဗားရှင်းတွင် RTC ဖိုင်မှတ်တမ်းကို ပိတ်ထားသည်။ ခေါ်ဆိုမှုအတွင်း စစ်ဆေးမှုမှတ်တမ်းများ မရေးတော့ပါ။</string>
+    <string name="rtc_close">ပိတ်ရန်</string>
 </resources>
