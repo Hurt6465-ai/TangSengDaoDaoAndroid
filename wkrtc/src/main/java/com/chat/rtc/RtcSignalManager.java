@@ -31,6 +31,8 @@ public class RtcSignalManager {
         this.myUid = myUid == null ? "" : myUid;
         this.transport = transport;
         this.delegate = delegate;
+        RtcDebugLogger.i("RtcSignalManager", "configure my=" + RtcDebugLogger.shortUid(this.myUid)
+                + " transport=" + (transport != null) + " delegate=" + (delegate != null));
     }
 
     public String myUid() { return myUid; }
@@ -41,6 +43,11 @@ public class RtcSignalManager {
      */
     public boolean tryHandleIncomingMsg(WKMsg msg) {
         String text = extractSignalText(msg);
+        if (!TextUtils.isEmpty(text)) {
+            RtcDebugLogger.i("RtcSignalManager", "msg has rtc text msgType=" + (msg == null ? -1 : msg.type)
+                    + " from=" + RtcDebugLogger.shortUid(msg == null ? "" : msg.fromUID)
+                    + " channel=" + RtcDebugLogger.shortUid(msg == null ? "" : msg.channelID));
+        }
         return tryHandleIncomingText(text);
     }
 
@@ -168,19 +175,43 @@ public class RtcSignalManager {
         try {
             RtcSignal s = RtcSignal.fromTransportText(text);
             if (s == null) return false;
+            RtcDebugLogger.i("RtcSignalManager", "valid " + RtcDebugLogger.signal(s)
+                    + " my=" + RtcDebugLogger.shortUid(myUid));
 
             // Hide every valid RTC packet from chat, but dispatch only packets explicitly
             // addressed to this login uid. Empty to_uid, wrong target or self-loop packets
             // must not enter RtcCallManager, otherwise they create phantom calls and BUSY locks.
-            if (TextUtils.isEmpty(myUid)) return true;
-            if (TextUtils.isEmpty(s.toUid) || !TextUtils.equals(s.toUid, myUid)) return true;
-            if (!TextUtils.isEmpty(s.fromUid) && TextUtils.equals(s.fromUid, myUid)) return true;
-            if (RtcSignal.INVITE.equals(s.type) && s.isExpired()) return true;
-            if (rememberSignal(s)) return true;
+            if (TextUtils.isEmpty(myUid)) {
+                RtcDebugLogger.w("RtcSignalManager", "drop-dispatch because myUid empty " + RtcDebugLogger.signal(s));
+                return true;
+            }
+            if (TextUtils.isEmpty(s.toUid) || !TextUtils.equals(s.toUid, myUid)) {
+                RtcDebugLogger.w("RtcSignalManager", "hide-only target mismatch " + RtcDebugLogger.signal(s)
+                        + " my=" + RtcDebugLogger.shortUid(myUid));
+                return true;
+            }
+            if (!TextUtils.isEmpty(s.fromUid) && TextUtils.equals(s.fromUid, myUid)) {
+                RtcDebugLogger.w("RtcSignalManager", "hide-only self packet " + RtcDebugLogger.signal(s));
+                return true;
+            }
+            if (RtcSignal.INVITE.equals(s.type) && s.isExpired()) {
+                RtcDebugLogger.w("RtcSignalManager", "drop expired invite " + RtcDebugLogger.signal(s));
+                return true;
+            }
+            if (rememberSignal(s)) {
+                RtcDebugLogger.w("RtcSignalManager", "drop duplicate " + RtcDebugLogger.signal(s));
+                return true;
+            }
 
-            if (delegate != null) delegate.onRtcSignal(s);
+            if (delegate != null) {
+                RtcDebugLogger.i("RtcSignalManager", "dispatch " + RtcDebugLogger.signal(s));
+                delegate.onRtcSignal(s);
+            } else {
+                RtcDebugLogger.w("RtcSignalManager", "delegate null for " + RtcDebugLogger.signal(s));
+            }
             return true;
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            RtcDebugLogger.e("RtcSignalManager", "tryHandleIncomingText failed", e);
             return false;
         }
     }
@@ -222,6 +253,7 @@ public class RtcSignalManager {
         if (TextUtils.isEmpty(signal.toUid)) throw new IllegalArgumentException("Rtc peer uid is empty");
         if (TextUtils.equals(signal.toUid, myUid)) throw new IllegalArgumentException("Rtc self-call blocked");
         if (TextUtils.equals(signal.fromUid, signal.toUid)) throw new IllegalArgumentException("Rtc from/to uid are same");
+        RtcDebugLogger.i("RtcSignalManager", "send " + RtcDebugLogger.signal(signal));
         transport.sendSignal(signal.toUid, signal.toTransportText());
     }
 

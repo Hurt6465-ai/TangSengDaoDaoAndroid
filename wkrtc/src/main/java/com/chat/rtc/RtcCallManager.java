@@ -41,13 +41,22 @@ public class RtcCallManager implements RtcSignalDelegate {
 
     public synchronized void configure(Context context, String myUid, RtcSignalTransport transport) {
         if (context != null) appContext = context.getApplicationContext();
+        RtcDebugLogger.init(appContext);
+        RtcDebugLogger.i("RtcCallManager", "configure my=" + RtcDebugLogger.shortUid(myUid)
+                + " context=" + (appContext != null) + " transport=" + (transport != null));
         RtcSignalManager.get().configure(myUid, transport, this);
     }
 
     public void startOutgoing(Context context, String peerUid, String peerName, String peerAvatar, int callType) {
-        if (context == null || TextUtils.isEmpty(peerUid)) return;
+        RtcDebugLogger.i("RtcCallManager", "startOutgoing peer=" + RtcDebugLogger.shortUid(peerUid)
+                + " name=" + peerName + " type=" + callType);
+        if (context == null || TextUtils.isEmpty(peerUid)) {
+            RtcDebugLogger.w("RtcCallManager", "startOutgoing blocked context/peer empty");
+            return;
+        }
         String myUid = RtcSignalManager.get().myUid();
         if (!TextUtils.isEmpty(myUid) && TextUtils.equals(peerUid, myUid)) {
+            RtcDebugLogger.w("RtcCallManager", "startOutgoing blocked self-call my=" + RtcDebugLogger.shortUid(myUid));
             forceClearAllZombieCalls();
             return;
         }
@@ -57,8 +66,10 @@ public class RtcCallManager implements RtcSignalDelegate {
             if (hasLiveCallLocked()) {
                 ActiveCallListener listener = activeListener.get();
                 if (listener != null && !TextUtils.isEmpty(listener.getActiveCallId())) {
+                    RtcDebugLogger.w("RtcCallManager", "startOutgoing blocked liveCall current=" + currentCallId);
                     return;
                 }
+                RtcDebugLogger.w("RtcCallManager", "startOutgoing clear zombie current=" + currentCallId);
                 forceClearAllZombieCallsLocked();
             }
             currentCallId = nextCallId;
@@ -71,7 +82,13 @@ public class RtcCallManager implements RtcSignalDelegate {
         i.putExtra(RtcConstants.EXTRA_PEER_AVATAR, peerAvatar == null ? "" : peerAvatar);
         i.putExtra(RtcConstants.EXTRA_CALL_TYPE, callType);
         i.putExtra(RtcConstants.EXTRA_INCOMING, false);
-        context.startActivity(i);
+        try {
+            context.startActivity(i);
+            RtcDebugLogger.i("RtcCallManager", "startOutgoing activity launched callId=" + nextCallId
+                    + " peer=" + RtcDebugLogger.shortUid(peerUid));
+        } catch (Exception e) {
+            RtcDebugLogger.e("RtcCallManager", "startOutgoing activity launch failed", e);
+        }
     }
 
     public String createCallId() {
@@ -83,6 +100,7 @@ public class RtcCallManager implements RtcSignalDelegate {
         if (listener != null && !TextUtils.isEmpty(listener.getActiveCallId())) {
             currentCallId = listener.getActiveCallId();
             currentCallStartedAt = System.currentTimeMillis();
+            RtcDebugLogger.i("RtcCallManager", "setActiveListener callId=" + currentCallId);
         }
     }
 
@@ -112,6 +130,7 @@ public class RtcCallManager implements RtcSignalDelegate {
 
     public synchronized void markClosed(String callId) {
         if (!TextUtils.isEmpty(callId)) {
+            RtcDebugLogger.i("RtcCallManager", "markClosed callId=" + callId + " current=" + currentCallId);
             closed.put(callId, System.currentTimeMillis());
             incomingSeen.remove(callId);
             incomingInviteMap.remove(callId);
@@ -131,22 +150,28 @@ public class RtcCallManager implements RtcSignalDelegate {
 
     @Override
     public void onRtcSignal(RtcSignal signal) {
+        RtcDebugLogger.i("RtcCallManager", "onRtcSignal " + RtcDebugLogger.signal(signal));
         if (signal == null || TextUtils.isEmpty(signal.callId)) return;
         ActiveCallListener listener;
         synchronized (this) {
             cleanupStateLocked();
-            if (closed.containsKey(signal.callId)) return;
+            if (closed.containsKey(signal.callId)) {
+                RtcDebugLogger.w("RtcCallManager", "ignore closed " + RtcDebugLogger.signal(signal));
+                return;
+            }
             listener = activeListener.get();
         }
 
         if (listener != null && TextUtils.equals(listener.getActiveCallId(), signal.callId)) {
+            RtcDebugLogger.i("RtcCallManager", "deliver to active screen " + RtcDebugLogger.signal(signal));
             listener.onSignalForActiveCall(signal);
             return;
         }
 
         if (RtcSignal.INVITE.equals(signal.type)) {
             if (listener != null && !TextUtils.isEmpty(listener.getActiveCallId())) {
-                try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception ignored) {}
+                RtcDebugLogger.w("RtcCallManager", "invite busy because activeListener exists active=" + listener.getActiveCallId());
+                try { RtcSignalManager.get().sendSimple(RtcSignal.BUSY, signal.callId, signal.fromUid); } catch (Exception e) { RtcDebugLogger.e("RtcCallManager", "send BUSY failed", e); }
                 return;
             }
             synchronized (this) {
@@ -158,10 +183,12 @@ public class RtcCallManager implements RtcSignalDelegate {
                         return;
                     }
                     // Zombie lock only, clear it and let the new invite ring.
+                    RtcDebugLogger.w("RtcCallManager", "invite clears zombie current=" + currentCallId);
                     forceClearAllZombieCallsLocked();
                 }
                 if (incomingSeen.containsKey(signal.callId)) {
-                    try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception ignored) {}
+                    RtcDebugLogger.i("RtcCallManager", "invite duplicate, resend ringing " + signal.callId);
+                    try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception e) { RtcDebugLogger.e("RtcCallManager", "resend RINGING failed", e); }
                     return;
                 }
                 incomingSeen.put(signal.callId, System.currentTimeMillis());
@@ -169,7 +196,8 @@ public class RtcCallManager implements RtcSignalDelegate {
                 currentCallId = signal.callId;
                 currentCallStartedAt = System.currentTimeMillis();
             }
-            try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception ignored) {}
+            try { RtcSignalManager.get().sendSimple(RtcSignal.RINGING, signal.callId, signal.fromUid); } catch (Exception e) { RtcDebugLogger.e("RtcCallManager", "send RINGING failed", e); }
+            RtcDebugLogger.i("RtcCallManager", "openIncoming for " + RtcDebugLogger.signal(signal));
             openIncoming(signal);
             return;
         }
@@ -192,6 +220,7 @@ public class RtcCallManager implements RtcSignalDelegate {
         }
 
         synchronized (this) {
+            RtcDebugLogger.i("RtcCallManager", "pending signal " + RtcDebugLogger.signal(signal));
             List<RtcSignal> list = pending.get(signal.callId);
             if (list == null) {
                 list = new ArrayList<>();
@@ -246,11 +275,16 @@ public class RtcCallManager implements RtcSignalDelegate {
     }
 
     private void openIncoming(RtcSignal signal) {
-        if (appContext == null) return;
+        if (appContext == null) {
+            RtcDebugLogger.w("RtcCallManager", "openIncoming skipped appContext null " + RtcDebugLogger.signal(signal));
+            return;
+        }
         String name = getDisplayName(signal);
         String avatar = getDisplayAvatar(signal);
         int type = RtcConstants.typeOf(signal.mode);
-        RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
+        boolean notificationShown = RtcCallNotification.showIncoming(appContext, signal, name, avatar, type);
+        RtcDebugLogger.i("RtcCallManager", "showIncoming notification=" + notificationShown + " name=" + name
+                + " type=" + type + " " + RtcDebugLogger.signal(signal));
         // Restore the old stable behavior: after the invite is actually received, open the
         // incoming call page directly. SINGLE_TOP makes duplicate notification launches harmless.
         tryOpenIncomingActivity(signal, name, avatar, type, false);
@@ -268,7 +302,12 @@ public class RtcCallManager implements RtcSignalDelegate {
         i.putExtra(RtcConstants.EXTRA_CALL_TYPE, type);
         i.putExtra(RtcConstants.EXTRA_INCOMING, true);
         i.putExtra(RtcConstants.EXTRA_AUTO_ACCEPT, autoAccept);
-        try { appContext.startActivity(i); } catch (Exception ignored) {}
+        try {
+            appContext.startActivity(i);
+            RtcDebugLogger.i("RtcCallManager", "incoming activity launched " + RtcDebugLogger.signal(signal));
+        } catch (Exception e) {
+            RtcDebugLogger.e("RtcCallManager", "incoming activity launch failed " + RtcDebugLogger.signal(signal), e);
+        }
     }
 
     public void rejectIncomingFromNotification(Context context, String callId, String peerUid, String peerName, int callType) {
@@ -280,6 +319,7 @@ public class RtcCallManager implements RtcSignalDelegate {
 
 
     public synchronized void forceClearAllZombieCalls() {
+        RtcDebugLogger.w("RtcCallManager", "forceClearAllZombieCalls current=" + currentCallId);
         forceClearAllZombieCallsLocked();
         try { RtcCallNotification.cancelIncoming(appContext); } catch (Exception ignored) {}
     }

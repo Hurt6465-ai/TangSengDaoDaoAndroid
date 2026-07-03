@@ -150,8 +150,11 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             setShowWhenLocked(true);
             setTurnScreenOn(true);
         }
+        RtcDebugLogger.init(this);
         RtcConfigManager.refreshAsync();
         readIntent();
+        RtcDebugLogger.i("RtcCallActivity", "onCreate incoming=" + incoming + " autoAccept=" + autoAccept
+                + " callId=" + callId + " peer=" + RtcDebugLogger.shortUid(peerUid) + " type=" + callType);
         setVolumeControlStream(AudioManager.STREAM_VOICE_CALL);
         RtcCallNotification.cancelIncoming(this);
         eglBase = EglBase.create();
@@ -189,7 +192,10 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
 
     @Override public void onBackPressed() { endCall(false); }
     @Override public String getActiveCallId() { return callId; }
-    @Override public void onSignalForActiveCall(RtcSignal signal) { runOnUiThread(() -> handleSignal(signal)); }
+    @Override public void onSignalForActiveCall(RtcSignal signal) {
+        RtcDebugLogger.i("RtcCallActivity", "onSignalForActiveCall " + RtcDebugLogger.signal(signal));
+        runOnUiThread(() -> handleSignal(signal));
+    }
 
     @Override public void onLocalDescription(SessionDescription description) {
         try { RtcSignalManager.get().sendDescription(callId, peerUid, description); }
@@ -233,6 +239,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     private void readIntent() {
+        RtcDebugLogger.i("RtcCallActivity", "readIntent action=" + (getIntent() == null ? "" : getIntent().getAction()));
         callId = getIntent().getStringExtra(RtcConstants.EXTRA_CALL_ID);
         peerUid = getIntent().getStringExtra(RtcConstants.EXTRA_PEER_UID);
         peerName = getIntent().getStringExtra(RtcConstants.EXTRA_PEER_NAME);
@@ -242,6 +249,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         autoAccept = getIntent().getBooleanExtra(RtcConstants.EXTRA_AUTO_ACCEPT, false);
         if (TextUtils.isEmpty(callId)) callId = RtcCallManager.get().createCallId();
         if (TextUtils.isEmpty(peerName)) peerName = getString(R.string.rtc_friend);
+        RtcDebugLogger.i("RtcCallActivity", "intent parsed incoming=" + incoming + " autoAccept=" + autoAccept
+                + " callId=" + callId + " peer=" + RtcDebugLogger.shortUid(peerUid) + " name=" + peerName);
     }
 
     private void bindViews() {
@@ -313,6 +322,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     private void showIncoming() {
+        RtcDebugLogger.i("RtcCallActivity", "showIncoming callId=" + callId
+                + " peer=" + RtcDebugLogger.shortUid(peerUid) + " type=" + callType);
         controlsLayout.setVisibility(View.GONE);
         sideControlsLayout.setVisibility(View.GONE);
         camBtn.setVisibility(View.GONE);
@@ -361,17 +372,23 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
 
     private void startOutgoingFlow() {
         accepted = true;
+        RtcDebugLogger.i("RtcCallActivity", "startOutgoingFlow callId=" + callId
+                + " peer=" + RtcDebugLogger.shortUid(peerUid) + " type=" + callType);
         startWebRtc();
         try {
             inviteRetryCount = 0;
             peerRinging = false;
             RtcSignalManager.get().sendInvite(callId, peerUid, peerName, peerAvatar, callType);
+            RtcDebugLogger.i("RtcCallActivity", "send INVITE ok callId=" + callId
+                    + " peer=" + RtcDebugLogger.shortUid(peerUid));
             statusText.setText(RtcConstants.isVideo(callType) ? getString(R.string.rtc_wait_accept_video) : getString(R.string.rtc_calling_audio));
             ringPlayer.playOutgoing();
             peerClient.createOffer();
             handler.postDelayed(inviteRetryRunnable, INVITE_RETRY_INTERVAL_MS);
             scheduleOutgoingInviteTimeout();
         } catch (Exception e) {
+            RtcDebugLogger.e("RtcCallActivity", "send INVITE failed callId=" + callId
+                    + " peer=" + RtcDebugLogger.shortUid(peerUid), e);
             closeReason = "connect_failed";
             toast(getString(R.string.rtc_signal_not_ready));
             endCall(false);
@@ -379,6 +396,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     private void acceptIncoming() {
+        RtcDebugLogger.i("RtcCallActivity", "acceptIncoming callId=" + callId + " peer=" + RtcDebugLogger.shortUid(peerUid));
         if (accepted) return;
         accepted = true;
         peerAccepted = true;
@@ -399,6 +417,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     private void timeoutIncoming() {
+        RtcDebugLogger.w("RtcCallActivity", "timeoutIncoming callId=" + callId + " peer=" + RtcDebugLogger.shortUid(peerUid));
         ringPlayer.stop();
         RtcCallNotification.cancelIncoming(this);
         closeReason = "missed";
@@ -410,6 +429,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     private void rejectIncoming() {
+        RtcDebugLogger.i("RtcCallActivity", "rejectIncoming callId=" + callId + " peer=" + RtcDebugLogger.shortUid(peerUid));
         ringPlayer.stop();
         RtcCallNotification.cancelIncoming(this);
         if (TextUtils.isEmpty(closeReason)) closeReason = "rejected";
@@ -542,6 +562,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     }
 
     private void endCall(boolean remoteEnded) {
+        RtcDebugLogger.i("RtcCallActivity", "endCall remote=" + remoteEnded + " ending=" + ending
+                + " callId=" + callId + " peer=" + RtcDebugLogger.shortUid(peerUid) + " reason=" + closeReason);
         if (ending) return;
         ending = true;
         handler.removeCallbacks(inviteRetryRunnable);
@@ -550,7 +572,13 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             closeReason = connected ? (remoteEnded ? "remote_ended" : "ended") : (incoming ? "missed" : "cancelled");
         }
         if (!remoteEnded) {
-            try { RtcSignalManager.get().sendSimple(connected ? RtcSignal.END : RtcSignal.CANCEL, callId, peerUid); } catch (Exception ignored) {}
+            try {
+                RtcSignalManager.get().sendSimple(connected ? RtcSignal.END : RtcSignal.CANCEL, callId, peerUid);
+                RtcDebugLogger.i("RtcCallActivity", "send terminal ok type=" + (connected ? RtcSignal.END : RtcSignal.CANCEL)
+                        + " callId=" + callId + " peer=" + RtcDebugLogger.shortUid(peerUid));
+            } catch (Exception e) {
+                RtcDebugLogger.e("RtcCallActivity", "send terminal failed", e);
+            }
         }
         reportCallRecordIfNeeded(closeReason);
         RtcCallManager.get().markClosed(callId);

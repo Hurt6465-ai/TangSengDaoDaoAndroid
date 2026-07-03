@@ -3,6 +3,7 @@ package com.chat.rtc;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.widget.Toast;
@@ -43,6 +44,8 @@ public class WKRTCApplication {
 
     public void init(Application app) {
         appRef = new WeakReference<>(app);
+        RtcDebugLogger.init(app);
+        RtcDebugLogger.i("WKRTCApplication", "init app=" + (app != null) + " uid=" + RtcDebugLogger.shortUid(WKConfig.getInstance().getUid()));
         registerLifecycleCallbacks(app);
         registerRtcMessageArtifacts();
         registerEndpoints();
@@ -107,6 +110,8 @@ public class WKRTCApplication {
         registerRtcMessageArtifacts();
         Context context = getContext();
         String uid = WKConfig.getInstance().getUid();
+        RtcDebugLogger.i("WKRTCApplication", "initRtcSignalModule uid=" + RtcDebugLogger.shortUid(uid)
+                + " listenerAdded=" + signalListenerAdded + " context=" + (context != null));
         if (!TextUtils.isEmpty(uid)) {
             RtcCallManager.get().configure(context, uid, new RtcWukongSignalTransport());
             RtcConfigManager.refreshAsync();
@@ -116,13 +121,18 @@ public class WKRTCApplication {
         try {
             WKIM.getInstance().getMsgManager().addOnNewMsgListener("wkrtc_global_signal", list -> {
                 String currentUid = WKConfig.getInstance().getUid();
+                RtcDebugLogger.i("WKRTCApplication", "onNewMsg list=" + (list == null ? 0 : list.size())
+                        + " uid=" + RtcDebugLogger.shortUid(currentUid));
                 if (TextUtils.isEmpty(currentUid) || list == null || list.isEmpty()) return;
                 RtcCallManager.get().configure(getContext(), currentUid, new RtcWukongSignalTransport());
                 for (WKMsg msg : list) {
-                    RtcSignalManager.get().tryHandleIncomingMsg(msg);
+                    boolean handled = RtcSignalManager.get().tryHandleIncomingMsg(msg);
+                    if (handled) RtcDebugLogger.i("WKRTCApplication", "onNewMsg rtc handled msgType=" + (msg == null ? -1 : msg.type));
                 }
             });
-        } catch (Exception ignored) {
+            RtcDebugLogger.i("WKRTCApplication", "addOnNewMsgListener ok");
+        } catch (Exception e) {
+            RtcDebugLogger.e("WKRTCApplication", "addOnNewMsgListener failed", e);
         }
         try {
             // Some RTC INVITEs arrive through message sync after reconnect/cold start rather than
@@ -130,11 +140,16 @@ public class WKRTCApplication {
             // otherwise ChatActivity may hide the signal from history without ever opening the call UI.
             WKIM.getInstance().getMsgManager().addOnRefreshMsgListener("wkrtc_global_refresh_signal", (msg, left) -> {
                 String currentUid = WKConfig.getInstance().getUid();
+                RtcDebugLogger.i("WKRTCApplication", "onRefreshMsg uid=" + RtcDebugLogger.shortUid(currentUid)
+                        + " msgType=" + (msg == null ? -1 : msg.type) + " left=" + left);
                 if (TextUtils.isEmpty(currentUid) || msg == null) return;
                 RtcCallManager.get().configure(getContext(), currentUid, new RtcWukongSignalTransport());
-                RtcSignalManager.get().tryHandleIncomingMsg(msg);
+                boolean handled = RtcSignalManager.get().tryHandleIncomingMsg(msg);
+                if (handled) RtcDebugLogger.i("WKRTCApplication", "onRefreshMsg rtc handled");
             });
-        } catch (Exception ignored) {
+            RtcDebugLogger.i("WKRTCApplication", "addOnRefreshMsgListener ok");
+        } catch (Exception e) {
+            RtcDebugLogger.e("WKRTCApplication", "addOnRefreshMsgListener failed", e);
         }
     }
 
@@ -168,6 +183,21 @@ public class WKRTCApplication {
 
         EndpointManager.getInstance().setMethod("rtc_open_full_screen_intent_settings", object -> {
             RtcPermissionHelper.openFullScreenIntentSettings(getContext());
+            return true;
+        });
+
+
+        EndpointManager.getInstance().setMethod("rtc_log", object -> {
+            RtcDebugLogger.i("UI", object == null ? "" : String.valueOf(object));
+            return true;
+        });
+
+        EndpointManager.getInstance().setMethod("rtc_open_debug_log", object -> {
+            Context context = object instanceof Context ? ((Context) object) : getContext();
+            if (context == null) return false;
+            Intent intent = new Intent(context, RtcDebugLogActivity.class);
+            if (!(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
             return true;
         });
 
@@ -233,6 +263,8 @@ public class WKRTCApplication {
                 return false;
             }
             if (TextUtils.isEmpty(peerName)) peerName = activity.getString(R.string.rtc_friend);
+            RtcDebugLogger.i("WKRTCApplication", "wk_p2p_call start peer=" + RtcDebugLogger.shortUid(peerUid)
+                    + " my=" + RtcDebugLogger.shortUid(loginUid) + " type=" + callType);
             RtcCallManager.get().startOutgoing(activity, peerUid, peerName, peerAvatar, callType);
             return true;
         });

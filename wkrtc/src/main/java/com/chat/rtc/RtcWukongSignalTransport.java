@@ -41,10 +41,23 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
 
     @Override
     public void sendSignal(String peerUid, String payload) throws Exception {
-        if (TextUtils.isEmpty(peerUid) || TextUtils.isEmpty(payload)) return;
+        if (TextUtils.isEmpty(peerUid) || TextUtils.isEmpty(payload)) {
+            RtcDebugLogger.w("RtcTransport", "send skipped empty peer/payload peer=" + RtcDebugLogger.shortUid(peerUid));
+            return;
+        }
         String loginUid = WKConfig.getInstance().getUid();
         if (!TextUtils.isEmpty(loginUid) && TextUtils.equals(peerUid, loginUid)) {
+            RtcDebugLogger.w("RtcTransport", "send blocked self peer=" + RtcDebugLogger.shortUid(peerUid));
             throw new IllegalArgumentException("RTC signal target is self: " + peerUid);
+        }
+
+        try {
+            com.chat.rtc.model.RtcSignal signal = com.chat.rtc.model.RtcSignal.fromTransportText(payload);
+            RtcDebugLogger.i("RtcTransport", "send begin peer=" + RtcDebugLogger.shortUid(peerUid)
+                    + " login=" + RtcDebugLogger.shortUid(loginUid) + " " + RtcDebugLogger.signal(signal));
+        } catch (Exception e) {
+            RtcDebugLogger.w("RtcTransport", "send begin nonparse payload peer=" + RtcDebugLogger.shortUid(peerUid)
+                    + " len=" + payload.length());
         }
 
         // IMPORTANT: keep INVITE on the same online-only path as CANCEL/END.
@@ -59,8 +72,20 @@ public class RtcWukongSignalTransport implements RtcSignalTransport {
         // Follow the same send hook path as normal chat messages. Some host logic is attached
         // to EndpointSID.sendMessage; bypassing it can make signaling behave differently from
         // regular text messages on certain builds.
-        try { EndpointManager.getInstance().invokes(EndpointSID.sendMessage, new WKSendMsgMenu(channel, options)); } catch (Exception ignored) {}
-        WKIM.getInstance().getMsgManager().sendWithOptions(content, channel, options);
+        try {
+            EndpointManager.getInstance().invokes(EndpointSID.sendMessage, new WKSendMsgMenu(channel, options));
+            RtcDebugLogger.i("RtcTransport", "EndpointSID.sendMessage hook ok peer=" + RtcDebugLogger.shortUid(peerUid));
+        } catch (Exception e) {
+            RtcDebugLogger.e("RtcTransport", "EndpointSID.sendMessage hook failed", e);
+        }
+        try {
+            WKIM.getInstance().getMsgManager().sendWithOptions(content, channel, options);
+            RtcDebugLogger.i("RtcTransport", "sendWithOptions called peer=" + RtcDebugLogger.shortUid(peerUid)
+                    + " noPersist=true expire=" + SIGNAL_EXPIRE_SECONDS);
+        } catch (Exception e) {
+            RtcDebugLogger.e("RtcTransport", "sendWithOptions failed peer=" + RtcDebugLogger.shortUid(peerUid), e);
+            throw e;
+        }
     }
 
     private void applySignalOptions(WKSendOptions options) {

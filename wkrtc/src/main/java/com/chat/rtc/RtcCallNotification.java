@@ -22,13 +22,22 @@ public final class RtcCallNotification {
     private RtcCallNotification() {}
 
     public static boolean showIncoming(Context context, RtcSignal signal, String peerName, String peerAvatar, int callType) {
-        if (context == null || signal == null) return false;
+        if (context == null || signal == null) {
+            RtcDebugLogger.w("RtcNotification", "showIncoming skipped context/signal null");
+            return false;
+        }
         Context app = context.getApplicationContext();
         ensureChannel(app);
         NotificationManager nm = app.getSystemService(NotificationManager.class);
-        if (nm == null) return false;
-        if (!RtcPermissionHelper.hasPostNotificationPermission(app)) return false;
+        if (nm == null) {
+            RtcDebugLogger.w("RtcNotification", "showIncoming skipped NotificationManager null " + RtcDebugLogger.signal(signal));
+            return false;
+        }
+        boolean hasNotification = RtcPermissionHelper.hasPostNotificationPermission(app);
         boolean allowFullScreen = RtcPermissionHelper.canUseFullScreenIntent(app);
+        RtcDebugLogger.i("RtcNotification", "showIncoming permission=" + hasNotification
+                + " fullScreen=" + allowFullScreen + " " + RtcDebugLogger.signal(signal));
+        if (!hasNotification) return false;
 
         String title = TextUtils.isEmpty(peerName) ? app.getString(R.string.rtc_friend) : peerName;
         String text = RtcConstants.isVideo(callType) ? app.getString(R.string.rtc_invite_video) : app.getString(R.string.rtc_invite_audio);
@@ -69,6 +78,7 @@ public final class RtcCallNotification {
         Notification notification = builder.build();
         notification.flags |= Notification.FLAG_INSISTENT;
         nm.notify(RtcConstants.NOTIFICATION_ID_INCOMING, notification);
+        RtcDebugLogger.i("RtcNotification", "notify incoming ok " + RtcDebugLogger.signal(signal));
         return true;
     }
 
@@ -99,7 +109,10 @@ public final class RtcCallNotification {
     public static void cancelIncoming(Context context) {
         if (context == null) return;
         NotificationManager nm = context.getApplicationContext().getSystemService(NotificationManager.class);
-        if (nm != null) nm.cancel(RtcConstants.NOTIFICATION_ID_INCOMING);
+        if (nm != null) {
+            nm.cancel(RtcConstants.NOTIFICATION_ID_INCOMING);
+            RtcDebugLogger.i("RtcNotification", "cancelIncoming");
+        }
     }
 
     private static PendingIntent callActivityIntent(Context context, RtcSignal signal, String peerName, String peerAvatar, int callType, boolean autoAccept) {
