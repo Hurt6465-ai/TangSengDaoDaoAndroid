@@ -7,6 +7,8 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.OrientationEventListener;
+import android.view.WindowManager;
 
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
@@ -55,7 +57,9 @@ public class RtcPeerClient {
         void onIceDisconnected();
         void onRemoteVideoTrack();
         void onRenegotiationNeeded();
+        void onLocalScreenShareStarted();
         void onLocalScreenShareStopped();
+        void onScreenShareError(String message, Throwable error);
         void onError(String message, Throwable error);
     }
 
@@ -86,6 +90,9 @@ public class RtcPeerClient {
     private VideoSource screenVideoSource;
     private VideoTrack screenVideoTrack;
     private SurfaceTextureHelper screenTextureHelper;
+    private OrientationEventListener screenOrientationListener;
+    private int lastScreenCaptureWidth;
+    private int lastScreenCaptureHeight;
 
     private final RtcVideoSinkProxy localProxy = new RtcVideoSinkProxy("local");
     private final RtcVideoSinkProxy remoteProxy = new RtcVideoSinkProxy("remote");
@@ -223,9 +230,12 @@ public class RtcPeerClient {
                 screenTextureHelper = nextHelper;
 
                 int[] screenSize = resolveScreenCaptureSize();
+                lastScreenCaptureWidth = screenSize[0];
+                lastScreenCaptureHeight = screenSize[1];
                 adaptScreenSourceOutput(screenVideoSource, screenSize[0], screenSize[1], RtcConstants.SCREEN_FPS);
                 screenVideoCapturer.startCapture(screenSize[0], screenSize[1], RtcConstants.SCREEN_FPS);
                 screenSharing = true;
+                enableScreenOrientationUpdates();
                 swapRenderers(false);
                 setVideoBitrate(
                         RtcConstants.SCREEN_MIN_BITRATE_KBPS,
@@ -239,11 +249,14 @@ public class RtcPeerClient {
                         + " startKbps=" + RtcConstants.SCREEN_START_BITRATE_KBPS
                         + " maxKbps=" + RtcConstants.SCREEN_MAX_BITRATE_KBPS
                         + " replaceTrack=" + senderReplaced + " track=" + screenVideoTrack.id());
+                if (events != null) events.onLocalScreenShareStarted();
             } catch (Exception e) {
+                screenSharing = false;
+                disableScreenOrientationUpdates();
                 try { if (senderReplaced && videoSender != null && localVideoTrack != null) videoSender.setTrack(localVideoTrack, false); } catch (Exception ignored) {}
                 disposeScreenObjects(nextCapturer, nextSource, nextTrack, nextHelper);
                 tryRestartCameraCapture();
-                report("屏幕共享失败", e);
+                if (events != null) events.onScreenShareError(null, e);
             }
         });
     }
@@ -415,6 +428,7 @@ public class RtcPeerClient {
     }
 
     private void stopAndDisposeCurrentScreenObjects() {
+        disableScreenOrientationUpdates();
         VideoCapturer c = screenVideoCapturer;
         VideoSource source = screenVideoSource;
         VideoTrack track = screenVideoTrack;
@@ -423,6 +437,8 @@ public class RtcPeerClient {
         screenVideoSource = null;
         screenVideoTrack = null;
         screenTextureHelper = null;
+        lastScreenCaptureWidth = 0;
+        lastScreenCaptureHeight = 0;
         disposeScreenObjects(c, source, track, helper);
     }
 
@@ -515,7 +531,14 @@ public class RtcPeerClient {
         int width = RtcConstants.SCREEN_WIDTH;
         int height = RtcConstants.SCREEN_HEIGHT;
         try {
-            DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+            WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+            DisplayMetrics metrics = new DisplayMetrics();
+            if (windowManager != null && windowManager.getDefaultDisplay() != null) {
+                windowManager.getDefaultDisplay().getRealMetrics(metrics);
+            }
+            if (metrics.widthPixels <= 0 || metrics.heightPixels <= 0) {
+                metrics = context.getResources().getDisplayMetrics();
+            }
             if (metrics != null && metrics.widthPixels > 0 && metrics.heightPixels > 0) {
                 width = metrics.widthPixels;
                 height = metrics.heightPixels;
@@ -539,6 +562,42 @@ public class RtcPeerClient {
 
     private int makeEven(int value) {
         return value % 2 == 0 ? value : value - 1;
+    }
+
+    private void enableScreenOrientationUpdates() {
+        disableScreenOrientationUpdates();
+        try {
+            screenOrientationListener = new OrientationEventListener(context) {
+                @Override public void onOrientationChanged(int orientation) {
+                    if (rtcHandler == null) return;
+                    rtcHandler.post(() -> updateScreenCaptureFormatIfNeeded());
+                }
+            };
+            if (screenOrientationListener.canDetectOrientation()) {
+                screenOrientationListener.enable();
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void disableScreenOrientationUpdates() {
+        try { if (screenOrientationListener != null) screenOrientationListener.disable(); } catch (Exception ignored) {}
+        screenOrientationListener = null;
+    }
+
+    private void updateScreenCaptureFormatIfNeeded() {
+        if (!screenSharing || screenVideoCapturer == null || closed) return;
+        int[] nextSize = resolveScreenCaptureSize();
+        int nextWidth = nextSize[0];
+        int nextHeight = nextSize[1];
+        if (nextWidth == lastScreenCaptureWidth && nextHeight == lastScreenCaptureHeight) return;
+        lastScreenCaptureWidth = nextWidth;
+        lastScreenCaptureHeight = nextHeight;
+        try {
+            adaptScreenSourceOutput(screenVideoSource, nextWidth, nextHeight, RtcConstants.SCREEN_FPS);
+            screenVideoCapturer.changeCaptureFormat(nextWidth, nextHeight, RtcConstants.SCREEN_FPS);
+        } catch (Exception e) {
+            Log.w(TAG, "change screen capture format", e);
+        }
     }
 
     private List<PeerConnection.IceServer> defaultIceServers() { return RtcIceServers.getDefault(); }
