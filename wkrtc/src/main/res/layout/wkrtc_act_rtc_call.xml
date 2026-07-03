@@ -164,6 +164,18 @@
                 android:textSize="9sp" />
 
             <TextView
+                android:id="@+id/screenBtn"
+                android:layout_width="0dp"
+                android:layout_height="58dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:lines="1"
+                android:paddingTop="4dp"
+                android:paddingBottom="2dp"
+                android:textColor="#EEFFFFFF"
+                android:textSize="9sp" />
+
+            <TextView
                 android:id="@+id/endBtn"
                 android:layout_width="0dp"
                 android:layout_height="58dp"
