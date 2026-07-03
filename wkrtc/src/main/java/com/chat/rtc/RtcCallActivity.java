@@ -81,6 +81,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
     private boolean controlsVisible = true;
     private boolean weakMode;
     private boolean screenSharing;
+    private boolean remoteScreenSharing;
     private boolean foregroundServiceStarted;
     private boolean recordReported;
     private String closeReason = "";
@@ -118,7 +119,7 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         @Override public void run() {
             if (!connected || ending) return;
             long seconds = (System.currentTimeMillis() - connectedAt) / 1000L;
-            statusText.setText(String.format("%02d:%02d", seconds / 60, seconds % 60));
+            if (!remoteScreenSharing && !screenSharing) statusText.setText(String.format(java.util.Locale.US, "%02d:%02d", seconds / 60, seconds % 60));
             handler.postDelayed(this, 1000);
         }
     };
@@ -234,6 +235,17 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         });
     }
 
+    @Override public void onLocalScreenShareStopped() {
+        runOnUiThread(() -> {
+            if (ending || !screenSharing) return;
+            screenSharing = false;
+            try { RtcSignalManager.get().sendScreenShareState(callId, peerUid, false, callType); } catch (Exception ignored) {}
+            RtcCallForegroundService.start(this, callId, peerName, callType);
+            applyScreenShareUi(false);
+            toast(getString(R.string.rtc_screen_share_stopped));
+        });
+    }
+
     @Override public void onError(String message, Throwable error) {
         runOnUiThread(() -> {
             if (ending) return;
@@ -293,7 +305,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         loadAvatar(peerAvatar);
 
         remoteRenderer.init(eglBase.getEglBaseContext(), null);
-        remoteRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
+        // Use FIT for the main remote renderer so phone screens shared to tablets are never cropped.
+        remoteRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
         remoteRenderer.setEnableHardwareScaler(true);
         remoteRenderer.setMirror(false);
         localRenderer.init(eglBase.getEglBaseContext(), null);
@@ -501,6 +514,14 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             statusText.setText(getString(R.string.rtc_ringing));
             return;
         }
+        if (RtcSignal.SCREEN_SHARE_STARTED.equals(s.type)) {
+            applyRemoteScreenShareUi(true);
+            return;
+        }
+        if (RtcSignal.SCREEN_SHARE_STOPPED.equals(s.type)) {
+            applyRemoteScreenShareUi(false);
+            return;
+        }
         if (RtcSignal.ACCEPT.equals(s.type)) {
             peerAccepted = true;
             handler.removeCallbacks(inviteRetryRunnable);
@@ -594,8 +615,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             localRenderer.setMirror(false);
             flipBtn.setVisibility(View.GONE);
             camBtn.setEnabled(false);
+            remoteRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
             statusText.setText(getString(R.string.rtc_screen_sharing));
-            RtcDebugLogger.i("RtcCallActivity", "screen share ui sharing=true remoteMain=true localHidden=true callId=" + callId);
         } else {
             localFullScreen = false;
             if (peerClient != null) peerClient.swapRenderers(false);
@@ -605,9 +626,27 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             localRenderer.setMirror(true);
             flipBtn.setVisibility(RtcConstants.isVideo(callType) ? View.VISIBLE : View.GONE);
             camBtn.setEnabled(true);
-            RtcDebugLogger.i("RtcCallActivity", "screen share ui sharing=false remoteMain=true localVisible=" + cameraOn + " callId=" + callId);
+            remoteRenderer.setScalingType(remoteScreenSharing ? RendererCommon.ScalingType.SCALE_ASPECT_FIT : RendererCommon.ScalingType.SCALE_ASPECT_FIT);
         }
         updateScreenShareButton(sharing);
+    }
+
+    private void applyRemoteScreenShareUi(boolean sharing) {
+        remoteScreenSharing = sharing;
+        if (remoteRenderer != null) {
+            remoteRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
+        }
+        if (sharing) {
+            statusText.setText(getString(R.string.rtc_remote_screen_sharing));
+        } else if (connected) {
+            statusText.setText(formatDurationText());
+        }
+    }
+
+    private String formatDurationText() {
+        long base = connectedAt <= 0 ? System.currentTimeMillis() : connectedAt;
+        long seconds = Math.max(0L, (System.currentTimeMillis() - base) / 1000L);
+        return String.format(java.util.Locale.US, "%02d:%02d", seconds / 60, seconds % 60);
     }
 
     private void toggleScreenShare() {
@@ -654,8 +693,8 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
             handler.postDelayed(() -> {
                 if (!ending && peerClient != null && screenSharing) {
                     peerClient.startScreenShare(data);
+                    try { RtcSignalManager.get().sendScreenShareState(callId, peerUid, true, callType); } catch (Exception ignored) {}
                     toast(getString(R.string.rtc_screen_share_started));
-                    RtcDebugLogger.i("RtcCallActivity", "screen share start requested callId=" + callId);
                     handler.postDelayed(this::goHomeForRealScreenShare, 650L);
                 }
             }, 350L);
@@ -688,10 +727,10 @@ public class RtcCallActivity extends Activity implements RtcPeerClient.Events, R
         try {
             screenSharing = false;
             peerClient.stopScreenShare();
+            try { RtcSignalManager.get().sendScreenShareState(callId, peerUid, false, callType); } catch (Exception ignored) {}
             RtcCallForegroundService.start(this, callId, peerName, callType);
             applyScreenShareUi(false);
             toast(getString(R.string.rtc_screen_share_stopped));
-            RtcDebugLogger.i("RtcCallActivity", "screen share stop requested callId=" + callId);
         } catch (Exception e) {
             RtcDebugLogger.e("RtcCallActivity", "stop screen share failed", e);
         }

@@ -167,7 +167,9 @@ public class RtcSignalManager {
                 || RtcSignal.TIMEOUT.equals(type)
                 || RtcSignal.OFFER.equals(type)
                 || RtcSignal.ANSWER.equals(type)
-                || RtcSignal.ICE.equals(type);
+                || RtcSignal.ICE.equals(type)
+                || RtcSignal.SCREEN_SHARE_STARTED.equals(type)
+                || RtcSignal.SCREEN_SHARE_STOPPED.equals(type);
     }
 
     public boolean tryHandleIncomingText(String text) {
@@ -296,6 +298,10 @@ public class RtcSignalManager {
         RtcSignal s = RtcSignal.base(type, callId, myUid, toUid);
         s.mode = RtcConstants.modeOf(callType);
         send(s);
+    }
+
+    public void sendScreenShareState(String callId, String toUid, boolean started, int callType) throws Exception {
+        sendSimple(started ? RtcSignal.SCREEN_SHARE_STARTED : RtcSignal.SCREEN_SHARE_STOPPED, callId, toUid, callType);
     }
 
     public void sendDescription(String callId, String toUid, SessionDescription d) throws Exception {

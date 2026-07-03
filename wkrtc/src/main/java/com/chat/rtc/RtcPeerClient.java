@@ -55,6 +55,7 @@ public class RtcPeerClient {
         void onIceDisconnected();
         void onRemoteVideoTrack();
         void onRenegotiationNeeded();
+        void onLocalScreenShareStopped();
         void onError(String message, Throwable error);
     }
 
@@ -258,7 +259,7 @@ public class RtcPeerClient {
                 swapRenderers(false);
                 if (lowQuality) setVideoBitrate(0, 0, RtcConstants.VIDEO_LOW_BITRATE_KBPS, RtcConstants.VIDEO_LOW_FPS, false);
                 else setVideoBitrate(RtcConstants.VIDEO_MIN_BITRATE_KBPS, RtcConstants.VIDEO_START_BITRATE_KBPS, RtcConstants.VIDEO_MAX_BITRATE_KBPS, RtcConstants.VIDEO_FPS, false);
-                RtcDebugLogger.i("RtcPeerClient", "screen share stopped cameraRestored=" + restored);
+                if (events != null) events.onLocalScreenShareStopped();
             } catch (Exception e) {
                 report("恢复摄像头失败", e);
             }

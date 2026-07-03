@@ -8,6 +8,7 @@ import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Vibrator;
+import android.os.VibratorManager;
 import android.os.VibrationEffect;
 import android.os.Build;
 import android.util.Log;
@@ -107,16 +108,35 @@ public class RtcRingPlayer {
     }
 
     private void startVibration() {
+        vibrator = vibrateIncoming(context, true);
+    }
+
+    public static Vibrator vibrateIncoming(Context context) {
+        return vibrateIncoming(context, false);
+    }
+
+    private static Vibrator vibrateIncoming(Context context, boolean repeat) {
+        if (context == null) return null;
         try {
-            vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
-            if (vibrator == null) return;
-            long[] pattern = new long[]{0, 320, 120, 320, 900};
+            Vibrator v;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                VibratorManager manager = (VibratorManager) context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+                v = manager == null ? null : manager.getDefaultVibrator();
+            } else {
+                v = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+            }
+            if (v == null) return null;
+            long[] pattern = repeat ? new long[]{0, 360, 140, 360, 850} : new long[]{0, 360, 140, 360};
+            int repeatIndex = repeat ? 0 : -1;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
+                v.vibrate(VibrationEffect.createWaveform(pattern, repeatIndex));
             } else {
                 //noinspection deprecation
-                vibrator.vibrate(pattern, 0);
+                v.vibrate(pattern, repeatIndex);
             }
-        } catch (Exception ignored) {}
+            return v;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 }

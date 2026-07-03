@@ -76,7 +76,7 @@ public final class RtcCallNotification {
             Notification notification = builder.build();
             notification.flags |= Notification.FLAG_INSISTENT;
             nm.notify(RtcConstants.NOTIFICATION_ID_INCOMING, notification);
-            RtcDebugLogger.i("RtcNotification", "notify incoming ok " + RtcDebugLogger.signal(signal));
+            RtcRingPlayer.vibrateIncoming(app);
             return true;
         } catch (Throwable e) {
             RtcDebugLogger.e("RtcNotification", "notify incoming failed, will fallback activity " + RtcDebugLogger.signal(signal), e);
@@ -85,10 +85,14 @@ public final class RtcCallNotification {
     }
 
     public static Notification buildActive(Context context, String callId, String peerName, int callType) {
+        return buildActive(context, callId, peerName, callType, false);
+    }
+
+    public static Notification buildActive(Context context, String callId, String peerName, int callType, boolean screenSharing) {
         Context app = context.getApplicationContext();
         ensureChannel(app);
         String title = TextUtils.isEmpty(peerName) ? app.getString(R.string.rtc_friend) : peerName;
-        String text = RtcConstants.isVideo(callType) ? app.getString(R.string.rtc_invite_video) : app.getString(R.string.rtc_invite_audio);
+        String text = screenSharing ? app.getString(R.string.rtc_screen_share_active) : app.getString(R.string.rtc_call_active);
         PendingIntent content = openCurrentCallIntent(app, callId);
         Notification.Builder builder = new Notification.Builder(app)
                 .setSmallIcon(android.R.drawable.stat_sys_phone_call)

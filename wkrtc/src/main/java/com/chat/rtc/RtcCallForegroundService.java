@@ -64,13 +64,13 @@ public class RtcCallForegroundService extends Service {
                 } else if (RtcConstants.isVideo(callType)) {
                     type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
                 }
-                startForeground(RtcConstants.NOTIFICATION_ID_ACTIVE, RtcCallNotification.buildActive(this, callId, peerName, callType), type);
+                startForeground(RtcConstants.NOTIFICATION_ID_ACTIVE, RtcCallNotification.buildActive(this, callId, peerName, callType, screenSharing), type);
             } else {
-                startForeground(RtcConstants.NOTIFICATION_ID_ACTIVE, RtcCallNotification.buildActive(this, callId, peerName, callType));
+                startForeground(RtcConstants.NOTIFICATION_ID_ACTIVE, RtcCallNotification.buildActive(this, callId, peerName, callType, screenSharing));
             }
         } catch (Exception e) {
             RtcDebugLogger.e("RtcForeground", "startForeground failed screen=" + screenSharing, e);
-            startForeground(RtcConstants.NOTIFICATION_ID_ACTIVE, RtcCallNotification.buildActive(this, callId, peerName, callType));
+            startForeground(RtcConstants.NOTIFICATION_ID_ACTIVE, RtcCallNotification.buildActive(this, callId, peerName, callType, screenSharing));
         }
         return START_NOT_STICKY;
     }
