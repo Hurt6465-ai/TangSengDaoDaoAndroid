@@ -1,6 +1,7 @@
 package com.chat.rtc;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.text.TextUtils;
 
 import com.chat.rtc.model.RtcSignal;
@@ -20,6 +21,8 @@ public final class RtcDebugLogger {
     private static final String DIR_NAME = "logs";
     private static final String FILE_NAME = "wkrtc.log";
     private static final String OLD_FILE_NAME = "wkrtc.old.log";
+    private static final String SP_NAME = "wkrtc_debug";
+    private static final String KEY_VERBOSE = "verbose_enabled";
     private static final long MAX_BYTES = 768L * 1024L;
     private static final long READ_TAIL_BYTES = 512L * 1024L;
 
@@ -34,6 +37,7 @@ public final class RtcDebugLogger {
     }
 
     public static void i(String tag, String message) {
+        if (!isVerboseEnabled()) return;
         write("I", tag, message, null);
     }
 
@@ -60,6 +64,28 @@ public final class RtcDebugLogger {
         if (TextUtils.isEmpty(uid)) return "";
         if (uid.length() <= 10) return uid;
         return uid.substring(0, 6) + "..." + uid.substring(uid.length() - 4);
+    }
+
+    public static boolean isVerboseEnabled() {
+        Context ctx = appContext;
+        if (ctx == null) return false;
+        try {
+            return ctx.getSharedPreferences(SP_NAME, Context.MODE_PRIVATE).getBoolean(KEY_VERBOSE, false);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    public static void setVerboseEnabled(Context context, boolean enabled) {
+        Context ctx = context != null ? context.getApplicationContext() : appContext;
+        if (ctx == null) return;
+        appContext = ctx;
+        try {
+            SharedPreferences sp = ctx.getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
+            sp.edit().putBoolean(KEY_VERBOSE, enabled).apply();
+        } catch (Exception ignored) {
+        }
+        write("W", "RtcDebugLogger", enabled ? "verbose log enabled" : "verbose log disabled", null);
     }
 
     public static String read(Context context) {
@@ -95,7 +121,7 @@ public final class RtcDebugLogger {
             try { File file = logFile(ctx); if (file.exists()) file.delete(); } catch (Exception ignored) {}
             try { File old = oldLogFile(ctx); if (old.exists()) old.delete(); } catch (Exception ignored) {}
         }
-        i("RtcDebugLogger", "log cleared");
+        write("W", "RtcDebugLogger", "log cleared", null);
     }
 
     public static File getLogFile(Context context) {

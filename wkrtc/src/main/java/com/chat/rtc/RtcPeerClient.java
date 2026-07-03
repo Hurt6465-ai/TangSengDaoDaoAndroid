@@ -186,9 +186,10 @@ public class RtcPeerClient {
                         stopScreenShare();
                     }
                 });
-                switchVideoCapturer(screenCapturer, RtcConstants.SCREEN_WIDTH, RtcConstants.SCREEN_HEIGHT, RtcConstants.SCREEN_FPS);
+                switchVideoCapturer(screenCapturer, RtcConstants.SCREEN_WIDTH, RtcConstants.SCREEN_HEIGHT, RtcConstants.SCREEN_FPS, true);
                 screenSharing = true;
                 setVideoMaxBitrate(RtcConstants.SCREEN_MAX_BITRATE_KBPS);
+                RtcDebugLogger.i("RtcPeerClient", "screen share started");
             } catch (Exception e) {
                 report("屏幕共享失败", e);
             }
@@ -203,9 +204,10 @@ public class RtcPeerClient {
                 if (camera == null) throw new IllegalStateException("没有可用摄像头");
                 switchVideoCapturer(camera, lowQuality ? RtcConstants.VIDEO_LOW_WIDTH : RtcConstants.VIDEO_WIDTH,
                         lowQuality ? RtcConstants.VIDEO_LOW_HEIGHT : RtcConstants.VIDEO_HEIGHT,
-                        lowQuality ? RtcConstants.VIDEO_LOW_FPS : RtcConstants.VIDEO_FPS);
+                        lowQuality ? RtcConstants.VIDEO_LOW_FPS : RtcConstants.VIDEO_FPS, false);
                 screenSharing = false;
                 setVideoMaxBitrate(lowQuality ? RtcConstants.VIDEO_LOW_BITRATE_KBPS : RtcConstants.VIDEO_MAX_BITRATE_KBPS);
+                RtcDebugLogger.i("RtcPeerClient", "screen share stopped");
             } catch (Exception e) {
                 report("恢复摄像头失败", e);
             }
@@ -342,13 +344,13 @@ public class RtcPeerClient {
         setVideoMaxBitrate(RtcConstants.VIDEO_MAX_BITRATE_KBPS);
     }
 
-    private void switchVideoCapturer(VideoCapturer next, int width, int height, int fps) throws Exception {
+    private void switchVideoCapturer(VideoCapturer next, int width, int height, int fps, boolean nextIsScreen) throws Exception {
         if (next == null || videoSource == null) return;
         try { if (videoCapturer != null) videoCapturer.stopCapture(); } catch (Exception ignored) {}
         try { if (videoCapturer != null) videoCapturer.dispose(); } catch (Exception ignored) {}
         try { if (surfaceTextureHelper != null) surfaceTextureHelper.dispose(); } catch (Exception ignored) {}
         videoCapturer = next;
-        surfaceTextureHelper = SurfaceTextureHelper.create(screenSharing ? "cp-screen-thread" : "cp-video-thread", eglContext);
+        surfaceTextureHelper = SurfaceTextureHelper.create(nextIsScreen ? "cp-screen-thread" : "cp-video-thread", eglContext);
         videoCapturer.initialize(surfaceTextureHelper, context, videoSource.getCapturerObserver());
         videoCapturer.startCapture(width, height, fps);
     }

@@ -17,6 +17,7 @@ import android.widget.Toast;
 
 public class RtcDebugLogActivity extends Activity {
     private TextView logView;
+    private Button verboseButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,6 +43,7 @@ public class RtcDebugLogActivity extends Activity {
         root.addView(bar, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         addButton(bar, "刷新", v -> refresh());
+        verboseButton = addButton(bar, "详细", v -> toggleVerbose());
         addButton(bar, "复制", v -> copyLog());
         addButton(bar, "分享", v -> shareLog());
         addButton(bar, "清空", v -> clearLog());
@@ -60,21 +62,34 @@ public class RtcDebugLogActivity extends Activity {
         refresh();
     }
 
-    private void addButton(LinearLayout bar, String text, View.OnClickListener listener) {
+    private Button addButton(LinearLayout bar, String text, View.OnClickListener listener) {
         Button button = new Button(this);
         button.setText(text);
-        button.setTextSize(13);
+        button.setTextSize(12);
         button.setAllCaps(false);
         button.setOnClickListener(listener);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(42), 1f);
-        lp.leftMargin = dp(3);
-        lp.rightMargin = dp(3);
+        lp.leftMargin = dp(2);
+        lp.rightMargin = dp(2);
         bar.addView(button, lp);
+        return button;
     }
 
     private void refresh() {
+        updateVerboseButton();
         String log = RtcDebugLogger.read(this);
-        logView.setText(log);
+        logView.setText((RtcDebugLogger.isVerboseEnabled() ? "详细日志：已开启\n" : "详细日志：已关闭，只记录警告/错误。复现问题前请点“详细”。\n") + "\n" + log);
+    }
+
+    private void toggleVerbose() {
+        boolean next = !RtcDebugLogger.isVerboseEnabled();
+        RtcDebugLogger.setVerboseEnabled(this, next);
+        Toast.makeText(this, next ? "已开启详细 RTC 日志" : "已关闭详细 RTC 日志", Toast.LENGTH_SHORT).show();
+        refresh();
+    }
+
+    private void updateVerboseButton() {
+        if (verboseButton != null) verboseButton.setText(RtcDebugLogger.isVerboseEnabled() ? "详细开" : "详细关");
     }
 
     private void copyLog() {
