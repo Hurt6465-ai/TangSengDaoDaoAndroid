@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="tsdd_learning_module_name">学习</string>
+    <string name="learning_title">学习</string>
+    <string name="learning_subtitle">选择 AI 网页、口语场景或脚本管理。官方场景先内置在 App，后续可热更新。</string>
+    <string name="learning_deepseek_title">DeepSeek</string>
+    <string name="learning_deepseek_desc">打开 DeepSeek 网页，支持脚本和场景提示词。</string>
+    <string name="learning_qianwen_title">千问国内版</string>
+    <string name="learning_qianwen_desc">打开 qianwen.com，适合国内用户和全能助手场景。</string>
+    <string name="learning_qwen_title">Qwen 国际版</string>
+    <string name="learning_qwen_desc">打开 chat.qwen.ai，适合纯聊天和语音练习。</string>
+    <string name="learning_scene_title">高频生活场景</string>
+    <string name="learning_scene_desc">点餐、面试、打招呼、医院、机场等场景 prompt。</string>
+    <string name="learning_script_title">脚本管理</string>
+    <string name="learning_script_desc">新增、导入、在线安装、启用官方推荐脚本。</string>
+    <string name="learning_enter">进入</string>
+    <string name="learning_select">选择</string>
+    <string name="learning_manage">管理</string>
+    <string name="learning_warning">网页服务由对应平台提供。唐僧叨叨仅提供学习入口、场景提示词和本地脚本管理，不保存网页登录密码。</string>
+    <string name="learning_choose_scene">选择场景</string>
+    <string name="learning_choose_target">选择打开方式</string>
+    <string name="learning_cancel">取消</string>
 </resources>
