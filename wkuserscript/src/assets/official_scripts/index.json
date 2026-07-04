@@ -1,0 +1,22 @@
+[
+  {
+    "file": "ai_prompt_panel.user.js",
+    "title": "学习提示词面板",
+    "description": "在 DeepSeek / 千问页面加入口语场景、题目解析、翻译等快捷 prompt。"
+  },
+  {
+    "file": "ai_read_aloud.user.js",
+    "title": "自动朗读 AI 回复",
+    "description": "使用网页 speechSynthesis 朗读最后一条 AI 回复，可手动朗读或开启自动朗读。"
+  },
+  {
+    "file": "ai_copy_last_answer.user.js",
+    "title": "一键复制最后回答",
+    "description": "右下角增加复制按钮，复制最后一条 AI 回复。"
+  },
+  {
+    "file": "ai_clean_style.user.js",
+    "title": "学习样式美化",
+    "description": "放大文字、优化行距、隐藏少量干扰元素，适合平板学习。"
+  }
+]
