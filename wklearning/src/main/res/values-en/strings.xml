@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="learning_title">Learning</string>
+    <string name="learning_subtitle">Choose an AI web page, speaking scenario, or script manager. Official scenarios are bundled first and can be updated later.</string>
+    <string name="learning_deepseek_title">DeepSeek</string>
+    <string name="learning_deepseek_desc">Open DeepSeek web chat with scripts and scenario prompts.</string>
+    <string name="learning_qianwen_title">Qianwen China</string>
+    <string name="learning_qianwen_desc">Open qianwen.com for China users and all-in-one assistant tools.</string>
+    <string name="learning_qwen_title">Qwen Global</string>
+    <string name="learning_qwen_desc">Open chat.qwen.ai for chat and voice practice.</string>
+    <string name="learning_scene_title">Daily scenarios</string>
+    <string name="learning_scene_desc">Ordering food, interviews, greetings, hospital, airport and more.</string>
+    <string name="learning_script_title">Script manager</string>
+    <string name="learning_script_desc">Create, import, install online scripts, and enable official scripts.</string>
+    <string name="learning_enter">Open</string>
+    <string name="learning_select">Select</string>
+    <string name="learning_manage">Manage</string>
+    <string name="learning_warning">Web services are provided by their platforms. TangSengDaoDao only provides learning entry, scenario prompts and local script management. It does not store your web login password.</string>
+    <string name="learning_choose_scene">Choose a scenario</string>
+    <string name="learning_choose_target">Choose target</string>
+    <string name="learning_cancel">Cancel</string>
+</resources>
