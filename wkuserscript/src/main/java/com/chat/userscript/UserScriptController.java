@@ -8,6 +8,7 @@ import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.net.Uri;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -32,6 +33,7 @@ public class UserScriptController {
     private final String secret = UUID.randomUUID().toString().replace("-", "");
     private static final int REQ_RECORD_AUDIO = 7301;
     private String startupPrompt = "";
+    private String scriptMode = "";
     private boolean startupPromptInjected = false;
     private PermissionRequest pendingPermissionRequest;
 
@@ -43,6 +45,10 @@ public class UserScriptController {
 
     public void setStartupPrompt(String prompt) {
         this.startupPrompt = prompt == null ? "" : prompt;
+    }
+
+    public void setScriptMode(String mode) {
+        this.scriptMode = normalizeMode(mode);
     }
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
@@ -87,6 +93,7 @@ public class UserScriptController {
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
                 startupPromptInjected = false;
+                exposeScriptMode(url);
                 exposeStartupPrompt();
                 injectNativeSpeechPolyfill();
                 inject(url, "document-start");
@@ -95,11 +102,13 @@ public class UserScriptController {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                exposeScriptMode(url);
                 exposeStartupPrompt();
                 injectNativeSpeechPolyfill();
                 inject(url, "document-end");
                 injectStartupPromptButton();
                 mainHandler.postDelayed(() -> {
+                    exposeScriptMode(view.getUrl());
                     injectNativeSpeechPolyfill();
                     inject(view.getUrl(), "document-idle");
                     injectStartupPromptButton();
@@ -156,11 +165,13 @@ public class UserScriptController {
 
     public void reinjectCurrentPage() {
         String url = webView.getUrl();
+        exposeScriptMode(url);
         exposeStartupPrompt();
         injectNativeSpeechPolyfill();
         inject(url, "document-end");
         injectStartupPromptButton();
         mainHandler.postDelayed(() -> {
+            exposeScriptMode(webView.getUrl());
             injectNativeSpeechPolyfill();
             inject(webView.getUrl(), "document-idle");
         }, 650L);
@@ -174,15 +185,160 @@ public class UserScriptController {
 
     private void inject(String url, String runAt) {
         if (webView == null || url == null || !AiWebPolicy.isScriptHostAllowed(url)) return;
+        String mode = effectiveScriptMode(url);
         List<UserScript> scripts = store.getRunnableScripts(url, runAt);
-        for (UserScript script : scripts) evaluate(script);
+        for (UserScript script : scripts) {
+            if (!shouldInjectScriptForMode(url, script, mode)) continue;
+            evaluate(script, mode);
+        }
     }
 
-    private void evaluate(UserScript script) {
+    private void evaluate(UserScript script, String mode) {
         if (script == null || script.code == null) return;
-        String js = buildWrappedScript(script);
+        String js = buildWrappedScript(script, mode);
         webView.evaluateJavascript(js, value -> {
         });
+    }
+
+
+    private String effectiveScriptMode(String url) {
+        if (scriptMode != null && scriptMode.length() > 0) return scriptMode;
+        return extractTsddMode(url);
+    }
+
+    private static String normalizeMode(String mode) {
+        if (mode == null) return "";
+        String value = mode.trim().toLowerCase();
+        if (value.length() == 0) return "";
+        if (value.length() > 40) value = value.substring(0, 40);
+        value = value.replaceAll("[^a-z0-9_-]", "");
+        return value;
+    }
+
+    private static String extractTsddMode(String url) {
+        if (url == null || url.length() == 0) return "";
+        String raw = url;
+        try {
+            Uri uri = Uri.parse(url);
+            String query = uri.getQuery();
+            String fragment = uri.getFragment();
+            String fromQuery = extractParam(query, "tsdd_mode");
+            if (fromQuery.length() > 0) return normalizeMode(fromQuery);
+            String fromFragment = extractParam(fragment, "tsdd_mode");
+            if (fromFragment.length() > 0) return normalizeMode(fromFragment);
+        } catch (Throwable ignored) {
+        }
+        return normalizeMode(extractParam(raw, "tsdd_mode"));
+    }
+
+    private static String extractParam(String raw, String key) {
+        if (raw == null || key == null || key.length() == 0) return "";
+        String[] parts = raw.split("[&#?]");
+        for (String part : parts) {
+            if (part == null) continue;
+            int eq = part.indexOf('=');
+            if (eq <= 0) continue;
+            String k = part.substring(0, eq).trim();
+            if (!key.equals(k)) continue;
+            String value = part.substring(eq + 1);
+            try {
+                return Uri.decode(value == null ? "" : value);
+            } catch (Throwable ignored) {
+                return value == null ? "" : value;
+            }
+        }
+        return "";
+    }
+
+    private boolean shouldInjectScriptForMode(String url, UserScript script, String mode) {
+        if (script == null || script.code == null) return false;
+        mode = normalizeMode(mode);
+
+        // 没有入口模式时保持旧逻辑，避免影响普通脚本和旧入口。
+        if (mode.length() == 0) return true;
+
+        return scriptMatchesMode(script, mode);
+    }
+
+    private boolean scriptMatchesMode(UserScript script, String mode) {
+        mode = normalizeMode(mode);
+        if (mode.length() == 0 || script == null) return false;
+
+        String name = script.name == null ? "" : script.name;
+        String code = script.code == null ? "" : script.code;
+        String all = name + "\n" + code;
+
+        String metaMode = readMetaValue(all, "@tsdd-mode");
+        if (metaMode.length() > 0) {
+            String[] modes = metaMode.toLowerCase().split("[,|/\\s]+");
+            for (String item : modes) {
+                String value = normalizeMode(item);
+                if (value.equals(mode) || value.equals("all") || value.equals("global") || value.equals("*")) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 兼容没有 @tsdd-mode 的旧脚本：根据 APP / SCRIPT_MODE / 文件名兜底判断。
+        String lower = all.toLowerCase();
+        String compact = lower.replace(" ", "").replace("\t", "").replace("\r", "").replace("\n", "").replace("\"", "'");
+
+        if (compact.contains("script_mode='" + mode + "'")) return true;
+        if (compact.contains("constscript_mode='" + mode + "'")) return true;
+        if (compact.contains("letscript_mode='" + mode + "'")) return true;
+        if (compact.contains("varscript_mode='" + mode + "'")) return true;
+        if (compact.contains("@name") && compact.contains(mode)) return true;
+        if (compact.contains("tsdd-ds-" + mode)) return true;
+        if (compact.contains("deepseek-" + mode)) return true;
+
+        if ("translate".equals(mode)) {
+            return lower.contains("tsdd-ds-translate") || lower.contains("deepseek-translate") || lower.contains("翻译专家") || lower.contains("翻译入口");
+        }
+        if ("question".equals(mode)) {
+            return lower.contains("tsdd-ds-question") || lower.contains("deepseek-question") || lower.contains("题目解析") || lower.contains("互动题") || lower.contains("选择题");
+        }
+        if ("sentence".equals(mode)) {
+            return lower.contains("tsdd-ds-sentence") || lower.contains("deepseek-sentence") || lower.contains("句型解析") || lower.contains("句型");
+        }
+        if ("grammar".equals(mode)) {
+            return lower.contains("tsdd-ds-grammar") || lower.contains("deepseek-grammar") || lower.contains("语法解析") || lower.contains("语法");
+        }
+        if ("pronunciation".equals(mode)) {
+            return lower.contains("tsdd-ds-pronunciation") || lower.contains("deepseek-pronunciation") || lower.contains("读法") || lower.contains("发音") || lower.contains(" pronunciation");
+        }
+        if ("qwen-tts".equals(mode)) {
+            return lower.contains("tsdd-qwen-tts") || lower.contains("qwen-tts") || lower.contains("千问") || lower.contains("chat.qwen.ai");
+        }
+
+        return false;
+    }
+
+    private static String readMetaValue(String text, String key) {
+        if (text == null || key == null) return "";
+        String[] lines = text.split("\\r?\\n");
+        String keyLower = key.toLowerCase();
+        for (String line : lines) {
+            if (line == null) continue;
+            String trimmed = line.trim();
+            String lower = trimmed.toLowerCase();
+            int idx = lower.indexOf(keyLower);
+            if (idx < 0) continue;
+            String value = trimmed.substring(idx + key.length()).trim();
+            if (value.startsWith(":")) value = value.substring(1).trim();
+            return value;
+        }
+        return "";
+    }
+
+    private void exposeScriptMode(String url) {
+        String mode = effectiveScriptMode(url);
+        String js = "window.__TS_DD_SCRIPT_MODE__=" + JSONObject.quote(mode) + ";" +
+                "window.__TS_DD_ENTRY_MODE__=" + JSONObject.quote(mode) + ";";
+        try {
+            webView.evaluateJavascript(js, null);
+        } catch (Exception ignored) {
+        }
     }
 
     private void exposeStartupPrompt() {
@@ -264,11 +420,12 @@ public class UserScriptController {
         }
     }
 
-    private String buildWrappedScript(UserScript script) {
+    private String buildWrappedScript(UserScript script, String mode) {
         String scriptId = JSONObject.quote(script.id);
         String scriptName = JSONObject.quote(script.name == null ? "" : script.name);
         String source = JSONObject.quote(script.code + "\n//# sourceURL=tsdd-userscript-" + script.id + ".user.js");
         String secretValue = JSONObject.quote(secret);
+        String modeValue = JSONObject.quote(normalizeMode(mode));
         String grants = new org.json.JSONArray(script.grants).toString();
         boolean networkAllowed = script.networkAllowed;
         return "(function(){\n" +
@@ -278,6 +435,8 @@ public class UserScriptController {
                 "window.__TS_DD_USER_SCRIPT_RAN__[__scriptId]=true;\n" +
                 "var __secret=" + secretValue + ";\n" +
                 "var __scriptName=" + scriptName + ";\n" +
+                "var __tsddMode=" + modeValue + ";\n" +
+                "window.__TS_DD_SCRIPT_MODE__=__tsddMode;window.__TS_DD_ENTRY_MODE__=__tsddMode;\n" +
                 "var __grants=" + grants + ";\n" +
                 "var __networkAllowed=" + networkAllowed + ";\n" +
                 "window.__TS_DD_GM_XHR_CALLBACKS__=window.__TS_DD_GM_XHR_CALLBACKS__||{};\n" +
