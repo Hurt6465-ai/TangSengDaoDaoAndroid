@@ -18,7 +18,8 @@ public final class AiWebPolicy {
             "www.qwen.ai",
             "qianwen.com",
             "www.qianwen.com",
-            "tongyi.aliyun.com"
+            "tongyi.aliyun.com",
+            "886.best"
     ));
 
     private static final Set<String> NAV_HOST_SUFFIXES = new HashSet<>(Arrays.asList(
@@ -34,7 +35,8 @@ public final class AiWebPolicy {
             "aliyun.com",
             "alibaba.com",
             "alicdn.com",
-            "aliyuncs.com"
+            "aliyuncs.com",
+            "886.best"
     ));
 
     private static final Set<String> NETWORK_HOST_SUFFIXES = new HashSet<>(Arrays.asList(
