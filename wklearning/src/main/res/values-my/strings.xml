@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="learning_title">လေ့လာရန်</string>
+    <string name="learning_subtitle">AI ဝဘ်စာမျက်နှာ၊ စကားပြောအခြေအနေ သို့မဟုတ် စခရစ်စီမံခန့်ခွဲမှုကို ရွေးပါ။ တရားဝင်အခြေအနေများကို App ထဲတွင် ထည့်သွင်းထားသည်။</string>
+    <string name="learning_deepseek_title">DeepSeek</string>
+    <string name="learning_deepseek_desc">DeepSeek ဝဘ်ကို ဖွင့်ပြီး စခရစ်နှင့် အခြေအနေ prompt များကို သုံးနိုင်သည်။</string>
+    <string name="learning_qianwen_title">Qianwen တရုတ်ဗားရှင်း</string>
+    <string name="learning_qianwen_desc">qianwen.com ကို ဖွင့်ပြီး တရုတ်အသုံးပြုသူများအတွက် သင့်တော်သည်။</string>
+    <string name="learning_qwen_title">Qwen နိုင်ငံတကာဗားရှင်း</string>
+    <string name="learning_qwen_desc">chat.qwen.ai ကို ဖွင့်ပြီး စကားပြောလေ့ကျင့်ရန် သင့်တော်သည်။</string>
+    <string name="learning_scene_title">နေ့စဉ်အသုံးများသော အခြေအနေများ</string>
+    <string name="learning_scene_desc">အစားအစာမှာခြင်း၊ အင်တာဗျူး၊ နှုတ်ဆက်ခြင်း၊ ဆေးရုံ၊ လေဆိပ် စသည်။</string>
+    <string name="learning_script_title">စခရစ် စီမံခန့်ခွဲမှု</string>
+    <string name="learning_script_desc">အသစ်ရေးရန်၊ တင်သွင်းရန်၊ အွန်လိုင်းမှ ထည့်ရန်၊ တရားဝင်စခရစ်များကို ဖွင့်ရန်။</string>
+    <string name="learning_enter">ဝင်ရန်</string>
+    <string name="learning_select">ရွေးရန်</string>
+    <string name="learning_manage">စီမံရန်</string>
+    <string name="learning_warning">ဝဘ်ဝန်ဆောင်မှုများကို သက်ဆိုင်ရာ platform များက ပေးသည်။ TangSengDaoDao သည် လေ့လာရေးဝင်ပေါက်၊ prompt နှင့် local script စီမံခန့်ခွဲမှုသာ ပေးပြီး web password ကို သိမ်းမထားပါ။</string>
+    <string name="learning_choose_scene">အခြေအနေ ရွေးပါ</string>
+    <string name="learning_choose_target">ဖွင့်မည့်နေရာ ရွေးပါ</string>
+    <string name="learning_cancel">မလုပ်တော့ပါ</string>
+</resources>
