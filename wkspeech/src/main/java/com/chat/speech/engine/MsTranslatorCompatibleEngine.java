@@ -5,6 +5,7 @@ import android.util.Base64;
 
 import com.chat.speech.SpeechCache;
 import com.chat.speech.SpeechPrefs;
+import com.chat.speech.model.TtsSource;
 
 import org.json.JSONObject;
 
@@ -16,7 +17,6 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -33,11 +33,25 @@ public class MsTranslatorCompatibleEngine {
     private static final String SECRET = "oik6PdDdMnOXemTbwvMn9de/h9lFnfBaCWbGMMZqqoSaQaqUOqjVGm5NqsmjcBI1x+sS9ugjB55HEJWRiFXYFw==";
 
     private Endpoint cachedEndpoint;
+    private String cachedEndpointKey = "";
 
     public synchronized File synthesize(Context context, String text, String voice, String locale, String audioFormat) throws Exception {
         SpeechPrefs prefs = new SpeechPrefs(context);
-        String format = audioFormat == null || audioFormat.trim().isEmpty() ? prefs.getAudioFormat() : audioFormat;
-        String cacheKey = "ms-translator|" + format + "|" + voice + "|" + locale + "|" + text;
+        return synthesize(context, prefs.getActiveSource(), text, voice, locale, audioFormat, prefs.getRatePercent(), prefs.getPitchPercent());
+    }
+
+    public synchronized File synthesize(Context context, String text, String voice, String locale, String audioFormat, int ratePercent, int pitchPercent) throws Exception {
+        SpeechPrefs prefs = new SpeechPrefs(context);
+        return synthesize(context, prefs.getActiveSource(), text, voice, locale, audioFormat, ratePercent, pitchPercent);
+    }
+
+    public synchronized File synthesize(Context context, TtsSource source, String text, String voice, String locale, String audioFormat, int ratePercent, int pitchPercent) throws Exception {
+        if (source == null) source = TtsSource.builtinMsTranslator();
+        source.normalize();
+        SpeechPrefs prefs = new SpeechPrefs(context);
+        String format = audioFormat == null || audioFormat.trim().isEmpty() ? source.audioFormat : audioFormat;
+        if (format == null || format.trim().isEmpty()) format = prefs.getAudioFormat();
+        String cacheKey = source.id + "|" + format + "|" + voice + "|" + locale + "|r" + ratePercent + "|p" + pitchPercent + "|" + text;
         File output = SpeechCache.audioFile(context, cacheKey);
         if (output.exists() && output.length() > 100) {
             output.setLastModified(System.currentTimeMillis());
@@ -46,8 +60,8 @@ public class MsTranslatorCompatibleEngine {
         Exception lastError = null;
         for (int i = 0; i < 2; i++) {
             try {
-                Endpoint endpoint = getEndpoint();
-                byte[] audio = requestAudio(endpoint, buildSsml(text, voice, locale), format);
+                Endpoint endpoint = getEndpoint(source);
+                byte[] audio = requestAudio(source, endpoint, buildSsml(text, voice, locale, ratePercent, pitchPercent), format);
                 File tmp = new File(output.getAbsolutePath() + ".tmp");
                 try (FileOutputStream fos = new FileOutputStream(tmp)) {
                     fos.write(audio);
@@ -63,27 +77,32 @@ public class MsTranslatorCompatibleEngine {
                 return output;
             } catch (Exception e) {
                 cachedEndpoint = null;
+                cachedEndpointKey = "";
                 lastError = e;
             }
         }
         throw lastError == null ? new RuntimeException("微软兼容源合成失败") : lastError;
     }
 
-    private Endpoint getEndpoint() throws Exception {
-        if (cachedEndpoint != null && cachedEndpoint.valid()) return cachedEndpoint;
-        String signature = getSign();
-        HttpURLConnection conn = (HttpURLConnection) new URL(ENDPOINT_URL).openConnection();
+    private Endpoint getEndpoint(TtsSource source) throws Exception {
+        if (source == null) source = TtsSource.builtinMsTranslator();
+        source.normalize();
+        String endpointUrl = TtsSource.isEmpty(source.endpointUrl) ? ENDPOINT_URL : source.endpointUrl;
+        String key = source.id + "|" + endpointUrl + "|" + source.appId;
+        if (cachedEndpoint != null && cachedEndpoint.valid() && key.equals(cachedEndpointKey)) return cachedEndpoint;
+        String signature = getSign(source);
+        HttpURLConnection conn = (HttpURLConnection) new URL(endpointUrl).openConnection();
         conn.setConnectTimeout(15000);
         conn.setReadTimeout(20000);
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
-        conn.setRequestProperty("Accept-Language", "zh-Hans");
-        conn.setRequestProperty("X-ClientVersion", "4.0.530a 5fe1dc6c");
-        conn.setRequestProperty("X-UserId", "0f04d16a175c411e");
-        conn.setRequestProperty("X-HomeGeographicRegion", "zh-Hans-CN");
+        conn.setRequestProperty("Accept-Language", emptyOr(source.acceptLanguage, "zh-Hans"));
+        conn.setRequestProperty("X-ClientVersion", emptyOr(source.clientVersion, "4.0.530a 5fe1dc6c"));
+        conn.setRequestProperty("X-UserId", emptyOr(source.userId, "0f04d16a175c411e"));
+        conn.setRequestProperty("X-HomeGeographicRegion", emptyOr(source.homeGeographicRegion, "zh-Hans-CN"));
         conn.setRequestProperty("X-ClientTraceId", UUID.randomUUID().toString());
         conn.setRequestProperty("X-MT-Signature", signature);
-        conn.setRequestProperty("User-Agent", "okhttp/4.5.0");
+        conn.setRequestProperty("User-Agent", emptyOr(source.userAgent, "okhttp/4.5.0"));
         conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
         conn.setRequestProperty("Content-Length", "0");
         conn.setRequestProperty("Accept-Encoding", "gzip");
@@ -95,12 +114,15 @@ public class MsTranslatorCompatibleEngine {
         if (code != 200) throw new RuntimeException("终结点信息获取失败: HTTP-" + code + " " + body);
         JSONObject object = new JSONObject(body);
         cachedEndpoint = new Endpoint(object.optString("r"), object.optString("t"));
+        cachedEndpointKey = key;
         if (!cachedEndpoint.valid()) throw new RuntimeException("终结点信息无效");
         return cachedEndpoint;
     }
 
-    private byte[] requestAudio(Endpoint endpoint, String ssml, String format) throws Exception {
-        String url = "https://" + endpoint.region + ".tts.speech.microsoft.com/cognitiveservices/v1";
+    private byte[] requestAudio(TtsSource source, Endpoint endpoint, String ssml, String format) throws Exception {
+        String template = source == null ? "" : source.ttsUrlTemplate;
+        if (TtsSource.isEmpty(template)) template = "https://{region}.tts.speech.microsoft.com/cognitiveservices/v1";
+        String url = template.replace("{region}", endpoint.region);
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setConnectTimeout(15000);
         conn.setReadTimeout(30000);
@@ -109,7 +131,7 @@ public class MsTranslatorCompatibleEngine {
         conn.setRequestProperty("Authorization", endpoint.token);
         conn.setRequestProperty("Content-Type", "application/ssml+xml");
         conn.setRequestProperty("X-Microsoft-OutputFormat", format);
-        conn.setRequestProperty("User-Agent", "okhttp/4.5.0");
+        conn.setRequestProperty("User-Agent", emptyOr(source.userAgent, "okhttp/4.5.0"));
         byte[] data = ssml.getBytes("UTF-8");
         conn.setFixedLengthStreamingMode(data.length);
         try (OutputStream os = conn.getOutputStream()) {
@@ -121,27 +143,39 @@ public class MsTranslatorCompatibleEngine {
         return body;
     }
 
-    private String buildSsml(String text, String voice, String locale) {
+    private String buildSsml(String text, String voice, String locale, int ratePercent, int pitchPercent) {
         String safe = escapeXml(text);
         String xmlLang = (locale == null || locale.trim().isEmpty()) ? "zh-CN" : locale;
-        return "<speak xmlns=\"http://www.w3.org/2001/10/synthesis\" version=\"1.0\" xml:lang=\"" + xmlLang + "\">"
+        String rate = signedPercent(ratePercent);
+        String pitch = signedPercent(pitchPercent);
+        return "<speak xmlns=\"http://www.w3.org/2001/10/synthesis\" xmlns:mstts=\"http://www.w3.org/2001/mstts\" version=\"1.0\" xml:lang=\"" + xmlLang + "\">"
                 + "<voice name=\"" + escapeXml(voice) + "\">"
-                + "<prosody rate=\"+0%\" pitch=\"+0%\" volume=\"+0%\">"
+                + "<prosody rate=\"" + rate + "\" pitch=\"" + pitch + "\" volume=\"+0%\">"
                 + safe
                 + "</prosody></voice></speak>";
     }
 
-    private String getSign() throws Exception {
-        String url = ENDPOINT_URL.split("://", 2)[1];
+    private String signedPercent(int value) {
+        if (value > 0) return "+" + value + "%";
+        return value + "%";
+    }
+
+    private String getSign(TtsSource source) throws Exception {
+        if (source == null) source = TtsSource.builtinMsTranslator();
+        source.normalize();
+        String endpointUrl = TtsSource.isEmpty(source.endpointUrl) ? ENDPOINT_URL : source.endpointUrl;
+        String appId = TtsSource.isEmpty(source.appId) ? APP_ID : source.appId;
+        String secret = TtsSource.isEmpty(source.secretBase64) ? SECRET : source.secretBase64;
+        String url = endpointUrl.split("://", 2)[1];
         String encodeUrl = URLEncoder.encode(url, "UTF-8");
         String uuid = UUID.randomUUID().toString().replace("-", "");
         String formattedDate = dateFormat();
-        String raw = (APP_ID + encodeUrl + formattedDate + uuid).toLowerCase(Locale.US);
-        SecretKeySpec keySpec = new SecretKeySpec(Base64.decode(SECRET, Base64.NO_WRAP), "HmacSHA256");
+        String raw = (appId + encodeUrl + formattedDate + uuid).toLowerCase(Locale.US);
+        SecretKeySpec keySpec = new SecretKeySpec(Base64.decode(secret, Base64.NO_WRAP), "HmacSHA256");
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(keySpec);
         String signBase64 = Base64.encodeToString(mac.doFinal(raw.getBytes("UTF-8")), Base64.NO_WRAP);
-        return APP_ID + "::" + signBase64 + "::" + formattedDate + "::" + uuid;
+        return appId + "::" + signBase64 + "::" + formattedDate + "::" + uuid;
     }
 
     private String dateFormat() {
@@ -174,6 +208,11 @@ public class MsTranslatorCompatibleEngine {
             while ((len = input.read(buffer)) >= 0) out.write(buffer, 0, len);
             return out.toByteArray();
         }
+    }
+
+
+    private static String emptyOr(String value, String def) {
+        return value == null || value.trim().isEmpty() ? def : value.trim();
     }
 
     private static class Endpoint {

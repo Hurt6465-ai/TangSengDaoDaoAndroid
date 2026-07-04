@@ -3,7 +3,6 @@ package com.chat.speech.engine;
 import android.content.Context;
 import android.os.Build;
 import android.speech.tts.TextToSpeech;
-import android.speech.tts.UtteranceProgressListener;
 
 import java.util.Locale;
 import java.util.UUID;
@@ -14,6 +13,8 @@ public class SystemTtsEngine {
     private TextToSpeech tts;
     private boolean ready;
     private String pendingText;
+    private float pendingRate = 1.0f;
+    private float pendingPitch = 1.0f;
 
     private SystemTtsEngine(Context context) {
         app = context.getApplicationContext();
@@ -25,7 +26,13 @@ public class SystemTtsEngine {
     }
 
     public synchronized void speak(String text) {
+        speak(text, 1.0f, 1.0f);
+    }
+
+    public synchronized void speak(String text, float rate, float pitch) {
         if (text == null || text.trim().isEmpty()) return;
+        pendingRate = safeRate(rate);
+        pendingPitch = safePitch(pitch);
         if (tts == null) {
             pendingText = text;
             tts = new TextToSpeech(app, status -> {
@@ -40,7 +47,7 @@ public class SystemTtsEngine {
                         p = pendingText;
                         pendingText = null;
                     }
-                    if (p != null) speakNow(p);
+                    if (p != null) speakNow(p, pendingRate, pendingPitch);
                 }
             });
             return;
@@ -49,14 +56,19 @@ public class SystemTtsEngine {
             pendingText = text;
             return;
         }
-        speakNow(text);
+        speakNow(text, pendingRate, pendingPitch);
     }
 
     public synchronized void stop() {
         if (tts != null) tts.stop();
     }
 
-    private void speakNow(String text) {
+    private void speakNow(String text, float rate, float pitch) {
+        try {
+            tts.setSpeechRate(safeRate(rate));
+            tts.setPitch(safePitch(pitch));
+        } catch (Throwable ignored) {
+        }
         String utteranceId = "tsdd_" + UUID.randomUUID();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId);
@@ -64,5 +76,13 @@ public class SystemTtsEngine {
             //noinspection deprecation
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null);
         }
+    }
+
+    private float safeRate(float value) {
+        return Math.max(0.5f, Math.min(2.0f, value));
+    }
+
+    private float safePitch(float value) {
+        return Math.max(0.5f, Math.min(1.8f, value));
     }
 }
