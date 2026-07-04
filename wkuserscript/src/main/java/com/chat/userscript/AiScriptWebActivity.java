@@ -34,6 +34,7 @@ public class AiScriptWebActivity extends Activity {
     public static final String EXTRA_TITLE = "title";
     public static final String EXTRA_URL = "url";
     public static final String EXTRA_START_PROMPT = "start_prompt";
+    public static final String EXTRA_SCRIPT_MODE = "script_mode";
 
     private static final int REQ_NATIVE_RECORD_AUDIO = 7401;
     private static final int REQ_NATIVE_SPEECH_INTENT = 7402;
@@ -60,14 +61,19 @@ public class AiScriptWebActivity extends Activity {
     private boolean toolbarVisible = true;
 
     public static void open(Context context, String title, String url) {
-        open(context, title, url, null);
+        open(context, title, url, null, null);
     }
 
     public static void open(Context context, String title, String url, String startPrompt) {
+        open(context, title, url, startPrompt, null);
+    }
+
+    public static void open(Context context, String title, String url, String startPrompt, String scriptMode) {
         Intent intent = new Intent(context, AiScriptWebActivity.class);
         intent.putExtra(EXTRA_TITLE, title);
         intent.putExtra(EXTRA_URL, url);
         intent.putExtra(EXTRA_START_PROMPT, startPrompt);
+        intent.putExtra(EXTRA_SCRIPT_MODE, normalizeScriptModeValue(scriptMode));
         context.startActivity(intent);
     }
 
@@ -77,8 +83,10 @@ public class AiScriptWebActivity extends Activity {
         String title = getIntent().getStringExtra(EXTRA_TITLE);
         String url = getIntent().getStringExtra(EXTRA_URL);
         String startPrompt = getIntent().getStringExtra(EXTRA_START_PROMPT);
+        String scriptMode = normalizeScriptModeValue(getIntent().getStringExtra(EXTRA_SCRIPT_MODE));
         if (title == null || title.length() == 0) title = "AI 网页";
         if (url == null || url.length() == 0) url = "https://chat.qwen.ai/";
+        url = appendTsddMode(url, scriptMode);
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.WHITE);
@@ -102,9 +110,48 @@ public class AiScriptWebActivity extends Activity {
 
         controller = new UserScriptController(this, webView);
         controller.setStartupPrompt(startPrompt);
+        controller.setScriptMode(scriptMode);
         controller.attach();
         controller.loadUrl(url);
         handler.postDelayed(this::hideToolbar, 1800L);
+    }
+
+
+    private static String normalizeScriptModeValue(String mode) {
+        if (mode == null) return "";
+        String value = mode.trim().toLowerCase();
+        if (value.length() == 0) return "";
+        if (value.length() > 40) value = value.substring(0, 40);
+        value = value.replaceAll("[^a-z0-9_-]", "");
+        return value;
+    }
+
+    private String appendTsddMode(String url, String mode) {
+        mode = normalizeScriptModeValue(mode);
+        if (url == null) url = "";
+        if (mode.length() == 0) return url;
+        if (url.indexOf("tsdd_mode=") >= 0) return url;
+
+        String host = "";
+        try {
+            host = Uri.parse(url).getHost();
+            host = host == null ? "" : host.toLowerCase();
+        } catch (Throwable ignored) {
+        }
+
+        // 目前入口绑定主要用于 DeepSeek；其他网页不用强塞 hash，避免影响登录/跳转。
+        boolean isDeepSeek = host.equals("chat.deepseek.com") || host.endsWith(".deepseek.com");
+        if (!isDeepSeek) return url;
+
+        String encoded = Uri.encode(mode);
+        int hashIndex = url.indexOf('#');
+        if (hashIndex >= 0) {
+            if (url.endsWith("#") || url.endsWith("&") || url.endsWith("?")) {
+                return url + "tsdd_mode=" + encoded;
+            }
+            return url + "&tsdd_mode=" + encoded;
+        }
+        return url + "#tsdd_mode=" + encoded;
     }
 
     private View buildToolbar(String title) {
