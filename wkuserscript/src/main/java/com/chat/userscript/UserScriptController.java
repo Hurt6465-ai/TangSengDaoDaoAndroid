@@ -201,10 +201,12 @@ public class UserScriptController {
                 "if(window.__TS_DD_NATIVE_SPEECH_POLYFILL_INSTALLED__)return;" +
                 "if(!window.TsddNativeSpeech)return;" +
                 "window.__TS_DD_NATIVE_SPEECH_POLYFILL_INSTALLED__=true;" +
-                "window.__TS_DD_ORIGINAL_SPEECH_RECOGNITION__=window.SpeechRecognition||null;" +
-                "window.__TS_DD_ORIGINAL_WEBKIT_SPEECH_RECOGNITION__=window.webkitSpeechRecognition||null;" +
+                "var oldSR=window.SpeechRecognition||null;" +
+                "var oldWebkitSR=window.webkitSpeechRecognition||null;" +
+                "window.__TS_DD_ORIGINAL_SPEECH_RECOGNITION__=oldSR;" +
+                "window.__TS_DD_ORIGINAL_WEBKIT_SPEECH_RECOGNITION__=oldWebkitSR;" +
                 "var active=null;" +
-                "function fire(fn,ev){try{if(typeof fn==='function')fn.call(active,ev);}catch(e){console.error(e);}}" +
+                "function fire(target,fn,ev){try{if(typeof fn==='function')fn.call(target,ev);}catch(e){console.error(e);}}" +
                 "function resultEvent(text,finalResult){" +
                 "text=String(text||'');" +
                 "var alt={transcript:text,confidence:finalResult?1:0};" +
@@ -222,21 +224,22 @@ public class UserScriptController {
                 "if(active&&active!==this){try{active.abort();}catch(e){}}" +
                 "active=this;this._active=true;" +
                 "try{window.TsddNativeSpeech.startSpeech(String(this.lang||'zh-CN'));}" +
-                "catch(e){fire(this.onerror,{error:'client',message:String(e&&e.message||e)});this._active=false;if(active===this)active=null;fire(this.onend,{});}" +
+                "catch(e){fire(this,this.onerror,{error:'client',message:String(e&&e.message||e)});this._active=false;if(active===this)active=null;fire(this,this.onend,{});}" +
                 "};" +
                 "NativeSpeechRecognition.prototype.stop=function(){try{window.TsddNativeSpeech.stopSpeech();}catch(e){}};" +
                 "NativeSpeechRecognition.prototype.abort=function(){try{window.TsddNativeSpeech.cancelSpeech();}catch(e){}};" +
                 "window.__TS_DD_NATIVE_SPEECH_DISPATCH__=function(type,text,error){" +
                 "var r=active;if(!r)return;" +
-                "if(type==='start'){r._active=true;fire(r.onstart,{});fire(r.onaudiostart,{});return;}" +
-                "if(type==='partial'){if(r.interimResults)fire(r.onresult,resultEvent(text,false));return;}" +
-                "if(type==='final'){fire(r.onresult,resultEvent(text,true));return;}" +
-                "if(type==='error'){fire(r.onerror,{error:error||'error',message:text||error||''});return;}" +
-                "if(type==='end'){r._active=false;fire(r.onaudioend,{});fire(r.onend,{});if(active===r)active=null;return;}" +
+                "if(type==='start'){r._active=true;fire(r,r.onstart,{});fire(r,r.onaudiostart,{});return;}" +
+                "if(type==='partial'){if(r.interimResults)fire(r,r.onresult,resultEvent(text,false));return;}" +
+                "if(type==='final'){fire(r,r.onresult,resultEvent(text,true));return;}" +
+                "if(type==='error'){fire(r,r.onerror,{error:error||'error',message:text||error||''});return;}" +
+                "if(type==='end'){r._active=false;fire(r,r.onaudioend,{});fire(r,r.onend,{});if(active===r)active=null;return;}" +
                 "};" +
                 "NativeSpeechRecognition.prototype.constructor=NativeSpeechRecognition;" +
-                "window.SpeechRecognition=NativeSpeechRecognition;" +
-                "window.webkitSpeechRecognition=NativeSpeechRecognition;" +
+                "window.TsddNativeSpeechRecognition=NativeSpeechRecognition;" +
+                "window.TsddSpeechRecognition=NativeSpeechRecognition;" +
+                "if(!oldSR&&!oldWebkitSR){window.SpeechRecognition=NativeSpeechRecognition;window.webkitSpeechRecognition=NativeSpeechRecognition;}" +
                 "})();";
         try {
             webView.evaluateJavascript(js, null);
