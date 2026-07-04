@@ -133,7 +133,7 @@ public class LearningFragment extends Fragment {
                     if (which == 0) {
                         AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/", item.prompt);
                     } else if (which == 1) {
-                        AiScriptWebActivity.open(requireContext(), "千问", "https://www.qianwen.com/", item.prompt);
+                        AiScriptWebActivity.open(requireContext(), "千问", "https:/886.best/", item.prompt);
                     } else {
                         AiScriptWebActivity.open(requireContext(), "Qwen", "https://chat.qwen.ai/", item.prompt);
                     }
