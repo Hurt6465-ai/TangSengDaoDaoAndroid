@@ -9,6 +9,7 @@ import android.widget.Toast;
 import com.chat.speech.engine.MsTranslatorCompatibleEngine;
 import com.chat.speech.engine.SystemTtsEngine;
 import com.chat.speech.model.SpeechSegment;
+import com.chat.speech.model.TtsSource;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -42,24 +43,36 @@ public class SpeechManager {
         if (text == null || text.trim().isEmpty()) return;
         stop();
         SpeechPrefs prefs = new SpeechPrefs(app);
-        if (!prefs.isMsEnabled()) {
-            SystemTtsEngine.get(app).speak(text);
+        TtsSource source = prefs.getActiveSource();
+        if (source == null || TtsSource.TYPE_SYSTEM.equals(source.type)) {
+            SystemTtsEngine.get(app).speak(text, prefs.getSystemRate(), prefs.getSystemPitch());
+            return;
+        }
+        if (!TtsSource.TYPE_MS_TRANSLATOR.equals(source.type)) {
+            Toast.makeText(app, "当前 TTS 源暂未接入朗读引擎，已使用系统 TTS", Toast.LENGTH_LONG).show();
+            SystemTtsEngine.get(app).speak(text, prefs.getSystemRate(), prefs.getSystemPitch());
             return;
         }
         executor.execute(() -> {
             try {
-                List<SpeechSegment> segments = SpeechSegmenter.splitByLanguage(text);
+                List<SpeechSegment> segments;
+                if (prefs.isMixedReadEnabled()) {
+                    segments = SpeechSegmenter.splitByLanguage(text);
+                } else {
+                    segments = new ArrayList<>();
+                    segments.add(new SpeechSegment(text.trim(), SpeechSegment.LANG_ZH));
+                }
                 List<File> files = new ArrayList<>();
                 for (SpeechSegment segment : segments) {
                     String voice = prefs.voiceForLang(segment.lang);
                     String locale = SpeechSegment.LANG_MY.equals(segment.lang) ? SpeechSegment.LANG_MY : SpeechSegment.LANG_ZH;
-                    files.add(msEngine.synthesize(app, segment.text, voice, locale, prefs.getAudioFormat()));
+                    files.add(msEngine.synthesize(app, source, segment.text, voice, locale, prefs.getAudioFormat(), prefs.getRatePercent(), prefs.getPitchPercent()));
                 }
                 mainHandler.post(() -> playFiles(files, 0));
             } catch (Exception e) {
                 mainHandler.post(() -> {
-                    Toast.makeText(app, "微软兼容源失败，已切换系统 TTS：" + e.getMessage(), Toast.LENGTH_LONG).show();
-                    SystemTtsEngine.get(app).speak(text);
+                    Toast.makeText(app, "当前在线语音源失败，已切换系统 TTS：" + e.getMessage(), Toast.LENGTH_LONG).show();
+                    SystemTtsEngine.get(app).speak(text, prefs.getSystemRate(), prefs.getSystemPitch());
                 });
             }
         });
