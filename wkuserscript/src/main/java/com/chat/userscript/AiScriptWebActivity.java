@@ -244,7 +244,22 @@ public class AiScriptWebActivity extends Activity {
     }
 
     @Override
+    protected void onPause() {
+        forceStopSpeechFromWeb();
+        super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        forceStopSpeechFromWeb();
+        cancelNativeSpeechFromWeb();
+        super.onStop();
+    }
+
+    @Override
     protected void onDestroy() {
+        forceStopSpeechFromWeb();
+        cancelNativeSpeechFromWeb();
         handler.removeCallbacksAndMessages(null);
         speechHandler.removeCallbacksAndMessages(null);
         releaseNativeSpeechRecognizer();
@@ -617,6 +632,10 @@ public class AiScriptWebActivity extends Activity {
 
     private void stopSpeechFromWeb() {
         if (!isSpeechHostAllowed()) return;
+        forceStopSpeechFromWeb();
+    }
+
+    private void forceStopSpeechFromWeb() {
         if (callSpeechManager("stop", new Class[]{Context.class}, new Object[]{this})) return;
         callSpeechManager("stop", new Class[]{}, new Object[]{});
     }
@@ -691,9 +710,7 @@ public class AiScriptWebActivity extends Activity {
                     || host.equals("qianwen.com")
                     || host.endsWith(".qianwen.com")
                     || host.equals("chat.deepseek.com")
-                    || host.endsWith(".deepseek.com")
-                    || host.equals("886.best")
-                    || host.endsWith(".886.best");
+                    || host.endsWith(".deepseek.com");
         } catch (Throwable ignored) {
             return false;
         }
