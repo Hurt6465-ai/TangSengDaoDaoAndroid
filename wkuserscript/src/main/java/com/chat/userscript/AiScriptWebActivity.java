@@ -6,6 +6,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
@@ -14,6 +15,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.speech.RecognitionListener;
+import android.speech.RecognitionService;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.view.Gravity;
@@ -30,6 +32,7 @@ import org.json.JSONObject;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.List;
 
 public class AiScriptWebActivity extends Activity {
     public static final String EXTRA_TITLE = "title";
@@ -52,6 +55,8 @@ public class AiScriptWebActivity extends Activity {
     private boolean nativeSpeechTriedDefault;
     private String nativeSpeechLang = "zh-CN";
     private String pendingNativeSpeechLang = "";
+    private int nativeSpeechSessionId = 0;
+    private Runnable nativeSpeechWatchdog;
 
     public static void open(Context context, String title, String url) {
         open(context, title, url, null);
@@ -248,15 +253,11 @@ public class AiScriptWebActivity extends Activity {
             nativeSpeechTriedDefault = false;
         }
 
-        boolean googleInstalled = isPackageInstalled(GOOGLE_APP_PACKAGE);
-        nativeSpeechUsingGoogle = !forceDefault && googleInstalled;
+        ComponentName googleComponent = forceDefault ? null : findGoogleRecognitionComponent();
+        nativeSpeechUsingGoogle = googleComponent != null;
 
         try {
             if (nativeSpeechUsingGoogle) {
-                ComponentName googleComponent = new ComponentName(
-                        GOOGLE_APP_PACKAGE,
-                        GOOGLE_RECOGNITION_SERVICE
-                );
                 nativeSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this, googleComponent);
             } else {
                 nativeSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
@@ -281,14 +282,19 @@ public class AiScriptWebActivity extends Activity {
             }
         }
 
+        final int sessionId = ++nativeSpeechSessionId;
+        scheduleNativeSpeechWatchdog(sessionId, 14000L, "识别超时，请检查 Google App、网络、麦克风权限，或先切到中文/英文测试");
+
         nativeSpeechRecognizer.setRecognitionListener(new RecognitionListener() {
             @Override
             public void onReadyForSpeech(Bundle params) {
                 emitNativeSpeechEvent("start", "", "", "", 0f);
+                scheduleNativeSpeechWatchdog(sessionId, 14000L, "识别超时，请确认已说话，或检查 Google App/网络/麦克风权限");
             }
 
             @Override
             public void onBeginningOfSpeech() {
+                scheduleNativeSpeechWatchdog(sessionId, 12000L, "已听到声音，但没有返回文字，请换中文/英文测试或检查当前语言是否支持");
             }
 
             @Override
@@ -301,10 +307,13 @@ public class AiScriptWebActivity extends Activity {
 
             @Override
             public void onEndOfSpeech() {
+                scheduleNativeSpeechWatchdog(sessionId, 3500L, "语音结束后没有返回识别结果，请重试");
             }
 
             @Override
             public void onError(int error) {
+                cancelNativeSpeechWatchdog();
+
                 if (shouldRetryWithDefaultRecognizer(error)) {
                     startNativeSpeechInternal(nativeSpeechLang, true);
                     return;
@@ -323,6 +332,7 @@ public class AiScriptWebActivity extends Activity {
 
             @Override
             public void onResults(Bundle results) {
+                cancelNativeSpeechWatchdog();
                 emitBestSpeechText("final", results);
                 emitNativeSpeechEvent("end", "", "", "", 0f);
                 destroyNativeSpeechRecognizer();
@@ -331,6 +341,7 @@ public class AiScriptWebActivity extends Activity {
             @Override
             public void onPartialResults(Bundle partialResults) {
                 emitBestSpeechText("partial", partialResults);
+                scheduleNativeSpeechWatchdog(sessionId, 9000L, "识别长时间没有最终结果，请点停止后重试");
             }
 
             @Override
@@ -341,7 +352,11 @@ public class AiScriptWebActivity extends Activity {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, nativeSpeechLang);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, nativeSpeechLang);
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1000L);
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 900L);
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1300L);
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
         intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
 
@@ -360,6 +375,7 @@ public class AiScriptWebActivity extends Activity {
     }
 
     private void stopNativeSpeechFromWeb() {
+        cancelNativeSpeechWatchdog();
         try {
             if (nativeSpeechRecognizer != null) {
                 nativeSpeechRecognizer.stopListening();
@@ -369,6 +385,7 @@ public class AiScriptWebActivity extends Activity {
     }
 
     private void cancelNativeSpeechFromWeb() {
+        cancelNativeSpeechWatchdog();
         try {
             if (nativeSpeechRecognizer != null) {
                 nativeSpeechRecognizer.cancel();
@@ -377,6 +394,32 @@ public class AiScriptWebActivity extends Activity {
         }
         destroyNativeSpeechRecognizer();
         emitNativeSpeechEvent("end", "", "", "", 0f);
+    }
+
+    private ComponentName findGoogleRecognitionComponent() {
+        if (!isPackageInstalled(GOOGLE_APP_PACKAGE)) return null;
+
+        try {
+            Intent serviceIntent = new Intent(RecognitionService.SERVICE_INTERFACE);
+            serviceIntent.setPackage(GOOGLE_APP_PACKAGE);
+            List<ResolveInfo> services = getPackageManager().queryIntentServices(
+                    serviceIntent,
+                    PackageManager.MATCH_DEFAULT_ONLY
+            );
+
+            if (services != null) {
+                for (ResolveInfo info : services) {
+                    if (info == null || info.serviceInfo == null) continue;
+                    if (!GOOGLE_APP_PACKAGE.equals(info.serviceInfo.packageName)) continue;
+                    return new ComponentName(info.serviceInfo.packageName, info.serviceInfo.name);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
+        // Some Google App versions do not expose the service to package queries, but this legacy
+        // component still works on many devices. Keep it as a fallback, not the first choice.
+        return new ComponentName(GOOGLE_APP_PACKAGE, GOOGLE_RECOGNITION_SERVICE);
     }
 
     private boolean shouldRetryWithDefaultRecognizer(int error) {
@@ -411,6 +454,27 @@ public class AiScriptWebActivity extends Activity {
         // Keep BCP-47 language tags such as zh-CN, my-MM, en-US.
         if (lang.length() > 16) return lang.substring(0, 16);
         return lang;
+    }
+
+    private void scheduleNativeSpeechWatchdog(final int sessionId, long delayMs, final String message) {
+        cancelNativeSpeechWatchdog();
+
+        nativeSpeechWatchdog = () -> {
+            if (sessionId != nativeSpeechSessionId || nativeSpeechRecognizer == null) return;
+
+            emitNativeSpeechEvent("error", "", "timeout", message == null ? "识别超时" : message, 0f);
+            emitNativeSpeechEvent("end", "", "", "", 0f);
+            destroyNativeSpeechRecognizer();
+        };
+
+        handler.postDelayed(nativeSpeechWatchdog, Math.max(2500L, delayMs));
+    }
+
+    private void cancelNativeSpeechWatchdog() {
+        if (nativeSpeechWatchdog != null) {
+            handler.removeCallbacks(nativeSpeechWatchdog);
+            nativeSpeechWatchdog = null;
+        }
     }
 
     private void emitBestSpeechText(String type, Bundle bundle) {
@@ -454,6 +518,8 @@ public class AiScriptWebActivity extends Activity {
     }
 
     private void destroyNativeSpeechRecognizer() {
+        cancelNativeSpeechWatchdog();
+        nativeSpeechSessionId++;
         if (nativeSpeechRecognizer == null) return;
 
         try {
