@@ -179,6 +179,8 @@ public class UserScriptController {
                 + "if(window.__TS_DD_NATIVE_SPEECH_POLYFILL__)return;"
                 + "var bridge=window.TsddNativeSpeech||window.TsddVoiceBridge||window.TsddVoice;"
                 + "if(!bridge||typeof bridge.startSpeech!=='function')return;"
+                + "var originalSpeech=window.SpeechRecognition||window.webkitSpeechRecognition;"
+                + "if(originalSpeech&&!window.__TS_DD_FORCE_NATIVE_SPEECH__){window.__TS_DD_NATIVE_SPEECH_AVAILABLE__=true;return;}"
                 + "window.__TS_DD_NATIVE_SPEECH_POLYFILL__=true;"
                 + "window.__TS_DD_ORIGINAL_SPEECH_RECOGNITION__=window.SpeechRecognition||null;"
                 + "window.__TS_DD_ORIGINAL_WEBKIT_SPEECH_RECOGNITION__=window.webkitSpeechRecognition||null;"
