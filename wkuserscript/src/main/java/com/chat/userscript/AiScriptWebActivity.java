@@ -1,14 +1,21 @@
 package com.chat.userscript;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.net.Uri;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import android.view.Gravity;
 import android.view.View;
 import android.webkit.JavascriptInterface;
@@ -22,17 +29,29 @@ import org.json.JSONObject;
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 
 public class AiScriptWebActivity extends Activity {
     public static final String EXTRA_TITLE = "title";
     public static final String EXTRA_URL = "url";
     public static final String EXTRA_START_PROMPT = "start_prompt";
 
+    private static final int REQ_NATIVE_RECORD_AUDIO = 7402;
+    private static final String GOOGLE_APP_PACKAGE = "com.google.android.googlequicksearchbox";
+    private static final String GOOGLE_RECOGNITION_SERVICE =
+            "com.google.android.voicesearch.serviceapi.GoogleRecognitionService";
+
     private final Handler handler = new Handler(Looper.getMainLooper());
     private WebView webView;
     private UserScriptController controller;
     private View toolbar;
     private boolean toolbarVisible = true;
+    private NativeSpeechBridge nativeSpeechBridge;
+    private SpeechRecognizer nativeSpeechRecognizer;
+    private boolean nativeSpeechUsingGoogle;
+    private boolean nativeSpeechTriedDefault;
+    private String nativeSpeechLang = "zh-CN";
+    private String pendingNativeSpeechLang = "";
 
     public static void open(Context context, String title, String url) {
         open(context, title, url, null);
@@ -61,6 +80,13 @@ public class AiScriptWebActivity extends Activity {
 
         webView = new WebView(this);
         webView.addJavascriptInterface(new TsddSpeechBridge(this), "TsddSpeech");
+
+        nativeSpeechBridge = new NativeSpeechBridge(this);
+        webView.addJavascriptInterface(nativeSpeechBridge, "TsddNativeSpeech");
+        // Compatibility aliases for different injected scripts.
+        webView.addJavascriptInterface(nativeSpeechBridge, "TsddVoiceBridge");
+        webView.addJavascriptInterface(nativeSpeechBridge, "TsddVoice");
+
         root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
 
         toolbar = buildToolbar(title);
@@ -135,6 +161,26 @@ public class AiScriptWebActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == REQ_NATIVE_RECORD_AUDIO) {
+            boolean granted = grantResults != null
+                    && grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+
+            if (granted) {
+                String lang = pendingNativeSpeechLang == null || pendingNativeSpeechLang.length() == 0
+                        ? "zh-CN"
+                        : pendingNativeSpeechLang;
+                pendingNativeSpeechLang = "";
+                startNativeSpeechInternal(lang, false);
+            } else {
+                pendingNativeSpeechLang = "";
+                emitNativeSpeechEvent("error", "", "permission-denied", "没有麦克风权限", 0f);
+                emitNativeSpeechEvent("end", "", "", "", 0f);
+            }
+            return;
+        }
+
         if (controller != null) controller.handleRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
@@ -160,6 +206,8 @@ public class AiScriptWebActivity extends Activity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacksAndMessages(null);
+        destroyNativeSpeechRecognizer();
+        nativeSpeechBridge = null;
         if (webView != null) {
             try {
                 webView.stopLoading();
@@ -171,6 +219,296 @@ public class AiScriptWebActivity extends Activity {
             webView = null;
         }
         super.onDestroy();
+    }
+
+
+    private void startNativeSpeechFromWeb(String lang) {
+        if (!isSpeechHostAllowed()) {
+            emitNativeSpeechEvent("error", "", "host-not-allowed", "当前网页不允许调用原生语音识别", 0f);
+            emitNativeSpeechEvent("end", "", "", "", 0f);
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            pendingNativeSpeechLang = normalizeSpeechLang(lang);
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQ_NATIVE_RECORD_AUDIO);
+            return;
+        }
+
+        startNativeSpeechInternal(lang, false);
+    }
+
+    private void startNativeSpeechInternal(String lang, boolean forceDefault) {
+        nativeSpeechLang = normalizeSpeechLang(lang);
+
+        destroyNativeSpeechRecognizer();
+
+        if (!forceDefault) {
+            nativeSpeechTriedDefault = false;
+        }
+
+        boolean googleInstalled = isPackageInstalled(GOOGLE_APP_PACKAGE);
+        nativeSpeechUsingGoogle = !forceDefault && googleInstalled;
+
+        try {
+            if (nativeSpeechUsingGoogle) {
+                ComponentName googleComponent = new ComponentName(
+                        GOOGLE_APP_PACKAGE,
+                        GOOGLE_RECOGNITION_SERVICE
+                );
+                nativeSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this, googleComponent);
+            } else {
+                nativeSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+                nativeSpeechUsingGoogle = false;
+                nativeSpeechTriedDefault = true;
+            }
+        } catch (Throwable createError) {
+            if (nativeSpeechUsingGoogle) {
+                nativeSpeechUsingGoogle = false;
+                nativeSpeechTriedDefault = true;
+                try {
+                    nativeSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+                } catch (Throwable fallbackError) {
+                    emitNativeSpeechEvent("error", "", "create-failed", "无法创建语音识别服务", 0f);
+                    emitNativeSpeechEvent("end", "", "", "", 0f);
+                    return;
+                }
+            } else {
+                emitNativeSpeechEvent("error", "", "create-failed", "无法创建语音识别服务", 0f);
+                emitNativeSpeechEvent("end", "", "", "", 0f);
+                return;
+            }
+        }
+
+        nativeSpeechRecognizer.setRecognitionListener(new RecognitionListener() {
+            @Override
+            public void onReadyForSpeech(Bundle params) {
+                emitNativeSpeechEvent("start", "", "", "", 0f);
+            }
+
+            @Override
+            public void onBeginningOfSpeech() {
+            }
+
+            @Override
+            public void onRmsChanged(float rmsdB) {
+            }
+
+            @Override
+            public void onBufferReceived(byte[] buffer) {
+            }
+
+            @Override
+            public void onEndOfSpeech() {
+            }
+
+            @Override
+            public void onError(int error) {
+                if (shouldRetryWithDefaultRecognizer(error)) {
+                    startNativeSpeechInternal(nativeSpeechLang, true);
+                    return;
+                }
+
+                emitNativeSpeechEvent(
+                        "error",
+                        "",
+                        String.valueOf(error),
+                        speechErrorText(error),
+                        0f
+                );
+                emitNativeSpeechEvent("end", "", "", "", 0f);
+                destroyNativeSpeechRecognizer();
+            }
+
+            @Override
+            public void onResults(Bundle results) {
+                emitBestSpeechText("final", results);
+                emitNativeSpeechEvent("end", "", "", "", 0f);
+                destroyNativeSpeechRecognizer();
+            }
+
+            @Override
+            public void onPartialResults(Bundle partialResults) {
+                emitBestSpeechText("partial", partialResults);
+            }
+
+            @Override
+            public void onEvent(int eventType, Bundle params) {
+            }
+        });
+
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, nativeSpeechLang);
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+        intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getPackageName());
+
+        try {
+            nativeSpeechRecognizer.startListening(intent);
+        } catch (Throwable startError) {
+            if (nativeSpeechUsingGoogle && !nativeSpeechTriedDefault) {
+                startNativeSpeechInternal(nativeSpeechLang, true);
+                return;
+            }
+
+            emitNativeSpeechEvent("error", "", "start-failed", "语音识别启动失败", 0f);
+            emitNativeSpeechEvent("end", "", "", "", 0f);
+            destroyNativeSpeechRecognizer();
+        }
+    }
+
+    private void stopNativeSpeechFromWeb() {
+        try {
+            if (nativeSpeechRecognizer != null) {
+                nativeSpeechRecognizer.stopListening();
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void cancelNativeSpeechFromWeb() {
+        try {
+            if (nativeSpeechRecognizer != null) {
+                nativeSpeechRecognizer.cancel();
+            }
+        } catch (Throwable ignored) {
+        }
+        destroyNativeSpeechRecognizer();
+        emitNativeSpeechEvent("end", "", "", "", 0f);
+    }
+
+    private boolean shouldRetryWithDefaultRecognizer(int error) {
+        if (!nativeSpeechUsingGoogle || nativeSpeechTriedDefault) return false;
+
+        return error == SpeechRecognizer.ERROR_CLIENT
+                || error == SpeechRecognizer.ERROR_SERVER
+                || error == SpeechRecognizer.ERROR_NETWORK
+                || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT
+                || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY;
+    }
+
+    private boolean isNativeSpeechAvailable() {
+        return isPackageInstalled(GOOGLE_APP_PACKAGE) || SpeechRecognizer.isRecognitionAvailable(this);
+    }
+
+    private boolean isPackageInstalled(String packageName) {
+        try {
+            getPackageManager().getPackageInfo(packageName, 0);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private String normalizeSpeechLang(String lang) {
+        if (lang == null) return "zh-CN";
+
+        lang = lang.trim();
+        if (lang.length() == 0) return "zh-CN";
+
+        // Keep BCP-47 language tags such as zh-CN, my-MM, en-US.
+        if (lang.length() > 16) return lang.substring(0, 16);
+        return lang;
+    }
+
+    private void emitBestSpeechText(String type, Bundle bundle) {
+        if (bundle == null) return;
+
+        ArrayList<String> matches = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+        if (matches == null || matches.isEmpty()) return;
+
+        String text = matches.get(0);
+        if (text == null) text = "";
+
+        float confidence = 0f;
+        float[] scores = bundle.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES);
+        if (scores != null && scores.length > 0) confidence = scores[0];
+
+        emitNativeSpeechEvent(type, text, "", "", confidence);
+    }
+
+    private String speechErrorText(int error) {
+        switch (error) {
+            case SpeechRecognizer.ERROR_AUDIO:
+                return "录音失败";
+            case SpeechRecognizer.ERROR_CLIENT:
+                return nativeSpeechUsingGoogle ? "Google 语音服务不可用" : "语音服务不可用";
+            case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
+                return "没有麦克风权限";
+            case SpeechRecognizer.ERROR_NETWORK:
+            case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
+                return "网络异常，语音识别失败";
+            case SpeechRecognizer.ERROR_NO_MATCH:
+                return "没有识别到语音";
+            case SpeechRecognizer.ERROR_RECOGNIZER_BUSY:
+                return "语音识别服务忙，请稍后再试";
+            case SpeechRecognizer.ERROR_SERVER:
+                return "语音识别服务异常";
+            case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
+                return "没有检测到说话";
+            default:
+                return "语音识别失败";
+        }
+    }
+
+    private void destroyNativeSpeechRecognizer() {
+        if (nativeSpeechRecognizer == null) return;
+
+        try {
+            nativeSpeechRecognizer.cancel();
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            nativeSpeechRecognizer.destroy();
+        } catch (Throwable ignored) {
+        }
+
+        nativeSpeechRecognizer = null;
+        nativeSpeechUsingGoogle = false;
+    }
+
+    private void emitNativeSpeechEvent(String type, String text, String error, String message, float confidence) {
+        final String safeType = type == null ? "" : type;
+        final String safeText = text == null ? "" : text;
+        final String safeError = error == null ? "" : error;
+        final String safeMessage = message == null ? "" : message;
+
+        handler.post(() -> {
+            if (webView == null) return;
+
+            JSONObject obj = new JSONObject();
+            try {
+                obj.put("type", safeType);
+                obj.put("text", safeText);
+                obj.put("error", safeError);
+                obj.put("message", safeMessage);
+                obj.put("confidence", confidence);
+                obj.put("usingGoogle", nativeSpeechUsingGoogle);
+                obj.put("lang", nativeSpeechLang);
+            } catch (Throwable ignored) {
+            }
+
+            String payload = JSONObject.quote(obj.toString());
+            String js = "(function(){"
+                    + "var p=JSON.parse(" + payload + ");"
+                    + "try{if(window.__TS_DD_NATIVE_SPEECH_EVENT__)window.__TS_DD_NATIVE_SPEECH_EVENT__(p);}catch(e){}"
+                    + "try{var h=window.__DSMT_NATIVE_SPEECH__;if(h){"
+                    + "if(p.type==='start'&&h.onStart)h.onStart();"
+                    + "else if(p.type==='partial'&&h.onPartial)h.onPartial(p.text||'');"
+                    + "else if(p.type==='final'&&h.onFinal)h.onFinal(p.text||'');"
+                    + "else if(p.type==='error'&&h.onError)h.onError(p.message||p.error||'语音识别失败');"
+                    + "else if(p.type==='end'&&h.onEnd)h.onEnd();"
+                    + "}}catch(e){}"
+                    + "})();";
+
+            try {
+                webView.evaluateJavascript(js, null);
+            } catch (Throwable ignored) {
+            }
+        });
     }
 
 
@@ -220,6 +558,47 @@ public class AiScriptWebActivity extends Activity {
                     || host.endsWith(".deepseek.com");
         } catch (Throwable ignored) {
             return false;
+        }
+    }
+
+    private static final class NativeSpeechBridge {
+        private final WeakReference<AiScriptWebActivity> activityRef;
+
+        NativeSpeechBridge(AiScriptWebActivity activity) {
+            this.activityRef = new WeakReference<>(activity);
+        }
+
+        @JavascriptInterface
+        public void startSpeech(String lang) {
+            AiScriptWebActivity activity = activityRef.get();
+            if (activity == null) return;
+            activity.runOnUiThread(() -> activity.startNativeSpeechFromWeb(lang));
+        }
+
+        @JavascriptInterface
+        public void stopSpeech() {
+            AiScriptWebActivity activity = activityRef.get();
+            if (activity == null) return;
+            activity.runOnUiThread(activity::stopNativeSpeechFromWeb);
+        }
+
+        @JavascriptInterface
+        public void cancelSpeech() {
+            AiScriptWebActivity activity = activityRef.get();
+            if (activity == null) return;
+            activity.runOnUiThread(activity::cancelNativeSpeechFromWeb);
+        }
+
+        @JavascriptInterface
+        public boolean isAvailable() {
+            AiScriptWebActivity activity = activityRef.get();
+            return activity != null && activity.isNativeSpeechAvailable();
+        }
+
+        @JavascriptInterface
+        public boolean isGoogleAppInstalled() {
+            AiScriptWebActivity activity = activityRef.get();
+            return activity != null && activity.isPackageInstalled(GOOGLE_APP_PACKAGE);
         }
     }
 
