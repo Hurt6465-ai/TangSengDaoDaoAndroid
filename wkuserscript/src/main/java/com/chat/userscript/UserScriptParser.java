@@ -22,9 +22,7 @@ public final class UserScriptParser {
         }
         String meta = code.substring(start, end);
         String[] lines = meta.split("\\r?\\n");
-        for (String line : lines) {
-            parseMetaLine(script, line);
-        }
+        for (String line : lines) parseMetaLine(script, line);
         if (TextUtils.isEmpty(script.name)) script.name = "未命名脚本";
         if (TextUtils.isEmpty(script.runAt)) script.runAt = "document-end";
         normalizeRunAt(script);
@@ -52,42 +50,27 @@ public final class UserScriptParser {
         }
         if (TextUtils.isEmpty(key)) return;
         switch (key) {
-            case "name":
-                script.name = value;
-                break;
-            case "description":
-                script.description = value;
-                break;
-            case "version":
-                script.version = value;
-                break;
-            case "author":
-                script.author = value;
-                break;
-            case "namespace":
-                script.namespace = value;
-                break;
-            case "match":
-                add(script.matches, value);
-                break;
-            case "include":
-                add(script.includes, value);
-                break;
-            case "exclude":
-                add(script.excludes, value);
-                break;
-            case "run-at":
-                script.runAt = value;
-                break;
-            case "grant":
-                add(script.grants, value);
-                break;
-            case "noframes":
-                script.noFrames = true;
-                break;
-            default:
-                break;
+            case "name": script.name = value; break;
+            case "description": script.description = value; break;
+            case "version": script.version = value; break;
+            case "author": script.author = value; break;
+            case "namespace": script.namespace = value; break;
+            case "match": add(script.matches, value); break;
+            case "include": add(script.includes, value); break;
+            case "exclude": add(script.excludes, value); break;
+            case "run-at": script.runAt = value; break;
+            case "grant": add(script.grants, value); break;
+            case "connect": add(script.connects, normalizeConnect(value)); break;
+            case "noframes": script.noFrames = true; break;
+            default: break;
         }
+    }
+
+    private static String normalizeConnect(String value) {
+        if (value == null) return "";
+        String v = value.trim();
+        if (v.startsWith("https://") || v.startsWith("http://")) return AiWebPolicy.hostOf(v);
+        return v.replace("*.", "");
     }
 
     private static void normalizeRunAt(UserScript script) {
@@ -103,6 +86,7 @@ public final class UserScriptParser {
         if (script.matches.isEmpty()) {
             script.matches.add("https://chat.deepseek.com/*");
             script.matches.add("https://chat.qwen.ai/*");
+            script.matches.add("https://www.qianwen.com/*");
         }
         if (script.grants.isEmpty()) {
             script.grants.add("GM_getValue");
@@ -124,6 +108,7 @@ public final class UserScriptParser {
                 "// @description  在 DeepSeek / 千问网页右下角显示测试按钮\n" +
                 "// @match        https://chat.deepseek.com/*\n" +
                 "// @match        https://chat.qwen.ai/*\n" +
+                "// @match        https://www.qianwen.com/*\n" +
                 "// @run-at       document-end\n" +
                 "// @grant        GM_getValue\n" +
                 "// @grant        GM_setValue\n" +

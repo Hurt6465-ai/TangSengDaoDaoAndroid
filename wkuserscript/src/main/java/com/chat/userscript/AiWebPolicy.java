@@ -12,8 +12,10 @@ public final class AiWebPolicy {
     private static final Set<String> SCRIPT_HOST_SUFFIXES = new HashSet<>(Arrays.asList(
             "chat.deepseek.com",
             "deepseek.com",
+            "www.deepseek.com",
             "chat.qwen.ai",
             "qwen.ai",
+            "www.qwen.ai",
             "qianwen.com",
             "www.qianwen.com",
             "tongyi.aliyun.com"
@@ -25,6 +27,7 @@ public final class AiWebPolicy {
             "www.deepseek.com",
             "chat.qwen.ai",
             "qwen.ai",
+            "www.qwen.ai",
             "qianwen.com",
             "www.qianwen.com",
             "tongyi.aliyun.com",
@@ -32,6 +35,20 @@ public final class AiWebPolicy {
             "alibaba.com",
             "alicdn.com",
             "aliyuncs.com"
+    ));
+
+    private static final Set<String> NETWORK_HOST_SUFFIXES = new HashSet<>(Arrays.asList(
+            "chat.deepseek.com",
+            "deepseek.com",
+            "www.deepseek.com",
+            "chat.qwen.ai",
+            "qwen.ai",
+            "www.qwen.ai",
+            "qianwen.com",
+            "www.qianwen.com",
+            "tongyi.aliyun.com",
+            "api.886.best",
+            "886.best"
     ));
 
     private AiWebPolicy() {
@@ -58,8 +75,21 @@ public final class AiWebPolicy {
     }
 
     public static boolean isNetworkRequestAllowed(String url) {
-        // 第三阶段默认不开放跨域联网。后续要做 GM_xmlhttpRequest 时，再加显式授权和域名白名单。
-        return isScriptHostAllowed(url);
+        if (!isHttpsUrl(url)) return false;
+        return hostMatchesAny(url, NETWORK_HOST_SUFFIXES) && !isLocalOrPrivateHost(url);
+    }
+
+    public static boolean isConnectAllowedByMeta(String url, java.util.List<String> connects) {
+        if (!isNetworkRequestAllowed(url)) return false;
+        if (connects == null || connects.isEmpty()) return true;
+        String host = hostOf(url);
+        for (String connect : connects) {
+            if (TextUtils.isEmpty(connect)) continue;
+            String c = connect.trim().toLowerCase(Locale.US);
+            if ("*".equals(c)) return true;
+            if (host.equals(c) || host.endsWith("." + c)) return true;
+        }
+        return false;
     }
 
     private static boolean hostMatchesAny(String url, Set<String> suffixes) {
@@ -78,5 +108,16 @@ public final class AiWebPolicy {
         } catch (Exception ignored) {
             return "";
         }
+    }
+
+    private static boolean isLocalOrPrivateHost(String url) {
+        String host = hostOf(url);
+        if (TextUtils.isEmpty(host)) return true;
+        return "localhost".equals(host)
+                || host.startsWith("127.")
+                || host.startsWith("10.")
+                || host.startsWith("192.168.")
+                || host.matches("172\\.(1[6-9]|2[0-9]|3[0-1])\\..*")
+                || host.startsWith("0.");
     }
 }
