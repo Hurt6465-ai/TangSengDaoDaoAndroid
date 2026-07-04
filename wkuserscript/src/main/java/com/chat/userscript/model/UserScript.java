@@ -17,21 +17,33 @@ public class UserScript {
     public String runAt = "document-end";
     public boolean enabled = true;
     public boolean noFrames = false;
+    public boolean networkAllowed = false;
+    public boolean official = false;
+    public String officialAsset = "";
     public String code = "";
     public final List<String> matches = new ArrayList<>();
     public final List<String> includes = new ArrayList<>();
     public final List<String> excludes = new ArrayList<>();
     public final List<String> grants = new ArrayList<>();
+    public final List<String> connects = new ArrayList<>();
 
     public boolean hasGrant(String grant) {
         if (grant == null) return false;
         if (grants.isEmpty()) return false;
         for (String value : grants) {
+            if (value == null) continue;
             if ("none".equalsIgnoreCase(value)) return false;
             if (grant.equals(value) || grant.equalsIgnoreCase(value)) return true;
             if (("GM." + grant.replace("GM_", "")).equals(value)) return true;
+            if (("GM_" + grant.replace("GM.", "")).equals(value)) return true;
         }
         return false;
+    }
+
+    public boolean wantsNetwork() {
+        if (hasGrant("GM_xmlhttpRequest") || hasGrant("GM.xmlHttpRequest") || hasGrant("GM.xmlhttpRequest")) return true;
+        if (!connects.isEmpty()) return true;
+        return code != null && (code.contains("GM_xmlhttpRequest") || code.contains("GM.xmlHttpRequest") || code.contains("GM.xmlhttpRequest"));
     }
 
     public JSONObject toJson() {
@@ -46,11 +58,15 @@ public class UserScript {
             object.put("runAt", runAt);
             object.put("enabled", enabled);
             object.put("noFrames", noFrames);
+            object.put("networkAllowed", networkAllowed);
+            object.put("official", official);
+            object.put("officialAsset", officialAsset);
             object.put("code", code);
             object.put("matches", toArray(matches));
             object.put("includes", toArray(includes));
             object.put("excludes", toArray(excludes));
             object.put("grants", toArray(grants));
+            object.put("connects", toArray(connects));
         } catch (Exception ignored) {
         }
         return object;
@@ -68,11 +84,15 @@ public class UserScript {
         script.runAt = object.optString("runAt", "document-end");
         script.enabled = object.optBoolean("enabled", true);
         script.noFrames = object.optBoolean("noFrames", false);
+        script.networkAllowed = object.optBoolean("networkAllowed", false);
+        script.official = object.optBoolean("official", false);
+        script.officialAsset = object.optString("officialAsset", "");
         script.code = object.optString("code", "");
         fill(script.matches, object.optJSONArray("matches"));
         fill(script.includes, object.optJSONArray("includes"));
         fill(script.excludes, object.optJSONArray("excludes"));
         fill(script.grants, object.optJSONArray("grants"));
+        fill(script.connects, object.optJSONArray("connects"));
         return script;
     }
 
