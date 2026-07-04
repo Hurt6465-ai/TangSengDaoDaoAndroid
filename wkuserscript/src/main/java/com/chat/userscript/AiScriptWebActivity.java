@@ -59,6 +59,7 @@ public class AiScriptWebActivity extends Activity {
     private UserScriptController controller;
     private View toolbar;
     private boolean toolbarVisible = true;
+    private String currentScriptMode = "";
 
     public static void open(Context context, String title, String url) {
         open(context, title, url, null, null);
@@ -84,6 +85,7 @@ public class AiScriptWebActivity extends Activity {
         String url = getIntent().getStringExtra(EXTRA_URL);
         String startPrompt = getIntent().getStringExtra(EXTRA_START_PROMPT);
         String scriptMode = normalizeScriptModeValue(getIntent().getStringExtra(EXTRA_SCRIPT_MODE));
+        currentScriptMode = scriptMode;
         if (title == null || title.length() == 0) title = "AI 网页";
         if (url == null || url.length() == 0) url = "https://chat.qwen.ai/";
         url = appendTsddMode(url, scriptMode);
@@ -231,7 +233,27 @@ public class AiScriptWebActivity extends Activity {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        if ("question".equals(currentScriptMode)) stopSpeechFromWeb();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if ("question".equals(currentScriptMode)) stopSpeechFromWeb();
+    }
+
+    @Override
     public void onBackPressed() {
+        // 互动题/题目解析入口是临时页：返回手势直接退出 DeepSeek，回到题目页，
+        // 不要先回到 DeepSeek 首页/历史页。
+        if ("question".equals(currentScriptMode)) {
+            stopSpeechFromWeb();
+            finish();
+            return;
+        }
+
         if (toolbar != null && !toolbarVisible) {
             showToolbarTemporarily();
             return;
@@ -244,22 +266,7 @@ public class AiScriptWebActivity extends Activity {
     }
 
     @Override
-    protected void onPause() {
-        forceStopSpeechFromWeb();
-        super.onPause();
-    }
-
-    @Override
-    protected void onStop() {
-        forceStopSpeechFromWeb();
-        cancelNativeSpeechFromWeb();
-        super.onStop();
-    }
-
-    @Override
     protected void onDestroy() {
-        forceStopSpeechFromWeb();
-        cancelNativeSpeechFromWeb();
         handler.removeCallbacksAndMessages(null);
         speechHandler.removeCallbacksAndMessages(null);
         releaseNativeSpeechRecognizer();
@@ -632,10 +639,6 @@ public class AiScriptWebActivity extends Activity {
 
     private void stopSpeechFromWeb() {
         if (!isSpeechHostAllowed()) return;
-        forceStopSpeechFromWeb();
-    }
-
-    private void forceStopSpeechFromWeb() {
         if (callSpeechManager("stop", new Class[]{Context.class}, new Object[]{this})) return;
         callSpeechManager("stop", new Class[]{}, new Object[]{});
     }
