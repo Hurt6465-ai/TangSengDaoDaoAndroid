@@ -37,7 +37,7 @@ public class AiScriptWebActivity extends Activity {
 
     private static final int REQ_NATIVE_RECORD_AUDIO = 7401;
     private static final int REQ_NATIVE_SPEECH_INTENT = 7402;
-    private static final long NATIVE_SPEECH_TIMEOUT_MS = 65000L;
+    private static final long NATIVE_SPEECH_TIMEOUT_MS = 120000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Handler speechHandler = new Handler(Looper.getMainLooper());
@@ -265,11 +265,11 @@ public class AiScriptWebActivity extends Activity {
 
         emitNativeSpeechEvent("start", "", "");
 
-        if (startSystemSpeechIntent(pendingNativeSpeechLang)) {
+        if (startSpeechRecognizerFallback(pendingNativeSpeechLang)) {
             return;
         }
 
-        if (startSpeechRecognizerFallback(pendingNativeSpeechLang)) {
+        if (startSystemSpeechIntent(pendingNativeSpeechLang)) {
             return;
         }
 
@@ -364,9 +364,9 @@ public class AiScriptWebActivity extends Activity {
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang);
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
             intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1100L);
-            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 900L);
-            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 600L);
+            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2600L);
+            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L);
+            intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 30000L);
             nativeRecognizer.startListening(intent);
             return true;
         } catch (Throwable e) {
@@ -506,32 +506,126 @@ public class AiScriptWebActivity extends Activity {
 
 
     private void speakFromWeb(String text) {
+        speakTextFromWeb(text);
+    }
+
+    private void speakTextFromWeb(String text) {
         if (!isSpeechHostAllowed()) {
-            Toast.makeText(this, "当前网页不允许调用唐僧语音", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Current page cannot use Tsdd speech", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (text == null) {
-            text = "";
-        }
-        text = text.replace('\u00A0', ' ').trim();
+        text = safeSpeechText(text);
         if (text.length() == 0) {
-            Toast.makeText(this, "没有可朗读内容", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "No text to speak", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // 防止网页一次性塞入超长文本导致合成等待太久。
-        if (text.length() > 8000) {
-            text = text.substring(0, 8000);
+        if (callSpeechManager("speak", new Class[]{Context.class, String.class}, new Object[]{this, text})) {
+            return;
+        }
+        Toast.makeText(this, "wkspeech is not available", Toast.LENGTH_SHORT).show();
+    }
+
+    private void speakJsonFromWeb(String json, String mode) {
+        if (!isSpeechHostAllowed()) {
+            Toast.makeText(this, "Current page cannot use Tsdd speech", Toast.LENGTH_SHORT).show();
+            return;
         }
 
+        String safeJson = json == null ? "{}" : json.trim();
+        String text = "";
+        try {
+            JSONObject obj = new JSONObject(safeJson.length() == 0 ? "{}" : safeJson);
+            text = obj.optString("text", "");
+        } catch (Throwable ignored) {
+        }
+
+        if (safeJson.length() > 60000) {
+            speakTextFromWeb(text);
+            return;
+        }
+
+        boolean stream = "stream".equals(mode);
+        boolean mixed = "mixed".equals(mode);
+
+        if (stream && callSpeechManager("speakStream", new Class[]{Context.class, String.class}, new Object[]{this, safeJson})) {
+            return;
+        }
+        if (mixed && callSpeechManager("speakMixed", new Class[]{Context.class, String.class}, new Object[]{this, safeJson})) {
+            return;
+        }
+        if (callSpeechManager("speakJson", new Class[]{Context.class, String.class}, new Object[]{this, safeJson})) {
+            return;
+        }
+        if (stream && callSpeechManager("speakJson", new Class[]{Context.class, String.class, boolean.class}, new Object[]{this, safeJson, true})) {
+            return;
+        }
+        if (mixed && callSpeechManager("speakJson", new Class[]{Context.class, String.class, boolean.class}, new Object[]{this, safeJson, true})) {
+            return;
+        }
+
+        speakTextFromWeb(text);
+    }
+
+    private void stopSpeechFromWeb() {
+        if (!isSpeechHostAllowed()) return;
+        if (callSpeechManager("stop", new Class[]{Context.class}, new Object[]{this})) return;
+        callSpeechManager("stop", new Class[]{}, new Object[]{});
+    }
+
+    private String safeSpeechText(String text) {
+        if (text == null) return "";
+        String value = text.replace('\u00A0', ' ').trim();
+        if (value.length() > 8000) value = value.substring(0, 8000);
+        return value;
+    }
+
+    private boolean callSpeechManager(String methodName, Class<?>[] parameterTypes, Object[] args) {
         try {
             Class<?> speechManager = Class.forName("com.chat.speech.SpeechManager");
-            Method speak = speechManager.getMethod("speak", Context.class, String.class);
-            speak.invoke(null, this, text);
-        } catch (Throwable e) {
-            Toast.makeText(this, "未接入 wkspeech，无法朗读", Toast.LENGTH_SHORT).show();
+            Method method = speechManager.getMethod(methodName, parameterTypes);
+            method.invoke(null, args);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
         }
+    }
+
+    private boolean isWkSpeechAvailable() {
+        try {
+            Class.forName("com.chat.speech.SpeechManager");
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private boolean isNativeSpeechAvailable() {
+        if (!isSpeechHostAllowed()) return false;
+        try {
+            if (SpeechRecognizer.isRecognitionAvailable(this)) return true;
+        } catch (Throwable ignored) {
+        }
+        try {
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            return intent.resolveActivity(getPackageManager()) != null;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private String nativeSpeechEngineName() {
+        try {
+            if (SpeechRecognizer.isRecognitionAvailable(this)) return "system-speechrecognizer";
+        } catch (Throwable ignored) {
+        }
+        try {
+            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            if (intent.resolveActivity(getPackageManager()) != null) return "system-intent";
+        } catch (Throwable ignored) {
+        }
+        return "none";
     }
 
     private boolean isSpeechHostAllowed() {
@@ -547,6 +641,8 @@ public class AiScriptWebActivity extends Activity {
                     || host.endsWith(".qwen.ai")
                     || host.equals("tongyi.aliyun.com")
                     || host.endsWith(".tongyi.aliyun.com")
+                    || host.equals("qianwen.com")
+                    || host.endsWith(".qianwen.com")
                     || host.equals("chat.deepseek.com")
                     || host.endsWith(".deepseek.com");
         } catch (Throwable ignored) {
@@ -562,21 +658,49 @@ public class AiScriptWebActivity extends Activity {
         }
 
         @JavascriptInterface
+        public boolean isAvailable() {
+            AiScriptWebActivity activity = activityRef.get();
+            return activity != null && activity.isSpeechHostAllowed() && activity.isWkSpeechAvailable();
+        }
+
+        @JavascriptInterface
+        public String engine() {
+            return isAvailable() ? "wkspeech" : "none";
+        }
+
+        @JavascriptInterface
         public void speak(String text) {
             AiScriptWebActivity activity = activityRef.get();
             if (activity == null) return;
-            activity.runOnUiThread(() -> activity.speakFromWeb(text));
+            activity.runOnUiThread(() -> activity.speakTextFromWeb(text));
         }
 
         @JavascriptInterface
         public void speakJson(String json) {
-            String text = "";
-            try {
-                JSONObject obj = new JSONObject(json == null ? "{}" : json);
-                text = obj.optString("text", "");
-            } catch (Throwable ignored) {
-            }
-            speak(text);
+            AiScriptWebActivity activity = activityRef.get();
+            if (activity == null) return;
+            activity.runOnUiThread(() -> activity.speakJsonFromWeb(json, "json"));
+        }
+
+        @JavascriptInterface
+        public void speakStream(String json) {
+            AiScriptWebActivity activity = activityRef.get();
+            if (activity == null) return;
+            activity.runOnUiThread(() -> activity.speakJsonFromWeb(json, "stream"));
+        }
+
+        @JavascriptInterface
+        public void speakMixed(String json) {
+            AiScriptWebActivity activity = activityRef.get();
+            if (activity == null) return;
+            activity.runOnUiThread(() -> activity.speakJsonFromWeb(json, "mixed"));
+        }
+
+        @JavascriptInterface
+        public void stop() {
+            AiScriptWebActivity activity = activityRef.get();
+            if (activity == null) return;
+            activity.runOnUiThread(activity::stopSpeechFromWeb);
         }
     }
 
@@ -589,12 +713,15 @@ public class AiScriptWebActivity extends Activity {
 
         @JavascriptInterface
         public boolean isAvailable() {
-            return true;
+            AiScriptWebActivity activity = activityRef.get();
+            return activity != null && activity.isNativeSpeechAvailable();
         }
 
         @JavascriptInterface
         public String engine() {
-            return "system-intent";
+            AiScriptWebActivity activity = activityRef.get();
+            if (activity == null) return "none";
+            return activity.nativeSpeechEngineName();
         }
 
         @JavascriptInterface
