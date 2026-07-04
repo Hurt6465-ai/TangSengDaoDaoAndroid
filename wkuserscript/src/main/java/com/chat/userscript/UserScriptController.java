@@ -88,6 +88,7 @@ public class UserScriptController {
                 super.onPageStarted(view, url, favicon);
                 startupPromptInjected = false;
                 exposeStartupPrompt();
+                injectNativeSpeechPolyfill(url);
                 inject(url, "document-start");
             }
 
@@ -95,9 +96,11 @@ public class UserScriptController {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 exposeStartupPrompt();
+                injectNativeSpeechPolyfill(url);
                 inject(url, "document-end");
                 injectStartupPromptButton();
                 mainHandler.postDelayed(() -> {
+                    injectNativeSpeechPolyfill(view.getUrl());
                     inject(view.getUrl(), "document-idle");
                     injectStartupPromptButton();
                 }, 650L);
@@ -154,15 +157,113 @@ public class UserScriptController {
     public void reinjectCurrentPage() {
         String url = webView.getUrl();
         exposeStartupPrompt();
+        injectNativeSpeechPolyfill(url);
         inject(url, "document-end");
         injectStartupPromptButton();
-        mainHandler.postDelayed(() -> inject(webView.getUrl(), "document-idle"), 650L);
+        mainHandler.postDelayed(() -> {
+            injectNativeSpeechPolyfill(webView.getUrl());
+            inject(webView.getUrl(), "document-idle");
+        }, 650L);
     }
 
     private boolean shouldBlock(String url) {
         if (AiWebPolicy.isNavigationAllowed(url)) return false;
         Toast.makeText(activity, activity.getString(R.string.script_blocked_external, AiWebPolicy.hostOf(url)), Toast.LENGTH_SHORT).show();
         return true;
+    }
+
+    private void injectNativeSpeechPolyfill(String url) {
+        if (webView == null || url == null || !AiWebPolicy.isScriptHostAllowed(url)) return;
+
+        String js = "(function(){"
+                + "if(window.__TS_DD_NATIVE_SPEECH_POLYFILL__)return;"
+                + "var bridge=window.TsddNativeSpeech||window.TsddVoiceBridge||window.TsddVoice;"
+                + "if(!bridge||typeof bridge.startSpeech!=='function')return;"
+                + "window.__TS_DD_NATIVE_SPEECH_POLYFILL__=true;"
+                + "window.__TS_DD_ORIGINAL_SPEECH_RECOGNITION__=window.SpeechRecognition||null;"
+                + "window.__TS_DD_ORIGINAL_WEBKIT_SPEECH_RECOGNITION__=window.webkitSpeechRecognition||null;"
+                + "var active=null;"
+                + "function makeResult(text,isFinal,confidence){"
+                + "var item=[{transcript:String(text||''),confidence:confidence||0}];"
+                + "item.isFinal=!!isFinal;"
+                + "var arr=[];"
+                + "arr[0]=item;"
+                + "arr.length=1;"
+                + "return arr;"
+                + "}"
+                + "function NativeSpeechRecognition(){"
+                + "this.lang='zh-CN';"
+                + "this.continuous=false;"
+                + "this.interimResults=false;"
+                + "this.maxAlternatives=1;"
+                + "this.onstart=null;"
+                + "this.onaudiostart=null;"
+                + "this.onsoundstart=null;"
+                + "this.onspeechstart=null;"
+                + "this.onspeechend=null;"
+                + "this.onsoundend=null;"
+                + "this.onaudioend=null;"
+                + "this.onresult=null;"
+                + "this.onerror=null;"
+                + "this.onend=null;"
+                + "this._started=false;"
+                + "}"
+                + "NativeSpeechRecognition.prototype.start=function(){"
+                + "active=this;"
+                + "this._started=true;"
+                + "try{bridge.startSpeech(String(this.lang||'zh-CN'));}catch(e){"
+                + "this._started=false;"
+                + "if(this.onerror)this.onerror({error:'native-start-failed',message:String(e&&e.message||e)});"
+                + "if(this.onend)this.onend({type:'end'});"
+                + "}"
+                + "};"
+                + "NativeSpeechRecognition.prototype.stop=function(){"
+                + "try{bridge.stopSpeech();}catch(e){}"
+                + "};"
+                + "NativeSpeechRecognition.prototype.abort=function(){"
+                + "try{bridge.cancelSpeech?bridge.cancelSpeech():bridge.stopSpeech();}catch(e){}"
+                + "};"
+                + "window.__TS_DD_NATIVE_SPEECH_EVENT__=function(payload){"
+                + "var p=payload;"
+                + "if(typeof p==='string'){try{p=JSON.parse(p);}catch(e){p={type:'error',message:p};}}"
+                + "p=p||{};"
+                + "var rec=active;"
+                + "if(!rec)return;"
+                + "var type=p.type||'';"
+                + "if(type==='start'){"
+                + "if(rec.onstart)rec.onstart({type:'start'});"
+                + "if(rec.onaudiostart)rec.onaudiostart({type:'audiostart'});"
+                + "return;"
+                + "}"
+                + "if(type==='partial'||type==='final'){"
+                + "var text=String(p.text||'');"
+                + "if(!text)return;"
+                + "if(type==='partial'&&rec.interimResults===false)return;"
+                + "var ev={resultIndex:0,results:makeResult(text,type==='final',p.confidence||0)};"
+                + "if(rec.onresult)rec.onresult(ev);"
+                + "return;"
+                + "}"
+                + "if(type==='error'){"
+                + "if(rec.onerror)rec.onerror({error:p.error||'native-error',message:p.message||p.error||'语音识别失败'});"
+                + "return;"
+                + "}"
+                + "if(type==='end'){"
+                + "rec._started=false;"
+                + "if(rec.onspeechend)rec.onspeechend({type:'speechend'});"
+                + "if(rec.onsoundend)rec.onsoundend({type:'soundend'});"
+                + "if(rec.onaudioend)rec.onaudioend({type:'audioend'});"
+                + "if(rec.onend)rec.onend({type:'end'});"
+                + "if(active===rec)active=null;"
+                + "}"
+                + "};"
+                + "window.SpeechRecognition=NativeSpeechRecognition;"
+                + "window.webkitSpeechRecognition=NativeSpeechRecognition;"
+                + "})();";
+
+        try {
+            webView.evaluateJavascript(js, null);
+        } catch (Exception ignored) {
+        }
     }
 
     private void inject(String url, String runAt) {
