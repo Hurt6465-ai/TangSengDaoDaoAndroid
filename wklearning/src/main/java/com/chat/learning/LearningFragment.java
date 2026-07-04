@@ -24,6 +24,8 @@ import com.chat.userscript.AiScriptWebActivity;
 import com.chat.userscript.ScriptManagerActivity;
 
 public class LearningFragment extends Fragment {
+    private long lastCardClickTime = 0L;
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         ScrollView scrollView = new ScrollView(requireContext());
@@ -144,9 +146,21 @@ public class LearningFragment extends Fragment {
         actionView.setGravity(Gravity.CENTER);
         actionView.setBackground(rounded(Color.rgb(24, 119, 242), dp(16), Color.TRANSPARENT, 0));
         card.addView(actionView, new LinearLayout.LayoutParams(-1, dp(46)));
-        card.setOnClickListener(v -> click.run());
-        actionView.setOnClickListener(v -> click.run());
+        View.OnClickListener guardedClick = v -> runCardClick(click);
+        card.setOnClickListener(guardedClick);
+        actionView.setOnClickListener(guardedClick);
         return card;
+    }
+
+    private void runCardClick(Runnable click) {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (now - lastCardClickTime < 800) {
+            return;
+        }
+        lastCardClickTime = now;
+        if (click != null) {
+            click.run();
+        }
     }
 
     private GradientDrawable rounded(int color, float radius, int strokeColor, int strokeWidth) {
