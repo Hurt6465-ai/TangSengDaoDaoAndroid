@@ -8,12 +8,20 @@ import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.net.Uri;
 import android.view.Gravity;
 import android.view.View;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import org.json.JSONObject;
+
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Method;
 
 public class AiScriptWebActivity extends Activity {
     public static final String EXTRA_TITLE = "title";
@@ -52,6 +60,7 @@ public class AiScriptWebActivity extends Activity {
         setContentView(root);
 
         webView = new WebView(this);
+        webView.addJavascriptInterface(new TsddSpeechBridge(this), "TsddSpeech");
         root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
 
         toolbar = buildToolbar(title);
@@ -162,6 +171,82 @@ public class AiScriptWebActivity extends Activity {
             webView = null;
         }
         super.onDestroy();
+    }
+
+
+    private void speakFromWeb(String text) {
+        if (!isSpeechHostAllowed()) {
+            Toast.makeText(this, "当前网页不允许调用唐僧语音", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (text == null) {
+            text = "";
+        }
+        text = text.replace('\u00A0', ' ').trim();
+        if (text.length() == 0) {
+            Toast.makeText(this, "没有可朗读内容", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 防止网页一次性塞入超长文本导致合成等待太久。
+        if (text.length() > 8000) {
+            text = text.substring(0, 8000);
+        }
+
+        try {
+            Class<?> speechManager = Class.forName("com.chat.speech.SpeechManager");
+            Method speak = speechManager.getMethod("speak", Context.class, String.class);
+            speak.invoke(null, this, text);
+        } catch (Throwable e) {
+            Toast.makeText(this, "未接入 wkspeech，无法朗读", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private boolean isSpeechHostAllowed() {
+        if (webView == null) return false;
+        try {
+            String currentUrl = webView.getUrl();
+            if (currentUrl == null || currentUrl.length() == 0) return false;
+            String host = Uri.parse(currentUrl).getHost();
+            if (host == null) return false;
+            host = host.toLowerCase();
+            return host.equals("chat.qwen.ai")
+                    || host.equals("qwen.ai")
+                    || host.endsWith(".qwen.ai")
+                    || host.equals("tongyi.aliyun.com")
+                    || host.endsWith(".tongyi.aliyun.com")
+                    || host.equals("chat.deepseek.com")
+                    || host.endsWith(".deepseek.com");
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static final class TsddSpeechBridge {
+        private final WeakReference<AiScriptWebActivity> activityRef;
+
+        TsddSpeechBridge(AiScriptWebActivity activity) {
+            this.activityRef = new WeakReference<>(activity);
+        }
+
+        @JavascriptInterface
+        public void speak(String text) {
+            AiScriptWebActivity activity = activityRef.get();
+            if (activity == null) return;
+            activity.runOnUiThread(() -> activity.speakFromWeb(text));
+        }
+
+        @JavascriptInterface
+        public void speakJson(String json) {
+            String text = "";
+            try {
+                JSONObject obj = new JSONObject(json == null ? "{}" : json);
+                text = obj.optString("text", "");
+            } catch (Throwable ignored) {
+            }
+            speak(text);
+        }
     }
 
     private TextView toolbarButton(String text) {
