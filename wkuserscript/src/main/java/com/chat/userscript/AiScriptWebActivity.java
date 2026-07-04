@@ -691,7 +691,9 @@ public class AiScriptWebActivity extends Activity {
                     || host.equals("qianwen.com")
                     || host.endsWith(".qianwen.com")
                     || host.equals("chat.deepseek.com")
-                    || host.endsWith(".deepseek.com");
+                    || host.endsWith(".deepseek.com")
+                    || host.equals("886.best")
+                    || host.endsWith(".886.best");
         } catch (Throwable ignored) {
             return false;
         }
