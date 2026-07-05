@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.content.pm.PackageManager;
-import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -15,13 +14,9 @@ import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.net.Uri;
-import android.view.Gravity;
-import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import org.json.JSONObject;
@@ -40,7 +35,6 @@ public class AiScriptWebActivity extends Activity {
     private static final int REQ_NATIVE_SPEECH_INTENT = 7402;
     private static final long NATIVE_SPEECH_TIMEOUT_MS = 120000L;
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
     private final Handler speechHandler = new Handler(Looper.getMainLooper());
     private WebView webView;
     private SpeechRecognizer nativeRecognizer;
@@ -57,8 +51,6 @@ public class AiScriptWebActivity extends Activity {
         }
     };
     private UserScriptController controller;
-    private View toolbar;
-    private boolean toolbarVisible = true;
     private String currentScriptMode = "";
 
     public static void open(Context context, String title, String url) {
@@ -102,21 +94,8 @@ public class AiScriptWebActivity extends Activity {
         webView.addJavascriptInterface(nativeSpeechBridge, "TsddVoice");
         root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
 
-        if (isQuestionMode()) {
-            // 互动题解析页是临时页，不显示顶部“关闭/刷新/脚本”工具栏，
-            // 也不添加顶部透明点击区，避免手势返回时先把工具栏唤出来，多一层返回。
-            toolbar = null;
-            toolbarVisible = false;
-        } else {
-            toolbar = buildToolbar(title);
-            root.addView(toolbar, new FrameLayout.LayoutParams(-1, dp(56), Gravity.TOP));
-
-            View topHit = new View(this);
-            topHit.setBackgroundColor(Color.TRANSPARENT);
-            topHit.setOnClickListener(v -> showToolbarTemporarily());
-            root.addView(topHit, new FrameLayout.LayoutParams(-1, dp(28), Gravity.TOP));
-            handler.postDelayed(this::hideToolbar, 1800L);
-        }
+        // 不再创建顶部“关闭 / 刷新 / 脚本”工具栏，也不再添加顶部透明点击区。
+        // 所有 AI 网页都使用系统返回键 / 手势返回，避免顶部工具栏多拦一层返回。
 
         controller = new UserScriptController(this, webView);
         controller.setStartupPrompt(startPrompt);
@@ -167,60 +146,6 @@ public class AiScriptWebActivity extends Activity {
         return "question".equals(currentScriptMode);
     }
 
-    private View buildToolbar(String title) {
-        LinearLayout bar = new LinearLayout(this);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(10), dp(8), dp(10), dp(8));
-        bar.setBackgroundColor(0xF9FFFFFF);
-        bar.setElevation(dp(2));
-
-        TextView close = toolbarButton(getString(R.string.script_close));
-        bar.addView(close, new LinearLayout.LayoutParams(dp(56), -1));
-        close.setOnClickListener(v -> finish());
-
-        TextView titleView = new TextView(this);
-        titleView.setText(title);
-        titleView.setTextColor(Color.rgb(17, 24, 39));
-        titleView.setTextSize(18);
-        titleView.setTypeface(Typeface.DEFAULT_BOLD);
-        titleView.setGravity(Gravity.CENTER_VERTICAL);
-        titleView.setSingleLine(true);
-        bar.addView(titleView, new LinearLayout.LayoutParams(0, -1, 1));
-
-        TextView refresh = toolbarButton(getString(R.string.script_refresh));
-        bar.addView(refresh, new LinearLayout.LayoutParams(dp(56), -1));
-        refresh.setOnClickListener(v -> {
-            if (webView != null) webView.reload();
-            showToolbarTemporarily();
-        });
-
-        TextView scripts = toolbarButton(getString(R.string.script_scripts));
-        bar.addView(scripts, new LinearLayout.LayoutParams(dp(56), -1));
-        scripts.setOnClickListener(v -> {
-            startActivity(new Intent(this, ScriptManagerActivity.class));
-            showToolbarTemporarily();
-        });
-        return bar;
-    }
-
-    private void showToolbarTemporarily() {
-        showToolbar();
-        handler.removeCallbacksAndMessages(null);
-        handler.postDelayed(this::hideToolbar, 2200L);
-    }
-
-    private void showToolbar() {
-        if (toolbar == null || toolbarVisible) return;
-        toolbarVisible = true;
-        toolbar.animate().translationY(0).alpha(1f).setDuration(180).start();
-    }
-
-    private void hideToolbar() {
-        if (toolbar == null || !toolbarVisible) return;
-        toolbarVisible = false;
-        toolbar.animate().translationY(-dp(56)).alpha(0f).setDuration(220).start();
-    }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -245,14 +170,15 @@ public class AiScriptWebActivity extends Activity {
 
     @Override
     protected void onPause() {
+        stopSpeechFromWeb();
         super.onPause();
-        if (isQuestionMode()) stopSpeechFromWeb();
     }
 
     @Override
     protected void onStop() {
+        stopSpeechFromWeb();
+        cancelNativeSpeechFromWeb();
         super.onStop();
-        if (isQuestionMode()) stopSpeechFromWeb();
     }
 
     @Override
@@ -265,20 +191,16 @@ public class AiScriptWebActivity extends Activity {
             return;
         }
 
-        if (toolbar != null && !toolbarVisible) {
-            showToolbarTemporarily();
-            return;
-        }
         if (webView != null && webView.canGoBack()) {
             webView.goBack();
-        } else {
-            super.onBackPressed();
+            return;
         }
+        stopSpeechFromWeb();
+        super.onBackPressed();
     }
 
     @Override
     protected void onDestroy() {
-        handler.removeCallbacksAndMessages(null);
         speechHandler.removeCallbacksAndMessages(null);
         releaseNativeSpeechRecognizer();
         if (webView != null) {
@@ -837,18 +759,4 @@ public class AiScriptWebActivity extends Activity {
         }
     }
 
-
-    private TextView toolbarButton(String text) {
-        TextView view = new TextView(this);
-        view.setText(text);
-        view.setTextSize(14);
-        view.setTextColor(Color.rgb(24, 119, 242));
-        view.setGravity(Gravity.CENTER);
-        view.setSingleLine(true);
-        return view;
-    }
-
-    private int dp(float value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
-    }
 }
