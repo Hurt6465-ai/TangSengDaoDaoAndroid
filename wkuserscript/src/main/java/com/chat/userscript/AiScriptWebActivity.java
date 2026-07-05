@@ -102,20 +102,27 @@ public class AiScriptWebActivity extends Activity {
         webView.addJavascriptInterface(nativeSpeechBridge, "TsddVoice");
         root.addView(webView, new FrameLayout.LayoutParams(-1, -1));
 
-        toolbar = buildToolbar(title);
-        root.addView(toolbar, new FrameLayout.LayoutParams(-1, dp(56), Gravity.TOP));
+        if (isQuestionMode()) {
+            // 互动题解析页是临时页，不显示顶部“关闭/刷新/脚本”工具栏，
+            // 也不添加顶部透明点击区，避免手势返回时先把工具栏唤出来，多一层返回。
+            toolbar = null;
+            toolbarVisible = false;
+        } else {
+            toolbar = buildToolbar(title);
+            root.addView(toolbar, new FrameLayout.LayoutParams(-1, dp(56), Gravity.TOP));
 
-        View topHit = new View(this);
-        topHit.setBackgroundColor(Color.TRANSPARENT);
-        topHit.setOnClickListener(v -> showToolbarTemporarily());
-        root.addView(topHit, new FrameLayout.LayoutParams(-1, dp(28), Gravity.TOP));
+            View topHit = new View(this);
+            topHit.setBackgroundColor(Color.TRANSPARENT);
+            topHit.setOnClickListener(v -> showToolbarTemporarily());
+            root.addView(topHit, new FrameLayout.LayoutParams(-1, dp(28), Gravity.TOP));
+            handler.postDelayed(this::hideToolbar, 1800L);
+        }
 
         controller = new UserScriptController(this, webView);
         controller.setStartupPrompt(startPrompt);
         controller.setScriptMode(scriptMode);
         controller.attach();
         controller.loadUrl(url);
-        handler.postDelayed(this::hideToolbar, 1800L);
     }
 
 
@@ -154,6 +161,10 @@ public class AiScriptWebActivity extends Activity {
             return url + "&tsdd_mode=" + encoded;
         }
         return url + "#tsdd_mode=" + encoded;
+    }
+
+    private boolean isQuestionMode() {
+        return "question".equals(currentScriptMode);
     }
 
     private View buildToolbar(String title) {
@@ -235,20 +246,20 @@ public class AiScriptWebActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        if ("question".equals(currentScriptMode)) stopSpeechFromWeb();
+        if (isQuestionMode()) stopSpeechFromWeb();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        if ("question".equals(currentScriptMode)) stopSpeechFromWeb();
+        if (isQuestionMode()) stopSpeechFromWeb();
     }
 
     @Override
     public void onBackPressed() {
         // 互动题/题目解析入口是临时页：返回手势直接退出 DeepSeek，回到题目页，
         // 不要先回到 DeepSeek 首页/历史页。
-        if ("question".equals(currentScriptMode)) {
+        if (isQuestionMode()) {
             stopSpeechFromWeb();
             finish();
             return;
