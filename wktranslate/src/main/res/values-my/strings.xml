@@ -1,0 +1,36 @@
+<resources>
+    <string name="wktranslate_title">ဘာသာပြန် ဆက်တင်များ</string>
+    <string name="wktranslate_translate">ဘာသာပြန်</string>
+    <string name="wktranslate_retranslate">ထပ်မံ ဘာသာပြန်</string>
+    <string name="wktranslate_translating">ဘာသာပြန်နေသည်…</string>
+    <string name="wktranslate_translate_failed">ဘာသာပြန် မအောင်မြင်ပါ။ ပြန်ကြိုးစားပါ။</string>
+    <string name="wktranslate_need_ai_config">ဤလုပ်ဆောင်ချက်အသုံးပြုရန် AI ဘာသာပြန်ကို ပြင်ဆင်ပါ။</string>
+    <string name="wktranslate_ai_translate">AI ဘာသာပြန်</string>
+    <string name="wktranslate_machine_translate">စက်ဘာသာပြန်</string>
+    <string name="wktranslate_auto">အလိုအလျောက်</string>
+    <string name="wktranslate_mode">ဘာသာပြန်နည်း</string>
+    <string name="wktranslate_api_endpoint">API လိပ်စာ</string>
+    <string name="wktranslate_api_key">API Key</string>
+    <string name="wktranslate_model">မော်ဒယ်</string>
+    <string name="wktranslate_test_ai">AI ဘာသာပြန် စမ်းသပ်ရန်</string>
+    <string name="wktranslate_test_machine">စက်ဘာသာပြန် စမ်းသပ်ရန်</string>
+    <string name="wktranslate_ai_verified">AI ဘာသာပြန် အတည်ပြုပြီး</string>
+    <string name="wktranslate_ai_not_verified">AI ဘာသာပြန် မအတည်ပြုရသေးပါ</string>
+    <string name="wktranslate_ai_test_success">AI ဘာသာပြန် စမ်းသပ်မှု အောင်မြင်ပါသည်</string>
+    <string name="wktranslate_machine_test_success">စက်ဘာသာပြန် စမ်းသပ်မှု အောင်မြင်ပါသည်</string>
+    <string name="wktranslate_deeplx">DeepLX</string>
+    <string name="wktranslate_google">Google</string>
+    <string name="wktranslate_custom_machine">စိတ်ကြိုက် စက်ဘာသာပြန်</string>
+    <string name="wktranslate_machine_url">စက်ဘာသာပြန် လိပ်စာ</string>
+    <string name="wktranslate_parser_type">ဖြေရှင်းပုံစံ</string>
+    <string name="wktranslate_clear_cache">ဘာသာပြန် cache ရှင်းရန်</string>
+    <string name="wktranslate_cache_cleared">ဘာသာပြန် cache ရှင်းပြီးပါပြီ</string>
+    <string name="wktranslate_save">သိမ်းမည်</string>
+    <string name="wktranslate_saved">သိမ်းပြီးပါပြီ</string>
+    <string name="wktranslate_purchase">ဘာသာပြန်ဝန်ဆောင်မှု ဝယ်ယူရန်</string>
+    <string name="wktranslate_contact_service">အကူအညီ ဆက်သွယ်ရန်</string>
+    <string name="wktranslate_invalid_config">ပြင်ဆင်ချက် မမှန်ပါ။ စစ်ဆေးပြီး ထပ်ကြိုးစားပါ။</string>
+    <string name="wktranslate_input_required">လိုအပ်သော ဆက်တင်များကို အရင်ဖြည့်ပါ။</string>
+    <string name="wktranslate_test_text">မင်္ဂလာပါ</string>
+    <string name="wktranslate_test_target_lang">တရုတ်</string>
+</resources>
