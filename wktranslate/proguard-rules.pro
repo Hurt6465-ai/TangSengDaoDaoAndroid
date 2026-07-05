@@ -1,0 +1,1 @@
+# wktranslate proguard rules
