@@ -1,0 +1,36 @@
+<resources>
+    <string name="wktranslate_title">Translation Settings</string>
+    <string name="wktranslate_translate">Translate</string>
+    <string name="wktranslate_retranslate">Translate Again</string>
+    <string name="wktranslate_translating">Translating…</string>
+    <string name="wktranslate_translate_failed">Translation failed. Please try again.</string>
+    <string name="wktranslate_need_ai_config">Configure AI translation to use this feature.</string>
+    <string name="wktranslate_ai_translate">AI Translation</string>
+    <string name="wktranslate_machine_translate">Machine Translation</string>
+    <string name="wktranslate_auto">Auto</string>
+    <string name="wktranslate_mode">Translation Mode</string>
+    <string name="wktranslate_api_endpoint">API Endpoint</string>
+    <string name="wktranslate_api_key">API Key</string>
+    <string name="wktranslate_model">Model</string>
+    <string name="wktranslate_test_ai">Test AI Translation</string>
+    <string name="wktranslate_test_machine">Test Machine Translation</string>
+    <string name="wktranslate_ai_verified">AI translation verified</string>
+    <string name="wktranslate_ai_not_verified">AI translation not verified</string>
+    <string name="wktranslate_ai_test_success">AI translation test passed</string>
+    <string name="wktranslate_machine_test_success">Machine translation test passed</string>
+    <string name="wktranslate_deeplx">DeepLX</string>
+    <string name="wktranslate_google">Google</string>
+    <string name="wktranslate_custom_machine">Custom Machine Translation</string>
+    <string name="wktranslate_machine_url">Machine Translation URL</string>
+    <string name="wktranslate_parser_type">Parser Type</string>
+    <string name="wktranslate_clear_cache">Clear Translation Cache</string>
+    <string name="wktranslate_cache_cleared">Translation cache cleared</string>
+    <string name="wktranslate_save">Save</string>
+    <string name="wktranslate_saved">Saved</string>
+    <string name="wktranslate_purchase">Buy Translation Service</string>
+    <string name="wktranslate_contact_service">Contact Support</string>
+    <string name="wktranslate_invalid_config">Invalid configuration. Please check and try again.</string>
+    <string name="wktranslate_input_required">Please fill in the required settings first.</string>
+    <string name="wktranslate_test_text">Hello</string>
+    <string name="wktranslate_test_target_lang">Chinese</string>
+</resources>
