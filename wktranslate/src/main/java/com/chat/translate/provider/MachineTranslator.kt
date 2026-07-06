@@ -86,17 +86,27 @@ object MachineTranslator {
         }
         client.newCall(request).execute().use { response ->
             val body = response.body.string()
-            if (!response.isSuccessful) throw TranslateException(TranslateErrorCode.HTTP_ERROR, "HTTP ${response.code}")
+            if (!response.isSuccessful) throw TranslateException(TranslateErrorCode.HTTP_ERROR, "HTTP ${response.code}: ${body.take(120)}")
             if (TranslateResultValidator.looksLikeHtml(body) || TranslateResultValidator.looksLikeErrorJson(body)) {
                 throw TranslateException(TranslateErrorCode.HTTP_ERROR, "Invalid machine response")
             }
-            val parsed = ParserFactory.forType(candidate.parser).parse(body)
+            val parsed = ParserFactory.forType(effectiveParser(candidate)).parse(body)
             val cleaned = TranslateResultValidator.clean(parsed)
             if (cleaned.isBlank()) throw TranslateException(TranslateErrorCode.EMPTY_RESULT, "Empty machine translation")
             if (!TranslateResultValidator.isValidForCache(text, cleaned)) {
                 throw TranslateException(TranslateErrorCode.UNSAFE_RESULT, "Unsafe machine translation")
             }
             return ProviderTranslateResult(cleaned, TranslateProvider.MACHINE, candidate.engine)
+        }
+    }
+
+
+    private fun effectiveParser(candidate: Candidate): String {
+        val lowerUrl = candidate.url.lowercase(Locale.US)
+        return if (candidate.engine == TranslatePrefs.ENGINE_GOOGLE || lowerUrl.contains("translate.googleapis.com/translate_a/single")) {
+            TranslatePrefs.PARSER_GOOGLE
+        } else {
+            candidate.parser
         }
     }
 
