@@ -8,7 +8,9 @@ object TranslateRouter {
         val hasAi = TranslatePrefs.hasUsableAi(context)
 
         if (scene == TranslateScene.BEFORE_SEND) {
-            return if (hasAi) TranslateProvider.AI else TranslateProvider.NEED_AI_CONFIG
+            // 发送前翻译也不要卡死在 AI 配置页。
+            // 有验证过的 AI 就用 AI；没有 AI 时用内置 Google 机翻兜底，失败则阻止发送原文。
+            return if (hasAi) TranslateProvider.AI else TranslateProvider.MACHINE
         }
 
         return when (TranslatePrefs.getMode(context)) {
