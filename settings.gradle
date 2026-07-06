@@ -39,3 +39,4 @@ include ':wkuserscript'
 include ':wklearning'
 
 include ':wkspeech'
+include ':wktranslate'
