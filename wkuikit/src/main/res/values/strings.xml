@@ -217,10 +217,10 @@
     <string name="forbidden_to_minute">禁言中，%d分后解禁</string>
     <string name="forbidden_to_second">禁言中，%d秒后解禁</string>
     <string name="forbidden_to_minute_second">还剩%d分钟%d秒解除禁言</string>
-    <string name="forbidden_detail_day">禁言中，%s天%s小时%s分钟%s秒后解禁</string>
-    <string name="forbidden_detail_hour">禁言中，%s小时%s分钟%s秒后解禁</string>
-    <string name="forbidden_detail_minute">禁言中，%s分钟%s秒后解禁</string>
-    <string name="forbidden_detail_second">禁言中，%s秒后解禁</string>
+    <string name="forbidden_detail_day">禁言中，%1$s天%2$s小时%3$s分钟%4$s秒后解禁</string>
+    <string name="forbidden_detail_hour">禁言中，%1$s小时%2$s分钟%3$s秒后解禁</string>
+    <string name="forbidden_detail_minute">禁言中，%1$s分钟%2$s秒后解禁</string>
+    <string name="forbidden_detail_second">禁言中，%1$s秒后解禁</string>
     <string name="edit_msg">编辑消息</string>
     <string name="msg_revoked">该消息已被撤回无法查看</string>
     <string name="non_friend_relationship">非好友关系</string>
