@@ -216,10 +216,10 @@
     <string name="forbidden_to_minute">Lift the ban after %d minutes</string>
     <string name="forbidden_to_minute_second">Lift the ban after %d minutes and %d seconds</string>
     <string name="forbidden_to_second">Lift the ban after %d seconds</string>
-    <string name="forbidden_detail_day">Lift ban after %sd,%sh,%sm and %ss</string>
-    <string name="forbidden_detail_hour">Lift ban after %sh,%sm and %ss</string>
-    <string name="forbidden_detail_minute">Lift ban after %sm and %ss</string>
-    <string name="forbidden_detail_second">Lift ban after %ss</string>
+    <string name="forbidden_detail_day">Lift ban after %1$sd,%2$sh,%3$sm and %4$ss</string>
+    <string name="forbidden_detail_hour">Lift ban after %1$sh,%2$sm and %3$ss</string>
+    <string name="forbidden_detail_minute">Lift ban after %1$sm and %2$ss</string>
+    <string name="forbidden_detail_second">Lift ban after %1$ss</string>
     <string name="edit_msg">Edit Message</string>
     <string name="msg_revoked">The message has been recalled and cannot be viewed</string>
     <string name="non_friend_relationship">Non friend relationship</string>
