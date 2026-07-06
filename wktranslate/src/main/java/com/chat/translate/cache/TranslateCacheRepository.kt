@@ -14,13 +14,13 @@ object TranslateCacheRepository {
 
     suspend fun find(context: Context, cacheKey: String): TranslateCacheEntity? {
         maybeClean(context)
-        return TranslateCacheDatabase.get(context).dao().findByKey(cacheKey)
+        return TranslateCacheStore.get(context).findByKey(cacheKey)
     }
 
     fun markHitAsync(context: Context, cacheKey: String) {
         scope.launch {
             runCatching {
-                TranslateCacheDatabase.get(context).dao().markHit(cacheKey, System.currentTimeMillis())
+                TranslateCacheStore.get(context).markHit(cacheKey, System.currentTimeMillis())
             }
         }
     }
@@ -40,9 +40,9 @@ object TranslateCacheRepository {
     ) {
         if (!TranslateCachePolicy.isRoomCacheable(normalizedText)) return
         val now = System.currentTimeMillis()
-        val old = TranslateCacheDatabase.get(context).dao().findByKey(cacheKey)
+        val old = TranslateCacheStore.get(context).findByKey(cacheKey)
         val hitCount = old?.hitCount ?: 1
-        TranslateCacheDatabase.get(context).dao().insertOrReplace(
+        TranslateCacheStore.get(context).insertOrReplace(
             TranslateCacheEntity(
                 id = old?.id ?: 0,
                 cacheKey = cacheKey,
@@ -64,7 +64,7 @@ object TranslateCacheRepository {
     }
 
     suspend fun clear(context: Context) {
-        TranslateCacheDatabase.get(context).dao().clearAll()
+        TranslateCacheStore.get(context).clearAll()
         TranslateMemoryCache.clear()
     }
 
@@ -72,10 +72,10 @@ object TranslateCacheRepository {
         val now = System.currentTimeMillis()
         val last = TranslatePrefs.getLastCleanTime(context)
         if (now - last < TranslateCachePolicy.CLEAN_INTERVAL_MS) return
-        val dao = TranslateCacheDatabase.get(context).dao()
-        val count = dao.count()
+        val store = TranslateCacheStore.get(context)
+        val count = store.count()
         if (count > TranslateCachePolicy.CLEAN_TRIGGER_COUNT) {
-            dao.deleteColdest(count - TranslateCachePolicy.MAX_CACHE_COUNT)
+            store.deleteColdest(count - TranslateCachePolicy.MAX_CACHE_COUNT)
         }
         TranslatePrefs.setLastCleanTime(context, now)
     }

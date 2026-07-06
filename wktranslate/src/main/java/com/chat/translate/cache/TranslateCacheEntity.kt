@@ -1,18 +1,9 @@
 package com.chat.translate.cache
 
-import androidx.room.Entity
-import androidx.room.Index
-import androidx.room.PrimaryKey
-
-@Entity(
-    tableName = "translation_cache",
-    indices = [
-        Index(value = ["cacheKey"], unique = true),
-        Index(value = ["hitCount", "lastAccessAt"])
-    ]
-)
+/**
+ * Plain SQLite cache row. Kept intentionally annotation-free so wktranslate does not need Room/KAPT.
+ */
 data class TranslateCacheEntity(
-    @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val cacheKey: String,
     val provider: String,
