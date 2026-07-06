@@ -76,7 +76,9 @@ import com.chat.uikit.user.UserDetailActivity
 import com.chat.translate.api.ChatTranslateRequest
 import com.chat.translate.api.WkTranslateBridge
 import com.chat.translate.core.TranslateErrorCode
+import com.chat.translate.core.TranslateMode
 import com.chat.translate.core.TranslateScene
+import com.chat.translate.prefs.TranslatePrefs
 import kotlinx.coroutines.runBlocking
 import com.google.android.material.snackbar.Snackbar
 import com.xinbida.wukongim.WKIM
@@ -381,6 +383,13 @@ open class WKTextProvider : WKChatBaseProvider() {
         cacheKey: String,
         requestWingman: Boolean
     ) {
+        val appContext = context.applicationContext
+        if (!TranslatePrefs.hasUsableAi(appContext) && TranslatePrefs.getMode(appContext) != TranslateMode.MACHINE) {
+            WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_need_ai_config))
+            WkTranslateBridge().openSettings(context, "chat_bubble")
+            return
+        }
+
         WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_translating))
         thread {
             try {
@@ -404,12 +413,22 @@ open class WKTextProvider : WKChatBaseProvider() {
                         WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_need_ai_config))
                         WkTranslateBridge().openSettings(context, "chat_bubble")
                     } else {
-                        WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_translate_failed))
+                        if (!TranslatePrefs.hasUsableAi(context.applicationContext)) {
+                            WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_need_ai_config))
+                            WkTranslateBridge().openSettings(context, "chat_bubble")
+                        } else {
+                            WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_translate_failed))
+                        }
                     }
                 }
             } catch (_: Exception) {
                 Handler(Looper.getMainLooper()).post {
-                    WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_translate_failed))
+                    if (!TranslatePrefs.hasUsableAi(context.applicationContext)) {
+                        WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_need_ai_config))
+                        WkTranslateBridge().openSettings(context, "chat_bubble")
+                    } else {
+                        WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_translate_failed))
+                    }
                 }
             }
         }
