@@ -38,12 +38,14 @@ object AiTranslator {
                 .url(normalizeEndpoint(config.endpoint))
                 .post(body)
                 .addHeader("Authorization", "Bearer ${config.apiKey}")
-                .addHeader("Content-Type", "application/json")
+                .addHeader("Content-Type", "application/json; charset=utf-8")
+                .addHeader("Accept", "application/json")
+                .addHeader("User-Agent", "Mozilla/5.0 TangSengDaoDao-Translate/1.0")
                 .build()
             client.newCall(request).execute().use { response ->
                 val responseBody = response.body.string()
                 if (!response.isSuccessful) {
-                    throw TranslateException(TranslateErrorCode.HTTP_ERROR, "HTTP ${response.code}")
+                    throw TranslateException(TranslateErrorCode.HTTP_ERROR, buildHttpErrorMessage(response.code, responseBody))
                 }
                 if (TranslateResultValidator.looksLikeHtml(responseBody) || TranslateResultValidator.looksLikeErrorJson(responseBody)) {
                     throw TranslateException(TranslateErrorCode.HTTP_ERROR, "Invalid AI response")
@@ -75,8 +77,23 @@ object AiTranslator {
 
     private fun normalizeEndpoint(endpoint: String): String {
         val trimmed = endpoint.trim()
-        if (trimmed.endsWith("/chat/completions")) return trimmed
-        return trimmed.trimEnd('/') + "/chat/completions"
+        if (trimmed.isBlank()) return trimmed
+        val noSlash = trimmed.trimEnd('/')
+        return when {
+            noSlash.endsWith("/chat/completions", ignoreCase = true) -> noSlash
+            noSlash.endsWith("/v1", ignoreCase = true) -> "$noSlash/chat/completions"
+            else -> "$noSlash/v1/chat/completions"
+        }
+    }
+
+    private fun buildHttpErrorMessage(code: Int, body: String): String {
+        val clean = body
+            .replace('\n', ' ')
+            .replace('\r', ' ')
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .take(220)
+        return if (clean.isBlank()) "HTTP $code" else "HTTP $code: $clean"
     }
 
     private fun parseOpenAiCompatible(body: String): String {
