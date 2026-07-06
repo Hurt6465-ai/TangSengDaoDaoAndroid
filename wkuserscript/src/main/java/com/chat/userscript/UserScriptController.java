@@ -352,55 +352,7 @@ public class UserScriptController {
 
 
     private void injectNativeSpeechPolyfill() {
-        if (webView == null) return;
-        String js = "(function(){" +
-                "if(window.__TS_DD_NATIVE_SPEECH_POLYFILL_INSTALLED__)return;" +
-                "if(!window.TsddNativeSpeech)return;" +
-                "window.__TS_DD_NATIVE_SPEECH_POLYFILL_INSTALLED__=true;" +
-                "var oldSR=window.SpeechRecognition||null;" +
-                "var oldWebkitSR=window.webkitSpeechRecognition||null;" +
-                "window.__TS_DD_ORIGINAL_SPEECH_RECOGNITION__=oldSR;" +
-                "window.__TS_DD_ORIGINAL_WEBKIT_SPEECH_RECOGNITION__=oldWebkitSR;" +
-                "var active=null;" +
-                "function fire(target,fn,ev){try{if(typeof fn==='function')fn.call(target,ev);}catch(e){console.error(e);}}" +
-                "function resultEvent(text,finalResult){" +
-                "text=String(text||'');" +
-                "var alt={transcript:text,confidence:finalResult?1:0};" +
-                "var res=[alt];res.isFinal=!!finalResult;res.length=1;res.item=function(i){return this[i];};" +
-                "var results=[res];results.length=1;results.item=function(i){return this[i];};" +
-                "return {resultIndex:0,results:results};" +
-                "}" +
-                "function NativeSpeechRecognition(){" +
-                "this.lang='zh-CN';this.interimResults=false;this.continuous=false;" +
-                "this.onstart=null;this.onresult=null;this.onerror=null;this.onend=null;" +
-                "this.onaudiostart=null;this.onaudioend=null;this.onspeechstart=null;this.onspeechend=null;" +
-                "this._active=false;" +
-                "}" +
-                "NativeSpeechRecognition.prototype.start=function(){" +
-                "if(active&&active!==this){try{active.abort();}catch(e){}}" +
-                "active=this;this._active=true;" +
-                "try{window.TsddNativeSpeech.startSpeech(String(this.lang||'zh-CN'));}" +
-                "catch(e){fire(this,this.onerror,{error:'client',message:String(e&&e.message||e)});this._active=false;if(active===this)active=null;fire(this,this.onend,{});}" +
-                "};" +
-                "NativeSpeechRecognition.prototype.stop=function(){try{window.TsddNativeSpeech.stopSpeech();}catch(e){}};" +
-                "NativeSpeechRecognition.prototype.abort=function(){try{window.TsddNativeSpeech.cancelSpeech();}catch(e){}};" +
-                "window.__TS_DD_NATIVE_SPEECH_DISPATCH__=function(type,text,error){" +
-                "var r=active;if(!r)return;" +
-                "if(type==='start'){r._active=true;fire(r,r.onstart,{});fire(r,r.onaudiostart,{});return;}" +
-                "if(type==='partial'){if(r.interimResults)fire(r,r.onresult,resultEvent(text,false));return;}" +
-                "if(type==='final'){fire(r,r.onresult,resultEvent(text,true));return;}" +
-                "if(type==='error'){fire(r,r.onerror,{error:error||'error',message:text||error||''});return;}" +
-                "if(type==='end'){r._active=false;fire(r,r.onaudioend,{});fire(r,r.onend,{});if(active===r)active=null;return;}" +
-                "};" +
-                "NativeSpeechRecognition.prototype.constructor=NativeSpeechRecognition;" +
-                "window.TsddNativeSpeechRecognition=NativeSpeechRecognition;" +
-                "window.TsddSpeechRecognition=NativeSpeechRecognition;" +
-                "if(!oldSR&&!oldWebkitSR){window.SpeechRecognition=NativeSpeechRecognition;window.webkitSpeechRecognition=NativeSpeechRecognition;}" +
-                "})();";
-        try {
-            webView.evaluateJavascript(js, null);
-        } catch (Exception ignored) {
-        }
+        TsddNativeSpeechPolyfill.inject(webView);
     }
 
     private void injectStartupPromptButton() {
