@@ -77,24 +77,44 @@ object TranslatePrefs {
 
     fun getAiConfig(context: Context): AiConfig {
         val p = sp(context)
+        val endpoint = p.getString(KEY_AI_ENDPOINT, "") ?: ""
+        val rawAdapter = p.getString(KEY_AI_ADAPTER, "") ?: ""
         return AiConfig(
-            endpoint = p.getString(KEY_AI_ENDPOINT, "") ?: "",
+            endpoint = endpoint,
             apiKey = p.getString(KEY_AI_KEY, "") ?: "",
             model = p.getString(KEY_AI_MODEL, "deepseek-chat") ?: "deepseek-chat",
-            adapter = p.getString(KEY_AI_ADAPTER, AI_ADAPTER_DEEPSEEK) ?: AI_ADAPTER_DEEPSEEK
+            adapter = resolveAiAdapter(endpoint, rawAdapter)
         )
     }
 
-    fun saveAiConfig(context: Context, endpoint: String, apiKey: String, model: String, adapter: String = AI_ADAPTER_DEEPSEEK) {
+    fun saveAiConfig(context: Context, endpoint: String, apiKey: String, model: String, adapter: String = "") {
         val oldHash = currentAiConfigHash(context)
-        val newHash = aiConfigHash(endpoint.trim(), apiKey.trim(), model.trim(), adapter.trim())
+        val cleanEndpoint = endpoint.trim()
+        val finalAdapter = resolveAiAdapter(cleanEndpoint, adapter.trim())
+        val newHash = aiConfigHash(cleanEndpoint, apiKey.trim(), model.trim(), finalAdapter)
         sp(context).edit()
-            .putString(KEY_AI_ENDPOINT, endpoint.trim())
+            .putString(KEY_AI_ENDPOINT, cleanEndpoint)
             .putString(KEY_AI_KEY, apiKey.trim())
             .putString(KEY_AI_MODEL, model.trim())
-            .putString(KEY_AI_ADAPTER, adapter.trim().ifBlank { AI_ADAPTER_DEEPSEEK })
+            .putString(KEY_AI_ADAPTER, finalAdapter)
             .apply()
         if (oldHash != newHash) setAiVerified(context, false)
+    }
+
+
+    private fun resolveAiAdapter(endpoint: String, adapter: String): String {
+        val lowerEndpoint = endpoint.lowercase()
+        val lowerAdapter = adapter.lowercase()
+        if (lowerAdapter == AI_ADAPTER_OPENAI) return AI_ADAPTER_OPENAI
+        if (lowerAdapter == AI_ADAPTER_DEEPSEEK && isDeepSeekOfficialEndpoint(lowerEndpoint)) return AI_ADAPTER_DEEPSEEK
+        if (isDeepSeekOfficialEndpoint(lowerEndpoint)) return AI_ADAPTER_DEEPSEEK
+        // Third-party gateways such as fuxingapi are OpenAI-compatible. Do not send
+        // DeepSeek-only fields like thinking/tool_choice to these gateways.
+        return AI_ADAPTER_OPENAI
+    }
+
+    private fun isDeepSeekOfficialEndpoint(lowerEndpoint: String): Boolean {
+        return lowerEndpoint.contains("api.deepseek.com") || lowerEndpoint.contains("deepseek.com/v1")
     }
 
     fun hasUsableAi(context: Context): Boolean {
