@@ -76,6 +76,12 @@ import com.chat.base.utils.WKDialogUtils
 import com.chat.base.utils.WKTimeUtils
 import com.chat.base.utils.WKToastUtils
 import com.chat.base.views.ChatItemView
+import com.chat.translate.R as TranslateR
+import com.chat.translate.api.ChatTranslateRequest
+import com.chat.translate.api.WkTranslateBridge
+import com.chat.translate.core.TranslateErrorCode
+import com.chat.translate.core.TranslateScene
+import kotlinx.coroutines.runBlocking
 import com.google.android.material.snackbar.Snackbar
 import com.xinbida.wukongim.WKIM
 import com.xinbida.wukongim.entity.WKChannel
@@ -1138,10 +1144,9 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         val menus = EndpointManager.getInstance().invokes<ChatItemPopupMenu>(EndpointCategory.wkChatPopupItem, mMsg)
         if (menus != null && menus.isNotEmpty() && mMsg.flame == 0) {
             for (menu in menus) {
-                val isCopy = isCopyPopupMenu(menu)
-                val popupMenu = if (isCopy) {
-                    // Deliberately replace Copy with Translate, as requested.
-                    PopupMenuItem(context.getString(R.string.chat_translate_menu_translate), menu.imageResource,
+                val isTranslate = isTranslatePopupMenu(menu)
+                val popupMenu = if (isTranslate) {
+                    PopupMenuItem(context.getString(TranslateR.string.wktranslate_translate), menu.imageResource,
                         object : PopupMenuItem.IClick {
                             override fun onClick() {
                                 translateWholeMessage(mMsg)
@@ -1160,7 +1165,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
                         })
                 }
                 popupMenu.subText = menu.subText
-                popupMenu.tag = if (isCopy) "chat_translate" else menu.tag
+                popupMenu.tag = if (isTranslate) "chat_translate" else menu.tag
                 list.add(popupMenu)
             }
         }
@@ -1285,14 +1290,8 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         }
     }
 
-    private fun isCopyPopupMenu(menu: ChatItemPopupMenu): Boolean {
-        val text = menu.text?.trim() ?: ""
-        val tag = menu.tag?.trim() ?: ""
-        return text.equals("复制", true)
-                || text.equals("copy", true)
-                || text.equals("拷贝", true)
-                || tag.equals("copy", true)
-                || tag.equals("msg_copy", true)
+    private fun isTranslatePopupMenu(menu: ChatItemPopupMenu): Boolean {
+        return menu.tag?.trim().equals("chat_translate", true)
     }
 
     private fun isTranslatePopupItem(item: PopupMenuItem): Boolean {
@@ -1302,19 +1301,73 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
     private fun translateWholeMessage(mMsg: WKMsg) {
         val content = getTranslatableMessageText(mMsg)
         if (TextUtils.isEmpty(content)) {
-            WKToastUtils.getInstance().showToastNormal(context.getString(R.string.chat_translate_no_text))
+            WKToastUtils.getInstance().showToastNormal(context.getString(TranslateR.string.wktranslate_translate_failed))
             return
         }
-        val targetLang = readAiSetting("chat_ai_source_lang", "中文")
-        val model = readAiSetting("chat_ai_model", "deepseek-chat")
-        val stableId = getStableTranslateId(mMsg, content)
-        val cacheSeed = listOf(
-            stableId,
-            content.hashCode().toString(),
-            targetLang,
-            model
-        ).joinToString("|")
-        translateTextWithCache(mMsg, content, "bubble_$cacheSeed")
+        val cacheKey = buildChatTranslateUiKey(mMsg, content)
+        translateTextWithPlugin(mMsg, content, cacheKey, TranslateScene.LONG_PRESS, false)
+    }
+
+    protected fun buildChatTranslateUiKey(mMsg: WKMsg, content: String): String {
+        val stableId = when {
+            !TextUtils.isEmpty(mMsg.clientMsgNO) -> "client:${mMsg.clientMsgNO}"
+            !TextUtils.isEmpty(mMsg.messageID) && mMsg.messageID != "0" -> "server:${mMsg.messageID}"
+            else -> "content:${mMsg.timestamp}:${mMsg.fromUID}:${mMsg.type}:${content.hashCode()}"
+        }
+        val targetLang = getChatTranslateTargetLang()
+        return "chat_translate_ui_" + sha256("$stableId|$targetLang|${content.hashCode()}")
+    }
+
+    protected fun getChatTranslateTargetLang(): String {
+        return readAiSetting("chat_ai_source_lang", "中文")
+    }
+
+    private fun translateTextWithPlugin(
+        mMsg: WKMsg,
+        text: String,
+        cacheKey: String,
+        scene: TranslateScene,
+        bypassCache: Boolean
+    ) {
+        mainHandler.post {
+            if (translationInflightKeys.contains(cacheKey)) return@post
+            translationInflightKeys.add(cacheKey)
+            WKToastUtils.getInstance().showToastNormal(context.getString(TranslateR.string.wktranslate_translating))
+
+            thread {
+                try {
+                    val result = runBlocking {
+                        WkTranslateBridge().translate(
+                            ChatTranslateRequest(
+                                context = context.applicationContext,
+                                text = text,
+                                sourceLang = "auto",
+                                targetLang = getChatTranslateTargetLang(),
+                                scene = scene,
+                                bypassCache = bypassCache
+                            )
+                        )
+                    }
+                    mainHandler.post {
+                        if (result.success && !TextUtils.isEmpty(result.translatedText)) {
+                            saveTranslationCache(cacheKey, result.translatedText, true)
+                            notifyTranslationChanged(mMsg)
+                        } else if (result.errorCode == TranslateErrorCode.NEED_AI_CONFIG) {
+                            WKToastUtils.getInstance().showToastNormal(context.getString(TranslateR.string.wktranslate_need_ai_config))
+                            WkTranslateBridge().openSettings(context, "chat_long_press")
+                        } else {
+                            WKToastUtils.getInstance().showToastNormal(context.getString(TranslateR.string.wktranslate_translate_failed))
+                        }
+                    }
+                } catch (e: Exception) {
+                    mainHandler.post {
+                        WKToastUtils.getInstance().showToastNormal(context.getString(TranslateR.string.wktranslate_translate_failed))
+                    }
+                } finally {
+                    mainHandler.post { translationInflightKeys.remove(cacheKey) }
+                }
+            }
+        }
     }
 
     private fun getStableTranslateId(mMsg: WKMsg, content: String): String {
