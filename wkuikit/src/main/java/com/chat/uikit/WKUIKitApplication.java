@@ -241,21 +241,18 @@ public class WKUIKitApplication {
         //注册消息长按菜单配置
         EndpointManager.getInstance().setMethod(EndpointCategory.msgConfig + WKContentType.WK_VOICE, object -> new MsgConfig(false, true, true, false, false, false));
         EndpointManager.getInstance().setMethod(EndpointCategory.msgConfig + WKContentType.typing, object -> new MsgConfig(false));
-        EndpointManager.getInstance().setMethod("", EndpointCategory.wkChatPopupItem, 90, object -> {
+        EndpointManager.getInstance().setMethod("chat_translate_popup", EndpointCategory.wkChatPopupItem, 90, object -> {
             WKMsg wkMsg = (WKMsg) object;
             if (wkMsg.type == WKContentType.WK_TEXT) {
-                return new ChatItemPopupMenu(R.mipmap.msg_copy, getContext().getString(R.string.copy), (msg, iConversationContext) -> {
-                    WKTextContent textContent = (WKTextContent) msg.baseContentMsgModel;
-                    String content = textContent.content;
-                    if (msg.remoteExtra.contentEditMsgModel != null) {
-                        content = msg.remoteExtra.contentEditMsgModel.getDisplayContent();
-                    }
-                    ClipboardManager cm = (ClipboardManager) iConversationContext.getChatActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    ClipData mClipData = ClipData.newPlainText("Label", content);
-                    assert cm != null;
-                    cm.setPrimaryClip(mClipData);
-                    WKToastUtils.getInstance().showToastNormal(iConversationContext.getChatActivity().getString(R.string.copyed));
-                });
+                ChatItemPopupMenu menu = new ChatItemPopupMenu(
+                        R.drawable.ic_chat_translate_wa,
+                        getContext().getString(com.chat.translate.R.string.wktranslate_translate),
+                        (msg, iConversationContext) -> {
+                            // Handled in WKChatBaseProvider by tag = chat_translate, so the action stays UI-module agnostic.
+                        }
+                );
+                menu.setTag("chat_translate");
+                return menu;
             }
             return null;
         });
