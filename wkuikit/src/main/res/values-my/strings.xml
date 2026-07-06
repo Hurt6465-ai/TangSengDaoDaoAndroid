@@ -215,10 +215,10 @@
     <string name="forbidden_to_minute">%d မိနစ်အကြာ ပြေလည်မည်</string>
     <string name="forbidden_to_second">%d စက္ကန့်အကြာ ပြေလည်မည်</string>
     <string name="forbidden_to_minute_second">%d မိနစ် %d စက္ကန့် ကျန်</string>
-    <string name="forbidden_detail_day">%s ရက် %s နာရီ %s မိနစ် %s စက္ကန့်အကြာ ပြေလည်မည်</string>
-    <string name="forbidden_detail_hour">%s နာရီ %s မိနစ် %s စက္ကန့်အကြာ</string>
-    <string name="forbidden_detail_minute">%s မိနစ် %s စက္ကန့်အကြာ</string>
-    <string name="forbidden_detail_second">%s စက္ကန့်အကြာ</string>
+    <string name="forbidden_detail_day">%1$s ရက် %2$s နာရီ %3$s မိနစ် %4$s စက္ကန့်အကြာ ပြေလည်မည်</string>
+    <string name="forbidden_detail_hour">%1$s နာရီ %2$s မိနစ် %3$s စက္ကန့်အကြာ</string>
+    <string name="forbidden_detail_minute">%1$s မိနစ် %2$s စက္ကန့်အကြာ</string>
+    <string name="forbidden_detail_second">%1$s စက္ကန့်အကြာ</string>
     <string name="edit_msg">မက်ဆေ့ချ်ပြင်မည်</string>
     <string name="msg_revoked">ဤမက်ဆေ့ချ်ကို ပြန်ရုပ်သိမ်းထား၍ မကြည့်နိုင်ပါ</string>
     <string name="non_friend_relationship">မိတ်ဆွေမဟုတ်</string>
