@@ -914,6 +914,55 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 && type != WKContentType.noRelation;
     }
 
+    private boolean isReceivedTextMsgForInlineTranslate(WKMsg msg) {
+        if (msg == null) return false;
+        if (shouldHideFromChatList(msg)) return false;
+        if (msg.type != WKContentType.WK_TEXT) return false;
+        if (msg.isDeleted == 1) return false;
+        if (msg.remoteExtra != null && (msg.remoteExtra.revoke == 1 || msg.remoteExtra.isMutualDeleted == 1)) {
+            return false;
+        }
+        if (TextUtils.isEmpty(msg.fromUID) || TextUtils.equals(msg.fromUID, loginUID)) return false;
+
+        String displayContent = "";
+        if (msg.baseContentMsgModel != null) {
+            try {
+                displayContent = msg.baseContentMsgModel.getDisplayContent();
+            } catch (Exception ignored) {
+            }
+        }
+        if (TextUtils.isEmpty(displayContent)) {
+            displayContent = msg.content;
+        }
+        return !TextUtils.isEmpty(displayContent);
+    }
+
+    private int findLatestReceivedTextMsgIndex() {
+        if (chatAdapter == null || WKReader.isEmpty(chatAdapter.getData())) return -1;
+        for (int i = chatAdapter.getData().size() - 1; i >= 0; i--) {
+            WKUIChatMsgItemEntity item = chatAdapter.getData().get(i);
+            if (item != null && isReceivedTextMsgForInlineTranslate(item.wkMsg)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void refreshOldInlineTranslateButton(int oldLatestReceivedTextIndex, WKMsg newMsg) {
+        if (oldLatestReceivedTextIndex < 0) return;
+        if (chatAdapter == null || WKReader.isEmpty(chatAdapter.getData())) return;
+        if (!isReceivedTextMsgForInlineTranslate(newMsg)) return;
+        if (oldLatestReceivedTextIndex >= chatAdapter.getData().size()) return;
+
+        WKUIChatMsgItemEntity oldItem = chatAdapter.getData().get(oldLatestReceivedTextIndex);
+        if (oldItem == null || !isReceivedTextMsgForInlineTranslate(oldItem.wkMsg)) return;
+
+        // 这里必须做完整数据刷新，不能用 payload 局部刷新。
+        // payload 只会刷新头像/背景/状态，WKTextProvider.setData() 不会重新执行，
+        // 旧“最后一条对方文字消息”上的快捷翻译按钮就会残留。
+        chatAdapter.notifyData(oldLatestReceivedTextIndex);
+    }
+
     private boolean isSameMessage(WKMsg first, WKMsg second) {
         if (first == null || second == null) return false;
         if (first.clientSeq != 0 && first.clientSeq == second.clientSeq) return true;
@@ -3188,6 +3237,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (TextUtils.equals(msg.channelID, channelId) && msg.channelType == channelType) {
                 if (!chatAdapter.isExist(msg.clientMsgNO, msg.messageID)) {
                     if (!isCanLoadMore) {
+                        // 新消息加入前，先记住当前“最后一条对方文字消息”。
+                        // 如果这次收到的也是对方文字消息，旧 item 就必须完整重绑，
+                        // 否则旧 item 已经 add 进去的翻译按钮不会自动消失。
+                        int oldLatestReceivedTextIndex = findLatestReceivedTextMsgIndex();
                         if (chatAdapter.getItemCount() > 0) {
                             WKUIChatMsgItemEntity last = chatAdapter.getData().get(chatAdapter.getItemCount() - 1);
                             if (last != null && last.wkMsg != null && last.wkMsg.type == WKContentType.typing) {
@@ -3228,6 +3281,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                         if (previousMsgIndex != -1 && previousMsgIndex < chatAdapter.getData().size()) {
                             chatAdapter.notifyItemChanged(previousMsgIndex, chatAdapter.getData().get(previousMsgIndex));
                         }
+                        refreshOldInlineTranslateButton(oldLatestReceivedTextIndex, msg);
                     }
                     if (isShowHistory || redDot > 0) {
                         redDot += 1;
