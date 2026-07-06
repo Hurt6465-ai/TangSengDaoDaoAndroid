@@ -14,7 +14,9 @@ object TranslateRouter {
         return when (TranslatePrefs.getMode(context)) {
             TranslateMode.AI -> if (hasAi) TranslateProvider.AI else TranslateProvider.NEED_AI_CONFIG
             TranslateMode.MACHINE -> TranslateProvider.MACHINE
-            TranslateMode.AUTO -> if (hasAi) TranslateProvider.AI else TranslateProvider.NEED_AI_CONFIG
+            // Chat bubble translation should work out of the box. If AI has not
+            // been verified, fall back to built-in Google machine translation.
+            TranslateMode.AUTO -> if (hasAi) TranslateProvider.AI else TranslateProvider.MACHINE
         }
     }
 }
