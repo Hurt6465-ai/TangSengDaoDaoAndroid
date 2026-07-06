@@ -73,6 +73,11 @@ import com.chat.base.utils.WKToastUtils
 import com.chat.base.views.BubbleLayout
 import com.chat.uikit.R
 import com.chat.uikit.user.UserDetailActivity
+import com.chat.translate.api.ChatTranslateRequest
+import com.chat.translate.api.WkTranslateBridge
+import com.chat.translate.core.TranslateErrorCode
+import com.chat.translate.core.TranslateScene
+import kotlinx.coroutines.runBlocking
 import com.google.android.material.snackbar.Snackbar
 import com.xinbida.wukongim.WKIM
 import com.xinbida.wukongim.entity.WKChannel
@@ -268,10 +273,9 @@ open class WKTextProvider : WKChatBaseProvider() {
 
     private fun makeTranslateIconText(): SpannableString {
         val text = SpannableString("文A")
-        text.setSpan(RelativeSizeSpan(1.08f), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        text.setSpan(SuperscriptSpan(), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        text.setSpan(RelativeSizeSpan(0.92f), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        text.setSpan(SubscriptSpan(), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(StyleSpan(Typeface.BOLD), 0, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(RelativeSizeSpan(0.98f), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(RelativeSizeSpan(0.88f), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         return text
     }
 
@@ -292,15 +296,15 @@ open class WKTextProvider : WKChatBaseProvider() {
         btn.includeFontPadding = false
         btn.rotation = if (cached == null) -10f else 0f
         btn.typeface = Typeface.DEFAULT_BOLD
-        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (cached == null) 10.5f else 13f)
+        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (cached == null) 9.2f else 11.5f)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-            btn.letterSpacing = -0.08f
+            btn.letterSpacing = -0.14f
         }
         btn.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
         btn.gravity = Gravity.CENTER
         btn.minWidth = 0
         btn.minHeight = 0
-        btn.setPadding(0, 0, 0, dp(1))
+        btn.setPadding(0, 0, 0, 0)
         btn.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             // 浅粉白，避免按钮太重。
@@ -322,10 +326,10 @@ open class WKTextProvider : WKChatBaseProvider() {
                 else -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
             }
         }
-        val lp = LinearLayout.LayoutParams(dp(24), dp(24))
+        val lp = LinearLayout.LayoutParams(dp(20), dp(20))
         lp.gravity = Gravity.BOTTOM
-        lp.leftMargin = dp(3)
-        lp.bottomMargin = dp(2)
+        lp.leftMargin = dp(2)
+        lp.bottomMargin = dp(1)
         parent.addView(btn, lp)
     }
 
@@ -377,28 +381,35 @@ open class WKTextProvider : WKChatBaseProvider() {
         cacheKey: String,
         requestWingman: Boolean
     ) {
-        val apiKey = readAiSetting("chat_ai_key", "")
-        if (TextUtils.isEmpty(apiKey)) {
-            WKToastUtils.getInstance().showToastNormal("请先在 AI 翻译设置里填写 API Key")
-            return
-        }
-        val endpoint = readAiSetting("chat_ai_endpoint", "https://api.deepseek.com/v1/chat/completions")
-        val model = readAiSetting("chat_ai_model", "deepseek-chat")
-        val targetLang = readAiSetting("chat_ai_source_lang", "中文")
-        WKToastUtils.getInstance().showToastNormal("正在翻译…")
+        WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_translating))
         thread {
             try {
-                val translated = requestAiTranslation(endpoint, apiKey, model, "自动检测", targetLang, text)
-                saveTranslationCache(cacheKey, translated, true)
+                val result = runBlocking {
+                    WkTranslateBridge().translate(
+                        ChatTranslateRequest(
+                            context = context.applicationContext,
+                            text = text,
+                            sourceLang = "auto",
+                            targetLang = getChatTranslateTargetLang(),
+                            scene = TranslateScene.MESSAGE_BUBBLE,
+                            bypassCache = false
+                        )
+                    )
+                }
                 Handler(Looper.getMainLooper()).post {
-                    notifyMessageChanged()
-                    if (requestWingman && getFlag("chat_ai_wingman_enabled", false)) {
-                        requestWingmanSuggestions(endpoint, apiKey, model, text, translated)
+                    if (result.success && !TextUtils.isEmpty(result.translatedText)) {
+                        saveTranslationCache(cacheKey, result.translatedText, true)
+                        notifyMessageChanged()
+                    } else if (result.errorCode == TranslateErrorCode.NEED_AI_CONFIG) {
+                        WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_need_ai_config))
+                        WkTranslateBridge().openSettings(context, "chat_bubble")
+                    } else {
+                        WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_translate_failed))
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Handler(Looper.getMainLooper()).post {
-                    WKToastUtils.getInstance().showToastNormal("翻译失败：" + (e.message ?: ""))
+                    WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_translate_failed))
                 }
             }
         }
@@ -529,12 +540,7 @@ open class WKTextProvider : WKChatBaseProvider() {
     }
 
     private fun translationCacheKey(mMsg: WKMsg, content: String): String {
-        val stableId = when {
-            !TextUtils.isEmpty(mMsg.messageID) && mMsg.messageID != "0" -> mMsg.messageID
-            !TextUtils.isEmpty(mMsg.clientMsgNO) -> mMsg.clientMsgNO
-            else -> content.hashCode().toString()
-        }
-        return "chat_translate_cache_" + "bubble_$stableId".hashCode()
+        return buildChatTranslateUiKey(mMsg, content)
     }
 
     private fun getMessageText(mMsg: WKMsg): String {
@@ -629,7 +635,7 @@ open class WKTextProvider : WKChatBaseProvider() {
             .setFlame(uiChatMsgItemEntity.wkMsg.flame)
             .setIsShowPinnedMessage(if (uiChatMsgItemEntity.isShowPinnedMessage) 1 else 0)
             .addItem(com.chat.uikit.R.drawable.ic_chat_translate_wa,
-                "翻译",
+                context.getString(com.chat.translate.R.string.wktranslate_translate),
                 object : SelectTextHelper.Builder.onSeparateItemClickListener {
                     override fun onClick() {
                         EndpointManager.getInstance().invoke("chat_activity_touch", null)
