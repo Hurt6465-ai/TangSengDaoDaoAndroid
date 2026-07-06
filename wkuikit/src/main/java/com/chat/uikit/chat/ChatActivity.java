@@ -627,11 +627,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         moreIV = new TextView(this);
         moreIV.setText("⋮");
         moreIV.setGravity(Gravity.CENTER);
-        moreIV.setTextSize(28);
+        moreIV.setTextSize(24);
         moreIV.setIncludeFontPadding(false);
         moreIV.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
         moreIV.setBackground(Theme.createSelectorDrawable(Theme.getPressedColor()));
-        wkVBinding.topLayout.rightView.addView(moreIV, LayoutHelper.createFrame(46, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 6, 0));
+        wkVBinding.topLayout.rightView.addView(moreIV, LayoutHelper.createFrame(40, 40, Gravity.END | Gravity.CENTER_VERTICAL, 0, 0, 6, 0));
         moreIV.setOnClickListener(v -> showChatMoreDialog());
     }
 
@@ -639,17 +639,17 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         AlertDialog dialog = new AlertDialog.Builder(this).create();
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        int horizontal = AndroidUtilities.dp(18f);
-        int vertical = AndroidUtilities.dp(12f);
+        int horizontal = AndroidUtilities.dp(12f);
+        int vertical = AndroidUtilities.dp(4f);
         root.setPadding(horizontal, vertical, horizontal, vertical);
 
         TextView title = new TextView(this);
         title.setText(R.string.chat_more_menu);
         title.setGravity(Gravity.CENTER);
-        title.setTextSize(18);
+        title.setTextSize(15);
         title.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
         title.setIncludeFontPadding(false);
-        title.setPadding(0, AndroidUtilities.dp(4f), 0, AndroidUtilities.dp(10f));
+        title.setPadding(0, AndroidUtilities.dp(1f), 0, AndroidUtilities.dp(5f));
         root.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
         root.addView(createChatMoreMenuItem(getString(R.string.chat_bg_menu), () -> {
@@ -662,7 +662,12 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }));
 
         dialog.setView(root);
-        dialog.setOnShowListener(d -> applyGlassDialogStyle(dialog));
+        dialog.setOnShowListener(d -> {
+            applyGlassDialogStyle(dialog);
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setLayout(AndroidUtilities.dp(260f), ViewGroup.LayoutParams.WRAP_CONTENT);
+            }
+        });
         dialog.show();
     }
 
@@ -671,17 +676,17 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         item.setText(text);
         item.setGravity(Gravity.CENTER);
         item.setSingleLine(true);
-        item.setTextSize(16);
+        item.setTextSize(14);
         item.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
         item.setIncludeFontPadding(false);
-        item.setPadding(0, AndroidUtilities.dp(14f), 0, AndroidUtilities.dp(14f));
+        item.setPadding(0, 0, 0, 0);
         item.setBackground(Theme.createSelectorDrawable(Color.argb(18, 0, 0, 0)));
         item.setOnClickListener(v -> {
             if (action != null) action.run();
         });
-        LinearLayout.LayoutParams lp = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, AndroidUtilities.dp(52f));
-        lp.topMargin = AndroidUtilities.dp(4f);
-        lp.bottomMargin = AndroidUtilities.dp(4f);
+        LinearLayout.LayoutParams lp = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, AndroidUtilities.dp(36f));
+        lp.topMargin = AndroidUtilities.dp(1f);
+        lp.bottomMargin = AndroidUtilities.dp(1f);
         item.setLayoutParams(lp);
         return item;
     }
@@ -1194,7 +1199,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         numberTextView = new NumberTextView(this);
         numberTextView.setTextSize(18);
         numberTextView.setTextColor(Theme.colorAccount);
-        wkVBinding.topLayout.rightView.addView(numberTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 124, 0));
+        wkVBinding.topLayout.rightView.addView(numberTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 102, 0));
 
         boolean isRegister = true;
         Object isRegisterRTC = EndpointManager.getInstance().invoke("is_register_rtc", null);
@@ -1205,8 +1210,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         callIV = new AppCompatImageView(this);
         callIV.setImageResource(R.mipmap.ic_call);
         if (isRegister) {
-            wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(46, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 72, 0));
+            wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(34, 34, Gravity.END | Gravity.CENTER_VERTICAL, 0, 0, 58, 0));
         }
+        callIV.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        callIV.setPadding(AndroidUtilities.dp(7f), AndroidUtilities.dp(7f), AndroidUtilities.dp(7f), AndroidUtilities.dp(7f));
         callIV.setColorFilter(new PorterDuffColorFilter(ContextCompat.getColor(this, R.color.popupTextColor), PorterDuff.Mode.MULTIPLY));
         callIV.setBackground(Theme.createSelectorDrawable(Theme.getPressedColor()));
 
