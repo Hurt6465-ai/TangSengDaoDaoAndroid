@@ -205,7 +205,7 @@ open class WKTextProvider : WKChatBaseProvider() {
         val cacheKey = translationCacheKey(currentMsg, content)
         val cached = readTranslationCache(cacheKey)
         if (cached != null && cached.expanded) {
-            addTranslationView(contentTvLayout, cacheKey, cached.text)
+            addTranslationView(contentTvLayout, cacheKey, cached.text, cached.status)
         }
 
         // 只给当前已加载列表里的“最后一条有效对方文本消息”显示快捷翻译按钮。
@@ -215,7 +215,11 @@ open class WKTextProvider : WKChatBaseProvider() {
         }
     }
 
-    private data class TranslationCache(val text: String, val expanded: Boolean)
+    private data class TranslationCache(
+        val text: String,
+        val expanded: Boolean,
+        val status: String = "ok"
+    )
 
     private fun removeTaggedChildDeep(parent: ViewGroup, tag: String) {
         for (i in parent.childCount - 1 downTo 0) {
@@ -317,12 +321,16 @@ open class WKTextProvider : WKChatBaseProvider() {
         btn.setOnClickListener {
             val latest = readTranslationCache(cacheKey)
             when {
+                latest?.status == "loading" -> return@setOnClickListener
+                latest?.status == "error" -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
                 latest != null -> {
-                    saveTranslationCache(cacheKey, latest.text, !latest.expanded)
+                    saveTranslationCache(cacheKey, latest.text, !latest.expanded, latest.status)
                     notifyMessageChanged()
                 }
+                cached?.status == "loading" -> return@setOnClickListener
+                cached?.status == "error" -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
                 cached != null -> {
-                    saveTranslationCache(cacheKey, cached.text, !cached.expanded)
+                    saveTranslationCache(cacheKey, cached.text, !cached.expanded, cached.status)
                     notifyMessageChanged()
                 }
                 else -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
@@ -335,7 +343,7 @@ open class WKTextProvider : WKChatBaseProvider() {
         parent.addView(btn, lp)
     }
 
-    private fun addTranslationView(parent: ViewGroup, cacheKey: String, text: String) {
+    private fun addTranslationView(parent: ViewGroup, cacheKey: String, text: String, status: String = "ok") {
         val box = LinearLayout(context)
         box.tag = translationViewTag
         box.orientation = LinearLayout.VERTICAL
@@ -347,17 +355,27 @@ open class WKTextProvider : WKChatBaseProvider() {
 
         val tv = AppCompatTextView(context)
         tv.text = text
-        tv.setTextColor(ContextCompat.getColor(context, R.color.colorDark))
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+        tv.setTextColor(
+            when (status) {
+                "loading" -> ContextCompat.getColor(context, R.color.color999)
+                "error" -> Color.rgb(220, 38, 38)
+                else -> ContextCompat.getColor(context, R.color.colorDark)
+            }
+        )
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (status == "loading") 14f else 15f)
         tv.setLineSpacing(0f, 1.08f)
         tv.setPadding(0, dp(7), 0, 0)
         tv.setOnClickListener {
-            saveTranslationCache(cacheKey, text, false)
-            notifyMessageChanged()
+            if (status != "loading") {
+                saveTranslationCache(cacheKey, text, false, status)
+                notifyMessageChanged()
+            }
         }
         box.setOnClickListener {
-            saveTranslationCache(cacheKey, text, false)
-            notifyMessageChanged()
+            if (status != "loading") {
+                saveTranslationCache(cacheKey, text, false, status)
+                notifyMessageChanged()
+            }
         }
         box.addView(tv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
 
@@ -369,8 +387,8 @@ open class WKTextProvider : WKChatBaseProvider() {
     private fun translateSelectedTextToBubble(uiChatMsgItemEntity: WKUIChatMsgItemEntity, text: String) {
         val cacheKey = translationCacheKey(uiChatMsgItemEntity.wkMsg, text)
         val cached = readTranslationCache(cacheKey)
-        if (cached != null) {
-            saveTranslationCache(cacheKey, cached.text, true)
+        if (cached != null && cached.status == "ok") {
+            saveTranslationCache(cacheKey, cached.text, true, cached.status)
             notifyMessageChanged()
             return
         }
@@ -384,13 +402,15 @@ open class WKTextProvider : WKChatBaseProvider() {
         requestWingman: Boolean
     ) {
         val appContext = context.applicationContext
-        if (!TranslatePrefs.hasUsableAi(appContext) && TranslatePrefs.getMode(appContext) != TranslateMode.MACHINE) {
+        val translateMode = TranslatePrefs.getMode(appContext)
+        if (translateMode == TranslateMode.AI && !TranslatePrefs.hasUsableAi(appContext)) {
             WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_need_ai_config))
             WkTranslateBridge().openSettings(context, "chat_bubble")
             return
         }
 
-        WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_translating))
+        saveTranslationCache(cacheKey, context.getString(com.chat.translate.R.string.wktranslate_translating), true, "loading")
+        notifyMessageChanged()
         thread {
             try {
                 val result = runBlocking {
@@ -407,27 +427,29 @@ open class WKTextProvider : WKChatBaseProvider() {
                 }
                 Handler(Looper.getMainLooper()).post {
                     if (result.success && !TextUtils.isEmpty(result.translatedText)) {
-                        saveTranslationCache(cacheKey, result.translatedText, true)
+                        saveTranslationCache(cacheKey, result.translatedText, true, "ok")
                         notifyMessageChanged()
                     } else if (result.errorCode == TranslateErrorCode.NEED_AI_CONFIG) {
-                        WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_need_ai_config))
-                        WkTranslateBridge().openSettings(context, "chat_bubble")
-                    } else {
-                        if (!TranslatePrefs.hasUsableAi(context.applicationContext)) {
+                        if (TranslatePrefs.getMode(context.applicationContext) == TranslateMode.AI) {
                             WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_need_ai_config))
                             WkTranslateBridge().openSettings(context, "chat_bubble")
                         } else {
-                            WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_translate_failed))
+                            saveTranslationCache(cacheKey, context.getString(com.chat.translate.R.string.wktranslate_translate_failed), true, "error")
+                            notifyMessageChanged()
                         }
+                    } else {
+                        saveTranslationCache(cacheKey, context.getString(com.chat.translate.R.string.wktranslate_translate_failed), true, "error")
+                            notifyMessageChanged()
                     }
                 }
             } catch (_: Exception) {
                 Handler(Looper.getMainLooper()).post {
-                    if (!TranslatePrefs.hasUsableAi(context.applicationContext)) {
+                    if (TranslatePrefs.getMode(context.applicationContext) == TranslateMode.AI && !TranslatePrefs.hasUsableAi(context.applicationContext)) {
                         WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_need_ai_config))
                         WkTranslateBridge().openSettings(context, "chat_bubble")
                     } else {
-                        WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_translate_failed))
+                        saveTranslationCache(cacheKey, context.getString(com.chat.translate.R.string.wktranslate_translate_failed), true, "error")
+                            notifyMessageChanged()
                     }
                 }
             }
@@ -585,15 +607,20 @@ open class WKTextProvider : WKChatBaseProvider() {
             val time = obj.optLong("time", 0L)
             if (System.currentTimeMillis() - time > 7L * 24L * 60L * 60L * 1000L) return null
             val text = obj.optString("text", "")
-            if (text.isBlank()) null else TranslationCache(text, obj.optBoolean("expanded", false))
+            val status = obj.optString("status", "ok")
+            if (text.isBlank()) null else TranslationCache(text, obj.optBoolean("expanded", false), status)
         } catch (_: Exception) {
             null
         }
     }
 
-    private fun saveTranslationCache(key: String, translated: String, expanded: Boolean) {
+    private fun saveTranslationCache(key: String, translated: String, expanded: Boolean, status: String = "ok") {
         try {
-            val obj = JSONObject().put("time", System.currentTimeMillis()).put("text", translated).put("expanded", expanded)
+            val obj = JSONObject()
+                .put("time", System.currentTimeMillis())
+                .put("text", translated)
+                .put("expanded", expanded)
+                .put("status", status)
             context.getSharedPreferences("chat_translate_cache", Context.MODE_PRIVATE).edit().putString(key, obj.toString()).apply()
         } catch (_: Exception) {
         }
