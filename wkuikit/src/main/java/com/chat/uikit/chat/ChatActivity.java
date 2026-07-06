@@ -113,6 +113,7 @@ import com.chat.uikit.robot.service.WKRobotModel;
 import com.chat.uikit.user.ProfileNavigator;
 import com.chat.uikit.user.service.UserModel;
 import com.chat.uikit.view.WKPlayVoiceUtils;
+import com.chat.translate.ui.TranslateSettingsActivity;
 import com.effective.android.panel.PanelSwitchHelper;
 import com.effective.android.panel.interfaces.ContentScrollMeasurer;
 import com.effective.android.panel.interfaces.listener.OnPanelChangeListener;
@@ -630,25 +631,59 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         moreIV.setIncludeFontPadding(false);
         moreIV.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
         moreIV.setBackground(Theme.createSelectorDrawable(Theme.getPressedColor()));
-        wkVBinding.topLayout.rightView.addView(moreIV, LayoutHelper.createFrame(42, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 4, 0));
+        wkVBinding.topLayout.rightView.addView(moreIV, LayoutHelper.createFrame(46, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 6, 0));
         moreIV.setOnClickListener(v -> showChatMoreDialog());
     }
 
     private void showChatMoreDialog() {
-        String[] items = new String[]{
-                getString(R.string.chat_bg_menu),
-                getString(R.string.chat_ai_settings),
-                "RTC 诊断日志"
-        };
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.chat_more_menu)
-                .setItems(items, (d, which) -> {
-                    if (which == 0) showChatBackgroundDialog();
-                    else if (which == 1) showChatAiSettingsDialog();
-                    else openRtcDebugLog();
-                })
-                .show();
-        applyGlassDialogStyle(dialog);
+        AlertDialog dialog = new AlertDialog.Builder(this).create();
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        int horizontal = AndroidUtilities.dp(18f);
+        int vertical = AndroidUtilities.dp(12f);
+        root.setPadding(horizontal, vertical, horizontal, vertical);
+
+        TextView title = new TextView(this);
+        title.setText(R.string.chat_more_menu);
+        title.setGravity(Gravity.CENTER);
+        title.setTextSize(18);
+        title.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
+        title.setIncludeFontPadding(false);
+        title.setPadding(0, AndroidUtilities.dp(4f), 0, AndroidUtilities.dp(10f));
+        root.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+
+        root.addView(createChatMoreMenuItem(getString(R.string.chat_bg_menu), () -> {
+            dialog.dismiss();
+            showChatBackgroundDialog();
+        }));
+        root.addView(createChatMoreMenuItem(getString(R.string.chat_ai_settings), () -> {
+            dialog.dismiss();
+            showChatAiSettingsDialog();
+        }));
+
+        dialog.setView(root);
+        dialog.setOnShowListener(d -> applyGlassDialogStyle(dialog));
+        dialog.show();
+    }
+
+    private View createChatMoreMenuItem(String text, Runnable action) {
+        TextView item = new TextView(this);
+        item.setText(text);
+        item.setGravity(Gravity.CENTER);
+        item.setSingleLine(true);
+        item.setTextSize(16);
+        item.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
+        item.setIncludeFontPadding(false);
+        item.setPadding(0, AndroidUtilities.dp(14f), 0, AndroidUtilities.dp(14f));
+        item.setBackground(Theme.createSelectorDrawable(Color.argb(18, 0, 0, 0)));
+        item.setOnClickListener(v -> {
+            if (action != null) action.run();
+        });
+        LinearLayout.LayoutParams lp = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, AndroidUtilities.dp(52f));
+        lp.topMargin = AndroidUtilities.dp(4f);
+        lp.bottomMargin = AndroidUtilities.dp(4f);
+        item.setLayoutParams(lp);
+        return item;
     }
 
     private void openRtcDebugLog() {
@@ -711,51 +746,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private void showChatAiSettingsDialog() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        int padding = AndroidUtilities.dp(18f);
-        root.setPadding(padding, AndroidUtilities.dp(8f), padding, 0);
-
-        EditText endpointEt = createSettingEdit(root, getString(R.string.chat_ai_endpoint), getLocalString(KEY_AI_ENDPOINT, "https://api.deepseek.com/v1/chat/completions"));
-        EditText keyEt = createSettingEdit(root, getString(R.string.chat_ai_key), getLocalString(KEY_AI_KEY, ""));
-        EditText modelEt = createSettingEdit(root, getString(R.string.chat_ai_model), getLocalString(KEY_AI_MODEL, "deepseek-chat"));
-        EditText sourceEt = createSettingEdit(root, getString(R.string.chat_ai_source_lang), getLocalString(KEY_AI_SOURCE_LANG, "မြန်မာစာ"));
-        EditText targetEt = createSettingEdit(root, getString(R.string.chat_ai_target_lang), getLocalString(KEY_AI_TARGET_LANG, "中文"));
-        sourceEt.setHint("မြန်မာစာ");
-        targetEt.setHint("中文");
-
-        Switch autoTranslate = new Switch(this);
-        autoTranslate.setText(R.string.chat_ai_auto_translate);
-        autoTranslate.setChecked(getLocalFlag(KEY_AI_AUTO_TRANSLATE, false));
-        root.addView(autoTranslate, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 8, 0, 0));
-
-        Switch sendTranslate = new Switch(this);
-        sendTranslate.setText(R.string.chat_ai_translate_before_send);
-        sendTranslate.setChecked(getLocalFlag(KEY_AI_SEND_TRANSLATE, false));
-        root.addView(sendTranslate, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
-
-        Switch wingmanEnabled = new Switch(this);
-        wingmanEnabled.setText(R.string.chat_ai_wingman_enabled);
-        wingmanEnabled.setChecked(getLocalFlag(KEY_AI_WINGMAN_ENABLED, false));
-        root.addView(wingmanEnabled, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.chat_ai_settings)
-                .setView(root)
-                .setNegativeButton(R.string.chat_ai_cancel, null)
-                .setPositiveButton(R.string.chat_ai_save, (dialogInterface, which) -> {
-                    WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_ENDPOINT, endpointEt.getText().toString().trim());
-                    WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_KEY, keyEt.getText().toString().trim());
-                    WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_MODEL, modelEt.getText().toString().trim());
-                    WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_SOURCE_LANG, sourceEt.getText().toString().trim());
-                    WKSharedPreferencesUtil.getInstance().putSP(KEY_AI_TARGET_LANG, targetEt.getText().toString().trim());
-                    putLocalFlag(KEY_AI_AUTO_TRANSLATE, autoTranslate.isChecked());
-                    putLocalFlag(KEY_AI_SEND_TRANSLATE, sendTranslate.isChecked());
-                    putLocalFlag(KEY_AI_WINGMAN_ENABLED, wingmanEnabled.isChecked());
-                    if (chatPanelManager != null) chatPanelManager.refreshAiAssistBar();
-                })
-                .show();
-        applyGlassDialogStyle(dialog);
+        TranslateSettingsActivity.Companion.start(this, "chat_more");
     }
 
 
@@ -860,10 +851,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private void rtcLog(String text) {
-        try {
-            EndpointManager.getInstance().invoke("rtc_log", "ChatActivity " + text);
-        } catch (Exception ignored) {
-        }
+        // RTC diagnostic logs are disabled in the chat UI.
     }
 
     private boolean isRtcSignalMessage(WKMsg msg, boolean dispatch) {
@@ -1206,7 +1194,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         numberTextView = new NumberTextView(this);
         numberTextView.setTextSize(18);
         numberTextView.setTextColor(Theme.colorAccount);
-        wkVBinding.topLayout.rightView.addView(numberTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 86, 0));
+        wkVBinding.topLayout.rightView.addView(numberTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 124, 0));
 
         boolean isRegister = true;
         Object isRegisterRTC = EndpointManager.getInstance().invoke("is_register_rtc", null);
@@ -1217,7 +1205,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         callIV = new AppCompatImageView(this);
         callIV.setImageResource(R.mipmap.ic_call);
         if (isRegister) {
-            wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 46, 0));
+            wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(46, LayoutHelper.MATCH_PARENT, Gravity.END, 0, 0, 72, 0));
         }
         callIV.setColorFilter(new PorterDuffColorFilter(ContextCompat.getColor(this, R.color.popupTextColor), PorterDuff.Mode.MULTIPLY));
         callIV.setBackground(Theme.createSelectorDrawable(Theme.getPressedColor()));
