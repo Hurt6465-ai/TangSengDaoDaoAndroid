@@ -54,8 +54,8 @@ object MachineTranslator {
     private fun buildFallbackChain(prefs: TranslatePrefs.MachineConfig): List<Candidate> {
         val selected = Candidate(prefs.engine, prefs.url, prefs.parser)
         val fallback = listOf(
-            Candidate(TranslatePrefs.ENGINE_DEEPLX, TranslatePrefs.DEFAULT_DEEPLX_URL, TranslatePrefs.PARSER_DEEPLX),
-            Candidate(TranslatePrefs.ENGINE_GOOGLE, TranslatePrefs.DEFAULT_GOOGLE_URL, TranslatePrefs.PARSER_GOOGLE)
+            Candidate(TranslatePrefs.ENGINE_GOOGLE, TranslatePrefs.DEFAULT_GOOGLE_URL, TranslatePrefs.PARSER_GOOGLE),
+            Candidate(TranslatePrefs.ENGINE_DEEPLX, TranslatePrefs.DEFAULT_DEEPLX_URL, TranslatePrefs.PARSER_DEEPLX)
         )
         return (listOf(selected) + fallback).distinctBy { it.engine + "|" + it.url + "|" + it.parser }
     }
@@ -72,10 +72,17 @@ object MachineTranslator {
                 .url(candidate.url)
                 .post(bodyJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .addHeader("Content-Type", "application/json")
+                .addHeader("Accept", "application/json")
+                .addHeader("User-Agent", "Mozilla/5.0 TangSengDaoDao-Translate/1.0")
                 .build()
         } else {
             val url = fillTemplate(candidate.url, sourceCode, targetCode, text)
-            Request.Builder().url(url).get().build()
+            Request.Builder()
+                .url(url)
+                .get()
+                .addHeader("Accept", "application/json")
+                .addHeader("User-Agent", "Mozilla/5.0 TangSengDaoDao-Translate/1.0")
+                .build()
         }
         client.newCall(request).execute().use { response ->
             val body = response.body.string()
