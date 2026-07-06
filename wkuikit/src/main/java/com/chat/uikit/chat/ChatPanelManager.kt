@@ -315,7 +315,6 @@ class ChatPanelManager(
         initBanView()
         initForbiddenView()
         initChatTopView()
-        initWingmanSuggestionsEndpoint()
         initFlame()
         initNewImageView()
         EndpointManager.getInstance().invoke(
@@ -3045,19 +3044,8 @@ ${content}"""
     }
 
     private fun initWingmanSuggestionsEndpoint() {
-        EndpointManager.getInstance().setMethod("chat_wingman_suggestions") { data ->
-            val replies = ArrayList<String>()
-            when (data) {
-                is List<*> -> data.forEach { if (!it.toString().isBlank()) replies.add(it.toString()) }
-                is Array<*> -> data.forEach { item ->
-                    val value = item?.toString() ?: ""
-                    if (value.isNotBlank()) replies.add(value)
-                }
-                is String -> if (data.isNotBlank()) replies.add(data)
-            }
-            showWingmanSuggestions(replies.take(5))
-            null
-        }
+        // Wingman suggestions are disabled to avoid extra AI cost.
+        EndpointManager.getInstance().setMethod("chat_wingman_suggestions") { null }
     }
 
     private fun showWingmanSuggestions(replies: List<String>) {
