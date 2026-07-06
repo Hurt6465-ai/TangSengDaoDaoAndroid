@@ -21,11 +21,12 @@ public class TangSengSpeechBridge {
 
     /**
      * For page buttons that want the app to insert text into the currently focused input.
+     * No language is forced by default. The page can pass zh-CN / my-MM / en-US when it knows the input language.
      * JS: window.TangSengSpeech.startSpeech()
      */
     @JavascriptInterface
     public void startSpeech() {
-        startSpeechWithLang("zh-CN");
+        startSpeechWithLang("");
     }
 
     @JavascriptInterface
@@ -38,11 +39,12 @@ public class TangSengSpeechBridge {
     /**
      * For the injected SpeechRecognition polyfill.
      * It returns result through window.__TangSengSpeechNativeResult(text), without direct insertion.
+     * No language is forced by default. recognition.lang controls the native language hint.
      * JS: window.TangSengSpeech.startRecognition()
      */
     @JavascriptInterface
     public void startRecognition() {
-        startRecognitionWithLang("zh-CN");
+        startRecognitionWithLang("");
     }
 
     @JavascriptInterface
