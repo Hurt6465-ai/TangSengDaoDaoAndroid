@@ -38,10 +38,11 @@ public class AiScriptWebActivity extends Activity {
     private final Handler speechHandler = new Handler(Looper.getMainLooper());
     private WebView webView;
     private SpeechRecognizer nativeRecognizer;
-    private String pendingNativeSpeechLang = "zh-CN";
+    private String pendingNativeSpeechLang = "";
     private boolean nativeSpeechActive = false;
     private boolean nativeSpeechIntentActive = false;
     private boolean nativeSpeechPermissionPending = false;
+    private boolean nativeSystemFallbackTried = false;
     private final Runnable nativeSpeechTimeoutRunnable = new Runnable() {
         @Override
         public void run() {
@@ -248,7 +249,7 @@ public class AiScriptWebActivity extends Activity {
             nativeSpeechPermissionPending = false;
             if (granted) {
                 beginNativeSpeech(pendingNativeSpeechLang);
-            } else {
+            } else if (!startSystemSpeechIntent(pendingNativeSpeechLang)) {
                 emitNativeSpeechEvent("error", "", "not-allowed");
                 emitNativeSpeechEvent("end", "", "");
                 Toast.makeText(this, "请先允许麦克风权限", Toast.LENGTH_SHORT).show();
@@ -262,6 +263,7 @@ public class AiScriptWebActivity extends Activity {
         pendingNativeSpeechLang = normalizeSpeechLang(lang);
         nativeSpeechActive = true;
         nativeSpeechIntentActive = false;
+        nativeSystemFallbackTried = false;
         speechHandler.removeCallbacks(nativeSpeechTimeoutRunnable);
         speechHandler.postDelayed(nativeSpeechTimeoutRunnable, NATIVE_SPEECH_TIMEOUT_MS);
 
@@ -281,19 +283,19 @@ public class AiScriptWebActivity extends Activity {
     }
 
     private boolean startSystemSpeechIntent(String lang) {
+        if (webView == null || isFinishing()) return false;
+
+        releaseNativeSpeechRecognizer();
+
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang);
+        putSpeechLanguageExtrasIfNeeded(intent, lang);
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
         intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "请讲话");
 
-        if (intent.resolveActivity(getPackageManager()) == null) {
-            return false;
-        }
-
         try {
+            nativeSystemFallbackTried = true;
             nativeSpeechIntentActive = true;
             startActivityForResult(intent, REQ_NATIVE_SPEECH_INTENT);
             return true;
@@ -334,6 +336,10 @@ public class AiScriptWebActivity extends Activity {
 
                 @Override
                 public void onError(int error) {
+                    if (shouldTrySystemSpeechDialogAfterError(error) && !nativeSystemFallbackTried
+                            && startSystemSpeechIntent(pendingNativeSpeechLang)) {
+                        return;
+                    }
                     emitNativeSpeechEvent("error", "", speechErrorName(error));
                     finishNativeSpeech(true);
                 }
@@ -362,8 +368,7 @@ public class AiScriptWebActivity extends Activity {
 
             Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang);
-            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, lang);
+            putSpeechLanguageExtrasIfNeeded(intent, lang);
             intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
             intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
             intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2600L);
@@ -440,6 +445,7 @@ public class AiScriptWebActivity extends Activity {
     private void finishNativeSpeech(boolean emitEnd) {
         nativeSpeechActive = false;
         nativeSpeechIntentActive = false;
+        nativeSystemFallbackTried = false;
         speechHandler.removeCallbacks(nativeSpeechTimeoutRunnable);
         releaseNativeSpeechRecognizer();
         if (emitEnd) emitNativeSpeechEvent("end", "", "");
@@ -469,9 +475,43 @@ public class AiScriptWebActivity extends Activity {
 
     private String normalizeSpeechLang(String lang) {
         String value = lang == null ? "" : lang.trim();
-        if (value.length() == 0) return "zh-CN";
-        if (value.length() > 20) value = value.substring(0, 20);
+        if (value.length() == 0) return "";
+        if (value.length() > 40) value = value.substring(0, 40);
+        value = value.replace('_', '-');
+
+        String lower = value.toLowerCase(java.util.Locale.US);
+        if ("auto".equals(lower) || "default".equals(lower) || "system".equals(lower) || "und".equals(lower)) {
+            return "";
+        }
+        if ("zh".equals(lower) || "cn".equals(lower) || "zh-cn".equals(lower)
+                || "chinese".equals(lower) || "中文".equals(value) || "汉语".equals(value)) {
+            return "zh-CN";
+        }
+        if ("my".equals(lower) || "mm".equals(lower) || "my-mm".equals(lower)
+                || "burmese".equals(lower) || "myanmar".equals(lower)
+                || "缅语".equals(value) || "缅甸语".equals(value) || "မြန်မာ".equals(value)) {
+            return "my-MM";
+        }
+        if ("en".equals(lower) || "english".equals(lower) || "英文".equals(value) || "英语".equals(value)) {
+            return "en-US";
+        }
         return value;
+    }
+
+    private void putSpeechLanguageExtrasIfNeeded(Intent intent, String lang) {
+        String value = normalizeSpeechLang(lang);
+        if (value.length() == 0) return;
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, value);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, value);
+    }
+
+    private boolean shouldTrySystemSpeechDialogAfterError(int error) {
+        return error == SpeechRecognizer.ERROR_CLIENT
+                || error == SpeechRecognizer.ERROR_SERVER
+                || error == SpeechRecognizer.ERROR_NETWORK
+                || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT
+                || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                || error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS;
     }
 
     private String firstSpeechResult(Bundle results) {
@@ -604,30 +644,20 @@ public class AiScriptWebActivity extends Activity {
     }
 
     private boolean isNativeSpeechAvailable() {
-        if (!isSpeechHostAllowed()) return false;
-        try {
-            if (SpeechRecognizer.isRecognitionAvailable(this)) return true;
-        } catch (Throwable ignored) {
-        }
-        try {
-            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-            return intent.resolveActivity(getPackageManager()) != null;
-        } catch (Throwable ignored) {
-            return false;
-        }
+        // Do not disable the JS microphone button just because SpeechRecognizer.isRecognitionAvailable()
+        // or resolveActivity() says false. Some OEM ROMs return false here but can still open the
+        // system speech dialog. Let startNativeSpeechFromWeb() try both paths and report an error only
+        // after both have actually failed.
+        return isSpeechHostAllowed();
     }
 
     private String nativeSpeechEngineName() {
+        if (!isSpeechHostAllowed()) return "none";
         try {
             if (SpeechRecognizer.isRecognitionAvailable(this)) return "system-speechrecognizer";
         } catch (Throwable ignored) {
         }
-        try {
-            Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-            if (intent.resolveActivity(getPackageManager()) != null) return "system-intent";
-        } catch (Throwable ignored) {
-        }
-        return "none";
+        return "system-intent";
     }
 
     private boolean isSpeechHostAllowed() {
@@ -646,7 +676,9 @@ public class AiScriptWebActivity extends Activity {
                     || host.equals("qianwen.com")
                     || host.endsWith(".qianwen.com")
                     || host.equals("chat.deepseek.com")
-                    || host.endsWith(".deepseek.com");
+                    || host.endsWith(".deepseek.com")
+                    || host.equals("886.best")
+                    || host.endsWith(".886.best");
         } catch (Throwable ignored) {
             return false;
         }
@@ -735,10 +767,10 @@ public class AiScriptWebActivity extends Activity {
 
         @JavascriptInterface
         public void startSpeechJson(String json) {
-            String lang = "zh-CN";
+            String lang = "";
             try {
                 JSONObject obj = new JSONObject(json == null ? "{}" : json);
-                lang = obj.optString("lang", lang);
+                lang = obj.optString("lang", "");
             } catch (Throwable ignored) {
             }
             startSpeech(lang);
