@@ -20,6 +20,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
 import android.view.View
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -101,6 +102,8 @@ import com.chat.uikit.robot.entity.WKRobotMenuEntity
 import com.chat.uikit.robot.service.WKRobotModel
 import com.chat.uikit.user.ProfileNavigator
 import com.chat.uikit.utils.mentionDisplay
+import com.chat.translate.api.ChatBeforeSendRequest
+import com.chat.translate.api.WkTranslateBridge
 import com.effective.android.panel.PanelSwitchHelper
 import com.xinbida.wukongim.WKIM
 import com.xinbida.wukongim.entity.WKChannel
@@ -114,6 +117,7 @@ import com.xinbida.wukongim.entity.WKSendOptions
 import com.xinbida.wukongim.msgmodel.WKMessageContent
 import com.xinbida.wukongim.msgmodel.WKMsgEntity
 import com.xinbida.wukongim.msgmodel.WKTextContent
+import com.xinbida.wukongim.msgmodel.WKReply
 import org.json.JSONObject
 import org.json.JSONArray
 import java.io.BufferedReader
@@ -122,11 +126,13 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
+import java.util.ArrayDeque
 import java.util.Objects
 import java.util.Timer
 import java.util.TimerTask
 import kotlin.math.min
 import androidx.core.view.isGone
+import kotlinx.coroutines.runBlocking
 
 
 class TranslateStatusView(context: android.content.Context) : View(context) {
@@ -238,6 +244,17 @@ class ChatPanelManager(
             return localText
         }
     }
+
+    private data class PendingBeforeSendTranslate(
+        val originalText: String,
+        val mentionUids: ArrayList<String>?,
+        val entities: ArrayList<WKMsgEntity>?,
+        val reply: WKReply?
+    )
+
+    private val beforeSendTranslateQueue = ArrayDeque<PendingBeforeSendTranslate>()
+    private var beforeSendTranslateRunning = false
+    private var handlingKeyboardSend = false
 
 
     private val menuView: View = parentView.findViewById(R.id.menuView)
@@ -1530,32 +1547,130 @@ ${content}"""
         }
 
         if (getFlag(keyAiSendTranslate, false)) {
-            val originalText = content
-            sendIV.isEnabled = false
-            requestAi(
-                buildTranslatePrompt(originalText),
-                onSuccess = { translated ->
-                    sendIV.isEnabled = true
-                    sendTextNow(translated, originalText)
-                },
-                onError = {
-                    sendIV.isEnabled = true
-                    WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_failed))
-                }
-            )
+            enqueueTranslateBeforeSend(content)
         } else {
             sendTextNow(content, null)
         }
     }
 
-    private fun sendTextNow(remoteContent: String, localDisplayContent: String?) {
+    private fun enqueueTranslateBeforeSend(content: String) {
+        val replySnapshot = buildReplySnapshot(iConversationContext.replyMsg)
+
+        // 编辑消息走原逻辑，避免异步翻译把“编辑”误变成一条新消息。
+        if (chatTopView?.visibility == View.VISIBLE && replySnapshot == null) {
+            sendTextNow(content, null)
+            return
+        }
+
+        val mentionUids = editText.allUIDs?.let { ArrayList(it) }
+        val entities = editText.allEntity?.let { ArrayList(it) }
+        beforeSendTranslateQueue.offer(PendingBeforeSendTranslate(content, mentionUids, entities, replySnapshot))
+
+        editText.text = null
+        lastInputTime = 0
+        updateSendButtonMode()
+        if (replySnapshot != null) {
+            try {
+                iConversationContext.deleteOperationMsg()
+            } catch (_: Exception) {
+                if (chatTopView?.visibility == View.VISIBLE) {
+                    CommonAnim.getInstance().animateClose(chatTopView)
+                }
+            }
+        }
+
+        processBeforeSendTranslateQueue()
+    }
+
+    private fun processBeforeSendTranslateQueue() {
+        if (beforeSendTranslateRunning) return
+        val task = beforeSendTranslateQueue.peek() ?: return
+        beforeSendTranslateRunning = true
+
+        Thread {
+            val result = try {
+                runBlocking {
+                    WkTranslateBridge().translateBeforeSend(
+                        ChatBeforeSendRequest(
+                            context = iConversationContext.chatActivity,
+                            text = task.originalText,
+                            sourceLang = getSetting(keyAiSourceLang, "မြန်မာစာ"),
+                            targetLang = getSetting(keyAiTargetLang, "中文")
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("ChatPanelManager", "before-send translation failed", e)
+                null
+            }
+
+            Handler(Looper.getMainLooper()).post {
+                val finished = beforeSendTranslateQueue.poll()
+                beforeSendTranslateRunning = false
+                if (finished != null && result != null && result.success && !TextUtils.isEmpty(result.translatedText)) {
+                    sendTextNow(
+                        remoteContent = result.translatedText,
+                        localDisplayContent = finished.originalText,
+                        mentionUids = finished.mentionUids,
+                        entities = finished.entities,
+                        reply = finished.reply
+                    )
+                } else {
+                    WKToastUtils.getInstance().showToast(
+                        iConversationContext.chatActivity.getString(R.string.chat_ai_failed)
+                    )
+                }
+                processBeforeSendTranslateQueue()
+            }
+        }.start()
+    }
+
+    private fun buildReplySnapshot(replyMsg: WKMsg?): WKReply? {
+        if (replyMsg == null) return null
+        return try {
+            val reply = WKReply()
+            reply.payload = if (replyMsg.remoteExtra != null && replyMsg.remoteExtra.contentEditMsgModel != null) {
+                replyMsg.remoteExtra.contentEditMsgModel
+            } else {
+                replyMsg.baseContentMsgModel
+            }
+            val from = replyMsg.from
+            var showName = from?.channelName ?: ""
+            if (TextUtils.isEmpty(showName)) {
+                val channel = WKIM.getInstance().channelManager.getChannel(replyMsg.fromUID, WKChannelType.PERSONAL)
+                if (channel != null) showName = channel.channelName
+            }
+            reply.from_name = showName
+            reply.from_uid = replyMsg.fromUID
+            reply.message_id = replyMsg.messageID
+            reply.message_seq = replyMsg.messageSeq
+            val parentReply = replyMsg.baseContentMsgModel?.reply
+            reply.root_mid = if (parentReply != null && !TextUtils.isEmpty(parentReply.root_mid)) {
+                parentReply.root_mid
+            } else {
+                reply.message_id
+            }
+            reply
+        } catch (e: Exception) {
+            Log.e("ChatPanelManager", "build reply snapshot failed", e)
+            null
+        }
+    }
+
+    private fun sendTextNow(
+        remoteContent: String,
+        localDisplayContent: String?,
+        mentionUids: List<String>? = null,
+        entities: List<WKMsgEntity>? = null,
+        reply: WKReply? = null
+    ) {
         val textMsgModel = if (!TextUtils.isEmpty(localDisplayContent) && localDisplayContent != remoteContent) {
             LocalOriginalTextContent(remoteContent, localDisplayContent!!)
         } else {
             WKTextContent(remoteContent)
         }
 
-        val list = editText.allUIDs
+        val list = mentionUids ?: editText.allUIDs
         if (list != null && list.isNotEmpty()) {
             val mMentionInfo = WKMentionInfo()
             val uidList: MutableList<String> = ArrayList()
@@ -1572,7 +1687,10 @@ ${content}"""
             mMentionInfo.uids = uidList
             textMsgModel.mentionInfo = mMentionInfo
         }
-        textMsgModel.entities = editText.allEntity
+        textMsgModel.entities = entities ?: editText.allEntity
+        if (reply != null) {
+            textMsgModel.reply = reply
+        }
 
         iConversationContext.sendMessage(textMsgModel)
         editText.text = null
@@ -1940,6 +2058,51 @@ ${content}"""
         return true
     }
 
+    private fun installKeyboardSendAction() {
+        // 让手机输入法右下角尽量显示“发送/Send”，并兼容部分输入法只插入换行的情况。
+        editText.imeOptions = EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_EXTRACT_UI
+        editText.setOnEditorActionListener { _, actionId, event ->
+            val isSendAction = actionId == EditorInfo.IME_ACTION_SEND ||
+                actionId == EditorInfo.IME_ACTION_DONE ||
+                actionId == EditorInfo.IME_ACTION_GO
+            val isEnterUp = event != null &&
+                event.keyCode == KeyEvent.KEYCODE_ENTER &&
+                event.action == KeyEvent.ACTION_UP &&
+                !event.isShiftPressed
+            if (isSendAction || isEnterUp) {
+                submitTextFromKeyboard()
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    private fun submitTextFromKeyboard(): Boolean {
+        if (handlingKeyboardSend) return true
+        handlingKeyboardSend = true
+        try {
+            val raw = editText.text?.toString() ?: ""
+            val cleaned = raw.trimEnd('\r', '\n')
+            if (cleaned != raw) {
+                editText.setText(cleaned)
+                editText.setSelection(cleaned.length)
+            }
+            if (!TextUtils.isEmpty(StringUtils.replaceBlank(cleaned))) {
+                sendInputText()
+            }
+            return true
+        } finally {
+            handlingKeyboardSend = false
+        }
+    }
+
+    private fun shouldSubmitInsertedNewLine(s: Editable): Boolean {
+        if (handlingKeyboardSend) return false
+        val text = s.toString()
+        return text.endsWith("\n") || text.endsWith("\r")
+    }
+
     private fun findVoiceRecordTarget(root: View?): View? {
         if (root == null || root.visibility != View.VISIBLE) return null
         val label = when (root) {
@@ -2019,6 +2182,7 @@ ${content}"""
         sendIV.setOnTouchListener { _, event ->
             if (hasInputText()) false else handleVoiceTouch(event)
         }
+        installKeyboardSendAction()
         editText.addTextChangedListener(object : TextWatcher {
 //            var linesCount = 0
 
@@ -2128,6 +2292,11 @@ ${content}"""
             }
 
             override fun afterTextChanged(s: Editable) {
+                if (shouldSubmitInsertedNewLine(s)) {
+                    submitTextFromKeyboard()
+                    return
+                }
+                if (handlingKeyboardSend) return
                 updateEditHeight()
                 MoonUtil.replaceEmoticons(
                     iConversationContext.chatActivity,
