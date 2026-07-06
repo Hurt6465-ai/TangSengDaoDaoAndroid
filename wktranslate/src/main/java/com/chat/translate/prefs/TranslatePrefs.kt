@@ -21,6 +21,7 @@ object TranslatePrefs {
     private const val KEY_MACHINE_PARSER = "machine_parser"
     private const val KEY_CURRENT_COUNTRY = "current_country"
     private const val KEY_LAST_CLEAN_TIME = "last_clean_time"
+    private const val KEY_GOOGLE_DEFAULT_MIGRATED = "google_default_migrated"
 
     const val MODE_AUTO = "auto"
     const val MODE_AI = "ai"
@@ -147,29 +148,64 @@ object TranslatePrefs {
 
     fun getMachineConfig(context: Context): MachineConfig {
         val p = sp(context)
-        val engine = p.getString(KEY_MACHINE_ENGINE, ENGINE_DEEPLX) ?: ENGINE_DEEPLX
-        val defaultUrl = when (engine) {
-            ENGINE_GOOGLE -> DEFAULT_GOOGLE_URL
-            else -> DEFAULT_DEEPLX_URL
-        }
-        val defaultParser = when (engine) {
-            ENGINE_GOOGLE -> PARSER_GOOGLE
-            ENGINE_CUSTOM -> PARSER_PLAIN
-            else -> PARSER_DEEPLX
-        }
+        migrateGoogleDefaultIfNeeded(context)
+        val engine = p.getString(KEY_MACHINE_ENGINE, ENGINE_GOOGLE) ?: ENGINE_GOOGLE
+        val defaultUrl = defaultMachineUrl(engine)
+        val defaultParser = defaultMachineParser(engine)
+        val savedUrl = p.getString(KEY_MACHINE_URL, defaultUrl) ?: defaultUrl
+        val savedParser = p.getString(KEY_MACHINE_PARSER, defaultParser) ?: defaultParser
         return MachineConfig(
             engine = engine,
-            url = p.getString(KEY_MACHINE_URL, defaultUrl) ?: defaultUrl,
-            parser = p.getString(KEY_MACHINE_PARSER, defaultParser) ?: defaultParser
+            url = savedUrl.ifBlank { defaultUrl },
+            parser = savedParser.ifBlank { defaultParser }
         )
     }
 
     fun saveMachineConfig(context: Context, engine: String, url: String, parser: String) {
+        val cleanEngine = engine.ifBlank { ENGINE_GOOGLE }
+        val cleanUrl = url.trim().ifBlank { defaultMachineUrl(cleanEngine) }
+        val cleanParser = parser.ifBlank { defaultMachineParser(cleanEngine) }
         sp(context).edit()
-            .putString(KEY_MACHINE_ENGINE, engine)
-            .putString(KEY_MACHINE_URL, url.trim())
-            .putString(KEY_MACHINE_PARSER, parser)
+            .putString(KEY_MACHINE_ENGINE, cleanEngine)
+            .putString(KEY_MACHINE_URL, cleanUrl)
+            .putString(KEY_MACHINE_PARSER, cleanParser)
+            .putBoolean(KEY_GOOGLE_DEFAULT_MIGRATED, true)
             .apply()
+    }
+
+    private fun defaultMachineUrl(engine: String): String {
+        return when (engine) {
+            ENGINE_DEEPLX -> DEFAULT_DEEPLX_URL
+            else -> DEFAULT_GOOGLE_URL
+        }
+    }
+
+    private fun defaultMachineParser(engine: String): String {
+        return when (engine) {
+            ENGINE_DEEPLX -> PARSER_DEEPLX
+            ENGINE_CUSTOM -> PARSER_PLAIN
+            else -> PARSER_GOOGLE
+        }
+    }
+
+    private fun migrateGoogleDefaultIfNeeded(context: Context) {
+        val p = sp(context)
+        if (p.getBoolean(KEY_GOOGLE_DEFAULT_MIGRATED, false)) return
+        val oldEngine = p.getString(KEY_MACHINE_ENGINE, "") ?: ""
+        val oldUrl = p.getString(KEY_MACHINE_URL, "") ?: ""
+        val oldParser = p.getString(KEY_MACHINE_PARSER, "") ?: ""
+        val shouldMigrate = oldEngine.isBlank()
+                || (oldEngine == ENGINE_DEEPLX && (oldUrl.isBlank() || oldUrl == DEFAULT_DEEPLX_URL) && (oldParser.isBlank() || oldParser == PARSER_DEEPLX))
+        if (shouldMigrate) {
+            p.edit()
+                .putString(KEY_MACHINE_ENGINE, ENGINE_GOOGLE)
+                .putString(KEY_MACHINE_URL, DEFAULT_GOOGLE_URL)
+                .putString(KEY_MACHINE_PARSER, PARSER_GOOGLE)
+                .putBoolean(KEY_GOOGLE_DEFAULT_MIGRATED, true)
+                .apply()
+        } else {
+            p.edit().putBoolean(KEY_GOOGLE_DEFAULT_MIGRATED, true).apply()
+        }
     }
 
     fun getCurrentCountryCode(context: Context): String {
