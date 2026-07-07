@@ -10,6 +10,9 @@ import android.net.Uri;
 import android.graphics.BitmapFactory;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.app.AlertDialog;
@@ -17,6 +20,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.PorterDuff;
@@ -241,6 +245,15 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private static final String KEY_AI_SEND_TRANSLATE = "chat_ai_send_translate";
     private static final String KEY_AI_WINGMAN_ENABLED = "chat_ai_wingman_enabled";
     private static final String KEY_IMAGE_COMPRESS = "chat_image_compress";
+
+    private static final int MORE_ICON_REMARK = 1;
+    private static final int MORE_ICON_MUTE = 2;
+    private static final int MORE_ICON_BG = 3;
+    private static final int MORE_ICON_AI = 4;
+    private static final int MORE_ICON_CLEAR = 5;
+    private static final int MORE_ICON_DELETE_FRIEND = 6;
+    private static final int MORE_ICON_BLACKLIST = 7;
+    private static final int MORE_ICON_REPORT = 8;
 
     // 图片字段反射缓存：key 为 Content 的 class，value 为可写入路径的 Field。避免每次发图都全量反射。
     private static final Map<Class<?>, List<Field>> IMG_PATH_FIELDS_CACHE = new HashMap<>();
@@ -643,15 +656,18 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         AlertDialog dialog = new AlertDialog.Builder(this).create();
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(AndroidUtilities.dp(10f), AndroidUtilities.dp(10f), AndroidUtilities.dp(10f), AndroidUtilities.dp(10f));
-        root.setBackground(makeRoundBg(Color.rgb(247, 248, 250), 18f));
+        root.setPadding(AndroidUtilities.dp(12f), AndroidUtilities.dp(12f), AndroidUtilities.dp(12f), AndroidUtilities.dp(12f));
+        root.setBackground(makeGlassBg(24f));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            root.setElevation(AndroidUtilities.dp(14f));
+        }
 
         LinearLayout group = new LinearLayout(this);
         group.setOrientation(LinearLayout.VERTICAL);
-        group.setBackground(makeRoundBg(Color.WHITE, 14f));
+        group.setBackground(makeRoundBg(Color.argb(190, 255, 255, 255), 18f));
         root.addView(group, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-        addChatMoreRow(group, "✎", getString(R.string.set_remark), false, () -> {
+        addChatMoreRow(group, MORE_ICON_REMARK, getString(R.string.set_remark), false, () -> {
             dialog.dismiss();
             showChatRemarkDialog();
         });
@@ -659,32 +675,32 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
         WKChannel curChannel = getCurrentChatChannel();
         boolean muteOn = curChannel != null && curChannel.mute == 1;
-        addChatMoreRow(group, muteOn ? "🔔" : "🔕", getString(R.string.chat_more_mute_notifications), false, () -> {
+        addChatMoreRow(group, MORE_ICON_MUTE, getString(R.string.chat_more_mute_notifications), false, () -> {
             dialog.dismiss();
             toggleChatMute();
         });
         addDivider(group);
 
-        addChatMoreRow(group, "🖼", getString(R.string.chat_more_bg), false, () -> {
+        addChatMoreRow(group, MORE_ICON_BG, getString(R.string.chat_more_bg), false, () -> {
             dialog.dismiss();
             showChatBackgroundDialog();
         });
         addDivider(group);
 
-        addChatMoreRow(group, "AI", getString(R.string.chat_more_ai_translate), false, () -> {
+        addChatMoreRow(group, MORE_ICON_AI, getString(R.string.chat_more_ai_translate), false, () -> {
             dialog.dismiss();
             showChatAiSettingsDialog();
         });
         addDivider(group);
 
-        addChatMoreRow(group, "⌫", getString(R.string.clear_history), true, () -> {
+        addChatMoreRow(group, MORE_ICON_CLEAR, getString(R.string.clear_history), true, () -> {
             dialog.dismiss();
             clearChatHistoryFromMore();
         });
 
         if (channelType == WKChannelType.PERSONAL && isFriendChatChannel()) {
             addDivider(group);
-            addChatMoreRow(group, "－", getString(R.string.delete_friends), true, () -> {
+            addChatMoreRow(group, MORE_ICON_DELETE_FRIEND, getString(R.string.delete_friends), true, () -> {
                 dialog.dismiss();
                 deleteFriendFromMore();
             });
@@ -693,14 +709,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (channelType == WKChannelType.PERSONAL) {
             addDivider(group);
             boolean black = isBlacklistedByMe();
-            addChatMoreRow(group, black ? "✓" : "!", getString(black ? R.string.pull_out_black_list : R.string.push_black_list), !black, () -> {
+            addChatMoreRow(group, MORE_ICON_BLACKLIST, getString(black ? R.string.pull_out_black_list : R.string.push_black_list), !black, () -> {
                 dialog.dismiss();
                 toggleBlacklistFromMore();
             });
         }
 
         addDivider(group);
-        addChatMoreRow(group, "⚠", getString(R.string.report), true, () -> {
+        addChatMoreRow(group, MORE_ICON_REPORT, getString(R.string.report), true, () -> {
             dialog.dismiss();
             openChatReportPage();
         });
@@ -727,28 +743,34 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         return drawable;
     }
 
+    private GradientDrawable makeGlassBg(float radiusDp) {
+        GradientDrawable drawable = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{Color.argb(242, 255, 255, 255), Color.argb(226, 247, 250, 255)}
+        );
+        drawable.setCornerRadius(AndroidUtilities.dp(radiusDp));
+        drawable.setStroke(AndroidUtilities.dp(1f), Color.argb(115, 255, 255, 255));
+        return drawable;
+    }
+
     private void addDivider(LinearLayout parent) {
         View line = new View(this);
-        line.setBackgroundColor(Color.rgb(238, 238, 238));
+        line.setBackgroundColor(Color.argb(90, 210, 214, 220));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1);
-        lp.leftMargin = AndroidUtilities.dp(54f);
+        lp.leftMargin = AndroidUtilities.dp(58f);
         parent.addView(line, lp);
     }
 
-    private void addChatMoreRow(LinearLayout parent, String icon, String text, boolean danger, Runnable action) {
+    private void addChatMoreRow(LinearLayout parent, int iconType, String text, boolean danger, Runnable action) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(AndroidUtilities.dp(14f), 0, AndroidUtilities.dp(10f), 0);
-        row.setBackground(Theme.createSelectorDrawable(Color.argb(18, 0, 0, 0)));
+        row.setPadding(AndroidUtilities.dp(13f), 0, AndroidUtilities.dp(10f), 0);
+        row.setBackground(Theme.createSelectorDrawable(Color.argb(22, 0, 0, 0)));
 
-        TextView iconTv = new TextView(this);
-        iconTv.setText(icon);
-        iconTv.setGravity(Gravity.CENTER);
-        iconTv.setIncludeFontPadding(false);
-        iconTv.setTextSize(icon.length() > 1 ? 13 : 18);
-        iconTv.setTextColor(danger ? Color.rgb(235, 77, 75) : ContextCompat.getColor(this, R.color.popupTextColor));
-        row.addView(iconTv, LayoutHelper.createLinear(30, 44));
+        ChatMoreIconView iconView = new ChatMoreIconView(this);
+        iconView.setType(iconType, danger);
+        row.addView(iconView, LayoutHelper.createLinear(34, 46));
 
         TextView textTv = new TextView(this);
         textTv.setText(text);
@@ -756,9 +778,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         textTv.setSingleLine(true);
         textTv.setTextSize(15);
         textTv.setIncludeFontPadding(false);
-        textTv.setTextColor(danger ? Color.rgb(235, 77, 75) : ContextCompat.getColor(this, R.color.popupTextColor));
-        LinearLayout.LayoutParams textLp = LayoutHelper.createLinear(0, 44, 1f);
-        textLp.leftMargin = AndroidUtilities.dp(10f);
+        textTv.setTextColor(danger ? Color.rgb(230, 57, 70) : ContextCompat.getColor(this, R.color.popupTextColor));
+        LinearLayout.LayoutParams textLp = LayoutHelper.createLinear(0, 46, 1f);
+        textLp.leftMargin = AndroidUtilities.dp(9f);
         row.addView(textTv, textLp);
 
         TextView arrowTv = new TextView(this);
@@ -766,33 +788,122 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         arrowTv.setGravity(Gravity.CENTER);
         arrowTv.setTextSize(24);
         arrowTv.setIncludeFontPadding(false);
-        arrowTv.setTextColor(Color.rgb(160, 160, 160));
-        row.addView(arrowTv, LayoutHelper.createLinear(18, 44));
+        arrowTv.setTextColor(Color.rgb(118, 124, 132));
+        row.addView(arrowTv, LayoutHelper.createLinear(18, 46));
 
         row.setOnClickListener(v -> {
             if (action != null) action.run();
         });
-        parent.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44));
+        parent.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 46));
     }
 
-    private WKChannel getCurrentChatChannel() {
-        return WKIM.getInstance().getChannelManager().getChannel(channelId, channelType);
-    }
+    private static class ChatMoreIconView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+        private int type;
+        private boolean danger;
 
-    private String getCurrentChatShowName() {
-        WKChannel channel = getCurrentChatChannel();
-        if (channel == null) return "";
-        return TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
-    }
+        ChatMoreIconView(Context context) {
+            super(context);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            fillPaint.setStyle(Paint.Style.FILL);
+        }
 
-    private boolean isFriendChatChannel() {
-        WKChannel channel = getCurrentChatChannel();
-        return channel != null && channel.follow == 1;
-    }
+        void setType(int type, boolean danger) {
+            this.type = type;
+            this.danger = danger;
+            invalidate();
+        }
 
-    private boolean isBlacklistedByMe() {
-        WKChannel channel = getCurrentChatChannel();
-        return channel != null && channel.status == 2;
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth();
+            float h = getHeight();
+            float cx = w / 2f;
+            float cy = h / 2f;
+            int color = danger ? Color.rgb(230, 57, 70) : Color.rgb(33, 37, 41);
+            int softColor = danger ? Color.argb(32, 230, 57, 70) : Color.argb(28, 50, 120, 255);
+            fillPaint.setColor(softColor);
+            canvas.drawCircle(cx, cy, Math.min(w, h) * 0.36f, fillPaint);
+            paint.setColor(color);
+            paint.setStrokeWidth(AndroidUtilities.dp(1.7f));
+            path.reset();
+
+            switch (type) {
+                case MORE_ICON_REMARK:
+                    canvas.drawLine(cx - dp(6), cy + dp(6), cx - dp(2), cy + dp(5), paint);
+                    canvas.drawLine(cx - dp(5), cy + dp(5), cx + dp(6), cy - dp(6), paint);
+                    canvas.drawLine(cx + dp(4), cy - dp(8), cx + dp(8), cy - dp(4), paint);
+                    break;
+                case MORE_ICON_MUTE:
+                    path.moveTo(cx - dp(7), cy + dp(2));
+                    path.lineTo(cx - dp(4), cy - dp(2));
+                    path.lineTo(cx - dp(4), cy - dp(6));
+                    path.quadTo(cx, cy - dp(10), cx + dp(4), cy - dp(6));
+                    path.lineTo(cx + dp(4), cy - dp(2));
+                    path.lineTo(cx + dp(7), cy + dp(2));
+                    path.close();
+                    canvas.drawPath(path, paint);
+                    canvas.drawLine(cx - dp(8), cy + dp(5), cx + dp(8), cy + dp(5), paint);
+                    canvas.drawLine(cx - dp(8), cy - dp(8), cx + dp(8), cy + dp(8), paint);
+                    break;
+                case MORE_ICON_BG:
+                    canvas.drawRoundRect(cx - dp(9), cy - dp(7), cx + dp(9), cy + dp(7), dp(3), dp(3), paint);
+                    canvas.drawCircle(cx - dp(4), cy - dp(2), dp(2), paint);
+                    path.moveTo(cx - dp(8), cy + dp(5));
+                    path.lineTo(cx - dp(2), cy);
+                    path.lineTo(cx + dp(2), cy + dp(3));
+                    path.lineTo(cx + dp(8), cy - dp(3));
+                    canvas.drawPath(path, paint);
+                    break;
+                case MORE_ICON_AI:
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setTextAlign(Paint.Align.CENTER);
+                    paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+                    paint.setTextSize(AndroidUtilities.dp(11f));
+                    canvas.drawText("AI", cx, cy + dp(4), paint);
+                    paint.setStyle(Paint.Style.STROKE);
+                    break;
+                case MORE_ICON_CLEAR:
+                    canvas.drawLine(cx - dp(6), cy - dp(6), cx + dp(6), cy - dp(6), paint);
+                    canvas.drawLine(cx - dp(3), cy - dp(9), cx + dp(3), cy - dp(9), paint);
+                    canvas.drawRoundRect(cx - dp(6), cy - dp(4), cx + dp(6), cy + dp(8), dp(2), dp(2), paint);
+                    canvas.drawLine(cx - dp(2), cy - dp(1), cx - dp(2), cy + dp(5), paint);
+                    canvas.drawLine(cx + dp(2), cy - dp(1), cx + dp(2), cy + dp(5), paint);
+                    break;
+                case MORE_ICON_DELETE_FRIEND:
+                    canvas.drawCircle(cx - dp(3), cy - dp(5), dp(3), paint);
+                    path.moveTo(cx - dp(10), cy + dp(7));
+                    path.quadTo(cx - dp(3), cy + dp(1), cx + dp(4), cy + dp(7));
+                    canvas.drawPath(path, paint);
+                    canvas.drawLine(cx + dp(4), cy - dp(1), cx + dp(11), cy - dp(1), paint);
+                    break;
+                case MORE_ICON_BLACKLIST:
+                    canvas.drawCircle(cx, cy, dp(8), paint);
+                    canvas.drawLine(cx - dp(5), cy + dp(5), cx + dp(5), cy - dp(5), paint);
+                    break;
+                case MORE_ICON_REPORT:
+                    path.moveTo(cx, cy - dp(10));
+                    path.lineTo(cx + dp(9), cy + dp(7));
+                    path.lineTo(cx - dp(9), cy + dp(7));
+                    path.close();
+                    canvas.drawPath(path, paint);
+                    canvas.drawLine(cx, cy - dp(3), cx, cy + dp(2), paint);
+                    canvas.drawCircle(cx, cy + dp(5), dp(0.8f), paint);
+                    break;
+                default:
+                    canvas.drawCircle(cx, cy, dp(7), paint);
+                    break;
+            }
+        }
+
+        private float dp(float value) {
+            return AndroidUtilities.dp(value);
+        }
     }
 
     private void showChatRemarkDialog() {
@@ -1499,10 +1610,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         callIV = new AppCompatImageView(this);
         callIV.setImageResource(R.mipmap.ic_call);
         if (isRegister) {
-            wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(38, 38, Gravity.END | Gravity.CENTER_VERTICAL, 0, 0, 58, 0));
+            wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(40, 40, Gravity.END | Gravity.CENTER_VERTICAL, 0, 0, 58, 0));
         }
         callIV.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        callIV.setPadding(AndroidUtilities.dp(8f), AndroidUtilities.dp(8f), AndroidUtilities.dp(8f), AndroidUtilities.dp(8f));
+        callIV.setPadding(AndroidUtilities.dp(7f), AndroidUtilities.dp(7f), AndroidUtilities.dp(7f), AndroidUtilities.dp(7f));
         callIV.setColorFilter(new PorterDuffColorFilter(ContextCompat.getColor(this, R.color.popupTextColor), PorterDuff.Mode.MULTIPLY));
         callIV.setBackground(Theme.createSelectorDrawable(Theme.getPressedColor()));
 
