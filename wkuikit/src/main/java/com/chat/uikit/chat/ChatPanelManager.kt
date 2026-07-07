@@ -267,6 +267,9 @@ class ChatPanelManager(
 
     // 回复 | 编辑
     private var chatTopView: LinearLayout? = null
+    private val chatInputNormalHeight = AndroidUtilities.dp(52f)
+    private val chatReplyPanelHeight = AndroidUtilities.dp(58f)
+    private val chatInputReplyHeight = AndroidUtilities.dp(110f)
 
     // 多选
     private var multipleChoiceView: LinearLayout? = null
@@ -391,6 +394,11 @@ class ChatPanelManager(
             newImageLayout?.visibility = View.GONE
             return false
         }
+        if (chatTopView?.visibility == View.VISIBLE) {
+            closeChatReplyPanel()
+            iConversationContext.deleteOperationMsg()
+            return false
+        }
         if (helper.isPanelState()) {
             resetToolBar()
             helper.resetState()
@@ -499,7 +507,7 @@ class ChatPanelManager(
         val topTitleTv = chatTopView?.findViewWithTag<AppCompatTextView>("topTitleTv")
         val contentTv = chatTopView?.findViewWithTag<AppCompatTextView>("contentTv")
         topLeftIv?.setImageResource(R.mipmap.msg_panel_reply)
-        topTitleTv?.text = showName
+        topTitleTv?.text = if (TextUtils.isEmpty(showName)) "回复" else "回复 $showName"
         val content =
             if (mMsg.remoteExtra != null && mMsg.remoteExtra.contentEditMsgModel != null) {
                 mMsg.remoteExtra.contentEditMsgModel.displayContent
@@ -513,21 +521,7 @@ class ChatPanelManager(
 //            mMsg.baseContentMsgModel.getDisplayContent(),
 //            MoonUtil.DEF_SCALE
 //        )
-        if (chatTopView?.visibility == View.GONE) {
-            CommonAnim.getInstance().animateOpen(
-                chatTopView,
-                0,
-                AndroidUtilities.dp(55f)
-            ) {
-                iConversationContext.chatRecyclerViewScrollToEnd()
-
-//                UIUtil.requestFocus(editText)
-//                UIUtil.showSoftInput(iConversationContext.chatActivity, editText)
-                helper.toKeyboardState()
-                // editText.performClick()
-//                SoftKeyboardUtils.getInstance().showInput(iConversationContext.chatActivity,editText)
-            }
-        }
+        openChatReplyPanel()
 
     }
 
@@ -546,16 +540,7 @@ class ChatPanelManager(
         contentTv?.text = content
         editText.setText(content)
         editText.setSelection(content.length)
-        if (chatTopView?.visibility == View.GONE) {
-            CommonAnim.getInstance().animateOpen(
-                chatTopView,
-                0,
-                AndroidUtilities.dp(55f)
-            ) {
-                iConversationContext.chatRecyclerViewScrollToEnd()
-                helper.toKeyboardState()
-            }
-        }
+        openChatReplyPanel()
         topLeftIv?.setImageResource(R.mipmap.msg_edit)
     }
 
@@ -1563,9 +1548,7 @@ ${content}"""
             try {
                 iConversationContext.deleteOperationMsg()
             } catch (_: Exception) {
-                if (chatTopView?.visibility == View.VISIBLE) {
-                    CommonAnim.getInstance().animateClose(chatTopView)
-                }
+                closeChatReplyPanel()
             }
         }
 
@@ -1686,9 +1669,7 @@ ${content}"""
         editText.text = null
         updateSendButtonMode()
         lastInputTime = 0
-        if (chatTopView?.visibility == View.VISIBLE) {
-            CommonAnim.getInstance().animateClose(chatTopView)
-        }
+        closeChatReplyPanel()
     }
 
     private fun requestAi(prompt: String, onSuccess: (String) -> Unit, onError: () -> Unit) {
@@ -3256,38 +3237,36 @@ ${content}"""
     private fun initChatTopView() {
         chatTopView = LinearLayout(iConversationContext.chatActivity)
         chatTopView?.visibility = View.GONE
-        chatTopView?.setBackgroundColor(
-            ContextCompat.getColor(
-                iConversationContext.chatActivity,
-                R.color.chat_face_tab_bg
-            )
-        )
+        chatTopView?.orientation = LinearLayout.HORIZONTAL
+        chatTopView?.gravity = Gravity.CENTER_VERTICAL
         chatTopView?.setPadding(
-            AndroidUtilities.dp(10f),
-            AndroidUtilities.dp(8f),
-            AndroidUtilities.dp(10f),
-            AndroidUtilities.dp(8f)
+            AndroidUtilities.dp(14f),
+            AndroidUtilities.dp(6f),
+            AndroidUtilities.dp(12f),
+            AndroidUtilities.dp(5f)
         )
-        chatTopLayout.addView(
-            chatTopView,
-            LayoutHelper.createFrame(
-                LayoutHelper.MATCH_PARENT,
-                LayoutHelper.WRAP_CONTENT,
-                Gravity.CENTER
-            )
+        chatTopView?.background = null
+        chatTopView?.elevation = AndroidUtilities.dp(7f).toFloat()
+
+        val lp = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            chatReplyPanelHeight,
+            Gravity.TOP
         )
+        panelView.addView(chatTopView, lp)
+
         val imageView = AppCompatImageView(iConversationContext.chatActivity)
         imageView.setImageResource(R.mipmap.ic_ab_forward)
         imageView.colorFilter = PorterDuffColorFilter(
-            ContextCompat.getColor(
-                iConversationContext.chatActivity, R.color.colorAccent
-            ), PorterDuff.Mode.MULTIPLY
+            Color.parseColor("#60A5FA"),
+            PorterDuff.Mode.MULTIPLY
         )
+        imageView.alpha = 0.95f
         chatTopView?.addView(
             imageView,
             LayoutHelper.createLinear(
-                LayoutHelper.WRAP_CONTENT,
-                LayoutHelper.WRAP_CONTENT,
+                26,
+                26,
                 Gravity.CENTER,
                 0,
                 0,
@@ -3295,68 +3274,56 @@ ${content}"""
                 0
             )
         )
+
         val centerLayout = LinearLayout(iConversationContext.chatActivity)
         centerLayout.orientation = LinearLayout.VERTICAL
+        centerLayout.gravity = Gravity.CENTER_VERTICAL
         chatTopView?.addView(
             centerLayout,
-            LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, Gravity.CENTER)
+            LayoutHelper.createLinear(0, LayoutHelper.MATCH_PARENT, 1f, Gravity.CENTER)
         )
+
         val nameTv = AppCompatTextView(iConversationContext.chatActivity)
-        nameTv.setTextColor(
-            ContextCompat.getColor(
-                iConversationContext.chatActivity,
-                R.color.colorAccent
-            )
-        )
-        val size = iConversationContext.chatActivity.getResources()
-            .getDimension(R.dimen.font_size_14)
-        val pSize = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_PX,
-            size,
-            iConversationContext.chatActivity.resources.displayMetrics
-        )
-        nameTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, pSize)
+        nameTv.setTextColor(Color.parseColor("#3B82F6"))
+        nameTv.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        nameTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        nameTv.includeFontPadding = false
+        nameTv.maxLines = 1
+        nameTv.ellipsize = TextUtils.TruncateAt.END
         centerLayout.addView(
             nameTv,
             LayoutHelper.createLinear(
+                LayoutHelper.MATCH_PARENT,
                 LayoutHelper.WRAP_CONTENT,
-                LayoutHelper.WRAP_CONTENT,
-                Gravity.START or Gravity.CENTER
+                Gravity.START or Gravity.CENTER_VERTICAL
             )
         )
-        nameTv.maxLines = 1
-        nameTv.ellipsize = TextUtils.TruncateAt.END
+
         val contentTv = AppCompatTextView(iConversationContext.chatActivity)
-        contentTv.setTextColor(
-            ContextCompat.getColor(
-                iConversationContext.chatActivity,
-                R.color.color999
-            )
-        )
-        contentTv.setTextSize(TypedValue.COMPLEX_UNIT_PX, pSize)
-        centerLayout.addView(
-            contentTv,
-            LayoutHelper.createLinear(
-                LayoutHelper.WRAP_CONTENT,
-                LayoutHelper.WRAP_CONTENT,
-                Gravity.START or Gravity.CENTER
-            )
-        )
+        contentTv.setTextColor(Color.parseColor("#64748B"))
+        contentTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        contentTv.includeFontPadding = false
         contentTv.maxLines = 1
         contentTv.ellipsize = TextUtils.TruncateAt.END
-
-        val rightIv = AppCompatImageView(iConversationContext.chatActivity)
-        rightIv.setImageResource(R.mipmap.themes_deletecolor)
-        rightIv.colorFilter = PorterDuffColorFilter(
-            ContextCompat.getColor(
-                iConversationContext.chatActivity, R.color.popupTextColor
-            ), PorterDuff.Mode.MULTIPLY
+        val contentLp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
         )
+        contentLp.topMargin = AndroidUtilities.dp(4f)
+        centerLayout.addView(contentTv, contentLp)
+
+        val rightIv = AppCompatTextView(iConversationContext.chatActivity)
+        rightIv.text = "×"
+        rightIv.gravity = Gravity.CENTER
+        rightIv.includeFontPadding = false
+        rightIv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 30f)
+        rightIv.setTextColor(Color.parseColor("#64748B"))
+        rightIv.alpha = 0.88f
         chatTopView?.addView(
             rightIv,
             LayoutHelper.createLinear(
-                LayoutHelper.WRAP_CONTENT,
-                LayoutHelper.WRAP_CONTENT,
+                36,
+                LayoutHelper.MATCH_PARENT,
                 Gravity.CENTER,
                 10,
                 0,
@@ -3365,15 +3332,72 @@ ${content}"""
             )
         )
         rightIv.setOnClickListener {
-            CommonAnim.getInstance().animateClose(chatTopView)
+            closeChatReplyPanel()
             editText.text = null
             iConversationContext.deleteOperationMsg()
         }
         rightIv.background = Theme.createSelectorDrawable(Theme.getPressedColor())
+
+        val divider = View(iConversationContext.chatActivity)
+        divider.tag = "replyDivider"
+        divider.setBackgroundColor(Color.parseColor("#14000000"))
+        val dividerLp = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            AndroidUtilities.dp(0.6f),
+            Gravity.TOP
+        )
+        dividerLp.topMargin = chatReplyPanelHeight - AndroidUtilities.dp(1.2f)
+        dividerLp.leftMargin = AndroidUtilities.dp(14f)
+        dividerLp.rightMargin = AndroidUtilities.dp(14f)
+        divider.visibility = View.GONE
+        panelView.addView(divider, dividerLp)
+
         imageView.tag = "topLeftIv"
         nameTv.tag = "topTitleTv"
         contentTv.tag = "contentTv"
     }
+
+    private fun openChatReplyPanel() {
+        val topView = chatTopView ?: return
+        if (topView.visibility != View.VISIBLE) {
+            topView.alpha = 0f
+            topView.visibility = View.VISIBLE
+            panelView.findViewWithTag<View>("replyDivider")?.visibility = View.VISIBLE
+            topView.animate().alpha(1f).setDuration(140L).start()
+        }
+        setInputReplyMode(true)
+        iConversationContext.chatRecyclerViewScrollToEnd()
+        helper.toKeyboardState()
+    }
+
+    private fun closeChatReplyPanel() {
+        val topView = chatTopView
+        if (topView != null && topView.visibility == View.VISIBLE) {
+            topView.animate().cancel()
+            topView.visibility = View.GONE
+            topView.alpha = 1f
+        }
+        panelView.findViewWithTag<View>("replyDivider")?.visibility = View.GONE
+        setInputReplyMode(false)
+    }
+
+    private fun setInputReplyMode(enable: Boolean) {
+        val targetHeight = if (enable) chatInputReplyHeight else chatInputNormalHeight
+        val params = chatView.layoutParams
+        if (params.height != targetHeight) {
+            params.height = targetHeight
+            chatView.layoutParams = params
+        }
+        chatView.minimumHeight = targetHeight
+        chatView.setPadding(
+            AndroidUtilities.dp(8f),
+            if (enable) chatReplyPanelHeight else AndroidUtilities.dp(4f),
+            AndroidUtilities.dp(8f),
+            AndroidUtilities.dp(4f)
+        )
+        chatView.gravity = Gravity.CENTER_VERTICAL
+    }
+
 
     private fun initFlameView() {
         flameLayout = LinearLayout(iConversationContext.chatActivity)
