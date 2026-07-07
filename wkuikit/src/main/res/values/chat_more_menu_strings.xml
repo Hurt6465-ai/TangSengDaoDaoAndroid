@@ -1,0 +1,10 @@
+<resources>
+    <string name="chat_more_bg">聊天背景</string>
+    <string name="chat_more_ai_translate">AI 翻译设置</string>
+    <string name="chat_more_mute_notifications">消息免打扰</string>
+    <string name="chat_more_remark_saved">备注已保存</string>
+    <string name="chat_more_mute_enabled">已开启免打扰</string>
+    <string name="chat_more_mute_disabled">已关闭免打扰</string>
+    <string name="chat_more_blacklist_added">已拉入黑名单</string>
+    <string name="chat_more_blacklist_removed">已移出黑名单</string>
+</resources>
