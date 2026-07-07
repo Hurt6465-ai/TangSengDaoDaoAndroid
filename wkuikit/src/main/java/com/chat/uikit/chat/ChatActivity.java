@@ -17,6 +17,9 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.PorterDuff;
@@ -241,6 +244,12 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     // 图片字段反射缓存：key 为 Content 的 class，value 为可写入路径的 Field。避免每次发图都全量反射。
     private static final Map<Class<?>, List<Field>> IMG_PATH_FIELDS_CACHE = new HashMap<>();
 
+    private static final String CHAT_LOAD_TAG = "TSChatLoad";
+    private static final int CHAT_LOAD_LOG_MAX = 120000;
+    private static final Object CHAT_LOAD_LOG_LOCK = new Object();
+    private static final StringBuilder CHAT_LOAD_LOG = new StringBuilder();
+    private int chatLoadSeq = 0;
+
     private final ActivityResultLauncher<String> chooseChatBgLauncher =
             registerForActivityResult(new ActivityResultContracts.GetContent(), this::saveChatBackgroundFromUri);
 
@@ -279,6 +288,229 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private String getLocalString(String key, String defaultValue) {
         String value = WKSharedPreferencesUtil.getInstance().getSP(key);
         return TextUtils.isEmpty(value) ? defaultValue : value;
+    }
+
+
+    private void chatLoadLog(String msg) {
+        String line = String.format(Locale.US, "%d | %s | ch=%s/%s | %s",
+                System.currentTimeMillis(),
+                Thread.currentThread().getName(),
+                TextUtils.isEmpty(channelId) ? "-" : shortValue(channelId, 16),
+                channelType,
+                msg);
+        Log.e(CHAT_LOAD_TAG, line);
+        synchronized (CHAT_LOAD_LOG_LOCK) {
+            CHAT_LOAD_LOG.append(line).append('\n');
+            if (CHAT_LOAD_LOG.length() > CHAT_LOAD_LOG_MAX) {
+                CHAT_LOAD_LOG.delete(0, CHAT_LOAD_LOG.length() - CHAT_LOAD_LOG_MAX);
+            }
+        }
+    }
+
+    private String getChatLoadLogSnapshot() {
+        synchronized (CHAT_LOAD_LOG_LOCK) {
+            if (CHAT_LOAD_LOG.length() == 0) {
+                return "暂无聊天加载日志。\n\n复现方法：打开聊天窗口，上拉/下拉历史消息，看到转圈或卡顿后，再点右上角三个点 -> 聊天加载日志 -> 复制全部。";
+            }
+            return CHAT_LOAD_LOG.toString();
+        }
+    }
+
+    private void clearChatLoadLog() {
+        synchronized (CHAT_LOAD_LOG_LOCK) {
+            CHAT_LOAD_LOG.setLength(0);
+        }
+        chatLoadLog("LOG cleared and restarted. " + adapterSnapshot());
+    }
+
+    private void copyChatLoadLogToClipboard() {
+        try {
+            ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (cm != null) {
+                cm.setPrimaryClip(ClipData.newPlainText("TangSeng chat load log", getChatLoadLogSnapshot()));
+                WKToastUtils.getInstance().showToast("已复制聊天加载日志");
+            }
+        } catch (Exception e) {
+            Log.e(CHAT_LOAD_TAG, "copy log failed", e);
+            WKToastUtils.getInstance().showToast("复制日志失败");
+        }
+    }
+
+    private void showChatLoadLogDialog() {
+        TextView tv = new TextView(this);
+        tv.setText(getChatLoadLogSnapshot());
+        tv.setTextIsSelectable(true);
+        tv.setTextSize(12);
+        tv.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
+        tv.setPadding(AndroidUtilities.dp(12f), AndroidUtilities.dp(10f), AndroidUtilities.dp(12f), AndroidUtilities.dp(10f));
+
+        android.widget.ScrollView scrollView = new android.widget.ScrollView(this);
+        scrollView.addView(tv, new android.widget.ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("聊天加载日志")
+                .setView(scrollView)
+                .setPositiveButton("复制全部", (d, which) -> copyChatLoadLogToClipboard())
+                .setNeutralButton("清空", (d, which) -> clearChatLoadLog())
+                .setNegativeButton("关闭", null)
+                .show();
+        applyGlassDialogStyle(dialog);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, AndroidUtilities.dp(560f));
+        }
+    }
+
+    private String shortValue(String value, int max) {
+        if (TextUtils.isEmpty(value)) return "";
+        if (value.length() <= max) return value;
+        return value.substring(0, Math.max(0, max / 2)) + "..." + value.substring(value.length() - Math.max(0, max / 2));
+    }
+
+    private String msgTypeName(int type) {
+        if (type == WKContentType.WK_TEXT) return "TEXT(" + type + ")";
+        if (type == WKContentType.WK_IMAGE) return "IMAGE(" + type + ")";
+        if (type == WKContentType.WK_VIDEO) return "VIDEO(" + type + ")";
+        if (type == WKContentType.WK_VOICE) return "VOICE(" + type + ")";
+        if (type == WKContentType.loading) return "LOADING(" + type + ")";
+        if (type == WKContentType.emptyView) return "EMPTY(" + type + ")";
+        if (type == WKContentType.spanEmptyView) return "SPAN_EMPTY(" + type + ")";
+        if (type == WKContentType.msgPromptTime) return "TIME(" + type + ")";
+        if (type == WKContentType.msgPromptNewMsg) return "NEW_PROMPT(" + type + ")";
+        if (type == WKContentType.typing) return "TYPING(" + type + ")";
+        if (type == WKContentType.noRelation) return "NO_RELATION(" + type + ")";
+        return "TYPE(" + type + ")";
+    }
+
+    private String msgBrief(WKMsg msg) {
+        if (msg == null) return "null";
+        int contentLen = 0;
+        try {
+            if (msg.baseContentMsgModel != null && msg.baseContentMsgModel.getDisplayContent() != null) {
+                contentLen = msg.baseContentMsgModel.getDisplayContent().length();
+            } else if (msg.content != null) {
+                contentLen = msg.content.length();
+            }
+        } catch (Exception ignored) {
+        }
+        int revoke = -1;
+        int mutualDeleted = -1;
+        int readed = -1;
+        int unreadCount = -1;
+        if (msg.remoteExtra != null) {
+            revoke = msg.remoteExtra.revoke;
+            mutualDeleted = msg.remoteExtra.isMutualDeleted;
+            readed = msg.remoteExtra.readed;
+            unreadCount = msg.remoteExtra.unreadCount;
+        }
+        return "type=" + msgTypeName(msg.type)
+                + ",seq=" + msg.messageSeq
+                + ",order=" + msg.orderSeq
+                + ",clientSeq=" + msg.clientSeq
+                + ",ts=" + msg.timestamp
+                + ",from=" + shortValue(msg.fromUID, 14)
+                + ",mine=" + TextUtils.equals(msg.fromUID, loginUID)
+                + ",mid=" + shortValue(msg.messageID, 12)
+                + ",cno=" + shortValue(msg.clientMsgNO, 12)
+                + ",deleted=" + msg.isDeleted
+                + ",viewed=" + msg.viewed
+                + ",revoke=" + revoke
+                + ",mutualDeleted=" + mutualDeleted
+                + ",readed=" + readed
+                + ",unread=" + unreadCount
+                + ",contentLen=" + contentLen;
+    }
+
+    private String listStats(List<WKMsg> list) {
+        if (WKReader.isEmpty(list)) return "size=0";
+        Map<Integer, Integer> typeCount = new HashMap<>();
+        long minOrder = Long.MAX_VALUE;
+        long maxOrder = Long.MIN_VALUE;
+        int minSeq = Integer.MAX_VALUE;
+        int maxSeq = Integer.MIN_VALUE;
+        int mine = 0;
+        int other = 0;
+        for (WKMsg msg : list) {
+            if (msg == null) continue;
+            Integer old = typeCount.get(msg.type);
+            typeCount.put(msg.type, old == null ? 1 : old + 1);
+            minOrder = Math.min(minOrder, msg.orderSeq);
+            maxOrder = Math.max(maxOrder, msg.orderSeq);
+            minSeq = Math.min(minSeq, msg.messageSeq);
+            maxSeq = Math.max(maxSeq, msg.messageSeq);
+            if (TextUtils.equals(msg.fromUID, loginUID)) mine++;
+            else other++;
+        }
+        StringBuilder types = new StringBuilder();
+        for (Map.Entry<Integer, Integer> entry : typeCount.entrySet()) {
+            if (types.length() > 0) types.append(',');
+            types.append(msgTypeName(entry.getKey())).append('=').append(entry.getValue());
+        }
+        return "size=" + list.size()
+                + ",mine=" + mine
+                + ",other=" + other
+                + ",orderRange=" + (minOrder == Long.MAX_VALUE ? "-" : (minOrder + "~" + maxOrder))
+                + ",seqRange=" + (minSeq == Integer.MAX_VALUE ? "-" : (minSeq + "~" + maxSeq))
+                + ",first={" + msgBrief(list.get(0)) + "}"
+                + ",last={" + msgBrief(list.get(list.size() - 1)) + "}"
+                + ",types={" + types + "}";
+    }
+
+    private String adapterSnapshot() {
+        try {
+            int dataSize = chatAdapter == null || chatAdapter.getData() == null ? -1 : chatAdapter.getData().size();
+            int itemCount = chatAdapter == null ? -1 : chatAdapter.getItemCount();
+            long firstOrder = -1;
+            long endOrder = -1;
+            WKMsg firstMsg = null;
+            WKMsg lastMsg = null;
+            if (chatAdapter != null && WKReader.isNotEmpty(chatAdapter.getData())) {
+                firstOrder = chatAdapter.getFirstMsgOrderSeq();
+                endOrder = chatAdapter.getEndMsgOrderSeq();
+                firstMsg = chatAdapter.getData().get(0).wkMsg;
+                lastMsg = chatAdapter.getData().get(chatAdapter.getData().size() - 1).wkMsg;
+            }
+            int firstVisible = linearLayoutManager == null ? -1 : linearLayoutManager.findFirstVisibleItemPosition();
+            int lastVisible = linearLayoutManager == null ? -1 : linearLayoutManager.findLastVisibleItemPosition();
+            boolean canTop = wkVBinding != null && wkVBinding.recyclerView != null && wkVBinding.recyclerView.canScrollVertically(-1);
+            boolean canBottom = wkVBinding != null && wkVBinding.recyclerView != null && wkVBinding.recyclerView.canScrollVertically(1);
+            return "adapter{dataSize=" + dataSize
+                    + ",itemCount=" + itemCount
+                    + ",firstOrder=" + firstOrder
+                    + ",endOrder=" + endOrder
+                    + ",firstVisible=" + firstVisible
+                    + ",lastVisible=" + lastVisible
+                    + ",canTop=" + canTop
+                    + ",canBottom=" + canBottom
+                    + ",isCanRefresh=" + isCanRefresh
+                    + ",isCanLoadMore=" + isCanLoadMore
+                    + ",isRefreshLoading=" + isRefreshLoading
+                    + ",isMoreLoading=" + isMoreLoading
+                    + ",isSyncLastMsg=" + isSyncLastMsg
+                    + ",redDot=" + redDot
+                    + ",unreadStart=" + unreadStartMsgOrderSeq
+                    + ",lastPreview=" + lastPreviewMsgOrderSeq
+                    + ",tipsOrder=" + tipsOrderSeq
+                    + ",maxMsgSeq=" + maxMsgSeq
+                    + ",maxMsgOrderSeq=" + maxMsgOrderSeq
+                    + ",firstMsg={" + msgBrief(firstMsg) + "}"
+                    + ",lastMsg={" + msgBrief(lastMsg) + "}"
+                    + "}";
+        } catch (Exception e) {
+            return "adapterSnapshotError=" + e.getMessage();
+        }
+    }
+
+    private void logCurrentLocalBounds(String prefix) {
+        try {
+            int localMaxSeq = WKIM.getInstance().getMsgManager().getMaxMessageSeqWithChannel(channelId, channelType);
+            long localMaxOrderSeq = WKIM.getInstance().getMsgManager().getMaxOrderSeqWithChannel(channelId, channelType);
+            chatLoadLog(prefix + " localDbBounds{maxSeq=" + localMaxSeq + ",maxOrderSeq=" + localMaxOrderSeq + "} " + adapterSnapshot());
+        } catch (Exception e) {
+            chatLoadLog(prefix + " localDbBounds error=" + e.getMessage() + " " + adapterSnapshot());
+        }
     }
 
 
@@ -659,6 +891,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         root.addView(createChatMoreMenuItem(getString(R.string.chat_ai_settings), () -> {
             dialog.dismiss();
             showChatAiSettingsDialog();
+        }));
+        root.addView(createChatMoreMenuItem("聊天加载日志", () -> {
+            dialog.dismiss();
+            showChatLoadLogDialog();
         }));
 
         dialog.setView(root);
@@ -1053,6 +1289,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         channelType = getIntent().getByteExtra("channelType", WKChannelType.PERSONAL);
         maxMsgOrderSeq = WKIM.getInstance().getMsgManager().getMaxOrderSeqWithChannel(channelId, channelType);
         maxMsgSeq = WKIM.getInstance().getMsgManager().getMaxMessageSeqWithChannel(channelId, channelType);
+        chatLoadLog("initParam channelId=" + shortValue(channelId, 18)
+                + ",channelType=" + channelType
+                + ",maxMsgSeq=" + maxMsgSeq
+                + ",maxMsgOrderSeq=" + maxMsgOrderSeq);
         resetHideChannelAllPinnedMessage();
         // 是否含有带转发的消息
         if (getIntent().hasExtra("msgContentList")) {
@@ -1353,7 +1593,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     long orderSeq = WKIM.getInstance().getMsgManager().getMessageOrderSeq(reminderList.get(0).messageSeq, channelId, channelType);
                     unreadStartMsgOrderSeq = 0;
                     tipsOrderSeq = orderSeq;
-                    getData(1, true, orderSeq, false);
+                    getDataWithSource("reminderJump", 1, true, orderSeq, false);
                     isCanLoadMore = true;
                 }
             }
@@ -1422,6 +1662,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         });
 
         wkVBinding.chatUnreadLayout.newMsgLayout.setOnClickListener(v -> {
+            chatLoadLog("TRIGGER newMsgLayout clicked. " + adapterSnapshot());
             redDot = 0;
             MsgModel.getInstance().clearUnread(channelId, channelType, redDot, (code, msg) -> {
                 if (code == HttpResponseCode.success && redDot == 0) {
@@ -1436,7 +1677,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 lastPreviewMsgOrderSeq = 0;
                 long maxSeq = WKIM.getInstance().getMsgManager().getMaxOrderSeqWithChannel(channelId, channelType);
                 new Handler().postDelayed(() -> {
-                    getData(0, true, maxSeq, true);
+                    getDataWithSource("newMsgLayoutSyncLast", 0, true, maxSeq, true);
                     showUnReadCountView();
                 }, 500);
             } else {
@@ -1632,7 +1873,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     tempMaxOrderSeq = chatAdapter.getLastMsg().orderSeq;
                 }
                 if (maxOrderSeq > tempMaxOrderSeq) {
-                    getData(0, true, maxOrderSeq, true);
+                    chatLoadLog("TRIGGER connectionSyncCompleted maxOrderSeq=" + maxOrderSeq + ",adapterLastOrder=" + tempMaxOrderSeq + " " + adapterSnapshot());
+                    getDataWithSource("connectionSyncCompleted", 0, true, maxOrderSeq, true);
                 }
             }
         });
@@ -1747,6 +1989,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private void initData() {
+        chatLoadLog("initData START intent{lastPreview=" + getIntent().getLongExtra("lastPreviewMsgOrderSeq", 0L)
+                + ",keepOffsetY=" + getIntent().getIntExtra("keepOffsetY", 0)
+                + ",redDot=" + getIntent().getIntExtra("redDot", 0)
+                + ",tipsOrderSeq=" + getIntent().getLongExtra("tipsOrderSeq", 0)
+                + ",unreadStart=" + getIntent().getLongExtra("unreadStartMsgOrderSeq", 0)
+                + ",aroundMsgSeq=" + getIntent().getLongExtra("aroundMsgSeq", 0)
+                + "} " + adapterSnapshot());
+        logCurrentLocalBounds("initData");
         startTimer();
         EndpointManager.getInstance().invoke(EndpointSID.openChatPage, getChatChannelInfo());
         WKIM.getInstance().getChannelManager().fetchChannelInfo(channelId, channelType);
@@ -1881,7 +2131,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (aroundMsgSeq == 0 && getIntent().hasExtra("aroundMsgSeq")) {
             aroundMsgSeq = getIntent().getLongExtra("aroundMsgSeq", 0);
         }
-        getData(lastPreviewMsgOrderSeq == 0 ? 0 : 1, unreadStartMsgOrderSeq > 0, aroundMsgSeq, isScrollToEnd);
+        getDataWithSource("initData", lastPreviewMsgOrderSeq == 0 ? 0 : 1, unreadStartMsgOrderSeq > 0, aroundMsgSeq, isScrollToEnd);
 
         WKConversationMsgExtra extra = WKIM.getInstance().getConversationManager().getMsgExtraWithChannel(channelId, channelType);
         if (extra != null) {
@@ -1970,6 +2220,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     // 获取聊天记录
     private void getData(int pullMode, boolean isSetNewData, long aroundMsgOrderSeq, boolean isScrollToEnd) {
+        getDataWithSource("direct", pullMode, isSetNewData, aroundMsgOrderSeq, isScrollToEnd);
+    }
+
+    private void getDataWithSource(String source, int pullMode, boolean isSetNewData, long aroundMsgOrderSeq, boolean isScrollToEnd) {
+        final int loadId = ++chatLoadSeq;
+        final long loadStart = System.currentTimeMillis();
+
         boolean contain = false;
         long oldestOrderSeq;
         if (pullMode == 1) {
@@ -1985,26 +2242,62 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             oldestOrderSeq = lastPreviewMsgOrderSeq;
         }
         if (unreadStartMsgOrderSeq != 0) contain = true;
-        WKIM.getInstance().getMsgManager().getOrSyncHistoryMessages(channelId, channelType, oldestOrderSeq, contain, pullMode, limit, aroundMsgOrderSeq, new IGetOrSyncHistoryMsgBack() {
+
+        final long requestOldestOrderSeq = oldestOrderSeq;
+        final boolean requestContain = contain;
+        final boolean[] didSync = new boolean[]{false};
+
+        chatLoadLog("LOAD#" + loadId + " START source=" + source
+                + ",pullMode=" + pullMode
+                + ",isSetNewData=" + isSetNewData
+                + ",aroundMsgOrderSeq=" + aroundMsgOrderSeq
+                + ",isScrollToEnd=" + isScrollToEnd
+                + ",oldestOrderSeq=" + requestOldestOrderSeq
+                + ",contain=" + requestContain
+                + ",limit=" + limit
+                + " " + adapterSnapshot());
+        logCurrentLocalBounds("LOAD#" + loadId + " before getOrSync");
+
+        WKIM.getInstance().getMsgManager().getOrSyncHistoryMessages(channelId, channelType, requestOldestOrderSeq, requestContain, pullMode, limit, aroundMsgOrderSeq, new IGetOrSyncHistoryMsgBack() {
             @Override
             public void onSyncing() {
+                didSync[0] = true;
+                chatLoadLog("LOAD#" + loadId + " onSyncing cost=" + (System.currentTimeMillis() - loadStart)
+                        + "ms, this means SDK decided to sync/check server, not pure local. "
+                        + "isShowPinnedView=" + isShowPinnedView
+                        + ",isRefreshLoading=" + isRefreshLoading
+                        + ",isMoreLoading=" + isMoreLoading
+                        + ",isSyncLastMsg=" + isSyncLastMsg
+                        + " " + adapterSnapshot());
 
                 if (isShowPinnedView && !isRefreshLoading && !isMoreLoading && !isSyncLastMsg) {
                     EndpointManager.getInstance().invoke("is_syncing_message", 1);
+                    chatLoadLog("LOAD#" + loadId + " onSyncing UI=endpoint is_syncing_message=1");
                 } else {
                     if (WKReader.isEmpty(chatAdapter.getData())) {
                         WKMsg wkMsg = new WKMsg();
                         wkMsg.type = WKContentType.loading;
                         chatAdapter.addData(new WKUIChatMsgItemEntity(ChatActivity.this, wkMsg, null));
+                        chatLoadLog("LOAD#" + loadId + " onSyncing UI=add full-screen/list loading because adapter empty");
+                    } else {
+                        chatLoadLog("LOAD#" + loadId + " onSyncing UI=no loading row added because adapter already has data");
                     }
                 }
             }
 
             @Override
             public void onResult(List<WKMsg> list) {
+                long resultAt = System.currentTimeMillis();
                 if (list == null) list = new ArrayList<>();
+
+                chatLoadLog("LOAD#" + loadId + " onResult RAW cost=" + (resultAt - loadStart)
+                        + "ms, afterSync=" + didSync[0]
+                        + ",rawStats={" + listStats(list) + "}"
+                        + " " + adapterSnapshot());
+
                 if (isShowPinnedView) {
                     EndpointManager.getInstance().invoke("is_syncing_message", 0);
+                    chatLoadLog("LOAD#" + loadId + " onResult UI=endpoint is_syncing_message=0");
                 }
                 if (pullMode == 0) {
                     if (WKReader.isEmpty(list))
@@ -2016,25 +2309,39 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 }
                 isSyncLastMsg = false;
                 List<WKMsg> tempList = new ArrayList<>();
+                int hiddenOrRtcCount = 0;
+                int duplicateCount = 0;
                 for (WKMsg msg : list) {
                     // Message sync/history may deliver RTC INVITE while the global live listener
                     // did not fire (background reconnect / cold start / cached sync). Do not only
                     // hide it; dispatch it first so the incoming call page can open.
                     if (handleRtcSignalIfNeeded(msg) || shouldHideFromChatList(msg)) {
+                        hiddenOrRtcCount++;
                         continue;
                     }
                     if (isSetNewData || !chatAdapter.isExist(msg.clientMsgNO, msg.messageID)) {
                         tempList.add(msg);
+                    } else {
+                        duplicateCount++;
                     }
                 }
-                showData(tempList, pullMode, isSetNewData, isScrollToEnd);
+                chatLoadLog("LOAD#" + loadId + " onResult FILTER cost=" + (System.currentTimeMillis() - resultAt)
+                        + "ms, filteredSize=" + tempList.size()
+                        + ",hiddenOrRtc=" + hiddenOrRtcCount
+                        + ",duplicate=" + duplicateCount
+                        + ",tempStats={" + listStats(tempList) + "}");
+
+                showData(tempList, pullMode, isSetNewData, isScrollToEnd, loadId, loadStart);
+
                 wkVBinding.chatUnreadLayout.progress.setVisibility(View.GONE);
                 wkVBinding.chatUnreadLayout.msgDownIv.setVisibility(View.VISIBLE);
 
+                int removedLoading = 0;
                 if (WKReader.isNotEmpty(chatAdapter.getData())) {
                     for (int i = 0, size = chatAdapter.getData().size(); i < size; i++) {
                         if (chatAdapter.getData().get(i).wkMsg != null && chatAdapter.getData().get(i).wkMsg.type == WKContentType.loading) {
                             chatAdapter.removeAt(i);
+                            removedLoading++;
                             break;
                         }
                     }
@@ -2042,13 +2349,28 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 isRefreshLoading = false;
                 isMoreLoading = false;
 
+                chatLoadLog("LOAD#" + loadId + " FINISH totalCost=" + (System.currentTimeMillis() - loadStart)
+                        + "ms, removedLoading=" + removedLoading
+                        + ",afterSync=" + didSync[0]
+                        + " " + adapterSnapshot());
+                logCurrentLocalBounds("LOAD#" + loadId + " after finish");
             }
         });
 
 
     }
 
-    private void showData(List<WKMsg> msgList, int pullMode, boolean isSetNewData, boolean isScrollToEnd) {
+
+    private void showData(List<WKMsg> msgList, int pullMode, boolean isSetNewData, boolean isScrollToEnd, int loadId, long loadStart) {
+        long showStart = System.currentTimeMillis();
+        int inputSize = msgList == null ? 0 : msgList.size();
+        chatLoadLog("LOAD#" + loadId + " showData START sinceLoad=" + (showStart - loadStart)
+                + "ms,inputSize=" + inputSize
+                + ",pullMode=" + pullMode
+                + ",isSetNewData=" + isSetNewData
+                + ",isScrollToEnd=" + isScrollToEnd
+                + ",inputStats={" + listStats(msgList) + "}"
+                + " " + adapterSnapshot());
         boolean isAddEmptyView = WKReader.isNotEmpty(msgList) && msgList.size() < limit;
         if (isAddEmptyView) {
             WKMsg msg = new WKMsg();
@@ -2096,8 +2418,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
         }
 
+        chatLoadLog("LOAD#" + loadId + " showData CONVERT cost=" + (System.currentTimeMillis() - showStart)
+                + "ms,inputSizeAfterSystem=" + (msgList == null ? 0 : msgList.size())
+                + ",uiListSize=" + list.size()
+                + " " + adapterSnapshot());
+
         rebuildMsgLinks(list);
 
+        long adapterUpdateStart = System.currentTimeMillis();
         if (isSetNewData) {
             if (unreadStartMsgOrderSeq != 0) {
                 for (int i = 0, size = list.size(); i < size; i++) {
@@ -2133,7 +2461,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }
         purgeHiddenMessagesFromAdapter();
         rebuildMsgLinks(chatAdapter.getData());
+        chatLoadLog("LOAD#" + loadId + " showData ADAPTER_UPDATE cost=" + (System.currentTimeMillis() - adapterUpdateStart)
+                + "ms,totalShowCost=" + (System.currentTimeMillis() - showStart)
+                + "ms " + adapterSnapshot());
 
+        long scrollStart = System.currentTimeMillis();
         if (tipsOrderSeq != 0 || lastPreviewMsgOrderSeq != 0) {
             wkVBinding.recyclerView.setVisibility(View.VISIBLE);
             if (tipsOrderSeq != 0) {
@@ -2160,12 +2492,25 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 wkVBinding.recyclerView.scrollToPosition(chatAdapter.getItemCount() - 1);
             else wkVBinding.recyclerView.setVisibility(View.VISIBLE);
         }
+        chatLoadLog("LOAD#" + loadId + " showData SCROLL cost=" + (System.currentTimeMillis() - scrollStart)
+                + "ms,totalShowCost=" + (System.currentTimeMillis() - showStart)
+                + "ms " + adapterSnapshot());
+
         if (isCanLoadMore && WKReader.isNotEmpty(chatAdapter.getData()) && chatAdapter.getData().get(chatAdapter.getData().size() - 1).wkMsg != null) {
             int maxSeq = WKIM.getInstance().getMsgManager().getMaxMessageSeqWithChannel(channelId, channelType);
             if (chatAdapter.getData().get(chatAdapter.getData().size() - 1).wkMsg.messageSeq == maxSeq) {
                 isCanLoadMore = false;
+                chatLoadLog("LOAD#" + loadId + " showData set isCanLoadMore=false because last messageSeq reached local maxSeq=" + maxSeq);
             }
         }
+
+        chatLoadLog("LOAD#" + loadId + " showData END totalShowCost=" + (System.currentTimeMillis() - showStart)
+                + "ms,totalLoadCost=" + (System.currentTimeMillis() - loadStart)
+                + "ms " + adapterSnapshot());
+        wkVBinding.recyclerView.post(() -> chatLoadLog("LOAD#" + loadId + " recyclerView.post rendered/check totalLoadCost="
+                + (System.currentTimeMillis() - loadStart)
+                + "ms,childCount=" + wkVBinding.recyclerView.getChildCount()
+                + " " + adapterSnapshot()));
 
         new Handler().postDelayed(() -> {
             if (isUpdateRedDot) {
@@ -2464,7 +2809,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
 
     private void showRefreshLoading() {
-        if (isRefreshLoading || !isCanRefresh) return;
+        chatLoadLog("TRIGGER showRefreshLoading(top/older) called. " + adapterSnapshot());
+        if (isRefreshLoading || !isCanRefresh) {
+            chatLoadLog("TRIGGER showRefreshLoading ignored, isRefreshLoading=" + isRefreshLoading + ",isCanRefresh=" + isCanRefresh + " " + adapterSnapshot());
+            return;
+        }
         isRefreshLoading = true;
         WKMsg wkMsg = new WKMsg();
         wkMsg.type = WKContentType.loading;
@@ -2480,11 +2829,16 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         chatAdapter.addData(index, new WKUIChatMsgItemEntity(this, wkMsg, null));
         wkVBinding.recyclerView.scrollToPosition(0);
         lastPreviewMsgOrderSeq = 0;
-        new Handler().postDelayed(() -> getData(0, false, 0, false), 300);
+        chatLoadLog("TRIGGER showRefreshLoading added loading at index=" + index + ",will call getData after 300ms. " + adapterSnapshot());
+        new Handler().postDelayed(() -> getDataWithSource("topRefreshDelay300", 0, false, 0, false), 300);
     }
 
     private void showMoreLoading() {
-        if (isMoreLoading || !isCanLoadMore) return;
+        chatLoadLog("TRIGGER showMoreLoading(bottom/newer) called. " + adapterSnapshot());
+        if (isMoreLoading || !isCanLoadMore) {
+            chatLoadLog("TRIGGER showMoreLoading ignored, isMoreLoading=" + isMoreLoading + ",isCanLoadMore=" + isCanLoadMore + " " + adapterSnapshot());
+            return;
+        }
         isMoreLoading = true;
         WKMsg wkMsg = new WKMsg();
         wkMsg.type = WKContentType.loading;
@@ -2492,7 +2846,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         wkVBinding.recyclerView.scrollToPosition(chatAdapter.getItemCount() - 1);
         lastPreviewMsgOrderSeq = 0;
         unreadStartMsgOrderSeq = 0;
-        new Handler().postDelayed(() -> getData(1, false, 0, false), 300);
+        chatLoadLog("TRIGGER showMoreLoading added loading at bottom, will call getData after 300ms. " + adapterSnapshot());
+        new Handler().postDelayed(() -> getDataWithSource("bottomMoreDelay300", 1, false, 0, false), 300);
     }
 
     private List<PopupMenuItem> getGroupApprovePopupItems() {
@@ -2889,7 +3244,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (msg != null && msg.isDeleted == 0) {
                 unreadStartMsgOrderSeq = 0;
                 tipsOrderSeq = msg.orderSeq;
-                getData(0, true, msg.orderSeq, true);
+                getDataWithSource("tipsMsgFallback", 0, true, msg.orderSeq, true);
                 isCanLoadMore = true;
             } else {
                 showToast(R.string.cannot_tips_msg);
