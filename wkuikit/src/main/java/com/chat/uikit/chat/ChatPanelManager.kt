@@ -146,118 +146,124 @@ class TranslateStatusView(context: android.content.Context) : View(context) {
         style = android.graphics.Paint.Style.STROKE
         strokeCap = android.graphics.Paint.Cap.ROUND
     }
-    private val dotPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-    private val haloPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    private val dotPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        style = android.graphics.Paint.Style.FILL
+    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // 给右侧留空白，灰点不会贴着“文A”图标；效果更接近 Web CSS 那个右侧开关。
-        setMeasuredDimension(AndroidUtilities.dp(34f), AndroidUtilities.dp(22f))
+        // 宽一点，让灰点和右侧“文A”拉开距离；高度加一点，半弧不会被裁切。
+        setMeasuredDimension(AndroidUtilities.dp(36f), AndroidUtilities.dp(24f))
     }
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
 
-        val centerY = height / 2f + AndroidUtilities.dp(1.1f)
+        // 整体略微下压，和右侧翻译图标视觉中心对齐。
+        val centerY = height / 2f + AndroidUtilities.dp(1.2f).toFloat()
+        // 灰点往左移，避免贴住右边“文A”。
         val dotX = AndroidUtilities.dp(18.2f).toFloat()
 
-        val activeColor = Theme.colorAccount
-        val inactiveColor = Color.parseColor("#94A3B8")
+        val activeColor = android.graphics.Color.rgb(34, 197, 94)      // 开启：绿色
+        val inactiveColor = android.graphics.Color.rgb(148, 163, 184)  // 关闭：灰色
         val color = if (active) activeColor else inactiveColor
 
-        // 半弧做成 CSS 一样的“外浅内深”：外层淡、中层浅、内层稍深。
-        // 不再是一根硬线，截图里看起来会更柔和。
-        val arcRect = RectF(
-            AndroidUtilities.dp(2.6f).toFloat(),
-            centerY - AndroidUtilities.dp(8.4f),
-            AndroidUtilities.dp(21.4f).toFloat(),
-            centerY + AndroidUtilities.dp(8.4f)
+        // 半弧不要画成光晕圆圈，而是画多条同心 C 形线：
+        // 越靠近灰点的弧线越深，越外侧越淡，接近网页 CSS 那种柔和半弧。
+        drawSoftArc(
+            canvas = canvas,
+            color = color,
+            alpha = if (active) 58 else 42,
+            strokeDp = 1.05f,
+            leftDp = 1.8f,
+            topOffsetDp = 9.0f,
+            rightDp = 24.4f,
+            bottomOffsetDp = 9.0f,
+            startAngle = 106f,
+            sweepAngle = 146f
         )
-        drawSoftArc(canvas, arcRect, color, if (active) 24 else 18, AndroidUtilities.dp(4.2f).toFloat())
-        drawSoftArc(canvas, arcRect, color, if (active) 50 else 36, AndroidUtilities.dp(2.7f).toFloat())
-        drawSoftArc(canvas, arcRect, color, if (active) 118 else 74, AndroidUtilities.dp(1.25f).toFloat())
+        drawSoftArc(
+            canvas = canvas,
+            color = color,
+            alpha = if (active) 102 else 74,
+            strokeDp = 1.18f,
+            leftDp = 4.8f,
+            topOffsetDp = 7.4f,
+            rightDp = 23.8f,
+            bottomOffsetDp = 7.4f,
+            startAngle = 101f,
+            sweepAngle = 156f
+        )
+        drawSoftArc(
+            canvas = canvas,
+            color = color,
+            alpha = if (active) 190 else 138,
+            strokeDp = 1.35f,
+            leftDp = 8.0f,
+            topOffsetDp = 5.7f,
+            rightDp = 23.0f,
+            bottomOffsetDp = 5.7f,
+            startAngle = 96f,
+            sweepAngle = 166f
+        )
 
-        // 灰点也做渐变：中心深，外圈越来越浅。
-        drawSoftDot(canvas, dotX, centerY, color)
+        // 只保留一个实心灰/绿点，不再画外圈光晕。
+        dotPaint.color = color
+        dotPaint.alpha = if (active) 255 else 215
+        canvas.drawCircle(dotX, centerY, AndroidUtilities.dp(2.35f).toFloat(), dotPaint)
     }
 
     private fun drawSoftArc(
         canvas: android.graphics.Canvas,
-        rect: RectF,
         color: Int,
-        alphaValue: Int,
-        stroke: Float
+        alpha: Int,
+        strokeDp: Float,
+        leftDp: Float,
+        topOffsetDp: Float,
+        rightDp: Float,
+        bottomOffsetDp: Float,
+        startAngle: Float,
+        sweepAngle: Float
     ) {
         arcPaint.color = color
-        arcPaint.alpha = alphaValue
-        arcPaint.strokeWidth = stroke
-        canvas.drawArc(rect, 96f, 168f, false, arcPaint)
-    }
-
-    private fun drawSoftDot(canvas: android.graphics.Canvas, cx: Float, cy: Float, color: Int) {
-        haloPaint.color = color
-        haloPaint.alpha = if (active) 22 else 16
-        canvas.drawCircle(cx, cy, AndroidUtilities.dp(6.4f).toFloat(), haloPaint)
-
-        haloPaint.alpha = if (active) 44 else 30
-        canvas.drawCircle(cx, cy, AndroidUtilities.dp(4.4f).toFloat(), haloPaint)
-
-        dotPaint.color = color
-        dotPaint.alpha = if (active) 255 else 218
-        canvas.drawCircle(cx, cy, AndroidUtilities.dp(2.05f).toFloat(), dotPaint)
+        arcPaint.alpha = alpha
+        arcPaint.strokeWidth = AndroidUtilities.dp(strokeDp).toFloat()
+        val cy = height / 2f + AndroidUtilities.dp(1.2f).toFloat()
+        val rect = RectF(
+            AndroidUtilities.dp(leftDp).toFloat(),
+            cy - AndroidUtilities.dp(topOffsetDp).toFloat(),
+            AndroidUtilities.dp(rightDp).toFloat(),
+            cy + AndroidUtilities.dp(bottomOffsetDp).toFloat()
+        )
+        canvas.drawArc(rect, startAngle, sweepAngle, false, arcPaint)
     }
 }
 
-class LanguageIconView(context: android.content.Context) : View(context) {
+class LanguageIconView(context: android.content.Context) : AppCompatImageView(context) {
     var active: Boolean = false
         set(value) {
             field = value
-            iconColor = if (value) {
-                Theme.colorAccount
+            val color = if (value) {
+                android.graphics.Color.rgb(34, 197, 94) // 开启后绿色
             } else {
                 ContextCompat.getColor(context, R.color.color999)
             }
+            setColorFilter(PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN))
             alpha = if (value) 1f else 0.66f
-            invalidate()
         }
 
-    private var iconColor: Int = ContextCompat.getColor(context, R.color.color999)
-
-    private val wenPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
-        textAlign = android.graphics.Paint.Align.CENTER
-    }
-
-    private val aPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
-        textAlign = android.graphics.Paint.Align.CENTER
-    }
-
     init {
-        isClickable = true
-        isFocusable = true
-        setPadding(AndroidUtilities.dp(1f), AndroidUtilities.dp(1f), AndroidUtilities.dp(1f), AndroidUtilities.dp(1f))
-    }
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        setMeasuredDimension(AndroidUtilities.dp(30f), AndroidUtilities.dp(22f))
-    }
-
-    override fun onDraw(canvas: android.graphics.Canvas) {
-        super.onDraw(canvas)
-
-        // 不再使用 R.drawable.ic_fa_language，因为那个矢量图内部自带一根横线。
-        // 这里直接画“文 A”，干净、无下划线，也不需要额外 drawable 资源。
-        wenPaint.color = iconColor
-        aPaint.color = iconColor
-        wenPaint.textSize = AndroidUtilities.dp(13.5f).toFloat()
-        aPaint.textSize = AndroidUtilities.dp(12.5f).toFloat()
-
-        val baseY = height / 2f - (wenPaint.ascent() + wenPaint.descent()) / 2f
-        canvas.drawText("文", width * 0.38f, baseY, wenPaint)
-        canvas.drawText("A", width * 0.68f, baseY + AndroidUtilities.dp(0.4f), aPaint)
+        setImageResource(R.drawable.ic_fa_language)
+        scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+        // 图标视觉上偏高，所以只把图标内容往下压一点。
+        setPadding(
+            AndroidUtilities.dp(2f),
+            AndroidUtilities.dp(4f),
+            AndroidUtilities.dp(2f),
+            0
+        )
+        translationY = AndroidUtilities.dp(1.4f).toFloat()
     }
 }
-
 
 class ChatPanelManager(
     val helper: PanelSwitchHelper,
@@ -1478,10 +1484,7 @@ class ChatPanelManager(
     private fun installLanguageIconView(anchor: View): LanguageIconView {
         val iconView = LanguageIconView(anchor.context)
         iconView.id = anchor.id
-        val iconParams = anchor.layoutParams
-        iconParams.width = AndroidUtilities.dp(30f)
-        iconParams.height = AndroidUtilities.dp(22f)
-        iconView.layoutParams = iconParams
+        iconView.layoutParams = anchor.layoutParams
         iconView.setOnClickListener { toggleBeforeSendTranslate() }
         val parent = anchor.parent as? ViewGroup
         val index = parent?.indexOfChild(anchor) ?: -1
@@ -1498,12 +1501,8 @@ class ChatPanelManager(
         val statusView = TranslateStatusView(anchor.context)
         statusView.id = anchor.id
         val params = anchor.layoutParams
-        params.width = AndroidUtilities.dp(34f)
-        params.height = AndroidUtilities.dp(22f)
-        if (params is ViewGroup.MarginLayoutParams) {
-            // 右侧空出一点点距离，灰点不再贴着翻译图标。
-            params.rightMargin = AndroidUtilities.dp(2f)
-        }
+        params.width = AndroidUtilities.dp(36f)
+        params.height = AndroidUtilities.dp(24f)
         statusView.layoutParams = params
         statusView.setOnClickListener { toggleBeforeSendTranslate() }
         val parent = anchor.parent as? ViewGroup
