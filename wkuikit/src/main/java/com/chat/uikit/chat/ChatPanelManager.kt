@@ -144,59 +144,101 @@ class TranslateStatusView(context: android.content.Context) : View(context) {
 
     private val arcPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         style = android.graphics.Paint.Style.STROKE
-        strokeWidth = AndroidUtilities.dp(1.45f).toFloat()
+        strokeWidth = AndroidUtilities.dp(1.6f).toFloat()
         strokeCap = android.graphics.Paint.Cap.ROUND
     }
     private val dotPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
     private val haloPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        setMeasuredDimension(AndroidUtilities.dp(22f), AndroidUtilities.dp(16f))
+        // 比上一版更宽一点，半弧不会挤在灰点旁边；高度也加大，方便整体下移。
+        setMeasuredDimension(AndroidUtilities.dp(28f), AndroidUtilities.dp(20f))
     }
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
-        val centerY = height / 2f + AndroidUtilities.dp(0.8f)
-        val dotRadius = AndroidUtilities.dp(2.6f).toFloat()
-        val haloRadius = AndroidUtilities.dp(4.8f).toFloat()
-        val dotX = width - AndroidUtilities.dp(5.8f).toFloat()
+
+        // 整体下移一点，避免灰点和半弧贴着翻译条上边。
+        val centerY = height / 2f + AndroidUtilities.dp(2.0f)
+
+        // 灰点缩小，半透明光晕保留一点点即可。
+        val dotRadius = AndroidUtilities.dp(2.1f).toFloat()
+        val haloRadius = AndroidUtilities.dp(4.1f).toFloat()
+        val dotX = width - AndroidUtilities.dp(6.2f).toFloat()
+
         val activeColor = android.graphics.Color.rgb(34, 197, 94)
         val inactiveColor = android.graphics.Color.rgb(148, 163, 184)
         val color = if (active) activeColor else inactiveColor
 
+        // 半弧加大，位置放在灰点左侧，形成“灰点左边有半弧”的效果。
         arcPaint.color = color
-        arcPaint.alpha = if (active) 220 else 160
+        arcPaint.alpha = if (active) 230 else 145
         val arcRect = RectF(
-            AndroidUtilities.dp(1.5f).toFloat(),
-            centerY - AndroidUtilities.dp(6.2f),
-            AndroidUtilities.dp(15.8f).toFloat(),
-            centerY + AndroidUtilities.dp(6.2f)
+            AndroidUtilities.dp(1.2f).toFloat(),
+            centerY - AndroidUtilities.dp(8.2f),
+            AndroidUtilities.dp(20.2f).toFloat(),
+            centerY + AndroidUtilities.dp(8.2f)
         )
-        canvas.drawArc(arcRect, 98f, 164f, false, arcPaint)
+        canvas.drawArc(arcRect, 96f, 170f, false, arcPaint)
 
         haloPaint.color = color
-        haloPaint.alpha = if (active) 48 else 30
+        haloPaint.alpha = if (active) 44 else 24
         canvas.drawCircle(dotX, centerY, haloRadius, haloPaint)
 
         dotPaint.color = color
-        dotPaint.alpha = if (active) 255 else 215
+        dotPaint.alpha = if (active) 255 else 205
         canvas.drawCircle(dotX, centerY, dotRadius, dotPaint)
     }
 }
 
-class LanguageIconView(context: android.content.Context) : AppCompatImageView(context) {
+class LanguageIconView(context: android.content.Context) : View(context) {
     var active: Boolean = false
         set(value) {
             field = value
-            val color = if (value) Theme.colorAccount else ContextCompat.getColor(context, R.color.color999)
-            setColorFilter(PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN))
-            alpha = if (value) 1f else 0.62f
+            iconColor = if (value) {
+                Theme.colorAccount
+            } else {
+                ContextCompat.getColor(context, R.color.color999)
+            }
+            alpha = if (value) 1f else 0.66f
+            invalidate()
         }
 
+    private var iconColor: Int = ContextCompat.getColor(context, R.color.color999)
+
+    private val wenPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
+        textAlign = android.graphics.Paint.Align.CENTER
+    }
+
+    private val aPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
+        textAlign = android.graphics.Paint.Align.CENTER
+    }
+
     init {
-        setImageResource(R.drawable.ic_fa_language)
-        scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
-        setPadding(AndroidUtilities.dp(2f), AndroidUtilities.dp(2f), AndroidUtilities.dp(2f), AndroidUtilities.dp(2f))
+        isClickable = true
+        isFocusable = true
+        setPadding(AndroidUtilities.dp(1f), AndroidUtilities.dp(1f), AndroidUtilities.dp(1f), AndroidUtilities.dp(1f))
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        setMeasuredDimension(AndroidUtilities.dp(30f), AndroidUtilities.dp(22f))
+    }
+
+    override fun onDraw(canvas: android.graphics.Canvas) {
+        super.onDraw(canvas)
+
+        // 不再使用 R.drawable.ic_fa_language，因为那个矢量图内部自带一根横线。
+        // 这里直接画“文 A”，干净、无下划线，也不需要额外 drawable 资源。
+        wenPaint.color = iconColor
+        aPaint.color = iconColor
+        wenPaint.textSize = AndroidUtilities.dp(13.5f).toFloat()
+        aPaint.textSize = AndroidUtilities.dp(12.5f).toFloat()
+
+        val baseY = height / 2f - (wenPaint.ascent() + wenPaint.descent()) / 2f
+        canvas.drawText("文", width * 0.38f, baseY, wenPaint)
+        canvas.drawText("A", width * 0.68f, baseY + AndroidUtilities.dp(0.4f), aPaint)
     }
 }
 
@@ -1420,7 +1462,10 @@ class ChatPanelManager(
     private fun installLanguageIconView(anchor: View): LanguageIconView {
         val iconView = LanguageIconView(anchor.context)
         iconView.id = anchor.id
-        iconView.layoutParams = anchor.layoutParams
+        val iconParams = anchor.layoutParams
+        iconParams.width = AndroidUtilities.dp(30f)
+        iconParams.height = AndroidUtilities.dp(22f)
+        iconView.layoutParams = iconParams
         iconView.setOnClickListener { toggleBeforeSendTranslate() }
         val parent = anchor.parent as? ViewGroup
         val index = parent?.indexOfChild(anchor) ?: -1
@@ -1437,8 +1482,8 @@ class ChatPanelManager(
         val statusView = TranslateStatusView(anchor.context)
         statusView.id = anchor.id
         val params = anchor.layoutParams
-        params.width = AndroidUtilities.dp(22f)
-        params.height = AndroidUtilities.dp(16f)
+        params.width = AndroidUtilities.dp(28f)
+        params.height = AndroidUtilities.dp(20f)
         statusView.layoutParams = params
         statusView.setOnClickListener { toggleBeforeSendTranslate() }
         val parent = anchor.parent as? ViewGroup
