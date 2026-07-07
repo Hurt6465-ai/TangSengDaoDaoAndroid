@@ -906,6 +906,35 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }
     }
 
+
+    private WKChannel getCurrentChatChannel() {
+        try {
+            return WKIM.getInstance().getChannelManager().getChannel(channelId, channelType);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private boolean isFriendChatChannel() {
+        if (channelType != WKChannelType.PERSONAL) return false;
+        WKChannel channel = getCurrentChatChannel();
+        return channel != null && channel.follow == 1;
+    }
+
+    private boolean isBlacklistedByMe() {
+        if (channelType != WKChannelType.PERSONAL) return false;
+        WKChannel channel = getCurrentChatChannel();
+        return channel != null && channel.status == 2;
+    }
+
+    private String getCurrentChatShowName() {
+        WKChannel channel = getCurrentChatChannel();
+        if (channel == null) return "";
+        if (!TextUtils.isEmpty(channel.channelRemark)) return channel.channelRemark;
+        if (!TextUtils.isEmpty(channel.channelName)) return channel.channelName;
+        return "";
+    }
+
     private void showChatRemarkDialog() {
         WKChannel channel = getCurrentChatChannel();
         String old = channel == null ? "" : channel.channelRemark;
