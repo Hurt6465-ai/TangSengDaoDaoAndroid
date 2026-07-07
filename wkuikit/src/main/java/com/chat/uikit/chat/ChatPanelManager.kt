@@ -144,126 +144,46 @@ class TranslateStatusView(context: android.content.Context) : View(context) {
 
     private val arcPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         style = android.graphics.Paint.Style.STROKE
+        strokeWidth = AndroidUtilities.dp(1.6f).toFloat()
         strokeCap = android.graphics.Paint.Cap.ROUND
     }
-    private val dotPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        style = android.graphics.Paint.Style.FILL
-    }
+    private val dotPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    private val haloPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // 宽一点，让灰点和右侧“文A”拉开距离；高度加一点，半弧不会被裁切。
-        setMeasuredDimension(AndroidUtilities.dp(36f), AndroidUtilities.dp(24f))
+        setMeasuredDimension(AndroidUtilities.dp(28f), AndroidUtilities.dp(20f))
     }
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
-
-        // 整体略微下压，和右侧翻译图标视觉中心对齐。
-        val centerY = height / 2f + AndroidUtilities.dp(1.2f).toFloat()
-        // 灰点往左移，避免贴住右边“文A”。
-        val dotX = AndroidUtilities.dp(18.2f).toFloat()
-
-        val activeColor = android.graphics.Color.rgb(34, 197, 94)      // 开启：绿色
-        val inactiveColor = android.graphics.Color.rgb(148, 163, 184)  // 关闭：灰色
+        val centerY = height / 2f
+        val dotRadius = AndroidUtilities.dp(4.2f).toFloat()
+        val haloRadius = AndroidUtilities.dp(7.2f).toFloat()
+        val dotX = width - AndroidUtilities.dp(7f).toFloat()
+        val activeColor = android.graphics.Color.rgb(34, 197, 94)
+        val inactiveColor = android.graphics.Color.rgb(148, 163, 184)
         val color = if (active) activeColor else inactiveColor
 
-        // 半弧不要画成光晕圆圈，而是画多条同心 C 形线：
-        // 越靠近灰点的弧线越深，越外侧越淡，接近网页 CSS 那种柔和半弧。
-        drawSoftArc(
-            canvas = canvas,
-            color = color,
-            alpha = if (active) 58 else 42,
-            strokeDp = 1.05f,
-            leftDp = 1.8f,
-            topOffsetDp = 9.0f,
-            rightDp = 24.4f,
-            bottomOffsetDp = 9.0f,
-            startAngle = 106f,
-            sweepAngle = 146f
-        )
-        drawSoftArc(
-            canvas = canvas,
-            color = color,
-            alpha = if (active) 102 else 74,
-            strokeDp = 1.18f,
-            leftDp = 4.8f,
-            topOffsetDp = 7.4f,
-            rightDp = 23.8f,
-            bottomOffsetDp = 7.4f,
-            startAngle = 101f,
-            sweepAngle = 156f
-        )
-        drawSoftArc(
-            canvas = canvas,
-            color = color,
-            alpha = if (active) 190 else 138,
-            strokeDp = 1.35f,
-            leftDp = 8.0f,
-            topOffsetDp = 5.7f,
-            rightDp = 23.0f,
-            bottomOffsetDp = 5.7f,
-            startAngle = 96f,
-            sweepAngle = 166f
-        )
-
-        // 只保留一个实心灰/绿点，不再画外圈光晕。
-        dotPaint.color = color
-        dotPaint.alpha = if (active) 255 else 215
-        canvas.drawCircle(dotX, centerY, AndroidUtilities.dp(2.35f).toFloat(), dotPaint)
-    }
-
-    private fun drawSoftArc(
-        canvas: android.graphics.Canvas,
-        color: Int,
-        alpha: Int,
-        strokeDp: Float,
-        leftDp: Float,
-        topOffsetDp: Float,
-        rightDp: Float,
-        bottomOffsetDp: Float,
-        startAngle: Float,
-        sweepAngle: Float
-    ) {
         arcPaint.color = color
-        arcPaint.alpha = alpha
-        arcPaint.strokeWidth = AndroidUtilities.dp(strokeDp).toFloat()
-        val cy = height / 2f + AndroidUtilities.dp(1.2f).toFloat()
-        val rect = RectF(
-            AndroidUtilities.dp(leftDp).toFloat(),
-            cy - AndroidUtilities.dp(topOffsetDp).toFloat(),
-            AndroidUtilities.dp(rightDp).toFloat(),
-            cy + AndroidUtilities.dp(bottomOffsetDp).toFloat()
+        arcPaint.alpha = if (active) 220 else 155
+        val arcRect = RectF(
+            AndroidUtilities.dp(2f).toFloat(),
+            centerY - AndroidUtilities.dp(7f),
+            AndroidUtilities.dp(18f).toFloat(),
+            centerY + AndroidUtilities.dp(7f)
         )
-        canvas.drawArc(rect, startAngle, sweepAngle, false, arcPaint)
+        canvas.drawArc(arcRect, 100f, 160f, false, arcPaint)
+
+        haloPaint.color = color
+        haloPaint.alpha = if (active) 50 else 32
+        canvas.drawCircle(dotX, centerY, haloRadius, haloPaint)
+
+        dotPaint.color = color
+        dotPaint.alpha = if (active) 255 else 220
+        canvas.drawCircle(dotX, centerY, dotRadius, dotPaint)
     }
 }
 
-class LanguageIconView(context: android.content.Context) : AppCompatImageView(context) {
-    var active: Boolean = false
-        set(value) {
-            field = value
-            val color = if (value) {
-                android.graphics.Color.rgb(34, 197, 94) // 开启后绿色
-            } else {
-                ContextCompat.getColor(context, R.color.color999)
-            }
-            setColorFilter(PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN))
-            alpha = if (value) 1f else 0.66f
-        }
-
-    init {
-        setImageResource(R.drawable.ic_fa_language)
-        scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
-        // 图标视觉上偏高，所以只把图标内容往下压一点。
-        setPadding(
-            AndroidUtilities.dp(2f),
-            AndroidUtilities.dp(4f),
-            AndroidUtilities.dp(2f),
-            0
-        )
-        translationY = AndroidUtilities.dp(1.4f).toFloat()
-    }
-}
 
 class ChatPanelManager(
     val helper: PanelSwitchHelper,
@@ -352,9 +272,8 @@ class ChatPanelManager(
     private val sourceLangBtn: AppCompatTextView = parentView.findViewById(R.id.sourceLangBtn)
     private val swapLangBtn: AppCompatTextView = parentView.findViewById(R.id.swapLangBtn)
     private val targetLangBtn: AppCompatTextView = parentView.findViewById(R.id.targetLangBtn)
-    private val aiSendToggleHost: View = parentView.findViewById(R.id.aiSendToggle)
+    private val aiSendToggle: AppCompatTextView = parentView.findViewById(R.id.aiSendToggle)
     private val aiSendDotHost: View = parentView.findViewById(R.id.aiSendDot)
-    private val aiSendToggle: LanguageIconView = installLanguageIconView(aiSendToggleHost)
     private val aiSendStatusView: TranslateStatusView = installTranslateStatusView(aiSendDotHost)
     private var flameLayout: LinearLayout? = null
 
@@ -1481,32 +1400,16 @@ class ChatPanelManager(
         WKSharedPreferencesUtil.getInstance().putSP(key, if (value) "1" else "0")
     }
 
-    private fun installLanguageIconView(anchor: View): LanguageIconView {
-        val iconView = LanguageIconView(anchor.context)
-        iconView.id = anchor.id
-        iconView.layoutParams = anchor.layoutParams
-        iconView.setOnClickListener { toggleBeforeSendTranslate() }
-        val parent = anchor.parent as? ViewGroup
-        val index = parent?.indexOfChild(anchor) ?: -1
-        if (parent != null && index >= 0) {
-            parent.removeView(anchor)
-            parent.addView(iconView, index)
-        } else {
-            anchor.visibility = View.GONE
-        }
-        return iconView
-    }
-
     private fun installTranslateStatusView(anchor: View): TranslateStatusView {
         val statusView = TranslateStatusView(anchor.context)
         statusView.id = anchor.id
-        val params = anchor.layoutParams
-        params.width = AndroidUtilities.dp(36f)
-        params.height = AndroidUtilities.dp(24f)
-        statusView.layoutParams = params
-        statusView.setOnClickListener { toggleBeforeSendTranslate() }
         val parent = anchor.parent as? ViewGroup
         val index = parent?.indexOfChild(anchor) ?: -1
+        val params = anchor.layoutParams
+        params.width = AndroidUtilities.dp(28f)
+        params.height = AndroidUtilities.dp(20f)
+        statusView.layoutParams = params
+        statusView.setOnClickListener { aiSendToggle.performClick() }
         if (parent != null && index >= 0) {
             parent.removeView(anchor)
             parent.addView(statusView, index)
@@ -1516,24 +1419,18 @@ class ChatPanelManager(
         return statusView
     }
 
-    private fun toggleBeforeSendTranslate() {
-        val enable = !getFlag(keyAiSendTranslate, false)
-        putFlag(keyAiSendTranslate, enable)
-        refreshAiAssistBar()
-        showCenterToast(
-            iConversationContext.chatActivity.getString(
-                if (enable) R.string.chat_ai_translate_enabled_tip else R.string.chat_ai_translate_disabled_tip
-            )
-        )
-    }
-
     fun refreshAiAssistBar() {
         val sendTranslate = getFlag(keyAiSendTranslate, false)
         sourceLangBtn.text = langLabel(getSetting(keyAiSourceLang, "မြန်မာစာ"))
         targetLangBtn.text = langLabel(getSetting(keyAiTargetLang, "中文"))
-        aiSendToggle.active = sendTranslate
+        aiSendToggle.text = "文A"
+        aiSendToggle.rotation = -12f
+        aiSendToggle.setTextColor(
+            if (sendTranslate) Theme.colorAccount else ContextCompat.getColor(iConversationContext.chatActivity, R.color.color999)
+        )
+        aiSendToggle.alpha = if (sendTranslate) 1f else 0.65f
         aiSendStatusView.active = sendTranslate
-        aiSendStatusView.alpha = if (sendTranslate) 1f else 0.88f
+        aiSendStatusView.alpha = if (sendTranslate) 1f else 0.86f
     }
 
     private fun langLabel(name: String): String {
@@ -1602,8 +1499,17 @@ class ChatPanelManager(
             WKSharedPreferencesUtil.getInstance().putSP(keyAiTargetLang, source)
             refreshAiAssistBar()
         }
-        aiSendToggle.setOnClickListener { toggleBeforeSendTranslate() }
-        aiSendStatusView.setOnClickListener { toggleBeforeSendTranslate() }
+        aiSendToggle.setOnClickListener {
+            val enable = !getFlag(keyAiSendTranslate, false)
+            putFlag(keyAiSendTranslate, enable)
+            refreshAiAssistBar()
+            showCenterToast(
+                iConversationContext.chatActivity.getString(
+                    if (enable) R.string.chat_ai_translate_enabled_tip else R.string.chat_ai_translate_disabled_tip
+                )
+            )
+        }
+        aiSendStatusView.setOnClickListener { aiSendToggle.performClick() }
     }
 
     private fun buildTranslatePrompt(content: String): String {
@@ -1737,7 +1643,7 @@ ${content}"""
             reply.from_name = showName
             reply.from_uid = replyMsg.fromUID
             reply.message_id = replyMsg.messageID
-            reply.message_seq = replyMsg.messageSeq.toLong()
+            reply.message_seq = replyMsg.messageSeq
             val parentReply = replyMsg.baseContentMsgModel?.reply
             reply.root_mid = if (parentReply != null && !TextUtils.isEmpty(parentReply.root_mid)) {
                 parentReply.root_mid
