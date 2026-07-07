@@ -53,9 +53,11 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.chat.base.act.WKWebViewActivity;
 import com.chat.base.common.WKCommonModel;
+import com.chat.base.act.WKWebViewActivity;
 import com.chat.base.config.WKApiConfig;
+import com.chat.uikit.contacts.service.FriendModel;
+import com.chat.uikit.db.WKContactsDB;
 import com.chat.base.config.WKBinder;
 import com.chat.base.config.WKConfig;
 import com.chat.base.config.WKConstants;
@@ -638,190 +640,290 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private void showChatMoreDialog() {
-        final AlertDialog dialog = new AlertDialog.Builder(this).create();
+        AlertDialog dialog = new AlertDialog.Builder(this).create();
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(AndroidUtilities.dp(10f), AndroidUtilities.dp(6f), AndroidUtilities.dp(10f), AndroidUtilities.dp(7f));
-        root.setBackground(createChatMoreDialogBackground());
+        root.setPadding(AndroidUtilities.dp(10f), AndroidUtilities.dp(10f), AndroidUtilities.dp(10f), AndroidUtilities.dp(10f));
+        root.setBackground(makeRoundBg(Color.rgb(247, 248, 250), 18f));
 
-        TextView title = new TextView(this);
-        title.setText(R.string.chat_more_menu);
-        title.setGravity(Gravity.CENTER);
-        title.setTextSize(15);
-        title.setTextColor(Color.rgb(31, 41, 55));
-        title.setIncludeFontPadding(false);
-        root.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 32));
-        root.addView(createChatMoreDivider(true));
+        LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.VERTICAL);
+        group.setBackground(makeRoundBg(Color.WHITE, 14f));
+        root.addView(group, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-        root.addView(createChatMoreMenuItem(getString(R.string.clear_chat_msg), () -> {
+        addChatMoreRow(group, "✎", getString(R.string.set_remark), false, () -> {
             dialog.dismiss();
-            showClearChatHistoryConfirm();
-        }));
-        root.addView(createChatMoreMenuItem(getString(R.string.chat_bg_menu), () -> {
+            showChatRemarkDialog();
+        });
+        addDivider(group);
+
+        WKChannel curChannel = getCurrentChatChannel();
+        boolean muteOn = curChannel != null && curChannel.mute == 1;
+        addChatMoreRow(group, muteOn ? "🔔" : "🔕", getString(R.string.chat_more_mute_notifications), false, () -> {
+            dialog.dismiss();
+            toggleChatMute();
+        });
+        addDivider(group);
+
+        addChatMoreRow(group, "🖼", getString(R.string.chat_more_bg), false, () -> {
             dialog.dismiss();
             showChatBackgroundDialog();
-        }));
-        root.addView(createChatMoreMenuItem(getString(R.string.chat_ai_settings), () -> {
+        });
+        addDivider(group);
+
+        addChatMoreRow(group, "AI", getString(R.string.chat_more_ai_translate), false, () -> {
             dialog.dismiss();
             showChatAiSettingsDialog();
-        }));
+        });
+        addDivider(group);
 
-        if (isPersonalMenuAvailable()) {
-            if (isCurrentFriend()) {
-                root.addView(createChatMoreMenuItem(getString(R.string.delete_friends), () -> {
-                    dialog.dismiss();
-                    confirmDeleteFriendFromMenu();
-                }));
-            }
-            root.addView(createChatMoreMenuItem(getString(isCurrentBlacklisted() ? R.string.pull_out_black_list : R.string.push_black_list), () -> {
-                dialog.dismiss();
-                confirmBlacklistAction();
-            }));
-        }
-
-        root.addView(createChatMoreMenuItem(getString(R.string.report), () -> {
+        addChatMoreRow(group, "⌫", getString(R.string.clear_history), true, () -> {
             dialog.dismiss();
-            openReportPage();
-        }));
+            clearChatHistoryFromMore();
+        });
 
-        dialog.show();
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.setDimAmount(0.20f);
-            window.setContentView(root);
-            window.setLayout(AndroidUtilities.dp(252f), ViewGroup.LayoutParams.WRAP_CONTENT);
+        if (channelType == WKChannelType.PERSONAL && isFriendChatChannel()) {
+            addDivider(group);
+            addChatMoreRow(group, "－", getString(R.string.delete_friends), true, () -> {
+                dialog.dismiss();
+                deleteFriendFromMore();
+            });
         }
+
+        if (channelType == WKChannelType.PERSONAL) {
+            addDivider(group);
+            boolean black = isBlacklistedByMe();
+            addChatMoreRow(group, black ? "✓" : "!", getString(black ? R.string.pull_out_black_list : R.string.push_black_list), !black, () -> {
+                dialog.dismiss();
+                toggleBlacklistFromMore();
+            });
+        }
+
+        addDivider(group);
+        addChatMoreRow(group, "⚠", getString(R.string.report), true, () -> {
+            dialog.dismiss();
+            openChatReportPage();
+        });
+
+        dialog.setView(root);
+        dialog.setOnShowListener(d -> {
+            Window window = dialog.getWindow();
+            if (window != null) {
+                window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                WindowManager.LayoutParams lp = window.getAttributes();
+                lp.width = Math.min(AndroidUtilities.dp(330f), AndroidUtilities.getScreenWidth() - AndroidUtilities.dp(36f));
+                lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+                lp.gravity = Gravity.CENTER;
+                window.setAttributes(lp);
+            }
+        });
+        dialog.show();
     }
 
-    private GradientDrawable createChatMoreDialogBackground() {
-        GradientDrawable bg = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(255, 255, 255), Color.rgb(250, 252, 255), Color.rgb(247, 250, 255)}
-        );
-        bg.setCornerRadius(AndroidUtilities.dp(18f));
-        bg.setStroke(AndroidUtilities.dp(1f), Color.argb(230, 232, 238, 248));
-        return bg;
+    private GradientDrawable makeRoundBg(int color, float radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(AndroidUtilities.dp(radiusDp));
+        return drawable;
     }
 
-    private View createChatMoreDivider(boolean strong) {
+    private void addDivider(LinearLayout parent) {
         View line = new View(this);
-        line.setBackgroundColor(strong ? Color.argb(190, 220, 226, 236) : Color.argb(110, 226, 232, 240));
-        LinearLayout.LayoutParams lp = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1);
-        lp.leftMargin = AndroidUtilities.dp(2f);
-        lp.rightMargin = AndroidUtilities.dp(2f);
-        lp.topMargin = AndroidUtilities.dp(1f);
-        lp.bottomMargin = AndroidUtilities.dp(2f);
-        line.setLayoutParams(lp);
-        return line;
+        line.setBackgroundColor(Color.rgb(238, 238, 238));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1);
+        lp.leftMargin = AndroidUtilities.dp(54f);
+        parent.addView(line, lp);
     }
 
-    private View createChatMoreMenuItem(String text, Runnable action) {
-        TextView item = new TextView(this);
-        item.setText(text);
-        item.setGravity(Gravity.CENTER);
-        item.setSingleLine(true);
-        item.setTextSize(14);
-        item.setTextColor(Color.rgb(55, 65, 81));
-        item.setIncludeFontPadding(false);
-        item.setPadding(0, 0, 0, 0);
-        item.setBackground(Theme.createSelectorDrawable(Color.argb(22, 0, 0, 0)));
-        item.setOnClickListener(v -> {
+    private void addChatMoreRow(LinearLayout parent, String icon, String text, boolean danger, Runnable action) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(AndroidUtilities.dp(14f), 0, AndroidUtilities.dp(10f), 0);
+        row.setBackground(Theme.createSelectorDrawable(Color.argb(18, 0, 0, 0)));
+
+        TextView iconTv = new TextView(this);
+        iconTv.setText(icon);
+        iconTv.setGravity(Gravity.CENTER);
+        iconTv.setIncludeFontPadding(false);
+        iconTv.setTextSize(icon.length() > 1 ? 13 : 18);
+        iconTv.setTextColor(danger ? Color.rgb(235, 77, 75) : ContextCompat.getColor(this, R.color.popupTextColor));
+        row.addView(iconTv, LayoutHelper.createLinear(30, 44));
+
+        TextView textTv = new TextView(this);
+        textTv.setText(text);
+        textTv.setGravity(Gravity.CENTER_VERTICAL);
+        textTv.setSingleLine(true);
+        textTv.setTextSize(15);
+        textTv.setIncludeFontPadding(false);
+        textTv.setTextColor(danger ? Color.rgb(235, 77, 75) : ContextCompat.getColor(this, R.color.popupTextColor));
+        LinearLayout.LayoutParams textLp = LayoutHelper.createLinear(0, 44, 1f);
+        textLp.leftMargin = AndroidUtilities.dp(10f);
+        row.addView(textTv, textLp);
+
+        TextView arrowTv = new TextView(this);
+        arrowTv.setText("›");
+        arrowTv.setGravity(Gravity.CENTER);
+        arrowTv.setTextSize(24);
+        arrowTv.setIncludeFontPadding(false);
+        arrowTv.setTextColor(Color.rgb(160, 160, 160));
+        row.addView(arrowTv, LayoutHelper.createLinear(18, 44));
+
+        row.setOnClickListener(v -> {
             if (action != null) action.run();
         });
-        LinearLayout.LayoutParams lp = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, AndroidUtilities.dp(34f));
-        lp.topMargin = AndroidUtilities.dp(1f);
-        lp.bottomMargin = AndroidUtilities.dp(1f);
-        item.setLayoutParams(lp);
-        return item;
+        parent.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44));
     }
 
-    private boolean isPersonalMenuAvailable() {
-        return channelType == WKChannelType.PERSONAL
-                && !TextUtils.isEmpty(channelId)
-                && !TextUtils.equals(channelId, loginUID)
-                && !WKSystemAccount.isSystemAccount(channelId);
+    private WKChannel getCurrentChatChannel() {
+        return WKIM.getInstance().getChannelManager().getChannel(channelId, channelType);
     }
 
-    private boolean isCurrentFriend() {
-        return isPersonalMenuAvailable()
-                && !UserUtils.getInstance().checkMyFriendDelete(channelId)
-                && !UserUtils.getInstance().checkFriendRelation(channelId);
-    }
-
-    private boolean isCurrentBlacklisted() {
-        return isPersonalMenuAvailable()
-                && (UserUtils.getInstance().checkMyFriendBlacklist(channelId)
-                || (getChatChannelInfo() != null && getChatChannelInfo().status == WKChannelStatus.statusBlacklist));
-    }
-
-    private String getCurrentChannelDisplayName() {
-        WKChannel channel = getChatChannelInfo();
+    private String getCurrentChatShowName() {
+        WKChannel channel = getCurrentChatChannel();
         if (channel == null) return "";
-        String name = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
-        return TextUtils.isEmpty(name) ? channel.channelID : name;
+        return TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
     }
 
-    private void showClearChatHistoryConfirm() {
-        String name = getCurrentChannelDisplayName();
-        String content = String.format(getString(R.string.clear_history_tip), name);
-        WKDialogUtils.getInstance().showDialog(this, getString(R.string.clear_chat_msg), content, true, "", getString(R.string.base_delete), 0, ContextCompat.getColor(this, R.color.red), index -> {
-            if (index == 1) {
-                MsgModel.getInstance().offsetMsg(channelId, channelType, null);
-                WKIM.getInstance().getMsgManager().clearWithChannel(channelId, channelType);
-                showToast(R.string.cleared);
-            }
-        });
+    private boolean isFriendChatChannel() {
+        WKChannel channel = getCurrentChatChannel();
+        return channel != null && channel.follow == 1;
     }
 
-    private void confirmDeleteFriendFromMenu() {
-        String name = getCurrentChannelDisplayName();
-        String content = String.format(getString(R.string.delete_friends_tips), name);
-        WKDialogUtils.getInstance().showDialog(this, getString(R.string.delete_friends), content, true, "", getString(R.string.base_delete), 0, ContextCompat.getColor(this, R.color.red), index -> {
-            if (index == 1) {
-                UserModel.getInstance().deleteUser(channelId, (code, msg) -> {
+    private boolean isBlacklistedByMe() {
+        WKChannel channel = getCurrentChatChannel();
+        return channel != null && channel.status == 2;
+    }
+
+    private void showChatRemarkDialog() {
+        WKChannel channel = getCurrentChatChannel();
+        String old = channel == null ? "" : channel.channelRemark;
+        WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.set_remark), getString(R.string.input_remark), old, getString(R.string.input_remark), 40, text -> {
+            if (channelType == WKChannelType.GROUP) {
+                GroupModel.getInstance().updateGroupSetting(channelId, "remark", text, (code, msg) -> {
                     if (code == HttpResponseCode.success) {
-                        MsgModel.getInstance().offsetMsg(channelId, WKChannelType.PERSONAL, null);
-                        WKIM.getInstance().getMsgManager().clearWithChannel(channelId, WKChannelType.PERSONAL);
-                        WKCommonModel.getInstance().getChannel(channelId, WKChannelType.PERSONAL, null);
-                        showToast(R.string.delete_friends);
-                    } else if (!TextUtils.isEmpty(msg)) {
-                        WKToastUtils.getInstance().showToast(msg);
-                    }
-                });
-            }
-        });
-    }
-
-    private void confirmBlacklistAction() {
-        boolean blacklisted = isCurrentBlacklisted();
-        int title = blacklisted ? R.string.pull_out_black_list : R.string.push_black_list;
-        int message = blacklisted ? R.string.pull_out_black_list_tips : R.string.join_black_list_tips;
-        WKDialogUtils.getInstance().showDialog(this, getString(title), getString(message), true, "", getString(title), 0, ContextCompat.getColor(this, R.color.red), index -> {
-            if (index != 1) return;
-            if (blacklisted) {
-                UserModel.getInstance().removeBlackList(channelId, (code, msg) -> {
-                    if (code == HttpResponseCode.success) {
-                        WKCommonModel.getInstance().getChannel(channelId, WKChannelType.PERSONAL, null);
-                        showToast(R.string.removed_from_blacklist);
-                    } else if (!TextUtils.isEmpty(msg)) {
-                        WKToastUtils.getInstance().showToast(msg);
+                        WKChannel local = getCurrentChatChannel();
+                        if (local != null) {
+                            local.channelRemark = text;
+                            WKIM.getInstance().getChannelManager().saveOrUpdateChannel(local);
+                            showChannelName(local);
+                        }
+                        WKToastUtils.getInstance().showToastNormal(getString(R.string.chat_more_remark_saved));
+                    } else {
+                        WKToastUtils.getInstance().showToastNormal(msg);
                     }
                 });
             } else {
-                UserModel.getInstance().addBlackList(channelId, (code, msg) -> {
+                UserModel.getInstance().updateUserRemark(channelId, text, (code, msg) -> {
                     if (code == HttpResponseCode.success) {
-                        WKCommonModel.getInstance().getChannel(channelId, WKChannelType.PERSONAL, null);
-                        showToast(R.string.black_list_desc);
-                    } else if (!TextUtils.isEmpty(msg)) {
-                        WKToastUtils.getInstance().showToast(msg);
+                        WKChannel local = getCurrentChatChannel();
+                        if (local != null) {
+                            local.channelRemark = text;
+                            WKIM.getInstance().getChannelManager().saveOrUpdateChannel(local);
+                            showChannelName(local);
+                        }
+                        EndpointManager.getInstance().invoke(WKConstants.refreshContacts, null);
+                        WKToastUtils.getInstance().showToastNormal(getString(R.string.chat_more_remark_saved));
+                    } else {
+                        WKToastUtils.getInstance().showToastNormal(msg);
                     }
                 });
             }
         });
     }
 
-    private void openReportPage() {
+    private void toggleChatMute() {
+        WKChannel channel = getCurrentChatChannel();
+        int next = channel != null && channel.mute == 1 ? 0 : 1;
+        if (channelType == WKChannelType.GROUP) {
+            GroupModel.getInstance().updateGroupSetting(channelId, "mute", next, (code, msg) -> onChatMuteUpdated(code, msg, next));
+        } else {
+            FriendModel.getInstance().updateUserSetting(channelId, "mute", next, (code, msg) -> onChatMuteUpdated(code, msg, next));
+        }
+    }
+
+    private void onChatMuteUpdated(int code, String msg, int mute) {
+        if (code == HttpResponseCode.success) {
+            WKChannel channel = getCurrentChatChannel();
+            if (channel != null) {
+                channel.mute = mute;
+                WKIM.getInstance().getChannelManager().saveOrUpdateChannel(channel);
+            }
+            WKToastUtils.getInstance().showToastNormal(getString(mute == 1 ? R.string.chat_more_mute_enabled : R.string.chat_more_mute_disabled));
+        } else {
+            WKToastUtils.getInstance().showToastNormal(msg);
+        }
+    }
+
+    private void clearChatHistoryFromMore() {
+        String showName = getCurrentChatShowName();
+        String content = String.format(getString(R.string.clear_history_tip), TextUtils.isEmpty(showName) ? "" : showName);
+        WKDialogUtils.getInstance().showDialog(this, getString(R.string.clear_history), content, true, "", getString(R.string.base_delete), 0, ContextCompat.getColor(this, R.color.red), index -> {
+            if (index == 1) {
+                MsgModel.getInstance().offsetMsg(channelId, channelType, null);
+                WKIM.getInstance().getMsgManager().clearWithChannel(channelId, channelType);
+                MsgModel.getInstance().clearUnread(channelId, channelType, 0, (code, msg) -> {});
+                if (chatAdapter != null) {
+                    chatAdapter.getData().clear();
+                    chatAdapter.notifyDataSetChanged();
+                }
+                WKToastUtils.getInstance().showToastNormal(getString(R.string.cleared));
+            }
+        });
+    }
+
+    private void deleteFriendFromMore() {
+        String name = getCurrentChatShowName();
+        String content = String.format(getString(R.string.delete_friends_tips), TextUtils.isEmpty(name) ? "" : name);
+        WKDialogUtils.getInstance().showDialog(this, getString(R.string.delete_friends), content, true, "", getString(R.string.delete), 0, ContextCompat.getColor(this, R.color.red), index -> {
+            if (index == 1) {
+                UserModel.getInstance().deleteUser(channelId, (code, msg) -> {
+                    if (code == HttpResponseCode.success) {
+                        WKIM.getInstance().getConversationManager().deleteWitchChannel(channelId, WKChannelType.PERSONAL);
+                        MsgModel.getInstance().offsetMsg(channelId, WKChannelType.PERSONAL, null);
+                        WKIM.getInstance().getMsgManager().clearWithChannel(channelId, WKChannelType.PERSONAL);
+                        WKContactsDB.getInstance().updateFriendStatus(channelId, 0);
+                        WKIM.getInstance().getChannelManager().updateFollow(channelId, WKChannelType.PERSONAL, 0);
+                        EndpointManager.getInstance().invoke(WKConstants.refreshContacts, null);
+                        EndpointManager.getInstance().invokes(EndpointCategory.wkExitChat, new WKChannel(channelId, WKChannelType.PERSONAL));
+                        finish();
+                    } else {
+                        WKToastUtils.getInstance().showToastNormal(msg);
+                    }
+                });
+            }
+        });
+    }
+
+    private void toggleBlacklistFromMore() {
+        boolean black = isBlacklistedByMe();
+        int titleRes = black ? R.string.pull_out_black_list : R.string.push_black_list;
+        int tipRes = black ? R.string.pull_out_black_list_tips : R.string.join_black_list_tips;
+        WKDialogUtils.getInstance().showDialog(this, getString(titleRes), getString(tipRes), true, "", getString(R.string.sure), 0, black ? Theme.colorAccount : ContextCompat.getColor(this, R.color.red), index -> {
+            if (index == 1) {
+                if (black) {
+                    UserModel.getInstance().removeBlackList(channelId, (code, msg) -> onBlacklistUpdated(code, msg, false));
+                } else {
+                    UserModel.getInstance().addBlackList(channelId, (code, msg) -> onBlacklistUpdated(code, msg, true));
+                }
+            }
+        });
+    }
+
+    private void onBlacklistUpdated(int code, String msg, boolean black) {
+        if (code == HttpResponseCode.success) {
+            WKChannel channel = getCurrentChatChannel();
+            if (channel != null) {
+                channel.status = black ? 2 : 1;
+                WKIM.getInstance().getChannelManager().saveOrUpdateChannel(channel);
+            }
+            WKToastUtils.getInstance().showToastNormal(getString(black ? R.string.chat_more_blacklist_added : R.string.chat_more_blacklist_removed));
+        } else {
+            WKToastUtils.getInstance().showToastNormal(msg);
+        }
+    }
+
+    private void openChatReportPage() {
         Intent intent = new Intent(this, WKWebViewActivity.class);
         intent.putExtra("channelType", channelType);
         intent.putExtra("channelID", channelId);
@@ -848,7 +950,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }
         items[10] = getString(R.string.chat_bg_choose_local);
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.chat_bg_menu)
+                .setTitle(R.string.chat_more_bg)
                 .setItems(items, (d, which) -> {
                     if (which == 0) clearLocalChatBackground();
                     else if (which >= 1 && which <= 9) {
@@ -1050,6 +1152,55 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 && type != WKContentType.spanEmptyView
                 && type != WKContentType.typing
                 && type != WKContentType.noRelation;
+    }
+
+    private boolean isReceivedTextMsgForInlineTranslate(WKMsg msg) {
+        if (msg == null) return false;
+        if (shouldHideFromChatList(msg)) return false;
+        if (msg.type != WKContentType.WK_TEXT) return false;
+        if (msg.isDeleted == 1) return false;
+        if (msg.remoteExtra != null && (msg.remoteExtra.revoke == 1 || msg.remoteExtra.isMutualDeleted == 1)) {
+            return false;
+        }
+        if (TextUtils.isEmpty(msg.fromUID) || TextUtils.equals(msg.fromUID, loginUID)) return false;
+
+        String displayContent = "";
+        if (msg.baseContentMsgModel != null) {
+            try {
+                displayContent = msg.baseContentMsgModel.getDisplayContent();
+            } catch (Exception ignored) {
+            }
+        }
+        if (TextUtils.isEmpty(displayContent)) {
+            displayContent = msg.content;
+        }
+        return !TextUtils.isEmpty(displayContent);
+    }
+
+    private int findLatestReceivedTextMsgIndex() {
+        if (chatAdapter == null || WKReader.isEmpty(chatAdapter.getData())) return -1;
+        for (int i = chatAdapter.getData().size() - 1; i >= 0; i--) {
+            WKUIChatMsgItemEntity item = chatAdapter.getData().get(i);
+            if (item != null && isReceivedTextMsgForInlineTranslate(item.wkMsg)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void refreshOldInlineTranslateButton(int oldLatestReceivedTextIndex, WKMsg newMsg) {
+        if (oldLatestReceivedTextIndex < 0) return;
+        if (chatAdapter == null || WKReader.isEmpty(chatAdapter.getData())) return;
+        if (!isReceivedTextMsgForInlineTranslate(newMsg)) return;
+        if (oldLatestReceivedTextIndex >= chatAdapter.getData().size()) return;
+
+        WKUIChatMsgItemEntity oldItem = chatAdapter.getData().get(oldLatestReceivedTextIndex);
+        if (oldItem == null || !isReceivedTextMsgForInlineTranslate(oldItem.wkMsg)) return;
+
+        // 这里必须做完整数据刷新，不能用 payload 局部刷新。
+        // payload 只会刷新头像/背景/状态，WKTextProvider.setData() 不会重新执行，
+        // 旧“最后一条对方文字消息”上的快捷翻译按钮就会残留。
+        chatAdapter.notifyData(oldLatestReceivedTextIndex);
     }
 
     private boolean isSameMessage(WKMsg first, WKMsg second) {
@@ -1348,10 +1499,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         callIV = new AppCompatImageView(this);
         callIV.setImageResource(R.mipmap.ic_call);
         if (isRegister) {
-            wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(34, 34, Gravity.END | Gravity.CENTER_VERTICAL, 0, 0, 58, 0));
+            wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(38, 38, Gravity.END | Gravity.CENTER_VERTICAL, 0, 0, 58, 0));
         }
         callIV.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        callIV.setPadding(AndroidUtilities.dp(7f), AndroidUtilities.dp(7f), AndroidUtilities.dp(7f), AndroidUtilities.dp(7f));
+        callIV.setPadding(AndroidUtilities.dp(8f), AndroidUtilities.dp(8f), AndroidUtilities.dp(8f), AndroidUtilities.dp(8f));
         callIV.setColorFilter(new PorterDuffColorFilter(ContextCompat.getColor(this, R.color.popupTextColor), PorterDuff.Mode.MULTIPLY));
         callIV.setBackground(Theme.createSelectorDrawable(Theme.getPressedColor()));
 
@@ -3326,6 +3477,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (TextUtils.equals(msg.channelID, channelId) && msg.channelType == channelType) {
                 if (!chatAdapter.isExist(msg.clientMsgNO, msg.messageID)) {
                     if (!isCanLoadMore) {
+                        // 新消息加入前，先记住当前“最后一条对方文字消息”。
+                        // 如果这次收到的也是对方文字消息，旧 item 就必须完整重绑，
+                        // 否则旧 item 已经 add 进去的翻译按钮不会自动消失。
+                        int oldLatestReceivedTextIndex = findLatestReceivedTextMsgIndex();
                         if (chatAdapter.getItemCount() > 0) {
                             WKUIChatMsgItemEntity last = chatAdapter.getData().get(chatAdapter.getItemCount() - 1);
                             if (last != null && last.wkMsg != null && last.wkMsg.type == WKContentType.typing) {
@@ -3366,6 +3521,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                         if (previousMsgIndex != -1 && previousMsgIndex < chatAdapter.getData().size()) {
                             chatAdapter.notifyItemChanged(previousMsgIndex, chatAdapter.getData().get(previousMsgIndex));
                         }
+                        refreshOldInlineTranslateButton(oldLatestReceivedTextIndex, msg);
                     }
                     if (isShowHistory || redDot > 0) {
                         redDot += 1;
