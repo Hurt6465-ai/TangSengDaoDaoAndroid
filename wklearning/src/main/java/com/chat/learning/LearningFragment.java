@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.Gravity;
@@ -15,6 +16,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -32,6 +34,8 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.chat.userscript.AiScriptWebActivity;
 import com.chat.userscript.ScriptManagerActivity;
 
+import java.io.File;
+
 /**
  * 独立学习插件首页。
  *
@@ -41,7 +45,7 @@ import com.chat.userscript.ScriptManagerActivity;
  * 3. 每个栏目里面用 RecyclerView 渲染内容；
  * 4. 背单词从“单词”页进入独立全屏 Activity，使用竖向 ViewPager2 + 横向会/不会手势。
  *
- * 注意：广告暂时不加。海报背景仍建议“本地兜底 + 远程 JSON 覆盖”。
+ * 注意：广告暂时不加。海报背景采用“本地 drawable-nodpi 兜底 + files/learning/images 远程更新覆盖”。
  */
 public class LearningFragment extends Fragment {
     private static final int COLOR_BG = 0xFFF7F9FC;
@@ -117,14 +121,32 @@ public class LearningFragment extends Fragment {
         wrap.setOrientation(LinearLayout.VERTICAL);
         wrap.setPadding(dp(16), dp(14), dp(16), dp(10));
 
+        FrameLayout bannerFrame = new FrameLayout(context);
+        bannerFrame.setBackground(createBannerBg());
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            bannerFrame.setElevation(dp(2));
+            bannerFrame.setClipToOutline(true);
+        }
+
+        ImageView bannerImage = new ImageView(context);
+        bannerImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        File remoteBanner = getRemoteBannerFile(context);
+        if (remoteBanner.exists() && remoteBanner.length() > 0) {
+            bannerImage.setImageURI(Uri.fromFile(remoteBanner));
+        } else {
+            bannerImage.setImageResource(R.drawable.learning_home_banner_default);
+        }
+        bannerFrame.addView(bannerImage, new FrameLayout.LayoutParams(-1, -1));
+
+        View scrim = new View(context);
+        scrim.setBackground(createBannerScrim());
+        bannerFrame.addView(scrim, new FrameLayout.LayoutParams(-1, -1));
+
         LinearLayout banner = new LinearLayout(context);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setGravity(Gravity.BOTTOM | Gravity.START);
         banner.setPadding(dp(18), dp(18), dp(18), dp(16));
-        banner.setBackground(createBannerBg());
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-            banner.setElevation(dp(2));
-        }
+        bannerFrame.addView(banner, new FrameLayout.LayoutParams(-1, -1));
 
         TextView badge = new TextView(context);
         badge.setText("新手推荐");
@@ -174,7 +196,7 @@ public class LearningFragment extends Fragment {
         });
         banner.addView(bottom, new LinearLayout.LayoutParams(-1, -2));
 
-        wrap.addView(banner, new LinearLayout.LayoutParams(-1, dp(198)));
+        wrap.addView(bannerFrame, new LinearLayout.LayoutParams(-1, dp(198)));
 
         LinearLayout quickRow = new LinearLayout(context);
         quickRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -473,9 +495,22 @@ public class LearningFragment extends Fragment {
         super.onDestroyView();
     }
 
+    private File getRemoteBannerFile(Context context) {
+        // 远程更新下载后的首页海报放这里：/data/data/包名/files/learning/images/home_banner.webp
+        // 没有该文件时自动使用 res/drawable-nodpi/learning_home_banner_default.webp 兜底。
+        return new File(new File(context.getFilesDir(), "learning/images"), "home_banner.webp");
+    }
+
     private GradientDrawable createBannerBg() {
         GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{0xFF4F8DFF, 0xFF7C5CFF, 0xFFFF8AAE});
+        drawable.setCornerRadius(dp(26));
+        return drawable;
+    }
+
+    private GradientDrawable createBannerScrim() {
+        GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0x22000000, 0x66000000, 0x99000000});
         drawable.setCornerRadius(dp(26));
         return drawable;
     }

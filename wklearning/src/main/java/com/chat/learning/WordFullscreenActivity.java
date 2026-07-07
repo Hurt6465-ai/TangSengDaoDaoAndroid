@@ -23,14 +23,16 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
  * 背单词全屏页：
  * - 上下滑：ViewPager2 竖向切词；
- * - 左滑：不会，加入复习；
- * - 右滑：会了；
- * - 点击：正反面翻转。
+ * - 左滑：忘记，10 分钟后再复习；
+ * - 右滑：记得，按 SM-2 拉长复习间隔；
+ * - 点击：正反面翻转；
+ * - 底部按钮：忘记 / 模糊 / 记得，三档写入 SM-2。
  */
 public class WordFullscreenActivity extends AppCompatActivity {
     private static final int COLOR_BLUE = 0xFF1877F2;
@@ -40,6 +42,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private ViewPager2 wordPager;
     private TextView progressView;
+    private LearningReviewStore reviewStore;
     private final ArrayList<WordItem> words = new ArrayList<>();
 
     @Override
@@ -54,6 +57,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
 
         seedWords();
+        reviewStore = new LearningReviewStore(this);
+        sortWordsByReviewTime();
 
         FrameLayout root = new FrameLayout(this);
         root.setBackground(createPageBg());
@@ -97,10 +102,10 @@ public class WordFullscreenActivity extends AppCompatActivity {
         progressView.setTextSize(13);
         progressView.setGravity(Gravity.CENTER);
         progressView.setBackground(rounded(0xCCFFFFFF, dp(17), COLOR_LINE, 1));
-        topBar.addView(progressView, new LinearLayout.LayoutParams(dp(66), dp(34)));
+        topBar.addView(progressView, new LinearLayout.LayoutParams(dp(86), dp(34)));
 
         TextView hint = new TextView(this);
-        hint.setText("上/下切词 · 左滑不会 · 右滑会了 · 点击翻面");
+        hint.setText("上/下切词 · 左滑忘记 · 右滑记得 · 点击翻面 · 模糊点按钮");
         hint.setTextColor(0xFF64748B);
         hint.setTextSize(12);
         hint.setGravity(Gravity.CENTER);
@@ -120,20 +125,45 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private void updateProgress(int position) {
         if (progressView != null) {
-            progressView.setText((position + 1) + "/" + words.size());
+            progressView.setText((position + 1) + "/" + words.size() + " · 待" + countDueWords());
         }
     }
 
     private void seedWords() {
         words.clear();
-        words.add(new WordItem("你好", "nǐ hǎo", "မင်္ဂလာပါ / Hello", "你好，你吃饭了吗？"));
-        words.add(new WordItem("谢谢", "xiè xie", "ကျေးဇူးတင်ပါတယ် / Thank you", "谢谢你帮我。"));
-        words.add(new WordItem("学习", "xué xí", "သင်ယူသည် / Study", "我正在学习中文。"));
-        words.add(new WordItem("工作", "gōng zuò", "အလုပ် / Work", "你在哪里工作？"));
-        words.add(new WordItem("朋友", "péng you", "သူငယ်ချင်း / Friend", "他是我的朋友。"));
-        words.add(new WordItem("吃饭", "chī fàn", "ထမင်းစားသည် / Eat", "我们一起吃饭吧。"));
-        words.add(new WordItem("多少钱", "duō shǎo qián", "ဘယ်လောက်လဲ / How much", "这个多少钱？"));
-        words.add(new WordItem("慢一点", "màn yì diǎn", "နည်းနည်းဖြေးဖြေး / Slower", "请你说慢一点。"));
+        words.add(new WordItem("zh_basic_001", "你好", "nǐ hǎo", "မင်္ဂလာပါ / Hello", "你好，你吃饭了吗？"));
+        words.add(new WordItem("zh_basic_002", "谢谢", "xiè xie", "ကျေးဇူးတင်ပါတယ် / Thank you", "谢谢你帮我。"));
+        words.add(new WordItem("zh_basic_003", "学习", "xué xí", "သင်ယူသည် / Study", "我正在学习中文。"));
+        words.add(new WordItem("zh_basic_004", "工作", "gōng zuò", "အလုပ် / Work", "你在哪里工作？"));
+        words.add(new WordItem("zh_basic_005", "朋友", "péng you", "သူငယ်ချင်း / Friend", "他是我的朋友。"));
+        words.add(new WordItem("zh_basic_006", "吃饭", "chī fàn", "ထမင်းစားသည် / Eat", "我们一起吃饭吧。"));
+        words.add(new WordItem("zh_basic_007", "多少钱", "duō shǎo qián", "ဘယ်လောက်လဲ / How much", "这个多少钱？"));
+        words.add(new WordItem("zh_basic_008", "慢一点", "màn yì diǎn", "နည်းနည်းဖြေးဖြေး / Slower", "请你说慢一点。"));
+    }
+
+    private void sortWordsByReviewTime() {
+        if (reviewStore == null) return;
+        final long now = System.currentTimeMillis();
+        Collections.sort(words, (a, b) -> {
+            LearningReviewStore.ReviewState ra = reviewStore.get(a.id);
+            LearningReviewStore.ReviewState rb = reviewStore.get(b.id);
+            boolean da = ra.isDue(now);
+            boolean db = rb.isDue(now);
+            if (da != db) return da ? -1 : 1;
+            long na = ra.nextReviewAt <= 0 ? 0 : ra.nextReviewAt;
+            long nb = rb.nextReviewAt <= 0 ? 0 : rb.nextReviewAt;
+            return Long.compare(na, nb);
+        });
+    }
+
+    private int countDueWords() {
+        if (reviewStore == null) return words.size();
+        long now = System.currentTimeMillis();
+        int count = 0;
+        for (WordItem item : words) {
+            if (reviewStore.get(item.id).isDue(now)) count++;
+        }
+        return count;
     }
 
     private class WordPagerAdapter extends RecyclerView.Adapter<WordPagerAdapter.Holder> {
@@ -169,6 +199,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
             private final TextView pinyin;
             private final TextView meaning;
             private final TextView example;
+            private final TextView reviewInfo;
             private final TextView markLeft;
             private final TextView markRight;
             private final int slop;
@@ -207,6 +238,13 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 pinyin.setPadding(0, dp(10), 0, 0);
                 card.addView(pinyin, new LinearLayout.LayoutParams(-1, -2));
 
+                reviewInfo = new TextView(itemView.getContext());
+                reviewInfo.setTextColor(0xFF64748B);
+                reviewInfo.setTextSize(13);
+                reviewInfo.setGravity(Gravity.CENTER);
+                reviewInfo.setPadding(0, dp(12), 0, 0);
+                card.addView(reviewInfo, new LinearLayout.LayoutParams(-1, -2));
+
                 meaning = new TextView(itemView.getContext());
                 meaning.setTextColor(0xFF334155);
                 meaning.setTextSize(21);
@@ -223,12 +261,29 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 example.setPadding(0, dp(18), 0, 0);
                 card.addView(example, new LinearLayout.LayoutParams(-1, -2));
 
-                markLeft = mark("不会", 0xFFFFEEF2, 0xFFE11D48);
+                LinearLayout actions = new LinearLayout(itemView.getContext());
+                actions.setOrientation(LinearLayout.HORIZONTAL);
+                actions.setGravity(Gravity.CENTER);
+                actions.setPadding(0, dp(24), 0, 0);
+                TextView forgot = actionButton("忘记", 0xFFFFEEF2, 0xFFE11D48);
+                TextView blurry = actionButton("模糊", 0xFFFFF7ED, 0xFFEA580C);
+                TextView remember = actionButton("记得", 0xFFECFDF5, 0xFF059669);
+                actions.addView(forgot, new LinearLayout.LayoutParams(0, dp(44), 1f));
+                LinearLayout.LayoutParams blurryLp = new LinearLayout.LayoutParams(0, dp(44), 1f);
+                blurryLp.setMargins(dp(10), 0, dp(10), 0);
+                actions.addView(blurry, blurryLp);
+                actions.addView(remember, new LinearLayout.LayoutParams(0, dp(44), 1f));
+                card.addView(actions, new LinearLayout.LayoutParams(-1, -2));
+                forgot.setOnClickListener(v -> commitJudge(Sm2Scheduler.QUALITY_FORGOT));
+                blurry.setOnClickListener(v -> commitJudge(Sm2Scheduler.QUALITY_BLURRY));
+                remember.setOnClickListener(v -> commitJudge(Sm2Scheduler.QUALITY_REMEMBER));
+
+                markLeft = mark("忘记", 0xFFFFEEF2, 0xFFE11D48);
                 FrameLayout.LayoutParams leftLp = new FrameLayout.LayoutParams(dp(86), dp(42), Gravity.START | Gravity.TOP);
                 leftLp.setMargins(dp(22), dp(102), 0, 0);
                 page.addView(markLeft, leftLp);
 
-                markRight = mark("会了", 0xFFECFDF5, 0xFF059669);
+                markRight = mark("记得", 0xFFECFDF5, 0xFF059669);
                 FrameLayout.LayoutParams rightLp = new FrameLayout.LayoutParams(dp(86), dp(42), Gravity.END | Gravity.TOP);
                 rightLp.setMargins(0, dp(102), dp(22), 0);
                 page.addView(markRight, rightLp);
@@ -246,7 +301,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 word.setText(item.word);
                 pinyin.setText(item.pinyin);
                 meaning.setText("点击查看意思");
-                example.setText("左滑不会 · 右滑会了");
+                reviewInfo.setText(formatReviewInfo(item));
+                example.setText("左滑忘记 · 右滑记得 · 模糊点按钮");
                 itemView.setTag(item);
             }
 
@@ -282,8 +338,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
                         float totalDx = event.getRawX() - downX;
                         float totalDy = event.getRawY() - downY;
                         if (horizontal && Math.abs(totalDx) > dp(92)) {
-                            boolean known = totalDx > 0;
-                            commitJudge(known);
+                            int quality = totalDx > 0 ? Sm2Scheduler.QUALITY_REMEMBER : Sm2Scheduler.QUALITY_FORGOT;
+                            commitJudge(quality);
                         } else if (Math.abs(totalDx) < slop && Math.abs(totalDy) < slop) {
                             toggleFlip(item);
                             resetCard();
@@ -305,21 +361,33 @@ public class WordFullscreenActivity extends AppCompatActivity {
                     example.setText("例句：" + item.example);
                 } else {
                     meaning.setText("点击查看意思");
-                    example.setText("左滑不会 · 右滑会了");
+                    example.setText("左滑忘记 · 右滑记得 · 模糊点按钮");
                 }
             }
 
-            private void commitJudge(boolean known) {
+            private void commitJudge(int quality) {
+                WordItem item = (WordItem) itemView.getTag();
+                if (item == null || reviewStore == null) return;
                 int current = getBindingAdapterPosition();
-                Toast.makeText(WordFullscreenActivity.this, known ? "已标记：会了" : "已加入复习", Toast.LENGTH_SHORT).show();
+                LearningReviewStore.ReviewState next = Sm2Scheduler.review(reviewStore.get(item.id), quality, System.currentTimeMillis());
+                next.wordId = item.id;
+                reviewStore.save(next);
+                reviewInfo.setText(formatReviewInfo(item));
+
+                String label = quality == Sm2Scheduler.QUALITY_REMEMBER ? "记得"
+                        : quality == Sm2Scheduler.QUALITY_BLURRY ? "模糊" : "忘记";
+                Toast.makeText(WordFullscreenActivity.this, label + "：下次复习 " + formatRelative(next.nextReviewAt), Toast.LENGTH_SHORT).show();
+
+                int direction = quality == Sm2Scheduler.QUALITY_FORGOT ? -1 : 1;
                 page.animate()
-                        .translationX(known ? dp(360) : -dp(360))
-                        .rotation(known ? 12f : -12f)
+                        .translationX(direction > 0 ? dp(360) : -dp(360))
+                        .rotation(direction > 0 ? 12f : -12f)
                         .alpha(0f)
                         .setDuration(170)
                         .withEndAction(() -> {
                             resetCard();
                             page.setAlpha(1f);
+                            updateProgress(Math.max(0, current));
                             if (wordPager != null && current >= 0 && current < words.size() - 1) {
                                 wordPager.setCurrentItem(current + 1, true);
                             }
@@ -331,6 +399,17 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 page.animate().translationX(0f).rotation(0f).setDuration(120).start();
                 markLeft.animate().alpha(0f).setDuration(120).start();
                 markRight.animate().alpha(0f).setDuration(120).start();
+            }
+
+            private TextView actionButton(String text, int bg, int color) {
+                TextView view = new TextView(WordFullscreenActivity.this);
+                view.setText(text);
+                view.setTextSize(15);
+                view.setTypeface(Typeface.DEFAULT_BOLD);
+                view.setTextColor(color);
+                view.setGravity(Gravity.CENTER);
+                view.setBackground(rounded(bg, dp(22), color, 1));
+                return view;
             }
 
             private TextView mark(String text, int bg, int color) {
@@ -364,13 +443,36 @@ public class WordFullscreenActivity extends AppCompatActivity {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    private String formatReviewInfo(WordItem item) {
+        if (reviewStore == null) return "新词";
+        LearningReviewStore.ReviewState state = reviewStore.get(item.id);
+        if (state.reviewCount <= 0) return "新词 · 未复习";
+        String level = state.lastQuality == Sm2Scheduler.QUALITY_REMEMBER ? "记得"
+                : state.lastQuality == Sm2Scheduler.QUALITY_BLURRY ? "模糊" : "忘记";
+        return level + " · 第 " + state.reviewCount + " 次 · 下次 " + formatRelative(state.nextReviewAt);
+    }
+
+    private String formatRelative(long timeMillis) {
+        long now = System.currentTimeMillis();
+        long diff = timeMillis - now;
+        if (diff <= 0L) return "现在";
+        long minute = 60L * 1000L;
+        long hour = 60L * minute;
+        long day = 24L * hour;
+        if (diff < hour) return Math.max(1, Math.round((float) diff / minute)) + "分钟后";
+        if (diff < day) return Math.max(1, Math.round((float) diff / hour)) + "小时后";
+        return Math.max(1, Math.round((float) diff / day)) + "天后";
+    }
+
     private static class WordItem {
+        final String id;
         final String word;
         final String pinyin;
         final String meaning;
         final String example;
 
-        WordItem(String word, String pinyin, String meaning, String example) {
+        WordItem(String id, String word, String pinyin, String meaning, String example) {
+            this.id = id;
             this.word = word;
             this.pinyin = pinyin;
             this.meaning = meaning;
