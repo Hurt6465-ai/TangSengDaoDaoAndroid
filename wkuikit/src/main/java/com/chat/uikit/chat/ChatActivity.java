@@ -53,7 +53,9 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.chat.base.act.WKWebViewActivity;
 import com.chat.base.common.WKCommonModel;
+import com.chat.base.config.WKApiConfig;
 import com.chat.base.config.WKBinder;
 import com.chat.base.config.WKConfig;
 import com.chat.base.config.WKConstants;
@@ -637,27 +639,24 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     private void showChatMoreDialog() {
         final AlertDialog dialog = new AlertDialog.Builder(this).create();
-
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(AndroidUtilities.dp(12f), AndroidUtilities.dp(10f), AndroidUtilities.dp(12f), AndroidUtilities.dp(10f));
+        root.setPadding(AndroidUtilities.dp(10f), AndroidUtilities.dp(6f), AndroidUtilities.dp(10f), AndroidUtilities.dp(7f));
+        root.setBackground(createChatMoreDialogBackground());
 
         TextView title = new TextView(this);
         title.setText(R.string.chat_more_menu);
         title.setGravity(Gravity.CENTER);
         title.setTextSize(15);
-        title.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
+        title.setTextColor(Color.rgb(31, 41, 55));
         title.setIncludeFontPadding(false);
-        root.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 34));
+        root.addView(title, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 32));
+        root.addView(createChatMoreDivider(true));
 
-        View divider = new View(this);
-        divider.setBackgroundColor(Color.argb(46, 100, 116, 139));
-        LinearLayout.LayoutParams dividerLp = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1);
-        dividerLp.leftMargin = AndroidUtilities.dp(8f);
-        dividerLp.rightMargin = AndroidUtilities.dp(8f);
-        dividerLp.bottomMargin = AndroidUtilities.dp(4f);
-        root.addView(divider, dividerLp);
-
+        root.addView(createChatMoreMenuItem(getString(R.string.clear_chat_msg), () -> {
+            dialog.dismiss();
+            showClearChatHistoryConfirm();
+        }));
         root.addView(createChatMoreMenuItem(getString(R.string.chat_bg_menu), () -> {
             dialog.dismiss();
             showChatBackgroundDialog();
@@ -667,14 +666,54 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             showChatAiSettingsDialog();
         }));
 
-        dialog.setOnShowListener(d -> {
-            Window window = dialog.getWindow();
-            if (window == null) return;
-            window.setContentView(root);
-            applyGlassDialogStyle(dialog);
-            window.setLayout(AndroidUtilities.dp(236f), ViewGroup.LayoutParams.WRAP_CONTENT);
-        });
+        if (isPersonalMenuAvailable()) {
+            if (isCurrentFriend()) {
+                root.addView(createChatMoreMenuItem(getString(R.string.delete_friends), () -> {
+                    dialog.dismiss();
+                    confirmDeleteFriendFromMenu();
+                }));
+            }
+            root.addView(createChatMoreMenuItem(getString(isCurrentBlacklisted() ? R.string.pull_out_black_list : R.string.push_black_list), () -> {
+                dialog.dismiss();
+                confirmBlacklistAction();
+            }));
+        }
+
+        root.addView(createChatMoreMenuItem(getString(R.string.report), () -> {
+            dialog.dismiss();
+            openReportPage();
+        }));
+
         dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setDimAmount(0.20f);
+            window.setContentView(root);
+            window.setLayout(AndroidUtilities.dp(252f), ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+    }
+
+    private GradientDrawable createChatMoreDialogBackground() {
+        GradientDrawable bg = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(255, 255, 255), Color.rgb(250, 252, 255), Color.rgb(247, 250, 255)}
+        );
+        bg.setCornerRadius(AndroidUtilities.dp(18f));
+        bg.setStroke(AndroidUtilities.dp(1f), Color.argb(230, 232, 238, 248));
+        return bg;
+    }
+
+    private View createChatMoreDivider(boolean strong) {
+        View line = new View(this);
+        line.setBackgroundColor(strong ? Color.argb(190, 220, 226, 236) : Color.argb(110, 226, 232, 240));
+        LinearLayout.LayoutParams lp = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 1);
+        lp.leftMargin = AndroidUtilities.dp(2f);
+        lp.rightMargin = AndroidUtilities.dp(2f);
+        lp.topMargin = AndroidUtilities.dp(1f);
+        lp.bottomMargin = AndroidUtilities.dp(2f);
+        line.setLayoutParams(lp);
+        return line;
     }
 
     private View createChatMoreMenuItem(String text, Runnable action) {
@@ -683,18 +722,111 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         item.setGravity(Gravity.CENTER);
         item.setSingleLine(true);
         item.setTextSize(14);
-        item.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
+        item.setTextColor(Color.rgb(55, 65, 81));
         item.setIncludeFontPadding(false);
         item.setPadding(0, 0, 0, 0);
-        item.setBackground(Theme.createSelectorDrawable(Color.argb(16, 0, 0, 0)));
+        item.setBackground(Theme.createSelectorDrawable(Color.argb(22, 0, 0, 0)));
         item.setOnClickListener(v -> {
             if (action != null) action.run();
         });
-        LinearLayout.LayoutParams lp = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 34);
+        LinearLayout.LayoutParams lp = LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, AndroidUtilities.dp(34f));
         lp.topMargin = AndroidUtilities.dp(1f);
         lp.bottomMargin = AndroidUtilities.dp(1f);
         item.setLayoutParams(lp);
         return item;
+    }
+
+    private boolean isPersonalMenuAvailable() {
+        return channelType == WKChannelType.PERSONAL
+                && !TextUtils.isEmpty(channelId)
+                && !TextUtils.equals(channelId, loginUID)
+                && !WKSystemAccount.isSystemAccount(channelId);
+    }
+
+    private boolean isCurrentFriend() {
+        return isPersonalMenuAvailable()
+                && !UserUtils.getInstance().checkMyFriendDelete(channelId)
+                && !UserUtils.getInstance().checkFriendRelation(channelId);
+    }
+
+    private boolean isCurrentBlacklisted() {
+        return isPersonalMenuAvailable()
+                && (UserUtils.getInstance().checkMyFriendBlacklist(channelId)
+                || (getChatChannelInfo() != null && getChatChannelInfo().status == WKChannelStatus.statusBlacklist));
+    }
+
+    private String getCurrentChannelDisplayName() {
+        WKChannel channel = getChatChannelInfo();
+        if (channel == null) return "";
+        String name = TextUtils.isEmpty(channel.channelRemark) ? channel.channelName : channel.channelRemark;
+        return TextUtils.isEmpty(name) ? channel.channelID : name;
+    }
+
+    private void showClearChatHistoryConfirm() {
+        String name = getCurrentChannelDisplayName();
+        String content = String.format(getString(R.string.clear_history_tip), name);
+        WKDialogUtils.getInstance().showDialog(this, getString(R.string.clear_chat_msg), content, true, "", getString(R.string.base_delete), 0, ContextCompat.getColor(this, R.color.red), index -> {
+            if (index == 1) {
+                MsgModel.getInstance().offsetMsg(channelId, channelType, null);
+                WKIM.getInstance().getMsgManager().clearWithChannel(channelId, channelType);
+                showToast(R.string.cleared);
+            }
+        });
+    }
+
+    private void confirmDeleteFriendFromMenu() {
+        String name = getCurrentChannelDisplayName();
+        String content = String.format(getString(R.string.delete_friends_tips), name);
+        WKDialogUtils.getInstance().showDialog(this, getString(R.string.delete_friends), content, true, "", getString(R.string.base_delete), 0, ContextCompat.getColor(this, R.color.red), index -> {
+            if (index == 1) {
+                UserModel.getInstance().deleteUser(channelId, (code, msg) -> {
+                    if (code == HttpResponseCode.success) {
+                        MsgModel.getInstance().offsetMsg(channelId, WKChannelType.PERSONAL, null);
+                        WKIM.getInstance().getMsgManager().clearWithChannel(channelId, WKChannelType.PERSONAL);
+                        WKCommonModel.getInstance().getChannel(channelId, WKChannelType.PERSONAL, null);
+                        showToast(R.string.delete_friends);
+                    } else if (!TextUtils.isEmpty(msg)) {
+                        WKToastUtils.getInstance().showToast(msg);
+                    }
+                });
+            }
+        });
+    }
+
+    private void confirmBlacklistAction() {
+        boolean blacklisted = isCurrentBlacklisted();
+        int title = blacklisted ? R.string.pull_out_black_list : R.string.push_black_list;
+        int message = blacklisted ? R.string.pull_out_black_list_tips : R.string.join_black_list_tips;
+        WKDialogUtils.getInstance().showDialog(this, getString(title), getString(message), true, "", getString(title), 0, ContextCompat.getColor(this, R.color.red), index -> {
+            if (index != 1) return;
+            if (blacklisted) {
+                UserModel.getInstance().removeBlackList(channelId, (code, msg) -> {
+                    if (code == HttpResponseCode.success) {
+                        WKCommonModel.getInstance().getChannel(channelId, WKChannelType.PERSONAL, null);
+                        showToast(R.string.removed_from_blacklist);
+                    } else if (!TextUtils.isEmpty(msg)) {
+                        WKToastUtils.getInstance().showToast(msg);
+                    }
+                });
+            } else {
+                UserModel.getInstance().addBlackList(channelId, (code, msg) -> {
+                    if (code == HttpResponseCode.success) {
+                        WKCommonModel.getInstance().getChannel(channelId, WKChannelType.PERSONAL, null);
+                        showToast(R.string.black_list_desc);
+                    } else if (!TextUtils.isEmpty(msg)) {
+                        WKToastUtils.getInstance().showToast(msg);
+                    }
+                });
+            }
+        });
+    }
+
+    private void openReportPage() {
+        Intent intent = new Intent(this, WKWebViewActivity.class);
+        intent.putExtra("channelType", channelType);
+        intent.putExtra("channelID", channelId);
+        intent.putExtra("url", WKApiConfig.baseWebUrl + "report.html");
+        startActivity(intent);
     }
 
     private void openRtcDebugLog() {
@@ -1216,10 +1348,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         callIV = new AppCompatImageView(this);
         callIV.setImageResource(R.mipmap.ic_call);
         if (isRegister) {
-            wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(40, 40, Gravity.END | Gravity.CENTER_VERTICAL, 0, 0, 58, 0));
+            wkVBinding.topLayout.rightView.addView(callIV, LayoutHelper.createFrame(34, 34, Gravity.END | Gravity.CENTER_VERTICAL, 0, 0, 58, 0));
         }
         callIV.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        callIV.setPadding(AndroidUtilities.dp(8f), AndroidUtilities.dp(8f), AndroidUtilities.dp(8f), AndroidUtilities.dp(8f));
+        callIV.setPadding(AndroidUtilities.dp(7f), AndroidUtilities.dp(7f), AndroidUtilities.dp(7f), AndroidUtilities.dp(7f));
         callIV.setColorFilter(new PorterDuffColorFilter(ContextCompat.getColor(this, R.color.popupTextColor), PorterDuff.Mode.MULTIPLY));
         callIV.setBackground(Theme.createSelectorDrawable(Theme.getPressedColor()));
 
