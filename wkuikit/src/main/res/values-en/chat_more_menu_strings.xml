@@ -1,0 +1,10 @@
+<resources>
+    <string name="chat_more_bg">Chat background</string>
+    <string name="chat_more_ai_translate">AI translation settings</string>
+    <string name="chat_more_mute_notifications">Mute notifications</string>
+    <string name="chat_more_remark_saved">Remark saved</string>
+    <string name="chat_more_mute_enabled">Muted</string>
+    <string name="chat_more_mute_disabled">Unmuted</string>
+    <string name="chat_more_blacklist_added">Added to blacklist</string>
+    <string name="chat_more_blacklist_removed">Removed from blacklist</string>
+</resources>
