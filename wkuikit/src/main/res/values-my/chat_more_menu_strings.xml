@@ -1,0 +1,10 @@
+<resources>
+    <string name="chat_more_bg">ချက်တင် နောက်ခံ</string>
+    <string name="chat_more_ai_translate">AI ဘာသာပြန် ဆက်တင်</string>
+    <string name="chat_more_mute_notifications">အကြောင်းကြားချက် မနှောင့်ယှက်ရန်</string>
+    <string name="chat_more_remark_saved">မှတ်ချက် သိမ်းပြီးပါပြီ</string>
+    <string name="chat_more_mute_enabled">မနှောင့်ယှက်ရန် ဖွင့်ပြီးပါပြီ</string>
+    <string name="chat_more_mute_disabled">မနှောင့်ယှက်ရန် ပိတ်ပြီးပါပြီ</string>
+    <string name="chat_more_blacklist_added">Blacklist ထဲ ထည့်ပြီးပါပြီ</string>
+    <string name="chat_more_blacklist_removed">Blacklist မှ ဖယ်ရှားပြီးပါပြီ</string>
+</resources>
