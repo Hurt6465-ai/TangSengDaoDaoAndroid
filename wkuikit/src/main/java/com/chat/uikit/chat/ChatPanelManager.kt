@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.AlertDialog
 import android.animation.ValueAnimator
 import android.graphics.Color
+import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
@@ -146,7 +147,7 @@ class TranslateStatusView(context: android.content.Context) : View(context) {
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        setMeasuredDimension(AndroidUtilities.dp(12f), AndroidUtilities.dp(22f))
+        setMeasuredDimension(AndroidUtilities.dp(10f), AndroidUtilities.dp(24f))
     }
 
     override fun onDraw(canvas: android.graphics.Canvas) {
@@ -161,76 +162,10 @@ class TranslateStatusView(context: android.content.Context) : View(context) {
         dotPaint.alpha = if (active) 255 else 220
         canvas.drawCircle(
             width / 2f,
-            height / 2f + AndroidUtilities.dp(0.8f).toFloat(),
-            AndroidUtilities.dp(2.45f).toFloat(),
+            height / 2f + AndroidUtilities.dp(3.2f).toFloat(),
+            AndroidUtilities.dp(2.6f).toFloat(),
             dotPaint
         )
-    }
-}
-
-class TranslateIconView(context: android.content.Context) : View(context) {
-    var active: Boolean = false
-        set(value) {
-            field = value
-            invalidate()
-        }
-
-    private val mainPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        style = android.graphics.Paint.Style.FILL
-        textAlign = android.graphics.Paint.Align.LEFT
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
-        isUnderlineText = false
-        isStrikeThruText = false
-    }
-
-    private val subPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        style = android.graphics.Paint.Style.FILL
-        textAlign = android.graphics.Paint.Align.LEFT
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
-        isUnderlineText = false
-        isStrikeThruText = false
-    }
-
-    init {
-        isClickable = true
-        isFocusable = true
-        setPadding(0, 0, 0, 0)
-    }
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        setMeasuredDimension(AndroidUtilities.dp(34f), AndroidUtilities.dp(28f))
-    }
-
-    override fun onDraw(canvas: android.graphics.Canvas) {
-        super.onDraw(canvas)
-        val color = if (active) {
-            android.graphics.Color.rgb(34, 197, 94)
-        } else {
-            android.graphics.Color.rgb(148, 163, 184)
-        }
-
-        mainPaint.color = color
-        subPaint.color = color
-        mainPaint.alpha = if (active) 255 else 215
-        subPaint.alpha = if (active) 245 else 205
-        mainPaint.textSize = AndroidUtilities.dp(20.5f).toFloat()
-        subPaint.textSize = AndroidUtilities.dp(15.5f).toFloat()
-
-        canvas.save()
-        canvas.rotate(-10f, width / 2f, height / 2f)
-        canvas.drawText(
-            "文",
-            AndroidUtilities.dp(4.2f).toFloat(),
-            AndroidUtilities.dp(19.4f).toFloat(),
-            mainPaint
-        )
-        canvas.drawText(
-            "A",
-            AndroidUtilities.dp(18.6f).toFloat(),
-            AndroidUtilities.dp(22.2f).toFloat(),
-            subPaint
-        )
-        canvas.restore()
     }
 }
 
@@ -322,8 +257,7 @@ class ChatPanelManager(
     private val sourceLangBtn: AppCompatTextView = parentView.findViewById(R.id.sourceLangBtn)
     private val swapLangBtn: AppCompatTextView = parentView.findViewById(R.id.swapLangBtn)
     private val targetLangBtn: AppCompatTextView = parentView.findViewById(R.id.targetLangBtn)
-    private val aiSendToggleHost: View = parentView.findViewById(R.id.aiSendToggle)
-    private val aiSendToggle: TranslateIconView = installTranslateIconView(aiSendToggleHost)
+    private val aiSendToggle: AppCompatTextView = parentView.findViewById(R.id.aiSendToggle)
     private val aiSendDotHost: View = parentView.findViewById(R.id.aiSendDot)
     private val aiSendStatusView: TranslateStatusView = installTranslateStatusView(aiSendDotHost)
     private var flameLayout: LinearLayout? = null
@@ -1451,32 +1385,14 @@ class ChatPanelManager(
         WKSharedPreferencesUtil.getInstance().putSP(key, if (value) "1" else "0")
     }
 
-    private fun installTranslateIconView(anchor: View): TranslateIconView {
-        val iconView = TranslateIconView(anchor.context)
-        iconView.id = anchor.id
-        val parent = anchor.parent as? ViewGroup
-        val index = parent?.indexOfChild(anchor) ?: -1
-        val params = anchor.layoutParams
-        params.width = AndroidUtilities.dp(34f)
-        params.height = AndroidUtilities.dp(28f)
-        iconView.layoutParams = params
-        if (parent != null && index >= 0) {
-            parent.removeView(anchor)
-            parent.addView(iconView, index)
-        } else {
-            anchor.visibility = View.GONE
-        }
-        return iconView
-    }
-
     private fun installTranslateStatusView(anchor: View): TranslateStatusView {
         val statusView = TranslateStatusView(anchor.context)
         statusView.id = anchor.id
         val parent = anchor.parent as? ViewGroup
         val index = parent?.indexOfChild(anchor) ?: -1
         val params = anchor.layoutParams
-        params.width = AndroidUtilities.dp(12f)
-        params.height = AndroidUtilities.dp(22f)
+        params.width = AndroidUtilities.dp(10f)
+        params.height = AndroidUtilities.dp(24f)
         statusView.layoutParams = params
         statusView.setOnClickListener { aiSendToggle.performClick() }
         if (parent != null && index >= 0) {
@@ -1492,7 +1408,16 @@ class ChatPanelManager(
         val sendTranslate = getFlag(keyAiSendTranslate, false)
         sourceLangBtn.text = langLabel(getSetting(keyAiSourceLang, "မြန်မာစာ"))
         targetLangBtn.text = langLabel(getSetting(keyAiTargetLang, "中文"))
-        aiSendToggle.active = sendTranslate
+        aiSendToggle.text = "文A"
+        aiSendToggle.rotation = 0f
+        aiSendToggle.gravity = Gravity.CENTER
+        aiSendToggle.includeFontPadding = false
+        aiSendToggle.typeface = android.graphics.Typeface.DEFAULT_BOLD
+        aiSendToggle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+        aiSendToggle.setPadding(AndroidUtilities.dp(1f), AndroidUtilities.dp(1.2f), AndroidUtilities.dp(1f), 0)
+        aiSendToggle.setTextColor(
+            if (sendTranslate) android.graphics.Color.rgb(34, 197, 94) else ContextCompat.getColor(iConversationContext.chatActivity, R.color.color999)
+        )
         aiSendToggle.alpha = if (sendTranslate) 1f else 0.72f
         aiSendStatusView.active = sendTranslate
         aiSendStatusView.alpha = if (sendTranslate) 1f else 0.86f
@@ -1708,7 +1633,7 @@ ${content}"""
             reply.from_name = showName
             reply.from_uid = replyMsg.fromUID
             reply.message_id = replyMsg.messageID
-            reply.message_seq = replyMsg.messageSeq.toLong()
+            reply.message_seq = replyMsg.messageSeq
             val parentReply = replyMsg.baseContentMsgModel?.reply
             reply.root_mid = if (parentReply != null && !TextUtils.isEmpty(parentReply.root_mid)) {
                 parentReply.root_mid
