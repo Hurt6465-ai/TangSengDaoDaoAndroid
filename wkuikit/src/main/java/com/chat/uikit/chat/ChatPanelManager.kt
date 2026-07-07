@@ -1708,7 +1708,7 @@ ${content}"""
             reply.from_name = showName
             reply.from_uid = replyMsg.fromUID
             reply.message_id = replyMsg.messageID
-            reply.message_seq = replyMsg.messageSeq
+            reply.message_seq = replyMsg.messageSeq.toLong()
             val parentReply = replyMsg.baseContentMsgModel?.reply
             reply.root_mid = if (parentReply != null && !TextUtils.isEmpty(parentReply.root_mid)) {
                 parentReply.root_mid
