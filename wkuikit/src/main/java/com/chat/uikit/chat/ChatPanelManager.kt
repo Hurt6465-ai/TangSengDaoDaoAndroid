@@ -144,50 +144,66 @@ class TranslateStatusView(context: android.content.Context) : View(context) {
 
     private val arcPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         style = android.graphics.Paint.Style.STROKE
-        strokeWidth = AndroidUtilities.dp(1.6f).toFloat()
         strokeCap = android.graphics.Paint.Cap.ROUND
     }
     private val dotPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
     private val haloPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // 比上一版更宽一点，半弧不会挤在灰点旁边；高度也加大，方便整体下移。
-        setMeasuredDimension(AndroidUtilities.dp(28f), AndroidUtilities.dp(20f))
+        // 给右侧留空白，灰点不会贴着“文A”图标；效果更接近 Web CSS 那个右侧开关。
+        setMeasuredDimension(AndroidUtilities.dp(34f), AndroidUtilities.dp(22f))
     }
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
 
-        // 整体下移一点，避免灰点和半弧贴着翻译条上边。
-        val centerY = height / 2f + AndroidUtilities.dp(2.0f)
+        val centerY = height / 2f + AndroidUtilities.dp(1.1f)
+        val dotX = AndroidUtilities.dp(18.2f).toFloat()
 
-        // 灰点缩小，半透明光晕保留一点点即可。
-        val dotRadius = AndroidUtilities.dp(2.1f).toFloat()
-        val haloRadius = AndroidUtilities.dp(4.1f).toFloat()
-        val dotX = width - AndroidUtilities.dp(6.2f).toFloat()
-
-        val activeColor = android.graphics.Color.rgb(34, 197, 94)
-        val inactiveColor = android.graphics.Color.rgb(148, 163, 184)
+        val activeColor = Theme.colorAccount
+        val inactiveColor = Color.parseColor("#94A3B8")
         val color = if (active) activeColor else inactiveColor
 
-        // 半弧加大，位置放在灰点左侧，形成“灰点左边有半弧”的效果。
-        arcPaint.color = color
-        arcPaint.alpha = if (active) 230 else 145
+        // 半弧做成 CSS 一样的“外浅内深”：外层淡、中层浅、内层稍深。
+        // 不再是一根硬线，截图里看起来会更柔和。
         val arcRect = RectF(
-            AndroidUtilities.dp(1.2f).toFloat(),
-            centerY - AndroidUtilities.dp(8.2f),
-            AndroidUtilities.dp(20.2f).toFloat(),
-            centerY + AndroidUtilities.dp(8.2f)
+            AndroidUtilities.dp(2.6f).toFloat(),
+            centerY - AndroidUtilities.dp(8.4f),
+            AndroidUtilities.dp(21.4f).toFloat(),
+            centerY + AndroidUtilities.dp(8.4f)
         )
-        canvas.drawArc(arcRect, 96f, 170f, false, arcPaint)
+        drawSoftArc(canvas, arcRect, color, if (active) 24 else 18, AndroidUtilities.dp(4.2f).toFloat())
+        drawSoftArc(canvas, arcRect, color, if (active) 50 else 36, AndroidUtilities.dp(2.7f).toFloat())
+        drawSoftArc(canvas, arcRect, color, if (active) 118 else 74, AndroidUtilities.dp(1.25f).toFloat())
 
+        // 灰点也做渐变：中心深，外圈越来越浅。
+        drawSoftDot(canvas, dotX, centerY, color)
+    }
+
+    private fun drawSoftArc(
+        canvas: android.graphics.Canvas,
+        rect: RectF,
+        color: Int,
+        alphaValue: Int,
+        stroke: Float
+    ) {
+        arcPaint.color = color
+        arcPaint.alpha = alphaValue
+        arcPaint.strokeWidth = stroke
+        canvas.drawArc(rect, 96f, 168f, false, arcPaint)
+    }
+
+    private fun drawSoftDot(canvas: android.graphics.Canvas, cx: Float, cy: Float, color: Int) {
         haloPaint.color = color
-        haloPaint.alpha = if (active) 44 else 24
-        canvas.drawCircle(dotX, centerY, haloRadius, haloPaint)
+        haloPaint.alpha = if (active) 22 else 16
+        canvas.drawCircle(cx, cy, AndroidUtilities.dp(6.4f).toFloat(), haloPaint)
+
+        haloPaint.alpha = if (active) 44 else 30
+        canvas.drawCircle(cx, cy, AndroidUtilities.dp(4.4f).toFloat(), haloPaint)
 
         dotPaint.color = color
-        dotPaint.alpha = if (active) 255 else 205
-        canvas.drawCircle(dotX, centerY, dotRadius, dotPaint)
+        dotPaint.alpha = if (active) 255 else 218
+        canvas.drawCircle(cx, cy, AndroidUtilities.dp(2.05f).toFloat(), dotPaint)
     }
 }
 
@@ -1482,8 +1498,12 @@ class ChatPanelManager(
         val statusView = TranslateStatusView(anchor.context)
         statusView.id = anchor.id
         val params = anchor.layoutParams
-        params.width = AndroidUtilities.dp(28f)
-        params.height = AndroidUtilities.dp(20f)
+        params.width = AndroidUtilities.dp(34f)
+        params.height = AndroidUtilities.dp(22f)
+        if (params is ViewGroup.MarginLayoutParams) {
+            // 右侧空出一点点距离，灰点不再贴着翻译图标。
+            params.rightMargin = AndroidUtilities.dp(2f)
+        }
         statusView.layoutParams = params
         statusView.setOnClickListener { toggleBeforeSendTranslate() }
         val parent = anchor.parent as? ViewGroup
