@@ -258,23 +258,24 @@ public class LearningFragment extends Fragment {
         LinearLayout card = new LinearLayout(requireContext());
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
-        card.setPadding(dp(6), dp(16), dp(6), dp(16));
-        card.setBackground(rounded(COLOR_CARD_BG, dp(18), COLOR_STROKE, dp(1)));
+        card.setPadding(dp(6), dp(18), dp(6), dp(16));
+        card.setMinimumHeight(dp(92));
+
+        // 工具卡片保留白底浅渐变，但去掉图标外面的彩色背景框。
+        card.setBackground(gradientRounded(0xFFFFFFFF, 0xFFFAFAFF, dp(18), COLOR_STROKE, dp(1)));
         card.setElevation(dp(2));
+
         bindClick(card, click);
         attachNativePressAnimator(card, 2, 5);
-
-        FrameLayout iconWrap = new FrameLayout(requireContext());
-        iconWrap.setBackground(rounded(withAlpha(accentColor, 24), dp(16), Color.TRANSPARENT, 0));
-        LinearLayout.LayoutParams wrapLp = new LinearLayout.LayoutParams(dp(50), dp(50));
-        wrapLp.setMargins(0, 0, 0, dp(12));
-        card.addView(iconWrap, wrapLp);
 
         ImageView iconView = new ImageView(requireContext());
         iconView.setImageResource(iconRes);
         iconView.setColorFilter(accentColor);
-        FrameLayout.LayoutParams ivLp = new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER);
-        iconWrap.addView(iconView, ivLp);
+        iconView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(30), dp(30));
+        iconLp.setMargins(0, 0, 0, dp(12));
+        card.addView(iconView, iconLp);
 
         TextView t = new TextView(requireContext());
         t.setText(title);
@@ -283,7 +284,9 @@ public class LearningFragment extends Fragment {
         t.setTypeface(Typeface.DEFAULT_BOLD);
         t.setGravity(Gravity.CENTER);
         t.setSingleLine(true);
+        t.setIncludeFontPadding(false);
         card.addView(t, new LinearLayout.LayoutParams(-1, -2));
+
         return card;
     }
 
