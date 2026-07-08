@@ -5,6 +5,9 @@
     <string name="partner_say_hello">Say Hello</string>
     <string name="partner_hello_sent">Sent</string>
     <string name="partner_send_message">Message</string>
+    <string name="partner_add_friend">Add Friend</string>
+    <string name="partner_friend_apply_sent">Request Sent</string>
+    <string name="partner_add_friend_hint">Write a request message</string>
     <string name="partner_hello_hint">Write a greeting</string>
     <string name="partner_default_hello_plain">Hi, can we get to know each other?</string>
     <string name="partner_default_hello_with_lang">Hi, I want to practice %1$s. Can we get to know each other?</string>
