@@ -412,6 +412,9 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         if (fragment instanceof ChatFragment && ((ChatFragment) fragment).closeSideMenuIfOpen()) {
             return true;
         }
+        if (fragment instanceof LearningFragment && ((LearningFragment) fragment).closeSideMenuIfOpen()) {
+            return true;
+        }
         if (fragment instanceof WebTabFragment) {
             WebTabFragment webTabFragment = (WebTabFragment) fragment;
             if (webTabFragment.canGoBack()) {
