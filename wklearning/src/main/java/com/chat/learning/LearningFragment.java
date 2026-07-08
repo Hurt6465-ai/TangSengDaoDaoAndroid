@@ -35,19 +35,19 @@ import java.lang.reflect.Field;
 
 /**
  * 学习首页：终极专业高端版本
- * 解决在真实设备上卡片对比度过低、看不清的问题。
- * 完善缺失字体时的降级方案，隐藏侧边栏滚动条，增强质感。
+ * 修复：小卡片在部分设备上因 MATCH_PARENT 高度测量异常导致后续卡片不可见。
+ * 优化：学习小卡片改为极浅渐变，保持 4 个卡片不动，增强高级感与可读性。
  */
 public class LearningFragment extends Fragment {
     // 强化对比度：背景采用偏冷的 Apple 风格浅灰，卡片采用绝对纯白
     private static final int COLOR_BG = 0xFFF2F2F7;
     private static final int COLOR_CARD_BG = 0xFFFFFFFF;
-    private static final int COLOR_STROKE = 0xFFE5E5EA; // 清晰的卡片边框色
-    private static final int COLOR_TEXT = 0xFF111827; // 极深灰（近黑）
-    private static final int COLOR_SUB = 0xFF6B7280;  // 高级辅助灰
+    private static final int COLOR_STROKE = 0xFFE5E5EA;
+    private static final int COLOR_TEXT = 0xFF111827;
+    private static final int COLOR_SUB = 0xFF6B7280;
 
     // 统一品牌主色调（高级靛蓝色），告别花哨的调色盘
-    private static final int COLOR_BRAND = 0xFF4F46E5; 
+    private static final int COLOR_BRAND = 0xFF4F46E5;
 
     // 核心 4 个工具的 FA 图标
     private static final String FA_LANGUAGE = "\uf1ab";
@@ -200,7 +200,7 @@ public class LearningFragment extends Fragment {
         start.setText("报名");
         start.setTextSize(14);
         start.setTypeface(Typeface.DEFAULT_BOLD);
-        start.setTextColor(COLOR_TEXT); // 黑字确保在白底上绝度清晰
+        start.setTextColor(COLOR_TEXT);
         start.setGravity(Gravity.CENTER);
         start.setBackground(rounded(Color.WHITE, dp(20), Color.TRANSPARENT, 0));
         bindClick(start, () -> Toast.makeText(requireContext(), "进入报名页面", Toast.LENGTH_SHORT).show());
@@ -275,7 +275,7 @@ public class LearningFragment extends Fragment {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
         card.setPadding(dp(4), dp(16), dp(4), dp(16));
-        
+
         // 彻底解决扁平化问题：纯白底色 + 清晰可见的边框线 + 小阴影
         card.setBackground(rounded(COLOR_CARD_BG, dp(16), COLOR_STROKE, dp(1)));
         card.setElevation(dp(2));
@@ -323,7 +323,7 @@ public class LearningFragment extends Fragment {
 
         if (more != null) {
             TextView moreView = new TextView(requireContext());
-            moreView.setText(more + " 〉"); // 添加 〉
+            moreView.setText(more + " 〉");
             moreView.setTextSize(13);
             moreView.setTextColor(COLOR_SUB);
             moreView.setGravity(Gravity.CENTER);
@@ -342,6 +342,7 @@ public class LearningFragment extends Fragment {
         while (index < cards.length) {
             LinearLayout row = new LinearLayout(requireContext());
             row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
 
             LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
             rowLp.setMargins(0, 0, 0, dp(12));
@@ -349,12 +350,14 @@ public class LearningFragment extends Fragment {
 
             for (int i = 0; i < columns; i++) {
                 if (index < cards.length) {
-                    row.addView(smallCard(cards[index]), new LinearLayout.LayoutParams(0, -1, 1f));
+                    // 关键修复：不能用 MATCH_PARENT(-1)，父 row 是 WRAP_CONTENT 时部分设备会测量异常。
+                    row.addView(smallCard(cards[index]), new LinearLayout.LayoutParams(0, -2, 1f));
                     index++;
                 } else {
                     View empty = new View(requireContext());
-                    row.addView(empty, new LinearLayout.LayoutParams(0, -1, 1f));
+                    row.addView(empty, new LinearLayout.LayoutParams(0, dp(1), 1f));
                 }
+
                 if (i < columns - 1) {
                     addHorizontalGap(row, 12);
                 }
@@ -368,22 +371,22 @@ public class LearningFragment extends Fragment {
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(12), dp(14), dp(12), dp(14));
-        
-        // 关键修复：纯白底色 + 清晰浅灰边线，彻底解决“看不到卡片”的问题
-        card.setBackground(rounded(COLOR_CARD_BG, dp(14), COLOR_STROKE, dp(1)));
+        card.setMinimumHeight(dp(76));
+
+        // 极浅渐变 + 清晰边框，比纯白更有高级感，但不会影响文字阅读。
+        card.setBackground(gradientRounded(0xFFFFFFFF, 0xFFF7F8FF, dp(14), COLOR_STROKE, dp(1)));
         card.setElevation(dp(1.5f));
         bindClick(card, () -> onSmallCardClick(spec));
         attachNativePressAnimator(card, 1.5f, 4);
 
         // 图标区域
         TextView icon = new TextView(requireContext());
-        // 【关键修复】如果FA字体缺失，使用精心挑选的汉字替代（而不是小圆点），保障界面极其规整
+        // 如果 FA 字体缺失，使用精心挑选的汉字替代（而不是小圆点），保障界面规整。
         icon.setText(faTypeface != null ? spec.faIcon : spec.fallbackChar);
         icon.setTextSize(faTypeface != null ? 15 : 14);
         icon.setTextColor(COLOR_BRAND);
         icon.setTypeface(faTypeface != null ? faTypeface : Typeface.DEFAULT_BOLD);
         icon.setGravity(Gravity.CENTER);
-        // 使用品牌色的10%透明度作为底色衬托
         icon.setBackground(rounded((COLOR_BRAND & 0x00FFFFFF) | 0x1A000000, dp(10), Color.TRANSPARENT, 0));
         card.addView(icon, new LinearLayout.LayoutParams(dp(34), dp(34)));
 
@@ -391,7 +394,7 @@ public class LearningFragment extends Fragment {
         LinearLayout textBox = new LinearLayout(requireContext());
         textBox.setOrientation(LinearLayout.VERTICAL);
         textBox.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
-        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(-1, -2);
+        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(0, -2, 1f);
         textLp.setMargins(dp(12), 0, 0, 0);
         card.addView(textBox, textLp);
 
@@ -399,7 +402,7 @@ public class LearningFragment extends Fragment {
         title.setText(spec.title);
         title.setTextSize(15);
         title.setTextColor(COLOR_TEXT);
-        title.setTypeface(Typeface.DEFAULT_BOLD); // 标题加粗
+        title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setSingleLine(true);
         title.setIncludeFontPadding(false);
         textBox.addView(title, new LinearLayout.LayoutParams(-1, -2));
@@ -408,7 +411,7 @@ public class LearningFragment extends Fragment {
         desc.setText(spec.desc);
         desc.setTextSize(12);
         desc.setTextColor(COLOR_SUB);
-        desc.setTypeface(Typeface.DEFAULT); // 【高级感优化】描述不加粗，拉开字体层级
+        desc.setTypeface(Typeface.DEFAULT);
         desc.setSingleLine(true);
         desc.setPadding(0, dp(4), 0, 0);
         textBox.addView(desc, new LinearLayout.LayoutParams(-1, -2));
@@ -441,7 +444,7 @@ public class LearningFragment extends Fragment {
 
         ScrollView scroll = new ScrollView(requireContext());
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        scroll.setVerticalScrollBarEnabled(false); // 【去除侧边栏滚动条】
+        scroll.setVerticalScrollBarEnabled(false);
 
         LinearLayout list = new LinearLayout(requireContext());
         list.setOrientation(LinearLayout.VERTICAL);
@@ -517,7 +520,7 @@ public class LearningFragment extends Fragment {
         d.setText(desc);
         d.setTextSize(12);
         d.setTextColor(COLOR_SUB);
-        d.setTypeface(Typeface.DEFAULT); // 降级层级
+        d.setTypeface(Typeface.DEFAULT);
         d.setPadding(0, dp(4), 0, 0);
         textBox.addView(d, new LinearLayout.LayoutParams(-1, -2));
 
@@ -677,7 +680,8 @@ public class LearningFragment extends Fragment {
                 int oldSize = edgeSizeField.getInt(leftDragger);
                 int newSize = Math.max(oldSize, edgeSizePx);
                 edgeSizeField.setInt(leftDragger, newSize);
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+            }
         });
     }
 
@@ -712,6 +716,16 @@ public class LearningFragment extends Fragment {
         return drawable;
     }
 
+    private GradientDrawable gradientRounded(int startColor, int endColor, float radius, int strokeColor, int strokeWidth) {
+        GradientDrawable drawable = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{startColor, endColor}
+        );
+        drawable.setCornerRadius(radius);
+        if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
+        return drawable;
+    }
+
     private void addSpace(LinearLayout parent, int heightDp) {
         View v = new View(requireContext());
         parent.addView(v, new LinearLayout.LayoutParams(1, dp(heightDp)));
@@ -735,7 +749,7 @@ public class LearningFragment extends Fragment {
         final String desc;
         final String id;
         final String faIcon;
-        final String fallbackChar; // 新增：完美充当替补图标的汉字
+        final String fallbackChar;
 
         CardSpec(String title, String desc, String id, String faIcon, String fallbackChar) {
             this.title = title;
