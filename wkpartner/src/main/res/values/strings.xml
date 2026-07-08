@@ -5,6 +5,9 @@
     <string name="partner_say_hello">打招呼</string>
     <string name="partner_hello_sent">已打招呼</string>
     <string name="partner_send_message">发消息</string>
+    <string name="partner_add_friend">加好友</string>
+    <string name="partner_friend_apply_sent">已申请</string>
+    <string name="partner_add_friend_hint">输入验证消息</string>
     <string name="partner_hello_hint">输入一句招呼</string>
     <string name="partner_default_hello_plain">你好，可以认识一下吗？</string>
     <string name="partner_default_hello_with_lang">你好，我想练习 %1$s，可以认识一下吗？</string>
