@@ -1,477 +1,529 @@
 package com.chat.learning;
 
-import android.content.ClipData;
-import android.content.ClipboardManager;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.content.Context;
-import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.net.Uri;
 import android.os.Bundle;
-import android.os.SystemClock;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.view.GestureDetector;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.Window;
-import android.view.WindowManager;
 import android.widget.FrameLayout;
-import android.widget.HorizontalScrollView;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.view.GravityCompat;
-import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.annotation.NonNull;
-import androidx.fragment.app.Fragment;
-import androidx.viewpager2.adapter.FragmentStateAdapter;
-import androidx.viewpager2.widget.ViewPager2;
 
-import com.chat.learning.ui.LearningPageFragment;
-import com.chat.userscript.AiScriptWebActivity;
-import com.chat.userscript.ScriptManagerActivity;
-
-import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 
 /**
- * 独立学习 Activity。
- *
- * 这版不再把学习首页塞在底部导航 Fragment 里：DrawerLayout 可以覆盖全屏，
- * 不会和底部导航产生层级/返回栈/重建问题。
+ * 全屏背单词：不依赖 RecyclerView / ViewPager2 / Room。
+ * 上下滑换词，左滑忘记，右滑记得，点击翻面，底部三档写入 SM-2 本地记录。
  */
-public class LearningActivity extends AppCompatActivity {
-    private static final int COLOR_BG = 0xFFF6F8FC;
+public class WordFullscreenActivity extends AppCompatActivity {
+    public static final String EXTRA_LEVEL = "level";
+    public static final String EXTRA_TITLE = "title";
+
+    private static final int COLOR_TEXT = 0xFF111827;
+    private static final int COLOR_SUB = 0xFF64748B;
     private static final int COLOR_BLUE = 0xFF1877F2;
-    private static final int COLOR_TEXT_DARK = 0xFF111827;
-    private static final int COLOR_TEXT_GRAY = 0xFF6B7280;
-    private static final int COLOR_LINE = 0xFFE8EDF6;
-    private static final String[] PAGE_TITLES = new String[]{"拼音", "单词", "口语", "句型", "语法", "互动题"};
+    private static final int COLOR_RED = 0xFFE11D48;
+    private static final int COLOR_ORANGE = 0xFFEA580C;
+    private static final int COLOR_GREEN = 0xFF059669;
 
-    private DrawerLayout drawerLayout;
-    private ViewPager2 pagePager;
-    private LinearLayout tabContainer;
-    private final TextView[] tabViews = new TextView[PAGE_TITLES.length];
-    private long lastMenuClickTime;
+    private final ArrayList<WordItem> words = new ArrayList<>();
+    private int index = 0;
+    private boolean flipped = false;
+    private boolean judging = false;
+    private Axis axis = Axis.NONE;
+    private float downX;
+    private float downY;
+    private int touchSlop;
+    private String level;
+    private String title;
+
+    private FrameLayout root;
+    private LinearLayout card;
+    private TextView progress;
+    private TextView word;
+    private TextView pinyin;
+    private TextView meaning;
+    private TextView example;
+    private TextView hint;
+    private TextView leftMark;
+    private TextView rightMark;
+    private GestureDetector gestureDetector;
+    private ReviewStore reviewStore;
+
+    private enum Axis { NONE, HORIZONTAL, VERTICAL }
 
     @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setupImmersiveWindow();
-
-        drawerLayout = new DrawerLayout(this);
-        drawerLayout.setBackgroundColor(COLOR_BG);
-        drawerLayout.setScrimColor(0x77000000);
-        drawerLayout.setDrawerElevation(dp(10));
-        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED, GravityCompat.START);
-        drawerLayout.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
-            @Override
-            public void onDrawerClosed(@NonNull View drawerView) {
-                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED, GravityCompat.START);
-            }
-        });
-
-        LinearLayout main = new LinearLayout(this);
-        main.setOrientation(LinearLayout.VERTICAL);
-        main.setBackgroundColor(COLOR_BG);
-        drawerLayout.addView(main, new DrawerLayout.LayoutParams(-1, -1));
-
-        main.addView(createHeader(), new LinearLayout.LayoutParams(-1, dp(278)));
-        main.addView(createTabs(), new LinearLayout.LayoutParams(-1, dp(54)));
-
-        pagePager = new ViewPager2(this);
-        pagePager.setId(View.generateViewId());
-        pagePager.setOrientation(ViewPager2.ORIENTATION_HORIZONTAL);
-        pagePager.setOffscreenPageLimit(2);
-        pagePager.setAdapter(new FragmentStateAdapter(this) {
-            @Override
-            public Fragment createFragment(int position) {
-                return LearningPageFragment.newInstance(position);
-            }
-
-            @Override
-            public int getItemCount() {
-                return PAGE_TITLES.length;
-            }
-        });
-        pagePager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-            @Override
-            public void onPageSelected(int position) {
-                updateTabs(position);
-            }
-        });
-        main.addView(pagePager, new LinearLayout.LayoutParams(-1, 0, 1f));
-
-        LinearLayout drawerPanel = createSideMenuPanel();
-        DrawerLayout.LayoutParams panelLp = new DrawerLayout.LayoutParams(getPanelWidth(), -1);
-        panelLp.gravity = GravityCompat.START;
-        drawerLayout.addView(drawerPanel, panelLp);
-
-        setContentView(drawerLayout);
-        updateTabs(0);
-    }
-
-    private void setupImmersiveWindow() {
         Window window = getWindow();
-        window.setStatusBarColor(Color.TRANSPARENT);
-        window.setNavigationBarColor(Color.WHITE);
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-        } else {
-            window.setFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS, WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-        }
+        window.setStatusBarColor(0xFFEAF4FF);
+        window.setNavigationBarColor(0xFFF8FBFF);
+
+        level = getIntent().getStringExtra(EXTRA_LEVEL);
+        if (level == null || level.length() == 0) level = "hsk1";
+        title = getIntent().getStringExtra(EXTRA_TITLE);
+        if (title == null || title.length() == 0) title = level.toUpperCase();
+
+        reviewStore = new ReviewStore(this);
+        touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onSingleTapConfirmed(MotionEvent e) {
+                flip();
+                return true;
+            }
+
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                playTtsHint();
+                return true;
+            }
+
+            @Override
+            public void onLongPress(MotionEvent e) {
+                Toast.makeText(WordFullscreenActivity.this, "收藏/更多后续接入", Toast.LENGTH_SHORT).show();
+                vibrate(12);
+            }
+        });
+
+        seedWords();
+        sortWordsByReview();
+        buildLayout();
+        bind();
     }
 
-    private View createHeader() {
-        FrameLayout header = new FrameLayout(this);
-        header.setBackgroundColor(0xFFDCEBFF);
+    private void buildLayout() {
+        root = new FrameLayout(this);
+        root.setBackground(pageBg());
+        setContentView(root);
 
-        ImageView banner = new ImageView(this);
-        banner.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        File remoteBanner = getRemoteBannerFile();
-        if (remoteBanner.exists() && remoteBanner.length() > 0) {
-            banner.setImageURI(Uri.fromFile(remoteBanner));
-        } else {
-            banner.setImageResource(R.drawable.learning_home_banner_default);
-        }
-        header.addView(banner, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(18), dp(16), dp(18), dp(18));
+        root.addView(page, new FrameLayout.LayoutParams(-1, -1));
 
-        View scrim = new View(this);
-        scrim.setBackground(createHeaderScrim());
-        header.addView(scrim, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        page.addView(top, new LinearLayout.LayoutParams(-1, dp(50)));
 
-        TextView close = circleButton("‹");
-        close.setTextSize(32);
+        TextView close = circle("×");
+        close.setTextSize(22);
         close.setOnClickListener(v -> finish());
-        FrameLayout.LayoutParams closeLp = new FrameLayout.LayoutParams(dp(42), dp(42), Gravity.START | Gravity.TOP);
-        closeLp.setMargins(dp(12), getStatusBarInset() + dp(8), 0, 0);
-        header.addView(close, closeLp);
+        top.addView(close, new LinearLayout.LayoutParams(dp(42), dp(42)));
 
-        TextView more = circleButton("⋯");
-        more.setTextSize(28);
-        more.setOnClickListener(v -> openDrawer());
-        FrameLayout.LayoutParams moreLp = new FrameLayout.LayoutParams(dp(42), dp(42), Gravity.END | Gravity.TOP);
-        moreLp.setMargins(0, getStatusBarInset() + dp(8), dp(12), 0);
-        header.addView(more, moreLp);
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        titleBox.setPadding(dp(12), 0, dp(12), 0);
+        top.addView(titleBox, new LinearLayout.LayoutParams(0, -1, 1f));
 
-        LinearLayout copy = new LinearLayout(this);
-        copy.setOrientation(LinearLayout.VERTICAL);
-        copy.setGravity(Gravity.BOTTOM | Gravity.START);
-        copy.setPadding(dp(20), 0, dp(20), dp(22));
-        header.addView(copy, new FrameLayout.LayoutParams(-1, -1));
+        TextView titleView = text(title + " 背单词", 18, COLOR_TEXT, true);
+        titleBox.addView(titleView, new LinearLayout.LayoutParams(-1, 0, 1f));
+        progress = text("", 12, COLOR_SUB, false);
+        titleBox.addView(progress, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        TextView badge = new TextView(this);
-        badge.setText("新手推荐");
-        badge.setTextSize(12);
-        badge.setTypeface(Typeface.DEFAULT_BOLD);
-        badge.setTextColor(COLOR_BLUE);
-        badge.setGravity(Gravity.CENTER);
-        badge.setBackground(roundRect(0xEEFFFFFF, dp(16), 0, 0));
-        copy.addView(badge, new LinearLayout.LayoutParams(dp(78), dp(30)));
+        TextView more = circle("⋯");
+        more.setTextSize(26);
+        more.setOnClickListener(v -> Toast.makeText(this, "更多设置后续接入", Toast.LENGTH_SHORT).show());
+        top.addView(more, new LinearLayout.LayoutParams(dp(42), dp(42)));
 
-        TextView title = new TextView(this);
-        title.setText("中文零基础入门");
-        title.setTextSize(30);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.WHITE);
-        title.setPadding(0, dp(16), 0, 0);
-        copy.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        FrameLayout cardHost = new FrameLayout(this);
+        LinearLayout.LayoutParams hostLp = new LinearLayout.LayoutParams(-1, 0, 1f);
+        hostLp.setMargins(0, dp(18), 0, dp(18));
+        page.addView(cardHost, hostLp);
 
-        TextView sub = new TextView(this);
-        sub.setText("每天 10 分钟，跟语伴一起学拼音、单词和口语");
-        sub.setTextSize(14);
-        sub.setTextColor(0xEEFFFFFF);
-        sub.setPadding(0, dp(6), 0, dp(14));
-        copy.addView(sub, new LinearLayout.LayoutParams(-1, -2));
-
-        LinearLayout bottom = new LinearLayout(this);
-        bottom.setGravity(Gravity.CENTER_VERTICAL);
-        bottom.setOrientation(LinearLayout.HORIZONTAL);
-        copy.addView(bottom, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView price = new TextView(this);
-        price.setText("免费试看");
-        price.setTextColor(Color.WHITE);
-        price.setTextSize(18);
-        price.setTypeface(Typeface.DEFAULT_BOLD);
-        bottom.addView(price, new LinearLayout.LayoutParams(0, -2, 1f));
-
-        TextView start = new TextView(this);
-        start.setText("开始学习");
-        start.setTextColor(COLOR_BLUE);
-        start.setTextSize(14);
-        start.setTypeface(Typeface.DEFAULT_BOLD);
-        start.setGravity(Gravity.CENTER);
-        start.setBackground(roundRect(Color.WHITE, dp(18), 0, 0));
-        start.setOnClickListener(v -> pagePager.setCurrentItem(1, true));
-        bottom.addView(start, new LinearLayout.LayoutParams(dp(104), dp(38)));
-
-        return header;
-    }
-
-    private TextView circleButton(String text) {
-        TextView view = new TextView(this);
-        view.setText(text);
-        view.setTextColor(Color.WHITE);
-        view.setGravity(Gravity.CENTER);
-        view.setTypeface(Typeface.DEFAULT_BOLD);
-        view.setBackground(roundRect(0x44000000, dp(21), 0x22FFFFFF, 1));
-        return view;
-    }
-
-    private View createTabs() {
-        HorizontalScrollView scroll = new HorizontalScrollView(this);
-        scroll.setHorizontalScrollBarEnabled(false);
-        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        scroll.setFillViewport(false);
-        scroll.setBackgroundColor(Color.WHITE);
-
-        tabContainer = new LinearLayout(this);
-        tabContainer.setOrientation(LinearLayout.HORIZONTAL);
-        tabContainer.setGravity(Gravity.CENTER_VERTICAL);
-        tabContainer.setPadding(dp(12), dp(7), dp(12), dp(7));
-        scroll.addView(tabContainer, new HorizontalScrollView.LayoutParams(-2, -1));
-
-        for (int i = 0; i < PAGE_TITLES.length; i++) {
-            final int index = i;
-            TextView tab = new TextView(this);
-            tab.setText(PAGE_TITLES[i]);
-            tab.setTextSize(15);
-            tab.setGravity(Gravity.CENTER);
-            tab.setSingleLine(true);
-            tab.setOnClickListener(v -> pagePager.setCurrentItem(index, true));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(72), -1);
-            lp.setMargins(0, 0, dp(7), 0);
-            tabContainer.addView(tab, lp);
-            tabViews[i] = tab;
-        }
-        return scroll;
-    }
-
-    private LinearLayout createSideMenuPanel() {
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setClickable(true);
-        panel.setFocusable(true);
-        panel.setPadding(dp(18), getStatusBarInset() + dp(20), dp(18), dp(18));
-        panel.setBackground(createDrawerBackground()); // 无圆角，浅渐变
-
-        TextView title = new TextView(this);
-        title.setText("学习工具");
-        title.setTextSize(28);
-        title.setTextColor(COLOR_TEXT_DARK);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        panel.addView(title, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView sub = new TextView(this);
-        sub.setText("AI 翻译、学习书籍、语音朗读、脚本管理和生活场景放这里。主页面只负责学习内容。侧边栏无圆角并覆盖全屏。");
-        sub.setTextSize(13);
-        sub.setTextColor(COLOR_TEXT_GRAY);
-        sub.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
-        subLp.setMargins(0, dp(8), 0, dp(16));
-        panel.addView(sub, subLp);
-
-        ScrollView scrollView = new ScrollView(this);
-        scrollView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        LinearLayout list = new LinearLayout(this);
-        list.setOrientation(LinearLayout.VERTICAL);
-        scrollView.addView(list, new ScrollView.LayoutParams(-1, -2));
-
-        list.addView(menuCard("DeepSeek 翻译", "打开 DeepSeek 网页，适合中缅互译、口语解释和场景练习。", "进入", () -> openAiPage("DeepSeek", "https://chat.deepseek.com/")));
-        list.addView(menuCard("886.best", "打开 886.best，作为你的国内学习 AI 入口。", "进入", () -> openAiPage("886.best", "https://886.best")));
-        list.addView(menuCard("千问国内版", "打开 qianwen.com，适合国内用户和全能助手场景。", "进入", () -> openAiPage("千问国内版", "https://www.qianwen.com/")));
-        list.addView(menuCard("Qwen 国际版", "打开 chat.qwen.ai，适合纯聊天和语音练习。", "进入", () -> openAiPage("Qwen 国际版", "https://chat.qwen.ai/")));
-        list.addView(menuCard("学习书籍", "后续用 books.json 做书籍目录；封面本地兜底，远程可覆盖。", "查看", this::showBookPlan));
-        list.addView(menuCard("语音朗读", "打开 wkspeech：导入 TTS 源、选择发音人、设置语速音调。", "设置", this::openSpeechSettings));
-        list.addView(menuCard("高频生活场景", "点餐、面试、打招呼、医院、机场等场景 prompt。", "选择", this::showPromptScenes));
-        list.addView(menuCard("脚本管理", "新增、导入、在线安装、启用官方推荐脚本。", "管理", () -> startActivity(new Intent(this, ScriptManagerActivity.class))));
-
-        TextView warn = new TextView(this);
-        warn.setText("说明：侧边栏默认不支持边缘右滑，只能点右上角三个点打开，避免和 ViewPager2 横滑冲突。背景图本地兜底，正式图远程覆盖。价格文字走 JSON，不写进图片。SM-2 记录存在 Room。音频第一版建议用 TTS 或远程缓存，不要全塞 APK。");
-        warn.setTextSize(12);
-        warn.setTextColor(COLOR_TEXT_GRAY);
-        warn.setPadding(dp(2), dp(8), dp(2), dp(14));
-        list.addView(warn, new LinearLayout.LayoutParams(-1, -2));
-
-        panel.addView(scrollView, new LinearLayout.LayoutParams(-1, 0, 1f));
-        return panel;
-    }
-
-    private View menuCard(String title, String desc, String action, Runnable click) {
-        LinearLayout card = new LinearLayout(this);
+        card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(13), dp(14), dp(13));
-        card.setBackground(roundRect(0xFFFFFFFF, dp(16), COLOR_LINE, 1));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.setMargins(0, 0, 0, dp(11));
-        card.setLayoutParams(lp);
+        card.setGravity(Gravity.CENTER);
+        card.setPadding(dp(26), dp(26), dp(26), dp(26));
+        card.setBackground(cardBg());
+        card.setOnTouchListener(this::handleCardTouch);
+        cardHost.addView(card, new FrameLayout.LayoutParams(-1, -1));
 
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView titleView = new TextView(this);
-        titleView.setText(title);
-        titleView.setTextSize(16);
-        titleView.setTextColor(COLOR_TEXT_DARK);
-        titleView.setTypeface(Typeface.DEFAULT_BOLD);
-        row.addView(titleView, new LinearLayout.LayoutParams(0, -2, 1f));
+        word = text("", 50, COLOR_TEXT, true);
+        word.setGravity(Gravity.CENTER);
+        card.addView(word, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView actionView = new TextView(this);
-        actionView.setText(action);
-        actionView.setTextSize(12);
-        actionView.setTypeface(Typeface.DEFAULT_BOLD);
-        actionView.setTextColor(COLOR_BLUE);
-        actionView.setGravity(Gravity.CENTER);
-        actionView.setBackground(roundRect(0xFFEAF2FF, dp(13), 0, 0));
-        row.addView(actionView, new LinearLayout.LayoutParams(dp(52), dp(28)));
-        card.addView(row, new LinearLayout.LayoutParams(-1, -2));
+        pinyin = text("", 22, COLOR_BLUE, true);
+        pinyin.setGravity(Gravity.CENTER);
+        pinyin.setPadding(0, dp(10), 0, 0);
+        card.addView(pinyin, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView descView = new TextView(this);
-        descView.setText(desc);
-        descView.setTextSize(12);
-        descView.setTextColor(COLOR_TEXT_GRAY);
-        descView.setLineSpacing(dp(2), 1f);
-        descView.setPadding(0, dp(7), 0, 0);
-        card.addView(descView, new LinearLayout.LayoutParams(-1, -2));
+        meaning = text("点击查看意思", 24, COLOR_TEXT, true);
+        meaning.setGravity(Gravity.CENTER);
+        meaning.setPadding(0, dp(34), 0, 0);
+        card.addView(meaning, new LinearLayout.LayoutParams(-1, -2));
 
-        View.OnClickListener guarded = v -> runMenuClick(click);
-        card.setOnClickListener(guarded);
-        actionView.setOnClickListener(guarded);
-        return card;
+        example = text("左滑忘记 · 右滑记得 · 模糊点按钮", 16, COLOR_SUB, false);
+        example.setGravity(Gravity.CENTER);
+        example.setLineSpacing(dp(3), 1f);
+        example.setPadding(0, dp(18), 0, 0);
+        card.addView(example, new LinearLayout.LayoutParams(-1, -2));
+
+        hint = text("点击翻面，双击发音，上下滑切词", 12, COLOR_SUB, false);
+        hint.setGravity(Gravity.CENTER);
+        hint.setPadding(0, dp(28), 0, 0);
+        card.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+
+        leftMark = mark("忘记", 0xFFFFEEF2, COLOR_RED);
+        FrameLayout.LayoutParams leftLp = new FrameLayout.LayoutParams(dp(92), dp(44), Gravity.START | Gravity.TOP);
+        leftLp.setMargins(dp(22), dp(76), 0, 0);
+        cardHost.addView(leftMark, leftLp);
+        leftMark.setAlpha(0f);
+
+        rightMark = mark("记得", 0xFFECFDF5, COLOR_GREEN);
+        FrameLayout.LayoutParams rightLp = new FrameLayout.LayoutParams(dp(92), dp(44), Gravity.END | Gravity.TOP);
+        rightLp.setMargins(0, dp(76), dp(22), 0);
+        cardHost.addView(rightMark, rightLp);
+        rightMark.setAlpha(0f);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+        page.addView(actions, new LinearLayout.LayoutParams(-1, dp(50)));
+
+        TextView forgot = actionButton("忘记", 0xFFFFEEF2, COLOR_RED);
+        TextView vague = actionButton("模糊", 0xFFFFF7ED, COLOR_ORANGE);
+        TextView known = actionButton("记得", 0xFFECFDF5, COLOR_GREEN);
+        actions.addView(forgot, new LinearLayout.LayoutParams(0, -1, 1f));
+        LinearLayout.LayoutParams mid = new LinearLayout.LayoutParams(0, -1, 1f);
+        mid.setMargins(dp(10), 0, dp(10), 0);
+        actions.addView(vague, mid);
+        actions.addView(known, new LinearLayout.LayoutParams(0, -1, 1f));
+        forgot.setOnClickListener(v -> judge(Sm2.QUALITY_FORGOT));
+        vague.setOnClickListener(v -> judge(Sm2.QUALITY_VAGUE));
+        known.setOnClickListener(v -> judge(Sm2.QUALITY_KNOWN));
     }
 
-    private void updateTabs(int selected) {
-        for (int i = 0; i < tabViews.length; i++) {
-            TextView tab = tabViews[i];
-            if (tab == null) continue;
-            boolean checked = i == selected;
-            tab.setTextColor(checked ? Color.WHITE : COLOR_TEXT_GRAY);
-            tab.setTypeface(Typeface.DEFAULT, checked ? Typeface.BOLD : Typeface.NORMAL);
-            tab.setBackground(roundRect(checked ? COLOR_BLUE : 0xFFF1F5F9, dp(18), 0, 0));
-        }
-        if (tabContainer != null && selected >= 0 && selected < tabViews.length) {
-            tabViews[selected].post(() -> {
-                View parent = (View) tabContainer.getParent();
-                if (parent instanceof HorizontalScrollView) {
-                    ((HorizontalScrollView) parent).smoothScrollTo(Math.max(0, tabViews[selected].getLeft() - dp(24)), 0);
+    private boolean handleCardTouch(View v, MotionEvent event) {
+        gestureDetector.onTouchEvent(event);
+        if (words.isEmpty() || judging) return true;
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                downX = event.getRawX();
+                downY = event.getRawY();
+                axis = Axis.NONE;
+                card.animate().cancel();
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                float dx = event.getRawX() - downX;
+                float dy = event.getRawY() - downY;
+                if (axis == Axis.NONE && (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop)) {
+                    axis = Math.abs(dx) > Math.abs(dy) ? Axis.HORIZONTAL : Axis.VERTICAL;
                 }
-            });
+                if (axis == Axis.HORIZONTAL) {
+                    card.setTranslationX(dx);
+                    card.setRotation(dx / 28f);
+                    float a = Math.min(1f, Math.abs(dx) / dp(128));
+                    leftMark.setAlpha(dx < 0 ? a : 0f);
+                    rightMark.setAlpha(dx > 0 ? a : 0f);
+                } else if (axis == Axis.VERTICAL) {
+                    card.setTranslationY(dy * 0.28f);
+                }
+                return true;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                float upDx = event.getRawX() - downX;
+                float upDy = event.getRawY() - downY;
+                if (axis == Axis.HORIZONTAL && Math.abs(upDx) > dp(118)) {
+                    judge(upDx > 0 ? Sm2.QUALITY_KNOWN : Sm2.QUALITY_FORGOT);
+                } else if (axis == Axis.VERTICAL && Math.abs(upDy) > dp(118)) {
+                    if (upDy < 0) next(); else prev();
+                    resetMotion();
+                } else {
+                    resetMotion();
+                }
+                axis = Axis.NONE;
+                return true;
+        }
+        return true;
+    }
+
+    private void bind() {
+        if (words.isEmpty()) return;
+        WordItem item = words.get(index);
+        flipped = false;
+        progress.setText((index + 1) + " / " + words.size() + " · " + formatReview(item.id));
+        word.setText(item.word);
+        pinyin.setText(item.pinyin);
+        meaning.setText("点击查看意思");
+        example.setText("左滑忘记 · 右滑记得 · 模糊点按钮");
+        hint.setText("点击翻面，双击发音，上下滑切词");
+        resetMotion();
+    }
+
+    private void flip() {
+        if (words.isEmpty()) return;
+        WordItem item = words.get(index);
+        flipped = !flipped;
+        if (flipped) {
+            meaning.setText(item.meaning);
+            example.setText("例句：" + item.example);
+            hint.setText("忘记=10分钟后 · 模糊=8小时后 · 记得=按 SM-2");
+        } else {
+            meaning.setText("点击查看意思");
+            example.setText("左滑忘记 · 右滑记得 · 模糊点按钮");
+            hint.setText("点击翻面，双击发音，上下滑切词");
         }
     }
 
-    private void openDrawer() {
-        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, GravityCompat.START);
-        drawerLayout.openDrawer(GravityCompat.START);
+    private void judge(int quality) {
+        if (words.isEmpty() || judging) return;
+        judging = true;
+        WordItem item = words.get(index);
+        ReviewState old = reviewStore.get(item.id);
+        ReviewState next = Sm2.schedule(old, item.id, quality, System.currentTimeMillis());
+        reviewStore.save(next);
+        vibrate(20);
+        int dir = quality == Sm2.QUALITY_FORGOT ? -1 : 1;
+        if (quality == Sm2.QUALITY_VAGUE) dir = 0;
+        if (quality == Sm2.QUALITY_FORGOT) leftMark.setAlpha(1f);
+        if (quality == Sm2.QUALITY_KNOWN) rightMark.setAlpha(1f);
+        Toast.makeText(this, quality == Sm2.QUALITY_VAGUE ? "模糊：8小时后复习" : quality == Sm2.QUALITY_FORGOT ? "忘记：10分钟后复习" : "记得：已安排复习", Toast.LENGTH_SHORT).show();
+        card.animate()
+                .translationX(dir == 0 ? 0 : dir * dp(460))
+                .translationY(quality == Sm2.QUALITY_VAGUE ? dp(460) : 0)
+                .rotation(dir * 10f)
+                .alpha(0f)
+                .setDuration(180)
+                .setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        card.animate().setListener(null);
+                        card.setAlpha(1f);
+                        judging = false;
+                        next();
+                    }
+                })
+                .start();
     }
 
-    private void closeDrawerIfOpen() {
-        if (drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START);
-        }
+    private void next() {
+        if (index < words.size() - 1) index++; else index = 0;
+        bind();
     }
 
-    private void openAiPage(String title, String url) {
-        closeDrawerIfOpen();
-        AiScriptWebActivity.open(this, title, url);
+    private void prev() {
+        if (index > 0) index--; else index = words.size() - 1;
+        bind();
     }
 
-    private void showBookPlan() {
-        closeDrawerIfOpen();
-        new AlertDialog.Builder(this)
-                .setTitle("学习书籍")
-                .setMessage("第一版书籍建议放在 learning/books 或 learning/config/books.json。书籍入口不抢主页，主页主线先打磨单词 + SM-2。")
-                .setPositiveButton("知道了", null)
-                .show();
+    private void resetMotion() {
+        card.animate().translationX(0f).translationY(0f).rotation(0f).alpha(1f).setDuration(130).start();
+        leftMark.animate().alpha(0f).setDuration(100).start();
+        rightMark.animate().alpha(0f).setDuration(100).start();
     }
 
-    private void openSpeechSettings() {
-        closeDrawerIfOpen();
+    private void playTtsHint() {
+        if (!words.isEmpty()) Toast.makeText(this, "发音后续接 wkspeech：" + words.get(index).word, Toast.LENGTH_SHORT).show();
+        vibrate(10);
+    }
+
+    private void seedWords() {
+        words.clear();
+        words.add(new WordItem(level + "_001", "你好", "nǐ hǎo", "မင်္ဂလာပါ / Hello", "你好，很高兴认识你。"));
+        words.add(new WordItem(level + "_002", "谢谢", "xiè xie", "ကျေးဇူးတင်ပါတယ် / Thank you", "谢谢你的帮助。"));
+        words.add(new WordItem(level + "_003", "再见", "zài jiàn", "နောက်မှတွေ့မယ် / Goodbye", "明天再见。"));
+        words.add(new WordItem(level + "_004", "可以", "kě yǐ", "ရပါတယ် / OK", "这样可以吗？"));
+        words.add(new WordItem(level + "_005", "朋友", "péng you", "သူငယ်ချင်း / Friend", "他是我的朋友。"));
+        words.add(new WordItem(level + "_006", "学习", "xué xí", "သင်ယူသည် / Study", "我每天学习中文。"));
+        words.add(new WordItem(level + "_007", "工作", "gōng zuò", "အလုပ် / Work", "我想找工作。"));
+        words.add(new WordItem(level + "_008", "吃饭", "chī fàn", "ထမင်းစားသည် / Eat", "我们一起吃饭吧。"));
+    }
+
+    private void sortWordsByReview() {
+        final long now = System.currentTimeMillis();
+        Collections.sort(words, (a, b) -> {
+            ReviewState ra = reviewStore.get(a.id);
+            ReviewState rb = reviewStore.get(b.id);
+            boolean da = ra.nextReviewAt <= 0 || ra.nextReviewAt <= now;
+            boolean db = rb.nextReviewAt <= 0 || rb.nextReviewAt <= now;
+            if (da != db) return da ? -1 : 1;
+            return Long.compare(ra.nextReviewAt, rb.nextReviewAt);
+        });
+    }
+
+    private String formatReview(String id) {
+        ReviewState s = reviewStore.get(id);
+        if (s.reviewCount <= 0) return "新词";
+        long diff = s.nextReviewAt - System.currentTimeMillis();
+        if (diff <= 0) return "待复习";
+        long h = diff / (60L * 60L * 1000L);
+        if (h < 1) return "稍后复习";
+        if (h < 24) return h + "小时后";
+        return (h / 24) + "天后";
+    }
+
+    private void vibrate(long ms) {
         try {
-            Class<?> clazz = Class.forName("com.chat.speech.ui.SpeechSettingsActivity");
-            startActivity(new Intent(this, clazz));
-        } catch (Throwable e) {
-            Toast.makeText(this, "语音插件未安装或 wkspeech 模块未打包", Toast.LENGTH_SHORT).show();
+            Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (vibrator == null || !vibrator.hasVibrator()) return;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) vibrator.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
+            else vibrator.vibrate(ms);
+        } catch (Throwable ignored) {}
+    }
+
+    private TextView text(String v, int sp, int color, boolean bold) {
+        TextView t = new TextView(this);
+        t.setText(v);
+        t.setTextSize(sp);
+        t.setTextColor(color);
+        t.setLineSpacing(dp(2), 1f);
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        return t;
+    }
+
+    private TextView circle(String v) {
+        TextView t = text(v, 18, COLOR_TEXT, true);
+        t.setGravity(Gravity.CENTER);
+        t.setBackground(rounded(0xAAFFFFFF, dp(21), 0xFFE5E7EB, 1));
+        return t;
+    }
+
+    private TextView actionButton(String v, int bg, int fg) {
+        TextView t = text(v, 15, fg, true);
+        t.setGravity(Gravity.CENTER);
+        t.setBackground(rounded(bg, dp(18), 0, 0));
+        return t;
+    }
+
+    private TextView mark(String v, int bg, int fg) {
+        TextView t = text(v, 16, fg, true);
+        t.setGravity(Gravity.CENTER);
+        t.setBackground(rounded(bg, dp(18), 0, 0));
+        return t;
+    }
+
+    private GradientDrawable pageBg() {
+        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xFFEAF4FF, 0xFFF8FBFF});
+    }
+
+    private GradientDrawable cardBg() {
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xFFFFFFFF, 0xFFF8FBFF});
+        g.setCornerRadius(dp(28));
+        g.setStroke(1, 0xFFE2E8F0);
+        return g;
+    }
+
+    private GradientDrawable rounded(int color, float radius, int strokeColor, int strokeWidth) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(radius);
+        if (strokeWidth > 0) d.setStroke(strokeWidth, strokeColor);
+        return d;
+    }
+
+    private int dp(float v) {
+        return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private static class WordItem {
+        final String id, word, pinyin, meaning, example;
+        WordItem(String id, String word, String pinyin, String meaning, String example) {
+            this.id = id; this.word = word; this.pinyin = pinyin; this.meaning = meaning; this.example = example;
         }
     }
 
-    private void showPromptScenes() {
-        final String[] names = new String[]{"日常打招呼", "点餐买东西", "求职面试", "医院看病", "机场过关", "租房沟通", "中文老师口语陪练", "中缅互译练习"};
-        final String[] prompts = new String[]{
-                "你是多语言口语陪练老师。请用中文、缅语和英文各给我 10 句自然的日常打招呼表达，每句附使用场景，并带慢速跟读版本。",
-                "请生成点餐和买东西场景的实用口语，包含中文、缅语、英文三列。句子要短、自然、适合手机朗读练习。",
-                "请模拟求职面试口语场景。先给常见问题，再给简短自然回答，最后给我可直接背诵的中文/缅语/英文版本。",
-                "请生成医院看病常用表达，包含挂号、描述症状、买药、复诊。中文、缅语、英文对照，句子要简单。",
-                "请生成机场过关常用口语，包含入境目的、住址、停留时间、行李说明。中文、缅语、英文对照。",
-                "请生成租房沟通常用表达，包含看房、价格、押金、水电、维修。中文、缅语、英文对照。",
-                "你是中文老师。请用适合初学者的方式教我这个场景的中文口语：先给短句，再给拼音，再给缅语解释，最后给练习对话。",
-                "请把我接下来输入的内容做中缅互译。要求忠实原意、语气自然、不解释、不加内容，只输出译文。"
-        };
-        closeDrawerIfOpen();
-        new AlertDialog.Builder(this)
-                .setTitle("高频生活场景")
-                .setItems(names, (dialog, which) -> copyPrompt(names[which], prompts[which]))
-                .setNegativeButton("取消", null)
-                .show();
+    private static class ReviewState {
+        String wordId = "";
+        double easeFactor = 2.5d;
+        int repetitions = 0;
+        int intervalDays = 0;
+        int lastQuality = -1;
+        long lastReviewAt = 0L;
+        long nextReviewAt = 0L;
+        int reviewCount = 0;
+        int lapseCount = 0;
     }
 
-    private void copyPrompt(String name, String prompt) {
-        ClipboardManager manager = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        if (manager != null) {
-            manager.setPrimaryClip(ClipData.newPlainText(name, prompt));
-            Toast.makeText(this, "已复制场景 prompt", Toast.LENGTH_LONG).show();
+    private static class Sm2 {
+        static final int QUALITY_FORGOT = 0;
+        static final int QUALITY_VAGUE = 2;
+        static final int QUALITY_KNOWN = 5;
+        private static final double MIN_EASE = 1.3d;
+        private static final long MINUTE = 60L * 1000L;
+        private static final long HOUR = 60L * MINUTE;
+        private static final long DAY = 24L * HOUR;
+
+        static ReviewState schedule(ReviewState old, String wordId, int quality, long now) {
+            ReviewState n = new ReviewState();
+            n.wordId = wordId;
+            double ef = old.easeFactor > 0 ? old.easeFactor : 2.5d;
+            int rep = Math.max(0, old.repetitions);
+            int interval = Math.max(0, old.intervalDays);
+            int lapse = Math.max(0, old.lapseCount);
+            long nextAt;
+            if (quality < 3) {
+                rep = 0;
+                interval = 0;
+                lapse++;
+                nextAt = now + (quality <= QUALITY_FORGOT ? 10L * MINUTE : 8L * HOUR);
+            } else {
+                if (rep == 0) interval = 1;
+                else if (rep == 1) interval = 6;
+                else interval = Math.max(1, (int) Math.round(interval * ef));
+                rep++;
+                nextAt = now + interval * DAY;
+            }
+            // EF 无论成功/失败都更新，别挪进 else。
+            ef = ef + (0.1d - (5 - quality) * (0.08d + (5 - quality) * 0.02d));
+            if (ef < MIN_EASE) ef = MIN_EASE;
+            n.easeFactor = ef;
+            n.repetitions = rep;
+            n.intervalDays = interval;
+            n.lastQuality = quality;
+            n.lastReviewAt = now;
+            n.nextReviewAt = nextAt;
+            n.reviewCount = old.reviewCount + 1;
+            n.lapseCount = lapse;
+            return n;
         }
     }
 
-    private void runMenuClick(Runnable click) {
-        long now = SystemClock.elapsedRealtime();
-        if (now - lastMenuClickTime < 700) return;
-        lastMenuClickTime = now;
-        if (click != null) click.run();
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            closeDrawerIfOpen();
-            return;
+    private static class ReviewStore {
+        private final SharedPreferences sp;
+        ReviewStore(Context context) { sp = context.getApplicationContext().getSharedPreferences("tsdd_learning_sm2", Context.MODE_PRIVATE); }
+        ReviewState get(String id) {
+            ReviewState s = new ReviewState();
+            s.wordId = id;
+            String k = "w." + id;
+            s.easeFactor = Double.longBitsToDouble(sp.getLong(k + ".ef", Double.doubleToLongBits(2.5d)));
+            s.repetitions = sp.getInt(k + ".rep", 0);
+            s.intervalDays = sp.getInt(k + ".int", 0);
+            s.lastQuality = sp.getInt(k + ".q", -1);
+            s.lastReviewAt = sp.getLong(k + ".last", 0L);
+            s.nextReviewAt = sp.getLong(k + ".next", 0L);
+            s.reviewCount = sp.getInt(k + ".count", 0);
+            s.lapseCount = sp.getInt(k + ".lapse", 0);
+            return s;
         }
-        super.onBackPressed();
-    }
-
-    private File getRemoteBannerFile() {
-        return new File(getFilesDir(), "learning/images/home_banner.webp");
-    }
-
-    private int getPanelWidth() {
-        return (int) (getResources().getDisplayMetrics().widthPixels * 0.84f);
-    }
-
-    private GradientDrawable createHeaderScrim() {
-        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0x33000000, 0x11000000, 0xAA000000});
-    }
-
-    private GradientDrawable createDrawerBackground() {
-        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xFFFFFFFF, 0xFFF3F8FF, 0xFFFFFFFF});
-    }
-
-    private GradientDrawable roundRect(int color, float radius, int strokeColor, int strokeWidth) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(radius);
-        if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
-        return drawable;
-    }
-
-    private int getStatusBarInset() {
-        int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
-        return id > 0 ? getResources().getDimensionPixelSize(id) : dp(24);
-    }
-
-    private int dp(float value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+        void save(ReviewState s) {
+            String k = "w." + s.wordId;
+            sp.edit()
+                    .putLong(k + ".ef", Double.doubleToLongBits(s.easeFactor))
+                    .putInt(k + ".rep", s.repetitions)
+                    .putInt(k + ".int", s.intervalDays)
+                    .putInt(k + ".q", s.lastQuality)
+                    .putLong(k + ".last", s.lastReviewAt)
+                    .putLong(k + ".next", s.nextReviewAt)
+                    .putInt(k + ".count", s.reviewCount)
+                    .putInt(k + ".lapse", s.lapseCount)
+                    .apply();
+        }
     }
 }
