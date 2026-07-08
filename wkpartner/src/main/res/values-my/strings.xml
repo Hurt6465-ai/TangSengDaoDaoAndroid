@@ -5,6 +5,9 @@
     <string name="partner_say_hello">နှုတ်ဆက်မည်</string>
     <string name="partner_hello_sent">ပို့ပြီး</string>
     <string name="partner_send_message">စာပို့မည်</string>
+    <string name="partner_add_friend">မိတ်ဆွေထည့်မည်</string>
+    <string name="partner_friend_apply_sent">တောင်းဆိုပြီး</string>
+    <string name="partner_add_friend_hint">မိတ်ဆွေတောင်းဆိုစာရေးပါ</string>
     <string name="partner_hello_hint">နှုတ်ဆက်စာရေးပါ</string>
     <string name="partner_default_hello_plain">မင်္ဂလာပါ၊ မိတ်ဆက်လို့ရမလား?</string>
     <string name="partner_default_hello_with_lang">မင်္ဂလာပါ၊ %1$s လေ့ကျင့်ချင်ပါတယ်။ မိတ်ဆက်လို့ရမလား?</string>
