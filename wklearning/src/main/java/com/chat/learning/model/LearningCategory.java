@@ -8,6 +8,8 @@ public class LearningCategory {
     public String cover;
     public String action;
 
+    public LearningCategory() {}
+
     public LearningCategory(String id, String title, String subtitle, int count, String cover, String action) {
         this.id = id;
         this.title = title;
