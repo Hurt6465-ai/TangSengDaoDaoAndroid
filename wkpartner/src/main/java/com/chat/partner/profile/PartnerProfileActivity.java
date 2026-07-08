@@ -886,7 +886,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (blocked) {
             wkVBinding.helloBtnText.setText(R.string.partner_remove_blacklist);
         } else {
-            wkVBinding.helloBtnText.setText(isFriend ? R.string.partner_send_message : R.string.partner_say_hello);
+            wkVBinding.helloBtnText.setText(isFriend ? R.string.partner_send_message : R.string.partner_add_friend);
         }
         wkVBinding.helloBtnText.setAlpha(1f);
         wkVBinding.helloBtnProgress.setAlpha(0f);
@@ -906,7 +906,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
                 WKIMUtils.getInstance().startChatActivity(new ChatViewMenu(this, uid, WKChannelType.PERSONAL, 0, false));
                 return;
             }
-            WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_say_hello), getString(R.string.partner_hello_hint), defaultGreeting(), defaultGreeting(), 40, text -> {
+            WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_add_friend), getString(R.string.partner_add_friend_hint), defaultGreeting(), defaultGreeting(), 40, text -> {
                 String remark = TextUtils.isEmpty(text) ? defaultGreeting() : text;
                 String vercode = profile == null ? "" : profile.vercode;
                 animateButtonToProgress();
@@ -1020,7 +1020,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             public void onAnimationEnd(Animator animation) {
                 wkVBinding.helloBtnProgress.setVisibility(View.GONE);
                 wkVBinding.helloBtnProgress.animate().setListener(null);
-                wkVBinding.helloBtnText.setText(success ? R.string.partner_hello_sent : R.string.partner_say_hello);
+                wkVBinding.helloBtnText.setText(success ? R.string.partner_friend_apply_sent : R.string.partner_add_friend);
                 wkVBinding.helloBtnText.animate().alpha(1f).setDuration(180).start();
             }
         }).start();
