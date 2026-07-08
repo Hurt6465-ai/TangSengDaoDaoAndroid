@@ -29,14 +29,12 @@ import com.chat.userscript.ScriptManagerActivity;
 
 /**
  * 学习首页：高端极简风格。
- * 顶部沉浸式 Banner，4个核心工具入口（带图标），底部学习分区卡片化去图标。
+ * 修复逻辑 Bug，调整为 2 列舒展排版，全盘定制非 Emoji 极简图标与高级莫兰迪质感卡片。
  */
 public class LearningFragment extends Fragment {
-    // 采用类似 Apple 的高级极简色彩体系
-    private static final int COLOR_BG = 0xFFF5F5F7; // 高级浅灰背
+    private static final int COLOR_BG = 0xFFF5F6F8; // 高级浅灰背
     private static final int COLOR_TEXT = 0xFF1D1D1F; // 深邃黑
     private static final int COLOR_SUB = 0xFF86868B; // 高级灰副标题
-    private static final int COLOR_ACCENT = 0xFF007AFF; // 纯净品牌蓝
 
     private DrawerLayout drawerLayout;
     private long lastCardClickTime = 0L;
@@ -45,7 +43,7 @@ public class LearningFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         drawerLayout = new DrawerLayout(requireContext());
         drawerLayout.setBackgroundColor(COLOR_BG);
-        drawerLayout.setScrimColor(0x80000000); // 加深侧边栏暗化效果
+        drawerLayout.setScrimColor(0x80000000);
         drawerLayout.setDrawerElevation(dp(16));
 
         View main = createMainPage();
@@ -66,56 +64,61 @@ public class LearningFragment extends Fragment {
 
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(0, 0, 0, dp(40)); // 底部留白更多
+        root.setPadding(0, 0, 0, dp(40));
         scrollView.addView(root, new ScrollView.LayoutParams(-1, -2));
 
-        root.addView(createHero(), new LinearLayout.LayoutParams(-1, dp(280))); // Banner稍微加高
+        // 高度修改为 240dp
+        root.addView(createHero(), new LinearLayout.LayoutParams(-1, dp(240)));
 
         LinearLayout content = new LinearLayout(requireContext());
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(20), dp(20), 0); // 增加两侧内边距，提升呼吸感
+        content.setPadding(dp(20), dp(20), dp(20), 0);
         root.addView(content, new LinearLayout.LayoutParams(-1, -2));
 
-        // 核心 4 个工具（带图标）
+        // 核心 4 个工具
         content.addView(createToolsRow(), new LinearLayout.LayoutParams(-1, dp(100)));
-        addSpace(content, 28);
+        addSpace(content, 24);
 
-        // 以下学习模块完全去除图标，改用极简卡片
+        // 改为 2 列排版，背景使用克制的极浅莫兰迪渐变色（解决太白的问题）
         addSection(content, "拼音", null,
                 new CardSpec[]{
-                        new CardSpec("声母", "b p m f", "initials"),
-                        new CardSpec("韵母", "a o e i u", "finals"),
-                        new CardSpec("整体", "zhi chi shi", "whole"),
-                        new CardSpec("声调", "一二三四声", "tone")
-                }, 2);
+                        new CardSpec("声母", "b p m f", "initials", new int[]{0xFFF6F9FF, 0xFFEBF1FF}),
+                        new CardSpec("韵母", "a o e i u", "finals", new int[]{0xFFF6F9FF, 0xFFEBF1FF}),
+                        new CardSpec("整体", "zhi chi shi", "whole", new int[]{0xFFF6F9FF, 0xFFEBF1FF}),
+                        new CardSpec("声调", "一二三四声", "tone", new int[]{0xFFF6F9FF, 0xFFEBF1FF})
+                });
 
         addSection(content, "单词", "更多",
                 new CardSpec[]{
-                        new CardSpec("HSK 1", "150 词", "hsk1"),
-                        new CardSpec("HSK 2", "300 词", "hsk2"),
-                        new CardSpec("HSK 3", "600 词", "hsk3")
-                }, 3);
+                        new CardSpec("HSK 1", "150 词", "hsk1", new int[]{0xFFFBF8FF, 0xFFF1E8FF}),
+                        new CardSpec("HSK 2", "300 词", "hsk2", new int[]{0xFFFBF8FF, 0xFFF1E8FF}),
+                        new CardSpec("HSK 3", "600 词", "hsk3", new int[]{0xFFFBF8FF, 0xFFF1E8FF}),
+                        new CardSpec("HSK 4", "1200 词", "hsk4", new int[]{0xFFFBF8FF, 0xFFF1E8FF})
+                });
 
         addSection(content, "口语", "更多",
                 new CardSpec[]{
-                        new CardSpec("打招呼", "日常开场", "speak_hello"),
-                        new CardSpec("点餐", "餐厅购物", "speak_food"),
-                        new CardSpec("求职", "面试工作", "speak_job")
-                }, 3);
+                        new CardSpec("打招呼", "日常开场", "speak_hello", new int[]{0xFFFFF8F6, 0xFFFFEBE3}),
+                        new CardSpec("点餐", "餐厅购物", "speak_food", new int[]{0xFFFFF8F6, 0xFFFFEBE3}),
+                        new CardSpec("求职", "面试工作", "speak_job", new int[]{0xFFFFF8F6, 0xFFFFEBE3}),
+                        new CardSpec("购物", "买单砍价", "speak_shop", new int[]{0xFFFFF8F6, 0xFFFFEBE3})
+                });
 
         addSection(content, "句型", "更多",
                 new CardSpec[]{
-                        new CardSpec("我想…", "表达需求", "pattern_want"),
-                        new CardSpec("可以吗", "请求帮助", "pattern_can"),
-                        new CardSpec("怎么…", "询问方法", "pattern_how")
-                }, 3);
+                        new CardSpec("我想…", "表达需求", "pattern_want", new int[]{0xFFF4FBF7, 0xFFE5F6EC}),
+                        new CardSpec("可以吗", "请求帮助", "pattern_can", new int[]{0xFFF4FBF7, 0xFFE5F6EC}),
+                        new CardSpec("怎么…", "询问方法", "pattern_how", new int[]{0xFFF4FBF7, 0xFFE5F6EC}),
+                        new CardSpec("为什么", "询问原因", "pattern_why", new int[]{0xFFF4FBF7, 0xFFE5F6EC})
+                });
 
         addSection(content, "语法", "更多",
                 new CardSpec[]{
-                        new CardSpec("了", "完成/变化", "grammar_le"),
-                        new CardSpec("在", "正在进行", "grammar_zai"),
-                        new CardSpec("吗 / 呢", "疑问语气", "grammar_ma")
-                }, 3);
+                        new CardSpec("了", "完成/变化", "grammar_le", new int[]{0xFFFDF9F2, 0xFFF7EBD8}),
+                        new CardSpec("在", "正在进行", "grammar_zai", new int[]{0xFFFDF9F2, 0xFFF7EBD8}),
+                        new CardSpec("吗/呢", "疑问语气", "grammar_ma", new int[]{0xFFFDF9F2, 0xFFF7EBD8}),
+                        new CardSpec("的/得", "结构助词", "grammar_de", new int[]{0xFFFDF9F2, 0xFFF7EBD8})
+                });
 
         return scrollView;
     }
@@ -129,9 +132,9 @@ public class LearningFragment extends Fragment {
         bg.setImageResource(R.drawable.learning_home_banner_default);
         hero.addView(bg, new FrameLayout.LayoutParams(-1, -1));
 
-        // 重新设计沉浸式遮罩：从透明平滑过渡到纯黑，让文字像浮在上面一样清晰
+        // 深色遮罩确保文字清晰
         View overlay = new View(requireContext());
-        overlay.setBackground(gradient(Color.TRANSPARENT, 0xCC000000, 0, Color.TRANSPARENT, 0));
+        overlay.setBackground(gradient(0x33000000, 0xCC000000, 0, Color.TRANSPARENT, 0));
         hero.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout copy = new LinearLayout(requireContext());
@@ -140,46 +143,41 @@ public class LearningFragment extends Fragment {
         copy.setPadding(dp(24), dp(24), dp(24), dp(24));
         hero.addView(copy, new FrameLayout.LayoutParams(-1, -1));
 
-        // 高级感标签
-        TextView badge = new TextView(requireContext());
-        badge.setText("0 基础入门");
-        badge.setTextSize(12);
-        badge.setTextColor(0xFFFFFFFF);
-        badge.setTypeface(Typeface.DEFAULT_BOLD);
-        badge.setPadding(dp(10), dp(4), dp(10), dp(4));
-        badge.setBackground(rounded(0x40FFFFFF, dp(6), Color.TRANSPARENT, 0)); // 极简磨砂块
-        LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(-2, -2);
-        badgeLp.setMargins(0, 0, 0, dp(12));
-        copy.addView(badge, badgeLp);
-
+        // 新标题
         TextView title = new TextView(requireContext());
-        title.setText("中文核心突破");
-        title.setTextSize(32); // 放大标题增强视觉冲击
+        title.setText("90天搞定汉语口语");
+        title.setTextSize(28);
         title.setTextColor(Color.WHITE);
         title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setPadding(0, 0, 0, dp(12));
         copy.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = new TextView(requireContext());
-        sub.setText("每天 10 分钟，与 AI 语伴沉浸式对练");
-        sub.setTextSize(15);
-        sub.setTextColor(0xD9FFFFFF); // 85% 白色
-        sub.setPadding(0, dp(6), 0, dp(20));
-        copy.addView(sub, new LinearLayout.LayoutParams(-1, -2));
+        // 底部：副标题在左，报名按钮在右
+        LinearLayout bottomRow = new LinearLayout(requireContext());
+        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+        bottomRow.setGravity(Gravity.BOTTOM | Gravity.CENTER_VERTICAL);
+        copy.addView(bottomRow, new LinearLayout.LayoutParams(-1, -2));
 
-        // 按钮区域
+        TextView sub = new TextView(requireContext());
+        sub.setText("每天10分钟，与AI语伴沉浸对练");
+        sub.setTextSize(14);
+        sub.setTextColor(0xE6FFFFFF);
+        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        bottomRow.addView(sub, subLp);
+
         TextView start = new TextView(requireContext());
-        start.setText("开始今日学习");
-        start.setTextSize(15);
+        start.setText("报名");
+        start.setTextSize(14);
         start.setTypeface(Typeface.DEFAULT_BOLD);
         start.setTextColor(COLOR_TEXT);
         start.setGravity(Gravity.CENTER);
-        start.setBackground(rounded(Color.WHITE, dp(24), Color.TRANSPARENT, 0)); // 高纯度白底大圆角按钮
-        start.setOnClickListener(v -> Toast.makeText(requireContext(), "从拼音开始学习", Toast.LENGTH_SHORT).show());
-        copy.addView(start, new LinearLayout.LayoutParams(dp(140), dp(48)));
+        start.setBackground(rounded(Color.WHITE, dp(18), Color.TRANSPARENT, 0)); // 纯白胶囊按钮，引人注目
+        start.setOnClickListener(v -> Toast.makeText(requireContext(), "进入报名页面", Toast.LENGTH_SHORT).show());
+        bottomRow.addView(start, new LinearLayout.LayoutParams(dp(76), dp(36)));
 
         // 汉堡菜单按钮
         FrameLayout.LayoutParams menuLp = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.END | Gravity.TOP);
-        menuLp.setMargins(0, dp(32), dp(16), 0);
+        menuLp.setMargins(0, dp(24), dp(16), 0);
         hero.addView(createMenuHandle(), menuLp);
 
         return hero;
@@ -189,55 +187,61 @@ public class LearningFragment extends Fragment {
         FrameLayout box = new FrameLayout(requireContext());
         box.setOnClickListener(v -> openDrawer());
 
+        // 替换“三个杠”，使用现代非对称设计（一长一短呼吸线）
         LinearLayout bars = new LinearLayout(requireContext());
-        bars.setOrientation(LinearLayout.HORIZONTAL);
-        bars.setGravity(Gravity.CENTER);
-        box.addView(bars, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+        bars.setOrientation(LinearLayout.VERTICAL);
+        bars.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+        
+        View bar1 = new View(requireContext());
+        bar1.setBackground(rounded(Color.WHITE, dp(1.5f), Color.TRANSPARENT, 0));
+        bars.addView(bar1, new LinearLayout.LayoutParams(dp(22), dp(3)));
+        
+        addSpace(bars, 6);
+        
+        View bar2 = new View(requireContext());
+        bar2.setBackground(rounded(Color.WHITE, dp(1.5f), Color.TRANSPARENT, 0));
+        bars.addView(bar2, new LinearLayout.LayoutParams(dp(14), dp(3)));
 
-        bars.addView(menuBar(16), new LinearLayout.LayoutParams(dp(3), dp(16)));
-        addHorizontalGap(bars, 5);
-        bars.addView(menuBar(22), new LinearLayout.LayoutParams(dp(3), dp(22)));
-        addHorizontalGap(bars, 5);
-        bars.addView(menuBar(14), new LinearLayout.LayoutParams(dp(3), dp(14)));
+        box.addView(bars, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         return box;
     }
 
-    private View menuBar(int heightDp) {
-        View view = new View(requireContext());
-        view.setBackground(rounded(Color.WHITE, dp(1.5f), Color.TRANSPARENT, 0));
-        return view;
-    }
-
-    // 顶部四个核心工具：保留图标，采用纯净悬浮卡片
     private View createToolsRow() {
         LinearLayout row = new LinearLayout(requireContext());
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER);
         
-        row.addView(toolCard("🌐", "AI翻译", () -> AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")), new LinearLayout.LayoutParams(0, -1, 1f));
+        // 废弃 Emoji，使用大厂常见的高级汉字+专属渐变底座图标
+        row.addView(toolCard("译", new int[]{0xFF4FACFE, 0xFF00F2FE}, "AI翻译", () -> AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")), new LinearLayout.LayoutParams(0, -1, 1f));
         addHorizontalGap(row, 12);
-        row.addView(toolCard("📚", "电子书", this::showBookPage), new LinearLayout.LayoutParams(0, -1, 1f));
+        row.addView(toolCard("阅", new int[]{0xFFA18CD1, 0xFFFBC2EB}, "电子书", this::showBookPage), new LinearLayout.LayoutParams(0, -1, 1f));
         addHorizontalGap(row, 12);
-        row.addView(toolCard("🎙", "口语伴", this::showPromptScenes), new LinearLayout.LayoutParams(0, -1, 1f));
+        row.addView(toolCard("伴", new int[]{0xFF43E97B, 0xFF38F9D7}, "口语伴", this::showPromptScenes), new LinearLayout.LayoutParams(0, -1, 1f));
         addHorizontalGap(row, 12);
-        row.addView(toolCard("✍", "练习题", () -> Toast.makeText(requireContext(), "练习题后续接入", Toast.LENGTH_SHORT).show()), new LinearLayout.LayoutParams(0, -1, 1f));
+        row.addView(toolCard("练", new int[]{0xFFFFB75E, 0xFFED8F03}, "练习题", () -> Toast.makeText(requireContext(), "练习题后续接入", Toast.LENGTH_SHORT).show()), new LinearLayout.LayoutParams(0, -1, 1f));
         return row;
     }
 
-    private View toolCard(String icon, String title, Runnable click) {
+    private View toolCard(String charIcon, int[] gradientColors, String title, Runnable click) {
         LinearLayout card = new LinearLayout(requireContext());
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
-        // 高级悬浮白卡
-        card.setBackground(rounded(Color.WHITE, dp(16), 0xFFE5E5EA, 1));
-        card.setElevation(dp(2)); // 微弱质感阴影
+        card.setBackground(rounded(Color.WHITE, dp(16), 0xFFE8E8ED, dp(1)));
+        card.setElevation(dp(2));
         card.setOnClickListener(v -> runCardClick(click));
 
+        // 定制化文字图标圆角底座
         TextView iconView = new TextView(requireContext());
-        iconView.setText(icon);
-        iconView.setTextSize(24);
+        iconView.setText(charIcon);
+        iconView.setTextSize(18);
+        iconView.setTextColor(Color.WHITE);
+        iconView.setTypeface(Typeface.DEFAULT_BOLD);
         iconView.setGravity(Gravity.CENTER);
-        card.addView(iconView, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        iconView.setBackground(gradient(gradientColors[0], gradientColors[1], dp(14), Color.TRANSPARENT, 0));
+        
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(44), dp(44));
+        iconLp.setMargins(0, dp(12), 0, dp(8));
+        card.addView(iconView, iconLp);
 
         TextView t = new TextView(requireContext());
         t.setText(title);
@@ -245,11 +249,13 @@ public class LearningFragment extends Fragment {
         t.setTextColor(COLOR_TEXT);
         t.setTypeface(Typeface.DEFAULT_BOLD);
         t.setGravity(Gravity.CENTER);
+        t.setPadding(0, 0, 0, dp(12));
         card.addView(t, new LinearLayout.LayoutParams(-1, -2));
         return card;
     }
 
-    private void addSection(LinearLayout parent, String title, String more, CardSpec[] cards, int columns) {
+    // 强制 2 列排布
+    private void addSection(LinearLayout parent, String title, String more, CardSpec[] cards) {
         LinearLayout header = new LinearLayout(requireContext());
         header.setGravity(Gravity.BOTTOM);
         header.setOrientation(LinearLayout.HORIZONTAL);
@@ -278,10 +284,11 @@ public class LearningFragment extends Fragment {
         parent.addView(grid, new LinearLayout.LayoutParams(-1, -2));
 
         int index = 0;
+        int columns = 2; // 固定为 2 列
         while (index < cards.length) {
             LinearLayout row = new LinearLayout(requireContext());
             row.setOrientation(LinearLayout.HORIZONTAL);
-            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(80)); // 高度降低，更为精致
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(84)); // 高度舒展
             rowLp.setMargins(0, 0, 0, dp(12));
             grid.addView(row, rowLp);
 
@@ -299,14 +306,15 @@ public class LearningFragment extends Fragment {
         addSpace(parent, 10);
     }
 
-    // 学习小卡片：【完全去除图标】，采用高级文字排版
+    // 无图标、带有克制渐变色的文字排版卡片
     private View smallCard(CardSpec spec) {
         LinearLayout card = new LinearLayout(requireContext());
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
         card.setPadding(dp(16), 0, dp(16), 0);
-        // 纯净白底，极细描边，去除杂乱马卡龙色
-        card.setBackground(rounded(Color.WHITE, dp(14), 0xFFEAEAEA, dp(1)));
+        // 使用非常淡雅的高级渐变色来替代纯白，同时加上微弱的阴影
+        card.setBackground(gradient(spec.bgColors[0], spec.bgColors[1], dp(14), 0xFFEAECEE, dp(1)));
+        card.setElevation(dp(1.5f));
         card.setOnClickListener(v -> runCardClick(() -> onSmallCardClick(spec)));
 
         TextView title = new TextView(requireContext());
@@ -320,7 +328,7 @@ public class LearningFragment extends Fragment {
         desc.setText(spec.desc);
         desc.setTextSize(12);
         desc.setTextColor(COLOR_SUB);
-        desc.setPadding(0, dp(2), 0, 0);
+        desc.setPadding(0, dp(4), 0, 0);
         card.addView(desc, new LinearLayout.LayoutParams(-1, -2));
 
         return card;
@@ -330,7 +338,7 @@ public class LearningFragment extends Fragment {
         LinearLayout panel = new LinearLayout(requireContext());
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(20), dp(40), dp(20), dp(20));
-        panel.setBackgroundColor(Color.WHITE); // 抽屉采用极简纯白
+        panel.setBackgroundColor(Color.WHITE);
         panel.setClickable(true);
 
         TextView title = new TextView(requireContext());
@@ -341,7 +349,7 @@ public class LearningFragment extends Fragment {
         panel.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         TextView sub = new TextView(requireContext());
-        sub.setText("在这里探索扩展工具与脚本");
+        sub.setText("探索扩展工具与脚本");
         sub.setTextSize(14);
         sub.setTextColor(COLOR_SUB);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
@@ -360,7 +368,7 @@ public class LearningFragment extends Fragment {
         list.addView(drawerCard("Qwen 国际版", "chat.qwen.ai", () -> AiScriptWebActivity.open(requireContext(), "Qwen 国际版", "https://chat.qwen.ai/")));
         list.addView(drawerCard("语音设置", "WKSpeech 引擎配置", this::openSpeechSettings));
         list.addView(drawerCard("口语 Prompt", "生活场景对话指令", this::showPromptScenes));
-        list.addView(drawerCard("脚本中心", "用户自定义插件库", () -> startActivity(new Intent(requireContext(), ScriptManagerActivity.class))));
+        list.addView(drawerCard("脚本中心", "自定义扩展功能", () -> startActivity(new Intent(requireContext(), ScriptManagerActivity.class))));
 
         panel.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
         return panel;
@@ -370,7 +378,7 @@ public class LearningFragment extends Fragment {
         LinearLayout card = new LinearLayout(requireContext());
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(16), dp(16), dp(16), dp(16));
-        card.setBackground(rounded(COLOR_BG, dp(12), Color.TRANSPARENT, 0)); // 浅灰卡片
+        card.setBackground(rounded(COLOR_BG, dp(12), Color.TRANSPARENT, 0));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, 0, 0, dp(10));
         card.setLayoutParams(lp);
@@ -406,14 +414,24 @@ public class LearningFragment extends Fragment {
         }
     }
 
+    // 【彻底修复】完全替换为你要求的稳定版数组逻辑
     private void openMorePage(String section) {
         if ("单词".equals(section)) {
-            final String[] items = new String[]{"HSK 1", "HSK 2", "HSK 3", "HSK 4", "HSK 5", "HSK 6", "生活高频", "工作求职", "恋爱聊天"};
+            final String[] items = new String[]{
+                    "HSK 1", "HSK 2", "HSK 3", "HSK 4", "HSK 5", "HSK 6",
+                    "生活高频", "工作求职", "恋爱聊天"
+            };
+
+            final String[] ids = new String[]{
+                    "hsk1", "hsk2", "hsk3", "hsk4", "hsk5", "hsk6",
+                    "daily", "job", "love"
+            };
+
             new AlertDialog.Builder(requireContext())
                     .setTitle("更多单词")
                     .setItems(items, (dialog, which) -> {
                         Intent intent = new Intent(requireContext(), WordFullscreenActivity.class);
-                        intent.putExtra(WordFullscreenActivity.EXTRA_LEVEL, "hsk" + (which + 1));
+                        intent.putExtra(WordFullscreenActivity.EXTRA_LEVEL, ids[which]);
                         intent.putExtra(WordFullscreenActivity.EXTRA_TITLE, items[which]);
                         startActivity(intent);
                     })
@@ -488,7 +506,7 @@ public class LearningFragment extends Fragment {
     }
 
     private GradientDrawable gradient(int start, int end, float radius, int strokeColor, int strokeWidth) {
-        GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{start, end});
+        GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{start, end});
         drawable.setCornerRadius(radius);
         if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
         return drawable;
@@ -513,23 +531,24 @@ public class LearningFragment extends Fragment {
     }
 
     private int getDrawerWidth() {
-        return (int) (getResources().getDisplayMetrics().widthPixels * 0.75f); // 缩小抽屉宽度，更显精致
+        return (int) (getResources().getDisplayMetrics().widthPixels * 0.75f);
     }
 
     private int dp(float value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    // 精简了 CardSpec，去掉了无用的强彩色配置参数
     private static class CardSpec {
         final String title;
         final String desc;
         final String id;
+        final int[] bgColors; // 新增属性，用于存放卡片的莫兰迪渐变背景色
 
-        CardSpec(String title, String desc, String id) {
+        CardSpec(String title, String desc, String id, int[] bgColors) {
             this.title = title;
             this.desc = desc;
             this.id = id;
+            this.bgColors = bgColors;
         }
     }
 }
