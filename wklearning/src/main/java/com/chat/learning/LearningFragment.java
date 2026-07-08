@@ -366,7 +366,10 @@ public class LearningFragment extends Fragment {
 
     private void onSmallCardClick(CardSpec spec) {
         if (spec.id.startsWith("hsk")) {
-            Toast.makeText(requireContext(), spec.title + " 背单词后续接 SM-2 全屏页", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(requireContext(), WordFullscreenActivity.class);
+            intent.putExtra(WordFullscreenActivity.EXTRA_LEVEL, spec.id);
+            intent.putExtra(WordFullscreenActivity.EXTRA_TITLE, spec.title);
+            startActivity(intent);
         } else {
             Toast.makeText(requireContext(), spec.title + " 学习内容后续接 JSON", Toast.LENGTH_SHORT).show();
         }
@@ -377,7 +380,12 @@ public class LearningFragment extends Fragment {
             final String[] items = new String[]{"HSK 1", "HSK 2", "HSK 3", "HSK 4", "HSK 5", "HSK 6", "生活高频", "工作求职", "恋爱聊天"};
             new AlertDialog.Builder(requireContext())
                     .setTitle("更多单词")
-                    .setItems(items, (dialog, which) -> Toast.makeText(requireContext(), items[which] + " 后续进入单词页", Toast.LENGTH_SHORT).show())
+                    .setItems(items, (dialog, which) -> {
+                        Intent intent = new Intent(requireContext(), WordFullscreenActivity.class);
+                        intent.putExtra(WordFullscreenActivity.EXTRA_LEVEL, "hsk" + (which + 1));
+                        intent.putExtra(WordFullscreenActivity.EXTRA_TITLE, items[which]);
+                        startActivity(intent);
+                    })
                     .setNegativeButton("取消", null)
                     .show();
         } else {
