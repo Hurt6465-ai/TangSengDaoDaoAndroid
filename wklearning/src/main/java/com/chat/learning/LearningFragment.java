@@ -34,20 +34,16 @@ import com.chat.userscript.ScriptManagerActivity;
 import java.lang.reflect.Field;
 
 /**
- * 学习首页：高端轻玻璃拟态课程风格。
- *
- * 设计原则：
- * 1. 电影级 3D UI 图只做 Hero 背景，不把整个页面做成重 3D。
- * 2. 主页卡片统一为轻玻璃白卡 + 彩色点缀，长期使用更耐看。
- * 3. 侧边栏只放工具，学习内容走主页和二级目录。
- * 4. Font Awesome 可选：有 assets/fonts/fa-solid-900.ttf 就显示图标，没有就自动退回汉字。
+ * 学习首页：极致高端极简风格。
+ * 全面去除冗余装饰，使用高对比度、清晰字体排版与 Font Awesome 精致图标。
  */
 public class LearningFragment extends Fragment {
-    private static final int COLOR_BG = 0xFFF5F6F8;
-    private static final int COLOR_TEXT = 0xFF1D1D1F;
-    private static final int COLOR_SUB = 0xFF7E8188;
-    private static final int COLOR_CARD_STROKE = 0xB3FFFFFF;
+    // 采用高级的浅灰背景，使得纯白卡片能清晰浮现
+    private static final int COLOR_BG = 0xFFF3F4F6;
+    private static final int COLOR_TEXT = 0xFF111827; // 极深灰（近黑），保证清晰
+    private static final int COLOR_SUB = 0xFF6B7280;  // 高级灰
 
+    // 核心 4 个工具的 FA 图标
     private static final String FA_LANGUAGE = "\uf1ab";
     private static final String FA_BOOK = "\uf02d";
     private static final String FA_MIC = "\uf130";
@@ -101,43 +97,44 @@ public class LearningFragment extends Fragment {
         content.addView(createToolsRow(), new LinearLayout.LayoutParams(-1, dp(98)));
         addSpace(content, 24);
 
-        addSection(content, "拼音", null,
+        addSection(content, "拼音", "更多",
                 new CardSpec[]{
-                        new CardSpec("声母", "b p m f", "initials"),
-                        new CardSpec("韵母", "a o e i u", "finals"),
-                        new CardSpec("整体", "zhi chi shi", "whole"),
-                        new CardSpec("声调", "一二三四声", "tone")
+                        new CardSpec("声母", "b p m f", "initials", "\uf028"), // volume-up
+                        new CardSpec("韵母", "a o e i u", "finals", "\uf130"),  // microphone
+                        new CardSpec("整体", "zhi chi shi", "whole", "\uf0c6"), // paperclip
+                        new CardSpec("声调", "一二三四声", "tone", "\uf001")     // music
                 });
 
         addSection(content, "单词", "更多",
                 new CardSpec[]{
-                        new CardSpec("HSK 1", "150 词", "hsk1"),
-                        new CardSpec("HSK 2", "300 词", "hsk2"),
-                        new CardSpec("HSK 3", "600 词", "hsk3")
+                        new CardSpec("HSK 1", "150 词", "hsk1", "\uf518"), // book-reader
+                        new CardSpec("HSK 2", "300 词", "hsk2", "\uf518"),
+                        new CardSpec("HSK 3", "600 词", "hsk3", "\uf518"),
+                        new CardSpec("HSK 4", "1200 词", "hsk4", "\uf518")
                 });
 
         addSection(content, "口语", "更多",
                 new CardSpec[]{
-                        new CardSpec("打招呼", "日常开场", "speak_hello"),
-                        new CardSpec("点餐", "餐厅购物", "speak_food"),
-                        new CardSpec("求职", "面试工作", "speak_job"),
-                        new CardSpec("购物", "买单砍价", "speak_shop")
+                        new CardSpec("打招呼", "日常开场", "speak_hello", "\uf086"), // comments
+                        new CardSpec("点餐", "餐厅购物", "speak_food", "\uf2e7"),    // utensils
+                        new CardSpec("求职", "面试工作", "speak_job", "\uf0b1"),     // briefcase
+                        new CardSpec("购物", "买单砍价", "speak_shop", "\uf290")      // shopping-bag
                 });
 
         addSection(content, "句型", "更多",
                 new CardSpec[]{
-                        new CardSpec("我想…", "表达需求", "pattern_want"),
-                        new CardSpec("可以吗", "请求帮助", "pattern_can"),
-                        new CardSpec("怎么…", "询问方法", "pattern_how"),
-                        new CardSpec("为什么", "询问原因", "pattern_why")
+                        new CardSpec("我想…", "表达需求", "pattern_want", "\uf1b3"), // cubes
+                        new CardSpec("可以吗", "请求帮助", "pattern_can", "\uf059"), // question-circle
+                        new CardSpec("怎么…", "询问方法", "pattern_how", "\uf128"),  // question
+                        new CardSpec("为什么", "询问原因", "pattern_why", "\uf0eb")   // lightbulb
                 });
 
         addSection(content, "语法", "更多",
                 new CardSpec[]{
-                        new CardSpec("了", "完成/变化", "grammar_le"),
-                        new CardSpec("在", "正在进行", "grammar_zai"),
-                        new CardSpec("吗/呢", "疑问语气", "grammar_ma"),
-                        new CardSpec("的/得", "结构助词", "grammar_de")
+                        new CardSpec("了", "完成/变化", "grammar_le", "\uf0ae"),    // tasks
+                        new CardSpec("在", "正在进行", "grammar_zai", "\uf017"),    // clock
+                        new CardSpec("吗/呢", "疑问语气", "grammar_ma", "\uf085"),    // cogs
+                        new CardSpec("的/得", "结构助词", "grammar_de", "\uf1de")     // sliders-h
                 });
 
         return scrollView;
@@ -152,45 +149,32 @@ public class LearningFragment extends Fragment {
         bg.setImageResource(getDrawableId("learning_home_banner_cinematic", R.drawable.learning_home_banner_default));
         hero.addView(bg, new FrameLayout.LayoutParams(-1, -1));
 
+        // 极简深色遮罩：底部加深，让文字异常清晰，无需任何背景框
         View overlay = new View(requireContext());
-        overlay.setBackground(verticalGradient(0x16000000, 0xDD000000, 0, Color.TRANSPARENT, 0));
+        overlay.setBackground(verticalGradient(0x00000000, 0xCC000000, 0, Color.TRANSPARENT, 0));
         hero.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
-
-        addHeroGlow(hero, Gravity.START | Gravity.TOP, 0x33A7D8FF, -36, 4, 170);
-        addHeroGlow(hero, Gravity.END | Gravity.BOTTOM, 0x2EFFE7C2, 28, 12, 150);
-
-        FrameLayout glassPanel = new FrameLayout(requireContext());
-        glassPanel.setBackground(heroGlassBg(dp(24)));
-        attachNativePressAnimator(glassPanel, 0, 2);
-        FrameLayout.LayoutParams panelLp = new FrameLayout.LayoutParams(-1, dp(132), Gravity.BOTTOM);
-        panelLp.setMargins(dp(16), 0, dp(16), dp(16));
-        hero.addView(glassPanel, panelLp);
 
         LinearLayout copy = new LinearLayout(requireContext());
         copy.setOrientation(LinearLayout.VERTICAL);
         copy.setGravity(Gravity.BOTTOM | Gravity.START);
-        copy.setPadding(dp(18), dp(15), dp(18), dp(15));
-        glassPanel.addView(copy, new FrameLayout.LayoutParams(-1, -1));
+        copy.setPadding(dp(20), dp(20), dp(20), dp(24));
+        hero.addView(copy, new FrameLayout.LayoutParams(-1, -1));
 
-        TextView badge = new TextView(requireContext());
-        badge.setText("AI 语伴课 · 零基础");
-        badge.setTextSize(12);
-        badge.setTextColor(0xF2FFFFFF);
-        badge.setTypeface(Typeface.DEFAULT_BOLD);
-        badge.setGravity(Gravity.CENTER);
-        badge.setPadding(dp(10), dp(4), dp(10), dp(4));
-        badge.setBackground(rounded(0x2EFFFFFF, dp(12), 0x30FFFFFF, 1));
-        LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(-2, -2);
-        badgeLp.setMargins(0, 0, 0, dp(9));
-        copy.addView(badge, badgeLp);
+        TextView tag = new TextView(requireContext());
+        tag.setText("AI 语伴课 · 零基础");
+        tag.setTextSize(12);
+        tag.setTextColor(0xD9FFFFFF);
+        tag.setTypeface(Typeface.DEFAULT_BOLD);
+        tag.setPadding(0, 0, 0, dp(6));
+        copy.addView(tag, new LinearLayout.LayoutParams(-2, -2));
 
         TextView title = new TextView(requireContext());
         title.setText("90天搞定汉语口语");
-        title.setTextSize(27);
+        title.setTextSize(28);
         title.setTextColor(Color.WHITE);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setIncludeFontPadding(false);
-        title.setPadding(0, 0, 0, dp(9));
+        title.setPadding(0, 0, 0, dp(8));
         copy.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout bottomRow = new LinearLayout(requireContext());
@@ -198,23 +182,12 @@ public class LearningFragment extends Fragment {
         bottomRow.setGravity(Gravity.CENTER_VERTICAL);
         copy.addView(bottomRow, new LinearLayout.LayoutParams(-1, -2));
 
-        LinearLayout textBox = new LinearLayout(requireContext());
-        textBox.setOrientation(LinearLayout.VERTICAL);
-        bottomRow.addView(textBox, new LinearLayout.LayoutParams(0, -2, 1f));
-
         TextView sub = new TextView(requireContext());
         sub.setText("每天10分钟，与AI语伴沉浸对练");
-        sub.setTextSize(13);
+        sub.setTextSize(14);
         sub.setTextColor(0xE6FFFFFF);
         sub.setIncludeFontPadding(false);
-        textBox.addView(sub, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView mini = new TextView(requireContext());
-        mini.setText("拼音 · 单词 · 口语 · 句型");
-        mini.setTextSize(11);
-        mini.setTextColor(0xBFFFFFFF);
-        mini.setPadding(0, dp(4), 0, 0);
-        textBox.addView(mini, new LinearLayout.LayoutParams(-1, -2));
+        bottomRow.addView(sub, new LinearLayout.LayoutParams(0, -2, 1f));
 
         TextView start = new TextView(requireContext());
         start.setText("报名");
@@ -222,57 +195,44 @@ public class LearningFragment extends Fragment {
         start.setTypeface(Typeface.DEFAULT_BOLD);
         start.setTextColor(COLOR_TEXT);
         start.setGravity(Gravity.CENTER);
-        start.setBackground(rounded(0xF5FFFFFF, dp(20), 0x80FFFFFF, 1));
+        // 高级质感的报名按钮
+        start.setBackground(rounded(Color.WHITE, dp(20), Color.TRANSPARENT, 0));
         bindClick(start, () -> Toast.makeText(requireContext(), "进入报名页面", Toast.LENGTH_SHORT).show());
         attachNativePressAnimator(start, 2, 5);
+        bottomRow.addView(start, new LinearLayout.LayoutParams(dp(76), dp(36)));
 
-        LinearLayout.LayoutParams startLp = new LinearLayout.LayoutParams(dp(78), dp(40));
-        startLp.setMargins(dp(12), 0, 0, 0);
-        bottomRow.addView(start, startLp);
-
+        // 右上角菜单
         FrameLayout.LayoutParams menuLp = new FrameLayout.LayoutParams(dp(46), dp(46), Gravity.END | Gravity.TOP);
-        menuLp.setMargins(0, dp(20), dp(14), 0);
+        menuLp.setMargins(0, dp(16), dp(12), 0);
         hero.addView(createMenuHandle(), menuLp);
 
         return hero;
     }
 
-    private void addHeroGlow(FrameLayout hero, int gravity, int color, int marginX, int marginY, int sizeDp) {
-        View glow = new View(requireContext());
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.OVAL);
-        drawable.setColor(color);
-        glow.setBackground(drawable);
-
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(dp(sizeDp), dp(sizeDp), gravity);
-        lp.setMargins(dp(Math.max(marginX, 0)), dp(Math.max(marginY, 0)),
-                dp(Math.max(-marginX, 0)), dp(Math.max(-marginY, 0)));
-        hero.addView(glow, lp);
-    }
-
     private View createMenuHandle() {
         FrameLayout box = new FrameLayout(requireContext());
-        box.setBackground(rounded(0x30FFFFFF, dp(16), 0x36FFFFFF, 1));
+        // 完全去除背景框
+        box.setBackground(null);
         bindClick(box, this::openDrawer);
-        attachNativePressAnimator(box, 1, 4);
 
         LinearLayout bars = new LinearLayout(requireContext());
         bars.setOrientation(LinearLayout.VERTICAL);
         bars.setGravity(Gravity.CENTER);
         box.addView(bars, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
 
-        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(22), dp(3)));
+        // 统一为等长、小巧精致的线条
+        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(18), dp(2)));
         addSpace(bars, 5);
-        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(18), dp(3)));
+        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(18), dp(2)));
         addSpace(bars, 5);
-        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(13), dp(3)));
+        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(18), dp(2)));
 
         return box;
     }
 
     private View menuLine() {
         View view = new View(requireContext());
-        view.setBackground(rounded(0xF2FFFFFF, dp(2), 0x26000000, 1));
+        view.setBackground(rounded(Color.WHITE, dp(1), Color.TRANSPARENT, 0));
         return view;
     }
 
@@ -285,19 +245,19 @@ public class LearningFragment extends Fragment {
                 () -> AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")),
                 new LinearLayout.LayoutParams(0, -1, 1f));
 
-        addHorizontalGap(row, 10);
+        addHorizontalGap(row, 12);
 
         row.addView(toolCard(FA_BOOK, "阅", 0xFF8B5CF6, "电子书",
                 this::showBookPage),
                 new LinearLayout.LayoutParams(0, -1, 1f));
 
-        addHorizontalGap(row, 10);
+        addHorizontalGap(row, 12);
 
         row.addView(toolCard(FA_MIC, "伴", 0xFF10B981, "口语伴",
                 this::showPromptScenes),
                 new LinearLayout.LayoutParams(0, -1, 1f));
 
-        addHorizontalGap(row, 10);
+        addHorizontalGap(row, 12);
 
         row.addView(toolCard(FA_PEN, "练", 0xFFF59E0B, "练习题",
                 () -> Toast.makeText(requireContext(), "练习题后续接入", Toast.LENGTH_SHORT).show()),
@@ -310,21 +270,23 @@ public class LearningFragment extends Fragment {
         LinearLayout card = new LinearLayout(requireContext());
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
-        card.setPadding(dp(6), dp(10), dp(6), dp(10));
-        card.setBackground(glassBg(accentColor, dp(18), 0.06f));
+        card.setPadding(dp(6), dp(14), dp(6), dp(14));
+        
+        // 使用非常清透且带有微弱边框的纯白毛玻璃效果，清晰且高级
+        card.setBackground(rounded(0xFAFFFFFF, dp(16), 0xFFE5E7EB, dp(1)));
+        card.setElevation(dp(2)); // 微弱投影增加立体感
         bindClick(card, click);
         attachNativePressAnimator(card, 2, 5);
 
         TextView iconView = new TextView(requireContext());
         iconView.setText(faTypeface != null ? faCode : fallbackText);
-        iconView.setTextSize(faTypeface != null ? 17 : 18);
+        iconView.setTextSize(faTypeface != null ? 22 : 18);
         iconView.setTextColor(accentColor);
         iconView.setTypeface(faTypeface != null ? faTypeface : Typeface.DEFAULT_BOLD);
         iconView.setGravity(Gravity.CENTER);
-        iconView.setBackground(glassBg(accentColor, dp(16), 0.14f));
 
-        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(43), dp(43));
-        iconLp.setMargins(0, 0, 0, dp(8));
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(-2, -2);
+        iconLp.setMargins(0, 0, 0, dp(10));
         card.addView(iconView, iconLp);
 
         TextView t = new TextView(requireContext());
@@ -333,7 +295,6 @@ public class LearningFragment extends Fragment {
         t.setTextColor(COLOR_TEXT);
         t.setTypeface(Typeface.DEFAULT_BOLD);
         t.setGravity(Gravity.CENTER);
-        t.setIncludeFontPadding(false);
         card.addView(t, new LinearLayout.LayoutParams(-1, -2));
 
         return card;
@@ -345,7 +306,7 @@ public class LearningFragment extends Fragment {
         header.setOrientation(LinearLayout.HORIZONTAL);
 
         LinearLayout.LayoutParams headerLp = new LinearLayout.LayoutParams(-1, -2);
-        headerLp.setMargins(0, dp(10), 0, dp(13));
+        headerLp.setMargins(0, dp(14), 0, dp(12));
         parent.addView(header, headerLp);
 
         TextView titleView = new TextView(requireContext());
@@ -358,16 +319,13 @@ public class LearningFragment extends Fragment {
 
         if (more != null) {
             TextView moreView = new TextView(requireContext());
-            moreView.setText(more.contains("›") ? more : more + " ›");
-            moreView.setTextSize(13);
-            moreView.setTextColor(COLOR_SUB);
-            moreView.setTypeface(Typeface.DEFAULT_BOLD);
+            moreView.setText(more);
+            moreView.setTextSize(14);
+            moreView.setTextColor(COLOR_SUB); // 清爽的灰色，不要背景框
             moreView.setGravity(Gravity.CENTER);
-            moreView.setPadding(dp(10), 0, dp(10), 0);
-            moreView.setBackground(glassBg(accentColorForTitle(title), dp(14), 0.05f));
+            moreView.setPadding(dp(4), dp(4), 0, dp(4));
             bindClick(moreView, () -> openMorePage(title));
-            attachNativePressAnimator(moreView, 1, 3);
-            header.addView(moreView, new LinearLayout.LayoutParams(-2, dp(28)));
+            header.addView(moreView, new LinearLayout.LayoutParams(-2, -2));
         }
 
         LinearLayout grid = new LinearLayout(requireContext());
@@ -381,7 +339,7 @@ public class LearningFragment extends Fragment {
             LinearLayout row = new LinearLayout(requireContext());
             row.setOrientation(LinearLayout.HORIZONTAL);
 
-            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(84));
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
             rowLp.setMargins(0, 0, 0, dp(12));
             grid.addView(row, rowLp);
 
@@ -393,61 +351,63 @@ public class LearningFragment extends Fragment {
                     View empty = new View(requireContext());
                     row.addView(empty, new LinearLayout.LayoutParams(0, -1, 1f));
                 }
-
                 if (i < columns - 1) {
                     addHorizontalGap(row, 12);
                 }
             }
         }
-
         addSpace(parent, 10);
     }
 
     private View smallCard(CardSpec spec) {
         int accent = accentColorFor(spec.id);
 
-        FrameLayout card = new FrameLayout(requireContext());
-        card.setBackground(glassBg(accent, dp(18), 0.055f));
+        LinearLayout card = new LinearLayout(requireContext());
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(14), dp(16), dp(14), dp(16));
+        
+        // 清晰、深沉的卡片底色（类毛玻璃白），去除所有多余边条和箭头
+        card.setBackground(rounded(0xFAFFFFFF, dp(14), 0xFFE5E7EB, dp(1)));
+        card.setElevation(dp(1.5f));
         bindClick(card, () -> onSmallCardClick(spec));
-        attachNativePressAnimator(card, 2, 5);
+        attachNativePressAnimator(card, 1.5f, 4);
 
-        View accentBar = new View(requireContext());
-        accentBar.setBackground(rounded(accent, dp(3), Color.TRANSPARENT, 0));
-        FrameLayout.LayoutParams barLp = new FrameLayout.LayoutParams(dp(4), dp(42), Gravity.START | Gravity.CENTER_VERTICAL);
-        barLp.setMargins(dp(12), 0, 0, 0);
-        card.addView(accentBar, barLp);
+        // 左侧 FA 图标
+        TextView icon = new TextView(requireContext());
+        icon.setText(faTypeface != null ? spec.faIcon : "•");
+        icon.setTextSize(faTypeface != null ? 16 : 18);
+        icon.setTextColor(accent);
+        icon.setTypeface(faTypeface != null ? faTypeface : Typeface.DEFAULT_BOLD);
+        icon.setGravity(Gravity.CENTER);
+        // 图标背景，带10%透明度的主题色
+        icon.setBackground(rounded((accent & 0x00FFFFFF) | 0x1A000000, dp(10), Color.TRANSPARENT, 0));
+        card.addView(icon, new LinearLayout.LayoutParams(dp(36), dp(36)));
 
-        LinearLayout content = new LinearLayout(requireContext());
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
-        content.setPadding(dp(25), 0, dp(34), 0);
-        card.addView(content, new FrameLayout.LayoutParams(-1, -1));
+        // 右侧文字
+        LinearLayout textBox = new LinearLayout(requireContext());
+        textBox.setOrientation(LinearLayout.VERTICAL);
+        textBox.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(-1, -2);
+        textLp.setMargins(dp(12), 0, 0, 0);
+        card.addView(textBox, textLp);
 
         TextView title = new TextView(requireContext());
         title.setText(spec.title);
-        title.setTextSize(16);
+        title.setTextSize(15);
         title.setTextColor(COLOR_TEXT);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setSingleLine(true);
         title.setIncludeFontPadding(false);
-        content.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        textBox.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         TextView desc = new TextView(requireContext());
         desc.setText(spec.desc);
         desc.setTextSize(12);
         desc.setTextColor(COLOR_SUB);
         desc.setSingleLine(true);
-        desc.setPadding(0, dp(6), 0, 0);
-        content.addView(desc, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView arrow = new TextView(requireContext());
-        arrow.setText("›");
-        arrow.setTextSize(22);
-        arrow.setTextColor(0x52000000);
-        arrow.setGravity(Gravity.CENTER);
-        FrameLayout.LayoutParams arrowLp = new FrameLayout.LayoutParams(dp(24), dp(32), Gravity.END | Gravity.CENTER_VERTICAL);
-        arrowLp.setMargins(0, 0, dp(8), 0);
-        card.addView(arrow, arrowLp);
+        desc.setPadding(0, dp(4), 0, 0);
+        textBox.addView(desc, new LinearLayout.LayoutParams(-1, -2));
 
         return card;
     }
@@ -456,7 +416,7 @@ public class LearningFragment extends Fragment {
         LinearLayout panel = new LinearLayout(requireContext());
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(20), dp(40), dp(20), dp(20));
-        panel.setBackground(verticalGradient(0xFFFFFFFF, 0xFFF7F8FB, 0, Color.TRANSPARENT, 0));
+        panel.setBackgroundColor(Color.WHITE);
         panel.setClickable(true);
 
         TextView title = new TextView(requireContext());
@@ -523,18 +483,17 @@ public class LearningFragment extends Fragment {
         LinearLayout card = new LinearLayout(requireContext());
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(14), dp(13), dp(10), dp(13));
-        card.setBackground(glassBg(accentColor, dp(16), 0.045f));
+        card.setPadding(dp(14), dp(14), dp(14), dp(14));
+        card.setBackground(rounded(0xFFF9FAFB, dp(12), Color.TRANSPARENT, 0));
         bindClick(card, () -> {
             closeDrawer();
             if (click != null) click.run();
         });
-        attachNativePressAnimator(card, 1, 4);
 
         View dot = new View(requireContext());
-        dot.setBackground(rounded(accentColor, dp(5), Color.TRANSPARENT, 0));
-        LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dp(9), dp(9));
-        dotLp.setMargins(0, 0, dp(10), 0);
+        dot.setBackground(rounded(accentColor, dp(4), Color.TRANSPARENT, 0));
+        LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dp(8), dp(8));
+        dotLp.setMargins(0, 0, dp(12), 0);
         card.addView(dot, dotLp);
 
         LinearLayout textBox = new LinearLayout(requireContext());
@@ -553,15 +512,8 @@ public class LearningFragment extends Fragment {
         d.setText(desc);
         d.setTextSize(12);
         d.setTextColor(COLOR_SUB);
-        d.setPadding(0, dp(5), 0, 0);
+        d.setPadding(0, dp(4), 0, 0);
         textBox.addView(d, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView arrow = new TextView(requireContext());
-        arrow.setText("›");
-        arrow.setTextSize(24);
-        arrow.setTextColor(0xFFB0B0B5);
-        arrow.setGravity(Gravity.CENTER);
-        card.addView(arrow, new LinearLayout.LayoutParams(dp(24), dp(40)));
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, 0, 0, dp(10));
@@ -719,9 +671,7 @@ public class LearningFragment extends Fragment {
                 int oldSize = edgeSizeField.getInt(leftDragger);
                 int newSize = Math.max(oldSize, edgeSizePx);
                 edgeSizeField.setInt(leftDragger, newSize);
-            } catch (Throwable ignored) {
-                // AndroidX 内部字段变动时不崩溃，保持默认手势区域
-            }
+            } catch (Throwable ignored) {}
         });
     }
 
@@ -738,48 +688,16 @@ public class LearningFragment extends Fragment {
         return id != 0 ? id : fallback;
     }
 
-    private int accentColorForTitle(String title) {
-        if ("拼音".equals(title)) return 0xFF3B82F6;
-        if ("单词".equals(title)) return 0xFF8B5CF6;
-        if ("口语".equals(title)) return 0xFFF97316;
-        if ("句型".equals(title)) return 0xFF10B981;
-        if ("语法".equals(title)) return 0xFFB45309;
-        return 0xFF64748B;
-    }
-
     private int accentColorFor(String id) {
-        if (id == null) return 0xFF64748B;
+        if (id == null) return 0xFF6B7280;
         if (id.startsWith("hsk")) return 0xFF8B5CF6;
         if (id.startsWith("speak")) return 0xFFF97316;
         if (id.startsWith("pattern")) return 0xFF10B981;
-        if (id.startsWith("grammar")) return 0xFFB45309;
+        if (id.startsWith("grammar")) return 0xFFD97706;
         if ("initials".equals(id) || "finals".equals(id) || "whole".equals(id) || "tone".equals(id)) {
-            return 0xFF3B82F6;
+            return 0xFF2563EB;
         }
-        return 0xFF64748B;
-    }
-
-    private GradientDrawable glassBg(int tintColor, float radius, float tintRatio) {
-        int start = blendColor(0xF2FFFFFF, tintColor, tintRatio);
-        int end = blendColor(0xD9FFFFFF, tintColor, tintRatio + 0.03f);
-
-        GradientDrawable drawable = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                new int[]{start, end}
-        );
-        drawable.setCornerRadius(radius);
-        drawable.setStroke(dp(1), COLOR_CARD_STROKE);
-        return drawable;
-    }
-
-    private GradientDrawable heroGlassBg(float radius) {
-        GradientDrawable drawable = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                new int[]{0x33FFFFFF, 0x1AFFFFFF}
-        );
-        drawable.setCornerRadius(radius);
-        drawable.setStroke(dp(1), 0x40FFFFFF);
-        return drawable;
+        return 0xFF6B7280;
     }
 
     private GradientDrawable verticalGradient(int start, int end, float radius, int strokeColor, int strokeWidth) {
@@ -798,15 +716,6 @@ public class LearningFragment extends Fragment {
         drawable.setCornerRadius(radius);
         if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
         return drawable;
-    }
-
-    private int blendColor(int base, int overlay, float ratio) {
-        float safeRatio = Math.max(0f, Math.min(1f, ratio));
-        int a = Color.alpha(base);
-        int r = (int) (Color.red(base) * (1 - safeRatio) + Color.red(overlay) * safeRatio);
-        int g = (int) (Color.green(base) * (1 - safeRatio) + Color.green(overlay) * safeRatio);
-        int b = (int) (Color.blue(base) * (1 - safeRatio) + Color.blue(overlay) * safeRatio);
-        return Color.argb(a, r, g, b);
     }
 
     private void addSpace(LinearLayout parent, int heightDp) {
@@ -831,11 +740,13 @@ public class LearningFragment extends Fragment {
         final String title;
         final String desc;
         final String id;
+        final String faIcon;
 
-        CardSpec(String title, String desc, String id) {
+        CardSpec(String title, String desc, String id, String faIcon) {
             this.title = title;
             this.desc = desc;
             this.id = id;
+            this.faIcon = faIcon;
         }
     }
 }
