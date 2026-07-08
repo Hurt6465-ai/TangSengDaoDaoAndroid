@@ -1,5 +1,8 @@
 package com.chat.learning;
 
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
+import android.animation.StateListAnimator;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -12,6 +15,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -31,23 +35,33 @@ import com.chat.userscript.ScriptManagerActivity;
 import java.lang.reflect.Field;
 
 /**
- * 学习首页：高端极简课程风格。
- * 保留报名 Banner，恢复大手势 Drawer，主页只做学习入口和工具入口。
+ * 学习首页：课程 Banner + 轻玻璃卡片 + 分组侧边栏。
+ * 说明：
+ * 1. 主页先保持静态数据，后续可再拆 Repository/JSON。
+ * 2. Font Awesome 采用兼容模式：assets/fonts/fa-solid-900.ttf 存在则显示图标，否则自动回退汉字。
+ * 3. 点击反馈使用 StateListAnimator，更接近原生按压动效。
  */
 public class LearningFragment extends Fragment {
-    private static final int COLOR_BG = 0xFFF5F6F8;
+    private static final int COLOR_BG_TOP = 0xFFF8FAFD;
+    private static final int COLOR_BG_BOTTOM = 0xFFEFF3F8;
     private static final int COLOR_TEXT = 0xFF1D1D1F;
-    private static final int COLOR_SUB = 0xFF86868B;
+    private static final int COLOR_SUB = 0xFF7A7F87;
+    private static final int COLOR_CARD = 0xEFFFFFFF;
+    private static final int COLOR_CARD_STROKE = 0xCCFFFFFF;
+    private static final int COLOR_SOFT_LINE = 0xFFE7EAF0;
 
     private DrawerLayout drawerLayout;
     private long lastCardClickTime = 0L;
+    private Typeface faTypeface;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        faTypeface = loadFontAwesomeTypeface();
+
         drawerLayout = new DrawerLayout(requireContext());
-        drawerLayout.setBackgroundColor(COLOR_BG);
-        drawerLayout.setScrimColor(0x80000000);
-        drawerLayout.setDrawerElevation(dp(16));
+        drawerLayout.setBackground(verticalGradient(COLOR_BG_TOP, COLOR_BG_BOTTOM, 0, Color.TRANSPARENT, 0));
+        drawerLayout.setScrimColor(0x82000000);
+        drawerLayout.setDrawerElevation(dp(18));
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, GravityCompat.START);
 
         View main = createMainPage();
@@ -58,7 +72,8 @@ public class LearningFragment extends Fragment {
         drawerLp.gravity = GravityCompat.START;
         drawerLayout.addView(drawer, drawerLp);
 
-        widenDrawerGestureArea(dp(72));
+        // 默认 Drawer 边缘手势太窄，学习页需要更容易从左侧滑出。
+        widenDrawerGestureArea(dp(76));
 
         return drawerLayout;
     }
@@ -67,60 +82,60 @@ public class LearningFragment extends Fragment {
         ScrollView scrollView = new ScrollView(requireContext());
         scrollView.setFillViewport(true);
         scrollView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        scrollView.setBackgroundColor(COLOR_BG);
+        scrollView.setBackground(verticalGradient(COLOR_BG_TOP, COLOR_BG_BOTTOM, 0, Color.TRANSPARENT, 0));
 
         LinearLayout root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(0, 0, 0, dp(40));
+        root.setPadding(0, 0, 0, dp(42));
         scrollView.addView(root, new ScrollView.LayoutParams(-1, -2));
 
-        root.addView(createHero(), new LinearLayout.LayoutParams(-1, dp(240)));
+        root.addView(createHero(), new LinearLayout.LayoutParams(-1, dp(244)));
 
         LinearLayout content = new LinearLayout(requireContext());
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(20), dp(20), 0);
+        content.setPadding(dp(18), dp(18), dp(18), 0);
         root.addView(content, new LinearLayout.LayoutParams(-1, -2));
 
-        content.addView(createToolsRow(), new LinearLayout.LayoutParams(-1, dp(100)));
+        content.addView(createToolsRow(), new LinearLayout.LayoutParams(-1, dp(104)));
         addSpace(content, 24);
 
         addSection(content, "拼音", null,
                 new CardSpec[]{
-                        new CardSpec("声母", "b p m f", "initials", new int[]{0xFFF6F9FF, 0xFFEBF1FF}),
-                        new CardSpec("韵母", "a o e i u", "finals", new int[]{0xFFF6F9FF, 0xFFEBF1FF}),
-                        new CardSpec("整体", "zhi chi shi", "whole", new int[]{0xFFF6F9FF, 0xFFEBF1FF}),
-                        new CardSpec("声调", "一二三四声", "tone", new int[]{0xFFF6F9FF, 0xFFEBF1FF})
+                        new CardSpec("声母", "b p m f", "initials", 0xFF3B82F6, 0xFFEAF2FF),
+                        new CardSpec("韵母", "a o e i u", "finals", 0xFF3B82F6, 0xFFEAF2FF),
+                        new CardSpec("整体", "zhi chi shi", "whole", 0xFF3B82F6, 0xFFEAF2FF),
+                        new CardSpec("声调", "一二三四声", "tone", 0xFF3B82F6, 0xFFEAF2FF)
                 });
 
         addSection(content, "单词", "更多",
                 new CardSpec[]{
-                        new CardSpec("HSK 1", "150 词", "hsk1", new int[]{0xFFFBF8FF, 0xFFF1E8FF}),
-                        new CardSpec("HSK 2", "300 词", "hsk2", new int[]{0xFFFBF8FF, 0xFFF1E8FF}),
-                        new CardSpec("HSK 3", "600 词", "hsk3", new int[]{0xFFFBF8FF, 0xFFF1E8FF})
+                        new CardSpec("HSK 1", "150 词", "hsk1", 0xFF8B5CF6, 0xFFF2ECFF),
+                        new CardSpec("HSK 2", "300 词", "hsk2", 0xFF8B5CF6, 0xFFF2ECFF),
+                        new CardSpec("HSK 3", "600 词", "hsk3", 0xFF8B5CF6, 0xFFF2ECFF)
                 });
 
         addSection(content, "口语", "更多",
                 new CardSpec[]{
-                        new CardSpec("打招呼", "日常开场", "speak_hello", new int[]{0xFFFFF8F6, 0xFFFFEBE3}),
-                        new CardSpec("点餐", "餐厅购物", "speak_food", new int[]{0xFFFFF8F6, 0xFFFFEBE3}),
-                        new CardSpec("求职", "面试工作", "speak_job", new int[]{0xFFFFF8F6, 0xFFFFEBE3}),
-                        new CardSpec("购物", "买单砍价", "speak_shop", new int[]{0xFFFFF8F6, 0xFFFFEBE3})
+                        new CardSpec("打招呼", "日常开场", "speak_hello", 0xFFF97316, 0xFFFFF0E8),
+                        new CardSpec("点餐", "餐厅购物", "speak_food", 0xFFF97316, 0xFFFFF0E8),
+                        new CardSpec("求职", "面试工作", "speak_job", 0xFFF97316, 0xFFFFF0E8),
+                        new CardSpec("购物", "买单砍价", "speak_shop", 0xFFF97316, 0xFFFFF0E8)
                 });
 
         addSection(content, "句型", "更多",
                 new CardSpec[]{
-                        new CardSpec("我想…", "表达需求", "pattern_want", new int[]{0xFFF4FBF7, 0xFFE5F6EC}),
-                        new CardSpec("可以吗", "请求帮助", "pattern_can", new int[]{0xFFF4FBF7, 0xFFE5F6EC}),
-                        new CardSpec("怎么…", "询问方法", "pattern_how", new int[]{0xFFF4FBF7, 0xFFE5F6EC}),
-                        new CardSpec("为什么", "询问原因", "pattern_why", new int[]{0xFFF4FBF7, 0xFFE5F6EC})
+                        new CardSpec("我想…", "表达需求", "pattern_want", 0xFF22A06B, 0xFFEAF8F1),
+                        new CardSpec("可以吗", "请求帮助", "pattern_can", 0xFF22A06B, 0xFFEAF8F1),
+                        new CardSpec("怎么…", "询问方法", "pattern_how", 0xFF22A06B, 0xFFEAF8F1),
+                        new CardSpec("为什么", "询问原因", "pattern_why", 0xFF22A06B, 0xFFEAF8F1)
                 });
 
         addSection(content, "语法", "更多",
                 new CardSpec[]{
-                        new CardSpec("了", "完成/变化", "grammar_le", new int[]{0xFFFDF9F2, 0xFFF7EBD8}),
-                        new CardSpec("在", "正在进行", "grammar_zai", new int[]{0xFFFDF9F2, 0xFFF7EBD8}),
-                        new CardSpec("吗/呢", "疑问语气", "grammar_ma", new int[]{0xFFFDF9F2, 0xFFF7EBD8}),
-                        new CardSpec("的/得", "结构助词", "grammar_de", new int[]{0xFFFDF9F2, 0xFFF7EBD8})
+                        new CardSpec("了", "完成/变化", "grammar_le", 0xFFC9892B, 0xFFFFF4E2),
+                        new CardSpec("在", "正在进行", "grammar_zai", 0xFFC9892B, 0xFFFFF4E2),
+                        new CardSpec("吗/呢", "疑问语气", "grammar_ma", 0xFFC9892B, 0xFFFFF4E2),
+                        new CardSpec("的/得", "结构助词", "grammar_de", 0xFFC9892B, 0xFFFFF4E2)
                 });
 
         return scrollView;
@@ -136,8 +151,15 @@ public class LearningFragment extends Fragment {
         hero.addView(bg, new FrameLayout.LayoutParams(-1, -1));
 
         View overlay = new View(requireContext());
-        overlay.setBackground(verticalGradient(0x22000000, 0xD9000000, 0, Color.TRANSPARENT, 0));
+        overlay.setBackground(verticalGradient(0x18000000, 0xE0000000, 0, Color.TRANSPARENT, 0));
         hero.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
+
+        // 轻微玻璃底板，解决文字压在图片上太硬的问题。
+        View glassPanel = new View(requireContext());
+        glassPanel.setBackground(verticalGradient(0x18FFFFFF, 0x08FFFFFF, dp(24), 0x2AFFFFFF, 1));
+        FrameLayout.LayoutParams glassLp = new FrameLayout.LayoutParams(-1, dp(92), Gravity.BOTTOM);
+        glassLp.setMargins(dp(14), 0, dp(14), dp(14));
+        hero.addView(glassPanel, glassLp);
 
         LinearLayout copy = new LinearLayout(requireContext());
         copy.setOrientation(LinearLayout.VERTICAL);
@@ -152,7 +174,7 @@ public class LearningFragment extends Fragment {
         badge.setTypeface(Typeface.DEFAULT_BOLD);
         badge.setGravity(Gravity.CENTER);
         badge.setPadding(dp(10), dp(4), dp(10), dp(4));
-        badge.setBackground(rounded(0x33FFFFFF, dp(12), 0x26FFFFFF, 1));
+        badge.setBackground(rounded(0x30FFFFFF, dp(12), 0x30FFFFFF, 1));
         LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(-2, -2);
         badgeLp.setMargins(0, 0, 0, dp(10));
         copy.addView(badge, badgeLp);
@@ -164,6 +186,7 @@ public class LearningFragment extends Fragment {
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setIncludeFontPadding(false);
         title.setPadding(0, 0, 0, dp(10));
+        title.setShadowLayer(dp(6), 0, dp(2), 0x50000000);
         copy.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout bottomRow = new LinearLayout(requireContext());
@@ -178,7 +201,7 @@ public class LearningFragment extends Fragment {
         TextView sub = new TextView(requireContext());
         sub.setText("每天10分钟，与AI语伴沉浸对练");
         sub.setTextSize(14);
-        sub.setTextColor(0xE6FFFFFF);
+        sub.setTextColor(0xE8FFFFFF);
         sub.setIncludeFontPadding(false);
         textBox.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -195,8 +218,9 @@ public class LearningFragment extends Fragment {
         start.setTypeface(Typeface.DEFAULT_BOLD);
         start.setTextColor(COLOR_TEXT);
         start.setGravity(Gravity.CENTER);
-        start.setBackground(rounded(Color.WHITE, dp(20), 0x33FFFFFF, 1));
-        bindPressClick(start, () -> Toast.makeText(requireContext(), "进入报名页面", Toast.LENGTH_SHORT).show());
+        start.setBackground(rounded(Color.WHITE, dp(20), 0x50FFFFFF, 1));
+        attachPressAnimator(start, dp(1), dp(4));
+        bindClick(start, () -> Toast.makeText(requireContext(), "进入报名页面", Toast.LENGTH_SHORT).show());
 
         LinearLayout.LayoutParams startLp = new LinearLayout.LayoutParams(dp(78), dp(40));
         startLp.setMargins(dp(12), 0, 0, 0);
@@ -211,7 +235,9 @@ public class LearningFragment extends Fragment {
 
     private View createMenuHandle() {
         FrameLayout box = new FrameLayout(requireContext());
-        box.setOnClickListener(v -> openDrawer());
+        box.setBackground(rounded(0x24FFFFFF, dp(16), 0x28FFFFFF, 1));
+        attachPressAnimator(box, dp(0), dp(4));
+        bindClick(box, this::openDrawer);
 
         LinearLayout bars = new LinearLayout(requireContext());
         bars.setOrientation(LinearLayout.VERTICAL);
@@ -229,7 +255,7 @@ public class LearningFragment extends Fragment {
 
     private View menuLine() {
         View view = new View(requireContext());
-        view.setBackground(rounded(0xF2FFFFFF, dp(2), 0x22000000, 1));
+        view.setBackground(rounded(0xF2FFFFFF, dp(2), 0x26000000, 1));
         return view;
     }
 
@@ -238,50 +264,55 @@ public class LearningFragment extends Fragment {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER);
 
-        row.addView(toolCard("译", new int[]{0xFF4FACFE, 0xFF00F2FE}, "AI翻译",
+        row.addView(toolCard("\uf1ab", "译", "AI翻译", 0xFF2F80ED, 0xFFEAF2FF,
                 () -> AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")),
                 new LinearLayout.LayoutParams(0, -1, 1f));
 
         addHorizontalGap(row, 12);
 
-        row.addView(toolCard("阅", new int[]{0xFFA18CD1, 0xFFFBC2EB}, "电子书",
+        row.addView(toolCard("\uf02d", "阅", "电子书", 0xFF8B5CF6, 0xFFF2ECFF,
                 this::showBookPage),
                 new LinearLayout.LayoutParams(0, -1, 1f));
 
         addHorizontalGap(row, 12);
 
-        row.addView(toolCard("伴", new int[]{0xFF43E97B, 0xFF38F9D7}, "口语伴",
+        row.addView(toolCard("\uf130", "伴", "口语伴", 0xFF22A06B, 0xFFEAF8F1,
                 this::showPromptScenes),
                 new LinearLayout.LayoutParams(0, -1, 1f));
 
         addHorizontalGap(row, 12);
 
-        row.addView(toolCard("练", new int[]{0xFFFFB75E, 0xFFED8F03}, "练习题",
+        row.addView(toolCard("\uf044", "练", "练习题", 0xFFF97316, 0xFFFFF0E8,
                 () -> Toast.makeText(requireContext(), "练习题后续接入", Toast.LENGTH_SHORT).show()),
                 new LinearLayout.LayoutParams(0, -1, 1f));
 
         return row;
     }
 
-    private View toolCard(String charIcon, int[] gradientColors, String title, Runnable click) {
-        LinearLayout card = new LinearLayout(requireContext());
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER);
-        card.setBackground(rounded(Color.WHITE, dp(16), 0xFFE8E8ED, 1));
+    private View toolCard(String faIcon, String fallbackText, String title, int accentColor, int softBgColor, Runnable click) {
+        FrameLayout card = new FrameLayout(requireContext());
+        card.setBackground(glassBackground(dp(18)));
         card.setElevation(dp(2));
-        bindPressClick(card, click);
+        attachPressAnimator(card, dp(1), dp(5));
+        bindClick(card, click);
+
+        LinearLayout content = new LinearLayout(requireContext());
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER);
+        content.setPadding(dp(6), dp(10), dp(6), dp(10));
+        card.addView(content, new FrameLayout.LayoutParams(-1, -1));
 
         TextView iconView = new TextView(requireContext());
-        iconView.setText(charIcon);
-        iconView.setTextSize(18);
-        iconView.setTextColor(Color.WHITE);
-        iconView.setTypeface(Typeface.DEFAULT_BOLD);
+        iconView.setText(getIconText(faIcon, fallbackText));
+        iconView.setTextSize(faTypeface != null ? 18 : 17);
+        iconView.setTextColor(accentColor);
+        iconView.setTypeface(faTypeface != null ? faTypeface : Typeface.DEFAULT_BOLD);
         iconView.setGravity(Gravity.CENTER);
-        iconView.setBackground(diagonalGradient(gradientColors[0], gradientColors[1], dp(14), Color.TRANSPARENT, 0));
+        iconView.setBackground(rounded(softBgColor, dp(15), 0xAAFFFFFF, 1));
 
         LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(44), dp(44));
-        iconLp.setMargins(0, dp(12), 0, dp(8));
-        card.addView(iconView, iconLp);
+        iconLp.setMargins(0, 0, 0, dp(8));
+        content.addView(iconView, iconLp);
 
         TextView t = new TextView(requireContext());
         t.setText(title);
@@ -289,9 +320,10 @@ public class LearningFragment extends Fragment {
         t.setTextColor(COLOR_TEXT);
         t.setTypeface(Typeface.DEFAULT_BOLD);
         t.setGravity(Gravity.CENTER);
-        t.setPadding(0, 0, 0, dp(12));
-        card.addView(t, new LinearLayout.LayoutParams(-1, -2));
+        t.setIncludeFontPadding(false);
+        content.addView(t, new LinearLayout.LayoutParams(-1, -2));
 
+        addGlassHighlight(card);
         return card;
     }
 
@@ -309,6 +341,7 @@ public class LearningFragment extends Fragment {
         titleView.setTextSize(20);
         titleView.setTextColor(COLOR_TEXT);
         titleView.setTypeface(Typeface.DEFAULT_BOLD);
+        titleView.setIncludeFontPadding(false);
         header.addView(titleView, new LinearLayout.LayoutParams(0, -2, 1f));
 
         if (more != null) {
@@ -319,8 +352,9 @@ public class LearningFragment extends Fragment {
             moreView.setTypeface(Typeface.DEFAULT_BOLD);
             moreView.setGravity(Gravity.CENTER);
             moreView.setPadding(dp(10), dp(4), dp(10), dp(4));
-            moreView.setBackground(rounded(Color.WHITE, dp(13), 0xFFE8E8ED, 1));
-            bindPressClick(moreView, () -> openMorePage(title));
+            moreView.setBackground(glassBackground(dp(14)));
+            attachPressAnimator(moreView, dp(0), dp(3));
+            bindClick(moreView, () -> openMorePage(title));
             header.addView(moreView, new LinearLayout.LayoutParams(-2, dp(28)));
         }
 
@@ -335,7 +369,7 @@ public class LearningFragment extends Fragment {
             LinearLayout row = new LinearLayout(requireContext());
             row.setOrientation(LinearLayout.HORIZONTAL);
 
-            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(84));
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(86));
             rowLp.setMargins(0, 0, 0, dp(12));
             grid.addView(row, rowLp);
 
@@ -359,14 +393,25 @@ public class LearningFragment extends Fragment {
 
     private View smallCard(CardSpec spec) {
         FrameLayout card = new FrameLayout(requireContext());
-        card.setBackground(diagonalGradient(spec.bgColors[0], spec.bgColors[1], dp(16), 0xFFE8EAEE, 1));
+        card.setBackground(glassBackground(dp(18)));
         card.setElevation(dp(1.5f));
-        bindPressClick(card, () -> onSmallCardClick(spec));
+        attachPressAnimator(card, dp(1), dp(4));
+        bindClick(card, () -> onSmallCardClick(spec));
+
+        View tint = new View(requireContext());
+        tint.setBackground(diagonalGradient(spec.softBgColor, 0x00FFFFFF, dp(18), Color.TRANSPARENT, 0));
+        card.addView(tint, new FrameLayout.LayoutParams(-1, -1));
+
+        View accent = new View(requireContext());
+        accent.setBackground(rounded(spec.accentColor, dp(2), Color.TRANSPARENT, 0));
+        FrameLayout.LayoutParams accentLp = new FrameLayout.LayoutParams(dp(4), dp(42), Gravity.START | Gravity.CENTER_VERTICAL);
+        accentLp.setMargins(dp(12), 0, 0, 0);
+        card.addView(accent, accentLp);
 
         LinearLayout content = new LinearLayout(requireContext());
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
-        content.setPadding(dp(16), 0, dp(34), 0);
+        content.setPadding(dp(26), 0, dp(34), 0);
         card.addView(content, new FrameLayout.LayoutParams(-1, -1));
 
         TextView title = new TextView(requireContext());
@@ -396,6 +441,7 @@ public class LearningFragment extends Fragment {
         arrowLp.setMargins(0, 0, dp(8), 0);
         card.addView(arrow, arrowLp);
 
+        addGlassHighlight(card);
         return card;
     }
 
@@ -403,7 +449,7 @@ public class LearningFragment extends Fragment {
         LinearLayout panel = new LinearLayout(requireContext());
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(20), dp(40), dp(20), dp(20));
-        panel.setBackgroundColor(Color.WHITE);
+        panel.setBackground(verticalGradient(0xFFFFFFFF, 0xFFF6F8FB, 0, Color.TRANSPARENT, 0));
         panel.setClickable(true);
 
         TextView title = new TextView(requireContext());
@@ -415,12 +461,12 @@ public class LearningFragment extends Fragment {
         panel.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         TextView sub = new TextView(requireContext());
-        sub.setText("探索扩展工具与脚本");
+        sub.setText("探索 AI、语音和扩展工具");
         sub.setTextSize(14);
         sub.setTextColor(COLOR_SUB);
 
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
-        subLp.setMargins(0, dp(6), 0, dp(24));
+        subLp.setMargins(0, dp(6), 0, dp(22));
         panel.addView(sub, subLp);
 
         ScrollView scroll = new ScrollView(requireContext());
@@ -430,23 +476,22 @@ public class LearningFragment extends Fragment {
         list.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(list, new ScrollView.LayoutParams(-1, -2));
 
-        list.addView(drawerCard("DeepSeek 翻译", "中缅互译、语法解释", () ->
+        addDrawerGroupTitle(list, "AI 助手");
+        list.addView(drawerCard("DeepSeek 翻译", "中缅互译、语法解释", 0xFF2F80ED, () ->
                 AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")));
-
-        list.addView(drawerCard("886.best", "国内学习 AI 入口", () ->
+        list.addView(drawerCard("886.best", "国内学习 AI 入口", 0xFF22A06B, () ->
                 AiScriptWebActivity.open(requireContext(), "886.best", "https://886.best")));
-
-        list.addView(drawerCard("千问国内版", "qianwen.com", () ->
+        list.addView(drawerCard("千问国内版", "qianwen.com", 0xFFF97316, () ->
                 AiScriptWebActivity.open(requireContext(), "千问国内版", "https://www.qianwen.com/")));
-
-        list.addView(drawerCard("Qwen 国际版", "chat.qwen.ai", () ->
+        list.addView(drawerCard("Qwen 国际版", "chat.qwen.ai", 0xFF8B5CF6, () ->
                 AiScriptWebActivity.open(requireContext(), "Qwen 国际版", "https://chat.qwen.ai/")));
 
-        list.addView(drawerCard("语音设置", "WKSpeech 引擎配置", this::openSpeechSettings));
+        addDrawerGroupTitle(list, "学习工具");
+        list.addView(drawerCard("语音设置", "WKSpeech 引擎配置", 0xFF0891B2, this::openSpeechSettings));
+        list.addView(drawerCard("口语 Prompt", "生活场景对话指令", 0xFF22A06B, this::showPromptScenes));
 
-        list.addView(drawerCard("口语 Prompt", "生活场景对话指令", this::showPromptScenes));
-
-        list.addView(drawerCard("脚本中心", "自定义扩展功能", () ->
+        addDrawerGroupTitle(list, "扩展功能");
+        list.addView(drawerCard("脚本中心", "自定义扩展功能", 0xFF64748B, () ->
                 startActivity(new Intent(requireContext(), ScriptManagerActivity.class))));
 
         panel.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
@@ -454,21 +499,41 @@ public class LearningFragment extends Fragment {
         return panel;
     }
 
-    private View drawerCard(String title, String desc, Runnable click) {
+    private void addDrawerGroupTitle(LinearLayout parent, String text) {
+        TextView title = new TextView(requireContext());
+        title.setText(text);
+        title.setTextSize(12);
+        title.setTextColor(0xFF9AA0A8);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        title.setIncludeFontPadding(false);
+        title.setPadding(dp(2), dp(10), 0, dp(8));
+        parent.addView(title, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private View drawerCard(String title, String desc, int accentColor, Runnable click) {
         LinearLayout card = new LinearLayout(requireContext());
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(15), dp(14), dp(10), dp(14));
-        card.setBackground(rounded(COLOR_BG, dp(14), Color.TRANSPARENT, 0));
+        card.setPadding(dp(14), dp(13), dp(10), dp(13));
+        card.setBackground(glassBackground(dp(15)));
+        card.setElevation(dp(1));
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.setMargins(0, 0, 0, dp(10));
         card.setLayoutParams(lp);
 
-        bindPressClick(card, () -> {
+        attachPressAnimator(card, dp(0), dp(3));
+        bindClick(card, () -> {
             closeDrawer();
             if (click != null) click.run();
         });
+
+        View dot = new View(requireContext());
+        dot.setBackground(rounded(accentColor, dp(4), Color.TRANSPARENT, 0));
+        LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dp(8), dp(8));
+        dotLp.setMargins(0, 0, dp(12), 0);
+        card.addView(dot, dotLp);
 
         LinearLayout textBox = new LinearLayout(requireContext());
         textBox.setOrientation(LinearLayout.VERTICAL);
@@ -492,7 +557,7 @@ public class LearningFragment extends Fragment {
         TextView arrow = new TextView(requireContext());
         arrow.setText("›");
         arrow.setTextSize(24);
-        arrow.setTextColor(0xFFB0B0B5);
+        arrow.setTextColor(0xFFB0B5BD);
         arrow.setGravity(Gravity.CENTER);
         card.addView(arrow, new LinearLayout.LayoutParams(dp(24), dp(40)));
 
@@ -604,42 +669,40 @@ public class LearningFragment extends Fragment {
         return false;
     }
 
-    private void runCardClick(Runnable click) {
-        long now = android.os.SystemClock.elapsedRealtime();
-        if (now - lastCardClickTime < 600) return;
-        lastCardClickTime = now;
-
-        if (click != null) {
-            click.run();
-        }
-    }
-
-    private void bindPressClick(View view, Runnable click) {
+    private void bindClick(View view, Runnable click) {
         view.setClickable(true);
         view.setOnClickListener(v -> {
             long now = android.os.SystemClock.elapsedRealtime();
-            if (now - lastCardClickTime < 450) return;
+            if (now - lastCardClickTime < 420) return;
             lastCardClickTime = now;
-
-            v.animate()
-                    .scaleX(0.97f)
-                    .scaleY(0.97f)
-                    .alpha(0.92f)
-                    .setDuration(70)
-                    .withEndAction(() -> {
-                        v.animate()
-                                .scaleX(1f)
-                                .scaleY(1f)
-                                .alpha(1f)
-                                .setDuration(110)
-                                .start();
-
-                        if (click != null) {
-                            click.run();
-                        }
-                    })
-                    .start();
+            if (click != null) click.run();
         });
+    }
+
+    private void attachPressAnimator(View view, float normalElevation, float pressedElevation) {
+        StateListAnimator animator = new StateListAnimator();
+
+        AnimatorSet pressed = new AnimatorSet();
+        pressed.playTogether(
+                ObjectAnimator.ofFloat(view, "scaleX", 0.985f),
+                ObjectAnimator.ofFloat(view, "scaleY", 0.985f),
+                ObjectAnimator.ofFloat(view, "translationZ", pressedElevation)
+        );
+        pressed.setDuration(90);
+        pressed.setInterpolator(new DecelerateInterpolator());
+
+        AnimatorSet normal = new AnimatorSet();
+        normal.playTogether(
+                ObjectAnimator.ofFloat(view, "scaleX", 1f),
+                ObjectAnimator.ofFloat(view, "scaleY", 1f),
+                ObjectAnimator.ofFloat(view, "translationZ", normalElevation)
+        );
+        normal.setDuration(120);
+        normal.setInterpolator(new DecelerateInterpolator());
+
+        animator.addState(new int[]{android.R.attr.state_pressed}, pressed);
+        animator.addState(new int[]{}, normal);
+        view.setStateListAnimator(animator);
     }
 
     private void widenDrawerGestureArea(final int edgeSizePx) {
@@ -660,9 +723,39 @@ public class LearningFragment extends Fragment {
                 int newSize = Math.max(oldSize, edgeSizePx);
                 edgeSizeField.setInt(leftDragger, newSize);
             } catch (Throwable ignored) {
-                // AndroidX 内部字段变动时不崩溃，保持默认手势区域
+                // AndroidX 内部字段变动时不崩溃，保持默认 Drawer 手势区域。
             }
         });
+    }
+
+    private Typeface loadFontAwesomeTypeface() {
+        try {
+            return Typeface.createFromAsset(requireContext().getAssets(), "fonts/fa-solid-900.ttf");
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private String getIconText(String faIcon, String fallbackText) {
+        return faTypeface != null ? faIcon : fallbackText;
+    }
+
+    private GradientDrawable glassBackground(float radius) {
+        GradientDrawable drawable = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xF4FFFFFF, COLOR_CARD}
+        );
+        drawable.setCornerRadius(radius);
+        drawable.setStroke(1, COLOR_CARD_STROKE);
+        return drawable;
+    }
+
+    private void addGlassHighlight(FrameLayout parent) {
+        View highlight = new View(requireContext());
+        highlight.setBackground(verticalGradient(0x2BFFFFFF, 0x00FFFFFF, dp(18), Color.TRANSPARENT, 0));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, dp(30), Gravity.TOP);
+        lp.setMargins(dp(1), dp(1), dp(1), 0);
+        parent.addView(highlight, lp);
     }
 
     private GradientDrawable verticalGradient(int start, int end, float radius, int strokeColor, int strokeWidth) {
@@ -671,9 +764,7 @@ public class LearningFragment extends Fragment {
                 new int[]{start, end}
         );
         drawable.setCornerRadius(radius);
-        if (strokeWidth > 0) {
-            drawable.setStroke(strokeWidth, strokeColor);
-        }
+        if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
         return drawable;
     }
 
@@ -683,9 +774,7 @@ public class LearningFragment extends Fragment {
                 new int[]{start, end}
         );
         drawable.setCornerRadius(radius);
-        if (strokeWidth > 0) {
-            drawable.setStroke(strokeWidth, strokeColor);
-        }
+        if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
         return drawable;
     }
 
@@ -693,9 +782,7 @@ public class LearningFragment extends Fragment {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setColor(color);
         drawable.setCornerRadius(radius);
-        if (strokeWidth > 0) {
-            drawable.setStroke(strokeWidth, strokeColor);
-        }
+        if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
         return drawable;
     }
 
@@ -710,7 +797,7 @@ public class LearningFragment extends Fragment {
     }
 
     private int getDrawerWidth() {
-        return (int) (getResources().getDisplayMetrics().widthPixels * 0.75f);
+        return (int) (getResources().getDisplayMetrics().widthPixels * 0.78f);
     }
 
     private int dp(float value) {
@@ -721,13 +808,15 @@ public class LearningFragment extends Fragment {
         final String title;
         final String desc;
         final String id;
-        final int[] bgColors;
+        final int accentColor;
+        final int softBgColor;
 
-        CardSpec(String title, String desc, String id, int[] bgColors) {
+        CardSpec(String title, String desc, String id, int accentColor, int softBgColor) {
             this.title = title;
             this.desc = desc;
             this.id = id;
-            this.bgColors = bgColors;
+            this.accentColor = accentColor;
+            this.softBgColor = softBgColor;
         }
     }
 }
