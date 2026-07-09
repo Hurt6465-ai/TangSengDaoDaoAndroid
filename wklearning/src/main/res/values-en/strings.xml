@@ -29,7 +29,7 @@
     <string name="word_pull_favorite_release">Release to save</string>
     <string name="word_pull_unfavorite_release">Release to unsave</string>
     <string name="word_front_tap">Tap to see meaning</string>
-    <string name="word_front_hint">Audio, spelling and practice buttons will not flip the card</string>
+    <string name="word_front_hint"></string>
     <string name="word_gesture_hint_short">Swipe left: Again · Swipe right: Known · Pull down: Save</string>
     <string name="word_back_hint">Swipe left: Again · Swipe right: Known</string>
     <string name="word_action_tts">Audio</string>
@@ -48,7 +48,7 @@
     <string name="word_label_antonyms">Opposite: </string>
     <string name="word_no_example">No example yet</string>
     <string name="word_toast_unknown">Again: review later</string>
-    <string name="word_toast_known">Known: review scheduled</string>
+    <string name="word_toast_known">Known: review again in 7 days</string>
     <string name="word_toast_hard">Hard: review again tomorrow</string>
     <string name="word_favorite_added">Saved</string>
     <string name="word_favorite_removed">Removed from saved</string>
@@ -61,12 +61,11 @@
     <string name="word_menu_show_guide">How to use</string>
     <string name="word_menu_tts_settings">Speech settings</string>
     <string name="word_guide_title">How to study cards</string>
-    <string name="word_guide_body">Tap blank area: see meaning
+    <string name="word_guide_body">Tap card: see meaning
 Swipe left: Again, review later
-Middle button: Hard, review tomorrow
-Swipe right: Known, next card
-Pull down: Save / unsave
-Audio, spelling, practice and stroke buttons only run their actions and will not flip the card</string>
+Swipe right: Known, review again in 7 days
+Pull down: Save
+Tap Hard: review tomorrow</string>
     <string name="word_guide_ok">Got it</string>
     <string name="word_guide_never">Do not show again</string>
     <string name="word_review_new">New</string>
