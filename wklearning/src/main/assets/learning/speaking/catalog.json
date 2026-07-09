@@ -1,0 +1,17 @@
+{
+  "type": "speaking",
+  "title": "口语",
+  "subtitle": "按真实场景分级，先选场景，再进入短句、对话和 AI 对练。",
+  "items": [
+    { "id": "speaking_daily", "title": "日常生活", "subtitle": "打招呼、点餐、购物、租房", "badge": "高频", "children": [
+      { "id": "speak_hello", "title": "打招呼", "subtitle": "认识新朋友、日常开场", "target": "study", "asset": "assets/learning/speaking/hello.json" },
+      { "id": "speak_food", "title": "点餐", "subtitle": "餐厅点菜、口味、买单", "target": "study", "asset": "assets/learning/speaking/food.json" },
+      { "id": "speak_shop", "title": "购物", "subtitle": "价格、尺码、砍价、付款", "target": "study", "asset": "assets/learning/speaking/shop.json" },
+      { "id": "speak_rent", "title": "租房", "subtitle": "看房、押金、水电、维修", "target": "study", "asset": "assets/learning/speaking/rent.json" }
+    ] },
+    { "id": "speaking_work", "title": "工作求职", "subtitle": "面试、同事沟通、请假、工资", "badge": "求职", "children": [
+      { "id": "speak_job", "title": "求职面试", "subtitle": "自我介绍、经验、期望薪资", "target": "study", "asset": "assets/learning/speaking/job.json" },
+      { "id": "speak_office", "title": "办公室沟通", "subtitle": "工作安排、反馈、请假", "target": "study", "asset": "assets/learning/speaking/office.json" }
+    ] }
+  ]
+}
