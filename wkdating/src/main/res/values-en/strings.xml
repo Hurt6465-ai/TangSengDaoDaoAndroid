@@ -1,0 +1,23 @@
+<resources>
+    <string name="dating_title">Match</string>
+    <string name="dating_scope_global">Global first</string>
+    <string name="dating_scope_nearby">Nearby first</string>
+    <string name="dating_loading">Loading matches…</string>
+    <string name="dating_retry">Retry</string>
+    <string name="dating_empty">No new recommendations</string>
+    <string name="dating_empty_tip">Try loosening filters or come back later.</string>
+    <string name="dating_like">Like</string>
+    <string name="dating_pass">Pass</string>
+    <string name="dating_like_stamp">LIKE</string>
+    <string name="dating_nope_stamp">NOPE</string>
+    <string name="dating_match_title">It is a match</string>
+    <string name="dating_match_notice">A system notice was sent. Chat unlocks after the notice arrives.</string>
+    <string name="dating_match_notice_pending">Matched. Waiting for the system notice to unlock chat.</string>
+    <string name="dating_ok">OK</string>
+    <string name="dating_photo_indicator">%1$d/%2$d</string>
+    <string name="dating_intent_study">Study partner</string>
+    <string name="dating_intent_friend">Friends</string>
+    <string name="dating_intent_love">Dating</string>
+    <string name="dating_distance_unknown">Global</string>
+    <string name="dating_mock_tip">Dating backend is not connected yet. Showing local demo data.</string>
+</resources>
