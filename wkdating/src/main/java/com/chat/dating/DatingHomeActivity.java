@@ -6,22 +6,36 @@ import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.dating.databinding.ActivityWkDatingHomeBinding;
 import com.chat.dating.model.DatingProfile;
 import com.chat.dating.model.DatingSwipeResult;
+import com.yuyakaido.android.cardstackview.CardStackLayoutManager;
+import com.yuyakaido.android.cardstackview.CardStackListener;
+import com.yuyakaido.android.cardstackview.Direction;
+import com.yuyakaido.android.cardstackview.Duration;
+import com.yuyakaido.android.cardstackview.RewindAnimationSetting;
+import com.yuyakaido.android.cardstackview.StackFrom;
+import com.yuyakaido.android.cardstackview.SwipeAnimationSetting;
+import com.yuyakaido.android.cardstackview.SwipeableMethod;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -43,6 +57,10 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private String exposureUid = "";
     private DatingProfile myProfile;
     private DatingFilter filter;
+    private DatingCardStackAdapter cardAdapter;
+    private CardStackLayoutManager cardStackManager;
+    private int currentIndex;
+    private int lastSwipedIndex = -1;
 
     @Override
     protected ActivityWkDatingHomeBinding getViewBinding() {
@@ -62,8 +80,8 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         Window window = getWindow();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            window.setStatusBarColor(0x00000000);
-            window.setNavigationBarColor(0x00000000);
+            window.setStatusBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(Color.TRANSPARENT);
         }
         window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         super.onCreate(savedInstanceState);
@@ -74,42 +92,106 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         sessionId = UUID.randomUUID().toString();
         filter = DatingFilter.load(this);
         myProfile = DatingMockData.demoMyProfile();
-        wkVBinding.deckView.setOnDeckActionListener(new DatingSwipeDeckView.OnDeckActionListener() {
-            @Override
-            public void onCurrentChanged(DatingProfile profile, int index) {
-                finishExposure(false);
-                startExposure(profile);
-                DatingImagePreloader.preloadAround(DatingHomeActivity.this, profiles, index);
-                if (!loading && !noMore && wkVBinding.deckView.remainingCount() <= 4) loadMore(false);
-            }
-
-            @Override
-            public void onSwiped(DatingProfile profile, String action, int photoIndex, int nextIndex) {
-                finishExposure(true);
-                reportSwipe(profile, action, photoIndex);
-            }
-
-            @Override
-            public void onDeckEmpty() {
-                if (!loading && noMore) showEmpty();
-            }
-
-            @Override
-            public void onCardCenterTap(DatingProfile profile) {
-                showProfilePreview(profile);
-            }
-        });
+        initCardStack();
         updateScopeTabs();
         updateFilterSummary();
         showLoading(true, getString(R.string.dating_loading), false);
     }
 
+    private void initCardStack() {
+        cardAdapter = new DatingCardStackAdapter();
+        cardAdapter.setOnCardTapListener(new DatingCardStackAdapter.OnCardTapListener() {
+            @Override
+            public void onPreviousPhoto(DatingProfile profile, int position, int photoIndex) {
+            }
+
+            @Override
+            public void onNextPhoto(DatingProfile profile, int position, int photoIndex) {
+                DatingImagePreloader.preloadAround(DatingHomeActivity.this, profiles, position);
+            }
+
+            @Override
+            public void onOpenProfile(DatingProfile profile, int position, int photoIndex) {
+                showProfilePreview(profile);
+            }
+        });
+
+        cardStackManager = new CardStackLayoutManager(this, new CardStackListener() {
+            @Override
+            public void onCardDragging(Direction direction, float ratio) {
+                updateTopSwipeOverlay(direction, ratio);
+            }
+
+            @Override
+            public void onCardSwiped(Direction direction) {
+                int swipedIndex = Math.max(0, currentIndex);
+                DatingProfile profile = cardAdapter.getProfile(swipedIndex);
+                int photoIndex = cardAdapter.getPhotoIndex(swipedIndex);
+                lastSwipedIndex = swipedIndex;
+                currentIndex = Math.min(cardAdapter.getItemCount(), swipedIndex + 1);
+                clearSwipeOverlay(swipedIndex);
+                finishExposure(true);
+                reportSwipe(profile, actionForDirection(direction), photoIndex);
+                if (!loading && !noMore && remainingCount() <= 4) loadMore(false);
+                if (remainingCount() == 0 && noMore) showEmpty();
+            }
+
+            @Override
+            public void onCardRewound() {
+                if (lastSwipedIndex >= 0) {
+                    currentIndex = Math.max(0, lastSwipedIndex);
+                    startExposure(cardAdapter.getProfile(currentIndex));
+                    lastSwipedIndex = -1;
+                }
+            }
+
+            @Override
+            public void onCardCanceled() {
+                clearSwipeOverlay(currentIndex);
+            }
+
+            @Override
+            public void onCardAppeared(View view, int position) {
+                currentIndex = Math.max(0, position);
+                clearSwipeOverlay(position);
+                finishExposure(false);
+                DatingProfile profile = cardAdapter.getProfile(position);
+                startExposure(profile);
+                DatingImagePreloader.preloadAround(DatingHomeActivity.this, profiles, position);
+                if (!loading && !noMore && remainingCount() <= 4) loadMore(false);
+            }
+
+            @Override
+            public void onCardDisappeared(View view, int position) {
+                if (view instanceof DatingCardView) {
+                    ((DatingCardView) view).setSwipeProgress(0f, 0f);
+                }
+            }
+        });
+        cardStackManager.setStackFrom(StackFrom.None);
+        cardStackManager.setVisibleCount(3);
+        cardStackManager.setTranslationInterval(7.0f);
+        cardStackManager.setScaleInterval(0.965f);
+        cardStackManager.setSwipeThreshold(0.27f);
+        cardStackManager.setMaxDegree(18.0f);
+        cardStackManager.setDirections(Arrays.asList(Direction.Left, Direction.Right, Direction.Top));
+        cardStackManager.setCanScrollHorizontal(true);
+        cardStackManager.setCanScrollVertical(true);
+        cardStackManager.setSwipeableMethod(SwipeableMethod.AutomaticAndManual);
+        cardStackManager.setOverlayInterpolator(new LinearInterpolator());
+
+        wkVBinding.deckView.setLayoutManager(cardStackManager);
+        wkVBinding.deckView.setAdapter(cardAdapter);
+        wkVBinding.deckView.setItemAnimator(null);
+    }
+
     @Override
     protected void initListener() {
         wkVBinding.retryBtn.setOnClickListener(v -> reload());
-        wkVBinding.passBtn.setOnClickListener(v -> wkVBinding.deckView.swipeTop(DatingSwipeAction.PASS));
-        wkVBinding.favoriteBtn.setOnClickListener(v -> wkVBinding.deckView.swipeTop(DatingSwipeAction.FAVORITE));
-        wkVBinding.likeBtn.setOnClickListener(v -> wkVBinding.deckView.swipeTop(DatingSwipeAction.LIKE));
+        wkVBinding.rewindBtn.setOnClickListener(v -> rewindTop(v));
+        wkVBinding.passBtn.setOnClickListener(v -> swipeTop(v, Direction.Left));
+        wkVBinding.favoriteBtn.setOnClickListener(v -> swipeTop(v, Direction.Top));
+        wkVBinding.likeBtn.setOnClickListener(v -> swipeTop(v, Direction.Right));
         wkVBinding.recommendTab.setOnClickListener(v -> {
             if (!"global".equals(scope)) {
                 scope = "global";
@@ -160,7 +242,10 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         profiles.clear();
         loadedUids.clear();
         pendingExposures.clear();
-        wkVBinding.deckView.setProfiles(profiles);
+        currentIndex = 0;
+        lastSwipedIndex = -1;
+        cardAdapter.setProfiles(profiles);
+        wkVBinding.deckView.scrollToPosition(0);
         showLoading(true, getString(R.string.dating_loading), false);
         loadMore(true);
     }
@@ -194,16 +279,19 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             loadedUids.clear();
             profiles.addAll(clean);
             for (DatingProfile p : clean) loadedUids.add(p.safeUid());
-            wkVBinding.deckView.setProfiles(profiles);
+            currentIndex = 0;
+            lastSwipedIndex = -1;
+            cardAdapter.setProfiles(profiles);
+            wkVBinding.deckView.scrollToPosition(0);
         } else if (!clean.isEmpty()) {
             profiles.addAll(clean);
             for (DatingProfile p : clean) loadedUids.add(p.safeUid());
-            wkVBinding.deckView.appendProfiles(clean);
+            cardAdapter.appendProfiles(clean);
         }
         if (profiles.isEmpty()) showEmpty();
         else showContent();
         if (demo) showToast(R.string.dating_mock_tip);
-        DatingImagePreloader.preloadAround(this, profiles, wkVBinding.deckView.getCurrentIndex());
+        DatingImagePreloader.preloadAround(this, profiles, currentIndex);
     }
 
     private List<DatingProfile> cleanProfiles(List<DatingProfile> data) {
@@ -216,6 +304,79 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             clean.add(profile);
         }
         return clean;
+    }
+
+    private int remainingCount() {
+        return Math.max(0, cardAdapter == null ? 0 : cardAdapter.getItemCount() - currentIndex);
+    }
+
+    private void swipeTop(View source, Direction direction) {
+        if (remainingCount() <= 0) return;
+        animateButton(source);
+        source.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        SwipeAnimationSetting setting = new SwipeAnimationSetting.Builder()
+                .setDirection(direction)
+                .setDuration(Duration.Normal.duration)
+                .setInterpolator(new AccelerateInterpolator())
+                .build();
+        cardStackManager.setSwipeAnimationSetting(setting);
+        wkVBinding.deckView.swipe();
+    }
+
+    private void rewindTop(View source) {
+        if (currentIndex <= 0) return;
+        animateButton(source);
+        source.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        RewindAnimationSetting setting = new RewindAnimationSetting.Builder()
+                .setDirection(Direction.Bottom)
+                .setDuration(Duration.Normal.duration)
+                .setInterpolator(new DecelerateInterpolator())
+                .build();
+        cardStackManager.setRewindAnimationSetting(setting);
+        wkVBinding.deckView.rewind();
+    }
+
+    private void animateButton(View view) {
+        if (view == null) return;
+        view.animate().cancel();
+        view.setScaleX(0.92f);
+        view.setScaleY(0.92f);
+        view.animate().scaleX(1.08f).scaleY(1.08f).setDuration(90).withEndAction(() ->
+                view.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+        ).start();
+    }
+
+    private void updateTopSwipeOverlay(Direction direction, float ratio) {
+        DatingCardView card = topCardView();
+        if (card == null) return;
+        float width = Math.max(1f, wkVBinding.deckView.getWidth());
+        float height = Math.max(1f, wkVBinding.deckView.getHeight());
+        float clamped = Math.max(0f, Math.min(1f, ratio));
+        if (direction == Direction.Right) card.setSwipeProgress(width * clamped, 0f);
+        else if (direction == Direction.Left) card.setSwipeProgress(-width * clamped, 0f);
+        else if (direction == Direction.Top) card.setSwipeProgress(0f, -height * clamped);
+        else card.setSwipeProgress(0f, 0f);
+    }
+
+    private void clearSwipeOverlay(int position) {
+        RecyclerView.ViewHolder holder = wkVBinding.deckView.findViewHolderForAdapterPosition(position);
+        if (holder instanceof DatingCardStackAdapter.CardHolder) {
+            ((DatingCardStackAdapter.CardHolder) holder).card.setSwipeProgress(0f, 0f);
+        }
+    }
+
+    private DatingCardView topCardView() {
+        RecyclerView.ViewHolder holder = wkVBinding.deckView.findViewHolderForAdapterPosition(currentIndex);
+        if (holder instanceof DatingCardStackAdapter.CardHolder) {
+            return ((DatingCardStackAdapter.CardHolder) holder).card;
+        }
+        return null;
+    }
+
+    private String actionForDirection(Direction direction) {
+        if (direction == Direction.Right) return DatingSwipeAction.LIKE;
+        if (direction == Direction.Top) return DatingSwipeAction.FAVORITE;
+        return DatingSwipeAction.PASS;
     }
 
     private void reportSwipe(DatingProfile profile, String action, int photoIndex) {
@@ -281,10 +442,10 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private void styleScopeTab(TextView tab, boolean selected) {
         if (tab == null) return;
         tab.setBackgroundColor(Color.TRANSPARENT);
-        tab.setTextColor(selected ? Color.WHITE : 0x99FFFFFF);
-        tab.setTextSize(selected ? 20 : 17);
+        tab.setTextColor(selected ? Color.WHITE : 0x8CFFFFFF);
+        tab.setTextSize(selected ? 21 : 17);
         tab.setTypeface(Typeface.DEFAULT, selected ? Typeface.BOLD : Typeface.NORMAL);
-        tab.setAlpha(selected ? 1f : 0.76f);
+        tab.setAlpha(selected ? 1f : 0.72f);
     }
 
     private void updateFilterSummary() {

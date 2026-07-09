@@ -34,8 +34,13 @@ public class DatingCardView extends FrameLayout {
     }
 
     public void bind(DatingProfile profile) {
+        bind(profile, 0);
+    }
+
+    public void bind(DatingProfile profile, int initialPhotoIndex) {
         this.profile = profile;
-        this.photoIndex = 0;
+        int max = profile == null ? 0 : Math.max(0, profile.safePhotos().size() - 1);
+        this.photoIndex = Math.max(0, Math.min(initialPhotoIndex, max));
         bindPhoto();
         setSwipeProgress(0f, 0f);
     }
@@ -74,11 +79,11 @@ public class DatingCardView extends FrameLayout {
         float width = Math.max(1f, getWidth());
         float height = Math.max(1f, getHeight());
         float horizontal = Math.min(1f, Math.abs(dx) / (width * 0.28f));
-        float down = Math.min(1f, Math.max(0f, dy) / (height * 0.16f));
-        binding.likeBadge.setAlpha(dx > 0 && horizontal >= down ? horizontal : 0f);
-        binding.nopeBadge.setAlpha(dx < 0 && horizontal >= down ? horizontal : 0f);
-        binding.favoriteBadge.setAlpha(down > horizontal ? down : 0f);
-        binding.infoPanel.setTranslationY(Math.max(horizontal, down) * dp(4));
+        float up = Math.min(1f, Math.max(0f, -dy) / (height * 0.16f));
+        binding.likeBadge.setAlpha(dx > 0 && horizontal >= up ? horizontal : 0f);
+        binding.nopeBadge.setAlpha(dx < 0 && horizontal >= up ? horizontal : 0f);
+        binding.favoriteBadge.setAlpha(up > horizontal ? up : 0f);
+        binding.infoPanel.setTranslationY(Math.max(horizontal, up) * dp(4));
     }
 
     private void bindPhoto() {
