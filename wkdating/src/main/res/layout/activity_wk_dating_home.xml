@@ -2,27 +2,9 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_dating_screen"
+    android:background="#000000"
     android:clipChildren="false"
     android:clipToPadding="false">
-
-    <View
-        android:layout_width="220dp"
-        android:layout_height="220dp"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="-70dp"
-        android:layout_marginEnd="-80dp"
-        android:alpha="0.35"
-        android:background="@drawable/bg_dating_action_like" />
-
-    <View
-        android:layout_width="180dp"
-        android:layout_height="180dp"
-        android:layout_gravity="bottom|start"
-        android:layout_marginStart="-70dp"
-        android:layout_marginBottom="40dp"
-        android:alpha="0.28"
-        android:background="@drawable/bg_dating_action_like" />
 
     <com.chat.dating.DatingSwipeDeckView
         android:id="@+id/deckView"
@@ -31,125 +13,118 @@
         android:clipChildren="false"
         android:clipToPadding="false" />
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
-        android:layout_height="94dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="14dp"
-        android:paddingTop="30dp"
-        android:paddingEnd="14dp"
-        android:clipToPadding="false">
+        android:layout_height="92dp"
+        android:layout_gravity="top"
+        android:paddingStart="18dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="18dp">
 
         <TextView
-            android:id="@+id/backBtn"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:background="@drawable/bg_dating_filter_button"
-            android:elevation="4dp"
+            android:id="@+id/filterBtn"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_gravity="start|top"
             android:gravity="center"
-            android:text="‹"
-            android:textColor="#D8325570"
-            android:textSize="31sp" />
+            android:includeFontPadding="false"
+            android:text="☷"
+            android:textColor="#F2FFFFFF"
+            android:textSize="28sp"
+            android:textStyle="bold" />
 
         <LinearLayout
-            android:id="@+id/tabContainer"
-            android:layout_width="0dp"
-            android:layout_height="46dp"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_weight="1"
-            android:background="@drawable/bg_dating_segment_container"
-            android:elevation="6dp"
+            android:id="@+id/scopeTabs"
+            android:layout_width="wrap_content"
+            android:layout_height="54dp"
+            android:layout_gravity="top|center_horizontal"
             android:gravity="center"
-            android:orientation="horizontal"
-            android:padding="4dp">
+            android:orientation="horizontal">
 
             <TextView
                 android:id="@+id/recommendTab"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
                 android:gravity="center"
-                android:text="@string/dating_tab_recommend"
+                android:includeFontPadding="false"
+                android:minWidth="72dp"
+                android:text="推荐"
                 android:textColor="#FFFFFFFF"
-                android:textSize="14sp"
+                android:textSize="20sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/nearbyTab"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
+                android:layout_marginStart="18dp"
                 android:gravity="center"
-                android:text="@string/dating_tab_nearby"
-                android:textColor="#7A35425A"
-                android:textSize="14sp"
+                android:includeFontPadding="false"
+                android:minWidth="72dp"
+                android:text="附近"
+                android:textColor="#AAFFFFFF"
+                android:textSize="17sp"
                 android:textStyle="bold" />
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/filterBtn"
-            android:layout_width="58dp"
-            android:layout_height="38dp"
-            android:background="@drawable/bg_dating_filter_button"
-            android:elevation="4dp"
-            android:gravity="center"
-            android:text="@string/dating_filter"
-            android:textColor="#D8325570"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/filterSummaryTv"
-        android:layout_width="wrap_content"
-        android:layout_height="30dp"
-        android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="86dp"
-        android:background="@drawable/bg_dating_filter_button"
-        android:gravity="center"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:textColor="#9F35425A"
-        android:textSize="12sp" />
+    </FrameLayout>
 
     <LinearLayout
         android:id="@+id/actionBar"
         android:layout_width="match_parent"
-        android:layout_height="104dp"
+        android:layout_height="106dp"
         android:layout_gravity="bottom"
         android:gravity="top|center_horizontal"
         android:orientation="horizontal"
-        android:paddingTop="8dp">
+        android:paddingTop="7dp"
+        android:paddingBottom="10dp">
 
         <TextView
             android:id="@+id/passBtn"
-            android:layout_width="70dp"
-            android:layout_height="70dp"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
             android:background="@drawable/bg_dating_action_pass"
             android:elevation="14dp"
             android:gravity="center"
+            android:includeFontPadding="false"
             android:text="×"
             android:textColor="#FFFF4F6A"
-            android:textSize="36sp"
+            android:textSize="42sp"
             android:textStyle="bold" />
 
         <Space
-            android:layout_width="44dp"
+            android:layout_width="18dp"
+            android:layout_height="1dp" />
+
+        <TextView
+            android:id="@+id/favoriteBtn"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_dating_action_favorite"
+            android:elevation="14dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="★"
+            android:textColor="#FF77A7FF"
+            android:textSize="29sp"
+            android:textStyle="bold" />
+
+        <Space
+            android:layout_width="18dp"
             android:layout_height="1dp" />
 
         <TextView
             android:id="@+id/likeBtn"
-            android:layout_width="78dp"
-            android:layout_height="78dp"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
             android:background="@drawable/bg_dating_action_like"
             android:elevation="16dp"
             android:gravity="center"
+            android:includeFontPadding="false"
             android:text="♥"
             android:textColor="#FFFFFFFF"
-            android:textSize="36sp"
+            android:textSize="42sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -157,42 +132,35 @@
         android:id="@+id/loadingLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="#000000"
         android:gravity="center"
         android:orientation="vertical"
         android:padding="30dp"
         android:visibility="gone">
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/loadingTv"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_dating_loading_panel"
-            android:elevation="10dp"
             android:gravity="center"
-            android:orientation="vertical"
-            android:padding="26dp">
+            android:text="@string/dating_loading"
+            android:textColor="#FFFFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/loadingTv"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/dating_loading"
-                android:textColor="#D8325570"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/retryBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_marginTop="18dp"
-                android:background="@drawable/bg_dating_loading_button"
-                android:gravity="center"
-                android:text="@string/dating_retry"
-                android:textColor="#FFFFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
-        </LinearLayout>
+        <TextView
+            android:id="@+id/retryBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_dating_loading_button"
+            android:gravity="center"
+            android:paddingStart="22dp"
+            android:paddingEnd="22dp"
+            android:text="@string/dating_retry"
+            android:textColor="#FFFFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
     </LinearLayout>
 </FrameLayout>
