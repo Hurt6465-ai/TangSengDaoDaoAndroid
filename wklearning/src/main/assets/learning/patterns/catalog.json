@@ -1,0 +1,17 @@
+{
+  "type": "patterns",
+  "title": "句型",
+  "subtitle": "先学句型分类，再做替换练习和对话应用。",
+  "items": [
+    { "id": "pattern_basic", "title": "基础表达", "subtitle": "需求、请求、方法、原因", "badge": "入门", "children": [
+      { "id": "pattern_want", "title": "我想……", "subtitle": "表达需求和愿望", "target": "study", "asset": "assets/learning/patterns/want.json" },
+      { "id": "pattern_can", "title": "可以吗？", "subtitle": "请求帮助和确认", "target": "study", "asset": "assets/learning/patterns/can.json" },
+      { "id": "pattern_how", "title": "怎么……", "subtitle": "询问方法和流程", "target": "study", "asset": "assets/learning/patterns/how.json" },
+      { "id": "pattern_why", "title": "为什么……", "subtitle": "询问原因", "target": "study", "asset": "assets/learning/patterns/why.json" }
+    ] },
+    { "id": "pattern_connect", "title": "连接表达", "subtitle": "因为所以、如果就、虽然但是", "badge": "进阶", "children": [
+      { "id": "pattern_because", "title": "因为……所以……", "subtitle": "说明原因和结果", "target": "study", "asset": "assets/learning/patterns/because.json" },
+      { "id": "pattern_if", "title": "如果……就……", "subtitle": "表达条件", "target": "study", "asset": "assets/learning/patterns/if.json" }
+    ] }
+  ]
+}
