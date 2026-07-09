@@ -1,6 +1,8 @@
 package com.chat.dating;
 
 import android.content.Context;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -30,7 +32,13 @@ public class DatingCardView extends FrameLayout {
         setClickable(true);
         setClipChildren(true);
         setClipToPadding(true);
-        setBackgroundColor(0xFF000000);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0xFF000000);
+        bg.setCornerRadius(dp(18));
+        setBackground(bg);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            setClipToOutline(true);
+        }
     }
 
     public void bind(DatingProfile profile) {
@@ -129,22 +137,18 @@ public class DatingCardView extends FrameLayout {
     }
 
     private void bindBasePage() {
-        StringBuilder jobLine = new StringBuilder();
-        if (!TextUtils.isEmpty(profile.job)) jobLine.append(profile.job);
-        if (!TextUtils.isEmpty(profile.education)) {
-            if (jobLine.length() > 0) jobLine.append(" · ");
-            jobLine.append(profile.education);
-        }
-        binding.jobTv.setText(jobLine.toString());
-        binding.jobTv.setVisibility(jobLine.length() == 0 ? GONE : VISIBLE);
+        binding.jobTv.setVisibility(GONE);
+        binding.tagRow.setVisibility(GONE);
+        binding.tagRow.removeAllViews();
 
         String intro = profile.safeIntro();
         binding.introTv.setText(intro);
+        binding.introTv.setMaxLines(1);
         binding.introTv.setVisibility(TextUtils.isEmpty(intro) ? GONE : VISIBLE);
-        bindPlainTags(firstNonEmpty(profile.personality_tags, profile.lifestyle_tags, profile.safeCoreTags()), 4);
     }
 
     private void bindIntroPage() {
+        binding.introTv.setMaxLines(2);
         binding.jobTv.setText("关于我");
         binding.jobTv.setVisibility(VISIBLE);
         String intro = profile.safeIntro();
@@ -155,6 +159,7 @@ public class DatingCardView extends FrameLayout {
     }
 
     private void bindLovePage() {
+        binding.introTv.setMaxLines(2);
         String goal = goalText(profile.safeRelationshipGoal());
         String cross = crossText(profile.safeCrossBorderPreference());
         StringBuilder line = new StringBuilder();

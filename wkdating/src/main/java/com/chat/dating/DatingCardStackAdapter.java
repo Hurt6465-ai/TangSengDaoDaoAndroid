@@ -65,10 +65,13 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
     @Override
     public CardHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         DatingCardView card = new DatingCardView(parent.getContext());
-        card.setLayoutParams(new RecyclerView.LayoutParams(
+        RecyclerView.LayoutParams lp = new RecyclerView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
-        ));
+        );
+        int margin = dp(parent, 6);
+        lp.setMargins(margin, margin, margin, margin);
+        card.setLayoutParams(lp);
         return new CardHolder(card);
     }
 
@@ -82,6 +85,10 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
     @Override
     public int getItemCount() {
         return profiles.size();
+    }
+
+    private int dp(View view, int value) {
+        return (int) (value * view.getResources().getDisplayMetrics().density + 0.5f);
     }
 
     public static class CardHolder extends RecyclerView.ViewHolder {

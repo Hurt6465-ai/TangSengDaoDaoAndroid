@@ -3,6 +3,9 @@ package com.chat.dating;
 import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.media.SoundPool;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -61,6 +64,11 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private CardStackLayoutManager cardStackManager;
     private int currentIndex;
     private int lastSwipedIndex = -1;
+    private boolean dragFeedbackTriggered;
+    private SoundPool soundPool;
+    private int likeSoundId;
+    private int passSoundId;
+    private int favoriteSoundId;
 
     @Override
     protected ActivityWkDatingHomeBinding getViewBinding() {
@@ -92,6 +100,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         sessionId = UUID.randomUUID().toString();
         filter = DatingFilter.load(this);
         myProfile = DatingMockData.demoMyProfile();
+        initFeedback();
         initCardStack();
         updateScopeTabs();
         updateFilterSummary();
@@ -120,6 +129,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             @Override
             public void onCardDragging(Direction direction, float ratio) {
                 updateTopSwipeOverlay(direction, ratio);
+                handleDragFeedback(direction, ratio);
             }
 
             @Override
@@ -128,6 +138,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                 DatingProfile profile = cardAdapter.getProfile(swipedIndex);
                 int photoIndex = cardAdapter.getPhotoIndex(swipedIndex);
                 lastSwipedIndex = swipedIndex;
+                dragFeedbackTriggered = false;
                 currentIndex = Math.min(cardAdapter.getItemCount(), swipedIndex + 1);
                 clearSwipeOverlay(swipedIndex);
                 finishExposure(true);
@@ -147,6 +158,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
 
             @Override
             public void onCardCanceled() {
+                dragFeedbackTriggered = false;
                 clearSwipeOverlay(currentIndex);
             }
 
@@ -225,7 +237,65 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     protected void onDestroy() {
         finishExposure(true);
         flushExposures();
+        releaseFeedback();
         super.onDestroy();
+    }
+
+    private void initFeedback() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            AudioAttributes attrs = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build();
+            soundPool = new SoundPool.Builder().setMaxStreams(3).setAudioAttributes(attrs).build();
+        } else {
+            soundPool = new SoundPool(3, AudioManager.STREAM_MUSIC, 0);
+        }
+        likeSoundId = soundPool.load(this, R.raw.dating_like, 1);
+        passSoundId = soundPool.load(this, R.raw.dating_pass, 1);
+        favoriteSoundId = soundPool.load(this, R.raw.dating_favorite, 1);
+    }
+
+    private void releaseFeedback() {
+        if (soundPool != null) {
+            soundPool.release();
+            soundPool = null;
+        }
+    }
+
+    private void handleDragFeedback(Direction direction, float ratio) {
+        if (direction == null) return;
+        if (ratio >= 0.56f && !dragFeedbackTriggered) {
+            dragFeedbackTriggered = true;
+            performLightHaptic(wkVBinding.deckView);
+            playSwipeSound(direction);
+        } else if (ratio < 0.44f) {
+            dragFeedbackTriggered = false;
+        }
+    }
+
+    private void performLightHaptic(View view) {
+        if (view == null) return;
+        try {
+            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void playSwipeSound(Direction direction) {
+        if (soundPool == null) return;
+        try {
+            AudioManager audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
+            if (audioManager != null) {
+                if (audioManager.getRingerMode() != AudioManager.RINGER_MODE_NORMAL) return;
+                if (audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) <= 0) return;
+            }
+            int soundId = passSoundId;
+            if (direction == Direction.Right) soundId = likeSoundId;
+            else if (direction == Direction.Top) soundId = favoriteSoundId;
+            if (soundId != 0) soundPool.play(soundId, 0.42f, 0.42f, 1, 0, 1.0f);
+        } catch (Throwable ignored) {
+        }
     }
 
     private void loadMyProfileThenRecommend() {
@@ -313,7 +383,8 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private void swipeTop(View source, Direction direction) {
         if (remainingCount() <= 0) return;
         animateButton(source);
-        source.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        performLightHaptic(source);
+        playSwipeSound(direction);
         SwipeAnimationSetting setting = new SwipeAnimationSetting.Builder()
                 .setDirection(direction)
                 .setDuration(Duration.Normal.duration)
@@ -326,7 +397,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private void rewindTop(View source) {
         if (currentIndex <= 0) return;
         animateButton(source);
-        source.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        performLightHaptic(source);
         RewindAnimationSetting setting = new RewindAnimationSetting.Builder()
                 .setDirection(Direction.Bottom)
                 .setDuration(Duration.Normal.duration)
