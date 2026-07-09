@@ -29,7 +29,7 @@
     <string name="word_pull_favorite_release">松手收藏</string>
     <string name="word_pull_unfavorite_release">松手取消收藏</string>
     <string name="word_front_tap">点击查看释义</string>
-    <string name="word_front_hint">朗读、拼读、跟读按钮不会触发翻面</string>
+    <string name="word_front_hint"></string>
     <string name="word_gesture_hint_short">左滑不认识 · 右滑认识 · 下拉收藏</string>
     <string name="word_back_hint">左滑不认识 · 右滑认识</string>
     <string name="word_action_tts">朗读</string>
@@ -48,7 +48,7 @@
     <string name="word_label_antonyms">反义：</string>
     <string name="word_no_example">暂无例句</string>
     <string name="word_toast_unknown">不认识：稍后再复习</string>
-    <string name="word_toast_known">认识：已安排复习</string>
+    <string name="word_toast_known">认识：7 天后再复习</string>
     <string name="word_toast_hard">模糊：明天重点复习</string>
     <string name="word_favorite_added">已收藏</string>
     <string name="word_favorite_removed">已取消收藏</string>
@@ -61,12 +61,11 @@
     <string name="word_menu_show_guide">操作说明</string>
     <string name="word_menu_tts_settings">语音设置</string>
     <string name="word_guide_title">背词操作说明</string>
-    <string name="word_guide_body">点击卡片空白处：查看释义
-左滑：不认识，稍后再复习
-中间按钮：模糊，明天重点复习
-右滑：认识，进入下一词
-下拉卡片：收藏 / 取消收藏
-朗读、拼读、跟读、笔顺按钮只执行对应功能，不会翻面</string>
+    <string name="word_guide_body">点击卡片：查看释义
+左滑：不认识，稍后复习
+右滑：认识，7 天后再复习
+下拉：加入收藏
+点击模糊：明天复习</string>
     <string name="word_guide_ok">知道了</string>
     <string name="word_guide_never">不再提示</string>
     <string name="word_review_new">新词</string>
