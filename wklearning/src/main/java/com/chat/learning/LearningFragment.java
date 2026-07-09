@@ -2,8 +2,6 @@ package com.chat.learning;
 
 import android.animation.ObjectAnimator;
 import android.animation.StateListAnimator;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -22,7 +20,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.core.view.GravityCompat;
 import androidx.customview.widget.ViewDragHelper;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -184,13 +181,13 @@ public class LearningFragment extends Fragment {
         bottomRow.addView(sub, new LinearLayout.LayoutParams(0, -2, 1f));
 
         TextView start = new TextView(requireContext());
-        start.setText("报名");
+        start.setText("开始");
         start.setTextSize(14);
         start.setTypeface(Typeface.DEFAULT_BOLD);
         start.setTextColor(COLOR_BRAND);
         start.setGravity(Gravity.CENTER);
         start.setBackground(rounded(Color.WHITE, dp(20), Color.TRANSPARENT, 0));
-        bindClick(start, () -> Toast.makeText(requireContext(), "进入报名页面", Toast.LENGTH_SHORT).show());
+        bindClick(start, () -> openDirectory("pinyin", "拼音", ""));
         attachNativePressAnimator(start, 2, 5);
         bottomRow.addView(start, new LinearLayout.LayoutParams(dp(76), dp(36)));
 
@@ -236,19 +233,19 @@ public class LearningFragment extends Fragment {
         addHorizontalGap(row, 12);
 
         row.addView(toolCard(R.drawable.ic_learning_book, 0xFF7C3AED, "电子书",
-                this::showBookPage),
+                () -> openDirectory("books", "电子书", "")),
                 new LinearLayout.LayoutParams(0, -2, 1f));
 
         addHorizontalGap(row, 12);
 
         row.addView(toolCard(R.drawable.ic_learning_mic, 0xFF059669, "口语伴",
-                this::showPromptScenes),
+                () -> openDirectory("prompts", "口语 Prompt", "")),
                 new LinearLayout.LayoutParams(0, -2, 1f));
 
         addHorizontalGap(row, 12);
 
         row.addView(toolCard(R.drawable.ic_learning_practice, 0xFFEA580C, "练习题",
-                () -> Toast.makeText(requireContext(), "练习题后续接入", Toast.LENGTH_SHORT).show()),
+                () -> openDirectory("quiz", "练习题", "")),
                 new LinearLayout.LayoutParams(0, -2, 1f));
 
         return row;
@@ -426,7 +423,7 @@ public class LearningFragment extends Fragment {
 
         drawerGroupTitle(list, "学习工具");
         list.addView(drawerCard("语音设置", "WKSpeech 引擎配置", 0xFF10B981, this::openSpeechSettings));
-        list.addView(drawerCard("口语 Prompt", "生活场景对话指令", 0xFFF59E0B, this::showPromptScenes));
+        list.addView(drawerCard("口语 Prompt", "生活场景对话指令", 0xFFF59E0B, () -> openDirectory("prompts", "口语 Prompt", "")));
 
         drawerGroupTitle(list, "扩展功能");
         list.addView(drawerCard("脚本中心", "自定义扩展功能", 0xFFE11D48,
@@ -496,45 +493,46 @@ public class LearningFragment extends Fragment {
     private void onSmallCardClick(CardSpec spec) {
         if (spec == null || spec.id == null) return;
 
-        if (spec.id.startsWith("hsk")) {
-            Intent intent = new Intent(requireContext(), WordFullscreenActivity.class);
-            intent.putExtra(WordFullscreenActivity.EXTRA_LEVEL, spec.id);
-            intent.putExtra(WordFullscreenActivity.EXTRA_TITLE, spec.title);
-            startActivity(intent);
-        } else {
+        String type = typeForCardId(spec.id);
+        if (type == null) {
             Toast.makeText(requireContext(), spec.title + " 正在开发中", Toast.LENGTH_SHORT).show();
+            return;
         }
+        openDirectory(type, spec.title, spec.id);
+    }
+
+    private String typeForCardId(String id) {
+        if (id == null) return null;
+        if (id.startsWith("hsk") || "daily".equals(id) || "job".equals(id) || "love".equals(id) || "greeting".equals(id)) return "words";
+        if (id.startsWith("speak")) return "speaking";
+        if (id.startsWith("pattern")) return "patterns";
+        if (id.startsWith("grammar")) return "grammar";
+        if ("initials".equals(id) || "finals".equals(id) || "whole".equals(id) || "tone".equals(id)) return "pinyin";
+        return null;
     }
 
     private void openMorePage(String section) {
-        if ("单词".equals(section)) {
-            final String[] items = new String[]{
-                    "HSK 1", "HSK 2", "HSK 3", "HSK 4", "HSK 5", "HSK 6",
-                    "生活高频", "工作求职", "恋爱聊天"
-            };
-
-            final String[] ids = new String[]{
-                    "hsk1", "hsk2", "hsk3", "hsk4", "hsk5", "hsk6",
-                    "daily", "job", "love"
-            };
-
-            new AlertDialog.Builder(requireContext())
-                    .setTitle("更多单词")
-                    .setItems(items, (dialog, which) -> {
-                        Intent intent = new Intent(requireContext(), WordFullscreenActivity.class);
-                        intent.putExtra(WordFullscreenActivity.EXTRA_LEVEL, ids[which]);
-                        intent.putExtra(WordFullscreenActivity.EXTRA_TITLE, items[which]);
-                        startActivity(intent);
-                    })
-                    .setNegativeButton("取消", null)
-                    .show();
+        if ("拼音".equals(section)) {
+            openDirectory("pinyin", "拼音", "");
+        } else if ("单词".equals(section)) {
+            openDirectory("words", "单词", "");
+        } else if ("口语".equals(section)) {
+            openDirectory("speaking", "口语", "");
+        } else if ("句型".equals(section)) {
+            openDirectory("patterns", "句型", "");
+        } else if ("语法".equals(section)) {
+            openDirectory("grammar", "语法", "");
         } else {
             Toast.makeText(requireContext(), section + " 更多内容即将上线", Toast.LENGTH_SHORT).show();
         }
     }
 
+    private void openDirectory(String type, String title, String parentId) {
+        LearningDirectoryActivity.open(requireContext(), type, title, parentId == null ? "" : parentId);
+    }
+
     private void showBookPage() {
-        Toast.makeText(requireContext(), "电子书架加载中...", Toast.LENGTH_SHORT).show();
+        openDirectory("books", "电子书", "");
     }
 
     private void openSpeechSettings() {
@@ -547,35 +545,7 @@ public class LearningFragment extends Fragment {
     }
 
     private void showPromptScenes() {
-        final String[] names = new String[]{
-                "日常打招呼", "点餐买东西", "求职面试", "医院看病",
-                "机场过关", "租房沟通", "口语陪练", "中缅互译"
-        };
-
-        final String[] prompts = new String[]{
-                "你是多语言口语陪练老师。请用中文、缅语和英文各给我 10 句自然的日常打招呼表达，每句附使用场景，并带慢速跟读版本。",
-                "请生成点餐和买东西场景的实用口语，包含中文、缅语、英文三列。句子要短、自然、适合手机朗读练习。",
-                "请模拟求职面试口语场景。先给常见问题，再给简短自然回答，最后给我可直接背诵的中文/缅语/英文版本。",
-                "请生成医院看病常用表达，包含挂号、描述症状、买药、复诊。中文、缅语、英文对照，句子要简单。",
-                "请生成机场过关常用口语，包含入境目的、住址、停留时间、行李说明。中文、缅语、英文对照。",
-                "请生成租房沟通常用表达，包含看房、价格、押金、水电、维修。中文、缅语、英文对照。",
-                "你是中文老师。请用适合初学者的方式教我这个场景的中文口语：先给短句，再给拼音，再给缅语解释，最后给练习对话。",
-                "请把我接下来输入的内容做中缅互译。要求忠实原意、语气自然、不解释、不加内容，只输出译文。"
-        };
-
-        new AlertDialog.Builder(requireContext())
-                .setTitle("选择一个场景 Prompt")
-                .setItems(names, (dialog, which) -> copyPrompt(names[which], prompts[which]))
-                .setNegativeButton("取消", null)
-                .show();
-    }
-
-    private void copyPrompt(String name, String prompt) {
-        ClipboardManager manager = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
-        if (manager != null) {
-            manager.setPrimaryClip(ClipData.newPlainText(name, prompt));
-            Toast.makeText(requireContext(), "已复制：" + name, Toast.LENGTH_SHORT).show();
-        }
+        openDirectory("prompts", "口语 Prompt", "");
     }
 
     private void openDrawer() {

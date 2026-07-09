@@ -3,6 +3,7 @@ package com.chat.learning;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -18,33 +19,53 @@ import android.view.ViewConfiguration;
 import android.view.Window;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 /**
- * 全屏背单词：不依赖 RecyclerView / ViewPager2 / Room。
- * 上下滑换词，左滑忘记，右滑记得，点击翻面，底部三档写入 SM-2 本地记录。
+ * 全屏背单词：左右滑明显换词、点击翻面、下拉收藏、拼读音频、跟读练习。
+ *
+ * 说明：
+ * - 单词分类卡片由 LearningDirectoryActivity 负责。
+ * - 具体词库数据来自 assets/learning/words/{level}.json，一个分类一个大 JSON。
+ * - TTS / ASR 不在本文件写死在线地址，通过 LearningTtsBridge / LearningAsrBridge 接插件。
  */
 public class WordFullscreenActivity extends AppCompatActivity {
     public static final String EXTRA_LEVEL = "level";
     public static final String EXTRA_TITLE = "title";
 
+    private static final int COLOR_BG_TOP = 0xFFEAF4FF;
+    private static final int COLOR_BG_BOTTOM = 0xFFF8FBFF;
     private static final int COLOR_TEXT = 0xFF111827;
     private static final int COLOR_SUB = 0xFF64748B;
-    private static final int COLOR_BLUE = 0xFF1877F2;
+    private static final int COLOR_BLUE = 0xFF2563EB;
+    private static final int COLOR_PHONETIC_MY = 0xFFB45309;
     private static final int COLOR_RED = 0xFFE11D48;
-    private static final int COLOR_ORANGE = 0xFFEA580C;
     private static final int COLOR_GREEN = 0xFF059669;
+    private static final int COLOR_FAV = 0xFFF59E0B;
+
+    private static final String SP_NAME = "tsdd_word_study";
+    private static final String SP_SHOW_GUIDE = "show_word_guide";
+    private static final String SP_SHOW_PINYIN = "show_pinyin";
+    private static final String SP_SHOW_MY_PHONETIC = "show_my_phonetic";
 
     private final ArrayList<WordItem> words = new ArrayList<>();
     private int index = 0;
     private boolean flipped = false;
     private boolean judging = false;
+    private boolean pullReady = false;
     private Axis axis = Axis.NONE;
     private float downX;
     private float downY;
@@ -53,17 +74,26 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private String title;
 
     private FrameLayout root;
-    private LinearLayout card;
+    private FrameLayout cardHost;
+    private FrameLayout card;
+    private LinearLayout cardContent;
     private TextView progress;
+    private TextView pinyinSwitch;
+    private TextView moreMenu;
+    private TextView favoriteButton;
     private TextView word;
     private TextView pinyin;
+    private TextView phoneticMy;
     private TextView meaning;
     private TextView example;
+    private TextView extraInfo;
     private TextView hint;
     private TextView leftMark;
     private TextView rightMark;
+    private TextView pullMark;
     private GestureDetector gestureDetector;
     private ReviewStore reviewStore;
+    private SharedPreferences settings;
 
     private enum Axis { NONE, HORIZONTAL, VERTICAL }
 
@@ -71,14 +101,15 @@ public class WordFullscreenActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Window window = getWindow();
-        window.setStatusBarColor(0xFFEAF4FF);
-        window.setNavigationBarColor(0xFFF8FBFF);
+        window.setStatusBarColor(COLOR_BG_TOP);
+        window.setNavigationBarColor(COLOR_BG_BOTTOM);
 
         level = getIntent().getStringExtra(EXTRA_LEVEL);
         if (level == null || level.length() == 0) level = "hsk1";
         title = getIntent().getStringExtra(EXTRA_TITLE);
         if (title == null || title.length() == 0) title = level.toUpperCase();
 
+        settings = getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
         reviewStore = new ReviewStore(this);
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
         gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
@@ -87,24 +118,13 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 flip();
                 return true;
             }
-
-            @Override
-            public boolean onDoubleTap(MotionEvent e) {
-                playTtsHint();
-                return true;
-            }
-
-            @Override
-            public void onLongPress(MotionEvent e) {
-                Toast.makeText(WordFullscreenActivity.this, "收藏/更多后续接入", Toast.LENGTH_SHORT).show();
-                vibrate(12);
-            }
         });
 
         seedWords();
         sortWordsByReview();
         buildLayout();
         bind();
+        maybeShowGuide();
     }
 
     private void buildLayout() {
@@ -120,94 +140,146 @@ public class WordFullscreenActivity extends AppCompatActivity {
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        page.addView(top, new LinearLayout.LayoutParams(-1, dp(50)));
+        page.addView(top, new LinearLayout.LayoutParams(-1, dp(54)));
 
-        TextView close = circle("×");
-        close.setTextSize(22);
-        close.setOnClickListener(v -> finish());
-        top.addView(close, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        pinyinSwitch = text("", 14, COLOR_BLUE, true);
+        pinyinSwitch.setGravity(Gravity.CENTER_VERTICAL);
+        pinyinSwitch.setPadding(dp(2), 0, dp(10), 0);
+        pinyinSwitch.setOnClickListener(v -> togglePinyin());
+        top.addView(pinyinSwitch, new LinearLayout.LayoutParams(dp(110), -1));
 
         LinearLayout titleBox = new LinearLayout(this);
         titleBox.setOrientation(LinearLayout.VERTICAL);
-        titleBox.setPadding(dp(12), 0, dp(12), 0);
+        titleBox.setGravity(Gravity.CENTER);
         top.addView(titleBox, new LinearLayout.LayoutParams(0, -1, 1f));
 
-        TextView titleView = text(title + " 背单词", 18, COLOR_TEXT, true);
+        TextView titleView = text(title, 17, COLOR_TEXT, true);
+        titleView.setGravity(Gravity.CENTER);
         titleBox.addView(titleView, new LinearLayout.LayoutParams(-1, 0, 1f));
         progress = text("", 12, COLOR_SUB, false);
+        progress.setGravity(Gravity.CENTER);
         titleBox.addView(progress, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        TextView more = circle("⋯");
-        more.setTextSize(26);
-        more.setOnClickListener(v -> Toast.makeText(this, "更多设置后续接入", Toast.LENGTH_SHORT).show());
-        top.addView(more, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        moreMenu = text("⋮", 30, COLOR_TEXT, true);
+        moreMenu.setGravity(Gravity.CENTER);
+        moreMenu.setOnClickListener(v -> toggleMyPhonetic());
+        top.addView(moreMenu, new LinearLayout.LayoutParams(dp(54), -1));
 
-        FrameLayout cardHost = new FrameLayout(this);
+        cardHost = new FrameLayout(this);
         LinearLayout.LayoutParams hostLp = new LinearLayout.LayoutParams(-1, 0, 1f);
-        hostLp.setMargins(0, dp(18), 0, dp(18));
+        hostLp.setMargins(0, dp(16), 0, dp(16));
         page.addView(cardHost, hostLp);
 
-        card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER);
-        card.setPadding(dp(26), dp(26), dp(26), dp(26));
+        leftMark = mark(getString(R.string.word_mark_unknown), 0xFFFFEEF2, COLOR_RED);
+        rightMark = mark(getString(R.string.word_mark_known), 0xFFECFDF5, COLOR_GREEN);
+        pullMark = mark(getString(R.string.word_pull_favorite_hint), 0xFFFFF7ED, COLOR_FAV);
+        FrameLayout.LayoutParams lLp = new FrameLayout.LayoutParams(dp(128), dp(52), Gravity.START | Gravity.CENTER_VERTICAL);
+        lLp.setMargins(dp(12), 0, 0, 0);
+        cardHost.addView(leftMark, lLp);
+        FrameLayout.LayoutParams rLp = new FrameLayout.LayoutParams(dp(128), dp(52), Gravity.END | Gravity.CENTER_VERTICAL);
+        rLp.setMargins(0, 0, dp(12), 0);
+        cardHost.addView(rightMark, rLp);
+        FrameLayout.LayoutParams pLp = new FrameLayout.LayoutParams(dp(190), dp(48), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        pLp.setMargins(0, dp(16), 0, 0);
+        cardHost.addView(pullMark, pLp);
+        leftMark.setAlpha(0f);
+        rightMark.setAlpha(0f);
+        pullMark.setAlpha(0f);
+
+        card = new FrameLayout(this);
         card.setBackground(cardBg());
         card.setOnTouchListener(this::handleCardTouch);
         cardHost.addView(card, new FrameLayout.LayoutParams(-1, -1));
 
-        word = text("", 50, COLOR_TEXT, true);
+        favoriteButton = text("♡", 28, COLOR_FAV, true);
+        favoriteButton.setGravity(Gravity.CENTER);
+        favoriteButton.setOnClickListener(v -> toggleFavoriteWithToast());
+        FrameLayout.LayoutParams favLp = new FrameLayout.LayoutParams(dp(54), dp(54), Gravity.END | Gravity.TOP);
+        favLp.setMargins(0, dp(8), dp(10), 0);
+        card.addView(favoriteButton, favLp);
+
+        cardContent = new LinearLayout(this);
+        cardContent.setOrientation(LinearLayout.VERTICAL);
+        cardContent.setGravity(Gravity.CENTER);
+        cardContent.setPadding(dp(26), dp(70), dp(26), dp(26));
+        cardContent.setOnTouchListener(this::handleCardTouch);
+        card.addView(cardContent, new FrameLayout.LayoutParams(-1, -1));
+
+        word = text("", 52, COLOR_TEXT, true);
         word.setGravity(Gravity.CENTER);
-        card.addView(word, new LinearLayout.LayoutParams(-1, -2));
+        cardContent.addView(word, new LinearLayout.LayoutParams(-1, -2));
 
         pinyin = text("", 22, COLOR_BLUE, true);
         pinyin.setGravity(Gravity.CENTER);
         pinyin.setPadding(0, dp(10), 0, 0);
-        card.addView(pinyin, new LinearLayout.LayoutParams(-1, -2));
+        cardContent.addView(pinyin, new LinearLayout.LayoutParams(-1, -2));
 
-        meaning = text("点击查看意思", 24, COLOR_TEXT, true);
+        phoneticMy = text("", 18, COLOR_PHONETIC_MY, true);
+        phoneticMy.setGravity(Gravity.CENTER);
+        phoneticMy.setPadding(0, dp(6), 0, 0);
+        cardContent.addView(phoneticMy, new LinearLayout.LayoutParams(-1, -2));
+
+        meaning = text("", 23, COLOR_TEXT, true);
         meaning.setGravity(Gravity.CENTER);
-        meaning.setPadding(0, dp(34), 0, 0);
-        card.addView(meaning, new LinearLayout.LayoutParams(-1, -2));
+        meaning.setPadding(0, dp(30), 0, 0);
+        meaning.setLineSpacing(dp(4), 1f);
+        cardContent.addView(meaning, new LinearLayout.LayoutParams(-1, -2));
 
-        example = text("左滑忘记 · 右滑记得 · 模糊点按钮", 16, COLOR_SUB, false);
+        example = text("", 15, COLOR_SUB, false);
         example.setGravity(Gravity.CENTER);
-        example.setLineSpacing(dp(3), 1f);
+        example.setLineSpacing(dp(4), 1f);
         example.setPadding(0, dp(18), 0, 0);
-        card.addView(example, new LinearLayout.LayoutParams(-1, -2));
+        cardContent.addView(example, new LinearLayout.LayoutParams(-1, -2));
 
-        hint = text("点击翻面，双击发音，上下滑切词", 12, COLOR_SUB, false);
+        extraInfo = text("", 13, COLOR_SUB, false);
+        extraInfo.setGravity(Gravity.CENTER);
+        extraInfo.setLineSpacing(dp(4), 1f);
+        extraInfo.setPadding(0, dp(14), 0, 0);
+        cardContent.addView(extraInfo, new LinearLayout.LayoutParams(-1, -2));
+
+        hint = text("", 12, COLOR_SUB, false);
         hint.setGravity(Gravity.CENTER);
-        hint.setPadding(0, dp(28), 0, 0);
-        card.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+        hint.setPadding(0, dp(20), 0, 0);
+        cardContent.addView(hint, new LinearLayout.LayoutParams(-1, -2));
 
-        leftMark = mark("忘记", 0xFFFFEEF2, COLOR_RED);
-        FrameLayout.LayoutParams leftLp = new FrameLayout.LayoutParams(dp(92), dp(44), Gravity.START | Gravity.TOP);
-        leftLp.setMargins(dp(22), dp(76), 0, 0);
-        cardHost.addView(leftMark, leftLp);
-        leftMark.setAlpha(0f);
+        LinearLayout toolRow = new LinearLayout(this);
+        toolRow.setOrientation(LinearLayout.HORIZONTAL);
+        toolRow.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams toolLp = new LinearLayout.LayoutParams(-1, dp(50));
+        toolLp.setMargins(0, dp(22), 0, 0);
+        cardContent.addView(toolRow, toolLp);
 
-        rightMark = mark("记得", 0xFFECFDF5, COLOR_GREEN);
-        FrameLayout.LayoutParams rightLp = new FrameLayout.LayoutParams(dp(92), dp(44), Gravity.END | Gravity.TOP);
-        rightLp.setMargins(0, dp(76), dp(22), 0);
-        cardHost.addView(rightMark, rightLp);
-        rightMark.setAlpha(0f);
+        addToolButton(toolRow, getString(R.string.word_action_tts), () -> speakCurrentWord());
+        addHorizontalGap(toolRow, 8);
+        addToolButton(toolRow, getString(R.string.word_action_spelling), () -> speakCurrentSpelling());
+        addHorizontalGap(toolRow, 8);
+        addToolButton(toolRow, getString(R.string.word_action_stroke), () -> openStrokePractice());
+        addHorizontalGap(toolRow, 8);
+        addToolButton(toolRow, getString(R.string.word_action_pronunciation), () -> openPronunciationPractice());
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER);
-        page.addView(actions, new LinearLayout.LayoutParams(-1, dp(50)));
+        page.addView(actions, new LinearLayout.LayoutParams(-1, dp(52)));
 
-        TextView forgot = actionButton("忘记", 0xFFFFEEF2, COLOR_RED);
-        TextView vague = actionButton("模糊", 0xFFFFF7ED, COLOR_ORANGE);
-        TextView known = actionButton("记得", 0xFFECFDF5, COLOR_GREEN);
+        TextView forgot = actionButton(getString(R.string.word_action_unknown), 0xFFFFEEF2, COLOR_RED);
+        TextView known = actionButton(getString(R.string.word_action_known), 0xFFECFDF5, COLOR_GREEN);
         actions.addView(forgot, new LinearLayout.LayoutParams(0, -1, 1f));
-        LinearLayout.LayoutParams mid = new LinearLayout.LayoutParams(0, -1, 1f);
-        mid.setMargins(dp(10), 0, dp(10), 0);
-        actions.addView(vague, mid);
-        actions.addView(known, new LinearLayout.LayoutParams(0, -1, 1f));
+        LinearLayout.LayoutParams knownLp = new LinearLayout.LayoutParams(0, -1, 1f);
+        knownLp.setMargins(dp(12), 0, 0, 0);
+        actions.addView(known, knownLp);
         forgot.setOnClickListener(v -> judge(Sm2.QUALITY_FORGOT));
-        vague.setOnClickListener(v -> judge(Sm2.QUALITY_VAGUE));
         known.setOnClickListener(v -> judge(Sm2.QUALITY_KNOWN));
+    }
+
+    private void addToolButton(LinearLayout row, String text, Runnable action) {
+        TextView button = text(text, 13, COLOR_TEXT, true);
+        button.setGravity(Gravity.CENTER);
+        button.setBackground(rounded(0xFFF8FAFC, dp(16), 0xFFE5E7EB, 1));
+        button.setOnClickListener(v -> {
+            if (action != null) action.run();
+        });
+        row.addView(button, new LinearLayout.LayoutParams(0, -1, 1f));
     }
 
     private boolean handleCardTouch(View v, MotionEvent event) {
@@ -218,6 +290,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 downX = event.getRawX();
                 downY = event.getRawY();
                 axis = Axis.NONE;
+                pullReady = false;
                 card.animate().cancel();
                 return true;
             case MotionEvent.ACTION_MOVE:
@@ -228,22 +301,32 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 }
                 if (axis == Axis.HORIZONTAL) {
                     card.setTranslationX(dx);
-                    card.setRotation(dx / 28f);
-                    float a = Math.min(1f, Math.abs(dx) / dp(128));
-                    leftMark.setAlpha(dx < 0 ? a : 0f);
-                    rightMark.setAlpha(dx > 0 ? a : 0f);
-                } else if (axis == Axis.VERTICAL) {
-                    card.setTranslationY(dy * 0.28f);
+                    card.setRotation(dx / 30f);
+                    float alpha = Math.min(1f, Math.abs(dx) / dp(120));
+                    leftMark.setAlpha(dx < 0 ? alpha : 0f);
+                    rightMark.setAlpha(dx > 0 ? alpha : 0f);
+                    pullMark.setAlpha(0f);
+                } else if (axis == Axis.VERTICAL && dy > 0 && !flipped) {
+                    float move = Math.min(dp(110), dy * 0.45f);
+                    card.setTranslationY(move);
+                    float alpha = Math.min(1f, dy / dp(92));
+                    pullMark.setAlpha(alpha);
+                    boolean nowReady = dy > dp(92);
+                    if (nowReady && !pullReady) {
+                        pullReady = true;
+                        vibrate(12);
+                    }
+                    pullMark.setText(isFavorite(currentId()) ? getString(R.string.word_pull_unfavorite_release) : getString(R.string.word_pull_favorite_release));
                 }
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 float upDx = event.getRawX() - downX;
                 float upDy = event.getRawY() - downY;
-                if (axis == Axis.HORIZONTAL && Math.abs(upDx) > dp(118)) {
+                if (axis == Axis.HORIZONTAL && Math.abs(upDx) > dp(116)) {
                     judge(upDx > 0 ? Sm2.QUALITY_KNOWN : Sm2.QUALITY_FORGOT);
-                } else if (axis == Axis.VERTICAL && Math.abs(upDy) > dp(118)) {
-                    if (upDy < 0) next(); else prev();
+                } else if (axis == Axis.VERTICAL && upDy > dp(92) && !flipped) {
+                    toggleFavoriteWithToast();
                     resetMotion();
                 } else {
                     resetMotion();
@@ -258,28 +341,79 @@ public class WordFullscreenActivity extends AppCompatActivity {
         if (words.isEmpty()) return;
         WordItem item = words.get(index);
         flipped = false;
+        updatePinyinSwitch();
         progress.setText((index + 1) + " / " + words.size() + " · " + formatReview(item.id));
         word.setText(item.word);
         pinyin.setText(item.pinyin);
-        meaning.setText("点击查看意思");
-        example.setText("左滑忘记 · 右滑记得 · 模糊点按钮");
-        hint.setText("点击翻面，双击发音，上下滑切词");
+        pinyin.setVisibility(showPinyin() ? View.VISIBLE : View.GONE);
+        phoneticMy.setText(item.phoneticMy);
+        phoneticMy.setVisibility(showMyPhonetic() && item.phoneticMy.length() > 0 ? View.VISIBLE : View.GONE);
+        meaning.setText(getString(R.string.word_front_tap));
+        example.setText(getString(R.string.word_front_hint));
+        extraInfo.setText(spellingText(item));
+        hint.setText(getString(R.string.word_gesture_hint_short));
+        favoriteButton.setText(isFavorite(item.id) ? "♥" : "♡");
         resetMotion();
+        card.setAlpha(0f);
+        card.setTranslationX(dp(80));
+        card.animate().alpha(1f).translationX(0f).rotation(0f).setDuration(150).start();
+        speakCurrentWordAuto();
     }
 
     private void flip() {
-        if (words.isEmpty()) return;
+        if (words.isEmpty() || axis != Axis.NONE) return;
         WordItem item = words.get(index);
         flipped = !flipped;
-        if (flipped) {
-            meaning.setText(item.meaning);
-            example.setText("例句：" + item.example);
-            hint.setText("忘记=10分钟后 · 模糊=8小时后 · 记得=按 SM-2");
-        } else {
-            meaning.setText("点击查看意思");
-            example.setText("左滑忘记 · 右滑记得 · 模糊点按钮");
-            hint.setText("点击翻面，双击发音，上下滑切词");
+        card.animate().rotationY(90f).setDuration(80).setListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                card.animate().setListener(null);
+                if (flipped) bindBack(item); else bindFront(item);
+                card.setRotationY(-90f);
+                card.animate().rotationY(0f).setDuration(100).start();
+            }
+        }).start();
+    }
+
+    private void bindFront(WordItem item) {
+        meaning.setText(getString(R.string.word_front_tap));
+        example.setText(getString(R.string.word_front_hint));
+        extraInfo.setText(spellingText(item));
+        hint.setText(getString(R.string.word_gesture_hint_short));
+        pinyin.setVisibility(showPinyin() ? View.VISIBLE : View.GONE);
+        phoneticMy.setVisibility(showMyPhonetic() && item.phoneticMy.length() > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    private void bindBack(WordItem item) {
+        StringBuilder m = new StringBuilder();
+        if (item.meaningMy.length() > 0) m.append(getString(R.string.word_label_meaning_my)).append("\n").append(item.meaningMy);
+        if (item.meaningEn.length() > 0) {
+            if (m.length() > 0) m.append("\n\n");
+            m.append(getString(R.string.word_label_meaning_en)).append("\n").append(item.meaningEn);
         }
+        meaning.setText(m.length() == 0 ? item.meaning : m.toString());
+
+        StringBuilder ex = new StringBuilder();
+        if (item.example.length() > 0) {
+            ex.append(getString(R.string.word_label_example)).append(item.example);
+            if (item.examplePinyin.length() > 0 && showPinyin()) ex.append("\n").append(item.examplePinyin);
+            if (item.exampleMy.length() > 0) ex.append("\n").append(item.exampleMy);
+        }
+        example.setText(ex.length() == 0 ? getString(R.string.word_no_example) : ex.toString());
+
+        StringBuilder more = new StringBuilder();
+        addMoreLine(more, getString(R.string.word_label_usage), item.usageScene);
+        addMoreLine(more, getString(R.string.word_label_notes), item.notes);
+        addMoreLine(more, getString(R.string.word_label_synonyms), item.synonymsText);
+        addMoreLine(more, getString(R.string.word_label_antonyms), item.antonymsText);
+        extraInfo.setText(more.toString());
+        hint.setText(getString(R.string.word_back_hint));
+    }
+
+    private void addMoreLine(StringBuilder builder, String label, String value) {
+        if (value == null || value.length() == 0) return;
+        if (builder.length() > 0) builder.append("\n");
+        builder.append(label).append(value);
     }
 
     private void judge(int quality) {
@@ -289,15 +423,12 @@ public class WordFullscreenActivity extends AppCompatActivity {
         ReviewState old = reviewStore.get(item.id);
         ReviewState next = Sm2.schedule(old, item.id, quality, System.currentTimeMillis());
         reviewStore.save(next);
-        vibrate(20);
+        vibrate(18);
         int dir = quality == Sm2.QUALITY_FORGOT ? -1 : 1;
-        if (quality == Sm2.QUALITY_VAGUE) dir = 0;
-        if (quality == Sm2.QUALITY_FORGOT) leftMark.setAlpha(1f);
-        if (quality == Sm2.QUALITY_KNOWN) rightMark.setAlpha(1f);
-        Toast.makeText(this, quality == Sm2.QUALITY_VAGUE ? "模糊：8小时后复习" : quality == Sm2.QUALITY_FORGOT ? "忘记：10分钟后复习" : "记得：已安排复习", Toast.LENGTH_SHORT).show();
+        if (quality == Sm2.QUALITY_FORGOT) leftMark.setAlpha(1f); else rightMark.setAlpha(1f);
+        Toast.makeText(this, quality == Sm2.QUALITY_FORGOT ? getString(R.string.word_toast_unknown) : getString(R.string.word_toast_known), Toast.LENGTH_SHORT).show();
         card.animate()
-                .translationX(dir == 0 ? 0 : dir * dp(460))
-                .translationY(quality == Sm2.QUALITY_VAGUE ? dp(460) : 0)
+                .translationX(dir * dp(520))
                 .rotation(dir * 10f)
                 .alpha(0f)
                 .setDuration(180)
@@ -306,20 +437,17 @@ public class WordFullscreenActivity extends AppCompatActivity {
                     public void onAnimationEnd(Animator animation) {
                         card.animate().setListener(null);
                         card.setAlpha(1f);
+                        card.setTranslationX(0f);
+                        card.setRotation(0f);
                         judging = false;
-                        next();
+                        nextWord();
                     }
                 })
                 .start();
     }
 
-    private void next() {
+    private void nextWord() {
         if (index < words.size() - 1) index++; else index = 0;
-        bind();
-    }
-
-    private void prev() {
-        if (index > 0) index--; else index = words.size() - 1;
         bind();
     }
 
@@ -327,23 +455,206 @@ public class WordFullscreenActivity extends AppCompatActivity {
         card.animate().translationX(0f).translationY(0f).rotation(0f).alpha(1f).setDuration(130).start();
         leftMark.animate().alpha(0f).setDuration(100).start();
         rightMark.animate().alpha(0f).setDuration(100).start();
+        pullMark.animate().alpha(0f).setDuration(100).start();
     }
 
-    private void playTtsHint() {
-        if (!words.isEmpty()) Toast.makeText(this, "发音后续接 wkspeech：" + words.get(index).word, Toast.LENGTH_SHORT).show();
+    private void speakCurrentWordAuto() {
+        // 第一版默认不强制自动朗读，避免打开列表时连续刷词太吵；后续可加设置开关。
+    }
+
+    private void speakCurrentWord() {
+        if (words.isEmpty()) return;
+        LearningTtsBridge.speak(this, words.get(index).word, LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_WORD);
+        vibrate(6);
+    }
+
+    private void speakCurrentSpelling() {
+        if (words.isEmpty()) return;
+        WordItem item = words.get(index);
+        LearningTtsBridge.speak(this, spellingText(item), LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_SPELLING);
+        vibrate(6);
+    }
+
+    private void openPronunciationPractice() {
+        if (words.isEmpty()) return;
+        WordItem item = words.get(index);
+        Intent intent = new Intent(this, WordPronunciationActivity.class);
+        intent.putExtra(WordPronunciationActivity.EXTRA_WORD, item.word);
+        intent.putExtra(WordPronunciationActivity.EXTRA_PINYIN, item.pinyin);
+        intent.putExtra(WordPronunciationActivity.EXTRA_SPELLING_TEXT, spellingText(item));
+        startActivity(intent);
+    }
+
+    private void openStrokePractice() {
+        if (words.isEmpty()) return;
+        Toast.makeText(this, getString(R.string.word_stroke_todo), Toast.LENGTH_SHORT).show();
+    }
+
+    private void togglePinyin() {
+        boolean next = !showPinyin();
+        settings.edit().putBoolean(SP_SHOW_PINYIN, next).apply();
+        updatePinyinSwitch();
+        if (!words.isEmpty()) {
+            pinyin.setVisibility(next ? View.VISIBLE : View.GONE);
+            if (flipped) bindBack(words.get(index)); else bindFront(words.get(index));
+        }
+    }
+
+    private void toggleMyPhonetic() {
+        boolean next = !showMyPhonetic();
+        settings.edit().putBoolean(SP_SHOW_MY_PHONETIC, next).apply();
+        Toast.makeText(this, next ? getString(R.string.word_toast_my_phonetic_on) : getString(R.string.word_toast_my_phonetic_off), Toast.LENGTH_SHORT).show();
+        if (!words.isEmpty()) phoneticMy.setVisibility(next && words.get(index).phoneticMy.length() > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    private boolean showPinyin() {
+        return settings.getBoolean(SP_SHOW_PINYIN, true);
+    }
+
+    private boolean showMyPhonetic() {
+        return settings.getBoolean(SP_SHOW_MY_PHONETIC, true);
+    }
+
+    private void updatePinyinSwitch() {
+        pinyinSwitch.setText(showPinyin() ? getString(R.string.word_pinyin_on) : getString(R.string.word_pinyin_off));
+    }
+
+    private void toggleFavoriteWithToast() {
+        String id = currentId();
+        if (id.length() == 0) return;
+        boolean next = !isFavorite(id);
+        settings.edit().putBoolean("fav." + id, next).apply();
+        favoriteButton.setText(next ? "♥" : "♡");
+        Toast.makeText(this, next ? getString(R.string.word_favorite_added) : getString(R.string.word_favorite_removed), Toast.LENGTH_SHORT).show();
         vibrate(10);
+    }
+
+    private boolean isFavorite(String id) {
+        return id != null && id.length() > 0 && settings.getBoolean("fav." + id, false);
+    }
+
+    private String currentId() {
+        return words.isEmpty() ? "" : words.get(index).id;
+    }
+
+    private void maybeShowGuide() {
+        if (!settings.getBoolean(SP_SHOW_GUIDE, true)) return;
+        final FrameLayout overlay = new FrameLayout(this);
+        overlay.setBackgroundColor(0x99000000);
+        root.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(24), dp(24), dp(24), dp(22));
+        panel.setBackground(rounded(0xFFFFFFFF, dp(24), 0, 0));
+        FrameLayout.LayoutParams panelLp = new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER);
+        panelLp.setMargins(dp(24), 0, dp(24), 0);
+        overlay.addView(panel, panelLp);
+
+        TextView title = text(getString(R.string.word_guide_title), 22, COLOR_TEXT, true);
+        title.setGravity(Gravity.CENTER);
+        panel.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView body = text(getString(R.string.word_guide_body), 15, COLOR_SUB, false);
+        body.setLineSpacing(dp(6), 1f);
+        LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(-1, -2);
+        bodyLp.setMargins(0, dp(16), 0, dp(20));
+        panel.addView(body, bodyLp);
+
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.setGravity(Gravity.CENTER);
+        panel.addView(buttons, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        TextView never = actionButton(getString(R.string.word_guide_never), 0xFFF3F4F6, COLOR_SUB);
+        TextView ok = actionButton(getString(R.string.word_guide_ok), 0xFFEFF6FF, COLOR_BLUE);
+        buttons.addView(never, new LinearLayout.LayoutParams(0, -1, 1f));
+        LinearLayout.LayoutParams okLp = new LinearLayout.LayoutParams(0, -1, 1f);
+        okLp.setMargins(dp(12), 0, 0, 0);
+        buttons.addView(ok, okLp);
+        never.setOnClickListener(v -> {
+            settings.edit().putBoolean(SP_SHOW_GUIDE, false).apply();
+            root.removeView(overlay);
+        });
+        ok.setOnClickListener(v -> root.removeView(overlay));
     }
 
     private void seedWords() {
         words.clear();
-        words.add(new WordItem(level + "_001", "你好", "nǐ hǎo", "မင်္ဂလာပါ / Hello", "你好，很高兴认识你。"));
-        words.add(new WordItem(level + "_002", "谢谢", "xiè xie", "ကျေးဇူးတင်ပါတယ် / Thank you", "谢谢你的帮助。"));
-        words.add(new WordItem(level + "_003", "再见", "zài jiàn", "နောက်မှတွေ့မယ် / Goodbye", "明天再见。"));
-        words.add(new WordItem(level + "_004", "可以", "kě yǐ", "ရပါတယ် / OK", "这样可以吗？"));
-        words.add(new WordItem(level + "_005", "朋友", "péng you", "သူငယ်ချင်း / Friend", "他是我的朋友。"));
-        words.add(new WordItem(level + "_006", "学习", "xué xí", "သင်ယူသည် / Study", "我每天学习中文。"));
-        words.add(new WordItem(level + "_007", "工作", "gōng zuò", "အလုပ် / Work", "我想找工作。"));
-        words.add(new WordItem(level + "_008", "吃饭", "chī fàn", "ထမင်းစားသည် / Eat", "我们一起吃饭吧。"));
+        if (loadWordsFromAsset(level)) return;
+
+        words.add(new WordItem(level + "_001", "你好", "nǐ hǎo", "နီ ဟောင်", "မင်္ဂလာပါ", "Hello", "မင်္ဂလာပါ / Hello", "你好，很高兴认识你。", "Nǐ hǎo, hěn gāoxìng rènshi nǐ.", "မင်္ဂလာပါ၊ တွေ့ရတာဝမ်းသာပါတယ်။", "见面、聊天开场", "你好偏日常，您好更礼貌。", "您好", ""));
+        words.add(new WordItem(level + "_002", "谢谢", "xiè xie", "ရှဲ့ ရှဲ့", "ကျေးဇူးတင်ပါတယ်", "Thank you", "ကျေးဇူးတင်ပါတယ် / Thank you", "谢谢你的帮助。", "Xièxie nǐ de bāngzhù.", "ကူညီပေးတာ ကျေးဇူးတင်ပါတယ်။", "表达感谢", "熟人和陌生人都可以用。", "感谢", ""));
+        words.add(new WordItem(level + "_003", "再见", "zài jiàn", "ဇိုင်း ကျန်", "နောက်မှတွေ့မယ်", "Goodbye", "နောက်မှတွေ့မယ် / Goodbye", "明天再见。", "Míngtiān zàijiàn.", "မနက်ဖြန် ပြန်တွေ့မယ်။", "告别", "也可以说拜拜。", "拜拜", ""));
+    }
+
+    private boolean loadWordsFromAsset(String levelId) {
+        if (levelId == null || levelId.length() == 0) return false;
+        try {
+            String json = readAsset("learning/words/" + levelId + ".json");
+            JSONObject root = new JSONObject(json);
+            JSONArray items = root.optJSONArray("items");
+            if (items == null || items.length() == 0) return false;
+            for (int i = 0; i < items.length(); i++) {
+                JSONObject item = items.optJSONObject(i);
+                if (item == null) continue;
+                String id = item.optString("id", levelId + "_" + i);
+                String wordText = firstNonEmpty(item.optString("word", ""), item.optString("chinese", ""));
+                String pinyinText = item.optString("pinyin", "");
+                String phonetic = firstNonEmpty(item.optString("phonetic_my", ""), item.optString("mnemonic", ""));
+                JSONObject translations = item.optJSONObject("translations");
+                String my = firstNonEmpty(item.optString("meaning_my", ""), translations != null ? translations.optString("my", "") : "", item.optString("burmese", ""));
+                String en = firstNonEmpty(item.optString("meaning_en", ""), translations != null ? translations.optString("en", "") : "");
+                String meaningText = my.length() > 0 && en.length() > 0 ? my + " / " + en : my.length() > 0 ? my : en;
+                String exampleText = item.optString("example", "");
+                String examplePinyin = item.optString("example_pinyin", "");
+                JSONObject exampleTranslations = item.optJSONObject("exampleTranslations");
+                String exampleMy = firstNonEmpty(item.optString("example_my", ""), exampleTranslations != null ? exampleTranslations.optString("my", "") : "");
+                String usage = firstNonEmpty(item.optString("usage_scene", ""), item.optString("scene", ""));
+                String notes = firstNonEmpty(item.optString("notes", ""), item.optString("explanation", ""));
+                String synonyms = joinArray(item.optJSONArray("synonyms"));
+                String antonyms = joinArray(item.optJSONArray("antonyms"));
+                if (wordText.length() == 0) continue;
+                words.add(new WordItem(id, wordText, pinyinText, phonetic, my, en, meaningText, exampleText, examplePinyin, exampleMy, usage, notes, synonyms, antonyms));
+            }
+            return !words.isEmpty();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String v : values) if (v != null && v.length() > 0) return v;
+        return "";
+    }
+
+    private String joinArray(JSONArray array) {
+        if (array == null || array.length() == 0) return "";
+        ArrayList<String> out = new ArrayList<>();
+        for (int i = 0; i < array.length(); i++) {
+            String v = array.optString(i, "");
+            if (v.length() > 0) out.add(v);
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < out.size(); i++) {
+            if (i > 0) builder.append(" / ");
+            builder.append(out.get(i));
+        }
+        return builder.toString();
+    }
+
+    private String readAsset(String path) throws Exception {
+        InputStream input = getAssets().open(path);
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int read;
+            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
+            return output.toString("UTF-8");
+        } finally {
+            try { input.close(); } catch (Throwable ignored) {}
+        }
     }
 
     private void sortWordsByReview() {
@@ -360,13 +671,85 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private String formatReview(String id) {
         ReviewState s = reviewStore.get(id);
-        if (s.reviewCount <= 0) return "新词";
+        if (s.reviewCount <= 0) return getString(R.string.word_review_new);
         long diff = s.nextReviewAt - System.currentTimeMillis();
-        if (diff <= 0) return "待复习";
+        if (diff <= 0) return getString(R.string.word_review_due);
         long h = diff / (60L * 60L * 1000L);
-        if (h < 1) return "稍后复习";
-        if (h < 24) return h + "小时后";
-        return (h / 24) + "天后";
+        if (h < 1) return getString(R.string.word_review_soon);
+        if (h < 24) return getString(R.string.word_review_hours, h);
+        return getString(R.string.word_review_days, h / 24);
+    }
+
+    private String spellingText(WordItem item) {
+        if (item == null || item.pinyin == null || item.pinyin.length() == 0) return "";
+        String[] parts = item.pinyin.trim().split("\\s+");
+        StringBuilder builder = new StringBuilder();
+        for (String part : parts) {
+            PinyinSyllable s = parseSyllable(part);
+            if (builder.length() > 0) builder.append("。 ");
+            if (s.initial.length() > 0) builder.append(s.initial).append("，");
+            if (s.finalPart.length() > 0) builder.append(s.finalPart).append("，");
+            builder.append(toneName(s.tone)).append("，").append(part);
+        }
+        return builder.toString();
+    }
+
+    private PinyinSyllable parseSyllable(String raw) {
+        String base = normalizePinyin(raw);
+        int tone = toneFromMarked(raw);
+        String[] initials = new String[]{"zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x", "r", "z", "c", "s", "y", "w"};
+        String initial = "";
+        for (String it : initials) {
+            if (base.startsWith(it) && base.length() > it.length()) {
+                initial = it;
+                break;
+            }
+        }
+        String finalPart = initial.length() > 0 ? base.substring(initial.length()) : base;
+        return new PinyinSyllable(initial, finalPart, tone);
+    }
+
+    private String normalizePinyin(String raw) {
+        if (raw == null) return "";
+        String s = raw.toLowerCase();
+        String[][] map = new String[][]{
+                {"āáǎàa", "a"}, {"ēéěèe", "e"}, {"īíǐìi", "i"}, {"ōóǒòo", "o"}, {"ūúǔùu", "u"}, {"ǖǘǚǜü", "u"}
+        };
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            String repl = String.valueOf(c);
+            for (String[] m : map) {
+                if (m[0].indexOf(c) >= 0) { repl = m[1]; break; }
+            }
+            if ((repl.charAt(0) >= 'a' && repl.charAt(0) <= 'z')) out.append(repl);
+        }
+        return out.toString();
+    }
+
+    private int toneFromMarked(String raw) {
+        if (raw == null) return 0;
+        String t1 = "āēīōūǖ";
+        String t2 = "áéíóúǘ";
+        String t3 = "ǎěǐǒǔǚ";
+        String t4 = "àèìòùǜ";
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (t1.indexOf(c) >= 0) return 1;
+            if (t2.indexOf(c) >= 0) return 2;
+            if (t3.indexOf(c) >= 0) return 3;
+            if (t4.indexOf(c) >= 0) return 4;
+            if (c >= '1' && c <= '5') return c - '0';
+        }
+        return 0;
+    }
+
+    private String toneName(int tone) {
+        if (tone == 1) return getString(R.string.word_tone_1);
+        if (tone == 2) return getString(R.string.word_tone_2);
+        if (tone == 3) return getString(R.string.word_tone_3);
+        if (tone == 4) return getString(R.string.word_tone_4);
+        return getString(R.string.word_tone_0);
     }
 
     private void vibrate(long ms) {
@@ -388,13 +771,6 @@ public class WordFullscreenActivity extends AppCompatActivity {
         return t;
     }
 
-    private TextView circle(String v) {
-        TextView t = text(v, 18, COLOR_TEXT, true);
-        t.setGravity(Gravity.CENTER);
-        t.setBackground(rounded(0xAAFFFFFF, dp(21), 0xFFE5E7EB, 1));
-        return t;
-    }
-
     private TextView actionButton(String v, int bg, int fg) {
         TextView t = text(v, 15, fg, true);
         t.setGravity(Gravity.CENTER);
@@ -403,14 +779,14 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private TextView mark(String v, int bg, int fg) {
-        TextView t = text(v, 16, fg, true);
+        TextView t = text(v, 15, fg, true);
         t.setGravity(Gravity.CENTER);
-        t.setBackground(rounded(bg, dp(18), 0, 0));
+        t.setBackground(rounded(bg, dp(20), 0, 0));
         return t;
     }
 
     private GradientDrawable pageBg() {
-        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xFFEAF4FF, 0xFFF8FBFF});
+        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{COLOR_BG_TOP, COLOR_BG_BOTTOM});
     }
 
     private GradientDrawable cardBg() {
@@ -428,14 +804,31 @@ public class WordFullscreenActivity extends AppCompatActivity {
         return d;
     }
 
+    private void addHorizontalGap(LinearLayout parent, int widthDp) {
+        View v = new View(this);
+        parent.addView(v, new LinearLayout.LayoutParams(dp(widthDp), 1));
+    }
+
     private int dp(float v) {
         return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    private static class PinyinSyllable {
+        final String initial;
+        final String finalPart;
+        final int tone;
+        PinyinSyllable(String initial, String finalPart, int tone) {
+            this.initial = initial; this.finalPart = finalPart; this.tone = tone;
+        }
+    }
+
     private static class WordItem {
-        final String id, word, pinyin, meaning, example;
-        WordItem(String id, String word, String pinyin, String meaning, String example) {
-            this.id = id; this.word = word; this.pinyin = pinyin; this.meaning = meaning; this.example = example;
+        final String id, word, pinyin, phoneticMy, meaningMy, meaningEn, meaning, example, examplePinyin, exampleMy, usageScene, notes, synonymsText, antonymsText;
+        WordItem(String id, String word, String pinyin, String phoneticMy, String meaningMy, String meaningEn, String meaning, String example, String examplePinyin, String exampleMy, String usageScene, String notes, String synonymsText, String antonymsText) {
+            this.id = id; this.word = word; this.pinyin = pinyin; this.phoneticMy = phoneticMy;
+            this.meaningMy = meaningMy; this.meaningEn = meaningEn; this.meaning = meaning;
+            this.example = example; this.examplePinyin = examplePinyin; this.exampleMy = exampleMy;
+            this.usageScene = usageScene; this.notes = notes; this.synonymsText = synonymsText; this.antonymsText = antonymsText;
         }
     }
 
@@ -453,12 +846,10 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private static class Sm2 {
         static final int QUALITY_FORGOT = 0;
-        static final int QUALITY_VAGUE = 2;
         static final int QUALITY_KNOWN = 5;
         private static final double MIN_EASE = 1.3d;
         private static final long MINUTE = 60L * 1000L;
-        private static final long HOUR = 60L * MINUTE;
-        private static final long DAY = 24L * HOUR;
+        private static final long DAY = 24L * 60L * MINUTE;
 
         static ReviewState schedule(ReviewState old, String wordId, int quality, long now) {
             ReviewState n = new ReviewState();
@@ -472,7 +863,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 rep = 0;
                 interval = 0;
                 lapse++;
-                nextAt = now + (quality <= QUALITY_FORGOT ? 10L * MINUTE : 8L * HOUR);
+                nextAt = now + 10L * MINUTE;
             } else {
                 if (rep == 0) interval = 1;
                 else if (rep == 1) interval = 6;
@@ -480,7 +871,6 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 rep++;
                 nextAt = now + interval * DAY;
             }
-            // EF 无论成功/失败都更新，别挪进 else。
             ef = ef + (0.1d - (5 - quality) * (0.08d + (5 - quality) * 0.02d));
             if (ef < MIN_EASE) ef = MIN_EASE;
             n.easeFactor = ef;
