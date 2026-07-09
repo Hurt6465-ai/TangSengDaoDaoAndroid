@@ -24,6 +24,7 @@
     <string name="word_pinyin_off">拼音 关</string>
     <string name="word_mark_unknown">不认识</string>
     <string name="word_mark_known">认识</string>
+    <string name="word_mark_hard">模糊</string>
     <string name="word_pull_favorite_hint">下拉收藏</string>
     <string name="word_pull_favorite_release">松手收藏</string>
     <string name="word_pull_unfavorite_release">松手取消收藏</string>
@@ -37,6 +38,7 @@
     <string name="word_action_pronunciation">跟读</string>
     <string name="word_action_unknown">不认识</string>
     <string name="word_action_known">认识</string>
+    <string name="word_action_hard">模糊</string>
     <string name="word_label_meaning_my">缅语：</string>
     <string name="word_label_meaning_en">英文：</string>
     <string name="word_label_example">例句：</string>
@@ -47,15 +49,21 @@
     <string name="word_no_example">暂无例句</string>
     <string name="word_toast_unknown">不认识：稍后再复习</string>
     <string name="word_toast_known">认识：已安排复习</string>
+    <string name="word_toast_hard">模糊：明天重点复习</string>
     <string name="word_favorite_added">已收藏</string>
     <string name="word_favorite_removed">已取消收藏</string>
     <string name="word_toast_my_phonetic_on">已显示缅文发音提示</string>
     <string name="word_toast_my_phonetic_off">已隐藏缅文发音提示</string>
     <string name="word_stroke_todo">笔顺/描红入口已预留，后续接 Hanzi 数据</string>
     <string name="word_tts_plugin_missing">TTS 插件未安装或未响应</string>
+    <string name="word_menu_show_my_phonetic">显示缅文谐音</string>
+    <string name="word_menu_hide_my_phonetic">隐藏缅文谐音</string>
+    <string name="word_menu_show_guide">操作说明</string>
+    <string name="word_menu_tts_settings">语音设置</string>
     <string name="word_guide_title">背词操作说明</string>
     <string name="word_guide_body">点击卡片空白处：查看释义
 左滑：不认识，稍后再复习
+中间按钮：模糊，明天重点复习
 右滑：认识，进入下一词
 下拉卡片：收藏 / 取消收藏
 朗读、拼读、跟读、笔顺按钮只执行对应功能，不会翻面</string>
@@ -72,6 +80,11 @@
     <string name="word_tone_3">三声</string>
     <string name="word_tone_4">四声</string>
     <string name="pronunciation_title">发音练习</string>
+    <string name="stroke_title">笔顺 / 描红</string>
+    <string name="stroke_subtitle">先保留原生全屏入口。接入 HanziWriter 或 makemeahanzi 数据后，可显示笔顺动画、逐笔练习和描红。</string>
+    <string name="stroke_chars_title">逐字练习</string>
+    <string name="stroke_data_missing">当前还没有接入汉字笔顺数据。后续接入数据后，这里会显示笔顺动画和描红练习。</string>
+    <string name="stroke_speak_word">朗读这个词</string>
     <string name="pronunciation_tip">先听标准音和拼读音，再录自己的声音。免费版只做录音对比；安装本地 ASR 插件后可做识别/评分。</string>
     <string name="pronunciation_play_standard">播放标准音</string>
     <string name="pronunciation_play_spelling">播放拼读音</string>
