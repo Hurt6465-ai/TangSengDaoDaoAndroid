@@ -30,4 +30,5 @@ android {
 dependencies {
     api project(':wkbase')
     implementation project(':wkuikit')
+    implementation 'com.yuyakaido.android:card-stack-view:2.3.4'
 }
