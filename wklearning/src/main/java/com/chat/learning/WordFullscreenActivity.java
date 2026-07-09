@@ -13,7 +13,6 @@ import android.media.ToneGenerator;
 import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
-import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -109,7 +108,6 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private View divider;
     private ScrollView contentScroll;
     private LinearLayout textBox;
-    private GestureDetector gestureDetector;
     private ReviewStore reviewStore;
     private SharedPreferences settings;
     private ToneGenerator toneGenerator;
@@ -132,14 +130,6 @@ public class WordFullscreenActivity extends AppCompatActivity {
         try { toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 36); } catch (Throwable ignored) {}
         reviewStore = new ReviewStore(this);
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
-        gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
-            @Override
-            public boolean onSingleTapConfirmed(MotionEvent e) {
-                flip();
-                return true;
-            }
-        });
-
         seedWords();
         sortWordsByReview();
         buildLayout();
@@ -295,17 +285,17 @@ public class WordFullscreenActivity extends AppCompatActivity {
         LinearLayout toolRow = new LinearLayout(this);
         toolRow.setOrientation(LinearLayout.HORIZONTAL);
         toolRow.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams toolLp = new LinearLayout.LayoutParams(-1, dp(50));
-        toolLp.setMargins(0, dp(22), 0, 0);
+        LinearLayout.LayoutParams toolLp = new LinearLayout.LayoutParams(-1, dp(44));
+        toolLp.setMargins(0, dp(18), 0, 0);
         cardContent.addView(toolRow, toolLp);
 
-        addToolButton(toolRow, getString(R.string.word_action_tts), () -> speakCurrentWord());
-        addHorizontalGap(toolRow, 8);
-        addToolButton(toolRow, getString(R.string.word_action_spelling), () -> speakCurrentSpelling());
-        addHorizontalGap(toolRow, 8);
-        addToolButton(toolRow, getString(R.string.word_action_stroke), () -> openStrokePractice());
-        addHorizontalGap(toolRow, 8);
-        addToolButton(toolRow, getString(R.string.word_action_pronunciation), () -> openPronunciationPractice());
+        addToolButton(toolRow, getString(R.string.word_action_tts), getString(R.string.word_action_tts_short), () -> speakCurrentWord());
+        addHorizontalGap(toolRow, 10);
+        addToolButton(toolRow, getString(R.string.word_action_spelling), getString(R.string.word_action_spelling_short), () -> speakCurrentSpelling());
+        addHorizontalGap(toolRow, 10);
+        addToolButton(toolRow, getString(R.string.word_action_stroke), getString(R.string.word_action_stroke_short), () -> openStrokePractice());
+        addHorizontalGap(toolRow, 10);
+        addToolButton(toolRow, getString(R.string.word_action_pronunciation), getString(R.string.word_action_pronunciation_short), () -> openPronunciationPractice());
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
@@ -327,19 +317,22 @@ public class WordFullscreenActivity extends AppCompatActivity {
         known.setOnClickListener(v -> judge(Sm2.QUALITY_KNOWN));
     }
 
-    private void addToolButton(LinearLayout row, String text, Runnable action) {
-        TextView button = text(text, 13, COLOR_TEXT, true);
+    private void addToolButton(LinearLayout row, String description, String label, Runnable action) {
+        TextView button = text(label, 16, COLOR_TEXT, true);
         button.setGravity(Gravity.CENTER);
-        button.setBackground(rounded(0xB3FFFFFF, dp(16), 0x99FFFFFF, 1));
-        button.setElevation(dp(2));
+        button.setContentDescription(description);
+        button.setBackground(bubbleBg());
+        button.setElevation(dp(3));
+        button.setClickable(true);
+        button.setOnTouchListener((v, event) -> false);
         button.setOnClickListener(v -> {
+            // 工具小气囊只执行工具动作，不触发卡片翻面。
             if (action != null) action.run();
         });
-        row.addView(button, new LinearLayout.LayoutParams(0, -1, 1f));
+        row.addView(button, new LinearLayout.LayoutParams(dp(44), dp(40)));
     }
 
     private boolean handleCardTouch(View v, MotionEvent event) {
-        gestureDetector.onTouchEvent(event);
         if (words.isEmpty() || judging) return true;
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
@@ -350,42 +343,52 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 horizontalReady = false;
                 horizontalFullReady = false;
                 card.animate().cancel();
+                try { cardHost.getParent().requestDisallowInterceptTouchEvent(true); } catch (Throwable ignored) {}
                 return true;
             case MotionEvent.ACTION_MOVE:
                 float dx = event.getRawX() - downX;
                 float dy = event.getRawY() - downY;
-                if (axis == Axis.NONE && (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop)) {
-                    axis = Math.abs(dx) > Math.abs(dy) ? Axis.HORIZONTAL : Axis.VERTICAL;
+                float absDx = Math.abs(dx);
+                float absDy = Math.abs(dy);
+                float startSlop = Math.max(dp(7), touchSlop * 0.75f);
+                if (axis == Axis.NONE && (absDx > startSlop || absDy > startSlop)) {
+                    // 借鉴 english__app：整张卡都能拖动，横滑判断更宽松，避免只在小区域生效。
+                    if (absDx >= absDy * 0.72f) axis = Axis.HORIZONTAL;
+                    else if (!flipped && dy > 0 && absDy >= absDx * 0.72f) axis = Axis.VERTICAL;
                 }
                 if (axis == Axis.HORIZONTAL) {
-                    card.setTranslationX(dx);
-                    card.setRotation(dx / 30f);
+                    float width = cardHost.getWidth() > 0 ? cardHost.getWidth() : getResources().getDisplayMetrics().widthPixels;
+                    float visualDx = Math.max(-width, Math.min(width, dx));
+                    card.setTranslationX(visualDx);
+                    card.setRotation(visualDx / 26f);
                     float trigger = horizontalTriggerDistance();
-                    float alpha = Math.min(1f, Math.abs(dx) / Math.max(1f, trigger));
+                    float alpha = Math.min(1f, absDx / Math.max(1f, trigger));
                     leftMark.setAlpha(dx < 0 ? alpha : 0f);
                     rightMark.setAlpha(dx > 0 ? alpha : 0f);
-                    leftBackdrop.setAlpha(dx < 0 ? Math.min(0.92f, alpha * 0.9f) : 0f);
-                    rightBackdrop.setAlpha(dx > 0 ? Math.min(0.92f, alpha * 0.9f) : 0f);
+                    leftBackdrop.setAlpha(dx < 0 ? 0.12f + Math.min(0.84f, alpha * 0.84f) : 0f);
+                    rightBackdrop.setAlpha(dx > 0 ? 0.12f + Math.min(0.84f, alpha * 0.84f) : 0f);
                     hardMark.setAlpha(0f);
                     pullMark.setAlpha(0f);
-                    if (Math.abs(dx) >= trigger && !horizontalReady) {
+                    if (absDx >= trigger && !horizontalReady) {
                         horizontalReady = true;
-                        vibrate(10);
+                        vibrate(13);
                         playTick();
                     }
-                    if (Math.abs(dx) >= cardHost.getWidth() * 0.96f && !horizontalFullReady) {
+                    if (absDx >= width * 0.90f && !horizontalFullReady) {
                         horizontalFullReady = true;
-                        vibrate(16);
+                        vibrate(22);
                     }
                 } else if (axis == Axis.VERTICAL && dy > 0 && !flipped) {
-                    float move = Math.min(dp(110), dy * 0.45f);
+                    float trigger = pullTriggerDistance();
+                    float move = Math.min(dp(132), dy * 0.82f);
                     card.setTranslationY(move);
-                    float alpha = Math.min(1f, dy / dp(92));
+                    float alpha = Math.min(1f, dy / Math.max(1f, trigger));
                     pullMark.setAlpha(alpha);
-                    boolean nowReady = dy > dp(92);
+                    boolean nowReady = dy > trigger;
                     if (nowReady && !pullReady) {
                         pullReady = true;
-                        vibrate(12);
+                        vibrate(13);
+                        playTick();
                     }
                     pullMark.setText(isFavorite(currentId()) ? getString(R.string.word_pull_unfavorite_release) : getString(R.string.word_pull_favorite_release));
                 }
@@ -394,9 +397,14 @@ public class WordFullscreenActivity extends AppCompatActivity {
             case MotionEvent.ACTION_CANCEL:
                 float upDx = event.getRawX() - downX;
                 float upDy = event.getRawY() - downY;
-                if (axis == Axis.HORIZONTAL && Math.abs(upDx) > horizontalTriggerDistance()) {
+                boolean tap = Math.abs(upDx) <= tapSlopDistance() && Math.abs(upDy) <= tapSlopDistance();
+                try { cardHost.getParent().requestDisallowInterceptTouchEvent(false); } catch (Throwable ignored) {}
+                if (tap) {
+                    resetMotion();
+                    flip();
+                } else if (axis == Axis.HORIZONTAL && Math.abs(upDx) >= horizontalTriggerDistance()) {
                     judge(upDx > 0 ? Sm2.QUALITY_KNOWN : Sm2.QUALITY_FORGOT);
-                } else if (axis == Axis.VERTICAL && upDy > dp(92) && !flipped) {
+                } else if (axis == Axis.VERTICAL && upDy >= pullTriggerDistance() && !flipped) {
                     toggleFavoriteWithToast();
                     resetMotion();
                 } else {
@@ -455,12 +463,15 @@ public class WordFullscreenActivity extends AppCompatActivity {
         meaning.setGravity(Gravity.CENTER);
         example.setGravity(Gravity.CENTER);
         extraInfo.setGravity(Gravity.CENTER);
-        meaning.setText(getString(R.string.word_front_tap));
-        example.setText(getString(R.string.word_front_hint));
-        extraInfo.setText(spellingText(item));
-        hint.setText(getString(R.string.word_gesture_hint_short));
+        meaning.setText("");
+        example.setText("");
+        extraInfo.setText("");
+        example.setVisibility(View.GONE);
+        extraInfo.setVisibility(View.GONE);
+        hint.setText(getString(R.string.word_front_tap));
         pinyin.setVisibility(showPinyin() ? View.VISIBLE : View.GONE);
         phoneticMy.setVisibility(showMyPhonetic() && item.phoneticMy.length() > 0 ? View.VISIBLE : View.GONE);
+        setFrontScrollTouch(true);
         if (contentScroll != null) contentScroll.scrollTo(0, 0);
     }
 
@@ -476,6 +487,9 @@ public class WordFullscreenActivity extends AppCompatActivity {
         meaning.setGravity(Gravity.START);
         example.setGravity(Gravity.START);
         extraInfo.setGravity(Gravity.START);
+        example.setVisibility(View.VISIBLE);
+        extraInfo.setVisibility(View.VISIBLE);
+        setFrontScrollTouch(false);
         pinyin.setVisibility(showPinyin() ? View.VISIBLE : View.GONE);
         phoneticMy.setVisibility(showMyPhonetic() && item.phoneticMy.length() > 0 ? View.VISIBLE : View.GONE);
 
@@ -501,6 +515,17 @@ public class WordFullscreenActivity extends AppCompatActivity {
         extraInfo.setText(more);
         hint.setText(getString(R.string.word_back_hint));
         if (contentScroll != null) contentScroll.scrollTo(0, 0);
+    }
+
+    private void setFrontScrollTouch(boolean front) {
+        if (contentScroll == null) return;
+        if (front) {
+            contentScroll.setOnTouchListener(this::handleCardTouch);
+            if (textBox != null) textBox.setOnTouchListener(this::handleCardTouch);
+        } else {
+            contentScroll.setOnTouchListener(null);
+            if (textBox != null) textBox.setOnTouchListener(null);
+        }
     }
 
     private void appendSection(SpannableStringBuilder builder, String label, String value, boolean highlightWord, String currentWord) {
@@ -628,7 +653,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private void speakCurrentSpelling() {
         if (words.isEmpty()) return;
         WordItem item = words.get(index);
-        LearningTtsBridge.speak(this, spellingText(item), LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_SPELLING);
+        // 拼读是音频模式，不在卡片上展示字母拆分；由 TTS 插件按 MODE_SPELLING 自己处理拼读音频。
+        LearningTtsBridge.speak(this, item.word, LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_SPELLING);
         vibrate(6);
     }
 
@@ -638,7 +664,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         Intent intent = new Intent(this, WordPronunciationActivity.class);
         intent.putExtra(WordPronunciationActivity.EXTRA_WORD, item.word);
         intent.putExtra(WordPronunciationActivity.EXTRA_PINYIN, item.pinyin);
-        intent.putExtra(WordPronunciationActivity.EXTRA_SPELLING_TEXT, spellingText(item));
+        intent.putExtra(WordPronunciationActivity.EXTRA_SPELLING_TEXT, item.word);
         startActivity(intent);
     }
 
@@ -946,7 +972,16 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private float horizontalTriggerDistance() {
         int width = cardHost != null && cardHost.getWidth() > 0 ? cardHost.getWidth() : getResources().getDisplayMetrics().widthPixels;
-        return Math.max(dp(96), width * 0.30f);
+        // 参考 english__app 的 30% 阈值，但给小屏保底，避免太难触发。
+        return Math.max(dp(68), width * 0.30f);
+    }
+
+    private float pullTriggerDistance() {
+        return dp(46);
+    }
+
+    private float tapSlopDistance() {
+        return Math.max(dp(30), touchSlop * 3f);
     }
 
     private void playTick() {
@@ -1009,6 +1044,14 @@ public class WordFullscreenActivity extends AppCompatActivity {
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xFFFFFFFF, 0xFFF8FBFF});
         g.setCornerRadius(dp(28));
         g.setStroke(1, 0xFFE2E8F0);
+        return g;
+    }
+
+
+    private GradientDrawable bubbleBg() {
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xDFFFFFFF, 0xBFFFFFFF});
+        g.setCornerRadius(dp(20));
+        g.setStroke(dp(1), 0xAAFFFFFF);
         return g;
     }
 
@@ -1081,10 +1124,15 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 interval = 0;
                 lapse++;
                 nextAt = now + 10L * MINUTE;
+            } else if (quality == QUALITY_HARD) {
+                // 模糊：明确安排到明天，不走“认识”的长间隔。
+                rep = Math.max(1, rep);
+                interval = 1;
+                nextAt = now + DAY;
             } else {
-                if (rep == 0) interval = 1;
-                else if (rep == 1) interval = 6;
-                else interval = Math.max(1, (int) Math.round(interval * ef));
+                // 认识：第一次直接 7 天后复习，后续按 SM-2 拉长。
+                if (rep == 0) interval = 7;
+                else interval = Math.max(7, (int) Math.round(Math.max(interval, 7) * ef));
                 rep++;
                 nextAt = now + interval * DAY;
             }
