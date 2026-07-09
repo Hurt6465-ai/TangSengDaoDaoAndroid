@@ -1,0 +1,115 @@
+{
+  "type": "words",
+  "title": "单词库",
+  "subtitle": "单词更多页采用全屏 3 列竖屏卡片。每张卡片底部显示分类名，下面用浅色小字展示示例词；点击进入对应单词卡片或二级小类。",
+  "items": [
+    {
+      "id": "hsk1",
+      "title": "HSK 1",
+      "subtitle": "150 个零基础高频词",
+      "preview": "你好 / 再见 / 不客气",
+      "badge": "150词",
+      "target": "word",
+      "level": "hsk1"
+    },
+    {
+      "id": "hsk2",
+      "title": "HSK 2",
+      "subtitle": "300 个日常扩展词",
+      "preview": "觉得 / 可能 / 已经",
+      "badge": "300词",
+      "target": "word",
+      "level": "hsk2"
+    },
+    {
+      "id": "hsk3",
+      "title": "HSK 3",
+      "subtitle": "600 个生活进阶词",
+      "preview": "重要 / 影响 / 习惯",
+      "badge": "600词",
+      "target": "word",
+      "level": "hsk3"
+    },
+    {
+      "id": "hsk4",
+      "title": "HSK 4",
+      "subtitle": "1200 个表达提升词",
+      "preview": "适合 / 经验 / 解决",
+      "badge": "1200词",
+      "target": "word",
+      "level": "hsk4"
+    },
+    {
+      "id": "hsk5",
+      "title": "HSK 5",
+      "subtitle": "中高级阅读词汇",
+      "preview": "观点 / 过程 / 充分",
+      "badge": "进阶",
+      "target": "word",
+      "level": "hsk5"
+    },
+    {
+      "id": "hsk6",
+      "title": "HSK 6",
+      "subtitle": "高级表达词汇",
+      "preview": "显著 / 推动 / 具备",
+      "badge": "高级",
+      "target": "word",
+      "level": "hsk6"
+    },
+    {
+      "id": "daily_greeting",
+      "title": "日常问候",
+      "subtitle": "见面、感谢、告别",
+      "preview": "你好 / 谢谢 / 再见",
+      "badge": "推荐",
+      "target": "word",
+      "level": "greeting"
+    },
+    {
+      "id": "shopping",
+      "title": "购物",
+      "subtitle": "价格、付款、砍价",
+      "preview": "多少钱 / 便宜点 / 买单",
+      "badge": "生活",
+      "target": "word",
+      "level": "shopping"
+    },
+    {
+      "id": "food",
+      "title": "点餐",
+      "subtitle": "餐厅、口味、结账",
+      "preview": "菜单 / 不辣 / 打包",
+      "badge": "生活",
+      "target": "word",
+      "level": "food"
+    },
+    {
+      "id": "job",
+      "title": "求职",
+      "subtitle": "岗位、工资、面试",
+      "preview": "简历 / 面试 / 工资",
+      "badge": "求职",
+      "target": "word",
+      "level": "job"
+    },
+    {
+      "id": "travel",
+      "title": "出行",
+      "subtitle": "打车、机场、酒店",
+      "preview": "机场 / 车站 / 护照",
+      "badge": "旅行",
+      "target": "word",
+      "level": "travel"
+    },
+    {
+      "id": "love_chat",
+      "title": "恋爱聊天",
+      "subtitle": "认识、约会、关心",
+      "preview": "想你 / 约会 / 喜欢",
+      "badge": "社交",
+      "target": "word",
+      "level": "love"
+    }
+  ]
+}
