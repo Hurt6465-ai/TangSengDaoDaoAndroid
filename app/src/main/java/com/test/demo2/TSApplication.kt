@@ -28,7 +28,6 @@ import com.chat.base.utils.ActManagerUtils
 import com.chat.base.utils.WKPlaySound
 import com.chat.base.utils.WKTimeUtils
 import com.chat.base.utils.language.WKMultiLanguageUtil
-import com.chat.dating.WKDatingApplication
 import com.chat.login.WKLoginApplication
 import com.chat.partner.profile.WKPartnerApplication
 import com.chat.push.WKPushApplication
@@ -128,7 +127,7 @@ class TSApplication : MultiDexApplication() {
         WKPushApplication.getInstance().init(getAppPackageName(), this)
         WKRoomApplication.getInstance().init(this)
         WKPartnerApplication.getInstance().init(this)
-        WKDatingApplication.getInstance().init(this)
+        initDatingModuleSafely()
         addAppFrontBack()
         addListener()
     }
@@ -158,6 +157,23 @@ class TSApplication : MultiDexApplication() {
             }
         }
         return null
+    }
+
+    /**
+     * 交友模块临时入口初始化。
+     *
+     * 用反射而不是直接 import WKDatingApplication：
+     * 1. 避免 app 模块还没接入 :wkdating 时 Kotlin 编译直接失败；
+     * 2. 接入 :wkdating 后会自动注册 dating_open / peipe_open_dating 入口；
+     * 3. 模块缺失时不影响主 App 启动，底部按钮会走 TabActivity 的兜底提示。
+     */
+    private fun initDatingModuleSafely() {
+        try {
+            val clazz = Class.forName("com.chat.dating.WKDatingApplication")
+            val instance = clazz.getMethod("getInstance").invoke(null)
+            clazz.getMethod("init", Context::class.java).invoke(instance, this)
+        } catch (_: Throwable) {
+        }
     }
 
     private fun addAppFrontBack() {
