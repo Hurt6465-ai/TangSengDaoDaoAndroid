@@ -33,9 +33,13 @@
     <string name="word_gesture_hint_short">左滑不认识 · 右滑认识 · 下拉收藏</string>
     <string name="word_back_hint">左滑不认识 · 右滑认识</string>
     <string name="word_action_tts">朗读</string>
+    <string name="word_action_tts_short">读</string>
     <string name="word_action_spelling">拼读</string>
+    <string name="word_action_spelling_short">拼</string>
     <string name="word_action_stroke">笔顺</string>
+    <string name="word_action_stroke_short">笔</string>
     <string name="word_action_pronunciation">跟读</string>
+    <string name="word_action_pronunciation_short">录</string>
     <string name="word_action_unknown">不认识</string>
     <string name="word_action_known">认识</string>
     <string name="word_action_hard">模糊</string>
