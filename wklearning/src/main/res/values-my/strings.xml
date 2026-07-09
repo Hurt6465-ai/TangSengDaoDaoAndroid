@@ -24,6 +24,7 @@
     <string name="word_pinyin_off">ပင်ယင် ပိတ်</string>
     <string name="word_mark_unknown">မမှတ်မိ</string>
     <string name="word_mark_known">မှတ်မိ</string>
+    <string name="word_mark_hard">မရှင်းသေး</string>
     <string name="word_pull_favorite_hint">ဆွဲချပြီး သိမ်းရန်</string>
     <string name="word_pull_favorite_release">လွှတ်ပါ သိမ်းမည်</string>
     <string name="word_pull_unfavorite_release">လွှတ်ပါ သိမ်းထားမှု ပယ်ဖျက်မည်</string>
@@ -37,6 +38,7 @@
     <string name="word_action_pronunciation">အသံလေ့ကျင့်</string>
     <string name="word_action_unknown">မမှတ်မိ</string>
     <string name="word_action_known">မှတ်မိ</string>
+    <string name="word_action_hard">မရှင်းသေး</string>
     <string name="word_label_meaning_my">မြန်မာအဓိပ္ပါယ်：</string>
     <string name="word_label_meaning_en">အင်္ဂလိပ်：</string>
     <string name="word_label_example">ဥပမာ：</string>
@@ -47,15 +49,21 @@
     <string name="word_no_example">ဥပမာ မရှိသေးပါ</string>
     <string name="word_toast_unknown">မမှတ်မိ：နောက်မှ ပြန်လေ့ကျင့်မည်</string>
     <string name="word_toast_known">မှတ်မိ：ပြန်လေ့ကျင့်ချိန် စီစဉ်ပြီး</string>
+    <string name="word_toast_hard">မရှင်းသေး：မနက်ဖြန် ပြန်လေ့ကျင့်မည်</string>
     <string name="word_favorite_added">သိမ်းပြီး</string>
     <string name="word_favorite_removed">သိမ်းထားမှု ပယ်ဖျက်ပြီး</string>
     <string name="word_toast_my_phonetic_on">မြန်မာအသံညွှန်ပြချက် ဖွင့်ပြီး</string>
     <string name="word_toast_my_phonetic_off">မြန်မာအသံညွှန်ပြချက် ပိတ်ပြီး</string>
     <string name="word_stroke_todo">ရေးပုံ/ခြေရာခံရေး ဝင်ပေါက်ကို ထားပြီး၊ Hanzi ဒေတာနဲ့ ချိတ်မည်</string>
     <string name="word_tts_plugin_missing">TTS ပလပ်အင် မရှိပါ သို့မဟုတ် မတုံ့ပြန်ပါ</string>
+    <string name="word_menu_show_my_phonetic">မြန်မာအသံညွှန်ပြချက် ဖွင့်ရန်</string>
+    <string name="word_menu_hide_my_phonetic">မြန်မာအသံညွှန်ပြချက် ပိတ်ရန်</string>
+    <string name="word_menu_show_guide">အသုံးပြုပုံ ပြရန်</string>
+    <string name="word_menu_tts_settings">အသံဆက်တင်</string>
     <string name="word_guide_title">စကားလုံးကတ် အသုံးပြုပုံ</string>
     <string name="word_guide_body">ကတ်လွတ်နေရာကို နှိပ်ပါ：အဓိပ္ပါယ်ကြည့်ရန်
 ဘယ်ဘက်သို့ ဆွဲပါ：မမှတ်မိ၊ နောက်မှ ပြန်လေ့ကျင့်ရန်
+အလယ်ခလုတ်：မရှင်းသေး၊ မနက်ဖြန် ပြန်လေ့ကျင့်ရန်
 ညာဘက်သို့ ဆွဲပါ：မှတ်မိ၊ နောက်ကတ်သို့ သွားရန်
 အောက်သို့ ဆွဲပါ：သိမ်းရန် / သိမ်းထားမှု ပယ်ဖျက်ရန်
 အသံ၊ ဖတ်ပြ၊ အသံလေ့ကျင့်၊ ရေးပုံ ခလုတ်များသည် သက်ဆိုင်ရာလုပ်ဆောင်ချက်သာ လုပ်ပြီး ကတ်ကို မလှန်ပါ</string>
@@ -72,6 +80,11 @@
     <string name="word_tone_3">တတိယသံ</string>
     <string name="word_tone_4">စတုတ္ထသံ</string>
     <string name="pronunciation_title">အသံထွက် လေ့ကျင့်ရန်</string>
+    <string name="stroke_title">ရေးပုံ / ခြေရာခံရေး</string>
+    <string name="stroke_subtitle">အရင်ဆုံး native full-screen ဝင်ပေါက်ကို ထားထားသည်။ HanziWriter သို့မဟုတ် makemeahanzi ဒေတာချိတ်ပြီးနောက် ရေးပုံ animation၊ တစ်ချက်ချင်းလေ့ကျင့်မှုနှင့် ခြေရာခံရေးကို ပြနိုင်မည်။</string>
+    <string name="stroke_chars_title">အက္ခရာတစ်လုံးချင်း လေ့ကျင့်ရန်</string>
+    <string name="stroke_data_missing">လက်ရှိတွင် တရုတ်စာရေးပုံ ဒေတာ မချိတ်ရသေးပါ။ ဒေတာချိတ်ပြီးနောက် ဒီနေရာတွင် ရေးပုံ animation နှင့် ခြေရာခံရေးကို ပြမည်။</string>
+    <string name="stroke_speak_word">ဒီစကားလုံးကို အသံဖွင့်ရန်</string>
     <string name="pronunciation_tip">စံအသံနှင့် ပင်ယင်ဖတ်ပြအသံကို နားထောင်ပြီး မိမိအသံကို မှတ်တမ်းတင်ပါ။ အခမဲ့ဗားရှင်းတွင် အသံနှိုင်းယှဉ်နိုင်ပြီး local ASR ပလပ်အင်ရှိလျှင် သိရှိ/အမှတ်ပေးနိုင်သည်။</string>
     <string name="pronunciation_play_standard">စံအသံ ဖွင့်ရန်</string>
     <string name="pronunciation_play_spelling">ပင်ယင်ဖတ်ပြအသံ ဖွင့်ရန်</string>
