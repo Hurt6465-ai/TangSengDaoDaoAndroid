@@ -1,0 +1,16 @@
+{
+  "type": "quiz",
+  "title": "练习题",
+  "subtitle": "按题型和学习模块进入练习，后续可接题库 JSON。",
+  "items": [
+    { "id": "quiz_type", "title": "按题型练习", "subtitle": "选择题、听力题、口语题、错题本", "badge": "题型", "children": [
+      { "id": "quiz_choice", "title": "选择题", "subtitle": "词汇、句型、语法选择", "target": "study", "asset": "assets/learning/quiz/choice.json" },
+      { "id": "quiz_listen", "title": "听力题", "subtitle": "听音选词和听句子", "target": "study", "asset": "assets/learning/quiz/listen.json" },
+      { "id": "quiz_speaking", "title": "口语题", "subtitle": "跟读和场景回答", "target": "study", "asset": "assets/learning/quiz/speaking.json" }
+    ] },
+    { "id": "quiz_review", "title": "复习", "subtitle": "错题本、收藏题、每日复习", "badge": "复习", "children": [
+      { "id": "quiz_wrong", "title": "错题本", "subtitle": "自动收集做错的题", "target": "study", "asset": "assets/learning/quiz/wrong.json" },
+      { "id": "quiz_daily", "title": "每日复习", "subtitle": "按 SM-2 安排复习", "target": "study", "asset": "assets/learning/quiz/daily.json" }
+    ] }
+  ]
+}
