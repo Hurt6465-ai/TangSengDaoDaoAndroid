@@ -68,7 +68,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private static final String ICON_CHAT = "faw-comments";
     private static final String ICON_PARTNER = "faw-user-friends";
     private static final String ICON_DISCOVER = "faw-compass";
-    private static final String ICON_COMMUNITY = "faw-users";
+    private static final String ICON_COMMUNITY = "faw-heart";
     private static final String ICON_STUDY = "faw-graduation-cap";
 
     // 参考 Messenger 的底部导航颜色：选中蓝色，未选中淡黑灰色。
@@ -159,6 +159,8 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         partnerTV = createTabTextView(R.string.tab_text_partner);
         discoverTV = createTabTextView(R.string.tab_text_discover);
         communityTV = createTabTextView(R.string.tab_text_community);
+        // 临时把原 NodeBB 社区入口改成交友；先不改语言文件，直接覆盖显示文案。
+        communityTV.setText("交友");
         studyTV = createTabTextView(R.string.tab_text_study);
 
         addTabView(R.id.i_chat, chatIV, chatTV, true);
@@ -211,7 +213,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         fragments.add(new ChatFragment());
         fragments.add(PlaceholderTabFragment.newInstance("语伴", "语伴模块加载失败，请重新安装或检查 wkpartnerbrowse 模块"));
         fragments.add(PlaceholderTabFragment.newInstance("发现", "发现模块加载失败，请重新安装或检查 wkfeed 模块"));
-        fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_HOME_URL)));
+        fragments.add(PlaceholderTabFragment.newInstance("交友", "交友模块加载失败，请重新安装或检查 wkdating 模块"));
         fragments.add(new LearningFragment());
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
         // 底部是一级导航，只允许点击切换；横滑手势留给聊天页内部二级导航使用。
@@ -261,7 +263,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
             } else if (itemId == R.id.i_discover) {
                 openFeedDiscover();
             } else if (itemId == R.id.i_community) {
-                switchToTab(TAB_COMMUNITY);
+                openDatingHome();
             } else if (itemId == R.id.i_study) {
                 switchToTab(TAB_STUDY);
             }
@@ -301,6 +303,27 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         } catch (Throwable ignored) {
             showToast("发现模块加载失败，请检查 wkfeed 模块");
             switchToTab(TAB_DISCOVER);
+        }
+    }
+
+    private void openDatingHome() {
+        try {
+            Object handled = EndpointManager.getInstance().invoke("dating_open", this);
+            if (handled instanceof Boolean && (Boolean) handled) return;
+        } catch (Throwable ignored) {
+        }
+        try {
+            Object handled = EndpointManager.getInstance().invoke("peipe_open_dating", this);
+            if (handled instanceof Boolean && (Boolean) handled) return;
+        } catch (Throwable ignored) {
+        }
+        try {
+            Class<?> clazz = Class.forName("com.chat.dating.DatingHomeActivity");
+            android.content.Intent intent = new android.content.Intent(this, clazz);
+            startActivity(intent);
+        } catch (Throwable ignored) {
+            showToast("交友模块加载失败，请检查 wkdating 模块");
+            switchToTab(TAB_COMMUNITY);
         }
     }
 
