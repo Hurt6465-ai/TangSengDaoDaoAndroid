@@ -1,0 +1,18 @@
+{
+  "type": "grammar",
+  "title": "语法",
+  "subtitle": "先选语法主题，再进入说明、例句、常见错误和练习。",
+  "items": [
+    { "id": "grammar_beginner", "title": "初级语法", "subtitle": "了、在、吗/呢、的/得/地", "badge": "入门", "children": [
+      { "id": "grammar_le", "title": "了", "subtitle": "完成、变化、语气", "target": "study", "asset": "assets/learning/grammar/le.json" },
+      { "id": "grammar_zai", "title": "在", "subtitle": "正在进行、地点表达", "target": "study", "asset": "assets/learning/grammar/zai.json" },
+      { "id": "grammar_ma", "title": "吗 / 呢", "subtitle": "疑问语气和追问", "target": "study", "asset": "assets/learning/grammar/ma_ne.json" },
+      { "id": "grammar_de", "title": "的 / 得 / 地", "subtitle": "结构助词区分", "target": "study", "asset": "assets/learning/grammar/de.json" }
+    ] },
+    { "id": "grammar_sentence", "title": "句式语法", "subtitle": "把字句、被字句、比字句", "badge": "进阶", "children": [
+      { "id": "grammar_ba", "title": "把字句", "subtitle": "处理和结果表达", "target": "study", "asset": "assets/learning/grammar/ba.json" },
+      { "id": "grammar_bei", "title": "被字句", "subtitle": "被动表达", "target": "study", "asset": "assets/learning/grammar/bei.json" },
+      { "id": "grammar_bi", "title": "比字句", "subtitle": "比较表达", "target": "study", "asset": "assets/learning/grammar/bi.json" }
+    ] }
+  ]
+}
