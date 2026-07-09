@@ -1,0 +1,23 @@
+<resources>
+    <string name="dating_title">ကိုက်ညီမှု</string>
+    <string name="dating_scope_global">ကမ္ဘာလုံးဆိုင်ရာ</string>
+    <string name="dating_scope_nearby">အနီးအနား ဦးစားပေး</string>
+    <string name="dating_loading">အကြံပြုချက်များ ဖွင့်နေသည်…</string>
+    <string name="dating_retry">ထပ်မံကြိုးစားရန်</string>
+    <string name="dating_empty">အကြံပြုချက်အသစ် မရှိသေးပါ</string>
+    <string name="dating_empty_tip">စစ်ထုတ်မှုကို လျှော့ချပြီး နောက်မှပြန်ကြည့်ပါ။</string>
+    <string name="dating_like">နှစ်သက်သည်</string>
+    <string name="dating_pass">ကျော်ရန်</string>
+    <string name="dating_like_stamp">LIKE</string>
+    <string name="dating_nope_stamp">NOPE</string>
+    <string name="dating_match_title">နှစ်ဦးနှစ်ဖက် ကြိုက်ပါပြီ</string>
+    <string name="dating_match_notice">စနစ်အသိပေးချက် ပို့ပြီးပါပြီ။ အသိပေးချက်ရမှ စကားပြောနိုင်ပါမည်။</string>
+    <string name="dating_match_notice_pending">နှစ်ဦးနှစ်ဖက် ကြိုက်ပါပြီ။ စကားပြောခွင့်အတွက် စနစ်အသိပေးချက်ကို စောင့်ပါ။</string>
+    <string name="dating_ok">သိပါပြီ</string>
+    <string name="dating_photo_indicator">%1$d/%2$d</string>
+    <string name="dating_intent_study">ဘာသာစကားဖော်</string>
+    <string name="dating_intent_friend">မိတ်ဆွေ</string>
+    <string name="dating_intent_love">ချစ်သူရှာဖွေ</string>
+    <string name="dating_distance_unknown">ကမ္ဘာလုံးဆိုင်ရာ</string>
+    <string name="dating_mock_tip">dating backend မချိတ်ရသေးပါ။ နမူနာဒေတာ ပြသနေသည်။</string>
+</resources>
