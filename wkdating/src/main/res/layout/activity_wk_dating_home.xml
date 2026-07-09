@@ -22,17 +22,45 @@
         android:paddingTop="18dp"
         android:paddingEnd="18dp">
 
-        <TextView
+        <FrameLayout
             android:id="@+id/filterBtn"
             android:layout_width="44dp"
             android:layout_height="44dp"
             android:layout_gravity="start|top"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:text="☰"
-            android:textColor="#F2FFFFFF"
-            android:textSize="25sp"
-            android:textStyle="bold" />
+            android:foreground="?android:attr/selectableItemBackgroundBorderless">
+
+            <View
+                android:layout_width="25dp"
+                android:layout_height="2dp"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="10dp"
+                android:layout_marginTop="15dp"
+                android:background="@drawable/bg_dating_filter_line" />
+
+            <View
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="9dp"
+                android:layout_marginTop="11dp"
+                android:background="@drawable/bg_dating_filter_knob" />
+
+            <View
+                android:layout_width="25dp"
+                android:layout_height="2dp"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="10dp"
+                android:layout_marginTop="28dp"
+                android:background="@drawable/bg_dating_filter_line" />
+
+            <View
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="26dp"
+                android:layout_marginTop="24dp"
+                android:background="@drawable/bg_dating_filter_knob" />
+        </FrameLayout>
 
         <LinearLayout
             android:id="@+id/scopeTabs"
@@ -72,18 +100,17 @@
     <LinearLayout
         android:id="@+id/actionBar"
         android:layout_width="match_parent"
-        android:layout_height="118dp"
+        android:layout_height="110dp"
         android:layout_gravity="bottom"
-        android:gravity="top|center_horizontal"
+        android:gravity="center"
         android:orientation="horizontal"
-        android:paddingTop="4dp"
-        android:paddingBottom="22dp">
+        android:paddingTop="0dp"
+        android:paddingBottom="16dp">
 
         <TextView
             android:id="@+id/rewindBtn"
-            android:layout_width="54dp"
-            android:layout_height="54dp"
-            android:layout_marginTop="10dp"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
             android:background="@drawable/bg_dating_action_rewind"
             android:elevation="13dp"
             android:gravity="center"
@@ -99,8 +126,8 @@
 
         <TextView
             android:id="@+id/passBtn"
-            android:layout_width="66dp"
-            android:layout_height="66dp"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
             android:background="@drawable/bg_dating_action_pass"
             android:elevation="15dp"
             android:gravity="center"
@@ -116,9 +143,8 @@
 
         <TextView
             android:id="@+id/favoriteBtn"
-            android:layout_width="58dp"
-            android:layout_height="58dp"
-            android:layout_marginTop="6dp"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
             android:background="@drawable/bg_dating_action_favorite"
             android:elevation="15dp"
             android:gravity="center"
@@ -134,15 +160,15 @@
 
         <TextView
             android:id="@+id/likeBtn"
-            android:layout_width="74dp"
-            android:layout_height="74dp"
+            android:layout_width="70dp"
+            android:layout_height="70dp"
             android:background="@drawable/bg_dating_action_like"
             android:elevation="17dp"
             android:gravity="center"
             android:includeFontPadding="false"
             android:text="♥"
-            android:textColor="#FFFFFFFF"
-            android:textSize="42sp"
+            android:textColor="#FFFF426D"
+            android:textSize="41sp"
             android:textStyle="bold" />
     </LinearLayout>
 
