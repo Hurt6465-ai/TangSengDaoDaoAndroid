@@ -133,7 +133,8 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
                     if (!moved && System.currentTimeMillis() - downAt < 260) {
                         float width = Math.max(1f, v.getWidth());
                         float height = Math.max(1f, v.getHeight());
-                        if (event.getX() > width * 0.74f && event.getY() > height * 0.58f) {
+                        // 只有右下角小箭头区域打开资料；右半屏仍然只是切换下一张照片，避免误触。
+                        if (isProfileArrowTap(v, event, width, height)) {
                             if (tapListener != null) tapListener.onOpenProfile(profile, position, card.getPhotoIndex());
                         } else if (event.getX() < width * 0.42f) {
                             card.showPreviousPhoto();
@@ -149,6 +150,15 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
                 default:
                     return false;
             }
+        }
+
+        private boolean isProfileArrowTap(View v, MotionEvent event, float width, float height) {
+            float density = v.getResources().getDisplayMetrics().density;
+            float right = width - 12f * density;
+            float left = right - 58f * density;
+            float bottom = height - 132f * density;
+            float top = bottom - 72f * density;
+            return event.getX() >= left && event.getX() <= right && event.getY() >= top && event.getY() <= bottom;
         }
     }
 }
