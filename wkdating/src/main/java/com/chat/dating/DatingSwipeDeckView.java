@@ -85,8 +85,7 @@ public class DatingSwipeDeckView extends FrameLayout {
     public void swipeTop(String action) {
         DatingCardView top = topCard();
         if (top == null) return;
-        int direction = DatingSwipeAction.LIKE.equals(action) ? 1 : -1;
-        animateOut(top, direction, action, true);
+        animateOut(top, action == null ? DatingSwipeAction.PASS : action, true);
     }
 
     private void rebuildDeck() {
@@ -97,7 +96,7 @@ public class DatingSwipeDeckView extends FrameLayout {
             DatingCardView card = new DatingCardView(getContext());
             card.bind(profiles.get(currentIndex + i));
             LayoutParams lp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
-            lp.setMargins(dp(12), dp(118), dp(12), dp(102));
+            lp.setMargins(0, 0, 0, 0);
             addView(card, lp);
             applyStackTransform(card, i, 0f);
             if (i == 0) attachTouch(card);
@@ -133,6 +132,7 @@ public class DatingSwipeDeckView extends FrameLayout {
             case MotionEvent.ACTION_CANCEL:
                 velocityTracker.computeCurrentVelocity(1000);
                 float vx = velocityTracker.getXVelocity();
+                float vy = velocityTracker.getYVelocity();
                 recycleVelocityTracker();
                 float totalDx = event.getRawX() - downX;
                 float totalDy = event.getRawY() - downY;
@@ -141,10 +141,15 @@ public class DatingSwipeDeckView extends FrameLayout {
                     resetCard(card);
                     return true;
                 }
-                float threshold = getWidth() * 0.28f;
-                if (Math.abs(card.getTranslationX()) > threshold || Math.abs(vx) > 1100f) {
-                    int direction = card.getTranslationX() >= 0 || vx > 1100f ? 1 : -1;
-                    animateOut(card, direction, direction > 0 ? DatingSwipeAction.LIKE : DatingSwipeAction.PASS, false);
+
+                float horizontalThreshold = getWidth() * 0.26f;
+                float downThreshold = getHeight() * 0.14f;
+                boolean downFavorite = (totalDy > downThreshold || vy > 1250f)
+                        && totalDy > Math.abs(totalDx) * 0.72f;
+                if (downFavorite) {
+                    animateOut(card, DatingSwipeAction.FAVORITE, false);
+                } else if (Math.abs(card.getTranslationX()) > horizontalThreshold || Math.abs(vx) > 1100f) {
+                    animateOut(card, card.getTranslationX() >= 0 || vx > 1100f ? DatingSwipeAction.LIKE : DatingSwipeAction.PASS, false);
                 } else {
                     resetCard(card);
                 }
@@ -156,12 +161,12 @@ public class DatingSwipeDeckView extends FrameLayout {
 
     private void updateDrag(DatingCardView card, float tx, float ty) {
         float width = Math.max(1f, getWidth());
-        float progress = Math.min(1f, Math.abs(tx) / (width * 0.28f));
+        float downY = Math.max(0f, ty);
         card.setTranslationX(tx);
-        card.setTranslationY(ty * 0.28f);
-        card.setRotation(14f * tx / width);
-        card.setSwipeProgress(tx);
-        updateBackCards(progress);
+        card.setTranslationY(downY > Math.abs(tx) * 0.72f ? downY * 0.42f : ty * 0.26f);
+        card.setRotation(12f * tx / width);
+        card.setSwipeProgress(tx, downY);
+        updateBackCards(Math.min(1f, Math.max(Math.abs(tx) / (width * 0.28f), downY / (Math.max(1f, getHeight()) * 0.18f))));
     }
 
     private void handleTap(DatingCardView card, float x) {
@@ -170,19 +175,19 @@ public class DatingSwipeDeckView extends FrameLayout {
             card.showPreviousPhoto();
         } else if (x > width * 0.58f) {
             card.showNextPhoto();
-        } else if (listener != null) {
-            listener.onCardCenterTap(card.getProfile());
         }
     }
 
-    private void animateOut(DatingCardView card, int direction, String action, boolean fromButton) {
-        float targetX = direction * (getWidth() + dp(96));
-        float targetY = card.getTranslationY() + dp(26);
-        card.setSwipeProgress(direction * getWidth());
+    private void animateOut(DatingCardView card, String action, boolean fromButton) {
+        boolean favorite = DatingSwipeAction.FAVORITE.equals(action);
+        boolean like = DatingSwipeAction.LIKE.equals(action);
+        float targetX = favorite ? 0f : (like ? 1 : -1) * (getWidth() + dp(96));
+        float targetY = favorite ? getHeight() + dp(96) : card.getTranslationY() + dp(18);
+        card.setSwipeProgress(like ? getWidth() : (favorite ? 0f : -getWidth()), favorite ? getHeight() : 0f);
         card.animate()
                 .translationX(targetX)
                 .translationY(targetY)
-                .rotation(direction * 18f)
+                .rotation(favorite ? 0f : (like ? 1 : -1) * 16f)
                 .setDuration(fromButton ? 230 : 190)
                 .setInterpolator(new DecelerateInterpolator())
                 .setListener(new AnimatorListenerAdapter() {
@@ -210,7 +215,7 @@ public class DatingSwipeDeckView extends FrameLayout {
                 .setListener(new AnimatorListenerAdapter() {
                     @Override
                     public void onAnimationEnd(Animator animation) {
-                        card.setSwipeProgress(0f);
+                        card.setSwipeProgress(0f, 0f);
                         updateBackCards(0f);
                     }
                 })
@@ -225,16 +230,16 @@ public class DatingSwipeDeckView extends FrameLayout {
     }
 
     private void applyStackTransform(View view, int stackIndex, float progress) {
-        float baseScale = 1f - 0.038f * stackIndex;
-        float baseY = dp(14) * stackIndex;
+        float baseScale = 1f - 0.026f * stackIndex;
+        float baseY = dp(10) * stackIndex;
         if (stackIndex > 0) {
-            baseScale += 0.045f * progress;
-            baseY -= dp(14) * progress;
+            baseScale += 0.032f * progress;
+            baseY -= dp(10) * progress;
         }
         view.setScaleX(baseScale);
         view.setScaleY(baseScale);
         view.setTranslationY(baseY);
-        view.setAlpha(stackIndex >= 2 ? 0.82f : 1f);
+        view.setAlpha(stackIndex >= 2 ? 0.92f : 1f);
     }
 
     private void updateBackCards(float progress) {

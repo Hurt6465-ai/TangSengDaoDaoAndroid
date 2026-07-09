@@ -106,9 +106,9 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
 
     @Override
     protected void initListener() {
-        wkVBinding.backBtn.setOnClickListener(v -> finish());
         wkVBinding.retryBtn.setOnClickListener(v -> reload());
         wkVBinding.passBtn.setOnClickListener(v -> wkVBinding.deckView.swipeTop(DatingSwipeAction.PASS));
+        wkVBinding.favoriteBtn.setOnClickListener(v -> wkVBinding.deckView.swipeTop(DatingSwipeAction.FAVORITE));
         wkVBinding.likeBtn.setOnClickListener(v -> wkVBinding.deckView.swipeTop(DatingSwipeAction.LIKE));
         wkVBinding.recommendTab.setOnClickListener(v -> {
             if (!"global".equals(scope)) {
@@ -274,14 +274,21 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
 
     private void updateScopeTabs() {
         boolean nearby = "nearby".equals(scope);
-        wkVBinding.recommendTab.setBackgroundResource(nearby ? R.drawable.bg_dating_tab_unselected : R.drawable.bg_dating_tab_selected);
-        wkVBinding.nearbyTab.setBackgroundResource(nearby ? R.drawable.bg_dating_tab_selected : R.drawable.bg_dating_tab_unselected);
-        wkVBinding.recommendTab.setTextColor(nearby ? Color.rgb(122, 53, 66) : Color.WHITE);
-        wkVBinding.nearbyTab.setTextColor(nearby ? Color.WHITE : Color.rgb(122, 53, 66));
+        styleScopeTab(wkVBinding.recommendTab, !nearby);
+        styleScopeTab(wkVBinding.nearbyTab, nearby);
+    }
+
+    private void styleScopeTab(TextView tab, boolean selected) {
+        if (tab == null) return;
+        tab.setBackgroundColor(Color.TRANSPARENT);
+        tab.setTextColor(selected ? Color.WHITE : 0x99FFFFFF);
+        tab.setTextSize(selected ? 20 : 17);
+        tab.setTypeface(Typeface.DEFAULT, selected ? Typeface.BOLD : Typeface.NORMAL);
+        tab.setAlpha(selected ? 1f : 0.76f);
     }
 
     private void updateFilterSummary() {
-        wkVBinding.filterSummaryTv.setText(filter == null ? "" : filter.summary());
+        // 全屏沉浸 UI 不再显示 “智能推荐 · 18-35 · 不限” 胶囊，筛选状态仅保存在本地。
     }
 
     private void showFilterDialog() {
