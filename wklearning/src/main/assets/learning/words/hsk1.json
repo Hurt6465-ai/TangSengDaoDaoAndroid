@@ -1,0 +1,209 @@
+{
+  "version": 1,
+  "updatedAt": "2026-07-07",
+  "categoryId": "hsk1",
+  "title": "HSK 1",
+  "items": [
+    {
+      "id": "greeting_001",
+      "word": "你好",
+      "pinyin": "nǐ hǎo",
+      "translations": {
+        "my": "မင်္ဂလာပါ",
+        "en": "Hello"
+      },
+      "example": "你好，很高兴认识你。",
+      "exampleTranslations": {
+        "my": "မင်္ဂလာပါ၊ တွေ့ရတာဝမ်းသာပါတယ်။",
+        "en": "Hello, nice to meet you."
+      },
+      "audio": "audio/words/greeting_001.mp3",
+      "level": "A1",
+      "phonetic_my": "နီ ဟောင်",
+      "example_pinyin": "Nǐ hǎo, hěn gāoxìng rènshi nǐ.",
+      "usage_scene": "见面、聊天开场",
+      "notes": "你好偏日常，您好更礼貌。",
+      "synonyms": [
+        "您好"
+      ],
+      "antonyms": []
+    },
+    {
+      "id": "greeting_002",
+      "word": "谢谢",
+      "pinyin": "xiè xie",
+      "translations": {
+        "my": "ကျေးဇူးတင်ပါတယ်",
+        "en": "Thank you"
+      },
+      "example": "谢谢你的帮助。",
+      "exampleTranslations": {
+        "my": "ကူညီပေးတာ ကျေးဇူးတင်ပါတယ်။",
+        "en": "Thank you for your help."
+      },
+      "audio": "audio/words/greeting_002.mp3",
+      "level": "A1",
+      "phonetic_my": "ရှဲ့ ရှဲ့",
+      "example_pinyin": "Xièxie nǐ de bāngzhù.",
+      "usage_scene": "表达感谢、收到帮助后使用",
+      "notes": "谢谢可以单独使用，也可以说“谢谢你”。",
+      "synonyms": [
+        "感谢"
+      ],
+      "antonyms": []
+    },
+    {
+      "id": "greeting_003",
+      "word": "再见",
+      "pinyin": "zài jiàn",
+      "translations": {
+        "my": "နောက်မှတွေ့မယ်",
+        "en": "Goodbye"
+      },
+      "example": "明天再见。",
+      "exampleTranslations": {
+        "my": "မနက်ဖြန် ပြန်တွေ့မယ်။",
+        "en": "See you tomorrow."
+      },
+      "audio": "audio/words/greeting_003.mp3",
+      "level": "A1",
+      "phonetic_my": "ဇိုင်း ကျန်",
+      "example_pinyin": "Míngtiān zàijiàn.",
+      "usage_scene": "离开、聊天结束、告别",
+      "notes": "口语里也可以说“拜拜”。",
+      "synonyms": [
+        "拜拜"
+      ],
+      "antonyms": [
+        "你好"
+      ]
+    },
+    {
+      "id": "greeting_004",
+      "word": "可以",
+      "pinyin": "kě yǐ",
+      "translations": {
+        "my": "ရပါတယ်",
+        "en": "Okay / can"
+      },
+      "example": "这样可以吗？",
+      "exampleTranslations": {
+        "my": "ဒီလို ရမလား။",
+        "en": "Is this okay?"
+      },
+      "audio": "audio/words/greeting_004.mp3",
+      "level": "A1",
+      "phonetic_my": "ခယ် ယီ",
+      "example_pinyin": "Zhèyàng kěyǐ ma?",
+      "usage_scene": "同意、请求许可、确认是否可以",
+      "notes": "“可以吗？”常用于礼貌询问。",
+      "synonyms": [
+        "行",
+        "能"
+      ],
+      "antonyms": [
+        "不可以"
+      ]
+    },
+    {
+      "id": "greeting_005",
+      "word": "不可以",
+      "pinyin": "bù kě yǐ",
+      "translations": {
+        "my": "မရပါဘူး",
+        "en": "Cannot"
+      },
+      "example": "这里不可以拍照。",
+      "exampleTranslations": {
+        "my": "ဒီနေရာမှာ ဓာတ်ပုံရိုက်လို့ မရပါဘူး။",
+        "en": "You cannot take photos here."
+      },
+      "audio": "audio/words/greeting_005.mp3",
+      "level": "A1",
+      "phonetic_my": "ပု ခယ် ယီ",
+      "example_pinyin": "Zhèlǐ bù kěyǐ pāizhào.",
+      "usage_scene": "拒绝、禁止、说明规则",
+      "notes": "比“不行”更完整，适合说明规定。",
+      "synonyms": [
+        "不行",
+        "不能"
+      ],
+      "antonyms": [
+        "可以"
+      ]
+    },
+    {
+      "id": "greeting_006",
+      "word": "朋友",
+      "pinyin": "péng you",
+      "translations": {
+        "my": "သူငယ်ချင်း",
+        "en": "Friend"
+      },
+      "example": "他是我的朋友。",
+      "exampleTranslations": {
+        "my": "သူက ကျွန်တော့်သူငယ်ချင်းပါ။",
+        "en": "He is my friend."
+      },
+      "audio": "audio/words/greeting_006.mp3",
+      "level": "A1",
+      "phonetic_my": "ဖုန့် ယို우",
+      "example_pinyin": "Tā shì wǒ de péngyou.",
+      "usage_scene": "介绍关系、社交聊天",
+      "notes": "中文口语里“朋友”范围较宽。",
+      "synonyms": [
+        "好友"
+      ],
+      "antonyms": []
+    },
+    {
+      "id": "greeting_007",
+      "word": "学习",
+      "pinyin": "xué xí",
+      "translations": {
+        "my": "သင်ယူသည်",
+        "en": "Study"
+      },
+      "example": "我每天学习中文。",
+      "exampleTranslations": {
+        "my": "ကျွန်တော် နေ့တိုင်း တရုတ်စာ သင်ယူတယ်။",
+        "en": "I study Chinese every day."
+      },
+      "audio": "audio/words/greeting_007.mp3",
+      "level": "A1",
+      "phonetic_my": "ရွှဲ ရှီ",
+      "example_pinyin": "Wǒ měitiān xuéxí Zhōngwén.",
+      "usage_scene": "学习、上课、自我介绍",
+      "notes": "学习是动词，也可以作名词。",
+      "synonyms": [
+        "学"
+      ],
+      "antonyms": []
+    },
+    {
+      "id": "greeting_008",
+      "word": "工作",
+      "pinyin": "gōng zuò",
+      "translations": {
+        "my": "အလုပ်",
+        "en": "Work"
+      },
+      "example": "我想找工作。",
+      "exampleTranslations": {
+        "my": "ကျွန်တော် အလုပ်ရှာချင်တယ်။",
+        "en": "I want to find a job."
+      },
+      "audio": "audio/words/greeting_008.mp3",
+      "level": "A1",
+      "phonetic_my": "ကုန်း ဇွော့",
+      "example_pinyin": "Wǒ xiǎng zhǎo gōngzuò.",
+      "usage_scene": "求职、职业、自我介绍",
+      "notes": "“工作”可以表示职业，也可以表示正在做事。",
+      "synonyms": [
+        "职业",
+        "上班"
+      ],
+      "antonyms": []
+    }
+  ]
+    }
