@@ -276,8 +276,8 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         boolean nearby = "nearby".equals(scope);
         wkVBinding.recommendTab.setBackgroundResource(nearby ? R.drawable.bg_dating_tab_unselected : R.drawable.bg_dating_tab_selected);
         wkVBinding.nearbyTab.setBackgroundResource(nearby ? R.drawable.bg_dating_tab_selected : R.drawable.bg_dating_tab_unselected);
-        wkVBinding.recommendTab.setTextColor(nearby ? 0xFF7A35425A : Color.WHITE);
-        wkVBinding.nearbyTab.setTextColor(nearby ? Color.WHITE : 0xFF7A35425A);
+        wkVBinding.recommendTab.setTextColor(nearby ? Color.rgb(122, 53, 66) : Color.WHITE);
+        wkVBinding.nearbyTab.setTextColor(nearby ? Color.WHITE : Color.rgb(122, 53, 66));
     }
 
     private void updateFilterSummary() {
@@ -300,7 +300,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
 
         TextView tip = new TextView(this);
         tip.setText(R.string.dating_filter_tip);
-        tip.setTextColor(0xFF7A35425A);
+        tip.setTextColor(Color.rgb(122, 53, 66));
         tip.setTextSize(13);
         tip.setLineSpacing(dp(2), 1f);
         root.addView(tip, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -356,7 +356,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private TextView filterRow(String text) {
         TextView row = new TextView(this);
         row.setText(text);
-        row.setTextColor(0xFFD8325570);
+        row.setTextColor(Color.rgb(216, 50, 85));
         row.setTextSize(15);
         row.setTypeface(row.getTypeface(), Typeface.BOLD);
         row.setBackgroundResource(R.drawable.bg_dating_filter_button);
