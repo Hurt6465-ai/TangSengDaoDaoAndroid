@@ -1,0 +1,14 @@
+{
+  "type": "books",
+  "title": "电子书",
+  "subtitle": "书籍按等级和场景分目录，后续章节可以离线缓存。",
+  "items": [
+    { "id": "book_beginner", "title": "入门教材", "subtitle": "零基础拼音、词汇、短句", "badge": "A1", "children": [
+      { "id": "book_pinyin", "title": "拼音入门", "subtitle": "声母韵母和声调", "target": "study", "asset": "assets/learning/books/pinyin_book.json" },
+      { "id": "book_daily", "title": "生活汉语", "subtitle": "日常场景短文和对话", "target": "study", "asset": "assets/learning/books/daily_book.json" }
+    ] },
+    { "id": "book_work", "title": "求职教材", "subtitle": "面试、自我介绍、工作沟通", "badge": "工作", "children": [
+      { "id": "book_interview", "title": "面试中文", "subtitle": "求职面试常用表达", "target": "study", "asset": "assets/learning/books/interview_book.json" }
+    ] }
+  ]
+}
