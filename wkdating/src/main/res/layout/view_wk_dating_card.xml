@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_dating_card_frame"
+    android:clipChildren="true"
+    android:clipToPadding="true">
+
+    <ImageView
+        android:id="@+id/photoIv"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FFF3EC"
+        android:scaleType="centerCrop" />
+
+    <LinearLayout
+        android:id="@+id/indicatorRow"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:layout_gravity="top"
+        android:layout_marginStart="18dp"
+        android:layout_marginTop="18dp"
+        android:layout_marginEnd="18dp"
+        android:orientation="horizontal" />
+
+    <TextView
+        android:id="@+id/nopeBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="104dp"
+        android:layout_marginEnd="34dp"
+        android:alpha="0"
+        android:background="@drawable/bg_dating_stamp_nope"
+        android:rotation="13"
+        android:text="@string/dating_nope_stamp"
+        android:textColor="#FFFF4F6A"
+        android:textSize="28sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/likeBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="34dp"
+        android:layout_marginTop="104dp"
+        android:alpha="0"
+        android:background="@drawable/bg_dating_stamp_like"
+        android:rotation="-13"
+        android:text="@string/dating_like_stamp"
+        android:textColor="#FF20D889"
+        android:textSize="28sp"
+        android:textStyle="bold" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="440dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_dating_bottom_mask" />
+
+    <LinearLayout
+        android:id="@+id/infoPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/nameTv"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#FFFFFFFF"
+                android:textSize="31sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/scoreTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_dating_chip"
+                android:textColor="#FFFFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/metaTv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#EFFFFFFF"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/loveChipRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/goalChipTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_dating_chip_warm"
+                android:maxLines="1"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/crossChipTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_dating_chip_cool"
+                android:maxLines="1"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/jobTv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#DFFFFFFF"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/introTv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:ellipsize="end"
+            android:lineSpacingExtra="2dp"
+            android:maxLines="2"
+            android:textColor="#F0FFFFFF"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/tagRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal" />
+
+        <TextView
+            android:id="@+id/moreHintTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_dating_glass_panel"
+            android:paddingStart="12dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="5dp"
+            android:text="@string/dating_tap_more"
+            android:textColor="#E6FFFFFF"
+            android:textSize="12sp" />
+    </LinearLayout>
+</FrameLayout>
