@@ -1,0 +1,21 @@
+{
+  "type": "prompts",
+  "title": "口语 Prompt",
+  "subtitle": "全屏选择场景，不再弹窗。点开后可一键复制到 AI 入口。",
+  "items": [
+    { "id": "prompt_daily", "title": "日常生活", "subtitle": "打招呼、点餐、租房、医院", "badge": "高频", "children": [
+      { "id": "prompt_hello", "title": "日常打招呼", "subtitle": "中文、缅语、英文三语跟读", "target": "prompt", "prompt": "你是多语言口语陪练老师。请用中文、缅语和英文各给我 10 句自然的日常打招呼表达，每句附使用场景，并带慢速跟读版本。" },
+      { "id": "prompt_food", "title": "点餐买东西", "subtitle": "餐厅、购物、价格、买单", "target": "prompt", "prompt": "请生成点餐和买东西场景的实用口语，包含中文、缅语、英文三列。句子要短、自然、适合手机朗读练习。" },
+      { "id": "prompt_hospital", "title": "医院看病", "subtitle": "挂号、症状、买药、复诊", "target": "prompt", "prompt": "请生成医院看病常用表达，包含挂号、描述症状、买药、复诊。中文、缅语、英文对照，句子要简单。" },
+      { "id": "prompt_rent", "title": "租房沟通", "subtitle": "看房、押金、水电、维修", "target": "prompt", "prompt": "请生成租房沟通常用表达，包含看房、价格、押金、水电、维修。中文、缅语、英文对照。" }
+    ] },
+    { "id": "prompt_work", "title": "求职工作", "subtitle": "面试、机场、工作沟通", "badge": "求职", "children": [
+      { "id": "prompt_job", "title": "求职面试", "subtitle": "常见问题和自然回答", "target": "prompt", "prompt": "请模拟求职面试口语场景。先给常见问题，再给简短自然回答，最后给我可直接背诵的中文/缅语/英文版本。" },
+      { "id": "prompt_airport", "title": "机场过关", "subtitle": "入境目的、住址、停留时间", "target": "prompt", "prompt": "请生成机场过关常用口语，包含入境目的、住址、停留时间、行李说明。中文、缅语、英文对照。" }
+    ] },
+    { "id": "prompt_ai_teacher", "title": "AI 老师", "subtitle": "中文老师、互译练习", "badge": "AI", "children": [
+      { "id": "prompt_teacher", "title": "中文老师口语陪练", "subtitle": "短句、拼音、缅语解释、对话", "target": "prompt", "prompt": "你是中文老师。请用适合初学者的方式教我这个场景的中文口语：先给短句，再给拼音，再给缅语解释，最后给练习对话。" },
+      { "id": "prompt_translate", "title": "中缅互译练习", "subtitle": "忠实原意，只输出译文", "target": "prompt", "prompt": "请把我接下来输入的内容做中缅互译。要求忠实原意、语气自然、不解释、不加内容，只输出译文。" }
+    ] }
+  ]
+}
