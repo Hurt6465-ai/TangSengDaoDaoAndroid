@@ -6,7 +6,7 @@
     android:clipChildren="false"
     android:clipToPadding="false">
 
-    <com.chat.dating.DatingSwipeDeckView
+    <com.yuyakaido.android.cardstackview.CardStackView
         android:id="@+id/deckView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -29,9 +29,9 @@
             android:layout_gravity="start|top"
             android:gravity="center"
             android:includeFontPadding="false"
-            android:text="☷"
+            android:text="☰"
             android:textColor="#F2FFFFFF"
-            android:textSize="28sp"
+            android:textSize="25sp"
             android:textStyle="bold" />
 
         <LinearLayout
@@ -51,7 +51,7 @@
                 android:minWidth="72dp"
                 android:text="推荐"
                 android:textColor="#FFFFFFFF"
-                android:textSize="20sp"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -63,7 +63,7 @@
                 android:includeFontPadding="false"
                 android:minWidth="72dp"
                 android:text="附近"
-                android:textColor="#AAFFFFFF"
+                android:textColor="#8CFFFFFF"
                 android:textSize="17sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -72,19 +72,37 @@
     <LinearLayout
         android:id="@+id/actionBar"
         android:layout_width="match_parent"
-        android:layout_height="106dp"
+        android:layout_height="118dp"
         android:layout_gravity="bottom"
         android:gravity="top|center_horizontal"
         android:orientation="horizontal"
-        android:paddingTop="7dp"
-        android:paddingBottom="10dp">
+        android:paddingTop="4dp"
+        android:paddingBottom="22dp">
+
+        <TextView
+            android:id="@+id/rewindBtn"
+            android:layout_width="54dp"
+            android:layout_height="54dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_dating_action_rewind"
+            android:elevation="13dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="↶"
+            android:textColor="#FFFFB64D"
+            android:textSize="29sp"
+            android:textStyle="bold" />
+
+        <Space
+            android:layout_width="14dp"
+            android:layout_height="1dp" />
 
         <TextView
             android:id="@+id/passBtn"
-            android:layout_width="68dp"
-            android:layout_height="68dp"
+            android:layout_width="66dp"
+            android:layout_height="66dp"
             android:background="@drawable/bg_dating_action_pass"
-            android:elevation="14dp"
+            android:elevation="15dp"
             android:gravity="center"
             android:includeFontPadding="false"
             android:text="×"
@@ -93,33 +111,33 @@
             android:textStyle="bold" />
 
         <Space
-            android:layout_width="18dp"
+            android:layout_width="14dp"
             android:layout_height="1dp" />
 
         <TextView
             android:id="@+id/favoriteBtn"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:layout_marginTop="4dp"
+            android:layout_width="58dp"
+            android:layout_height="58dp"
+            android:layout_marginTop="6dp"
             android:background="@drawable/bg_dating_action_favorite"
-            android:elevation="14dp"
+            android:elevation="15dp"
             android:gravity="center"
             android:includeFontPadding="false"
             android:text="★"
-            android:textColor="#FF77A7FF"
+            android:textColor="#FF61A0FF"
             android:textSize="29sp"
             android:textStyle="bold" />
 
         <Space
-            android:layout_width="18dp"
+            android:layout_width="14dp"
             android:layout_height="1dp" />
 
         <TextView
             android:id="@+id/likeBtn"
-            android:layout_width="76dp"
-            android:layout_height="76dp"
+            android:layout_width="74dp"
+            android:layout_height="74dp"
             android:background="@drawable/bg_dating_action_like"
-            android:elevation="16dp"
+            android:elevation="17dp"
             android:gravity="center"
             android:includeFontPadding="false"
             android:text="♥"
