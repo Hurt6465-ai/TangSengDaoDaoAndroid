@@ -29,7 +29,7 @@
     <string name="word_pull_favorite_release">လွှတ်ပါ သိမ်းမည်</string>
     <string name="word_pull_unfavorite_release">လွှတ်ပါ သိမ်းထားမှု ပယ်ဖျက်မည်</string>
     <string name="word_front_tap">အဓိပ္ပါယ်ကြည့်ရန် နှိပ်ပါ</string>
-    <string name="word_front_hint">အသံ၊ ပင်ယင်ဖတ်ပြ၊ လေ့ကျင့်ရန် ခလုတ်များသည် ကတ်ကို မလှန်ပါ</string>
+    <string name="word_front_hint"></string>
     <string name="word_gesture_hint_short">ဘယ်ဆွဲ = မမှတ်မိ · ညာဆွဲ = မှတ်မိ · အောက်ဆွဲ = သိမ်းရန်</string>
     <string name="word_back_hint">ဘယ်ဆွဲ = မမှတ်မိ · ညာဆွဲ = မှတ်မိ</string>
     <string name="word_action_tts">အသံ</string>
@@ -48,7 +48,7 @@
     <string name="word_label_antonyms">ဆန့်ကျင်：</string>
     <string name="word_no_example">ဥပမာ မရှိသေးပါ</string>
     <string name="word_toast_unknown">မမှတ်မိ：နောက်မှ ပြန်လေ့ကျင့်မည်</string>
-    <string name="word_toast_known">မှတ်မိ：ပြန်လေ့ကျင့်ချိန် စီစဉ်ပြီး</string>
+    <string name="word_toast_known">မှတ်မိ：၇ ရက်နောက် ပြန်လေ့ကျင့်မည်</string>
     <string name="word_toast_hard">မရှင်းသေး：မနက်ဖြန် ပြန်လေ့ကျင့်မည်</string>
     <string name="word_favorite_added">သိမ်းပြီး</string>
     <string name="word_favorite_removed">သိမ်းထားမှု ပယ်ဖျက်ပြီး</string>
@@ -61,12 +61,11 @@
     <string name="word_menu_show_guide">အသုံးပြုပုံ ပြရန်</string>
     <string name="word_menu_tts_settings">အသံဆက်တင်</string>
     <string name="word_guide_title">စကားလုံးကတ် အသုံးပြုပုံ</string>
-    <string name="word_guide_body">ကတ်လွတ်နေရာကို နှိပ်ပါ：အဓိပ္ပါယ်ကြည့်ရန်
-ဘယ်ဘက်သို့ ဆွဲပါ：မမှတ်မိ၊ နောက်မှ ပြန်လေ့ကျင့်ရန်
-အလယ်ခလုတ်：မရှင်းသေး၊ မနက်ဖြန် ပြန်လေ့ကျင့်ရန်
-ညာဘက်သို့ ဆွဲပါ：မှတ်မိ၊ နောက်ကတ်သို့ သွားရန်
-အောက်သို့ ဆွဲပါ：သိမ်းရန် / သိမ်းထားမှု ပယ်ဖျက်ရန်
-အသံ၊ ဖတ်ပြ၊ အသံလေ့ကျင့်၊ ရေးပုံ ခလုတ်များသည် သက်ဆိုင်ရာလုပ်ဆောင်ချက်သာ လုပ်ပြီး ကတ်ကို မလှန်ပါ</string>
+    <string name="word_guide_body">ကတ်ကို နှိပ်ပါ：အဓိပ္ပါယ်ကြည့်ရန်
+ဘယ်ဆွဲ：မမှတ်မိ၊ နောက်မှ ပြန်လေ့ကျင့်ရန်
+ညာဆွဲ：မှတ်မိ၊ ၇ ရက်နောက် ပြန်လေ့ကျင့်ရန်
+အောက်ဆွဲ：သိမ်းရန်
+မရှင်းသေးကို နှိပ်ပါ：မနက်ဖြန် ပြန်လေ့ကျင့်ရန်</string>
     <string name="word_guide_ok">သိပြီ</string>
     <string name="word_guide_never">ထပ်မပြပါနှင့်</string>
     <string name="word_review_new">စကားလုံးအသစ်</string>
