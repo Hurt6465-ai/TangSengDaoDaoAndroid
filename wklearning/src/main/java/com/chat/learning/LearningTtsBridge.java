@@ -2,6 +2,7 @@ package com.chat.learning;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ResolveInfo;
 import android.widget.Toast;
 
 import java.lang.reflect.Method;
@@ -38,6 +39,7 @@ final class LearningTtsBridge {
 
     private static boolean tryStatic(Context context, String text, String lang) {
         String[] classNames = new String[]{
+                "com.chat.speech.SpeechManager",
                 "com.chat.speech.TsddTtsManager",
                 "com.chat.speech.WKSpeechManager",
                 "com.chat.speech.WKSpeechBridge",
@@ -78,6 +80,8 @@ final class LearningTtsBridge {
             intent.putExtra("text", text);
             intent.putExtra("lang", lang);
             intent.putExtra("mode", mode);
+            java.util.List<ResolveInfo> receivers = context.getPackageManager().queryBroadcastReceivers(intent, 0);
+            if (receivers == null || receivers.isEmpty()) return false;
             context.sendBroadcast(intent);
             return true;
         } catch (Throwable ignored) {

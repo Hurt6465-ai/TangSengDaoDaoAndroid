@@ -8,6 +8,8 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
@@ -17,12 +19,18 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.Window;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.StyleSpan;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import org.json.JSONArray;
@@ -55,6 +63,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private static final int COLOR_RED = 0xFFE11D48;
     private static final int COLOR_GREEN = 0xFF059669;
     private static final int COLOR_FAV = 0xFFF59E0B;
+    private static final int COLOR_HARD = 0xFFD97706;
+    private static final int COLOR_DIVIDER = 0xFFE5E7EB;
 
     private static final String SP_NAME = "tsdd_word_study";
     private static final String SP_SHOW_GUIDE = "show_word_guide";
@@ -66,6 +76,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private boolean flipped = false;
     private boolean judging = false;
     private boolean pullReady = false;
+    private boolean horizontalReady = false;
+    private boolean horizontalFullReady = false;
     private Axis axis = Axis.NONE;
     private float downX;
     private float downY;
@@ -90,10 +102,17 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private TextView hint;
     private TextView leftMark;
     private TextView rightMark;
+    private TextView hardMark;
     private TextView pullMark;
+    private View leftBackdrop;
+    private View rightBackdrop;
+    private View divider;
+    private ScrollView contentScroll;
+    private LinearLayout textBox;
     private GestureDetector gestureDetector;
     private ReviewStore reviewStore;
     private SharedPreferences settings;
+    private ToneGenerator toneGenerator;
 
     private enum Axis { NONE, HORIZONTAL, VERTICAL }
 
@@ -110,6 +129,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         if (title == null || title.length() == 0) title = level.toUpperCase();
 
         settings = getSharedPreferences(SP_NAME, Context.MODE_PRIVATE);
+        try { toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 36); } catch (Throwable ignored) {}
         reviewStore = new ReviewStore(this);
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
         gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
@@ -162,7 +182,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
         moreMenu = text("⋮", 30, COLOR_TEXT, true);
         moreMenu.setGravity(Gravity.CENTER);
-        moreMenu.setOnClickListener(v -> toggleMyPhonetic());
+        moreMenu.setOnClickListener(v -> openWordSettingsMenu());
         top.addView(moreMenu, new LinearLayout.LayoutParams(dp(54), -1));
 
         cardHost = new FrameLayout(this);
@@ -170,8 +190,18 @@ public class WordFullscreenActivity extends AppCompatActivity {
         hostLp.setMargins(0, dp(16), 0, dp(16));
         page.addView(cardHost, hostLp);
 
+        leftBackdrop = new View(this);
+        leftBackdrop.setBackground(rounded(0xFFFFEEF2, dp(28), 0, 0));
+        rightBackdrop = new View(this);
+        rightBackdrop.setBackground(rounded(0xFFECFDF5, dp(28), 0, 0));
+        cardHost.addView(leftBackdrop, new FrameLayout.LayoutParams(-1, -1));
+        cardHost.addView(rightBackdrop, new FrameLayout.LayoutParams(-1, -1));
+        leftBackdrop.setAlpha(0f);
+        rightBackdrop.setAlpha(0f);
+
         leftMark = mark(getString(R.string.word_mark_unknown), 0xFFFFEEF2, COLOR_RED);
         rightMark = mark(getString(R.string.word_mark_known), 0xFFECFDF5, COLOR_GREEN);
+        hardMark = mark(getString(R.string.word_mark_hard), 0xFFFFF7ED, COLOR_HARD);
         pullMark = mark(getString(R.string.word_pull_favorite_hint), 0xFFFFF7ED, COLOR_FAV);
         FrameLayout.LayoutParams lLp = new FrameLayout.LayoutParams(dp(128), dp(52), Gravity.START | Gravity.CENTER_VERTICAL);
         lLp.setMargins(dp(12), 0, 0, 0);
@@ -179,11 +209,14 @@ public class WordFullscreenActivity extends AppCompatActivity {
         FrameLayout.LayoutParams rLp = new FrameLayout.LayoutParams(dp(128), dp(52), Gravity.END | Gravity.CENTER_VERTICAL);
         rLp.setMargins(0, 0, dp(12), 0);
         cardHost.addView(rightMark, rLp);
+        FrameLayout.LayoutParams hLp = new FrameLayout.LayoutParams(dp(128), dp(52), Gravity.CENTER);
+        cardHost.addView(hardMark, hLp);
         FrameLayout.LayoutParams pLp = new FrameLayout.LayoutParams(dp(190), dp(48), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         pLp.setMargins(0, dp(16), 0, 0);
         cardHost.addView(pullMark, pLp);
         leftMark.setAlpha(0f);
         rightMark.setAlpha(0f);
+        hardMark.setAlpha(0f);
         pullMark.setAlpha(0f);
 
         card = new FrameLayout(this);
@@ -191,7 +224,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         card.setOnTouchListener(this::handleCardTouch);
         cardHost.addView(card, new FrameLayout.LayoutParams(-1, -1));
 
-        favoriteButton = text("♡", 28, COLOR_FAV, true);
+        favoriteButton = text("☆", 30, COLOR_FAV, true);
         favoriteButton.setGravity(Gravity.CENTER);
         favoriteButton.setOnClickListener(v -> toggleFavoriteWithToast());
         FrameLayout.LayoutParams favLp = new FrameLayout.LayoutParams(dp(54), dp(54), Gravity.END | Gravity.TOP);
@@ -219,28 +252,45 @@ public class WordFullscreenActivity extends AppCompatActivity {
         phoneticMy.setPadding(0, dp(6), 0, 0);
         cardContent.addView(phoneticMy, new LinearLayout.LayoutParams(-1, -2));
 
+        divider = new View(this);
+        divider.setBackgroundColor(COLOR_DIVIDER);
+        LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(-1, dp(1));
+        dividerLp.setMargins(0, dp(18), 0, dp(6));
+        cardContent.addView(divider, dividerLp);
+
+        contentScroll = new ScrollView(this);
+        contentScroll.setFillViewport(false);
+        contentScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        textBox = new LinearLayout(this);
+        textBox.setOrientation(LinearLayout.VERTICAL);
+        textBox.setPadding(0, 0, 0, dp(8));
+        contentScroll.addView(textBox, new ScrollView.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams scrollLp = new LinearLayout.LayoutParams(-1, 0, 1f);
+        scrollLp.setMargins(0, dp(4), 0, 0);
+        cardContent.addView(contentScroll, scrollLp);
+
         meaning = text("", 23, COLOR_TEXT, true);
         meaning.setGravity(Gravity.CENTER);
-        meaning.setPadding(0, dp(30), 0, 0);
+        meaning.setPadding(0, dp(18), 0, 0);
         meaning.setLineSpacing(dp(4), 1f);
-        cardContent.addView(meaning, new LinearLayout.LayoutParams(-1, -2));
+        textBox.addView(meaning, new LinearLayout.LayoutParams(-1, -2));
 
         example = text("", 15, COLOR_SUB, false);
         example.setGravity(Gravity.CENTER);
         example.setLineSpacing(dp(4), 1f);
         example.setPadding(0, dp(18), 0, 0);
-        cardContent.addView(example, new LinearLayout.LayoutParams(-1, -2));
+        textBox.addView(example, new LinearLayout.LayoutParams(-1, -2));
 
         extraInfo = text("", 13, COLOR_SUB, false);
         extraInfo.setGravity(Gravity.CENTER);
         extraInfo.setLineSpacing(dp(4), 1f);
         extraInfo.setPadding(0, dp(14), 0, 0);
-        cardContent.addView(extraInfo, new LinearLayout.LayoutParams(-1, -2));
+        textBox.addView(extraInfo, new LinearLayout.LayoutParams(-1, -2));
 
         hint = text("", 12, COLOR_SUB, false);
         hint.setGravity(Gravity.CENTER);
         hint.setPadding(0, dp(20), 0, 0);
-        cardContent.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+        textBox.addView(hint, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout toolRow = new LinearLayout(this);
         toolRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -263,19 +313,25 @@ public class WordFullscreenActivity extends AppCompatActivity {
         page.addView(actions, new LinearLayout.LayoutParams(-1, dp(52)));
 
         TextView forgot = actionButton(getString(R.string.word_action_unknown), 0xFFFFEEF2, COLOR_RED);
+        TextView hard = actionButton(getString(R.string.word_action_hard), 0xFFFFF7ED, COLOR_HARD);
         TextView known = actionButton(getString(R.string.word_action_known), 0xFFECFDF5, COLOR_GREEN);
         actions.addView(forgot, new LinearLayout.LayoutParams(0, -1, 1f));
+        LinearLayout.LayoutParams hardLp = new LinearLayout.LayoutParams(0, -1, 1f);
+        hardLp.setMargins(dp(10), 0, 0, 0);
+        actions.addView(hard, hardLp);
         LinearLayout.LayoutParams knownLp = new LinearLayout.LayoutParams(0, -1, 1f);
-        knownLp.setMargins(dp(12), 0, 0, 0);
+        knownLp.setMargins(dp(10), 0, 0, 0);
         actions.addView(known, knownLp);
         forgot.setOnClickListener(v -> judge(Sm2.QUALITY_FORGOT));
+        hard.setOnClickListener(v -> judge(Sm2.QUALITY_HARD));
         known.setOnClickListener(v -> judge(Sm2.QUALITY_KNOWN));
     }
 
     private void addToolButton(LinearLayout row, String text, Runnable action) {
         TextView button = text(text, 13, COLOR_TEXT, true);
         button.setGravity(Gravity.CENTER);
-        button.setBackground(rounded(0xFFF8FAFC, dp(16), 0xFFE5E7EB, 1));
+        button.setBackground(rounded(0xB3FFFFFF, dp(16), 0x99FFFFFF, 1));
+        button.setElevation(dp(2));
         button.setOnClickListener(v -> {
             if (action != null) action.run();
         });
@@ -291,6 +347,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 downY = event.getRawY();
                 axis = Axis.NONE;
                 pullReady = false;
+                horizontalReady = false;
+                horizontalFullReady = false;
                 card.animate().cancel();
                 return true;
             case MotionEvent.ACTION_MOVE:
@@ -302,10 +360,23 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 if (axis == Axis.HORIZONTAL) {
                     card.setTranslationX(dx);
                     card.setRotation(dx / 30f);
-                    float alpha = Math.min(1f, Math.abs(dx) / dp(120));
+                    float trigger = horizontalTriggerDistance();
+                    float alpha = Math.min(1f, Math.abs(dx) / Math.max(1f, trigger));
                     leftMark.setAlpha(dx < 0 ? alpha : 0f);
                     rightMark.setAlpha(dx > 0 ? alpha : 0f);
+                    leftBackdrop.setAlpha(dx < 0 ? Math.min(0.92f, alpha * 0.9f) : 0f);
+                    rightBackdrop.setAlpha(dx > 0 ? Math.min(0.92f, alpha * 0.9f) : 0f);
+                    hardMark.setAlpha(0f);
                     pullMark.setAlpha(0f);
+                    if (Math.abs(dx) >= trigger && !horizontalReady) {
+                        horizontalReady = true;
+                        vibrate(10);
+                        playTick();
+                    }
+                    if (Math.abs(dx) >= cardHost.getWidth() * 0.96f && !horizontalFullReady) {
+                        horizontalFullReady = true;
+                        vibrate(16);
+                    }
                 } else if (axis == Axis.VERTICAL && dy > 0 && !flipped) {
                     float move = Math.min(dp(110), dy * 0.45f);
                     card.setTranslationY(move);
@@ -323,7 +394,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
             case MotionEvent.ACTION_CANCEL:
                 float upDx = event.getRawX() - downX;
                 float upDy = event.getRawY() - downY;
-                if (axis == Axis.HORIZONTAL && Math.abs(upDx) > dp(116)) {
+                if (axis == Axis.HORIZONTAL && Math.abs(upDx) > horizontalTriggerDistance()) {
                     judge(upDx > 0 ? Sm2.QUALITY_KNOWN : Sm2.QUALITY_FORGOT);
                 } else if (axis == Axis.VERTICAL && upDy > dp(92) && !flipped) {
                     toggleFavoriteWithToast();
@@ -348,11 +419,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
         pinyin.setVisibility(showPinyin() ? View.VISIBLE : View.GONE);
         phoneticMy.setText(item.phoneticMy);
         phoneticMy.setVisibility(showMyPhonetic() && item.phoneticMy.length() > 0 ? View.VISIBLE : View.GONE);
-        meaning.setText(getString(R.string.word_front_tap));
-        example.setText(getString(R.string.word_front_hint));
-        extraInfo.setText(spellingText(item));
-        hint.setText(getString(R.string.word_gesture_hint_short));
-        favoriteButton.setText(isFavorite(item.id) ? "♥" : "♡");
+        favoriteButton.setText(isFavorite(item.id) ? "★" : "☆");
+        bindFront(item);
         resetMotion();
         card.setAlpha(0f);
         card.setTranslationX(dp(80));
@@ -376,44 +444,93 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void bindFront(WordItem item) {
+        cardContent.setGravity(Gravity.CENTER_HORIZONTAL);
+        word.setTextSize(52);
+        word.setGravity(Gravity.CENTER);
+        pinyin.setTextSize(22);
+        pinyin.setGravity(Gravity.CENTER);
+        phoneticMy.setTextSize(18);
+        phoneticMy.setGravity(Gravity.CENTER);
+        divider.setVisibility(View.GONE);
+        meaning.setGravity(Gravity.CENTER);
+        example.setGravity(Gravity.CENTER);
+        extraInfo.setGravity(Gravity.CENTER);
         meaning.setText(getString(R.string.word_front_tap));
         example.setText(getString(R.string.word_front_hint));
         extraInfo.setText(spellingText(item));
         hint.setText(getString(R.string.word_gesture_hint_short));
         pinyin.setVisibility(showPinyin() ? View.VISIBLE : View.GONE);
         phoneticMy.setVisibility(showMyPhonetic() && item.phoneticMy.length() > 0 ? View.VISIBLE : View.GONE);
+        if (contentScroll != null) contentScroll.scrollTo(0, 0);
     }
 
     private void bindBack(WordItem item) {
-        StringBuilder m = new StringBuilder();
-        if (item.meaningMy.length() > 0) m.append(getString(R.string.word_label_meaning_my)).append("\n").append(item.meaningMy);
-        if (item.meaningEn.length() > 0) {
-            if (m.length() > 0) m.append("\n\n");
-            m.append(getString(R.string.word_label_meaning_en)).append("\n").append(item.meaningEn);
-        }
-        meaning.setText(m.length() == 0 ? item.meaning : m.toString());
+        cardContent.setGravity(Gravity.START);
+        word.setTextSize(31);
+        word.setGravity(Gravity.START);
+        pinyin.setTextSize(16);
+        pinyin.setGravity(Gravity.START);
+        phoneticMy.setTextSize(15);
+        phoneticMy.setGravity(Gravity.START);
+        divider.setVisibility(View.VISIBLE);
+        meaning.setGravity(Gravity.START);
+        example.setGravity(Gravity.START);
+        extraInfo.setGravity(Gravity.START);
+        pinyin.setVisibility(showPinyin() ? View.VISIBLE : View.GONE);
+        phoneticMy.setVisibility(showMyPhonetic() && item.phoneticMy.length() > 0 ? View.VISIBLE : View.GONE);
 
-        StringBuilder ex = new StringBuilder();
+        SpannableStringBuilder m = new SpannableStringBuilder();
+        if (item.meaningMy.length() > 0) appendSection(m, getString(R.string.word_label_meaning_my), item.meaningMy, false, "");
+        if (item.meaningEn.length() > 0) appendSection(m, getString(R.string.word_label_meaning_en), item.meaningEn, false, "");
+        if (m.length() == 0) m.append(item.meaning);
+        meaning.setText(m);
+
+        SpannableStringBuilder ex = new SpannableStringBuilder();
         if (item.example.length() > 0) {
-            ex.append(getString(R.string.word_label_example)).append(item.example);
-            if (item.examplePinyin.length() > 0 && showPinyin()) ex.append("\n").append(item.examplePinyin);
-            if (item.exampleMy.length() > 0) ex.append("\n").append(item.exampleMy);
+            appendSection(ex, getString(R.string.word_label_example), item.example, true, item.word);
+            if (item.examplePinyin.length() > 0 && showPinyin()) appendPlainLine(ex, item.examplePinyin);
+            if (item.exampleMy.length() > 0) appendPlainLine(ex, item.exampleMy);
         }
-        example.setText(ex.length() == 0 ? getString(R.string.word_no_example) : ex.toString());
+        example.setText(ex.length() == 0 ? getString(R.string.word_no_example) : ex);
 
-        StringBuilder more = new StringBuilder();
-        addMoreLine(more, getString(R.string.word_label_usage), item.usageScene);
-        addMoreLine(more, getString(R.string.word_label_notes), item.notes);
-        addMoreLine(more, getString(R.string.word_label_synonyms), item.synonymsText);
-        addMoreLine(more, getString(R.string.word_label_antonyms), item.antonymsText);
-        extraInfo.setText(more.toString());
+        SpannableStringBuilder more = new SpannableStringBuilder();
+        appendSection(more, getString(R.string.word_label_usage), item.usageScene, false, "");
+        appendSection(more, getString(R.string.word_label_notes), item.notes, false, "");
+        appendSection(more, getString(R.string.word_label_synonyms), item.synonymsText, false, "");
+        appendSection(more, getString(R.string.word_label_antonyms), item.antonymsText, false, "");
+        extraInfo.setText(more);
         hint.setText(getString(R.string.word_back_hint));
+        if (contentScroll != null) contentScroll.scrollTo(0, 0);
     }
 
-    private void addMoreLine(StringBuilder builder, String label, String value) {
+    private void appendSection(SpannableStringBuilder builder, String label, String value, boolean highlightWord, String currentWord) {
+        if (value == null || value.length() == 0) return;
+        if (builder.length() > 0) builder.append("\n\n");
+        int labelStart = builder.length();
+        builder.append(label);
+        builder.setSpan(new ForegroundColorSpan(COLOR_BLUE), labelStart, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        builder.setSpan(new StyleSpan(Typeface.BOLD), labelStart, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        int valueStart = builder.length();
+        builder.append(value);
+        if (highlightWord && currentWord != null && currentWord.length() > 0) {
+            String full = builder.toString();
+            int from = valueStart;
+            while (true) {
+                int hit = full.indexOf(currentWord, from);
+                if (hit < 0) break;
+                int to = hit + currentWord.length();
+                builder.setSpan(new ForegroundColorSpan(COLOR_TEXT), hit, to, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                builder.setSpan(new StyleSpan(Typeface.BOLD), hit, to, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                builder.setSpan(new RelativeSizeSpan(1.28f), hit, to, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                from = to;
+            }
+        }
+    }
+
+    private void appendPlainLine(SpannableStringBuilder builder, String value) {
         if (value == null || value.length() == 0) return;
         if (builder.length() > 0) builder.append("\n");
-        builder.append(label).append(value);
+        builder.append(value);
     }
 
     private void judge(int quality) {
@@ -423,10 +540,41 @@ public class WordFullscreenActivity extends AppCompatActivity {
         ReviewState old = reviewStore.get(item.id);
         ReviewState next = Sm2.schedule(old, item.id, quality, System.currentTimeMillis());
         reviewStore.save(next);
-        vibrate(18);
-        int dir = quality == Sm2.QUALITY_FORGOT ? -1 : 1;
-        if (quality == Sm2.QUALITY_FORGOT) leftMark.setAlpha(1f); else rightMark.setAlpha(1f);
-        Toast.makeText(this, quality == Sm2.QUALITY_FORGOT ? getString(R.string.word_toast_unknown) : getString(R.string.word_toast_known), Toast.LENGTH_SHORT).show();
+        vibrate(20);
+        playActionTone(quality);
+        int dir = quality == Sm2.QUALITY_FORGOT ? -1 : quality == Sm2.QUALITY_KNOWN ? 1 : 0;
+        if (quality == Sm2.QUALITY_FORGOT) {
+            leftMark.setAlpha(1f);
+            leftBackdrop.setAlpha(0.9f);
+        } else if (quality == Sm2.QUALITY_KNOWN) {
+            rightMark.setAlpha(1f);
+            rightBackdrop.setAlpha(0.9f);
+        } else {
+            hardMark.setAlpha(1f);
+        }
+        Toast.makeText(this, toastForQuality(quality), Toast.LENGTH_SHORT).show();
+        if (dir == 0) {
+            card.animate()
+                    .translationY(dp(56))
+                    .scaleX(0.96f)
+                    .scaleY(0.96f)
+                    .alpha(0f)
+                    .setDuration(160)
+                    .setListener(new AnimatorListenerAdapter() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            card.animate().setListener(null);
+                            card.setScaleX(1f);
+                            card.setScaleY(1f);
+                            card.setAlpha(1f);
+                            card.setTranslationY(0f);
+                            judging = false;
+                            nextWord();
+                        }
+                    })
+                    .start();
+            return;
+        }
         card.animate()
                 .translationX(dir * dp(520))
                 .rotation(dir * 10f)
@@ -446,6 +594,12 @@ public class WordFullscreenActivity extends AppCompatActivity {
                 .start();
     }
 
+    private String toastForQuality(int quality) {
+        if (quality == Sm2.QUALITY_FORGOT) return getString(R.string.word_toast_unknown);
+        if (quality == Sm2.QUALITY_HARD) return getString(R.string.word_toast_hard);
+        return getString(R.string.word_toast_known);
+    }
+
     private void nextWord() {
         if (index < words.size() - 1) index++; else index = 0;
         bind();
@@ -455,7 +609,10 @@ public class WordFullscreenActivity extends AppCompatActivity {
         card.animate().translationX(0f).translationY(0f).rotation(0f).alpha(1f).setDuration(130).start();
         leftMark.animate().alpha(0f).setDuration(100).start();
         rightMark.animate().alpha(0f).setDuration(100).start();
+        hardMark.animate().alpha(0f).setDuration(100).start();
         pullMark.animate().alpha(0f).setDuration(100).start();
+        leftBackdrop.animate().alpha(0f).setDuration(100).start();
+        rightBackdrop.animate().alpha(0f).setDuration(100).start();
     }
 
     private void speakCurrentWordAuto() {
@@ -487,7 +644,10 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private void openStrokePractice() {
         if (words.isEmpty()) return;
-        Toast.makeText(this, getString(R.string.word_stroke_todo), Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(this, WordStrokeActivity.class);
+        intent.putExtra(WordStrokeActivity.EXTRA_WORD, words.get(index).word);
+        intent.putExtra(WordStrokeActivity.EXTRA_PINYIN, words.get(index).pinyin);
+        startActivity(intent);
     }
 
     private void togglePinyin() {
@@ -497,6 +657,38 @@ public class WordFullscreenActivity extends AppCompatActivity {
         if (!words.isEmpty()) {
             pinyin.setVisibility(next ? View.VISIBLE : View.GONE);
             if (flipped) bindBack(words.get(index)); else bindFront(words.get(index));
+        }
+    }
+
+    private void openWordSettingsMenu() {
+        final String phoneticText = showMyPhonetic() ? getString(R.string.word_menu_hide_my_phonetic) : getString(R.string.word_menu_show_my_phonetic);
+        final String[] items = new String[]{
+                phoneticText,
+                getString(R.string.word_menu_show_guide),
+                getString(R.string.word_menu_tts_settings)
+        };
+        new AlertDialog.Builder(this)
+                .setItems(items, (dialog, which) -> {
+                    if (which == 0) toggleMyPhonetic();
+                    else if (which == 1) maybeShowGuideForce();
+                    else openSpeechSettings();
+                })
+                .show();
+    }
+
+    private void maybeShowGuideForce() {
+        final boolean old = settings.getBoolean(SP_SHOW_GUIDE, true);
+        settings.edit().putBoolean(SP_SHOW_GUIDE, true).apply();
+        maybeShowGuide();
+        settings.edit().putBoolean(SP_SHOW_GUIDE, old).apply();
+    }
+
+    private void openSpeechSettings() {
+        try {
+            Class<?> clazz = Class.forName("com.chat.speech.ui.SpeechSettingsActivity");
+            startActivity(new Intent(this, clazz));
+        } catch (Throwable e) {
+            Toast.makeText(this, getString(R.string.word_tts_plugin_missing), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -524,7 +716,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         if (id.length() == 0) return;
         boolean next = !isFavorite(id);
         settings.edit().putBoolean("fav." + id, next).apply();
-        favoriteButton.setText(next ? "♥" : "♡");
+        favoriteButton.setText(next ? "★" : "☆");
         Toast.makeText(this, next ? getString(R.string.word_favorite_added) : getString(R.string.word_favorite_removed), Toast.LENGTH_SHORT).show();
         vibrate(10);
     }
@@ -689,7 +881,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
             if (builder.length() > 0) builder.append("。 ");
             if (s.initial.length() > 0) builder.append(s.initial).append("，");
             if (s.finalPart.length() > 0) builder.append(s.finalPart).append("，");
-            builder.append(toneName(s.tone)).append("，").append(part);
+            builder.append(part);
         }
         return builder.toString();
     }
@@ -750,6 +942,30 @@ public class WordFullscreenActivity extends AppCompatActivity {
         if (tone == 3) return getString(R.string.word_tone_3);
         if (tone == 4) return getString(R.string.word_tone_4);
         return getString(R.string.word_tone_0);
+    }
+
+    private float horizontalTriggerDistance() {
+        int width = cardHost != null && cardHost.getWidth() > 0 ? cardHost.getWidth() : getResources().getDisplayMetrics().widthPixels;
+        return Math.max(dp(96), width * 0.30f);
+    }
+
+    private void playTick() {
+        try { if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 45); } catch (Throwable ignored) {}
+    }
+
+    private void playActionTone(int quality) {
+        try {
+            if (toneGenerator == null) return;
+            int tone = quality == Sm2.QUALITY_KNOWN ? ToneGenerator.TONE_PROP_ACK : quality == Sm2.QUALITY_HARD ? ToneGenerator.TONE_PROP_BEEP : ToneGenerator.TONE_PROP_NACK;
+            toneGenerator.startTone(tone, 70);
+        } catch (Throwable ignored) {}
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        try { if (toneGenerator != null) toneGenerator.release(); } catch (Throwable ignored) {}
+        toneGenerator = null;
     }
 
     private void vibrate(long ms) {
@@ -846,6 +1062,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private static class Sm2 {
         static final int QUALITY_FORGOT = 0;
+        static final int QUALITY_HARD = 3;
         static final int QUALITY_KNOWN = 5;
         private static final double MIN_EASE = 1.3d;
         private static final long MINUTE = 60L * 1000L;
