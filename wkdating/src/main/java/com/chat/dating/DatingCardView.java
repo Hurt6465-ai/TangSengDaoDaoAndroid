@@ -1,216 +1,430 @@
 package com.chat.dating;
 
-import android.content.Context;
-import android.graphics.Outline;
+import android.app.AlertDialog;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Build;
+import android.os.Bundle;
 import android.text.TextUtils;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewOutlineProvider;
-import android.widget.FrameLayout;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
-import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.engine.DiskCacheStrategy;
-import com.chat.dating.databinding.ViewWkDatingCardBinding;
+import com.chat.base.base.WKBaseActivity;
+import com.chat.base.net.HttpResponseCode;
+import com.chat.dating.databinding.ActivityWkDatingHomeBinding;
 import com.chat.dating.model.DatingProfile;
+import com.chat.dating.model.DatingSwipeResult;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
-public class DatingCardView extends FrameLayout {
-    private final ViewWkDatingCardBinding binding;
-    private DatingProfile profile;
-    private int photoIndex;
+public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBinding> {
+    private static final int PAGE_LIMIT = 12;
+    private final ArrayList<DatingProfile> profiles = new ArrayList<>();
+    private final ArrayList<Map<String, Object>> pendingExposures = new ArrayList<>();
+    private final HashSet<String> loadedUids = new HashSet<>();
+    private String cursor = "";
+    private String scope = "global";
+    private String sessionId;
+    private boolean loading;
+    private boolean noMore;
+    private long exposureStartMs;
+    private String exposureUid = "";
+    private DatingProfile myProfile;
+    private DatingFilter filter;
 
-    public DatingCardView(@NonNull Context context) {
-        super(context);
-        binding = ViewWkDatingCardBinding.inflate(LayoutInflater.from(context), this, true);
-        setClickable(true);
-        setClipChildren(true);
-        setClipToPadding(true);
+    @Override
+    protected ActivityWkDatingHomeBinding getViewBinding() {
+        return ActivityWkDatingHomeBinding.inflate(getLayoutInflater());
+    }
+
+    @Override
+    public boolean supportSlideBack() {
+        return false;
+    }
+
+    @Override
+    protected void setTitle(TextView titleTv) {
+    }
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        Window window = getWindow();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            setClipToOutline(true);
-            setOutlineProvider(new ViewOutlineProvider() {
-                @Override
-                public void getOutline(View view, Outline outline) {
-                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(30));
-                }
-            });
+            window.setStatusBarColor(0x00000000);
+            window.setNavigationBarColor(0x00000000);
         }
+        window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        super.onCreate(savedInstanceState);
     }
 
-    public void bind(DatingProfile profile) {
-        this.profile = profile;
-        this.photoIndex = 0;
-        bindText();
-        bindPhoto();
-        setSwipeProgress(0f);
+    @Override
+    protected void initView() {
+        sessionId = UUID.randomUUID().toString();
+        filter = DatingFilter.load(this);
+        myProfile = DatingMockData.demoMyProfile();
+        wkVBinding.deckView.setOnDeckActionListener(new DatingSwipeDeckView.OnDeckActionListener() {
+            @Override
+            public void onCurrentChanged(DatingProfile profile, int index) {
+                finishExposure(false);
+                startExposure(profile);
+                DatingImagePreloader.preloadAround(DatingHomeActivity.this, profiles, index);
+                if (!loading && !noMore && wkVBinding.deckView.remainingCount() <= 4) loadMore(false);
+            }
+
+            @Override
+            public void onSwiped(DatingProfile profile, String action, int photoIndex, int nextIndex) {
+                finishExposure(true);
+                reportSwipe(profile, action, photoIndex);
+            }
+
+            @Override
+            public void onDeckEmpty() {
+                if (!loading && noMore) showEmpty();
+            }
+
+            @Override
+            public void onCardCenterTap(DatingProfile profile) {
+                showProfilePreview(profile);
+            }
+        });
+        updateScopeTabs();
+        updateFilterSummary();
+        showLoading(true, getString(R.string.dating_loading), false);
     }
 
-    public DatingProfile getProfile() {
-        return profile;
+    @Override
+    protected void initListener() {
+        wkVBinding.backBtn.setOnClickListener(v -> finish());
+        wkVBinding.retryBtn.setOnClickListener(v -> reload());
+        wkVBinding.passBtn.setOnClickListener(v -> wkVBinding.deckView.swipeTop(DatingSwipeAction.PASS));
+        wkVBinding.likeBtn.setOnClickListener(v -> wkVBinding.deckView.swipeTop(DatingSwipeAction.LIKE));
+        wkVBinding.recommendTab.setOnClickListener(v -> {
+            if (!"global".equals(scope)) {
+                scope = "global";
+                updateScopeTabs();
+                reload();
+            }
+        });
+        wkVBinding.nearbyTab.setOnClickListener(v -> {
+            if (!"nearby".equals(scope)) {
+                scope = "nearby";
+                updateScopeTabs();
+                reload();
+            }
+        });
+        wkVBinding.filterBtn.setOnClickListener(v -> showFilterDialog());
     }
 
-    public int getPhotoIndex() {
-        return photoIndex;
+    @Override
+    protected void initData() {
+        loadMyProfileThenRecommend();
     }
 
-    public void showNextPhoto() {
+    @Override
+    protected void onPause() {
+        finishExposure(true);
+        flushExposures();
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        finishExposure(true);
+        flushExposures();
+        super.onDestroy();
+    }
+
+    private void loadMyProfileThenRecommend() {
+        DatingModel.getInstance().getMyDatingProfile((code, msg, data) -> {
+            if (data != null) myProfile = data;
+            loadMore(true);
+        });
+    }
+
+    private void reload() {
+        finishExposure(true);
+        cursor = "";
+        noMore = false;
+        profiles.clear();
+        loadedUids.clear();
+        pendingExposures.clear();
+        wkVBinding.deckView.setProfiles(profiles);
+        showLoading(true, getString(R.string.dating_loading), false);
+        loadMore(true);
+    }
+
+    private void loadMore(boolean firstPage) {
+        if (loading) return;
+        loading = true;
+        if (firstPage) showLoading(true, getString(R.string.dating_loading), false);
+        DatingModel.getInstance().recommend(cursor, PAGE_LIMIT, scope, sessionId, filter, (code, msg, data) -> {
+            if (isFinishing() || isDestroyed()) return;
+            loading = false;
+            if (code == HttpResponseCode.success && data != null && data.getItems() != null && !data.getItems().isEmpty()) {
+                cursor = data.cursor == null ? "" : data.cursor;
+                noMore = !data.hasMore() || TextUtils.isEmpty(cursor);
+                appendProfiles(data.getItems(), firstPage, false);
+                return;
+            }
+            if (firstPage) {
+                appendProfiles(DatingMockData.demoProfiles(), true, true);
+                noMore = true;
+            } else {
+                noMore = true;
+            }
+        });
+    }
+
+    private void appendProfiles(List<DatingProfile> data, boolean reset, boolean demo) {
+        List<DatingProfile> clean = cleanProfiles(data);
+        if (reset) {
+            profiles.clear();
+            loadedUids.clear();
+            profiles.addAll(clean);
+            for (DatingProfile p : clean) loadedUids.add(p.safeUid());
+            wkVBinding.deckView.setProfiles(profiles);
+        } else if (!clean.isEmpty()) {
+            profiles.addAll(clean);
+            for (DatingProfile p : clean) loadedUids.add(p.safeUid());
+            wkVBinding.deckView.appendProfiles(clean);
+        }
+        if (profiles.isEmpty()) showEmpty();
+        else showContent();
+        if (demo) showToast(R.string.dating_mock_tip);
+        DatingImagePreloader.preloadAround(this, profiles, wkVBinding.deckView.getCurrentIndex());
+    }
+
+    private List<DatingProfile> cleanProfiles(List<DatingProfile> data) {
+        ArrayList<DatingProfile> clean = new ArrayList<>();
+        if (data == null) return clean;
+        for (DatingProfile profile : data) {
+            if (profile == null || TextUtils.isEmpty(profile.safeUid()) || profile.safePhotos().isEmpty()) continue;
+            if (loadedUids.contains(profile.safeUid())) continue;
+            if (!filter.accepts(myProfile, profile)) continue;
+            clean.add(profile);
+        }
+        return clean;
+    }
+
+    private void reportSwipe(DatingProfile profile, String action, int photoIndex) {
+        if (profile == null || TextUtils.isEmpty(profile.safeUid())) return;
+        DatingModel.getInstance().swipe(profile.safeUid(), action, photoIndex, (code, msg, data) -> {
+            if (code == HttpResponseCode.success && data != null && data.isMatched()) {
+                showMatchDialog(data, profile);
+            }
+        });
+    }
+
+    private void showMatchDialog(DatingSwipeResult result, DatingProfile profile) {
+        String name = profile == null ? "" : profile.safeName();
+        String message = TextUtils.isEmpty(name)
+                ? getString(R.string.dating_match_notice_ready)
+                : getString(R.string.dating_match_notice_named, name);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.dating_match_title)
+                .setMessage(message)
+                .setPositiveButton(R.string.dating_keep_swiping, null)
+                .show();
+    }
+
+    private void startExposure(DatingProfile profile) {
+        if (profile == null || TextUtils.isEmpty(profile.safeUid())) return;
+        exposureUid = profile.safeUid();
+        exposureStartMs = System.currentTimeMillis();
+    }
+
+    private void finishExposure(boolean forceFlush) {
+        if (!TextUtils.isEmpty(exposureUid) && exposureStartMs > 0) {
+            long duration = System.currentTimeMillis() - exposureStartMs;
+            if (duration > 250) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("to_uid", exposureUid);
+                item.put("seen_at", System.currentTimeMillis());
+                item.put("duration_ms", duration);
+                item.put("source", "wkdating");
+                item.put("event_type", "expose");
+                item.put("scope", scope);
+                item.put("country_mode", filter == null ? "" : filter.countryMode);
+                pendingExposures.add(item);
+            }
+        }
+        exposureUid = "";
+        exposureStartMs = 0;
+        if (forceFlush || pendingExposures.size() >= 5) flushExposures();
+    }
+
+    private void flushExposures() {
+        if (pendingExposures.isEmpty()) return;
+        ArrayList<Map<String, Object>> copy = new ArrayList<>(pendingExposures);
+        pendingExposures.clear();
+        DatingModel.getInstance().reportExposures(copy);
+    }
+
+    private void updateScopeTabs() {
+        boolean nearby = "nearby".equals(scope);
+        wkVBinding.recommendTab.setBackgroundResource(nearby ? R.drawable.bg_dating_tab_unselected : R.drawable.bg_dating_tab_selected);
+        wkVBinding.nearbyTab.setBackgroundResource(nearby ? R.drawable.bg_dating_tab_selected : R.drawable.bg_dating_tab_unselected);
+        wkVBinding.recommendTab.setTextColor(nearby ? 0xFF7A3542 : Color.WHITE);
+        wkVBinding.nearbyTab.setTextColor(nearby ? Color.WHITE : 0xFF7A3542);
+    }
+
+    private void updateFilterSummary() {
+        wkVBinding.filterSummaryTv.setText(filter == null ? "" : filter.summary());
+    }
+
+    private void showFilterDialog() {
+        DatingFilter draft = new DatingFilter();
+        draft.countryMode = filter.countryMode;
+        draft.gender = filter.gender;
+        draft.ageMin = filter.ageMin;
+        draft.ageMax = filter.ageMax;
+        draft.goal = filter.goal;
+
+        ScrollView scrollView = new ScrollView(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(20), dp(10), dp(20), dp(8));
+        scrollView.addView(root);
+
+        TextView tip = new TextView(this);
+        tip.setText(R.string.dating_filter_tip);
+        tip.setTextColor(0xFF7A3542);
+        tip.setTextSize(13);
+        tip.setLineSpacing(dp(2), 1f);
+        root.addView(tip, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView countryRow = filterRow(getCountryText(draft.countryMode));
+        TextView genderRow = filterRow(getGenderText(draft.gender));
+        TextView ageRow = filterRow(getAgeText(draft.ageMin, draft.ageMax));
+        TextView goalRow = filterRow(getGoalText(draft.goal));
+        root.addView(countryRow);
+        root.addView(genderRow);
+        root.addView(ageRow);
+        root.addView(goalRow);
+
+        countryRow.setOnClickListener(v -> {
+            if (DatingFilter.COUNTRY_SMART.equals(draft.countryMode)) draft.countryMode = DatingFilter.COUNTRY_SAME;
+            else if (DatingFilter.COUNTRY_SAME.equals(draft.countryMode)) draft.countryMode = DatingFilter.COUNTRY_FOREIGN;
+            else draft.countryMode = DatingFilter.COUNTRY_SMART;
+            countryRow.setText(getCountryText(draft.countryMode));
+        });
+        genderRow.setOnClickListener(v -> {
+            if ("all".equals(draft.gender)) draft.gender = "female";
+            else if ("female".equals(draft.gender)) draft.gender = "male";
+            else draft.gender = "all";
+            genderRow.setText(getGenderText(draft.gender));
+        });
+        ageRow.setOnClickListener(v -> {
+            if (draft.ageMin == 18 && draft.ageMax == 35) { draft.ageMin = 22; draft.ageMax = 35; }
+            else if (draft.ageMin == 22 && draft.ageMax == 35) { draft.ageMin = 18; draft.ageMax = 45; }
+            else if (draft.ageMin == 18 && draft.ageMax == 45) { draft.ageMin = 30; draft.ageMax = 45; }
+            else { draft.ageMin = 18; draft.ageMax = 35; }
+            ageRow.setText(getAgeText(draft.ageMin, draft.ageMax));
+        });
+        goalRow.setOnClickListener(v -> {
+            if ("love".equals(draft.goal)) draft.goal = "marriage";
+            else if ("marriage".equals(draft.goal)) draft.goal = "all";
+            else draft.goal = "love";
+            goalRow.setText(getGoalText(draft.goal));
+        });
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.dating_filter_title)
+                .setView(scrollView)
+                .setNegativeButton(R.string.dating_cancel, null)
+                .setPositiveButton(R.string.dating_apply, (dialog, which) -> {
+                    filter = draft;
+                    filter.save(this);
+                    updateFilterSummary();
+                    reload();
+                })
+                .show();
+    }
+
+    private TextView filterRow(String text) {
+        TextView row = new TextView(this);
+        row.setText(text);
+        row.setTextColor(0xFFD83255);
+        row.setTextSize(15);
+        row.setTypeface(row.getTypeface(), Typeface.BOLD);
+        row.setBackgroundResource(R.drawable.bg_dating_filter_button);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(16), 0, dp(16), 0);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(46));
+        lp.setMargins(0, dp(12), 0, 0);
+        row.setLayoutParams(lp);
+        return row;
+    }
+
+    private String getCountryText(String mode) {
+        if (DatingFilter.COUNTRY_SAME.equals(mode)) return getString(R.string.dating_filter_country_same);
+        if (DatingFilter.COUNTRY_FOREIGN.equals(mode)) return getString(R.string.dating_filter_country_foreign);
+        return getString(R.string.dating_filter_country_smart);
+    }
+
+    private String getGenderText(String gender) {
+        if ("female".equals(gender)) return getString(R.string.dating_filter_gender_female);
+        if ("male".equals(gender)) return getString(R.string.dating_filter_gender_male);
+        return getString(R.string.dating_filter_gender_all);
+    }
+
+    private String getAgeText(int min, int max) {
+        return getString(R.string.dating_filter_age, min, max);
+    }
+
+    private String getGoalText(String goal) {
+        if ("marriage".equals(goal)) return getString(R.string.dating_filter_goal_marriage);
+        if ("all".equals(goal)) return getString(R.string.dating_filter_goal_all);
+        return getString(R.string.dating_filter_goal_love);
+    }
+
+    private void showProfilePreview(DatingProfile profile) {
         if (profile == null) return;
-        List<String> photos = profile.safePhotos();
-        if (photos.isEmpty()) return;
-        if (photoIndex < photos.size() - 1) {
-            photoIndex++;
-            bindPhoto();
-        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(profile.safeName());
+        if (profile.age > 0) sb.append(" · ").append(profile.age);
+        if (!TextUtils.isEmpty(profile.city)) sb.append("\n").append(profile.city);
+        sb.append("\n").append(profile.safeRelationshipGoal());
+        if (!TextUtils.isEmpty(profile.safeIntro())) sb.append("\n\n").append(profile.safeIntro());
+        List<String> tags = profile.safeCoreTags();
+        if (!tags.isEmpty()) sb.append("\n\n#").append(TextUtils.join("  #", tags.subList(0, Math.min(tags.size(), 8))));
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.dating_profile_preview)
+                .setMessage(sb.toString())
+                .setPositiveButton(R.string.dating_ok, null)
+                .show();
     }
 
-    public void showPreviousPhoto() {
-        if (profile == null) return;
-        if (photoIndex > 0) {
-            photoIndex--;
-            bindPhoto();
-        }
+    private void showLoading(boolean show, String text, boolean retry) {
+        wkVBinding.loadingLayout.setVisibility(show ? View.VISIBLE : View.GONE);
+        wkVBinding.loadingTv.setText(text);
+        wkVBinding.retryBtn.setVisibility(retry ? View.VISIBLE : View.GONE);
+        wkVBinding.actionBar.setVisibility(show ? View.GONE : View.VISIBLE);
+        wkVBinding.deckView.setVisibility(show ? View.GONE : View.VISIBLE);
     }
 
-    public void setSwipeProgress(float dx) {
-        float width = Math.max(1f, getWidth());
-        float progress = Math.min(1f, Math.abs(dx) / (width * 0.28f));
-        binding.likeBadge.setAlpha(dx > 0 ? progress : 0f);
-        binding.nopeBadge.setAlpha(dx < 0 ? progress : 0f);
-        binding.infoPanel.setTranslationY(progress * dp(4));
+    private void showContent() {
+        wkVBinding.loadingLayout.setVisibility(View.GONE);
+        wkVBinding.actionBar.setVisibility(View.VISIBLE);
+        wkVBinding.deckView.setVisibility(View.VISIBLE);
     }
 
-    private void bindText() {
-        if (profile == null) return;
-        String nameLine = profile.safeName();
-        if (profile.age > 0) nameLine += ", " + profile.age;
-        if (!TextUtils.isEmpty(profile.safeCountryCode())) nameLine += " " + flagEmoji(profile.safeCountryCode());
-        binding.nameTv.setText(nameLine);
-
-        StringBuilder meta = new StringBuilder();
-        if (!TextUtils.isEmpty(profile.city)) meta.append(profile.city);
-        else if (!TextUtils.isEmpty(profile.country)) meta.append(profile.country);
-        String distance = profile.safeDistanceLabel();
-        if (!TextUtils.isEmpty(distance)) {
-            if (meta.length() > 0) meta.append(" · ");
-            meta.append(distance);
-        }
-        binding.metaTv.setText(meta.toString());
-        binding.metaTv.setVisibility(meta.length() == 0 ? GONE : VISIBLE);
-
-        int score = profile.profile_score > 0 ? Math.min(99, profile.profile_score) : 88;
-        binding.scoreTv.setText(getResources().getString(R.string.dating_match_score, score));
-
-        String goal = goalText(profile.safeRelationshipGoal());
-        binding.goalChipTv.setText(TextUtils.isEmpty(goal) ? getResources().getString(R.string.dating_goal_love) : goal);
-        binding.crossChipTv.setText(crossText(profile.safeCrossBorderPreference()));
-
-        StringBuilder jobLine = new StringBuilder();
-        if (!TextUtils.isEmpty(profile.job)) jobLine.append(profile.job);
-        if (!TextUtils.isEmpty(profile.education)) {
-            if (jobLine.length() > 0) jobLine.append(" · ");
-            jobLine.append(profile.education);
-        }
-        if (jobLine.length() == 0 && !TextUtils.isEmpty(profile.relationship_status)) jobLine.append(profile.relationship_status);
-        binding.jobTv.setText(jobLine.toString());
-        binding.jobTv.setVisibility(jobLine.length() == 0 ? GONE : VISIBLE);
-
-        String intro = profile.safeIntro();
-        binding.introTv.setText(intro);
-        binding.introTv.setVisibility(TextUtils.isEmpty(intro) ? GONE : VISIBLE);
-
-        bindTagChips(profile.safeCoreTags());
-    }
-
-    private void bindPhoto() {
-        if (profile == null) return;
-        List<String> photos = profile.safePhotos();
-        if (photos.isEmpty()) {
-            binding.photoIv.setImageDrawable(null);
-        } else {
-            String url = photos.get(Math.max(0, Math.min(photoIndex, photos.size() - 1)));
-            Glide.with(this)
-                    .load(DatingImageSource.resolve(getContext(), url))
-                    .override(900, 1400)
-                    .centerCrop()
-                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                    .into(binding.photoIv);
-            if (photoIndex + 1 < photos.size()) DatingImagePreloader.preload(getContext(), photos.get(photoIndex + 1));
-        }
-        bindIndicators(photos.size());
-    }
-
-    private void bindIndicators(int count) {
-        binding.indicatorRow.removeAllViews();
-        int realCount = Math.max(1, count);
-        for (int i = 0; i < realCount; i++) {
-            View bar = new View(getContext());
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(4), 1f);
-            if (i > 0) lp.setMarginStart(dp(5));
-            bar.setLayoutParams(lp);
-            bar.setBackgroundResource(i == photoIndex ? R.drawable.bg_dating_indicator_active : R.drawable.bg_dating_indicator_inactive);
-            binding.indicatorRow.addView(bar);
-        }
-    }
-
-    private void bindTagChips(List<String> list) {
-        binding.tagRow.removeAllViews();
-        if (list == null || list.isEmpty()) {
-            binding.tagRow.setVisibility(GONE);
-            return;
-        }
-        binding.tagRow.setVisibility(VISIBLE);
-        int count = 0;
-        for (String item : list) {
-            if (TextUtils.isEmpty(item)) continue;
-            if (count >= 4) break;
-            TextView chip = new TextView(getContext());
-            chip.setText("#" + item);
-            chip.setTextColor(0xE6FFFFFF);
-            chip.setTextSize(12);
-            chip.setSingleLine(true);
-            chip.setMaxLines(1);
-            chip.setEllipsize(TextUtils.TruncateAt.END);
-            chip.setBackgroundResource(R.drawable.bg_dating_chip);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-            if (count > 0) lp.setMarginStart(dp(7));
-            binding.tagRow.addView(chip, lp);
-            count++;
-        }
-    }
-
-    private String goalText(String raw) {
-        if (TextUtils.isEmpty(raw)) return "";
-        String value = raw.trim().toLowerCase(Locale.US);
-        if (value.contains("marriage") || value.contains("结婚") || value.contains("奔")) return getResources().getString(R.string.dating_goal_marriage);
-        if (value.contains("chat") || value.contains("了解") || value.contains("慢慢")) return getResources().getString(R.string.dating_goal_chat);
-        if (value.contains("long") || value.contains("稳定") || value.contains("长期")) return getResources().getString(R.string.dating_goal_long_term);
-        if (value.contains("love") || value.contains("date") || value.contains("恋爱") || value.contains("认真")) return getResources().getString(R.string.dating_goal_love);
-        return raw;
-    }
-
-    private String crossText(String raw) {
-        if (TextUtils.isEmpty(raw)) return getResources().getString(R.string.dating_cross_open);
-        String value = raw.trim().toLowerCase(Locale.US);
-        if (value.contains("same") || value.contains("local") || value.contains("nearby") || value.contains("本国") || value.contains("拒绝")) {
-            return getResources().getString(R.string.dating_cross_same_country);
-        }
-        if (value.contains("prefer") || value.contains("喜欢异国")) return getResources().getString(R.string.dating_cross_prefer_foreign);
-        return getResources().getString(R.string.dating_cross_open);
-    }
-
-    private String flagEmoji(String countryCode) {
-        if (TextUtils.isEmpty(countryCode) || countryCode.length() < 2) return "";
-        String code = countryCode.trim().toUpperCase(Locale.US);
-        int first = Character.codePointAt(code, 0) - 'A' + 0x1F1E6;
-        int second = Character.codePointAt(code, 1) - 'A' + 0x1F1E6;
-        if (first < 0x1F1E6 || first > 0x1F1FF || second < 0x1F1E6 || second > 0x1F1FF) return "";
-        return new String(Character.toChars(first)) + new String(Character.toChars(second));
+    private void showEmpty() {
+        String text = String.format(Locale.getDefault(), "%s\n%s", getString(R.string.dating_empty), getString(R.string.dating_empty_tip));
+        showLoading(true, text, true);
+        wkVBinding.actionBar.setVisibility(View.GONE);
     }
 
     private int dp(int value) {
