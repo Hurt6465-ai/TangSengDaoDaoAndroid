@@ -5,31 +5,54 @@ import android.content.Context;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 学习内容目录仓库。
- * 目录结构来自 assets/learning/{type}/catalog.json，首页不再承载二级/三级目录数据。
- */
+/** Learning content catalog with bundled fallback and optional Cloudflare static refresh. */
 final class LearningCatalogRepository {
+    private static final int MAX_CATALOG_BYTES = 2 * 1024 * 1024;
+
     private LearningCatalogRepository() {}
 
     static Catalog load(Context context, String type) {
-        try {
-            String json = readAsset(context, "learning/" + type + "/catalog.json");
-            JSONObject root = new JSONObject(json);
-            Catalog catalog = new Catalog();
-            catalog.type = root.optString("type", type);
-            catalog.title = root.optString("title", defaultTitle(type));
-            catalog.subtitle = root.optString("subtitle", "");
-            catalog.items = parseItems(root.optJSONArray("items"));
-            return catalog;
-        } catch (Throwable ignored) {
-            return fallback(type);
+        String json = "";
+        File cache = new File(context.getFilesDir(), "learning/catalogs/" + safe(type) + ".json");
+        try { json = LearningRemoteContent.readFile(cache, MAX_CATALOG_BYTES); } catch (Throwable ignored) {}
+        if (json.length() == 0) {
+            try { json = LearningRemoteContent.readAsset(context, "learning/" + type + "/catalog.json"); }
+            catch (Throwable ignored) {}
         }
+        Catalog catalog;
+        try { catalog = parse(type, json); }
+        catch (Throwable ignored) { catalog = fallback(type); }
+        refreshInBackground(context, type, cache);
+        return catalog;
+    }
+
+    private static void refreshInBackground(Context context, String type, File cache) {
+        if (!"words".equals(type)) return;
+        String path = LearningRemoteContent.config(context).wordsCatalog;
+        String resolved = LearningRemoteContent.resolveUrl(context, path);
+        if (resolved.length() == 0) return;
+        Context app = context.getApplicationContext();
+        LearningRemoteContent.execute(() -> {
+            try {
+                byte[] bytes = LearningRemoteContent.download(app, resolved, MAX_CATALOG_BYTES);
+                parse(type, new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
+                LearningRemoteContent.atomicWrite(cache, bytes);
+            } catch (Throwable ignored) {}
+        });
+    }
+
+    private static Catalog parse(String type, String json) throws Exception {
+        JSONObject root = new JSONObject(json);
+        Catalog catalog = new Catalog();
+        catalog.type = root.optString("type", type);
+        catalog.title = root.optString("title", defaultTitle(type));
+        catalog.subtitle = root.optString("subtitle", "");
+        catalog.items = parseItems(root.optJSONArray("items"));
+        return catalog;
     }
 
     static Node find(Catalog catalog, String id) {
@@ -41,8 +64,7 @@ final class LearningCatalogRepository {
         if (catalog == null) return new ArrayList<>();
         if (parentId == null || parentId.length() == 0) return catalog.items;
         Node parent = find(catalog, parentId);
-        if (parent == null || parent.children == null) return new ArrayList<>();
-        return parent.children;
+        return parent == null || parent.children == null ? new ArrayList<>() : parent.children;
     }
 
     static String titleFor(Catalog catalog, String parentId) {
@@ -85,38 +107,28 @@ final class LearningCatalogRepository {
             node.level = object.optString("level", node.id);
             node.asset = object.optString("asset", "");
             node.prompt = object.optString("prompt", "");
+            node.coverUrl = object.optString("cover_url", "");
+            node.coverVersion = object.optInt("cover_version", 1);
+            node.dataUrl = object.optString("data_url", "");
+            node.dataVersion = object.optInt("data_version", 1);
+            node.dataSha256 = object.optString("data_sha256", "");
             node.children = parseItems(object.optJSONArray("children"));
             result.add(node);
         }
         return result;
     }
 
-    private static String readAsset(Context context, String path) throws Exception {
-        InputStream input = context.getAssets().open(path);
-        try {
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[4096];
-            int read;
-            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
-            return output.toString("UTF-8");
-        } finally {
-            try { input.close(); } catch (Throwable ignored) {}
-        }
-    }
-
     private static Catalog fallback(String type) {
         Catalog catalog = new Catalog();
         catalog.type = type;
         catalog.title = defaultTitle(type);
-        catalog.subtitle = "本地目录文件缺失，先使用内置占位目录";
+        catalog.subtitle = "本地目录文件缺失";
         catalog.items = new ArrayList<>();
-        Node node = new Node();
-        node.id = type + "_demo";
-        node.title = catalog.title + "示例";
-        node.subtitle = "后续接入 assets/learning/" + type + "/catalog.json";
-        node.target = "study";
-        catalog.items.add(node);
         return catalog;
+    }
+
+    private static String safe(String value) {
+        return value == null ? "catalog" : value.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
     private static String defaultTitle(String type) {
@@ -148,10 +160,13 @@ final class LearningCatalogRepository {
         String level;
         String asset;
         String prompt;
+        String coverUrl;
+        int coverVersion;
+        String dataUrl;
+        int dataVersion;
+        String dataSha256;
         List<Node> children = new ArrayList<>();
 
-        boolean hasChildren() {
-            return children != null && !children.isEmpty();
-        }
+        boolean hasChildren() { return children != null && !children.isEmpty(); }
     }
 }

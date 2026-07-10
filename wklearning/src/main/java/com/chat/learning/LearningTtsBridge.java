@@ -31,13 +31,13 @@ final class LearningTtsBridge {
         if (context == null || text == null || text.trim().length() == 0) return false;
         Context app = context.getApplicationContext();
         String content = text.trim();
-        if (tryStatic(app, content, lang)) return true;
+        if (tryStatic(app, content, lang, mode)) return true;
         if (tryIntent(app, content, lang, mode)) return true;
         Toast.makeText(context, context.getString(R.string.word_tts_plugin_missing), Toast.LENGTH_SHORT).show();
         return false;
     }
 
-    private static boolean tryStatic(Context context, String text, String lang) {
+    private static boolean tryStatic(Context context, String text, String lang, String mode) {
         String[] classNames = new String[]{
                 "com.chat.speech.SpeechManager",
                 "com.chat.speech.TsddTtsManager",
@@ -52,6 +52,8 @@ final class LearningTtsBridge {
             try {
                 Class<?> cls = Class.forName(clsName);
                 for (String m : methodNames) {
+                    if (invoke(cls, m, new Class[]{Context.class, String.class, String.class, String.class}, new Object[]{context, text, lang, mode})) return true;
+                    if (invoke(cls, m, new Class[]{String.class, String.class, String.class}, new Object[]{text, lang, mode})) return true;
                     if (invoke(cls, m, new Class[]{Context.class, String.class, String.class}, new Object[]{context, text, lang})) return true;
                     if (invoke(cls, m, new Class[]{Context.class, String.class}, new Object[]{context, text})) return true;
                     if (invoke(cls, m, new Class[]{String.class, String.class}, new Object[]{text, lang})) return true;

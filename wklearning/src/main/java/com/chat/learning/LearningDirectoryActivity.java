@@ -12,6 +12,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -161,49 +162,64 @@ public class LearningDirectoryActivity extends AppCompatActivity {
     }
 
     private View wordVerticalCard(LearningCatalogRepository.Node node) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.TOP | Gravity.START);
-        card.setPadding(dp(12), dp(12), dp(12), dp(12));
-        card.setBackground(gradientRounded(cardStartFor(node), 0xFFFFFFFF, dp(18), 0x33FFFFFF, dp(1)));
-        card.setMinimumHeight(dp(148));
+        FrameLayout card = new FrameLayout(this);
+        card.setBackground(gradientRounded(cardStartFor(node), 0xFFFFFFFF, dp(18), 0x22FFFFFF, dp(1)));
+        card.setClipToOutline(true);
         card.setOnClickListener(v -> throttledClick(() -> handleNode(node)));
+
+        ImageView cover = new ImageView(this);
+        cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        cover.setBackgroundColor(cardStartFor(node));
+        card.addView(cover, new FrameLayout.LayoutParams(-1, -1));
+        LearningCoverLoader.load(cover, node.coverUrl, node.coverVersion);
+
+        View shade = new View(this);
+        GradientDrawable shadeDrawable = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0x10000000, 0x22000000, 0xCC111827});
+        shade.setBackground(shadeDrawable);
+        card.addView(shade, new FrameLayout.LayoutParams(-1, -1));
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.TOP | Gravity.START);
+        content.setPadding(dp(10), dp(10), dp(10), dp(10));
+        card.addView(content, new FrameLayout.LayoutParams(-1, -1));
 
         TextView badge = new TextView(this);
         badge.setText(node.badge != null && node.badge.length() > 0 ? node.badge : targetLabel(node));
         badge.setTextSize(10);
-        badge.setTextColor(0xCC111827);
+        badge.setTextColor(0xFF111827);
         badge.setTypeface(Typeface.DEFAULT_BOLD);
         badge.setGravity(Gravity.CENTER);
         badge.setIncludeFontPadding(false);
         badge.setPadding(dp(7), dp(4), dp(7), dp(4));
-        badge.setBackground(rounded(0x80FFFFFF, dp(12), 0x33FFFFFF, dp(1)));
-        card.addView(badge, new LinearLayout.LayoutParams(-2, -2));
+        badge.setBackground(rounded(0xEFFFFFFF, dp(12), 0x33FFFFFF, dp(1)));
+        content.addView(badge, new LinearLayout.LayoutParams(-2, -2));
 
-        View spacer = new View(this);
-        card.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1f));
+        content.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 1f));
 
         TextView title = new TextView(this);
         title.setText(node.title);
         title.setTextSize(16);
-        title.setTextColor(COLOR_TEXT);
+        title.setTextColor(Color.WHITE);
+        title.setShadowLayer(dp(2), 0, dp(1), 0x77000000);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setIncludeFontPadding(false);
         title.setMaxLines(1);
-        card.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        content.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         TextView preview = new TextView(this);
         String previewText = node.preview != null && node.preview.length() > 0 ? node.preview : node.subtitle;
         preview.setText(previewText);
-        preview.setTextSize(11);
-        preview.setTextColor(0xFF8A8F98);
+        preview.setTextSize(10.5f);
+        preview.setTextColor(0xE6FFFFFF);
         preview.setIncludeFontPadding(false);
         preview.setMaxLines(2);
-        preview.setLineSpacing(dp(2), 1f);
+        preview.setLineSpacing(dp(1), 1f);
         LinearLayout.LayoutParams previewLp = new LinearLayout.LayoutParams(-1, -2);
-        previewLp.setMargins(0, dp(6), 0, 0);
-        card.addView(preview, previewLp);
-
+        previewLp.setMargins(0, dp(5), 0, 0);
+        content.addView(preview, previewLp);
         return card;
     }
 
@@ -320,6 +336,9 @@ public class LearningDirectoryActivity extends AppCompatActivity {
             Intent intent = new Intent(this, WordFullscreenActivity.class);
             intent.putExtra(WordFullscreenActivity.EXTRA_LEVEL, node.level != null && node.level.length() > 0 ? node.level : node.id);
             intent.putExtra(WordFullscreenActivity.EXTRA_TITLE, node.title);
+            intent.putExtra(WordFullscreenActivity.EXTRA_DATA_URL, node.dataUrl);
+            intent.putExtra(WordFullscreenActivity.EXTRA_DATA_SHA256, node.dataSha256);
+            intent.putExtra(WordFullscreenActivity.EXTRA_DATA_VERSION, node.dataVersion);
             startActivity(intent);
             return;
         }
