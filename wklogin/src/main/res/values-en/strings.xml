@@ -56,7 +56,14 @@
     <string name="copied">Copied</string>
     <string name="phone_error">Invalid phone number</string>
     <string name="agree_auth_tips">Please read and agree to the Privacy Policy and User Agreement first</string>
-    <string name="choose_login_type">—  Third-party Login  —</string>
+    <string name="choose_login_type">—  Other sign-in methods  —</string>
+    <string name="google_sign_in">Sign in with Google</string>
+    <string name="google_login_loading">Verifying your Google account</string>
+    <string name="google_login_cancelled">Google sign-in was cancelled</string>
+    <string name="google_login_failed">Google sign-in failed. Please try again later</string>
+    <string name="google_login_no_credential">No Google account is available. Add an account in your device settings first</string>
+    <string name="google_login_invalid_response">Google returned an invalid sign-in response. Please try again</string>
+    <string name="google_login_not_configured">Google sign-in is not configured. Please set the Web Client ID</string>
     <string name="update_api_ip">Start with http (e.g., http://172.0.0.1:8090)</string>
     <string name="input_invite_code_must">Please enter invitation code (required)</string>
     <string name="input_invite_code_not_must">Please enter invitation code (optional)</string>
