@@ -1,209 +1,167 @@
 {
-  "version": 1,
-  "updatedAt": "2026-07-07",
+  "version": 2,
+  "updatedAt": "2026-07-11",
   "categoryId": "hsk1",
-  "title": "HSK 1",
+  "title": "HSK 1 本地预览",
   "items": [
     {
-      "id": "greeting_001",
+      "id": "hsk1_0001",
       "word": "你好",
-      "pinyin": "nǐ hǎo",
-      "translations": {
-        "my": "မင်္ဂလာပါ",
-        "en": "Hello"
-      },
-      "example": "你好，很高兴认识你。",
-      "exampleTranslations": {
-        "my": "မင်္ဂလာပါ၊ တွေ့ရတာဝမ်းသာပါတယ်။",
-        "en": "Hello, nice to meet you."
-      },
-      "audio": "audio/words/greeting_001.mp3",
-      "level": "A1",
       "phonetic_my": "နီ ဟောင်",
-      "example_pinyin": "Nǐ hǎo, hěn gāoxìng rènshi nǐ.",
-      "usage_scene": "见面、聊天开场",
-      "notes": "你好偏日常，您好更礼貌。",
+      "part_of_speech_my": "နှုတ်ဆက်စကား",
+      "meaning_my": "မင်္ဂလာပါ",
+      "usage_scene_my": "လူတွေ့ဆုံချိန် သို့မဟုတ် စကားစပြောချိန်တွင် အသုံးပြုသော နှုတ်ဆက်စကား။",
+      "example": "你好，我叫小明。",
+      "example_my": "မင်္ဂလာပါ၊ ကျွန်တော့်နာမည် Xiaoming ပါ။",
       "synonyms": [
         "您好"
       ],
-      "antonyms": []
+      "antonyms": [],
+      "collocations": [
+        "你好啊",
+        "大家好",
+        "老师好"
+      ],
+      "notes_my": "“您好” သည် ပိုမိုယဉ်ကျေးပြီး လူကြီး၊ ဆရာ သို့မဟုတ် ဖောက်သည်နှင့် ပြောရာတွင် အသုံးများသည်။"
     },
     {
-      "id": "greeting_002",
+      "id": "hsk1_0002",
       "word": "谢谢",
-      "pinyin": "xiè xie",
-      "translations": {
-        "my": "ကျေးဇူးတင်ပါတယ်",
-        "en": "Thank you"
-      },
-      "example": "谢谢你的帮助。",
-      "exampleTranslations": {
-        "my": "ကူညီပေးတာ ကျေးဇူးတင်ပါတယ်။",
-        "en": "Thank you for your help."
-      },
-      "audio": "audio/words/greeting_002.mp3",
-      "level": "A1",
       "phonetic_my": "ရှဲ့ ရှဲ့",
-      "example_pinyin": "Xièxie nǐ de bāngzhù.",
-      "usage_scene": "表达感谢、收到帮助后使用",
-      "notes": "谢谢可以单独使用，也可以说“谢谢你”。",
+      "part_of_speech_my": "ယဉ်ကျေးစကား",
+      "meaning_my": "ကျေးဇူးတင်ပါတယ်",
+      "usage_scene_my": "အကူအညီရသောအခါ သို့မဟုတ် ကျေးဇူးတင်ကြောင်း ဖော်ပြရာတွင် အသုံးပြုသည်။",
+      "example": "谢谢你的帮助。",
+      "example_my": "ကူညီပေးတာ ကျေးဇူးတင်ပါတယ်။",
       "synonyms": [
         "感谢"
       ],
-      "antonyms": []
+      "antonyms": [],
+      "collocations": [
+        "谢谢你",
+        "非常感谢"
+      ],
+      "notes_my": ""
     },
     {
-      "id": "greeting_003",
+      "id": "hsk1_0003",
       "word": "再见",
-      "pinyin": "zài jiàn",
-      "translations": {
-        "my": "နောက်မှတွေ့မယ်",
-        "en": "Goodbye"
-      },
-      "example": "明天再见。",
-      "exampleTranslations": {
-        "my": "မနက်ဖြန် ပြန်တွေ့မယ်။",
-        "en": "See you tomorrow."
-      },
-      "audio": "audio/words/greeting_003.mp3",
-      "level": "A1",
       "phonetic_my": "ဇိုင်း ကျန်",
-      "example_pinyin": "Míngtiān zàijiàn.",
-      "usage_scene": "离开、聊天结束、告别",
-      "notes": "口语里也可以说“拜拜”。",
+      "part_of_speech_my": "နှုတ်ဆက်စကား",
+      "meaning_my": "နောက်မှတွေ့မယ်",
+      "usage_scene_my": "ခွဲခွာချိန် သို့မဟုတ် စကားပြောပြီးဆုံးချိန်တွင် အသုံးပြုသည်။",
+      "example": "明天再见。",
+      "example_my": "မနက်ဖြန် ပြန်တွေ့မယ်။",
       "synonyms": [
         "拜拜"
       ],
       "antonyms": [
         "你好"
-      ]
+      ],
+      "collocations": [
+        "明天见",
+        "下次见"
+      ],
+      "notes_my": ""
     },
     {
-      "id": "greeting_004",
+      "id": "hsk1_0004",
       "word": "可以",
-      "pinyin": "kě yǐ",
-      "translations": {
-        "my": "ရပါတယ်",
-        "en": "Okay / can"
-      },
-      "example": "这样可以吗？",
-      "exampleTranslations": {
-        "my": "ဒီလို ရမလား။",
-        "en": "Is this okay?"
-      },
-      "audio": "audio/words/greeting_004.mp3",
-      "level": "A1",
       "phonetic_my": "ခယ် ယီ",
-      "example_pinyin": "Zhèyàng kěyǐ ma?",
-      "usage_scene": "同意、请求许可、确认是否可以",
-      "notes": "“可以吗？”常用于礼貌询问。",
+      "part_of_speech_my": "အကူကြိယာ",
+      "meaning_my": "ရတယ်၊ လုပ်နိုင်တယ်",
+      "usage_scene_my": "ခွင့်ပြုချက်တောင်းခြင်း၊ သဘောတူခြင်း သို့မဟုတ် လုပ်နိုင်မနိုင် မေးရာတွင် အသုံးပြုသည်။",
+      "example": "这样可以吗？",
+      "example_my": "ဒီလို ရမလား။",
       "synonyms": [
         "行",
         "能"
       ],
       "antonyms": [
         "不可以"
-      ]
-    },
-    {
-      "id": "greeting_005",
-      "word": "不可以",
-      "pinyin": "bù kě yǐ",
-      "translations": {
-        "my": "မရပါဘူး",
-        "en": "Cannot"
-      },
-      "example": "这里不可以拍照。",
-      "exampleTranslations": {
-        "my": "ဒီနေရာမှာ ဓာတ်ပုံရိုက်လို့ မရပါဘူး။",
-        "en": "You cannot take photos here."
-      },
-      "audio": "audio/words/greeting_005.mp3",
-      "level": "A1",
-      "phonetic_my": "ပု ခယ် ယီ",
-      "example_pinyin": "Zhèlǐ bù kěyǐ pāizhào.",
-      "usage_scene": "拒绝、禁止、说明规则",
-      "notes": "比“不行”更完整，适合说明规定。",
-      "synonyms": [
-        "不行",
-        "不能"
       ],
-      "antonyms": [
-        "可以"
-      ]
+      "collocations": [
+        "可以吗",
+        "当然可以"
+      ],
+      "notes_my": "“可以吗？” သည် ယဉ်ကျေးစွာ ခွင့်တောင်းရာတွင် အသုံးများသည်။"
     },
     {
-      "id": "greeting_006",
+      "id": "hsk1_0005",
       "word": "朋友",
-      "pinyin": "péng you",
-      "translations": {
-        "my": "သူငယ်ချင်း",
-        "en": "Friend"
-      },
+      "phonetic_my": "ဖုန် ယိုဝ်",
+      "part_of_speech_my": "နာမ်",
+      "meaning_my": "သူငယ်ချင်း",
+      "usage_scene_my": "လူမှုဆက်ဆံရေးကို မိတ်ဆက်ခြင်း သို့မဟုတ် ပြောဆိုရာတွင် အသုံးပြုသည်။",
       "example": "他是我的朋友。",
-      "exampleTranslations": {
-        "my": "သူက ကျွန်တော့်သူငယ်ချင်းပါ။",
-        "en": "He is my friend."
-      },
-      "audio": "audio/words/greeting_006.mp3",
-      "level": "A1",
-      "phonetic_my": "ဖုန့် ယို우",
-      "example_pinyin": "Tā shì wǒ de péngyou.",
-      "usage_scene": "介绍关系、社交聊天",
-      "notes": "中文口语里“朋友”范围较宽。",
+      "example_my": "သူက ကျွန်တော့်သူငယ်ချင်းပါ။",
       "synonyms": [
         "好友"
       ],
-      "antonyms": []
+      "antonyms": [],
+      "collocations": [
+        "好朋友",
+        "中国朋友"
+      ],
+      "notes_my": ""
     },
     {
-      "id": "greeting_007",
+      "id": "hsk1_0006",
       "word": "学习",
-      "pinyin": "xué xí",
-      "translations": {
-        "my": "သင်ယူသည်",
-        "en": "Study"
-      },
-      "example": "我每天学习中文。",
-      "exampleTranslations": {
-        "my": "ကျွန်တော် နေ့တိုင်း တရုတ်စာ သင်ယူတယ်။",
-        "en": "I study Chinese every day."
-      },
-      "audio": "audio/words/greeting_007.mp3",
-      "level": "A1",
       "phonetic_my": "ရွှဲ ရှီ",
-      "example_pinyin": "Wǒ měitiān xuéxí Zhōngwén.",
-      "usage_scene": "学习、上课、自我介绍",
-      "notes": "学习是动词，也可以作名词。",
+      "part_of_speech_my": "ကြိယာ",
+      "meaning_my": "သင်ယူသည်၊ လေ့လာသည်",
+      "usage_scene_my": "စာသင်ခြင်း၊ ဘာသာစကားလေ့လာခြင်း သို့မဟုတ် ကျောင်းအကြောင်း ပြောရာတွင် အသုံးပြုသည်။",
+      "example": "我每天学习中文。",
+      "example_my": "ကျွန်တော် နေ့တိုင်း တရုတ်စာ လေ့လာတယ်။",
       "synonyms": [
         "学"
       ],
-      "antonyms": []
+      "antonyms": [],
+      "collocations": [
+        "学习中文",
+        "努力学习"
+      ],
+      "notes_my": ""
     },
     {
-      "id": "greeting_008",
+      "id": "hsk1_0007",
       "word": "工作",
-      "pinyin": "gōng zuò",
-      "translations": {
-        "my": "အလုပ်",
-        "en": "Work"
-      },
-      "example": "我想找工作。",
-      "exampleTranslations": {
-        "my": "ကျွန်တော် အလုပ်ရှာချင်တယ်။",
-        "en": "I want to find a job."
-      },
-      "audio": "audio/words/greeting_008.mp3",
-      "level": "A1",
       "phonetic_my": "ကုန်း ဇွော့",
-      "example_pinyin": "Wǒ xiǎng zhǎo gōngzuò.",
-      "usage_scene": "求职、职业、自我介绍",
-      "notes": "“工作”可以表示职业，也可以表示正在做事。",
+      "part_of_speech_my": "နာမ် / ကြိယာ",
+      "meaning_my": "အလုပ်၊ အလုပ်လုပ်သည်",
+      "usage_scene_my": "အလုပ်အကိုင်၊ အလုပ်ရှာခြင်း သို့မဟုတ် လုပ်ငန်းအကြောင်း ပြောရာတွင် အသုံးပြုသည်။",
+      "example": "我想找工作。",
+      "example_my": "ကျွန်တော် အလုပ်ရှာချင်တယ်။",
       "synonyms": [
         "职业",
         "上班"
       ],
-      "antonyms": []
+      "antonyms": [],
+      "collocations": [
+        "找工作",
+        "努力工作"
+      ],
+      "notes_my": "နာမ်အဖြစ် “အလုပ်”၊ ကြိယာအဖြစ် “အလုပ်လုပ်သည်” ဟူ၍ နှစ်မျိုးအသုံးပြုနိုင်သည်။"
+    },
+    {
+      "id": "hsk1_0008",
+      "word": "银行",
+      "pinyin_override": "yín háng",
+      "phonetic_my": "ယင် ဟန်",
+      "part_of_speech_my": "နာမ်",
+      "meaning_my": "ဘဏ်",
+      "usage_scene_my": "ငွေထုတ်ခြင်း၊ ငွေလွှဲခြင်းနှင့် ဘဏ်ဝန်ဆောင်မှုများအကြောင်း ပြောရာတွင် အသုံးပြုသည်။",
+      "example": "银行在哪里？",
+      "example_pinyin_override": "Yínháng zài nǎlǐ?",
+      "example_my": "ဘဏ်က ဘယ်မှာလဲ။",
+      "synonyms": [],
+      "antonyms": [],
+      "collocations": [
+        "去银行",
+        "银行账户"
+      ],
+      "notes_my": "“行” ကို ဒီစကားလုံးတွင် háng ဟု ဖတ်သည်။"
     }
   ]
-    }
+}
