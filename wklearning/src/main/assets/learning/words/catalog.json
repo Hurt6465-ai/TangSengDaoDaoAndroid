@@ -1,7 +1,7 @@
 {
   "type": "words",
   "title": "单词库",
-  "subtitle": "单词更多页采用全屏 3 列竖屏卡片。每张卡片底部显示分类名，下面用浅色小字展示示例词；点击进入对应单词卡片或二级小类。",
+  "subtitle": "三列封面目录；远程封面和词库会自动缓存，离线时使用本地预览。",
   "items": [
     {
       "id": "hsk1",
@@ -10,7 +10,12 @@
       "preview": "你好 / 再见 / 不客气",
       "badge": "150词",
       "target": "word",
-      "level": "hsk1"
+      "level": "hsk1",
+      "cover_url": "covers/words/hsk1_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/hsk1_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     },
     {
       "id": "hsk2",
@@ -19,7 +24,12 @@
       "preview": "觉得 / 可能 / 已经",
       "badge": "300词",
       "target": "word",
-      "level": "hsk2"
+      "level": "hsk2",
+      "cover_url": "covers/words/hsk2_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/hsk2_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     },
     {
       "id": "hsk3",
@@ -28,7 +38,12 @@
       "preview": "重要 / 影响 / 习惯",
       "badge": "600词",
       "target": "word",
-      "level": "hsk3"
+      "level": "hsk3",
+      "cover_url": "covers/words/hsk3_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/hsk3_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     },
     {
       "id": "hsk4",
@@ -37,7 +52,12 @@
       "preview": "适合 / 经验 / 解决",
       "badge": "1200词",
       "target": "word",
-      "level": "hsk4"
+      "level": "hsk4",
+      "cover_url": "covers/words/hsk4_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/hsk4_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     },
     {
       "id": "hsk5",
@@ -46,7 +66,12 @@
       "preview": "观点 / 过程 / 充分",
       "badge": "进阶",
       "target": "word",
-      "level": "hsk5"
+      "level": "hsk5",
+      "cover_url": "covers/words/hsk5_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/hsk5_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     },
     {
       "id": "hsk6",
@@ -55,7 +80,12 @@
       "preview": "显著 / 推动 / 具备",
       "badge": "高级",
       "target": "word",
-      "level": "hsk6"
+      "level": "hsk6",
+      "cover_url": "covers/words/hsk6_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/hsk6_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     },
     {
       "id": "daily_greeting",
@@ -64,7 +94,12 @@
       "preview": "你好 / 谢谢 / 再见",
       "badge": "推荐",
       "target": "word",
-      "level": "greeting"
+      "level": "greeting",
+      "cover_url": "covers/words/daily_greeting_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/greeting_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     },
     {
       "id": "shopping",
@@ -73,7 +108,12 @@
       "preview": "多少钱 / 便宜点 / 买单",
       "badge": "生活",
       "target": "word",
-      "level": "shopping"
+      "level": "shopping",
+      "cover_url": "covers/words/shopping_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/shopping_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     },
     {
       "id": "food",
@@ -82,7 +122,12 @@
       "preview": "菜单 / 不辣 / 打包",
       "badge": "生活",
       "target": "word",
-      "level": "food"
+      "level": "food",
+      "cover_url": "covers/words/food_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/food_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     },
     {
       "id": "job",
@@ -91,7 +136,12 @@
       "preview": "简历 / 面试 / 工资",
       "badge": "求职",
       "target": "word",
-      "level": "job"
+      "level": "job",
+      "cover_url": "covers/words/job_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/job_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     },
     {
       "id": "travel",
@@ -100,7 +150,12 @@
       "preview": "机场 / 车站 / 护照",
       "badge": "旅行",
       "target": "word",
-      "level": "travel"
+      "level": "travel",
+      "cover_url": "covers/words/travel_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/travel_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     },
     {
       "id": "love_chat",
@@ -109,7 +164,12 @@
       "preview": "想你 / 约会 / 喜欢",
       "badge": "社交",
       "target": "word",
-      "level": "love"
+      "level": "love",
+      "cover_url": "covers/words/love_chat_v1.webp",
+      "cover_version": 1,
+      "data_url": "packs/words/love_v1.json",
+      "data_version": 1,
+      "data_sha256": ""
     }
   ]
 }
