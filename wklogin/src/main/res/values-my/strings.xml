@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="choose_login_type">—  အခြားနည်းဖြင့် ဝင်ရောက်ရန်  —</string>
+    <string name="google_sign_in">Google အကောင့်ဖြင့် ဝင်ရောက်မည်</string>
+    <string name="google_login_loading">Google အကောင့်ကို အတည်ပြုနေသည်</string>
+    <string name="google_login_cancelled">Google ဝင်ရောက်မှုကို ပယ်ဖျက်လိုက်သည်</string>
+    <string name="google_login_failed">Google ဖြင့် ဝင်ရောက်မရပါ။ နောက်မှ ထပ်စမ်းပါ</string>
+    <string name="google_login_no_credential">အသုံးပြုနိုင်သော Google အကောင့် မတွေ့ပါ။ စက်ဆက်တင်တွင် အကောင့်တစ်ခု ထည့်ပါ</string>
+    <string name="google_login_invalid_response">Google မှ ပြန်လာသော ဝင်ရောက်မှုအချက်အလက် မမှန်ကန်ပါ။ ထပ်စမ်းပါ</string>
+    <string name="google_login_not_configured">Google ဝင်ရောက်မှုကို မသတ်မှတ်ရသေးပါ။ Web Client ID ကို ထည့်ပါ</string>
+
     <string name="profile_intro">မိတ်ဆက်</string>
     <string name="profile_intro_hint">ကိုယ့်အကြောင်း၊ မည်သည့်နိုင်ငံမှဖြစ်ကြောင်း၊ လေ့ကျင့်ချင်သောဘာသာစကားကိုရေးပါ</string>
     <string name="profile_country_region">နိုင်ငံ / ဒေသ</string>
