@@ -34,10 +34,10 @@ public class DatingCardView extends FrameLayout {
         setClipToPadding(true);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(0xFF000000);
-        bg.setCornerRadius(dp(18));
+        bg.setCornerRadius(0);
         setBackground(bg);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            setClipToOutline(true);
+            setClipToOutline(false);
         }
     }
 
@@ -88,10 +88,26 @@ public class DatingCardView extends FrameLayout {
         float height = Math.max(1f, getHeight());
         float horizontal = Math.min(1f, Math.abs(dx) / (width * 0.28f));
         float up = Math.min(1f, Math.max(0f, -dy) / (height * 0.16f));
-        binding.likeBadge.setAlpha(dx > 0 && horizontal >= up ? horizontal : 0f);
-        binding.nopeBadge.setAlpha(dx < 0 && horizontal >= up ? horizontal : 0f);
-        binding.favoriteBadge.setAlpha(up > horizontal ? up : 0f);
-        binding.infoPanel.setTranslationY(Math.max(horizontal, up) * dp(4));
+        float progress = Math.max(horizontal, up);
+
+        updateBadge(binding.likeBadge, dx > 0 && horizontal >= up ? horizontal : 0f);
+        updateBadge(binding.nopeBadge, dx < 0 && horizontal >= up ? horizontal : 0f);
+        updateBadge(binding.favoriteBadge, up > horizontal ? up : 0f);
+
+        binding.photoIv.setScaleX(1f + progress * 0.018f);
+        binding.photoIv.setScaleY(1f + progress * 0.018f);
+        binding.infoPanel.setTranslationY(progress * dp(5));
+        binding.infoPanel.setAlpha(1f - progress * 0.18f);
+    }
+
+    private void updateBadge(TextView badge, float alpha) {
+        if (badge == null) return;
+        float clamped = Math.max(0f, Math.min(1f, alpha));
+        badge.setAlpha(clamped);
+        float scale = 0.72f + clamped * 0.36f;
+        badge.setScaleX(scale);
+        badge.setScaleY(scale);
+        badge.setTranslationY((1f - clamped) * dp(12));
     }
 
     private void bindPhoto() {
@@ -229,7 +245,7 @@ public class DatingCardView extends FrameLayout {
 
     private void bindIndicators(int count) {
         binding.indicatorRow.removeAllViews();
-        int realCount = Math.max(1, Math.min(5, count));
+        int realCount = Math.max(1, Math.min(6, count));
         for (int i = 0; i < realCount; i++) {
             View bar = new View(getContext());
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(3), 1f);

@@ -7,12 +7,12 @@ import java.util.Locale;
 
 /**
  * 交友照片上传规则。首页只负责展示，真正上传页应复用这里的规则：
- * 1. 最多 10 张；至少 2 张才允许开启交友；
+ * 1. 最多 6 张；至少 2 张才允许开启交友；
  * 2. 前端统一压缩为 WebP，卡片图目标约 200KB；
- * 3. 本地只能做尺寸/格式/数量校验，真人/人脸必须走服务端审核或第三方审核。
+ * 3. 本地只能做尺寸/格式/数量校验，V1 不做真人照片自动审核；后期可接管理员后台审核/删除。
  */
 public final class DatingPhotoPolicy {
-    public static final int MAX_PHOTO_COUNT = 10;
+    public static final int MAX_PHOTO_COUNT = 6;
     public static final int MIN_PHOTO_COUNT_TO_ENABLE = 2;
     public static final int CARD_TARGET_MAX_BYTES = 200 * 1024;
     public static final int UPLOAD_MAX_EDGE = 1440;
@@ -54,6 +54,6 @@ public final class DatingPhotoPolicy {
     }
 
     public static boolean needsServerHumanReview() {
-        return true;
+        return false;
     }
 }

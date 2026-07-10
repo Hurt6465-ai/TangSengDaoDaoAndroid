@@ -69,8 +69,7 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
         );
-        int margin = dp(parent, 6);
-        lp.setMargins(margin, margin, margin, margin);
+        lp.setMargins(0, 0, 0, 0);
         card.setLayoutParams(lp);
         return new CardHolder(card);
     }
@@ -154,10 +153,10 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
 
         private boolean isProfileArrowTap(View v, MotionEvent event, float width, float height) {
             float density = v.getResources().getDisplayMetrics().density;
-            float right = width - 12f * density;
-            float left = right - 58f * density;
+            float right = width - 16f * density;
+            float left = right - 44f * density;
             float bottom = height - 132f * density;
-            float top = bottom - 72f * density;
+            float top = bottom - 52f * density;
             return event.getX() >= left && event.getX() <= right && event.getY() >= top && event.getY() <= bottom;
         }
     }

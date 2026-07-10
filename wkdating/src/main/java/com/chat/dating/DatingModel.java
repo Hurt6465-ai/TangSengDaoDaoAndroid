@@ -155,6 +155,42 @@ public class DatingModel extends WKBaseModel {
         });
     }
 
+
+    public void block(String targetUid, final Callback<Object> callback) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("to_uid", targetUid == null ? "" : targetUid);
+        body.put("target_uid", targetUid == null ? "" : targetUid);
+        request(createService(DatingService.class).block(body), new IRequestResultListener<>() {
+            @Override
+            public void onSuccess(Object result) {
+                if (callback != null) callback.onResult(HttpResponseCode.success, "", result);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (callback != null) callback.onResult(code, msg, null);
+            }
+        });
+    }
+
+    public void report(String targetUid, String reason, final Callback<Object> callback) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("to_uid", targetUid == null ? "" : targetUid);
+        body.put("target_uid", targetUid == null ? "" : targetUid);
+        body.put("reason", reason == null ? "" : reason);
+        request(createService(DatingService.class).report(body), new IRequestResultListener<>() {
+            @Override
+            public void onSuccess(Object result) {
+                if (callback != null) callback.onResult(HttpResponseCode.success, "", result);
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                if (callback != null) callback.onResult(code, msg, null);
+            }
+        });
+    }
+
     public interface Callback<T> {
         void onResult(int code, String msg, T data);
     }
