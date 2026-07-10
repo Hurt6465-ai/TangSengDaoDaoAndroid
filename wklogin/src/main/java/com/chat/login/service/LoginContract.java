@@ -1,6 +1,5 @@
 package com.chat.login.service;
 
-
 import android.content.Context;
 import android.widget.Button;
 import android.widget.EditText;
@@ -13,15 +12,19 @@ import com.chat.login.entity.CountryCodeEntity;
 import java.util.List;
 
 /**
- * 2019-11-19 17:44
- * 登录
+ * 登录页面契约。
  */
-public class LoginContract {
+public final class LoginContract {
+
+    private LoginContract() {
+    }
+
     public interface LoginPresenter extends WKBasePresenter {
         void login(String name, String pwd);
 
         /**
-         * 将 Credential Manager 获取到的 Google ID Token 交给业务后端验证并登录。
+         * 使用 Credential Manager 获取到的 Google ID Token 登录。
+         * ID Token 和 nonce 必须交给业务后端验证，客户端不能自行认定登录成功。
          */
         void googleLogin(String idToken, String nonce);
 
@@ -33,7 +36,14 @@ public class LoginContract {
 
         void forgetPwd(String zone, String phone);
 
-        void registerApp(String code, String zone, String name, String phone, String password, String inviteCode);
+        void registerApp(
+                String code,
+                String zone,
+                String name,
+                String phone,
+                String password,
+                String inviteCode
+        );
 
         void checkLoginAuth(String uid, String code);
 
