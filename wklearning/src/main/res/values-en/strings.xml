@@ -48,13 +48,13 @@
     <string name="word_label_antonyms">Opposite: </string>
     <string name="word_no_example">No example yet</string>
     <string name="word_toast_unknown">Again: review later</string>
-    <string name="word_toast_known">Known: review again in 7 days</string>
+    <string name="word_toast_known">Known: scheduled by FSRS</string>
     <string name="word_toast_hard">Hard: review again tomorrow</string>
     <string name="word_favorite_added">Saved</string>
     <string name="word_favorite_removed">Removed from saved</string>
     <string name="word_toast_my_phonetic_on">Burmese sound hint shown</string>
     <string name="word_toast_my_phonetic_off">Burmese sound hint hidden</string>
-    <string name="word_stroke_todo">Stroke order / tracing entry reserved for Hanzi data</string>
+    <string name="word_stroke_todo">Stroke order entry reserved for Hanzi data</string>
     <string name="word_tts_plugin_missing">TTS plugin is missing or did not respond</string>
     <string name="word_menu_show_my_phonetic">Show Burmese sound hint</string>
     <string name="word_menu_hide_my_phonetic">Hide Burmese sound hint</string>
@@ -63,7 +63,7 @@
     <string name="word_guide_title">How to study cards</string>
     <string name="word_guide_body">Tap card: see meaning
 Swipe left: Again, review later
-Swipe right: Known, review again in 7 days
+Swipe right after checking: Known, scheduled by FSRS
 Pull down: Save
 Tap Hard: review tomorrow</string>
     <string name="word_guide_ok">Got it</string>
@@ -79,10 +79,10 @@ Tap Hard: review tomorrow</string>
     <string name="word_tone_3">third tone</string>
     <string name="word_tone_4">fourth tone</string>
     <string name="pronunciation_title">Pronunciation practice</string>
-    <string name="stroke_title">Stroke order / tracing</string>
-    <string name="stroke_subtitle">This keeps a native full-screen entry first. After HanziWriter or makemeahanzi data is connected, it can show stroke animation, step practice, and tracing.</string>
+    <string name="stroke_title">Stroke order</string>
+    <string name="stroke_subtitle">This keeps a native full-screen entry first. After HanziWriter or makemeahanzi data is connected, it can show stroke animation, step-by-step animation.</string>
     <string name="stroke_chars_title">Practice each character</string>
-    <string name="stroke_data_missing">Stroke-order data is not connected yet. Once data is added, this page will show stroke animation and tracing practice.</string>
+    <string name="stroke_data_missing">Stroke-order data is not connected yet. Once data is added, this page will show stroke animation and step-by-step playback.</string>
     <string name="stroke_speak_word">Speak this word</string>
     <string name="pronunciation_tip">Listen to the standard audio and spelling audio, then record yourself. The free version compares recordings; a local ASR plugin can add recognition/scoring.</string>
     <string name="pronunciation_play_standard">Play standard audio</string>
@@ -102,4 +102,29 @@ Tap Hard: review tomorrow</string>
     <string name="pronunciation_no_record">Record first</string>
     <string name="pronunciation_need_permission">Microphone permission is required</string>
     <string name="pronunciation_asr_plugin_missing">Local ASR/scoring plugin is missing. Recording comparison is still available.</string>
+
+    <string name="word_action_easy">Easy</string>
+    <string name="word_today_plan">Today</string>
+    <string name="word_today_plan_count">Due %1$d · Queue %2$d</string>
+    <string name="word_auto_read_on">Auto On</string>
+    <string name="word_auto_read_off">Auto Off</string>
+    <string name="word_core_meaning">Core meaning</string>
+    <string name="word_part_of_speech">Part of speech · %1$s</string>
+    <string name="word_label_collocations">Common combinations</string>
+    <string name="word_check_answer_first">Check the answer first</string>
+    <string name="word_review_minutes">%1$d min</string>
+    <string name="word_review_months">%1$d mo</string>
+    <string name="word_review_years">%1$d yr</string>
+    <string name="word_plan_message">Due today: %1$d
+Current queue: %2$d
+Words at start: %3$d</string>
+    <string name="word_tts_settings_hint">Set voice and speed in the learning tools or speech plugin</string>
+    <string name="word_session_complete">Session complete</string>
+    <string name="word_session_stats">Again %1$d   Hard %2$d
+Good %3$d   Easy %4$d
+Study time %5$d min</string>
+    <string name="word_finish">Done</string>
+    <string name="word_loading_remote">Downloading word pack…</string>
+    <string name="word_remote_load_failed">Download failed. Check the network or remote URL.</string>
+    <string name="word_pack_unavailable">This word pack is not downloaded yet. Configure the remote static host or check the bundled preview.</string>
 </resources>
