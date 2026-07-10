@@ -11,9 +11,10 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * 前端轻量额度提示。真正额度必须由后端再次校验，避免改包绕过。
- * V1：不喜欢不限额，只做后端频率防刷；喜欢/收藏限额；撤回每天免费 3 次。
- * 交友资料只保留男女两个性别；未知/异常值按男性额度处理，避免出现第三套规则。
+ * V1 客户端额度提示：男喜欢 40/天、女喜欢 60/天；收藏男 10/天、女 20/天；撤回免费 3/天。
+ * 不喜欢不限次数，只应由服务端做频率防刷。
+ *
+ * 注意：真正防绕过必须由后端返回并校验剩余额度，客户端只能改善体验。
  */
 public final class DatingQuotaManager {
     private static final String SP_NAME = "wkdating_daily_quota";
@@ -30,7 +31,7 @@ public final class DatingQuotaManager {
     }
 
     public static int dailyLimit(DatingProfile myProfile, String action) {
-        boolean female = isFemale(myProfile);
+        boolean female = myProfile != null && myProfile.isFemale();
         if (DatingSwipeAction.FAVORITE.equals(action)) {
             return female ? FEMALE_FAVORITE_LIMIT : MALE_FAVORITE_LIMIT;
         }
@@ -60,7 +61,6 @@ public final class DatingQuotaManager {
         return true;
     }
 
-
     public static int rewindDailyLimit() {
         return FREE_REWIND_LIMIT;
     }
@@ -75,18 +75,11 @@ public final class DatingQuotaManager {
     }
 
     public static boolean consumeRewind(Context context) {
-        if (context == null) return false;
-        if (rewindRemaining(context) <= 0) return false;
+        if (context == null || rewindRemaining(context) <= 0) return false;
         SharedPreferences preferences = sp(context);
         String key = key("rewind");
         preferences.edit().putInt(key, preferences.getInt(key, 0) + 1).apply();
         return true;
-    }
-
-    private static boolean isFemale(DatingProfile profile) {
-        if (profile == null) return false;
-        int gender = profile.safeGender();
-        return gender == 2;
     }
 
     private static SharedPreferences sp(Context context) {

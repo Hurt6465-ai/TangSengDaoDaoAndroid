@@ -25,6 +25,11 @@ public final class DatingPhotoCompressor {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(input.getAbsolutePath(), bounds);
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IllegalStateException("图片读取失败");
+        if (Math.min(bounds.outWidth, bounds.outHeight) < DatingPhotoPolicy.UPLOAD_MIN_EDGE) {
+            throw new IllegalStateException("图片太小，请选择更清晰的照片");
+        }
+        if (input.length() > 20L * 1024L * 1024L) throw new IllegalStateException("图片太大，请重新选择");
         int max = Math.max(bounds.outWidth, bounds.outHeight);
         int sample = 1;
         while (max / sample > DatingPhotoPolicy.UPLOAD_MAX_EDGE) sample *= 2;
@@ -42,6 +47,16 @@ public final class DatingPhotoCompressor {
         while (bytes.length > DatingPhotoPolicy.CARD_TARGET_MAX_BYTES && quality > DatingPhotoPolicy.WEBP_MIN_QUALITY) {
             quality -= 5;
             bytes = encode(bitmap, quality);
+        }
+        // 复杂照片仅降低质量仍可能超过 200KB，再小步缩放，避免首页流量和解码压力失控。
+        while (bytes.length > DatingPhotoPolicy.CARD_TARGET_MAX_BYTES
+                && Math.min(bitmap.getWidth(), bitmap.getHeight()) > 720) {
+            int width = Math.max(1, Math.round(bitmap.getWidth() * 0.88f));
+            int height = Math.max(1, Math.round(bitmap.getHeight() * 0.88f));
+            Bitmap scaled = Bitmap.createScaledBitmap(bitmap, width, height, true);
+            if (scaled != bitmap) bitmap.recycle();
+            bitmap = scaled;
+            bytes = encode(bitmap, DatingPhotoPolicy.WEBP_MIN_QUALITY);
         }
         FileOutputStream fos = new FileOutputStream(out);
         fos.write(bytes);

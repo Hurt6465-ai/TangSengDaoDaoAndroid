@@ -64,11 +64,8 @@ public class DatingFilter {
         if (target == null) return false;
         if (target.age > 0 && (target.age < ageMin || target.age > ageMax)) return false;
         if (!"all".equals(gender)) {
-            int g = target.safeGender();
-            if (g > 0) {
-                if ("female".equals(gender) && g != 2) return false;
-                if ("male".equals(gender) && g != 1) return false;
-            }
+            if ("female".equals(gender) && !target.isFemale()) return false;
+            if ("male".equals(gender) && !target.isMale()) return false;
         }
         if (TextUtils.isEmpty(goal) || "all".equals(goal)) return acceptsCountry(my, target);
         String goalText = target.safeRelationshipGoal().toLowerCase();
@@ -80,7 +77,11 @@ public class DatingFilter {
         if (my == null || target == null) return true;
         String myCountry = my.safeCountryCode();
         String targetCountry = target.safeCountryCode();
-        if (TextUtils.isEmpty(myCountry) || TextUtils.isEmpty(targetCountry)) return true;
+        if (TextUtils.isEmpty(myCountry) || TextUtils.isEmpty(targetCountry)) {
+            // 只接受本国时，国籍未知就不能冒险推荐；显式本国/异国筛选也要求双方国家明确。
+            if (my.rejectsCrossBorder() || target.rejectsCrossBorder()) return false;
+            return COUNTRY_SMART.equals(countryMode);
+        }
         boolean sameCountry = myCountry.equalsIgnoreCase(targetCountry);
         if (my.rejectsCrossBorder() && !sameCountry) return false;
         if (target.rejectsCrossBorder() && !sameCountry) return false;

@@ -1,5 +1,6 @@
 package com.chat.dating;
 
+import com.chat.dating.model.DatingMatchesResponse;
 import com.chat.dating.model.DatingProfile;
 import com.chat.dating.model.DatingRecommendResponse;
 import com.chat.dating.model.DatingSwipeResult;
@@ -10,6 +11,7 @@ import io.reactivex.rxjava3.core.Observable;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
 import retrofit2.http.POST;
+import retrofit2.http.Path;
 import retrofit2.http.Query;
 
 public interface DatingService {
@@ -44,6 +46,12 @@ public interface DatingService {
 
     @POST("dating/exposures")
     Observable<Object> reportExposures(@Body Map<String, Object> body);
+
+    @GET("dating/matches")
+    Observable<DatingMatchesResponse> matches(@Query("limit") int limit);
+
+    @POST("dating/matches/{match_id}/cancel")
+    Observable<Object> cancelMatch(@Path("match_id") String matchId);
 
     @POST("dating/block")
     Observable<Object> block(@Body Map<String, Object> body);

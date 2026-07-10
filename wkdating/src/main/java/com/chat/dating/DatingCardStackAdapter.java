@@ -6,6 +6,7 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.chat.dating.model.DatingProfile;
@@ -26,15 +27,36 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
     private final Map<String, Integer> photoPositions = new HashMap<>();
     private OnCardTapListener tapListener;
 
+    public DatingCardStackAdapter() {
+        setHasStableIds(true);
+    }
+
     public void setOnCardTapListener(OnCardTapListener listener) {
         this.tapListener = listener;
     }
 
-    public void setProfiles(List<DatingProfile> data) {
+    public void submitProfiles(List<DatingProfile> data) {
+        ArrayList<DatingProfile> next = new ArrayList<>();
+        if (data != null) next.addAll(data);
+        ArrayList<DatingProfile> old = new ArrayList<>(profiles);
+        DiffUtil.DiffResult result = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+            @Override public int getOldListSize() { return old.size(); }
+            @Override public int getNewListSize() { return next.size(); }
+            @Override public boolean areItemsTheSame(int oldItemPosition, int newItemPosition) {
+                return TextUtils.equals(old.get(oldItemPosition).safeUid(), next.get(newItemPosition).safeUid());
+            }
+            @Override public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
+                DatingProfile a = old.get(oldItemPosition);
+                DatingProfile b = next.get(newItemPosition);
+                return TextUtils.equals(a.safeName(), b.safeName())
+                        && a.age == b.age
+                        && a.safePhotos().equals(b.safePhotos())
+                        && TextUtils.equals(a.safeIntro(), b.safeIntro());
+            }
+        }, false);
         profiles.clear();
-        photoPositions.clear();
-        if (data != null) profiles.addAll(data);
-        notifyDataSetChanged();
+        profiles.addAll(next);
+        result.dispatchUpdatesTo(this);
     }
 
     public void appendProfiles(List<DatingProfile> data) {
@@ -56,21 +78,18 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
         return index == null ? 0 : Math.max(0, index);
     }
 
-    private void savePhotoIndex(DatingProfile profile, int index) {
-        if (profile == null || TextUtils.isEmpty(profile.safeUid())) return;
-        photoPositions.put(profile.safeUid(), Math.max(0, index));
+    @Override
+    public long getItemId(int position) {
+        DatingProfile profile = getProfile(position);
+        return profile == null ? RecyclerView.NO_ID : profile.safeUid().hashCode();
     }
 
     @NonNull
     @Override
     public CardHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         DatingCardView card = new DatingCardView(parent.getContext());
-        RecyclerView.LayoutParams lp = new RecyclerView.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-        );
-        lp.setMargins(0, 0, 0, 0);
-        card.setLayoutParams(lp);
+        card.setLayoutParams(new RecyclerView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         return new CardHolder(card);
     }
 
@@ -78,7 +97,21 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
     public void onBindViewHolder(@NonNull CardHolder holder, int position) {
         DatingProfile profile = profiles.get(position);
         holder.card.bind(profile, getPhotoIndex(position));
-        holder.card.setOnTouchListener(new TapRouter(holder.card, profile, position));
+        holder.card.setOnTouchListener(new TapRouter(holder.card, profile, holder));
+        holder.card.getProfileArrowView().setOnTouchListener((v, event) -> {
+            // 借鉴 CardSlidePanel 的可拖动区域：资料按钮点击时不让父层把它误判为滑卡。
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN) v.getParent().requestDisallowInterceptTouchEvent(true);
+            if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                v.getParent().requestDisallowInterceptTouchEvent(false);
+            }
+            return false;
+        });
+        holder.card.getProfileArrowView().setOnClickListener(v -> {
+            int current = holder.getBindingAdapterPosition();
+            if (current != RecyclerView.NO_POSITION && tapListener != null) {
+                tapListener.onOpenProfile(profile, current, holder.card.getPhotoIndex());
+            }
+        });
     }
 
     @Override
@@ -86,32 +119,32 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
         return profiles.size();
     }
 
-    private int dp(View view, int value) {
-        return (int) (value * view.getResources().getDisplayMetrics().density + 0.5f);
+    private void savePhotoIndex(DatingProfile profile, int index) {
+        if (profile == null || TextUtils.isEmpty(profile.safeUid())) return;
+        photoPositions.put(profile.safeUid(), Math.max(0, index));
     }
 
     public static class CardHolder extends RecyclerView.ViewHolder {
         public final DatingCardView card;
-
-        public CardHolder(@NonNull DatingCardView itemView) {
+        CardHolder(@NonNull DatingCardView itemView) {
             super(itemView);
-            this.card = itemView;
+            card = itemView;
         }
     }
 
     private final class TapRouter implements View.OnTouchListener {
         private final DatingCardView card;
         private final DatingProfile profile;
-        private final int position;
+        private final CardHolder holder;
         private float downX;
         private float downY;
         private long downAt;
         private boolean moved;
 
-        TapRouter(DatingCardView card, DatingProfile profile, int position) {
+        TapRouter(DatingCardView card, DatingProfile profile, CardHolder holder) {
             this.card = card;
             this.profile = profile;
-            this.position = position;
+            this.holder = holder;
         }
 
         @Override
@@ -124,18 +157,16 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
                     moved = false;
                     return false;
                 case MotionEvent.ACTION_MOVE:
-                    float dx = event.getX() - downX;
-                    float dy = event.getY() - downY;
-                    if (Math.hypot(dx, dy) > v.getResources().getDisplayMetrics().density * 12f) moved = true;
+                    if (Math.hypot(event.getX() - downX, event.getY() - downY)
+                            > v.getResources().getDisplayMetrics().density * 12f) moved = true;
                     return false;
                 case MotionEvent.ACTION_UP:
                     if (!moved && System.currentTimeMillis() - downAt < 260) {
+                        int position = holder.getBindingAdapterPosition();
+                        if (position == RecyclerView.NO_POSITION) return false;
                         float width = Math.max(1f, v.getWidth());
-                        float height = Math.max(1f, v.getHeight());
-                        // 只有右下角小箭头区域打开资料；右半屏仍然只是切换下一张照片，避免误触。
-                        if (isProfileArrowTap(v, event, width, height)) {
-                            if (tapListener != null) tapListener.onOpenProfile(profile, position, card.getPhotoIndex());
-                        } else if (event.getX() < width * 0.42f) {
+                        // 箭头有独立点击监听；卡片左右区域只负责切图。
+                        if (event.getX() < width * 0.42f) {
                             card.showPreviousPhoto();
                             savePhotoIndex(profile, card.getPhotoIndex());
                             if (tapListener != null) tapListener.onPreviousPhoto(profile, position, card.getPhotoIndex());
@@ -149,15 +180,6 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
                 default:
                     return false;
             }
-        }
-
-        private boolean isProfileArrowTap(View v, MotionEvent event, float width, float height) {
-            float density = v.getResources().getDisplayMetrics().density;
-            float right = width - 16f * density;
-            float left = right - 44f * density;
-            float bottom = height - 132f * density;
-            float top = bottom - 52f * density;
-            return event.getX() >= left && event.getX() <= right && event.getY() >= top && event.getY() <= bottom;
         }
     }
 }
