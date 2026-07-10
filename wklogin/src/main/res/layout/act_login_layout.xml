@@ -179,7 +179,7 @@
             android:id="@+id/loginBtn"
             style="@style/buttonNormal"
             android:layout_marginLeft="30dp"
-            android:layout_marginTop="50dp"
+            android:layout_marginTop="36dp"
             android:layout_marginRight="30dp"
             android:text="@string/login"
             app:cornerRadius="@dimen/button_radian" />
@@ -216,6 +216,40 @@
                 android:textColor="@color/color999"
                 android:textSize="@dimen/font_size_13" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/otherLoginTitleTv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="30dp"
+            android:layout_marginTop="22dp"
+            android:layout_marginEnd="30dp"
+            android:gravity="center"
+            android:text="@string/choose_login_type"
+            android:textColor="@color/color999"
+            android:textSize="@dimen/font_size_13" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/googleLoginBtn"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginStart="30dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="30dp"
+            android:backgroundTint="@color/layoutColor"
+            android:text="@string/google_sign_in"
+            android:textAllCaps="false"
+            android:textColor="@color/colorDark"
+            android:textSize="15sp"
+            app:cornerRadius="@dimen/button_radian"
+            app:icon="@drawable/ic_google_logo"
+            app:iconGravity="textStart"
+            app:iconPadding="10dp"
+            app:iconSize="20dp"
+            app:iconTint="@null"
+            app:strokeColor="@color/colorLine"
+            app:strokeWidth="1dp" />
 
 
     </LinearLayout>
