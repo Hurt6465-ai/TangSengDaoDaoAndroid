@@ -111,6 +111,22 @@ public class DatingProfile implements Serializable {
         return "";
     }
 
+    /**
+     * 是否拒绝异国恋。兼容新字段和旧版保存在 tags 中的 cross:* 值。
+     */
+    public boolean rejectsCrossBorder() {
+        String value = safeCrossBorderPreference().toLowerCase(Locale.US);
+        return value.contains("same_country")
+                || value.contains("same-country")
+                || value.contains("local_only")
+                || value.contains("nearby_only")
+                || value.contains("no_foreign")
+                || value.contains("refuse_foreign")
+                || value.contains("拒绝异国")
+                || value.contains("只接受本国")
+                || value.contains("本国恋");
+    }
+
     public String firstPhoto() {
         List<String> list = safePhotos();
         return list.isEmpty() ? "" : list.get(0);
