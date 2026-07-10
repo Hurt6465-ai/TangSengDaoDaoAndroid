@@ -265,11 +265,20 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     }
 
     private void loadMyProfileThenRecommend() {
+        fetchMyProfile(false);
+    }
+
+    /**
+     * 首次进入只加载第一页；从“我的/编辑资料”返回时必须先清空旧推荐池再重新推荐。
+     * 否则旧 loadedUids 会把新一页相同用户全部过滤掉，页面会错误显示为空。
+     */
+    private void fetchMyProfile(boolean resetRecommendation) {
         DatingModel.getInstance().getMyDatingProfile((code, msg, data) -> {
             if (data != null) myProfile = data;
             if (myProfile == null && BuildConfig.DEBUG) myProfile = DatingMockData.demoMyProfile();
             actionController.setMyProfile(myProfile);
-            loadMore(true);
+            if (resetRecommendation) reload();
+            else loadMore(true);
         });
     }
 
@@ -434,7 +443,8 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             else if (DatingSwipeAction.FAVORITE.equals(action)) swipeTop(null, Direction.Top);
             else if (DatingSwipeAction.LIKE.equals(action)) swipeTop(null, Direction.Right);
         } else if (requestCode == REQ_MINE && resultCode == RESULT_OK) {
-            loadMyProfileThenRecommend();
+            showLoading(true, "正在根据新资料刷新推荐…", false);
+            fetchMyProfile(true);
         }
     }
 
