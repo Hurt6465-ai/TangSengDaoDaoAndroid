@@ -50,7 +50,8 @@ public class DatingProfile {
     }
 
     public int safeGender() {
-        return gender != 0 ? gender : sex;
+        int value = gender != 0 ? gender : sex;
+        return value == 2 ? 2 : 1;
     }
 
     public String safeCountryCode() {
@@ -93,7 +94,7 @@ public class DatingProfile {
         ArrayList<String> list = new ArrayList<>();
         if (photos != null) {
             for (String item : photos) {
-                if (!TextUtils.isEmpty(item)) list.add(item);
+                if (!TextUtils.isEmpty(item) && list.size() < 6) list.add(item);
             }
         }
         if (list.isEmpty() && !TextUtils.isEmpty(avatar)) list.add(avatar);
