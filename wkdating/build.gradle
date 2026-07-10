@@ -30,6 +30,6 @@ android {
 dependencies {
     api project(':wkbase')
     implementation project(':wkuikit')
-    implementation 'com.github.yuyakaido:CardStackView:2.3.4'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.exifinterface:exifinterface:1.3.7'
 }
