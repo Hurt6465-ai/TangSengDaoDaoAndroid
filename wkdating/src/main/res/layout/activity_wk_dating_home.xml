@@ -13,6 +13,13 @@
         android:clipChildren="false"
         android:clipToPadding="false" />
 
+    <com.chat.dating.DatingSwipeFxView
+        android:id="@+id/swipeFxView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false" />
+
     <FrameLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
