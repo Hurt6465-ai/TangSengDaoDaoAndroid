@@ -104,6 +104,20 @@
                 android:textSize="17sp"
                 android:textStyle="bold" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/editProfileBtn"
+            android:layout_width="54dp"
+            android:layout_height="34dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bg_dating_edit_profile_btn"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="我的"
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
     </FrameLayout>
 
     <LinearLayout

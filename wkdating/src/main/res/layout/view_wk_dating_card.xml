@@ -15,7 +15,7 @@
 
     <LinearLayout
         android:id="@+id/indicatorRow"
-        android:layout_width="86dp"
+        android:layout_width="66dp"
         android:layout_height="3dp"
         android:layout_gravity="top|center_horizontal"
         android:layout_marginTop="74dp"
@@ -27,7 +27,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|end"
-        android:layout_marginTop="118dp"
+        android:layout_marginTop="120dp"
         android:layout_marginEnd="36dp"
         android:alpha="0"
         android:rotation="13"
@@ -35,9 +35,9 @@
         android:shadowDx="0"
         android:shadowDy="2"
         android:shadowRadius="8"
-        android:text="@string/dating_nope_stamp"
+        android:text="✕"
         android:textColor="#FFFF4F6A"
-        android:textSize="25sp"
+        android:textSize="54sp"
         android:textStyle="bold" />
 
     <TextView
@@ -46,16 +46,16 @@
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
         android:layout_marginStart="36dp"
-        android:layout_marginTop="118dp"
+        android:layout_marginTop="120dp"
         android:alpha="0"
         android:rotation="-13"
         android:shadowColor="#99000000"
         android:shadowDx="0"
         android:shadowDy="2"
         android:shadowRadius="8"
-        android:text="@string/dating_like_stamp"
-        android:textColor="#FF20D889"
-        android:textSize="25sp"
+        android:text="♥"
+        android:textColor="#FFFF426D"
+        android:textSize="54sp"
         android:textStyle="bold" />
 
     <TextView
@@ -63,24 +63,24 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="128dp"
+        android:layout_marginTop="132dp"
         android:alpha="0"
         android:shadowColor="#99000000"
         android:shadowDx="0"
         android:shadowDy="2"
         android:shadowRadius="8"
-        android:text="★ 收藏"
+        android:text="★"
         android:textColor="#FF77A7FF"
-        android:textSize="25sp"
+        android:textSize="48sp"
         android:textStyle="bold" />
 
 
     <TextView
         android:id="@+id/profileArrowBtn"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
         android:layout_gravity="bottom|end"
-        android:layout_marginEnd="22dp"
+        android:layout_marginEnd="20dp"
         android:layout_marginBottom="158dp"
         android:background="@drawable/bg_dating_profile_arrow"
         android:gravity="center"
@@ -89,9 +89,9 @@
         android:shadowDx="0"
         android:shadowDy="1"
         android:shadowRadius="4"
-        android:text="↑"
+        android:text="▲"
         android:textColor="#FFFFFFFF"
-        android:textSize="22sp"
+        android:textSize="13sp"
         android:textStyle="bold" />
 
     <LinearLayout
