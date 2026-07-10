@@ -2,20 +2,35 @@ package com.chat.dating.model;
 
 import android.text.TextUtils;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public class DatingProfile {
+/**
+ * 交友资料模型。
+ *
+ * 后端当前 sex 约定：0 女、1 男；部分旧接口可能返回 gender=1 男、gender=2 女，
+ * 所以这里同时兼容两套值，但业务层只保留男/女两种性别。
+ */
+public class DatingProfile implements Serializable {
+    private static final long serialVersionUID = 2L;
+
     public String uid;
+    public String id;
     public String name;
+    public String username;
     public String avatar;
     public String country_code;
     public String country;
     public String city;
     public int age;
-    public int gender;
-    public int sex;
+    public String birthday;
+    public int gender = -1;
+    public int sex = -1;
+    public int gender_preference = -1;
+    public int min_age = 18;
+    public int max_age = 99;
     public String looking_for_gender;
     public String intent;
     public String relationship_goal;
@@ -25,10 +40,18 @@ public class DatingProfile {
     public String job;
     public String education;
     public String relationship_status;
+    public int height_cm;
+    public int show_distance = 1;
+    public int allow_voice = 1;
+    public int allow_video;
+    public int online;
+    public boolean complete;
+    public boolean can_recommend;
     public String distance_label;
     public double distance_km;
     public int distance_meters;
     public List<String> photos;
+    public List<String> profile_images;
     public List<String> native_languages;
     public List<String> learning_languages;
     public List<String> tags;
@@ -42,16 +65,32 @@ public class DatingProfile {
     public int enabled;
 
     public String safeUid() {
-        return uid == null ? "" : uid;
+        if (!TextUtils.isEmpty(uid)) return uid;
+        return id == null ? "" : id;
     }
 
     public String safeName() {
-        return TextUtils.isEmpty(name) ? safeUid() : name;
+        if (!TextUtils.isEmpty(name)) return name;
+        if (!TextUtils.isEmpty(username)) return username;
+        return safeUid();
     }
 
-    public int safeGender() {
-        int value = gender != 0 ? gender : sex;
-        return value == 2 ? 2 : 1;
+    public boolean isFemale() {
+        // 新交友后端：sex=0 女，sex=1 男；旧 Android 资料：gender=2 女。
+        if (gender == 2) return true;
+        if (gender == 1) return false;
+        if (sex == 0) return true;
+        if (sex == 1) return false;
+        return false;
+    }
+
+    public boolean isMale() {
+        return !isFemale();
+    }
+
+    /** 统一返回 0 女、1 男。 */
+    public int normalizedSex() {
+        return isFemale() ? 0 : 1;
     }
 
     public String safeCountryCode() {
@@ -59,21 +98,29 @@ public class DatingProfile {
     }
 
     public String safeIntro() {
-        if (!TextUtils.isEmpty(intro)) return intro;
-        return bio == null ? "" : bio;
+        if (!TextUtils.isEmpty(intro)) return intro.trim();
+        return bio == null ? "" : bio.trim();
     }
 
     public String safeRelationshipGoal() {
-        if (!TextUtils.isEmpty(relationship_goal)) return relationship_goal;
-        return intent == null ? "" : intent;
+        if (!TextUtils.isEmpty(relationship_goal)) return relationship_goal.trim();
+        return intent == null ? "" : intent.trim();
     }
 
     public String safeCrossBorderPreference() {
-        return cross_border_preference == null ? "" : cross_border_preference;
+        if (!TextUtils.isEmpty(cross_border_preference)) return cross_border_preference.trim();
+        if (tags != null) {
+            for (String tag : tags) {
+                if (!TextUtils.isEmpty(tag) && tag.trim().toLowerCase(Locale.US).startsWith("cross:")) {
+                    return tag.trim().substring("cross:".length());
+                }
+            }
+        }
+        return "";
     }
 
     public boolean rejectsCrossBorder() {
-        String value = safeCrossBorderPreference().trim().toLowerCase(Locale.US);
+        String value = safeCrossBorderPreference().toLowerCase(Locale.US);
         return value.contains("same_country")
                 || value.contains("same-country")
                 || value.contains("local_only")
@@ -92,13 +139,27 @@ public class DatingProfile {
 
     public List<String> safePhotos() {
         ArrayList<String> list = new ArrayList<>();
-        if (photos != null) {
-            for (String item : photos) {
-                if (!TextUtils.isEmpty(item) && list.size() < 6) list.add(item);
-            }
-        }
-        if (list.isEmpty() && !TextUtils.isEmpty(avatar)) list.add(avatar);
+        appendPhotos(list, photos);
+        appendPhotos(list, profile_images);
+        if (list.isEmpty() && !TextUtils.isEmpty(avatar)) list.add(avatar.trim());
+        if (list.size() > 6) return new ArrayList<>(list.subList(0, 6));
         return list;
+    }
+
+    private void appendPhotos(ArrayList<String> out, List<String> source) {
+        if (source == null) return;
+        for (String item : source) {
+            if (TextUtils.isEmpty(item)) continue;
+            String value = item.trim();
+            boolean exists = false;
+            for (String old : out) {
+                if (old.equals(value)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists && out.size() < 6) out.add(value);
+        }
     }
 
     public List<String> safeTags() {
@@ -135,11 +196,22 @@ public class DatingProfile {
         if (!TextUtils.isEmpty(distance_label)) return distance_label;
         if (distance_meters > 0) {
             if (distance_meters < 1000) return distance_meters + "m";
-            float km = distance_meters / 1000f;
-            return String.format(Locale.getDefault(), "%.1fkm", km);
+            return String.format(Locale.getDefault(), "%.1fkm", distance_meters / 1000f);
         }
         if (distance_km > 0) return String.format(Locale.getDefault(), "%.1fkm", distance_km);
         return "";
+    }
+
+    public String displayLocation() {
+        StringBuilder out = new StringBuilder();
+        if (!TextUtils.isEmpty(city)) out.append(city.trim());
+        else if (!TextUtils.isEmpty(country)) out.append(country.trim());
+        String distance = show_distance == 1 ? safeDistanceLabel() : "";
+        if (!TextUtils.isEmpty(distance)) {
+            if (out.length() > 0) out.append(" · ");
+            out.append(distance);
+        }
+        return out.toString();
     }
 
     private void addAll(ArrayList<String> out, List<String> source) {
