@@ -21,7 +21,6 @@ import androidx.credentials.exceptions.NoCredentialException;
 import com.chat.login.R;
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
-import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException;
 
 import java.security.SecureRandom;
 
@@ -132,7 +131,7 @@ public final class GoogleLoginManager {
                 return;
             }
             callback.onSuccess(idToken, nonce);
-        } catch (GoogleIdTokenParsingException | IllegalArgumentException e) {
+        } catch (IllegalArgumentException | NullPointerException e) {
             callback.onError(R.string.google_login_invalid_response, e);
         }
     }
