@@ -1,6 +1,8 @@
 package com.chat.login.service;
 
 
+import android.text.TextUtils;
+
 import com.chat.base.net.HttpResponseCode;
 import com.chat.login.R;
 
@@ -34,7 +36,7 @@ public class LoginPresenter implements LoginContract.LoginPresenter {
             } else {
                 if (loginView.get() != null) {
                     loginView.get().hideLoading();
-                    if (code == 110) {
+                    if (code == 110 && userInfoEntity != null) {
                         loginView.get().setLoginFail(code, userInfoEntity.uid, userInfoEntity.phone);
                     } else {
                         loginView.get().showError(msg);
@@ -42,6 +44,28 @@ public class LoginPresenter implements LoginContract.LoginPresenter {
                 }
             }
 
+        });
+    }
+
+    @Override
+    public void googleLogin(String idToken, String nonce) {
+        LoginModel.getInstance().googleLogin(idToken, nonce, (code, msg, userInfoEntity) -> {
+            LoginContract.LoginView view = loginView.get();
+            if (view == null) return;
+
+            if (code == HttpResponseCode.success) {
+                view.loginResult(userInfoEntity);
+            } else {
+                view.hideLoading();
+                if (code == 110 && userInfoEntity != null) {
+                    view.setLoginFail(code, userInfoEntity.uid, userInfoEntity.phone);
+                } else {
+                    String error = TextUtils.isEmpty(msg)
+                            ? view.getContext().getString(R.string.google_login_failed)
+                            : msg;
+                    view.showError(error);
+                }
+            }
         });
     }
 

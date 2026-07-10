@@ -26,6 +26,12 @@ public interface LoginService {
     @POST("user/login")
     Observable<UserInfoEntity> login(@Body JSONObject jsonObject);
 
+    /**
+     * Google ID Token 登录。后端必须验证签名、aud、iss、exp 与 nonce。
+     */
+    @POST("user/oauth/google")
+    Observable<UserInfoEntity> googleLogin(@Body JSONObject jsonObject);
+
     @GET("user/grant_login")
     Observable<CommonResponse> webLoginConfirm(@Query("auth_code") String auth_code);
 

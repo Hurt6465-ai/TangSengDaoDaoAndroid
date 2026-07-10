@@ -53,11 +53,7 @@ public class LoginModel extends WKBaseModel {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("username", name);
         jsonObject.put("password", pwd);
-        JSONObject deviceJson = new JSONObject();
-        deviceJson.put("device_id", WKConstants.getDeviceID());
-        deviceJson.put("device_name", WKDeviceUtils.getInstance().getDeviceName());
-        deviceJson.put("device_model", WKDeviceUtils.getInstance().getSystemModel());
-        jsonObject.put("device", deviceJson);
+        jsonObject.put("device", createDeviceJson());
 
         requestAndErrorBack(createService(LoginService.class).login(jsonObject), new IRequestResultErrorInfoListener<>() {
             @Override
@@ -88,6 +84,55 @@ public class LoginModel extends WKBaseModel {
 
     public interface ILoginListener {
         void onResult(int code, String errorMsg, UserInfoEntity userInfo);
+    }
+
+
+    /**
+     * Google 登录。客户端只传递 Google ID Token 与本次 nonce，身份真实性由后端验证。
+     */
+    void googleLogin(String idToken, String nonce, final ILoginListener iLoginListener) {
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("id_token", idToken);
+        jsonObject.put("nonce", nonce);
+        jsonObject.put("device", createDeviceJson());
+
+        requestAndErrorBack(createService(LoginService.class).googleLogin(jsonObject), new IRequestResultErrorInfoListener<>() {
+            @Override
+            public void onSuccess(UserInfoEntity userInfo) {
+                if (userInfo != null) {
+                    saveLoginInfo(userInfo);
+                    iLoginListener.onResult(HttpResponseCode.success, "", userInfo);
+                } else {
+                    iLoginListener.onResult(HttpResponseCode.error, "", new UserInfoEntity());
+                }
+            }
+
+            @Override
+            public void onFail(int code, String msg, String errJson) {
+                iLoginListener.onResult(code, msg, parseLoginErrorUser(code, errJson));
+            }
+        });
+    }
+
+    private JSONObject createDeviceJson() {
+        JSONObject deviceJson = new JSONObject();
+        deviceJson.put("device_id", WKConstants.getDeviceID());
+        deviceJson.put("device_name", WKDeviceUtils.getInstance().getDeviceName());
+        deviceJson.put("device_model", WKDeviceUtils.getInstance().getSystemModel());
+        return deviceJson;
+    }
+
+    private UserInfoEntity parseLoginErrorUser(int code, String errJson) {
+        UserInfoEntity userInfoEntity = new UserInfoEntity();
+        if (code == 110 && !TextUtils.isEmpty(errJson)) {
+            try {
+                org.json.JSONObject errorObject = new org.json.JSONObject(errJson);
+                userInfoEntity.phone = errorObject.optString("phone");
+                userInfoEntity.uid = errorObject.optString("uid");
+            } catch (JSONException ignored) {
+            }
+        }
+        return userInfoEntity;
     }
 
     /**
@@ -194,11 +239,7 @@ public class LoginModel extends WKBaseModel {
         jsonObject.put("phone", phone);
         jsonObject.put("password", password);
         jsonObject.put("invite_code", inviteCode);
-        JSONObject deviceJson = new JSONObject();
-        deviceJson.put("device_id", WKConstants.getDeviceID());
-        deviceJson.put("device_name", WKDeviceUtils.getInstance().getDeviceName());
-        deviceJson.put("device_model", WKDeviceUtils.getInstance().getSystemModel());
-        jsonObject.put("device", deviceJson);
+        jsonObject.put("device", createDeviceJson());
         request(createService(LoginService.class).register(jsonObject), new IRequestResultListener<>() {
             @Override
             public void onSuccess(UserInfoEntity userInfo) {

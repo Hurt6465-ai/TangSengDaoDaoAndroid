@@ -20,6 +20,11 @@ public class LoginContract {
     public interface LoginPresenter extends WKBasePresenter {
         void login(String name, String pwd);
 
+        /**
+         * 将 Credential Manager 获取到的 Google ID Token 交给业务后端验证并登录。
+         */
+        void googleLogin(String idToken, String nonce);
+
         void sendLoginAuthVerificationCode(String uid);
 
         void getCountryCode();
@@ -28,7 +33,7 @@ public class LoginContract {
 
         void forgetPwd(String zone, String phone);
 
-        void registerApp(String code, String zone, String name, String phone, String password,String inviteCode);
+        void registerApp(String code, String zone, String name, String phone, String password, String inviteCode);
 
         void checkLoginAuth(String uid, String code);
 
