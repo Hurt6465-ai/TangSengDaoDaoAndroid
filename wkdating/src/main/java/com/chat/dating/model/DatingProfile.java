@@ -7,14 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * 交友资料模型。
- *
- * 后端当前 sex 约定：0 女、1 男；部分旧接口可能返回 gender=1 男、gender=2 女，
- * 所以这里同时兼容两套值，但业务层只保留男/女两种性别。
- */
+/** 交友资料模型。 */
 public class DatingProfile implements Serializable {
-    private static final long serialVersionUID = 2L;
+    private static final long serialVersionUID = 3L;
 
     public String uid;
     public String id;
@@ -40,7 +35,11 @@ public class DatingProfile implements Serializable {
     public String job;
     public String education;
     public String relationship_status;
+    public String sexual_orientation;
+    public String drinking;
+    public String smoking;
     public int height_cm;
+    public int weight_kg;
     public int show_distance = 1;
     public int allow_voice = 1;
     public int allow_video;
@@ -76,7 +75,6 @@ public class DatingProfile implements Serializable {
     }
 
     public boolean isFemale() {
-        // 新交友后端：sex=0 女，sex=1 男；旧 Android 资料：gender=2 女。
         if (gender == 2) return true;
         if (gender == 1) return false;
         if (sex == 0) return true;
@@ -84,14 +82,8 @@ public class DatingProfile implements Serializable {
         return false;
     }
 
-    public boolean isMale() {
-        return !isFemale();
-    }
-
-    /** 统一返回 0 女、1 男。 */
-    public int normalizedSex() {
-        return isFemale() ? 0 : 1;
-    }
+    public boolean isMale() { return !isFemale(); }
+    public int normalizedSex() { return isFemale() ? 0 : 1; }
 
     public String safeCountryCode() {
         return TextUtils.isEmpty(country_code) ? "" : country_code.trim().toUpperCase(Locale.US);
@@ -119,19 +111,6 @@ public class DatingProfile implements Serializable {
         return "";
     }
 
-    public boolean rejectsCrossBorder() {
-        String value = safeCrossBorderPreference().toLowerCase(Locale.US);
-        return value.contains("same_country")
-                || value.contains("same-country")
-                || value.contains("local_only")
-                || value.contains("nearby_only")
-                || value.contains("no_foreign")
-                || value.contains("refuse_foreign")
-                || value.contains("拒绝异国")
-                || value.contains("只接受本国")
-                || value.contains("本国恋");
-    }
-
     public String firstPhoto() {
         List<String> list = safePhotos();
         return list.isEmpty() ? "" : list.get(0);
@@ -142,7 +121,7 @@ public class DatingProfile implements Serializable {
         appendPhotos(list, photos);
         appendPhotos(list, profile_images);
         if (list.isEmpty() && !TextUtils.isEmpty(avatar)) list.add(avatar.trim());
-        if (list.size() > 6) return new ArrayList<>(list.subList(0, 6));
+        if (list.size() > 5) return new ArrayList<>(list.subList(0, 5));
         return list;
     }
 
@@ -153,12 +132,9 @@ public class DatingProfile implements Serializable {
             String value = item.trim();
             boolean exists = false;
             for (String old : out) {
-                if (old.equals(value)) {
-                    exists = true;
-                    break;
-                }
+                if (old.equals(value)) { exists = true; break; }
             }
-            if (!exists && out.size() < 6) out.add(value);
+            if (!exists && out.size() < 5) out.add(value);
         }
     }
 
@@ -173,24 +149,8 @@ public class DatingProfile implements Serializable {
         return dedupe(list);
     }
 
-    public List<String> safeCoreTags() {
-        ArrayList<String> list = new ArrayList<>();
-        addAll(list, love_tags);
-        addAll(list, personality_tags);
-        addAll(list, communication_tags);
-        addAll(list, lifestyle_tags);
-        addAll(list, interest_tags);
-        addAll(list, tags);
-        return dedupe(list);
-    }
-
-    public List<String> safeNativeLanguages() {
-        return clean(native_languages);
-    }
-
-    public List<String> safeLearningLanguages() {
-        return clean(learning_languages);
-    }
+    public List<String> safeNativeLanguages() { return clean(native_languages); }
+    public List<String> safeLearningLanguages() { return clean(learning_languages); }
 
     public String safeDistanceLabel() {
         if (!TextUtils.isEmpty(distance_label)) return distance_label;
@@ -216,9 +176,7 @@ public class DatingProfile implements Serializable {
 
     private void addAll(ArrayList<String> out, List<String> source) {
         if (source == null) return;
-        for (String item : source) {
-            if (!TextUtils.isEmpty(item)) out.add(item.trim());
-        }
+        for (String item : source) if (!TextUtils.isEmpty(item)) out.add(item.trim());
     }
 
     private List<String> clean(List<String> source) {
@@ -234,10 +192,7 @@ public class DatingProfile implements Serializable {
             if (TextUtils.isEmpty(item)) continue;
             boolean exists = false;
             for (String old : list) {
-                if (item.equalsIgnoreCase(old)) {
-                    exists = true;
-                    break;
-                }
+                if (item.equalsIgnoreCase(old)) { exists = true; break; }
             }
             if (!exists) list.add(item);
         }
