@@ -15,20 +15,21 @@
 
     <LinearLayout
         android:id="@+id/indicatorRow"
-        android:layout_width="66dp"
+        android:layout_width="54dp"
         android:layout_height="3dp"
         android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="74dp"
+        android:layout_marginTop="75dp"
         android:gravity="center"
         android:orientation="horizontal" />
 
+    <!-- CardStackView 原生 overlay：自动根据方向和进度控制 alpha。 -->
     <TextView
-        android:id="@+id/nopeBadge"
+        android:id="@+id/left_overlay"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|end"
-        android:layout_marginTop="120dp"
-        android:layout_marginEnd="36dp"
+        android:layout_marginTop="118dp"
+        android:layout_marginEnd="34dp"
         android:alpha="0"
         android:rotation="13"
         android:shadowColor="#99000000"
@@ -37,16 +38,16 @@
         android:shadowRadius="8"
         android:text="✕"
         android:textColor="#FFFF4F6A"
-        android:textSize="54sp"
+        android:textSize="55sp"
         android:textStyle="bold" />
 
     <TextView
-        android:id="@+id/likeBadge"
+        android:id="@+id/right_overlay"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
-        android:layout_marginStart="36dp"
-        android:layout_marginTop="120dp"
+        android:layout_marginStart="34dp"
+        android:layout_marginTop="118dp"
         android:alpha="0"
         android:rotation="-13"
         android:shadowColor="#99000000"
@@ -55,11 +56,11 @@
         android:shadowRadius="8"
         android:text="♥"
         android:textColor="#FFFF426D"
-        android:textSize="54sp"
+        android:textSize="55sp"
         android:textStyle="bold" />
 
     <TextView
-        android:id="@+id/favoriteBadge"
+        android:id="@+id/top_overlay"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|center_horizontal"
@@ -70,29 +71,28 @@
         android:shadowDy="2"
         android:shadowRadius="8"
         android:text="★"
-        android:textColor="#FF77A7FF"
-        android:textSize="48sp"
+        android:textColor="#FF75A8FF"
+        android:textSize="50sp"
         android:textStyle="bold" />
 
+    <View
+        android:id="@+id/bottom_overlay"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:alpha="0" />
 
-    <TextView
+    <ImageView
         android:id="@+id/profileArrowBtn"
-        android:layout_width="28dp"
-        android:layout_height="28dp"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
         android:layout_gravity="bottom|end"
-        android:layout_marginEnd="20dp"
+        android:layout_marginEnd="18dp"
         android:layout_marginBottom="158dp"
         android:background="@drawable/bg_dating_profile_arrow"
-        android:gravity="center"
-        android:includeFontPadding="false"
-        android:shadowColor="#80000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4"
-        android:text="▲"
-        android:textColor="#FFFFFFFF"
-        android:textSize="13sp"
-        android:textStyle="bold" />
+        android:contentDescription="查看更多资料"
+        android:padding="8dp"
+        android:src="@drawable/ic_dating_chevron_up"
+        android:tint="#FFFFFFFF" />
 
     <LinearLayout
         android:id="@+id/infoPanel"
@@ -111,27 +111,27 @@
             android:ellipsize="end"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:shadowColor="#B0000000"
+            android:shadowColor="#C0000000"
             android:shadowDx="0"
             android:shadowDy="2"
             android:shadowRadius="9"
             android:textColor="#FFFFFFFF"
-            android:textSize="25sp"
+            android:textSize="24sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/metaTv"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="7dp"
+            android:layout_marginTop="6dp"
             android:ellipsize="end"
             android:includeFontPadding="false"
             android:maxLines="1"
             android:shadowColor="#B0000000"
             android:shadowDx="0"
-            android:shadowDy="2"
-            android:shadowRadius="8"
-            android:textColor="#F2FFFFFF"
+            android:shadowDy="1"
+            android:shadowRadius="7"
+            android:textColor="#F3FFFFFF"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -147,8 +147,9 @@
             android:shadowDx="0"
             android:shadowDy="2"
             android:shadowRadius="8"
-            android:textColor="#E6FFFFFF"
-            android:textSize="12sp" />
+            android:textColor="#E9FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/introTv"
@@ -158,11 +159,11 @@
             android:ellipsize="end"
             android:lineSpacingExtra="2dp"
             android:maxLines="2"
-            android:shadowColor="#B0000000"
+            android:shadowColor="#C0000000"
             android:shadowDx="0"
             android:shadowDy="2"
             android:shadowRadius="8"
-            android:textColor="#F7FFFFFF"
+            android:textColor="#F8FFFFFF"
             android:textSize="13sp" />
 
         <LinearLayout

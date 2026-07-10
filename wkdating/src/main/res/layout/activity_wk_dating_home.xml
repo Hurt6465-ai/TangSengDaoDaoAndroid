@@ -16,22 +16,22 @@
     <FrameLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
-        android:layout_height="96dp"
+        android:layout_height="100dp"
         android:layout_gravity="top"
         android:background="@drawable/bg_dating_top_soft_mask"
-        android:paddingStart="18dp"
+        android:paddingStart="14dp"
         android:paddingTop="18dp"
-        android:paddingEnd="18dp">
+        android:paddingEnd="14dp">
 
         <FrameLayout
             android:id="@+id/filterBtn"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_gravity="start|top"
             android:foreground="?android:attr/selectableItemBackgroundBorderless">
 
             <View
-                android:layout_width="25dp"
+                android:layout_width="26dp"
                 android:layout_height="2dp"
                 android:layout_gravity="top|start"
                 android:layout_marginStart="10dp"
@@ -47,19 +47,19 @@
                 android:background="@drawable/bg_dating_filter_knob" />
 
             <View
-                android:layout_width="25dp"
+                android:layout_width="26dp"
                 android:layout_height="2dp"
                 android:layout_gravity="top|start"
                 android:layout_marginStart="10dp"
-                android:layout_marginTop="28dp"
+                android:layout_marginTop="29dp"
                 android:background="@drawable/bg_dating_filter_line" />
 
             <View
                 android:layout_width="10dp"
                 android:layout_height="10dp"
                 android:layout_gravity="top|start"
-                android:layout_marginStart="26dp"
-                android:layout_marginTop="24dp"
+                android:layout_marginStart="27dp"
+                android:layout_marginTop="25dp"
                 android:background="@drawable/bg_dating_filter_knob" />
         </FrameLayout>
 
@@ -77,57 +77,54 @@
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:includeFontPadding="false"
-                android:minWidth="72dp"
-                android:text="推荐"
+                android:minWidth="70dp"
                 android:shadowColor="#AA000000"
                 android:shadowDx="0"
                 android:shadowDy="1"
                 android:shadowRadius="6"
+                android:text="推荐"
                 android:textColor="#FFFFFFFF"
-                android:textSize="21sp"
+                android:textSize="22sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/nearbyTab"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_marginStart="18dp"
+                android:layout_marginStart="14dp"
                 android:gravity="center"
                 android:includeFontPadding="false"
-                android:minWidth="72dp"
-                android:text="附近"
+                android:minWidth="70dp"
                 android:shadowColor="#90000000"
                 android:shadowDx="0"
                 android:shadowDy="1"
                 android:shadowRadius="6"
-                android:textColor="#9EFFFFFF"
+                android:text="附近"
+                android:textColor="#88FFFFFF"
                 android:textSize="17sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/editProfileBtn"
-            android:layout_width="54dp"
-            android:layout_height="34dp"
+        <!-- “我的”只保留无背景的人形图标，避免像一个编辑按钮。 -->
+        <ImageView
+            android:id="@+id/mineBtn"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_gravity="top|end"
-            android:layout_marginTop="5dp"
-            android:background="@drawable/bg_dating_edit_profile_btn"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:text="我的"
-            android:textColor="#FFFFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:contentDescription="我的交友"
+            android:foreground="?android:attr/selectableItemBackgroundBorderless"
+            android:padding="11dp"
+            android:src="@drawable/ic_dating_mine"
+            android:tint="#FFFFFFFF" />
     </FrameLayout>
 
     <LinearLayout
         android:id="@+id/actionBar"
         android:layout_width="match_parent"
-        android:layout_height="104dp"
+        android:layout_height="108dp"
         android:layout_gravity="bottom"
         android:gravity="center"
         android:orientation="horizontal"
-        android:paddingTop="0dp"
         android:paddingBottom="18dp">
 
         <TextView
@@ -135,7 +132,7 @@
             android:layout_width="52dp"
             android:layout_height="52dp"
             android:background="@drawable/bg_dating_action_rewind"
-            android:elevation="13dp"
+            android:elevation="12dp"
             android:gravity="center"
             android:includeFontPadding="false"
             android:text="↶"
@@ -143,16 +140,14 @@
             android:textSize="29sp"
             android:textStyle="bold" />
 
-        <Space
-            android:layout_width="14dp"
-            android:layout_height="1dp" />
+        <Space android:layout_width="13dp" android:layout_height="1dp" />
 
         <TextView
             android:id="@+id/passBtn"
             android:layout_width="64dp"
             android:layout_height="64dp"
             android:background="@drawable/bg_dating_action_pass"
-            android:elevation="15dp"
+            android:elevation="14dp"
             android:gravity="center"
             android:includeFontPadding="false"
             android:text="×"
@@ -160,33 +155,29 @@
             android:textSize="42sp"
             android:textStyle="bold" />
 
-        <Space
-            android:layout_width="14dp"
-            android:layout_height="1dp" />
+        <Space android:layout_width="13dp" android:layout_height="1dp" />
 
         <TextView
             android:id="@+id/favoriteBtn"
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:background="@drawable/bg_dating_action_favorite"
-            android:elevation="15dp"
+            android:elevation="14dp"
             android:gravity="center"
             android:includeFontPadding="false"
             android:text="★"
-            android:textColor="#FF61A0FF"
+            android:textColor="#FF68A2FF"
             android:textSize="29sp"
             android:textStyle="bold" />
 
-        <Space
-            android:layout_width="14dp"
-            android:layout_height="1dp" />
+        <Space android:layout_width="13dp" android:layout_height="1dp" />
 
         <TextView
             android:id="@+id/likeBtn"
             android:layout_width="70dp"
             android:layout_height="70dp"
             android:background="@drawable/bg_dating_action_like"
-            android:elevation="17dp"
+            android:elevation="16dp"
             android:gravity="center"
             android:includeFontPadding="false"
             android:text="♥"
@@ -210,7 +201,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:text="@string/dating_loading"
+            android:text="正在为你挑选合适的人…"
             android:textColor="#FFFFFFFF"
             android:textSize="15sp"
             android:textStyle="bold" />
@@ -224,7 +215,7 @@
             android:gravity="center"
             android:paddingStart="22dp"
             android:paddingEnd="22dp"
-            android:text="@string/dating_retry"
+            android:text="重试"
             android:textColor="#FFFFFFFF"
             android:textSize="14sp"
             android:textStyle="bold"

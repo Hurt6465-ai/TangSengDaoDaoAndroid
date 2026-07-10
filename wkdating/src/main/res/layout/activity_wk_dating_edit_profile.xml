@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F6F6F8">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:overScrollMode="never">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="36dp">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="64dp">
+                <ImageView
+                    android:id="@+id/backBtn"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="start|center_vertical"
+                    android:layout_marginStart="8dp"
+                    android:contentDescription="返回"
+                    android:foreground="?android:attr/selectableItemBackgroundBorderless"
+                    android:padding="13dp"
+                    android:src="@drawable/ic_dating_back"
+                    android:tint="#24242A" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="编辑交友资料"
+                    android:textColor="#202026"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:text="照片"
+                android:textColor="#202026"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/photoTip"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="18dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="18dp"
+                android:textColor="#777780"
+                android:textSize="13sp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/photoRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="560dp"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="12dp"
+                android:clipToPadding="false"
+                android:padding="2dp" />
+
+            <TextView
+                android:id="@+id/copyPartnerBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="18dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_dating_secondary_button"
+                android:gravity="center"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:text="复制语伴资料"
+                android:textColor="#3D3D46"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginEnd="16dp"
+                android:background="@drawable/bg_dating_detail_card"
+                android:orientation="vertical">
+
+                <LinearLayout android:id="@+id/intentRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="恋爱意向" />
+                    <TextView android:id="@+id/intentValue" style="@style/WkDatingEditValue" />
+                </LinearLayout>
+                <View style="@style/WkDatingDivider" />
+                <LinearLayout android:id="@+id/crossRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="异国恋态度" />
+                    <TextView android:id="@+id/crossValue" style="@style/WkDatingEditValue" />
+                </LinearLayout>
+                <View style="@style/WkDatingDivider" />
+                <LinearLayout android:id="@+id/genderRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="希望认识" />
+                    <TextView android:id="@+id/genderValue" style="@style/WkDatingEditValue" />
+                </LinearLayout>
+                <View style="@style/WkDatingDivider" />
+                <LinearLayout android:id="@+id/ageRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="年龄范围" />
+                    <TextView android:id="@+id/ageValue" style="@style/WkDatingEditValue" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginEnd="16dp"
+                android:background="@drawable/bg_dating_detail_card"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <EditText android:id="@+id/cityEt" style="@style/WkDatingEditText" android:hint="现居城市" />
+                <EditText android:id="@+id/countryEt" style="@style/WkDatingEditText" android:hint="国家/地区" />
+                <EditText android:id="@+id/countryCodeEt" style="@style/WkDatingEditText" android:hint="国家代码，例如 MM / CN / JP" android:maxLength="2" />
+                <EditText android:id="@+id/jobEt" style="@style/WkDatingEditText" android:hint="职业" />
+                <EditText android:id="@+id/educationEt" style="@style/WkDatingEditText" android:hint="学历" />
+                <EditText android:id="@+id/relationshipEt" style="@style/WkDatingEditText" android:hint="当前感情状态" />
+                <EditText
+                    android:id="@+id/bioEt"
+                    style="@style/WkDatingEditText"
+                    android:gravity="top|start"
+                    android:hint="自我介绍（最多 500 字）"
+                    android:inputType="textCapSentences|textMultiLine"
+                    android:maxLength="500"
+                    android:minHeight="110dp" />
+                <EditText
+                    android:id="@+id/tagsEt"
+                    style="@style/WkDatingEditText"
+                    android:hint="标签，用空格、逗号或顿号分隔"
+                    android:inputType="textCapSentences|textMultiLine"
+                    android:minHeight="72dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="62dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="14dp"
+                android:layout_marginEnd="16dp"
+                android:background="@drawable/bg_dating_detail_card"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="开启交友推荐"
+                    android:textColor="#202026"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/enabledSwitch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/saveBtn"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="18dp"
+                android:layout_marginEnd="16dp"
+                android:background="@drawable/bg_dating_primary_button"
+                android:gravity="center"
+                android:text="保存资料"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </ScrollView>
+
+    <FrameLayout
+        android:id="@+id/uploadOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#99000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+        <LinearLayout
+            android:layout_width="220dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_dating_upload_panel"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="22dp">
+            <ProgressBar
+                android:id="@+id/uploadProgress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:max="100" />
+            <TextView
+                android:id="@+id/uploadText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:textColor="#202026"
+                android:textSize="14sp" />
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>
