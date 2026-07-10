@@ -37,6 +37,7 @@ public class DatingCardView extends FrameLayout {
         this.profile = profile;
         int max = profile == null ? 0 : Math.max(0, profile.safePhotos().size() - 1);
         this.photoIndex = Math.max(0, Math.min(initialPhotoIndex, max));
+        bindAvatar();
         bindPhoto();
         resetDragProgress();
     }
@@ -92,6 +93,14 @@ public class DatingCardView extends FrameLayout {
         binding.profileArrowBtn.setAlpha(1f);
     }
 
+
+    private void bindAvatar() {
+        if (profile == null) return;
+        binding.avatarView.setSize(48, 24);
+        binding.avatarView.showAvatar(profile.safeUid(), (byte) 1);
+        binding.avatarView.showFlag(profile.safeCountryCode());
+    }
+
     private void bindPhoto() {
         if (profile == null) return;
         List<String> photos = profile.safePhotos();
@@ -121,7 +130,7 @@ public class DatingCardView extends FrameLayout {
         binding.metaTv.setVisibility(TextUtils.isEmpty(meta) ? GONE : VISIBLE);
 
         if (photoIndex == 0) {
-            // 第一张保持克制：姓名、城市、一句介绍，不放标签和职业。
+            // 第一张只保留身份和一句话，避免挡住人像。
             binding.jobTv.setVisibility(GONE);
             binding.tagRow.setVisibility(GONE);
             binding.tagRow.removeAllViews();
@@ -129,26 +138,49 @@ public class DatingCardView extends FrameLayout {
             binding.introTv.setText(intro);
             binding.introTv.setMaxLines(1);
             binding.introTv.setVisibility(TextUtils.isEmpty(intro) ? GONE : VISIBLE);
-        } else if (photoIndex == 1) {
+            return;
+        }
+
+        binding.jobTv.setVisibility(VISIBLE);
+        binding.introTv.setMaxLines(2);
+        if (photoIndex == 1) {
             binding.jobTv.setText("关于我");
-            binding.jobTv.setVisibility(VISIBLE);
-            binding.introTv.setMaxLines(2);
-            String intro = profile.safeIntro();
-            if (TextUtils.isEmpty(intro)) intro = profile.job;
-            binding.introTv.setText(intro);
-            binding.introTv.setVisibility(TextUtils.isEmpty(intro) ? GONE : VISIBLE);
-            bindPlainTags(profile.safeCoreTags(), 4);
-        } else {
-            String expectation = DatingUi.loveExpectation(profile);
-            binding.jobTv.setText(TextUtils.isEmpty(expectation) ? "恋爱期待" : expectation);
-            binding.jobTv.setVisibility(VISIBLE);
-            binding.introTv.setMaxLines(2);
-            String line = profile.relationship_status;
-            if (TextUtils.isEmpty(line)) line = profile.education;
+            binding.introTv.setText(profile.safeIntro());
+            binding.introTv.setVisibility(TextUtils.isEmpty(profile.safeIntro()) ? GONE : VISIBLE);
+            bindPlainTags(profile.safeTags(), 4);
+        } else if (photoIndex == 2) {
+            binding.jobTv.setText("恋爱意向");
+            String line = joinText(profile.safeRelationshipGoal(), profile.relationship_status);
             binding.introTv.setText(line);
             binding.introTv.setVisibility(TextUtils.isEmpty(line) ? GONE : VISIBLE);
-            bindPlainTags(profile.safeCoreTags(), 4);
+            bindPlainTags(profile.love_tags, 4);
+        } else if (photoIndex == 3) {
+            binding.jobTv.setText("生活方式");
+            String line = joinText(
+                    TextUtils.isEmpty(profile.drinking) ? "" : "饮酒：" + profile.drinking,
+                    TextUtils.isEmpty(profile.smoking) ? "" : "吸烟：" + profile.smoking);
+            binding.introTv.setText(line);
+            binding.introTv.setVisibility(TextUtils.isEmpty(line) ? GONE : VISIBLE);
+            bindPlainTags(profile.lifestyle_tags, 4);
+        } else {
+            binding.jobTv.setText("基本资料");
+            ArrayList<String> basics = new ArrayList<>();
+            if (profile.height_cm > 0) basics.add(profile.height_cm + "cm");
+            if (profile.weight_kg > 0) basics.add(profile.weight_kg + "kg");
+            if (!TextUtils.isEmpty(profile.sexual_orientation)) basics.add(profile.sexual_orientation);
+            if (!TextUtils.isEmpty(profile.education)) basics.add(profile.education);
+            if (!TextUtils.isEmpty(profile.job)) basics.add(profile.job);
+            String line = TextUtils.join(" · ", basics);
+            binding.introTv.setText(line);
+            binding.introTv.setVisibility(TextUtils.isEmpty(line) ? GONE : VISIBLE);
+            bindPlainTags(profile.safeTags(), 4);
         }
+    }
+
+    private String joinText(String first, String second) {
+        if (TextUtils.isEmpty(first)) return second == null ? "" : second;
+        if (TextUtils.isEmpty(second)) return first;
+        return first + " · " + second;
     }
 
     private void bindIndicators(int count) {

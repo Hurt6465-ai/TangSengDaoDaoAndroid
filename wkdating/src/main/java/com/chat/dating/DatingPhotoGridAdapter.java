@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** 6 图编辑网格：点击空位添加、删除后自动前移、长按拖动排序。 */
+/** 5 图编辑网格：点击空位添加、删除后自动前移、长按拖动排序。 */
 public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPhotoGridAdapter.Holder> {
     public interface Listener {
         void onAddPhoto();

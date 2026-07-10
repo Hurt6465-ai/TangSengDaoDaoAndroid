@@ -87,9 +87,25 @@ public class DatingProfileDetailActivity extends Activity {
             if (out.length() > 0) out.append(" · ");
             out.append(profile.height_cm).append("cm");
         }
+        if (profile.weight_kg > 0) {
+            if (out.length() > 0) out.append(" · ");
+            out.append(profile.weight_kg).append("kg");
+        }
         if (!TextUtils.isEmpty(profile.relationship_status)) {
             if (out.length() > 0) out.append(" · ");
             out.append(profile.relationship_status);
+        }
+        if (!TextUtils.isEmpty(profile.sexual_orientation)) {
+            if (out.length() > 0) out.append(" · ");
+            out.append(profile.sexual_orientation);
+        }
+        if (!TextUtils.isEmpty(profile.drinking)) {
+            if (out.length() > 0) out.append(" · ");
+            out.append("饮酒").append(profile.drinking);
+        }
+        if (!TextUtils.isEmpty(profile.smoking)) {
+            if (out.length() > 0) out.append(" · ");
+            out.append("吸烟").append(profile.smoking);
         }
         return out.toString();
     }

@@ -57,6 +57,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private String sessionId;
     private boolean loading;
     private boolean noMore;
+    private boolean initialLocationRequested;
     private long exposureStartMs;
     private String exposureUid = "";
     private int visiblePosition;
@@ -103,7 +104,15 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
 
     @Override
     protected void initListener() {
-        wkVBinding.retryBtn.setOnClickListener(v -> reload());
+        wkVBinding.retryBtn.setOnClickListener(v -> {
+            if (myProfile == null || myProfile.enabled != 1) {
+                Intent intent = new Intent(this, DatingMineActivity.class);
+                intent.putExtra(DatingMineActivity.EXTRA_PROFILE, myProfile);
+                startActivityForResult(intent, REQ_MINE);
+            } else {
+                reload();
+            }
+        });
         wkVBinding.rewindBtn.setOnClickListener(v -> rewindTop(v, true));
         wkVBinding.passBtn.setOnClickListener(v -> swipeTop(v, Direction.Left));
         wkVBinding.favoriteBtn.setOnClickListener(v -> swipeTop(v, Direction.Top));
@@ -160,6 +169,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                     rewindTop(null, false);
                     return;
                 }
+                playSwipeEffect(direction);
 
                 swipeHistory.addLast(new SwipeRecord(profile, swipedPosition, action, photoIndex));
                 while (swipeHistory.size() > 30) swipeHistory.removeFirst();
@@ -217,8 +227,8 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         // 借鉴 Shuffle/CardSlidePanel：三层实体卡、后卡明显顶上来、快速飞出但不拖沓。
         cardStackManager.setStackFrom(StackFrom.None);
         cardStackManager.setVisibleCount(3);
-        cardStackManager.setTranslationInterval(11f);
-        cardStackManager.setScaleInterval(0.95f);
+        cardStackManager.setTranslationInterval(8f);
+        cardStackManager.setScaleInterval(0.97f);
         cardStackManager.setSwipeThreshold(0.30f);
         cardStackManager.setMaxDegree(17f);
         cardStackManager.setDirections(Arrays.asList(Direction.Left, Direction.Right, Direction.Top));
@@ -243,16 +253,17 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         locationHelper.ensureLocation(new DatingLocationHelper.Callback() {
             @Override
             public void onSuccess(Location location) {
-                DatingModel.getInstance().updateLocation(location.getLatitude(), location.getLongitude(), "", "",
-                        (code, msg, data) -> {
-                            if (code != HttpResponseCode.success) {
-                                showToast(TextUtils.isEmpty(msg) ? "位置更新失败，请稍后重试" : msg);
-                                return;
-                            }
-                            scope = "nearby";
-                            updateScopeTabs();
-                            reload();
-                        });
+                DatingModel.getInstance().updateLocation(location.getLatitude(), location.getLongitude(), (code, msg, data) -> {
+                    if (code != HttpResponseCode.success) {
+                        showToast(TextUtils.isEmpty(msg) ? "位置更新失败，请稍后重试" : msg);
+                        scope = "global";
+                        updateScopeTabs();
+                        return;
+                    }
+                    scope = "nearby";
+                    updateScopeTabs();
+                    reload();
+                });
             }
 
             @Override
@@ -277,8 +288,46 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             if (data != null) myProfile = data;
             if (myProfile == null && BuildConfig.DEBUG) myProfile = DatingMockData.demoMyProfile();
             actionController.setMyProfile(myProfile);
+            if (myProfile == null) {
+                showLoading(true, TextUtils.isEmpty(msg) ? "资料加载失败，请重试" : msg, true);
+                wkVBinding.retryBtn.setText("重试");
+                return;
+            }
+            if (myProfile.enabled != 1) {
+                profiles.clear();
+                loadedUids.clear();
+                cardAdapter.submitProfiles(profiles);
+                showLoading(true, "先开启交友，才能开始刷人", true);
+                wkVBinding.retryBtn.setText("去开启");
+                return;
+            }
+            wkVBinding.retryBtn.setText("重试");
+            requestInitialLocationThenLoad(resetRecommendation);
+        });
+    }
+
+    private void requestInitialLocationThenLoad(boolean resetRecommendation) {
+        if (initialLocationRequested) {
             if (resetRecommendation) reload();
             else loadMore(true);
+            return;
+        }
+        initialLocationRequested = true;
+        locationHelper.ensureLocation(new DatingLocationHelper.Callback() {
+            @Override
+            public void onSuccess(Location location) {
+                DatingModel.getInstance().updateLocation(location.getLatitude(), location.getLongitude(), (code, msg, data) -> {
+                    if (resetRecommendation) reload();
+                    else loadMore(true);
+                });
+            }
+
+            @Override
+            public void onDenied(String message) {
+                if (!TextUtils.isEmpty(message)) showToast(message);
+                if (resetRecommendation) reload();
+                else loadMore(true);
+            }
         });
     }
 
@@ -482,6 +531,13 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         RecyclerView.ViewHolder holder = wkVBinding.deckView.findViewHolderForAdapterPosition(top);
         if (holder instanceof DatingCardStackAdapter.CardHolder) return ((DatingCardStackAdapter.CardHolder) holder).card;
         return null;
+    }
+
+    private void playSwipeEffect(Direction direction) {
+        if (wkVBinding.swipeFxView == null) return;
+        if (direction == Direction.Right) wkVBinding.swipeFxView.playLike();
+        else if (direction == Direction.Left) wkVBinding.swipeFxView.playPass();
+        else if (direction == Direction.Top) wkVBinding.swipeFxView.playFavorite();
     }
 
     private void updateScopeTabs() {

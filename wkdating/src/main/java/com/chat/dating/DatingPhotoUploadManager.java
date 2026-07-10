@@ -167,6 +167,7 @@ public final class DatingPhotoUploadManager {
         while (value.startsWith("/")) value = value.substring(1);
         if (value.startsWith("file/preview/")) return value;
         if (value.startsWith("common/")) return "file/preview/" + value;
+        if (value.startsWith("profile/")) return "file/preview/common/" + value;
         if (value.startsWith("dating/")) return "file/preview/common/" + value;
         return value;
     }

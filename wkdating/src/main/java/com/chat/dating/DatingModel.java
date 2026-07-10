@@ -66,12 +66,15 @@ public class DatingModel extends WKBaseModel {
         request(createService(DatingService.class).enableProfile(body), listener(callback));
     }
 
+    public void updateLocation(double lat, double lng, final Callback<Object> callback) {
+        updateLocation(lat, lng, "", "", callback);
+    }
+
     public void updateLocation(double lat, double lng, String city, String countryCode, final Callback<Object> callback) {
         Map<String, Object> body = new HashMap<>();
         body.put("lat", lat);
         body.put("lng", lng);
         body.put("city", city == null ? "" : city);
-        body.put("country_code", countryCode == null ? "" : countryCode);
         body.put("source", "android");
         request(createService(DatingService.class).updateLocation(body), listener(callback));
     }
@@ -131,7 +134,7 @@ public class DatingModel extends WKBaseModel {
         String ext = fileExt(localPath);
         String uid = WKConfig.getInstance().getUid();
         if (TextUtils.isEmpty(uid)) uid = "anonymous";
-        String path = "/dating/" + uid + "/photo_" + System.currentTimeMillis() + "_"
+        String path = "/profile/" + uid + "/dating_" + System.currentTimeMillis() + "_"
                 + Math.abs(localPath == null ? 0 : localPath.hashCode()) + "." + ext;
         String url = WKApiConfig.baseUrl + "file/upload?type=common&path=" + path;
         request(createService(ApiService.class).getUploadFileUrl(url), new IRequestResultListener<>() {
@@ -139,7 +142,7 @@ public class DatingModel extends WKBaseModel {
             public void onSuccess(UploadFileUrl result) {
                 DatingUploadUrl out = new DatingUploadUrl();
                 out.url = result == null ? "" : result.url;
-                out.path = path;
+                out.path = "file/preview/common" + path;
                 out.publicUrl = result == null ? "" : result.public_url;
                 if (callback != null) callback.onResult(HttpResponseCode.success, "", out);
             }

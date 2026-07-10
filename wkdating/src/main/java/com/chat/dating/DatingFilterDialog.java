@@ -6,11 +6,10 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-/** 轻量筛选弹窗。筛选值仍保存在 DatingFilter，后端未识别的字段由客户端二次过滤。 */
+/** 筛选弹窗。每个选项都用单选弹窗，不再通过连续点击轮换值。 */
 public final class DatingFilterDialog {
     public interface Callback {
         void onApplied(DatingFilter filter);
@@ -45,36 +44,38 @@ public final class DatingFilterDialog {
         root.addView(age);
         root.addView(goal);
 
-        country.setOnClickListener(v -> {
-            if (DatingFilter.COUNTRY_SMART.equals(draft.countryMode)) draft.countryMode = DatingFilter.COUNTRY_SAME;
-            else if (DatingFilter.COUNTRY_SAME.equals(draft.countryMode)) draft.countryMode = DatingFilter.COUNTRY_FOREIGN;
+        country.setOnClickListener(v -> choose(context, "国家/地区", new String[]{"智能推荐", "只看本国恋", "只看可异国恋"}, countryText(draft.countryMode).replace("国家：", ""), value -> {
+            if ("只看本国恋".equals(value)) draft.countryMode = DatingFilter.COUNTRY_SAME;
+            else if ("只看可异国恋".equals(value)) draft.countryMode = DatingFilter.COUNTRY_FOREIGN;
             else draft.countryMode = DatingFilter.COUNTRY_SMART;
             country.setText(countryText(draft.countryMode));
-        });
-        gender.setOnClickListener(v -> {
-            if ("all".equals(draft.gender)) draft.gender = "female";
-            else if ("female".equals(draft.gender)) draft.gender = "male";
+        }));
+
+        gender.setOnClickListener(v -> choose(context, "性别", new String[]{"不限", "女生", "男生"}, genderText(draft.gender).replace("性别：", ""), value -> {
+            if ("女生".equals(value)) draft.gender = "female";
+            else if ("男生".equals(value)) draft.gender = "male";
             else draft.gender = "all";
             gender.setText(genderText(draft.gender));
-        });
-        age.setOnClickListener(v -> {
-            if (draft.ageMin == 18 && draft.ageMax == 35) {
-                draft.ageMin = 22; draft.ageMax = 35;
-            } else if (draft.ageMin == 22 && draft.ageMax == 35) {
-                draft.ageMin = 18; draft.ageMax = 45;
-            } else if (draft.ageMin == 18 && draft.ageMax == 45) {
-                draft.ageMin = 30; draft.ageMax = 50;
-            } else {
-                draft.ageMin = 18; draft.ageMax = 35;
+        }));
+
+        age.setOnClickListener(v -> choose(context, "年龄", new String[]{"18-28 岁", "18-35 岁", "22-35 岁", "25-40 岁", "30-50 岁", "18-60 岁"}, ageText(draft.ageMin, draft.ageMax).replace("年龄：", ""), value -> {
+            String raw = value.replace(" 岁", "");
+            String[] pair = raw.split("-");
+            if (pair.length == 2) {
+                try {
+                    draft.ageMin = Integer.parseInt(pair[0]);
+                    draft.ageMax = Integer.parseInt(pair[1]);
+                } catch (Exception ignored) {}
             }
             age.setText(ageText(draft.ageMin, draft.ageMax));
-        });
-        goal.setOnClickListener(v -> {
-            if ("love".equals(draft.goal)) draft.goal = "marriage";
-            else if ("marriage".equals(draft.goal)) draft.goal = "all";
+        }));
+
+        goal.setOnClickListener(v -> choose(context, "恋爱意向", new String[]{"认真恋爱", "奔结婚", "不限"}, goalText(draft.goal).replace("意向：", ""), value -> {
+            if ("奔结婚".equals(value)) draft.goal = "marriage";
+            else if ("不限".equals(value)) draft.goal = "all";
             else draft.goal = "love";
             goal.setText(goalText(draft.goal));
-        });
+        }));
 
         AlertDialog dialog = new AlertDialog.Builder(context)
                 .setTitle("筛选偏好")
@@ -88,6 +89,24 @@ public final class DatingFilterDialog {
             if (callback != null) callback.onApplied(draft);
         }));
         dialog.show();
+    }
+
+    private static void choose(Context context, String title, String[] items, String current, ValueCallback callback) {
+        int checked = 0;
+        for (int i = 0; i < items.length; i++) {
+            if (items[i].equals(current)) {
+                checked = i;
+                break;
+            }
+        }
+        new AlertDialog.Builder(context)
+                .setTitle(title)
+                .setSingleChoiceItems(items, checked, (dialog, which) -> {
+                    if (callback != null) callback.onValue(items[which]);
+                    dialog.dismiss();
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     private static TextView row(Context context, String value) {
@@ -139,5 +158,9 @@ public final class DatingFilterDialog {
 
     private static int dp(Context context, int value) {
         return (int) (value * context.getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private interface ValueCallback {
+        void onValue(String value);
     }
 }
