@@ -264,21 +264,21 @@ public class WordFullscreenActivity extends AppCompatActivity {
         hostParams.setMargins(0, dp(8), 0, 0);
         page.addView(cardHost, hostParams);
 
-        leftBackdrop = backdrop(0xFFFFDCE5);
-        rightBackdrop = backdrop(0xFFD4F8E7);
-        downBackdrop = backdrop(0xFFFFE8A3);
+        leftBackdrop = backdrop(0xFFFFCBD7);
+        rightBackdrop = backdrop(0xFFC9F3DD);
+        downBackdrop = backdrop(0xFFFFE3A0);
         cardHost.addView(leftBackdrop, new FrameLayout.LayoutParams(-1, -1));
         cardHost.addView(rightBackdrop, new FrameLayout.LayoutParams(-1, -1));
         cardHost.addView(downBackdrop, new FrameLayout.LayoutParams(-1, -1));
 
-        leftMark = dragMark(getString(R.string.word_mark_unknown), COLOR_RED);
-        rightMark = dragMark(getString(R.string.word_mark_known), COLOR_GREEN);
+        leftMark = dragMark("← " + getString(R.string.word_mark_unknown), COLOR_RED);
+        rightMark = dragMark(getString(R.string.word_mark_known) + " →", COLOR_GREEN);
         downMark = dragMark(getString(R.string.word_pull_favorite_hint), 0xFFB45309);
-        FrameLayout.LayoutParams leftLp = new FrameLayout.LayoutParams(dp(132), dp(54), Gravity.START | Gravity.CENTER_VERTICAL);
-        leftLp.setMargins(dp(12), 0, 0, 0);
-        FrameLayout.LayoutParams rightLp = new FrameLayout.LayoutParams(dp(132), dp(54), Gravity.END | Gravity.CENTER_VERTICAL);
-        rightLp.setMargins(0, 0, dp(12), 0);
-        FrameLayout.LayoutParams downLp = new FrameLayout.LayoutParams(dp(190), dp(50), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        FrameLayout.LayoutParams leftLp = new FrameLayout.LayoutParams(dp(172), dp(46), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        leftLp.setMargins(0, 0, 0, dp(18));
+        FrameLayout.LayoutParams rightLp = new FrameLayout.LayoutParams(dp(172), dp(46), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        rightLp.setMargins(0, 0, 0, dp(18));
+        FrameLayout.LayoutParams downLp = new FrameLayout.LayoutParams(dp(196), dp(46), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         downLp.setMargins(0, dp(14), 0, 0);
         cardHost.addView(leftMark, leftLp);
         cardHost.addView(rightMark, rightLp);
@@ -350,8 +350,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
         card.addView(backScroll, faceLp);
 
         ratingRow = buildRatingRow();
-        LinearLayout.LayoutParams ratingLp = new LinearLayout.LayoutParams(-1, dp(60));
-        ratingLp.setMargins(0, dp(12), 0, 0);
+        LinearLayout.LayoutParams ratingLp = new LinearLayout.LayoutParams(-1, dp(56));
+        ratingLp.setMargins(0, dp(17), 0, 0);
         page.addView(ratingRow, ratingLp);
     }
 
@@ -395,52 +395,60 @@ public class WordFullscreenActivity extends AppCompatActivity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER);
-        box.setPadding(dp(20), dp(12), dp(20), dp(12));
+        box.setPadding(dp(20), dp(10), dp(20), dp(12));
 
         progressView = label("", 12, COLOR_SUB, false);
         progressView.setGravity(Gravity.CENTER);
         box.addView(progressView, new LinearLayout.LayoutParams(-1, -2));
 
-        box.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 0.55f));
-        wordView = label("", 54, COLOR_TEXT, true);
+        box.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 0.62f));
+
+        wordView = label("", 56, COLOR_TEXT, true);
         wordView.setGravity(Gravity.CENTER);
         box.addView(wordView, new LinearLayout.LayoutParams(-1, -2));
 
         pinyinView = label("", 21, COLOR_BLUE, true);
         pinyinView.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams pyLp = new LinearLayout.LayoutParams(-1, -2);
-        pyLp.setMargins(0, dp(8), 0, 0);
+        pyLp.setMargins(0, dp(9), 0, 0);
         box.addView(pinyinView, pyLp);
 
-        phoneticView = label("", 18, 0xFFB45309, true);
+        phoneticView = label("", 18, 0xFFB36B20, true);
         phoneticView.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams phLp = new LinearLayout.LayoutParams(-1, -2);
         phLp.setMargins(0, dp(7), 0, 0);
         box.addView(phoneticView, phLp);
 
-        TextView tap = label(getString(R.string.word_front_tap), 12, 0xFF94A3B8, false);
+        TextView tap = label(getString(R.string.word_front_tap), 12, 0xFF8C96A8, true);
         tap.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams tapLp = new LinearLayout.LayoutParams(-1, -2);
-        tapLp.setMargins(0, dp(14), 0, 0);
+        tapLp.setMargins(0, dp(17), 0, 0);
         box.addView(tap, tapLp);
 
-        box.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 0.55f));
+        TextView swipeHint = label("← " + getString(R.string.word_mark_unknown)
+                + "        " + getString(R.string.word_mark_known) + " →", 11, 0xFFA1A8B5, false);
+        swipeHint.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams swipeLp = new LinearLayout.LayoutParams(-1, -2);
+        swipeLp.setMargins(0, dp(7), 0, 0);
+        box.addView(swipeHint, swipeLp);
+
+        box.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 0.50f));
 
         LinearLayout tools = new LinearLayout(this);
         tools.setOrientation(LinearLayout.HORIZONTAL);
         tools.setGravity(Gravity.CENTER);
         tools.addView(toolIconButton(ToolIconView.TYPE_SPEAKER, R.string.word_action_tts, v -> speakWord()),
-                new LinearLayout.LayoutParams(dp(42), dp(42)));
-        addGap(tools, 10);
+                new LinearLayout.LayoutParams(dp(38), dp(38)));
+        addGap(tools, 12);
         tools.addView(toolIconButton(ToolIconView.TYPE_SPELLING, R.string.word_action_spelling, v -> speakSpelling()),
-                new LinearLayout.LayoutParams(dp(42), dp(42)));
-        addGap(tools, 10);
+                new LinearLayout.LayoutParams(dp(38), dp(38)));
+        addGap(tools, 12);
         tools.addView(toolIconButton(ToolIconView.TYPE_STROKE, R.string.word_action_stroke, v -> openStroke()),
-                new LinearLayout.LayoutParams(dp(42), dp(42)));
-        addGap(tools, 10);
+                new LinearLayout.LayoutParams(dp(38), dp(38)));
+        addGap(tools, 12);
         tools.addView(toolIconButton(ToolIconView.TYPE_MICROPHONE, R.string.word_action_pronunciation, v -> openPronunciation()),
-                new LinearLayout.LayoutParams(dp(42), dp(42)));
-        box.addView(tools, new LinearLayout.LayoutParams(-1, dp(48)));
+                new LinearLayout.LayoutParams(dp(38), dp(38)));
+        box.addView(tools, new LinearLayout.LayoutParams(-1, dp(42)));
         return box;
     }
 
@@ -448,24 +456,24 @@ public class WordFullscreenActivity extends AppCompatActivity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER);
-        addRating(row, WordFsrsScheduler.Rating.AGAIN, R.string.word_action_unknown, 0xFFFFE7EC, COLOR_RED, 0.62f);
-        addGap(row, 6);
-        addRating(row, WordFsrsScheduler.Rating.HARD, R.string.word_action_hard, 0xFFFFF0D9, 0xFFD97706, 1f);
-        addGap(row, 6);
-        addRating(row, WordFsrsScheduler.Rating.GOOD, R.string.word_action_known, 0xFFE2F7EC, COLOR_GREEN, 1f);
-        addGap(row, 6);
-        addRating(row, WordFsrsScheduler.Rating.EASY, R.string.word_action_easy, 0xFFE7EDFF, COLOR_BRAND, 1f);
+        addRating(row, WordFsrsScheduler.Rating.AGAIN, R.string.word_action_unknown, 0.50f);
+        addGap(row, 8);
+        addRating(row, WordFsrsScheduler.Rating.HARD, R.string.word_action_hard, 0.90f);
+        addGap(row, 8);
+        addRating(row, WordFsrsScheduler.Rating.GOOD, R.string.word_action_known, 0.90f);
+        addGap(row, 8);
+        addRating(row, WordFsrsScheduler.Rating.EASY, R.string.word_action_easy, 0.90f);
+        resetRatingVisuals();
         return row;
     }
 
-    private void addRating(LinearLayout row, WordFsrsScheduler.Rating rating, int titleRes,
-                           int bg, int color, float weight) {
-        TextView button = label("", 13, color, true);
+    private void addRating(LinearLayout row, WordFsrsScheduler.Rating rating, int titleRes, float weight) {
+        TextView button = label("", 12.5f, ratingTextColor(rating), true);
         button.setGravity(Gravity.CENTER);
-        button.setBackground(rounded(bg, dp(15), 0, 0));
+        button.setBackground(rounded(ratingBackgroundColor(rating), dp(13), 0, 0));
         button.setTag(titleRes);
         button.setOnClickListener(v -> onRatingClick(rating));
-        row.addView(button, new LinearLayout.LayoutParams(0, dp(50), weight));
+        row.addView(button, new LinearLayout.LayoutParams(0, dp(46), weight));
         ratingButtons.put(rating, button);
     }
 
@@ -536,11 +544,6 @@ public class WordFullscreenActivity extends AppCompatActivity {
         addSection(backContent, R.string.word_label_antonyms, join(item.antonyms), COLOR_RED);
         addSection(backContent, R.string.word_label_notes, item.notesMy, 0xFFB45309);
 
-        TextView hint = label(getString(R.string.word_back_hint), 11, 0xFF94A3B8, false);
-        hint.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
-        hintLp.setMargins(0, dp(16), 0, dp(6));
-        backContent.addView(hint, hintLp);
     }
 
     private void addCoreMeaning(LinearLayout parent, String partOfSpeech, String meaning) {
@@ -560,7 +563,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         }
 
         if (meaningText.length() > 0) {
-            TextView content = label(meaningText, 23, COLOR_TEXT, true);
+            TextView content = label(meaningText, 25, COLOR_TEXT, true);
             content.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
             content.setLineSpacing(dp(7), 1.12f);
             row.addView(content, new LinearLayout.LayoutParams(0, -2, 1f));
@@ -628,7 +631,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         View speaker = soundWaveButton();
         speaker.setOnClickListener(v -> LearningTtsBridge.speak(this, item.example,
                 LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_EXAMPLE));
-        heading.addView(speaker, new LinearLayout.LayoutParams(dp(30), dp(30)));
+        heading.addView(speaker, new LinearLayout.LayoutParams(dp(28), dp(28)));
         LinearLayout.LayoutParams headingLp = new LinearLayout.LayoutParams(-1, -2);
         headingLp.setMargins(0, dp(13), 0, 0);
         parent.addView(heading, headingLp);
@@ -696,21 +699,13 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
 
     private void bindRatingAvailability() {
-        for (WordFsrsScheduler.Rating rating : WordFsrsScheduler.Rating.values()) {
-            TextView button = ratingButtons.get(rating);
-            if (button == null) continue;
-            boolean canRateImmediately = !frontFace || rating == WordFsrsScheduler.Rating.AGAIN;
-            button.setAlpha(canRateImmediately ? 1f : 0.72f);
+        for (TextView button : ratingButtons.values()) {
+            if (button != null) button.setAlpha(1f);
         }
     }
 
     private void onRatingClick(WordFsrsScheduler.Rating rating) {
         if (queue.isEmpty()) return;
-        if (frontFace && rating != WordFsrsScheduler.Rating.AGAIN) {
-            flipCard();
-            Toast.makeText(this, R.string.word_check_answer_first, Toast.LENGTH_SHORT).show();
-            return;
-        }
         rateCurrent(rating, false);
     }
 
@@ -759,11 +754,6 @@ public class WordFullscreenActivity extends AppCompatActivity {
             return true;
         }
         if (direction == WordCardContainer.Direction.RIGHT) {
-            if (frontFace) {
-                flipCard();
-                Toast.makeText(this, R.string.word_check_answer_first, Toast.LENGTH_SHORT).show();
-                return false;
-            }
             rateCurrent(WordFsrsScheduler.Rating.GOOD, true);
             return true;
         }
@@ -775,25 +765,35 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void showDrag(WordCardContainer.Direction direction, float progress, boolean crossed) {
-        float alpha = Math.min(1f, Math.max(0.18f, progress));
+        float alpha = Math.min(1f, Math.max(0.14f, progress * 0.92f));
         leftBackdrop.setAlpha(direction == WordCardContainer.Direction.LEFT ? alpha : 0f);
         rightBackdrop.setAlpha(direction == WordCardContainer.Direction.RIGHT ? alpha : 0f);
         downBackdrop.setAlpha(direction == WordCardContainer.Direction.DOWN ? alpha : 0f);
         leftMark.setAlpha(direction == WordCardContainer.Direction.LEFT ? alpha : 0f);
         rightMark.setAlpha(direction == WordCardContainer.Direction.RIGHT ? alpha : 0f);
         downMark.setAlpha(direction == WordCardContainer.Direction.DOWN ? alpha : 0f);
-        if (direction == WordCardContainer.Direction.DOWN) {
+
+        if (direction == WordCardContainer.Direction.LEFT) {
+            leftMark.setText("← " + getString(R.string.word_mark_unknown));
+            highlightRating(WordFsrsScheduler.Rating.AGAIN, progress, crossed);
+        } else if (direction == WordCardContainer.Direction.RIGHT) {
+            rightMark.setText(getString(R.string.word_mark_known) + " →");
+            highlightRating(WordFsrsScheduler.Rating.GOOD, progress, crossed);
+        } else {
+            resetRatingVisuals();
+            WordItem item = current();
+            boolean favorite = item != null && progressStore.isFavorite(item.packId, item.id);
             downMark.setText(crossed
-                    ? getString(progressStore.isFavorite(current().packId, current().id)
-                    ? R.string.word_pull_unfavorite_release : R.string.word_pull_favorite_release)
+                    ? getString(favorite ? R.string.word_pull_unfavorite_release : R.string.word_pull_favorite_release)
                     : getString(R.string.word_pull_favorite_hint));
-        } else if (direction == WordCardContainer.Direction.RIGHT && frontFace) {
-            rightMark.setText(R.string.word_check_answer_first);
         }
+
         if (crossed && !thresholdFeedbackSent) {
             thresholdFeedbackSent = true;
             haptic();
-            try { if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 45); } catch (Throwable ignored) {}
+            try {
+                if (toneGenerator != null) toneGenerator.startTone(ToneGenerator.TONE_PROP_ACK, 45);
+            } catch (Throwable ignored) {}
         } else if (!crossed) {
             thresholdFeedbackSent = false;
         }
@@ -807,9 +807,75 @@ public class WordFullscreenActivity extends AppCompatActivity {
         leftMark.setAlpha(0f);
         rightMark.setAlpha(0f);
         downMark.setAlpha(0f);
-        leftMark.setText(R.string.word_mark_unknown);
-        rightMark.setText(R.string.word_mark_known);
+        leftMark.setText("← " + getString(R.string.word_mark_unknown));
+        rightMark.setText(getString(R.string.word_mark_known) + " →");
         downMark.setText(R.string.word_pull_favorite_hint);
+        resetRatingVisuals();
+    }
+
+    private void highlightRating(WordFsrsScheduler.Rating selected, float progress, boolean crossed) {
+        float strength = Math.min(1f, Math.max(0f, progress));
+        for (WordFsrsScheduler.Rating rating : WordFsrsScheduler.Rating.values()) {
+            TextView button = ratingButtons.get(rating);
+            if (button == null) continue;
+            boolean active = rating == selected;
+            if (active) {
+                int background;
+                int text;
+                if (rating == WordFsrsScheduler.Rating.AGAIN) {
+                    background = crossed ? 0xFFFFBCCB : 0xFFFFD7E0;
+                    text = 0xFFC71545;
+                } else {
+                    background = crossed ? 0xFFBFEED5 : 0xFFD9F6E7;
+                    text = 0xFF047857;
+                }
+                button.setBackground(rounded(background, dp(13), 0, 0));
+                button.setTextColor(text);
+                float scale = 1f + 0.055f * strength;
+                button.setScaleX(scale);
+                button.setScaleY(scale);
+                button.setAlpha(1f);
+            } else {
+                button.setBackground(rounded(ratingBackgroundColor(rating), dp(13), 0, 0));
+                button.setTextColor(ratingTextColor(rating));
+                button.setScaleX(1f);
+                button.setScaleY(1f);
+                button.setAlpha(0.84f);
+            }
+        }
+    }
+
+    private void resetRatingVisuals() {
+        for (WordFsrsScheduler.Rating rating : WordFsrsScheduler.Rating.values()) {
+            TextView button = ratingButtons.get(rating);
+            if (button == null) continue;
+            button.animate().cancel();
+            button.setBackground(rounded(ratingBackgroundColor(rating), dp(13), 0, 0));
+            button.setTextColor(ratingTextColor(rating));
+            button.setScaleX(1f);
+            button.setScaleY(1f);
+            button.setAlpha(1f);
+        }
+    }
+
+    private int ratingBackgroundColor(WordFsrsScheduler.Rating rating) {
+        switch (rating) {
+            case AGAIN: return 0xFFFFE8ED;
+            case HARD: return 0xFFFFF2DE;
+            case GOOD: return 0xFFE3F7ED;
+            case EASY:
+            default: return 0xFFE9EEFF;
+        }
+    }
+
+    private int ratingTextColor(WordFsrsScheduler.Rating rating) {
+        switch (rating) {
+            case AGAIN: return 0xFFD11F4B;
+            case HARD: return 0xFFB96A05;
+            case GOOD: return 0xFF07845D;
+            case EASY:
+            default: return 0xFF4F46E5;
+        }
     }
 
     private void flipCard() {
@@ -996,9 +1062,9 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private View toolIconButton(int type, int descriptionRes, View.OnClickListener listener) {
         ToolIconView view = new ToolIconView(this, type);
         view.setContentDescription(getString(descriptionRes));
-        view.setBackground(rounded(0xFFF4F5F7, dp(22), 0, 0));
+        view.setBackground(rounded(0xFFF1F2F4, dp(19), 0, 0));
         view.setOnClickListener(listener);
-        view.setElevation(dp(1));
+        view.setElevation(0f);
         return view;
     }
 
@@ -1101,8 +1167,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private View soundWaveButton() {
         AudioWaveView view = new AudioWaveView(this);
         view.setContentDescription(getString(R.string.word_action_tts));
-        view.setBackground(rounded(0xFFF0F1F3, dp(15), 0, 0));
-        view.setPadding(dp(3), dp(3), dp(3), dp(3));
+        view.setBackground(rounded(0xFFEFF0F2, dp(14), 0, 0));
+        view.setPadding(dp(2), dp(2), dp(2), dp(2));
         return view;
     }
 
@@ -1178,9 +1244,9 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private TextView dragMark(String text, int color) {
-        TextView view = label(text, 16, color, true);
+        TextView view = label(text, 15, color, true);
         view.setGravity(Gravity.CENTER);
-        view.setBackground(rounded(0xEFFFFFFF, dp(16), 0x24000000, dp(1)));
+        view.setBackground(rounded(0xE8FFFFFF, dp(15), 0x16000000, dp(1)));
         return view;
     }
 
@@ -1210,11 +1276,11 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private GradientDrawable pageBackground() {
         return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFFEAF2FF, 0xFFF7F9FD, 0xFFF4F6FA});
+                new int[]{0xFFEFF5FF, 0xFFF8FAFD, 0xFFF4F6FA});
     }
 
     private GradientDrawable cardBackground() {
-        GradientDrawable drawable = rounded(Color.WHITE, dp(28), 0x1F94A3B8, dp(1));
+        GradientDrawable drawable = rounded(0xFFFEFEFF, dp(27), 0x1894A3B8, dp(1));
         return drawable;
     }
 

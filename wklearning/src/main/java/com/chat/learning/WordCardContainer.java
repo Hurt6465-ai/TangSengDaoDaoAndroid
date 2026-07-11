@@ -3,13 +3,18 @@ package com.chat.learning;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
 
 /**
- * Gesture-owning card container. It intercepts clear horizontal drags on both faces and downward
- * drags on the front only, leaving back-side vertical movement to the ScrollView.
+ * Stable gesture container for the word card.
+ *
+ * The gesture axis is locked once per touch sequence. Horizontal drags are owned by the card on
+ * both faces. A downward drag is owned by the card only on the front face; vertical movement on
+ * the back face is left to the inner ScrollView. Translation uses raw screen coordinates so the
+ * moving view never changes the coordinate system used to calculate the drag distance.
  */
 final class WordCardContainer extends FrameLayout {
     enum Direction { LEFT, RIGHT, DOWN }
@@ -22,22 +27,32 @@ final class WordCardContainer extends FrameLayout {
         void onReset();
     }
 
+    private enum Axis { UNDECIDED, HORIZONTAL, DOWN, CHILD_VERTICAL, REJECTED }
+
     private Listener listener;
     private final int touchSlop;
-    private float downX;
-    private float downY;
-    private float lastDx;
-    private float lastDy;
-    private boolean dragging;
+    private final int minimumFlingVelocity;
+    private int activePointerId = MotionEvent.INVALID_POINTER_ID;
+    private float downRawX;
+    private float downRawY;
+    private float dragX;
+    private float dragY;
+    private Axis axis = Axis.UNDECIDED;
     private Direction direction;
+    private VelocityTracker velocityTracker;
 
-    WordCardContainer(Context context) { this(context, null); }
+    WordCardContainer(Context context) {
+        this(context, null);
+    }
 
     WordCardContainer(Context context, AttributeSet attrs) {
         super(context, attrs);
-        touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+        ViewConfiguration configuration = ViewConfiguration.get(context);
+        touchSlop = configuration.getScaledTouchSlop();
+        minimumFlingVelocity = configuration.getScaledMinimumFlingVelocity();
         setClickable(true);
         setClipChildren(false);
+        setClipToPadding(false);
     }
 
     void setGestureListener(Listener listener) {
@@ -47,124 +62,181 @@ final class WordCardContainer extends FrameLayout {
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
         if (listener == null) return super.onInterceptTouchEvent(event);
-        switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                downX = event.getRawX();
-                downY = event.getRawY();
-                dragging = false;
-                direction = null;
-                lastDx = lastDy = 0f;
-                return false;
-            case MotionEvent.ACTION_MOVE:
-                float dx = event.getRawX() - downX;
-                float dy = event.getRawY() - downY;
-                if (Math.max(Math.abs(dx), Math.abs(dy)) < touchSlop) return false;
-                if (Math.abs(dx) >= Math.abs(dy) * 0.78f) {
-                    dragging = true;
-                    direction = dx < 0 ? Direction.LEFT : Direction.RIGHT;
-                    requestDisallowInterceptTouchEvent(true);
-                    return true;
-                }
-                if (listener.isFrontFace() && dy > 0 && Math.abs(dy) >= Math.abs(dx) * 0.78f) {
-                    dragging = true;
-                    direction = Direction.DOWN;
-                    requestDisallowInterceptTouchEvent(true);
-                    return true;
-                }
-                return false;
-            default:
-                return false;
+
+        final int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            beginGesture(event);
+            return false;
         }
+        if (action == MotionEvent.ACTION_MOVE) {
+            addMovement(event);
+            if (axis == Axis.UNDECIDED) decideAxis(event);
+            return axis == Axis.HORIZONTAL || axis == Axis.DOWN;
+        }
+        if (action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_UP) {
+            recycleVelocityTracker();
+        }
+        return false;
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (listener == null) return super.onTouchEvent(event);
+        addMovement(event);
+
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                downX = event.getRawX();
-                downY = event.getRawY();
-                dragging = false;
-                direction = null;
-                lastDx = lastDy = 0f;
+                beginGesture(event);
                 return true;
+
             case MotionEvent.ACTION_MOVE:
-                float dx = event.getRawX() - downX;
-                float dy = event.getRawY() - downY;
-                lastDx = dx;
-                lastDy = dy;
-                if (!dragging) {
-                    if (Math.max(Math.abs(dx), Math.abs(dy)) < touchSlop) return true;
-                    if (Math.abs(dx) >= Math.abs(dy) * 0.78f) {
-                        dragging = true;
-                        direction = dx < 0 ? Direction.LEFT : Direction.RIGHT;
-                    } else if (listener.isFrontFace() && dy > 0 && Math.abs(dy) >= Math.abs(dx) * 0.78f) {
-                        dragging = true;
-                        direction = Direction.DOWN;
-                    } else {
-                        return false;
-                    }
-                }
-                applyDrag(dx, dy);
+                if (axis == Axis.UNDECIDED) decideAxis(event);
+                if (axis != Axis.HORIZONTAL && axis != Axis.DOWN) return false;
+                updateDrag(event);
                 return true;
+
+            case MotionEvent.ACTION_POINTER_UP:
+                handlePointerUp(event);
+                return true;
+
             case MotionEvent.ACTION_UP:
-                if (!dragging) {
-                    if (Math.hypot(event.getRawX() - downX, event.getRawY() - downY) <= touchSlop * 1.5f) {
-                        listener.onClickCard();
-                    }
-                    return true;
+                if (axis == Axis.HORIZONTAL || axis == Axis.DOWN) {
+                    finishDrag();
+                } else if (axis == Axis.UNDECIDED && distanceFromDown(event) <= touchSlop * 1.5f) {
+                    listener.onClickCard();
+                    clearGesture(false);
+                } else {
+                    clearGesture(false);
                 }
-                finishDrag();
                 return true;
+
             case MotionEvent.ACTION_CANCEL:
                 animateBack();
                 return true;
+
             default:
                 return true;
         }
     }
 
-    private void applyDrag(float dx, float dy) {
-        if (direction == Direction.DOWN) {
-            float y = Math.max(0f, dy);
-            setTranslationY(y);
-            setTranslationX(0f);
-            setRotation(0f);
-            float threshold = Math.max(dp(46), getHeight() * 0.10f);
-            float progress = Math.min(1.35f, y / threshold);
-            listener.onDrag(direction, progress, progress >= 1f);
-        } else {
-            setTranslationX(dx);
+    private void beginGesture(MotionEvent event) {
+        animate().cancel();
+        activePointerId = event.getPointerId(0);
+        downRawX = rawX(event, 0);
+        downRawY = rawY(event, 0);
+        dragX = 0f;
+        dragY = 0f;
+        axis = Axis.UNDECIDED;
+        direction = null;
+        recycleVelocityTracker();
+        velocityTracker = VelocityTracker.obtain();
+        velocityTracker.addMovement(event);
+    }
+
+    private void decideAxis(MotionEvent event) {
+        int index = pointerIndex(event);
+        if (index < 0) return;
+        float dx = rawX(event, index) - downRawX;
+        float dy = rawY(event, index) - downRawY;
+        float absX = Math.abs(dx);
+        float absY = Math.abs(dy);
+        if (Math.max(absX, absY) < touchSlop) return;
+
+        // A clear dominance ratio prevents diagonal movement from switching axes and shaking.
+        final float dominance = 1.18f;
+        if (absX >= absY * dominance) {
+            axis = Axis.HORIZONTAL;
+            direction = dx < 0f ? Direction.LEFT : Direction.RIGHT;
+            getParent().requestDisallowInterceptTouchEvent(true);
+            return;
+        }
+
+        if (absY >= absX * dominance) {
+            if (listener.isFrontFace() && dy > 0f) {
+                axis = Axis.DOWN;
+                direction = Direction.DOWN;
+                getParent().requestDisallowInterceptTouchEvent(true);
+            } else if (!listener.isFrontFace()) {
+                // The back-side ScrollView owns vertical gestures for the rest of this sequence.
+                axis = Axis.CHILD_VERTICAL;
+            } else {
+                axis = Axis.REJECTED;
+            }
+        }
+    }
+
+    private void updateDrag(MotionEvent event) {
+        int index = pointerIndex(event);
+        if (index < 0) return;
+        float dx = rawX(event, index) - downRawX;
+        float dy = rawY(event, index) - downRawY;
+
+        if (axis == Axis.HORIZONTAL) {
+            // Remove the touch slop from the visual distance, avoiding a jump when interception begins.
+            dragX = subtractSlop(dx);
+            dragY = 0f;
+            direction = dragX < 0f ? Direction.LEFT : Direction.RIGHT;
+            setTranslationX(dragX);
             setTranslationY(0f);
             setRotation(0f);
-            float threshold = Math.max(dp(68), getWidth() * 0.26f);
-            float progress = Math.min(1.35f, Math.abs(dx) / threshold);
+            float threshold = horizontalThreshold();
+            float progress = Math.min(1.35f, Math.abs(dragX) / threshold);
             listener.onDrag(direction, progress, progress >= 1f);
+        } else if (axis == Axis.DOWN) {
+            dragY = Math.max(0f, subtractSlop(dy));
+            dragX = 0f;
+            setTranslationX(0f);
+            setTranslationY(dragY);
+            setRotation(0f);
+            float threshold = verticalThreshold();
+            float progress = Math.min(1.35f, dragY / threshold);
+            listener.onDrag(Direction.DOWN, progress, progress >= 1f);
         }
     }
 
     private void finishDrag() {
-        float threshold = direction == Direction.DOWN
-                ? Math.max(dp(46), getHeight() * 0.10f)
-                : Math.max(dp(68), getWidth() * 0.26f);
-        float distance = direction == Direction.DOWN ? Math.max(0f, lastDy) : Math.abs(lastDx);
-        if (distance >= threshold && listener.onCommit(direction)) {
+        float velocity = 0f;
+        if (velocityTracker != null) {
+            velocityTracker.computeCurrentVelocity(1000);
+            velocity = axis == Axis.HORIZONTAL
+                    ? velocityTracker.getXVelocity(activePointerId)
+                    : velocityTracker.getYVelocity(activePointerId);
+        }
+
+        float distance = axis == Axis.HORIZONTAL ? Math.abs(dragX) : dragY;
+        float threshold = axis == Axis.HORIZONTAL ? horizontalThreshold() : verticalThreshold();
+        boolean flingMatches = Math.abs(velocity) >= minimumFlingVelocity * 1.35f
+                && (axis != Axis.DOWN || velocity > 0f)
+                && (axis != Axis.HORIZONTAL || Math.signum(velocity) == Math.signum(dragX));
+        boolean commit = distance >= threshold || (distance >= threshold * 0.58f && flingMatches);
+
+        if (commit && direction != null && listener.onCommit(direction)) {
             flyOut(direction);
         } else {
             animateBack();
         }
+        recycleVelocityTracker();
     }
 
     private void flyOut(Direction direction) {
         float targetX = 0f;
         float targetY = 0f;
-        if (direction == Direction.LEFT) targetX = -Math.max(getWidth() * 1.35f, dp(480));
-        if (direction == Direction.RIGHT) targetX = Math.max(getWidth() * 1.35f, dp(480));
-        if (direction == Direction.DOWN) targetY = Math.max(getHeight() * 0.38f, dp(180));
-        animate().translationX(targetX).translationY(targetY)
-                .rotation(direction == Direction.LEFT ? -10f : direction == Direction.RIGHT ? 10f : 0f)
-                .alpha(direction == Direction.DOWN ? 0.92f : 0f)
-                .setDuration(165)
+        float rotation = 0f;
+        if (direction == Direction.LEFT) {
+            targetX = -Math.max(getWidth() * 1.28f, dp(460));
+            rotation = -5f;
+        } else if (direction == Direction.RIGHT) {
+            targetX = Math.max(getWidth() * 1.28f, dp(460));
+            rotation = 5f;
+        } else {
+            targetY = Math.max(getHeight() * 0.34f, dp(160));
+        }
+        animate()
+                .translationX(targetX)
+                .translationY(targetY)
+                .rotation(rotation)
+                .alpha(direction == Direction.DOWN ? 0.94f : 0f)
+                .setDuration(170)
                 .withEndAction(this::resetImmediately)
                 .start();
     }
@@ -175,22 +247,88 @@ final class WordCardContainer extends FrameLayout {
         setTranslationY(0f);
         setRotation(0f);
         setAlpha(1f);
-        dragging = false;
-        direction = null;
+        clearGesture(false);
         if (listener != null) listener.onReset();
     }
 
     private void animateBack() {
-        animate().translationX(0f).translationY(0f).rotation(0f).alpha(1f)
-                .setDuration(150)
+        animate()
+                .translationX(0f)
+                .translationY(0f)
+                .rotation(0f)
+                .alpha(1f)
+                .setDuration(175)
                 .withEndAction(() -> {
-                    dragging = false;
-                    direction = null;
+                    clearGesture(false);
                     if (listener != null) listener.onReset();
-                }).start();
+                })
+                .start();
     }
 
-    private int dp(int value) {
+    private void handlePointerUp(MotionEvent event) {
+        int actionIndex = event.getActionIndex();
+        if (event.getPointerId(actionIndex) != activePointerId) return;
+        int replacement = actionIndex == 0 ? 1 : 0;
+        if (replacement >= event.getPointerCount()) return;
+        activePointerId = event.getPointerId(replacement);
+        downRawX = rawX(event, replacement) - dragX;
+        downRawY = rawY(event, replacement) - dragY;
+    }
+
+    private void clearGesture(boolean notify) {
+        activePointerId = MotionEvent.INVALID_POINTER_ID;
+        dragX = 0f;
+        dragY = 0f;
+        axis = Axis.UNDECIDED;
+        direction = null;
+        recycleVelocityTracker();
+        if (notify && listener != null) listener.onReset();
+    }
+
+    private void addMovement(MotionEvent event) {
+        if (velocityTracker != null) velocityTracker.addMovement(event);
+    }
+
+    private void recycleVelocityTracker() {
+        if (velocityTracker != null) {
+            velocityTracker.recycle();
+            velocityTracker = null;
+        }
+    }
+
+    private int pointerIndex(MotionEvent event) {
+        if (activePointerId == MotionEvent.INVALID_POINTER_ID) return 0;
+        return event.findPointerIndex(activePointerId);
+    }
+
+    private float distanceFromDown(MotionEvent event) {
+        int index = pointerIndex(event);
+        if (index < 0) return Float.MAX_VALUE;
+        return (float) Math.hypot(rawX(event, index) - downRawX, rawY(event, index) - downRawY);
+    }
+
+    private float rawX(MotionEvent event, int pointerIndex) {
+        return event.getRawX() + event.getX(pointerIndex) - event.getX();
+    }
+
+    private float rawY(MotionEvent event, int pointerIndex) {
+        return event.getRawY() + event.getY(pointerIndex) - event.getY();
+    }
+
+    private float subtractSlop(float value) {
+        float magnitude = Math.max(0f, Math.abs(value) - touchSlop);
+        return Math.copySign(magnitude, value);
+    }
+
+    private float horizontalThreshold() {
+        return Math.max(dp(64), getWidth() * 0.245f);
+    }
+
+    private float verticalThreshold() {
+        return Math.max(dp(44), getHeight() * 0.09f);
+    }
+
+    private int dp(float value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
