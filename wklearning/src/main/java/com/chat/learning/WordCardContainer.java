@@ -49,15 +49,15 @@ final class WordCardContainer extends FrameLayout {
         if (listener == null) return super.onInterceptTouchEvent(event);
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                downX = event.getX();
-                downY = event.getY();
+                downX = event.getRawX();
+                downY = event.getRawY();
                 dragging = false;
                 direction = null;
                 lastDx = lastDy = 0f;
                 return false;
             case MotionEvent.ACTION_MOVE:
-                float dx = event.getX() - downX;
-                float dy = event.getY() - downY;
+                float dx = event.getRawX() - downX;
+                float dy = event.getRawY() - downY;
                 if (Math.max(Math.abs(dx), Math.abs(dy)) < touchSlop) return false;
                 if (Math.abs(dx) >= Math.abs(dy) * 0.78f) {
                     dragging = true;
@@ -82,15 +82,15 @@ final class WordCardContainer extends FrameLayout {
         if (listener == null) return super.onTouchEvent(event);
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                downX = event.getX();
-                downY = event.getY();
+                downX = event.getRawX();
+                downY = event.getRawY();
                 dragging = false;
                 direction = null;
                 lastDx = lastDy = 0f;
                 return true;
             case MotionEvent.ACTION_MOVE:
-                float dx = event.getX() - downX;
-                float dy = event.getY() - downY;
+                float dx = event.getRawX() - downX;
+                float dy = event.getRawY() - downY;
                 lastDx = dx;
                 lastDy = dy;
                 if (!dragging) {
@@ -109,7 +109,7 @@ final class WordCardContainer extends FrameLayout {
                 return true;
             case MotionEvent.ACTION_UP:
                 if (!dragging) {
-                    if (Math.hypot(event.getX() - downX, event.getY() - downY) <= touchSlop * 1.5f) {
+                    if (Math.hypot(event.getRawX() - downX, event.getRawY() - downY) <= touchSlop * 1.5f) {
                         listener.onClickCard();
                     }
                     return true;
@@ -136,7 +136,7 @@ final class WordCardContainer extends FrameLayout {
         } else {
             setTranslationX(dx);
             setTranslationY(0f);
-            setRotation(5.5f * dx / Math.max(1f, getWidth()));
+            setRotation(0f);
             float threshold = Math.max(dp(68), getWidth() * 0.26f);
             float progress = Math.min(1.35f, Math.abs(dx) / threshold);
             listener.onDrag(direction, progress, progress >= 1f);
@@ -164,7 +164,7 @@ final class WordCardContainer extends FrameLayout {
         animate().translationX(targetX).translationY(targetY)
                 .rotation(direction == Direction.LEFT ? -10f : direction == Direction.RIGHT ? 10f : 0f)
                 .alpha(direction == Direction.DOWN ? 0.92f : 0f)
-                .setDuration(180)
+                .setDuration(165)
                 .withEndAction(this::resetImmediately)
                 .start();
     }
@@ -182,7 +182,7 @@ final class WordCardContainer extends FrameLayout {
 
     private void animateBack() {
         animate().translationX(0f).translationY(0f).rotation(0f).alpha(1f)
-                .setDuration(180)
+                .setDuration(150)
                 .withEndAction(() -> {
                     dragging = false;
                     direction = null;

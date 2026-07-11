@@ -3,7 +3,10 @@ package com.chat.learning;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -426,22 +429,18 @@ public class WordFullscreenActivity extends AppCompatActivity {
         LinearLayout tools = new LinearLayout(this);
         tools.setOrientation(LinearLayout.HORIZONTAL);
         tools.setGravity(Gravity.CENTER);
-        tools.addView(toolBubble(R.string.word_action_tts_short, R.string.word_action_tts,
-                new int[]{0xFF60A5FA, 0xFF22D3EE}, new int[]{0xFFF5FAFF, 0xFFEAF8FF}, v -> speakWord()),
-                new LinearLayout.LayoutParams(dp(48), dp(42)));
+        tools.addView(toolBubble(R.string.word_action_tts_short, R.string.word_action_tts, v -> speakWord()),
+                new LinearLayout.LayoutParams(dp(46), dp(46)));
         addGap(tools, 12);
-        tools.addView(toolBubble(R.string.word_action_spelling_short, R.string.word_action_spelling,
-                new int[]{0xFF8B5CF6, 0xFFEC4899}, new int[]{0xFFFAF7FF, 0xFFFFF4FB}, v -> speakSpelling()),
-                new LinearLayout.LayoutParams(dp(48), dp(42)));
+        tools.addView(toolBubble(R.string.word_action_spelling_short, R.string.word_action_spelling, v -> speakSpelling()),
+                new LinearLayout.LayoutParams(dp(46), dp(46)));
         addGap(tools, 12);
-        tools.addView(toolBubble(R.string.word_action_stroke_short, R.string.word_action_stroke,
-                new int[]{0xFFF59E0B, 0xFFFB7185}, new int[]{0xFFFFFAF0, 0xFFFFF4F2}, v -> openStroke()),
-                new LinearLayout.LayoutParams(dp(48), dp(42)));
+        tools.addView(toolBubble(R.string.word_action_stroke_short, R.string.word_action_stroke, v -> openStroke()),
+                new LinearLayout.LayoutParams(dp(46), dp(46)));
         addGap(tools, 12);
-        tools.addView(toolBubble(R.string.word_action_pronunciation_short, R.string.word_action_pronunciation,
-                new int[]{0xFF10B981, 0xFF22D3EE}, new int[]{0xFFF2FFF9, 0xFFEFFFFF}, v -> openPronunciation()),
-                new LinearLayout.LayoutParams(dp(48), dp(42)));
-        box.addView(tools, new LinearLayout.LayoutParams(-1, dp(50)));
+        tools.addView(toolBubble(R.string.word_action_pronunciation_short, R.string.word_action_pronunciation, v -> openPronunciation()),
+                new LinearLayout.LayoutParams(dp(46), dp(46)));
+        box.addView(tools, new LinearLayout.LayoutParams(-1, dp(54)));
         return box;
     }
 
@@ -449,23 +448,24 @@ public class WordFullscreenActivity extends AppCompatActivity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER);
-        addRating(row, WordFsrsScheduler.Rating.AGAIN, R.string.word_action_unknown, 0xFFFFE7EC, COLOR_RED);
+        addRating(row, WordFsrsScheduler.Rating.AGAIN, R.string.word_action_unknown, 0xFFFFE7EC, COLOR_RED, 0.82f);
         addGap(row, 6);
-        addRating(row, WordFsrsScheduler.Rating.HARD, R.string.word_action_hard, 0xFFFFF0D9, 0xFFD97706);
+        addRating(row, WordFsrsScheduler.Rating.HARD, R.string.word_action_hard, 0xFFFFF0D9, 0xFFD97706, 1f);
         addGap(row, 6);
-        addRating(row, WordFsrsScheduler.Rating.GOOD, R.string.word_action_known, 0xFFE2F7EC, COLOR_GREEN);
+        addRating(row, WordFsrsScheduler.Rating.GOOD, R.string.word_action_known, 0xFFE2F7EC, COLOR_GREEN, 1f);
         addGap(row, 6);
-        addRating(row, WordFsrsScheduler.Rating.EASY, R.string.word_action_easy, 0xFFE7EDFF, COLOR_BRAND);
+        addRating(row, WordFsrsScheduler.Rating.EASY, R.string.word_action_easy, 0xFFE7EDFF, COLOR_BRAND, 1f);
         return row;
     }
 
-    private void addRating(LinearLayout row, WordFsrsScheduler.Rating rating, int titleRes, int bg, int color) {
+    private void addRating(LinearLayout row, WordFsrsScheduler.Rating rating, int titleRes,
+                           int bg, int color, float weight) {
         TextView button = label("", 13, color, true);
         button.setGravity(Gravity.CENTER);
-        button.setBackground(rounded(bg, dp(16), 0x18000000, dp(1)));
+        button.setBackground(rounded(bg, dp(15), 0, 0));
         button.setTag(titleRes);
         button.setOnClickListener(v -> onRatingClick(rating));
-        row.addView(button, new LinearLayout.LayoutParams(0, dp(54), 1f));
+        row.addView(button, new LinearLayout.LayoutParams(0, dp(50), weight));
         ratingButtons.put(rating, button);
     }
 
@@ -544,34 +544,48 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void addCoreMeaning(LinearLayout parent, String partOfSpeech, String meaning) {
-        if ((partOfSpeech == null || partOfSpeech.trim().length() == 0)
-                && (meaning == null || meaning.trim().length() == 0)) return;
+        String posText = partOfSpeechAbbreviation(partOfSpeech);
+        String meaningText = meaning == null ? "" : meaning.trim();
+        if (posText.length() == 0 && meaningText.length() == 0) return;
 
-        LinearLayout heading = new LinearLayout(this);
-        heading.setOrientation(LinearLayout.HORIZONTAL);
-        heading.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
 
-        if (partOfSpeech != null && partOfSpeech.trim().length() > 0) {
-            TextView pos = label(partOfSpeech.trim(), 12, COLOR_BRAND, true);
-            pos.setPadding(dp(8), dp(3), dp(8), dp(3));
-            pos.setBackground(rounded(0xFFF0EFFF, dp(6), 0x225B5BD6, dp(1)));
-            heading.addView(pos, new LinearLayout.LayoutParams(-2, -2));
-
-            TextView dot = label(" · ", 14, 0xFF9CA3AF, true);
-            heading.addView(dot, new LinearLayout.LayoutParams(-2, -2));
+        if (posText.length() > 0) {
+            TextView pos = label(posText, 13, 0xFF7C8392, true);
+            row.addView(pos, new LinearLayout.LayoutParams(-2, -2));
+            if (meaningText.length() > 0) {
+                TextView dot = label(" · ", 14, 0xFF9CA3AF, true);
+                row.addView(dot, new LinearLayout.LayoutParams(-2, -2));
+            }
         }
 
-        TextView title = sectionTitle(getString(R.string.word_core_meaning), COLOR_BRAND);
-        heading.addView(title, new LinearLayout.LayoutParams(-2, -2));
-        parent.addView(heading, new LinearLayout.LayoutParams(-1, -2));
-
-        if (meaning != null && meaning.trim().length() > 0) {
-            TextView content = label(meaning.trim(), 17, COLOR_TEXT, false);
+        if (meaningText.length() > 0) {
+            TextView content = label(meaningText, 18, COLOR_TEXT, true);
             content.setLineSpacing(dp(5), 1.08f);
-            LinearLayout.LayoutParams contentLp = new LinearLayout.LayoutParams(-1, -2);
-            contentLp.setMargins(0, dp(8), 0, 0);
-            parent.addView(content, contentLp);
+            row.addView(content, new LinearLayout.LayoutParams(0, -2, 1f));
         }
+        parent.addView(row, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private String partOfSpeechAbbreviation(String value) {
+        if (value == null) return "";
+        String raw = value.trim();
+        if (raw.length() == 0) return "";
+        String key = raw.toLowerCase(java.util.Locale.ROOT);
+        if (key.equals("noun") || key.equals("n") || key.equals("n.") || raw.equals("名词")) return "n.";
+        if (key.equals("verb") || key.equals("v") || key.equals("v.") || raw.equals("动词")) return "v.";
+        if (key.equals("adjective") || key.equals("adj") || key.equals("adj.") || raw.equals("形容词")) return "adj.";
+        if (key.equals("adverb") || key.equals("adv") || key.equals("adv.") || raw.equals("副词")) return "adv.";
+        if (key.equals("pronoun") || key.equals("pron") || key.equals("pron.") || raw.equals("代词")) return "pron.";
+        if (key.equals("preposition") || key.equals("prep") || key.equals("prep.") || raw.equals("介词")) return "prep.";
+        if (key.equals("conjunction") || key.equals("conj") || key.equals("conj.") || raw.equals("连词")) return "conj.";
+        if (key.equals("particle") || key.equals("part") || key.equals("part.") || raw.equals("助词")) return "part.";
+        if (key.equals("measure") || key.equals("measure_word") || key.equals("mw") || key.equals("mw.") || raw.equals("量词")) return "mw.";
+        if (key.equals("greeting") || raw.equals("问候语")) return "greeting";
+        if (key.equals("phrase") || raw.equals("短语") || raw.equals("固定表达")) return "phrase";
+        return raw;
     }
 
     private void addExampleSection(LinearLayout parent, WordItem item) {
@@ -581,7 +595,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         heading.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = sectionTitle(getString(R.string.word_label_example), COLOR_BLUE);
         heading.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView speaker = soundWaveButton();
+        View speaker = soundWaveButton();
         speaker.setOnClickListener(v -> LearningTtsBridge.speak(this, item.example,
                 LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_EXAMPLE));
         heading.addView(speaker, new LinearLayout.LayoutParams(dp(46), dp(34)));
@@ -949,27 +963,59 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private LinearLayout.LayoutParams weighted() { return new LinearLayout.LayoutParams(0, -1, 1f); }
     private void addGap(LinearLayout row, int width) { row.addView(new View(this), new LinearLayout.LayoutParams(dp(width), 1)); }
 
-    private TextView toolBubble(int shortTitleRes, int descriptionRes, int[] borderColors,
-                                int[] fillColors, View.OnClickListener listener) {
-        TextView view = label(getString(shortTitleRes), 16, COLOR_TEXT, true);
+    private TextView toolBubble(int shortTitleRes, int descriptionRes, View.OnClickListener listener) {
+        TextView view = label(getString(shortTitleRes), 15, 0xFF5F5960, true);
         view.setGravity(Gravity.CENTER);
         view.setContentDescription(getString(descriptionRes));
-        view.setBackground(gradientBorder(borderColors, fillColors, dp(18), dp(1)));
-        view.setElevation(dp(2));
+        view.setBackground(rounded(0xFFFFE9EF, dp(23), 0, 0));
         view.setOnClickListener(listener);
         return view;
     }
 
-    private TextView soundWaveButton() {
-        TextView view = label("▂▅▃", 12, COLOR_PURPLE, true);
-        view.setGravity(Gravity.CENTER);
-        view.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) view.setLetterSpacing(0.04f);
+    private View soundWaveButton() {
+        AudioWaveView view = new AudioWaveView(this);
         view.setContentDescription(getString(R.string.word_action_tts));
-        view.setBackground(gradientBorder(
-                new int[]{0xFF60A5FA, 0xFF8B5CF6},
-                new int[]{0xFFF7FAFF, 0xFFF6F3FF}, dp(13), dp(1)));
+        view.setBackground(rounded(0xFFF1F2F4, dp(17), 0, 0));
         return view;
+    }
+
+    private static final class AudioWaveView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF arc = new RectF();
+
+        AudioWaveView(Context context) {
+            super(context);
+            paint.setColor(0xFF9AA0A8);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(context.getResources().getDisplayMetrics().density * 1.8f);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            setClickable(true);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float d = getResources().getDisplayMetrics().density;
+            float cx = getWidth() * 0.43f;
+            float cy = getHeight() * 0.50f;
+
+            paint.setStyle(Paint.Style.FILL);
+            canvas.drawRoundRect(new RectF(cx - 7f * d, cy - 4f * d, cx - 3f * d, cy + 4f * d),
+                    1.5f * d, 1.5f * d, paint);
+            android.graphics.Path cone = new android.graphics.Path();
+            cone.moveTo(cx - 3f * d, cy - 4f * d);
+            cone.lineTo(cx + 2f * d, cy - 8f * d);
+            cone.lineTo(cx + 2f * d, cy + 8f * d);
+            cone.lineTo(cx - 3f * d, cy + 4f * d);
+            cone.close();
+            canvas.drawPath(cone, paint);
+
+            paint.setStyle(Paint.Style.STROKE);
+            arc.set(cx - 1f * d, cy - 7f * d, cx + 11f * d, cy + 7f * d);
+            canvas.drawArc(arc, -48f, 96f, false, paint);
+            arc.set(cx + 1f * d, cy - 10f * d, cx + 17f * d, cy + 10f * d);
+            canvas.drawArc(arc, -45f, 90f, false, paint);
+        }
     }
 
     private Drawable gradientBorder(int[] borderColors, int[] fillColors, float radius, int width) {
