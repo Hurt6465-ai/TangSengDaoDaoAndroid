@@ -58,7 +58,7 @@
     <string name="word_favorite_removed">已取消收藏</string>
     <string name="word_toast_my_phonetic_on">已显示缅文发音提示</string>
     <string name="word_toast_my_phonetic_off">已隐藏缅文发音提示</string>
-    <string name="word_stroke_todo">笔顺入口已预留，后续接 Hanzi 数据</string>
+    <string name="word_stroke_todo">使用 Hanzi Writer 播放正确笔顺动画</string>
     <string name="word_tts_plugin_missing">TTS 插件未安装或未响应</string>
     <string name="word_menu_show_my_phonetic">显示缅文谐音</string>
     <string name="word_menu_hide_my_phonetic">隐藏缅文谐音</string>
@@ -83,11 +83,11 @@
     <string name="word_tone_3">三声</string>
     <string name="word_tone_4">四声</string>
     <string name="pronunciation_title">发音练习</string>
-    <string name="stroke_title">笔顺</string>
-    <string name="stroke_subtitle">先保留原生全屏入口。接入 HanziWriter 或 makemeahanzi 数据后，可显示笔顺动画和逐笔演示。</string>
-    <string name="stroke_chars_title">逐字练习</string>
-    <string name="stroke_data_missing">当前还没有接入汉字笔顺数据。后续接入数据后，这里会显示笔顺动画和逐笔演示。</string>
-    <string name="stroke_speak_word">朗读这个词</string>
+    <string name="stroke_title">笔顺动画</string>
+    <string name="stroke_subtitle">点击汉字切换，按正确笔画顺序自动播放。某个汉字首次打开需要联网，之后可使用本地缓存。</string>
+    <string name="stroke_chars_title">选择汉字</string>
+    <string name="stroke_data_missing">笔顺数据加载失败，请检查网络后重试。</string>
+    <string name="stroke_speak_word">朗读词语</string>
     <string name="pronunciation_tip">先听标准音和拼读音，再录自己的声音。免费版只做录音对比；安装本地 ASR 插件后可做识别/评分。</string>
     <string name="pronunciation_play_standard">播放标准音</string>
     <string name="pronunciation_play_spelling">播放拼读音</string>
@@ -109,7 +109,7 @@
 
     <string name="word_action_easy">简单</string>
     <string name="word_today_plan">今日安排</string>
-    <string name="word_today_plan_count">复习 %1$d · 队列 %2$d</string>
+    <string name="word_today_plan_count">复习 %1$d · 新词 %2$d</string>
     <string name="word_auto_read_on">自动读 开</string>
     <string name="word_auto_read_off">自动读 关</string>
     <string name="word_core_meaning">核心释义</string>
@@ -119,9 +119,9 @@
     <string name="word_review_minutes">%1$d分钟</string>
     <string name="word_review_months">%1$d个月</string>
     <string name="word_review_years">%1$d年</string>
-    <string name="word_plan_message">今日到期复习：%1$d
-当前学习队列：%2$d
-本组初始单词：%3$d</string>
+    <string name="word_plan_message">本组到期复习：%1$d
+本组新词：%2$d
+当前剩余：%3$d</string>
     <string name="word_tts_settings_hint">请在学习工具或语音插件中设置发音人和语速</string>
     <string name="word_session_complete">本组完成</string>
     <string name="word_session_stats">不认识 %1$d   模糊 %2$d
@@ -131,4 +131,6 @@
     <string name="word_loading_remote">正在下载词库…</string>
     <string name="word_remote_load_failed">词库下载失败，请检查网络或远程地址</string>
     <string name="word_pack_unavailable">词库尚未下载。配置远程静态域名后再进入，或检查本地预览文件。</string>
+    <string name="stroke_replay">重播笔顺</string>
+    <string name="stroke_loading">正在加载笔顺…</string>
 </resources>
