@@ -47,6 +47,7 @@
     <string name="word_label_meaning_en">英文：</string>
     <string name="word_label_example">例句：</string>
     <string name="word_label_usage">场景：</string>
+    <string name="word_label_memory_tip">记忆提示</string>
     <string name="word_label_notes">注意：</string>
     <string name="word_label_synonyms">近义：</string>
     <string name="word_label_antonyms">反义：</string>
@@ -67,7 +68,7 @@
     <string name="word_guide_title">背词操作说明</string>
     <string name="word_guide_body">点击卡片：查看释义
 左滑：不认识，稍后复习
-右滑：认识，按计划复习
+右滑：认识，7 天后再复习
 下拉：加入收藏
 点击模糊：明天复习</string>
     <string name="word_guide_ok">知道了</string>
