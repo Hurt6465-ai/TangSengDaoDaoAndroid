@@ -1,18 +1,18 @@
 package com.chat.learning;
 
 import android.Manifest;
-import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.MediaPlayer;
-import android.media.MediaRecorder;
+import android.os.Build;
 import android.os.Bundle;
-import android.speech.RecognizerIntent;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -23,180 +23,344 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Locale;
 
-/** Google speech recognition plus local recording playback for pronunciation comparison. */
+/** One-tap native speech recognition and recording in a centered translucent popup. */
 public class WordPronunciationActivity extends AppCompatActivity {
     public static final String EXTRA_WORD = "word";
     public static final String EXTRA_PINYIN = "pinyin";
     public static final String EXTRA_SPELLING_TEXT = "spelling_text";
 
     private static final int REQ_RECORD_AUDIO = 3021;
-    private static final int REQ_GOOGLE_RECOGNITION = 3022;
-    private static final int COLOR_BG = 0xFFF5F7FB;
-    private static final int COLOR_TEXT = 0xFF111827;
-    private static final int COLOR_SUB = 0xFF64748B;
-    private static final int COLOR_BLUE = 0xFF2563EB;
-    private static final int COLOR_GREEN = 0xFF059669;
-    private static final int COLOR_RED = 0xFFE11D48;
+    private static final int COLOR_TEXT = 0xFF151922;
+    private static final int COLOR_SUB = 0xFF6B7280;
+    private static final int COLOR_ACCENT = 0xFF6761D7;
+    private static final int COLOR_SOFT = 0xFFF2F3F5;
+    private static final int COLOR_SUCCESS = 0xFF138A63;
 
     private String word;
     private String pinyin;
-    private String spellingText;
-    private File recordFile;
-    private MediaRecorder recorder;
+    private File recordingFile;
     private MediaPlayer player;
-    private boolean recording;
-    private TextView status;
-    private TextView recordButton;
-    private TextView playbackButton;
+    private PronunciationCaptureSession captureSession;
+
+    private LinearLayout panel;
+    private TextView statusView;
+    private TextView partialView;
+    private TextView micButton;
+    private LinearLayout resultGroup;
+    private TextView recognizedView;
+    private TextView matchView;
+    private TextView playMineButton;
+    private boolean practicing;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Window window = getWindow();
-        window.setStatusBarColor(COLOR_BG);
-        window.setNavigationBarColor(COLOR_BG);
-
-        word = getIntent().getStringExtra(EXTRA_WORD);
-        pinyin = getIntent().getStringExtra(EXTRA_PINYIN);
-        spellingText = getIntent().getStringExtra(EXTRA_SPELLING_TEXT);
-        if (word == null || word.length() == 0) word = getString(R.string.word_unknown);
-        if (pinyin == null) pinyin = "";
-        if (spellingText == null || spellingText.length() == 0) spellingText = word;
-        recordFile = new File(getCacheDir(), "word_pronunciation_" + System.currentTimeMillis() + ".m4a");
+        word = safe(getIntent().getStringExtra(EXTRA_WORD), getString(R.string.word_unknown));
+        pinyin = safe(getIntent().getStringExtra(EXTRA_PINYIN), "");
+        configureWindow();
         buildLayout();
     }
 
     @Override
     protected void onDestroy() {
-        stopRecording(false);
+        releaseCapture();
         releasePlayer();
         super.onDestroy();
     }
 
-    private void buildLayout() {
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(COLOR_BG);
-        setContentView(root);
-
-        LinearLayout page = new LinearLayout(this);
-        page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(dp(22), dp(20), dp(22), dp(22));
-        root.addView(page, new FrameLayout.LayoutParams(-1, -1));
-
-        LinearLayout top = new LinearLayout(this);
-        top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setGravity(Gravity.CENTER_VERTICAL);
-        page.addView(top, new LinearLayout.LayoutParams(-1, dp(48)));
-
-        TextView back = text("‹", 32, COLOR_TEXT, true);
-        back.setGravity(Gravity.CENTER);
-        back.setOnClickListener(v -> finish());
-        top.addView(back, new LinearLayout.LayoutParams(dp(44), -1));
-
-        TextView title = text(getString(R.string.pronunciation_title), 18, COLOR_TEXT, true);
-        title.setGravity(Gravity.CENTER_VERTICAL);
-        title.setPadding(dp(8), 0, 0, 0);
-        top.addView(title, new LinearLayout.LayoutParams(0, -1, 1f));
-
-        LinearLayout hero = new LinearLayout(this);
-        hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setGravity(Gravity.CENTER);
-        hero.setPadding(dp(20), dp(24), dp(20), dp(24));
-        hero.setBackground(rounded(0xFFFFFFFF, dp(26), 0xFFE5E7EB, 1));
-        LinearLayout.LayoutParams heroLp = new LinearLayout.LayoutParams(-1, -2);
-        heroLp.setMargins(0, dp(24), 0, dp(16));
-        page.addView(hero, heroLp);
-
-        TextView wordView = text(word, 54, COLOR_TEXT, true);
-        wordView.setGravity(Gravity.CENTER);
-        hero.addView(wordView, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView pinyinView = text(pinyin, 22, COLOR_BLUE, true);
-        pinyinView.setGravity(Gravity.CENTER);
-        pinyinView.setPadding(0, dp(8), 0, 0);
-        hero.addView(pinyinView, new LinearLayout.LayoutParams(-1, -2));
-
-        status = text(getString(R.string.pronunciation_tip), 14, COLOR_SUB, false);
-        status.setGravity(Gravity.CENTER);
-        status.setLineSpacing(dp(4), 1.05f);
-        LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
-        statusLp.setMargins(0, 0, 0, dp(16));
-        page.addView(status, statusLp);
-
-        page.addView(button(getString(R.string.pronunciation_play_standard), COLOR_BLUE, 0xFFEFF6FF,
-                v -> playStandard()), new LinearLayout.LayoutParams(-1, dp(52)));
-        addSpace(page, 10);
-        page.addView(button(getString(R.string.pronunciation_play_spelling), 0xFF7C3AED, 0xFFF5F3FF,
-                v -> playSpelling()), new LinearLayout.LayoutParams(-1, dp(52)));
-        addSpace(page, 10);
-        page.addView(button(getString(R.string.pronunciation_google_recognize), COLOR_TEXT, 0xFFFFFFFF,
-                v -> startGoogleRecognition()), new LinearLayout.LayoutParams(-1, dp(52)));
-        addSpace(page, 10);
-
-        LinearLayout recordRow = new LinearLayout(this);
-        recordRow.setOrientation(LinearLayout.HORIZONTAL);
-        recordRow.setGravity(Gravity.CENTER);
-        recordButton = button(getString(R.string.pronunciation_start_record), COLOR_RED, 0xFFFFEEF2,
-                v -> toggleRecord());
-        recordRow.addView(recordButton, new LinearLayout.LayoutParams(0, dp(52), 1f));
-        addHorizontalSpace(recordRow, 10);
-        playbackButton = button(getString(R.string.pronunciation_play_mine), COLOR_GREEN, 0xFFECFDF5,
-                v -> playMine());
-        playbackButton.setAlpha(0.45f);
-        recordRow.addView(playbackButton, new LinearLayout.LayoutParams(0, dp(52), 1f));
-        page.addView(recordRow, new LinearLayout.LayoutParams(-1, dp(52)));
+    private void configureWindow() {
+        Window window = getWindow();
+        window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        window.setStatusBarColor(Color.TRANSPARENT);
+        window.setNavigationBarColor(Color.TRANSPARENT);
+        window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        attributes.dimAmount = Build.VERSION.SDK_INT >= 31 ? 0.08f : 0.18f;
+        if (Build.VERSION.SDK_INT >= 31) {
+            try {
+                window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
+                attributes.getClass().getMethod("setBlurBehindRadius", int.class)
+                        .invoke(attributes, dp(24));
+            } catch (Throwable ignored) { }
+        }
+        window.setAttributes(attributes);
+        window.setLayout(WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT);
     }
 
-    private TextView button(String label, int fg, int bg, View.OnClickListener listener) {
-        TextView view = text(label, 15, fg, true);
-        view.setGravity(Gravity.CENTER);
-        view.setBackground(rounded(bg, dp(17), 0xFFE5E7EB, 1));
-        view.setOnClickListener(listener);
-        return view;
+    private void buildLayout() {
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.TRANSPARENT);
+        root.setClickable(true);
+        root.setOnClickListener(v -> finish());
+        setContentView(root);
+
+        panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_HORIZONTAL);
+        panel.setPadding(dp(22), dp(18), dp(22), dp(20));
+        panel.setBackground(rounded(0xF7FFFFFF, dp(26), 0xCCFFFFFF, dp(1)));
+        panel.setElevation(dp(16));
+        panel.setClickable(true);
+        panel.setOnClickListener(v -> { });
+
+        FrameLayout.LayoutParams panelLp = new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER);
+        panelLp.setMargins(dp(22), dp(24), dp(22), dp(24));
+        root.addView(panel, panelLp);
+
+        FrameLayout header = new FrameLayout(this);
+        panel.addView(header, new LinearLayout.LayoutParams(-1, dp(34)));
+
+        TextView title = text(getString(R.string.pronunciation_title), 17, COLOR_TEXT, true);
+        title.setGravity(Gravity.CENTER);
+        header.addView(title, new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
+
+        TextView close = text("×", 25, COLOR_SUB, false);
+        close.setGravity(Gravity.CENTER);
+        close.setContentDescription(getString(android.R.string.cancel));
+        close.setOnClickListener(v -> finish());
+        header.addView(close, new FrameLayout.LayoutParams(dp(34), dp(34), Gravity.END));
+
+        TextView wordView = text(word, 48, COLOR_TEXT, true);
+        wordView.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams wordLp = new LinearLayout.LayoutParams(-1, -2);
+        wordLp.setMargins(0, dp(12), 0, 0);
+        panel.addView(wordView, wordLp);
+
+        if (!pinyin.isEmpty()) {
+            TextView pinyinView = text(pinyin, 20, COLOR_ACCENT, true);
+            pinyinView.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams pinyinLp = new LinearLayout.LayoutParams(-1, -2);
+            pinyinLp.setMargins(0, dp(3), 0, 0);
+            panel.addView(pinyinView, pinyinLp);
+        }
+
+        TextView original = compactButton("◖))  " + getString(R.string.pronunciation_play_standard),
+                v -> playStandard());
+        LinearLayout.LayoutParams originalLp = new LinearLayout.LayoutParams(-2, dp(38));
+        originalLp.setMargins(0, dp(14), 0, 0);
+        panel.addView(original, originalLp);
+
+        statusView = text(getString(R.string.pronunciation_one_tap_hint), 14, COLOR_SUB, false);
+        statusView.setGravity(Gravity.CENTER);
+        statusView.setLineSpacing(dp(3), 1.05f);
+        LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
+        statusLp.setMargins(0, dp(16), 0, 0);
+        panel.addView(statusView, statusLp);
+
+        partialView = text("", 15, COLOR_TEXT, true);
+        partialView.setGravity(Gravity.CENTER);
+        partialView.setVisibility(View.GONE);
+        LinearLayout.LayoutParams partialLp = new LinearLayout.LayoutParams(-1, -2);
+        partialLp.setMargins(0, dp(6), 0, 0);
+        panel.addView(partialView, partialLp);
+
+        micButton = text("●", 28, Color.WHITE, true);
+        micButton.setGravity(Gravity.CENTER);
+        micButton.setBackground(rounded(COLOR_ACCENT, dp(34), 0, 0));
+        micButton.setContentDescription(getString(R.string.pronunciation_start_once));
+        micButton.setOnClickListener(v -> {
+            if (practicing) stopPractice();
+            else ensurePermissionAndStart();
+        });
+        LinearLayout.LayoutParams micLp = new LinearLayout.LayoutParams(dp(68), dp(68));
+        micLp.gravity = Gravity.CENTER_HORIZONTAL;
+        micLp.setMargins(0, dp(16), 0, 0);
+        panel.addView(micButton, micLp);
+
+        TextView micCaption = text(getString(R.string.pronunciation_start_once), 13, COLOR_SUB, true);
+        micCaption.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams captionLp = new LinearLayout.LayoutParams(-1, -2);
+        captionLp.setMargins(0, dp(7), 0, 0);
+        panel.addView(micCaption, captionLp);
+
+        resultGroup = new LinearLayout(this);
+        resultGroup.setOrientation(LinearLayout.VERTICAL);
+        resultGroup.setGravity(Gravity.CENTER_HORIZONTAL);
+        resultGroup.setVisibility(View.GONE);
+        LinearLayout.LayoutParams resultLp = new LinearLayout.LayoutParams(-1, -2);
+        resultLp.setMargins(0, dp(16), 0, 0);
+        panel.addView(resultGroup, resultLp);
+
+        TextView resultTitle = text(getString(R.string.pronunciation_result_title), 13, COLOR_SUB, true);
+        resultTitle.setGravity(Gravity.CENTER);
+        resultGroup.addView(resultTitle, new LinearLayout.LayoutParams(-1, -2));
+
+        recognizedView = text("", 22, COLOR_TEXT, true);
+        recognizedView.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams recognizedLp = new LinearLayout.LayoutParams(-1, -2);
+        recognizedLp.setMargins(0, dp(5), 0, 0);
+        resultGroup.addView(recognizedView, recognizedLp);
+
+        matchView = text("", 29, COLOR_SUCCESS, true);
+        matchView.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams matchLp = new LinearLayout.LayoutParams(-1, -2);
+        matchLp.setMargins(0, dp(5), 0, 0);
+        resultGroup.addView(matchView, matchLp);
+
+        TextView compareHint = text(getString(R.string.pronunciation_compare_hint), 12, COLOR_SUB, false);
+        compareHint.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams compareLp = new LinearLayout.LayoutParams(-1, -2);
+        compareLp.setMargins(0, dp(3), 0, dp(10));
+        resultGroup.addView(compareHint, compareLp);
+
+        LinearLayout compareRow = new LinearLayout(this);
+        compareRow.setOrientation(LinearLayout.HORIZONTAL);
+        compareRow.setGravity(Gravity.CENTER);
+        resultGroup.addView(compareRow, new LinearLayout.LayoutParams(-1, dp(40)));
+
+        TextView playOriginal = compactButton("◖))  " + getString(R.string.pronunciation_original_short),
+                v -> playStandard());
+        compareRow.addView(playOriginal, new LinearLayout.LayoutParams(0, dp(40), 1f));
+        addHorizontalSpace(compareRow, 10);
+        playMineButton = compactButton("▶  " + getString(R.string.pronunciation_mine_short),
+                v -> playMine());
+        compareRow.addView(playMineButton, new LinearLayout.LayoutParams(0, dp(40), 1f));
+
+        TextView retry = text(getString(R.string.pronunciation_try_again), 14, COLOR_ACCENT, true);
+        retry.setGravity(Gravity.CENTER);
+        retry.setBackground(rounded(0xFFF4F3FF, dp(18), 0, 0));
+        retry.setOnClickListener(v -> ensurePermissionAndStart());
+        LinearLayout.LayoutParams retryLp = new LinearLayout.LayoutParams(-1, dp(40));
+        retryLp.setMargins(0, dp(10), 0, 0);
+        resultGroup.addView(retry, retryLp);
+    }
+
+    private void ensurePermissionAndStart() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.RECORD_AUDIO}, REQ_RECORD_AUDIO);
+            return;
+        }
+        startPractice();
+    }
+
+    private void startPractice() {
+        releaseCapture();
+        releasePlayer();
+        recordingFile = null;
+        practicing = true;
+        resultGroup.setVisibility(View.GONE);
+        partialView.setText("");
+        partialView.setVisibility(View.GONE);
+        statusView.setText(R.string.pronunciation_status_preparing);
+        micButton.setText("■");
+        micButton.setScaleX(1f);
+        micButton.setScaleY(1f);
+        micButton.setAlpha(1f);
+
+        captureSession = new PronunciationCaptureSession(this, word,
+                new PronunciationCaptureSession.Listener() {
+                    @Override public void onStateChanged(PronunciationCaptureSession.State state) {
+                        runOnUiThread(() -> {
+                            if (isFinishing()) return;
+                            if (state == PronunciationCaptureSession.State.LISTENING) {
+                                statusView.setText(R.string.pronunciation_status_recording_and_recognizing);
+                            } else if (state == PronunciationCaptureSession.State.PROCESSING) {
+                                statusView.setText(R.string.pronunciation_status_processing);
+                            }
+                        });
+                    }
+
+                    @Override public void onRms(float rmsDb) {
+                        runOnUiThread(() -> {
+                            if (!practicing || isFinishing()) return;
+                            float normalized = Math.max(0f, Math.min(1f, (rmsDb + 48f) / 42f));
+                            float scale = 1f + normalized * 0.11f;
+                            micButton.animate().scaleX(scale).scaleY(scale).setDuration(70).start();
+                            micButton.setAlpha(0.78f + normalized * 0.22f);
+                        });
+                    }
+
+                    @Override public void onPartialResult(String text) {
+                        runOnUiThread(() -> {
+                            if (text == null || text.isEmpty() || isFinishing()) return;
+                            partialView.setText(text);
+                            partialView.setVisibility(View.VISIBLE);
+                        });
+                    }
+
+                    @Override public void onFinished(PronunciationCaptureSession.Result result) {
+                        runOnUiThread(() -> showResult(result));
+                    }
+                });
+        captureSession.start();
+    }
+
+    private void stopPractice() {
+        if (captureSession != null) captureSession.stop();
+    }
+
+    private void showResult(PronunciationCaptureSession.Result result) {
+        practicing = false;
+        micButton.setText("●");
+        micButton.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(120).start();
+        recordingFile = result == null ? null : result.recordingFile;
+        String recognized = result == null ? "" : safe(result.recognizedText, "");
+        int match = recognized.isEmpty() ? 0 : textMatchPercent(word, recognized);
+
+        partialView.setVisibility(View.GONE);
+        resultGroup.setVisibility(View.VISIBLE);
+        recognizedView.setText(recognized.isEmpty()
+                ? getString(R.string.pronunciation_unrecognized)
+                : recognized);
+        matchView.setText(getString(R.string.pronunciation_match_value, match));
+        matchView.setTextColor(match >= 80 ? COLOR_SUCCESS : match >= 50 ? 0xFFD97706 : 0xFFCA3854);
+        playMineButton.setEnabled(recordingFile != null);
+        playMineButton.setAlpha(recordingFile == null ? 0.42f : 1f);
+        statusView.setText(recognized.isEmpty()
+                ? R.string.pronunciation_recognition_empty
+                : R.string.pronunciation_result_ready);
     }
 
     private void playStandard() {
-        LearningTtsBridge.speak(this, word, LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_WORD);
-        status.setText(getString(R.string.pronunciation_status_standard));
+        LearningTtsBridge.speak(this, word,
+                LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_WORD);
+        statusView.setText(R.string.pronunciation_status_standard);
     }
 
-    private void playSpelling() {
-        LearningTtsBridge.speak(this, spellingText, LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_SPELLING);
-        status.setText(getString(R.string.pronunciation_status_spelling));
-    }
-
-    private void startGoogleRecognition() {
-        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "zh-CN");
-        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.pronunciation_recognition_prompt, word));
-        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
-        try {
-            startActivityForResult(intent, REQ_GOOGLE_RECOGNITION);
-        } catch (Throwable error) {
-            Toast.makeText(this, R.string.pronunciation_google_unavailable, Toast.LENGTH_SHORT).show();
+    private void playMine() {
+        if (recordingFile == null || !recordingFile.isFile() || recordingFile.length() <= 44) {
+            Toast.makeText(this, R.string.pronunciation_no_record, Toast.LENGTH_SHORT).show();
+            return;
         }
+        try {
+            releasePlayer();
+            player = new MediaPlayer();
+            player.setDataSource(recordingFile.getAbsolutePath());
+            player.setOnCompletionListener(mp -> releasePlayer());
+            player.prepare();
+            player.start();
+            statusView.setText(R.string.pronunciation_status_play_mine);
+        } catch (Throwable error) {
+            releasePlayer();
+            Toast.makeText(this, R.string.pronunciation_play_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void releaseCapture() {
+        if (captureSession != null) captureSession.release();
+        captureSession = null;
+        practicing = false;
+    }
+
+    private void releasePlayer() {
+        try { if (player != null) player.release(); } catch (Throwable ignored) { }
+        player = null;
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQ_GOOGLE_RECOGNITION) return;
-        if (resultCode != RESULT_OK || data == null) {
-            status.setText(R.string.pronunciation_recognition_cancelled);
-            return;
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQ_RECORD_AUDIO) return;
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startPractice();
+        } else {
+            Toast.makeText(this, R.string.pronunciation_need_permission, Toast.LENGTH_SHORT).show();
         }
-        ArrayList<String> results = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-        if (results == null || results.isEmpty()) {
-            status.setText(R.string.pronunciation_recognition_empty);
-            return;
-        }
-        String recognized = results.get(0) == null ? "" : results.get(0).trim();
-        int match = textMatchPercent(word, recognized);
-        status.setText(getString(R.string.pronunciation_recognition_result, recognized, match));
     }
 
     private int textMatchPercent(String expected, String actual) {
@@ -205,7 +369,8 @@ public class WordPronunciationActivity extends AppCompatActivity {
         int max = Math.max(left.length, right.length);
         if (max == 0) return 100;
         int distance = levenshtein(left, right);
-        return Math.max(0, Math.min(100, Math.round((1f - distance / (float) max) * 100f)));
+        return Math.max(0, Math.min(100,
+                Math.round((1f - distance / (float) max) * 100f)));
     }
 
     private String normalize(String value) {
@@ -240,7 +405,9 @@ public class WordPronunciationActivity extends AppCompatActivity {
             current[0] = i;
             for (int j = 1; j <= right.length; j++) {
                 int cost = left[i - 1] == right[j - 1] ? 0 : 1;
-                current[j] = Math.min(Math.min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + cost);
+                current[j] = Math.min(
+                        Math.min(current[j - 1] + 1, previous[j] + 1),
+                        previous[j - 1] + cost);
             }
             int[] swap = previous;
             previous = current;
@@ -249,85 +416,13 @@ public class WordPronunciationActivity extends AppCompatActivity {
         return previous[right.length];
     }
 
-    private void toggleRecord() {
-        if (recording) stopRecording(true);
-        else startRecording();
-    }
-
-    private void startRecording() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, REQ_RECORD_AUDIO);
-            return;
-        }
-        try {
-            releasePlayer();
-            recordFile = new File(getCacheDir(), "word_pronunciation_" + System.currentTimeMillis() + ".m4a");
-            recorder = new MediaRecorder();
-            recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
-            recorder.setAudioSamplingRate(16000);
-            recorder.setAudioEncodingBitRate(64000);
-            recorder.setOutputFile(recordFile.getAbsolutePath());
-            recorder.prepare();
-            recorder.start();
-            recording = true;
-            recordButton.setText(getString(R.string.pronunciation_stop_record));
-            status.setText(getString(R.string.pronunciation_status_recording));
-        } catch (Throwable error) {
-            recording = false;
-            cleanupRecorder();
-            Toast.makeText(this, R.string.pronunciation_record_failed, Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void stopRecording(boolean notify) {
-        if (!recording) return;
-        try { recorder.stop(); } catch (Throwable ignored) { }
-        cleanupRecorder();
-        recording = false;
-        recordButton.setText(getString(R.string.pronunciation_start_record));
-        playbackButton.setAlpha(1f);
-        if (notify) status.setText(getString(R.string.pronunciation_status_record_done));
-    }
-
-    private void cleanupRecorder() {
-        try { if (recorder != null) recorder.release(); } catch (Throwable ignored) { }
-        recorder = null;
-    }
-
-    private void playMine() {
-        if (recordFile == null || !recordFile.exists() || recordFile.length() <= 0) {
-            Toast.makeText(this, R.string.pronunciation_no_record, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        try {
-            releasePlayer();
-            player = new MediaPlayer();
-            player.setDataSource(recordFile.getAbsolutePath());
-            player.setOnCompletionListener(mp -> releasePlayer());
-            player.prepare();
-            player.start();
-            status.setText(getString(R.string.pronunciation_status_play_mine));
-        } catch (Throwable error) {
-            releasePlayer();
-            Toast.makeText(this, R.string.pronunciation_play_failed, Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void releasePlayer() {
-        try { if (player != null) player.release(); } catch (Throwable ignored) { }
-        player = null;
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQ_RECORD_AUDIO) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) startRecording();
-            else Toast.makeText(this, R.string.pronunciation_need_permission, Toast.LENGTH_SHORT).show();
-        }
+    private TextView compactButton(String label, View.OnClickListener listener) {
+        TextView view = text(label, 13, COLOR_TEXT, true);
+        view.setGravity(Gravity.CENTER);
+        view.setPadding(dp(12), 0, dp(12), 0);
+        view.setBackground(rounded(COLOR_SOFT, dp(19), 0, 0));
+        view.setOnClickListener(listener);
+        return view;
     }
 
     private TextView text(String value, int sp, int color, boolean bold) {
@@ -335,17 +430,14 @@ public class WordPronunciationActivity extends AppCompatActivity {
         view.setText(value);
         view.setTextSize(sp);
         view.setTextColor(color);
+        view.setIncludeFontPadding(false);
         view.setLineSpacing(dp(2), 1f);
         if (bold) view.setTypeface(Typeface.DEFAULT_BOLD);
         return view;
     }
 
-    private void addSpace(LinearLayout parent, int value) {
-        parent.addView(new View(this), new LinearLayout.LayoutParams(1, dp(value)));
-    }
-
-    private void addHorizontalSpace(LinearLayout parent, int value) {
-        parent.addView(new View(this), new LinearLayout.LayoutParams(dp(value), 1));
+    private void addHorizontalSpace(LinearLayout parent, int dp) {
+        parent.addView(new View(this), new LinearLayout.LayoutParams(dp(dp), 1));
     }
 
     private GradientDrawable rounded(int color, float radius, int strokeColor, int strokeWidth) {
@@ -358,5 +450,9 @@ public class WordPronunciationActivity extends AppCompatActivity {
 
     private int dp(float value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private String safe(String value, String fallback) {
+        return value == null || value.trim().isEmpty() ? fallback : value.trim();
     }
 }
