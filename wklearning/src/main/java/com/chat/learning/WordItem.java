@@ -14,6 +14,7 @@ final class WordItem {
     final String partOfSpeech;
     final String meaningMy;
     final String usageSceneMy;
+    final String memoryTip;
     final String example;
     final String examplePinyin;
     final String exampleMy;
@@ -33,6 +34,7 @@ final class WordItem {
             String partOfSpeech,
             String meaningMy,
             String usageSceneMy,
+            String memoryTip,
             String example,
             String examplePinyin,
             String exampleMy,
@@ -50,6 +52,7 @@ final class WordItem {
         this.partOfSpeech = safe(partOfSpeech);
         this.meaningMy = safe(meaningMy);
         this.usageSceneMy = safe(usageSceneMy);
+        this.memoryTip = safe(memoryTip);
         this.example = safe(example);
         this.examplePinyin = safe(examplePinyin);
         this.exampleMy = safe(exampleMy);

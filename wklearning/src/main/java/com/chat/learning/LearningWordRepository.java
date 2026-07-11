@@ -92,6 +92,12 @@ final class LearningWordRepository {
                     translations == null ? "" : translations.optString("my", ""));
             String exampleMy = first(item.optString("example_my", ""),
                     exampleTranslations == null ? "" : exampleTranslations.optString("my", ""));
+            JSONObject memoryTipObject = item.optJSONObject("memory_tip");
+            String memoryTipMy = first(item.optString("memory_tip_my", ""),
+                    memoryTipObject == null ? "" : memoryTipObject.optString("my", ""));
+            String memoryTipZh = first(item.optString("memory_tip_zh", ""),
+                    memoryTipObject == null ? "" : memoryTipObject.optString("zh", ""));
+            String memoryTip = first(memoryTipMy, memoryTipZh);
             String pinyin = PinyinUtils.resolve(word,
                     item.optString("pinyin_override", ""), item.optString("pinyin", ""));
             String exampleText = item.optString("example", "");
@@ -106,6 +112,7 @@ final class LearningWordRepository {
                     first(item.optString("part_of_speech", ""), item.optString("part_of_speech_my", "")),
                     meaningMy,
                     first(item.optString("usage_scene_my", ""), item.optString("usage_scene", "")),
+                    memoryTip,
                     exampleText,
                     examplePinyin,
                     exampleMy,
