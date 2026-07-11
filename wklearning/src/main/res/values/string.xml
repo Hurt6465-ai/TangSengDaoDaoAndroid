@@ -47,7 +47,6 @@
     <string name="word_label_meaning_en">英文：</string>
     <string name="word_label_example">例句：</string>
     <string name="word_label_usage">场景：</string>
-    <string name="word_label_memory_tip">记忆提示</string>
     <string name="word_label_notes">注意：</string>
     <string name="word_label_synonyms">近义：</string>
     <string name="word_label_antonyms">反义：</string>
@@ -116,6 +115,20 @@
     <string name="pronunciation_recognition_empty">没有识别到文字，请再试一次</string>
     <string name="pronunciation_recognition_result">识别：%1$s
 文字匹配：%2$d%%（不是专业发音分）</string>
+
+    <string name="pronunciation_one_tap_hint">点击麦克风后会同时录音和语音识别</string>
+    <string name="pronunciation_start_once">开始跟读</string>
+    <string name="pronunciation_status_preparing">正在准备麦克风…</string>
+    <string name="pronunciation_status_recording_and_recognizing">正在录音并识别，再次点击可结束</string>
+    <string name="pronunciation_status_processing">正在生成结果…</string>
+    <string name="pronunciation_result_title">识别结果</string>
+    <string name="pronunciation_unrecognized">未识别到文字</string>
+    <string name="pronunciation_match_value">文字匹配 %1$d%%</string>
+    <string name="pronunciation_compare_hint">可反复播放原音和我的录音进行对比</string>
+    <string name="pronunciation_original_short">原音</string>
+    <string name="pronunciation_mine_short">我的录音</string>
+    <string name="pronunciation_try_again">再试一次</string>
+    <string name="pronunciation_result_ready">录音和识别已完成</string>
 
     <string name="word_pack_unavailable">词库尚未下载</string>
     <string name="word_loading_remote">正在加载词库…</string>
