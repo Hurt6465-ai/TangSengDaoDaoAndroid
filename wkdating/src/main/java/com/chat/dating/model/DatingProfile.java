@@ -35,6 +35,8 @@ public class DatingProfile implements Serializable {
     public String job;
     public String education;
     public String relationship_status;
+    public String job_status;
+    public String ideal_partner;
     public String sexual_orientation;
     public String drinking;
     public String smoking;
@@ -56,6 +58,10 @@ public class DatingProfile implements Serializable {
     public List<String> tags;
     public List<String> love_tags;
     public List<String> personality_tags;
+    public List<String> pet_tags;
+    public List<String> sport_tags;
+    public List<String> movie_tags;
+    public List<String> dealbreakers;
     public List<String> lifestyle_tags;
     public List<String> interest_tags;
     public List<String> communication_tags;
@@ -132,12 +138,17 @@ public class DatingProfile implements Serializable {
         return list.isEmpty() ? "" : list.get(0);
     }
 
-    public List<String> safePhotos() {
+    public List<String> safeDatingPhotos() {
         ArrayList<String> list = new ArrayList<>();
         appendPhotos(list, photos);
         appendPhotos(list, profile_images);
-        if (list.isEmpty() && !TextUtils.isEmpty(avatar)) list.add(avatar.trim());
         if (list.size() > 5) return new ArrayList<>(list.subList(0, 5));
+        return list;
+    }
+
+    public List<String> safePhotos() {
+        ArrayList<String> list = new ArrayList<>(safeDatingPhotos());
+        if (list.isEmpty() && !TextUtils.isEmpty(avatar)) list.add(avatar.trim());
         return list;
     }
 
@@ -158,12 +169,22 @@ public class DatingProfile implements Serializable {
         ArrayList<String> list = new ArrayList<>();
         addAll(list, love_tags);
         addAll(list, personality_tags);
+        addAll(list, pet_tags);
+        addAll(list, sport_tags);
+        addAll(list, movie_tags);
         addAll(list, lifestyle_tags);
         addAll(list, interest_tags);
         addAll(list, communication_tags);
         addAll(list, tags);
         return dedupe(list);
     }
+
+
+    public List<String> safeDealbreakers() { return clean(dealbreakers); }
+    public List<String> safePersonalityTags() { return clean(personality_tags); }
+    public List<String> safePetTags() { return clean(pet_tags); }
+    public List<String> safeSportTags() { return clean(sport_tags); }
+    public List<String> safeMovieTags() { return clean(movie_tags); }
 
     public List<String> safeNativeLanguages() { return clean(native_languages); }
     public List<String> safeLearningLanguages() { return clean(learning_languages); }
