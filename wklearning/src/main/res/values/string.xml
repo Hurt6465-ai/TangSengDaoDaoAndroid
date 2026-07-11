@@ -52,7 +52,7 @@
     <string name="word_label_antonyms">反义：</string>
     <string name="word_no_example">暂无例句</string>
     <string name="word_toast_unknown">不认识：稍后再复习</string>
-    <string name="word_toast_known">认识：按 FSRS 安排复习</string>
+    <string name="word_toast_known">认识：7 天后再复习</string>
     <string name="word_toast_hard">模糊：明天重点复习</string>
     <string name="word_favorite_added">已收藏</string>
     <string name="word_favorite_removed">已取消收藏</string>
@@ -67,9 +67,9 @@
     <string name="word_guide_title">背词操作说明</string>
     <string name="word_guide_body">点击卡片：查看释义
 左滑：不认识，稍后复习
-右滑：翻面核对后标记认识
+右滑：认识，7 天后再复习
 下拉：加入收藏
-底部四按钮：按记忆程度安排复习</string>
+点击模糊：明天复习</string>
     <string name="word_guide_ok">知道了</string>
     <string name="word_guide_never">不再提示</string>
     <string name="word_review_new">新词</string>
@@ -88,7 +88,9 @@
     <string name="stroke_chars_title">选择汉字</string>
     <string name="stroke_data_missing">笔顺数据加载失败，请检查网络后重试。</string>
     <string name="stroke_speak_word">朗读词语</string>
-    <string name="pronunciation_tip">先听标准音和拼读音，再录自己的声音。免费版只做录音对比；安装本地 ASR 插件后可做识别/评分。</string>
+    <string name="stroke_replay">重播笔顺</string>
+    <string name="stroke_loading">正在加载笔顺…</string>
+    <string name="pronunciation_tip">先听标准音，再使用 Google 语音识别检查文字匹配；也可以录下自己的声音，与标准音反复对比。</string>
     <string name="pronunciation_play_standard">播放标准音</string>
     <string name="pronunciation_play_spelling">播放拼读音</string>
     <string name="pronunciation_start_record">开始录音</string>
@@ -106,31 +108,11 @@
     <string name="pronunciation_no_record">请先录音</string>
     <string name="pronunciation_need_permission">需要麦克风权限才能录音</string>
     <string name="pronunciation_asr_plugin_missing">本地 ASR/评分插件未安装，仅支持录音对比</string>
-
-    <string name="word_action_easy">简单</string>
-    <string name="word_today_plan">今日安排</string>
-    <string name="word_today_plan_count">复习 %1$d · 新词 %2$d</string>
-    <string name="word_auto_read_on">自动读 开</string>
-    <string name="word_auto_read_off">自动读 关</string>
-    <string name="word_core_meaning">核心释义</string>
-    <string name="word_part_of_speech">词性 · %1$s</string>
-    <string name="word_label_collocations">常见搭配</string>
-    <string name="word_check_answer_first">先查看答案</string>
-    <string name="word_review_minutes">%1$d分钟</string>
-    <string name="word_review_months">%1$d个月</string>
-    <string name="word_review_years">%1$d年</string>
-    <string name="word_plan_message">本组到期复习：%1$d
-本组新词：%2$d
-当前剩余：%3$d</string>
-    <string name="word_tts_settings_hint">请在学习工具或语音插件中设置发音人和语速</string>
-    <string name="word_session_complete">本组完成</string>
-    <string name="word_session_stats">不认识 %1$d   模糊 %2$d
-认识 %3$d   简单 %4$d
-学习 %5$d 分钟</string>
-    <string name="word_finish">完成</string>
-    <string name="word_loading_remote">正在下载词库…</string>
-    <string name="word_remote_load_failed">词库下载失败，请检查网络或远程地址</string>
-    <string name="word_pack_unavailable">词库尚未下载。配置远程静态域名后再进入，或检查本地预览文件。</string>
-    <string name="stroke_replay">重播笔顺</string>
-    <string name="stroke_loading">正在加载笔顺…</string>
+    <string name="pronunciation_google_recognize">Google 语音识别</string>
+    <string name="pronunciation_google_unavailable">设备没有可用的 Google/系统语音识别服务</string>
+    <string name="pronunciation_recognition_prompt">请读：%1$s</string>
+    <string name="pronunciation_recognition_cancelled">已取消语音识别</string>
+    <string name="pronunciation_recognition_empty">没有识别到文字，请再试一次</string>
+    <string name="pronunciation_recognition_result">识别：%1$s
+文字匹配：%2$d%%（不是专业发音分）</string>
 </resources>
