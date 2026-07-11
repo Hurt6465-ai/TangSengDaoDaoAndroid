@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="learning_title">Learning</string>
     <string name="learning_subtitle">Choose an AI web page, speaking scenario, or script manager. Official scenarios are bundled first and can be updated later.</string>
@@ -29,7 +29,7 @@
     <string name="word_pull_favorite_release">Release to save</string>
     <string name="word_pull_unfavorite_release">Release to unsave</string>
     <string name="word_front_tap">Tap to see meaning</string>
-    <string name="word_front_hint"></string>
+    <string name="word_front_hint" />
     <string name="word_gesture_hint_short">Swipe left: Again · Swipe right: Known · Pull down: Save</string>
     <string name="word_back_hint">Swipe left: Again · Swipe right: Known</string>
     <string name="word_action_tts">Audio</string>
@@ -112,7 +112,6 @@ Tap Hard: review tomorrow</string>
     <string name="pronunciation_recognition_empty">No speech was recognized. Try again.</string>
     <string name="pronunciation_recognition_result">Recognized: %1$s
 Text match: %2$d%% (not a professional pronunciation score)</string>
-
     <string name="word_pack_unavailable">Word pack is not downloaded</string>
     <string name="word_loading_remote">Loading word pack…</string>
     <string name="word_remote_load_failed">Failed to load the word pack. Try again later.</string>
@@ -132,4 +131,17 @@ Good %3$d
 Easy %4$d
 Time %5$d min</string>
     <string name="word_finish">Finish</string>
+    <string name="pronunciation_compare_hint">Replay the original and your recording to compare</string>
+    <string name="pronunciation_match_value">Text match %1$d%%</string>
+    <string name="pronunciation_mine_short">My recording</string>
+    <string name="pronunciation_one_tap_hint">Tap the microphone to record and recognize at the same time</string>
+    <string name="pronunciation_original_short">Original</string>
+    <string name="pronunciation_result_ready">Recording and recognition complete</string>
+    <string name="pronunciation_result_title">Recognition result</string>
+    <string name="pronunciation_start_once">Start practice</string>
+    <string name="pronunciation_status_preparing">Preparing the microphone…</string>
+    <string name="pronunciation_status_processing">Preparing the result…</string>
+    <string name="pronunciation_status_recording_and_recognizing">Recording and recognizing. Tap again to finish.</string>
+    <string name="pronunciation_try_again">Try again</string>
+    <string name="pronunciation_unrecognized">No text recognized</string>
 </resources>
