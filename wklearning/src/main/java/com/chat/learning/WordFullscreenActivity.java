@@ -429,18 +429,18 @@ public class WordFullscreenActivity extends AppCompatActivity {
         LinearLayout tools = new LinearLayout(this);
         tools.setOrientation(LinearLayout.HORIZONTAL);
         tools.setGravity(Gravity.CENTER);
-        tools.addView(toolBubble(R.string.word_action_tts_short, R.string.word_action_tts, v -> speakWord()),
-                new LinearLayout.LayoutParams(dp(40), dp(40)));
-        addGap(tools, 9);
-        tools.addView(toolBubble(R.string.word_action_spelling_short, R.string.word_action_spelling, v -> speakSpelling()),
-                new LinearLayout.LayoutParams(dp(40), dp(40)));
-        addGap(tools, 9);
-        tools.addView(toolBubble(R.string.word_action_stroke_short, R.string.word_action_stroke, v -> openStroke()),
-                new LinearLayout.LayoutParams(dp(40), dp(40)));
-        addGap(tools, 9);
-        tools.addView(toolBubble(R.string.word_action_pronunciation_short, R.string.word_action_pronunciation, v -> openPronunciation()),
-                new LinearLayout.LayoutParams(dp(40), dp(40)));
-        box.addView(tools, new LinearLayout.LayoutParams(-1, dp(46)));
+        tools.addView(toolIconButton(ToolIconView.TYPE_SPEAKER, R.string.word_action_tts, v -> speakWord()),
+                new LinearLayout.LayoutParams(dp(42), dp(42)));
+        addGap(tools, 10);
+        tools.addView(toolIconButton(ToolIconView.TYPE_SPELLING, R.string.word_action_spelling, v -> speakSpelling()),
+                new LinearLayout.LayoutParams(dp(42), dp(42)));
+        addGap(tools, 10);
+        tools.addView(toolIconButton(ToolIconView.TYPE_STROKE, R.string.word_action_stroke, v -> openStroke()),
+                new LinearLayout.LayoutParams(dp(42), dp(42)));
+        addGap(tools, 10);
+        tools.addView(toolIconButton(ToolIconView.TYPE_MICROPHONE, R.string.word_action_pronunciation, v -> openPronunciation()),
+                new LinearLayout.LayoutParams(dp(42), dp(42)));
+        box.addView(tools, new LinearLayout.LayoutParams(-1, dp(48)));
         return box;
     }
 
@@ -554,17 +554,15 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
         if (posText.length() > 0) {
             TextView pos = label(posText, 13, 0xFF7C8392, true);
-            row.addView(pos, new LinearLayout.LayoutParams(-2, -2));
-            if (meaningText.length() > 0) {
-                TextView dot = label(" · ", 14, 0xFF9CA3AF, true);
-                row.addView(dot, new LinearLayout.LayoutParams(-2, -2));
-            }
+            LinearLayout.LayoutParams posLp = new LinearLayout.LayoutParams(-2, -2);
+            posLp.setMargins(0, dp(3), meaningText.length() > 0 ? dp(10) : 0, 0);
+            row.addView(pos, posLp);
         }
 
         if (meaningText.length() > 0) {
-            TextView content = label(meaningText, 21, COLOR_TEXT, true);
+            TextView content = label(meaningText, 23, COLOR_TEXT, true);
             content.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-            content.setLineSpacing(dp(6), 1.10f);
+            content.setLineSpacing(dp(7), 1.12f);
             row.addView(content, new LinearLayout.LayoutParams(0, -2, 1f));
         }
         parent.addView(row, new LinearLayout.LayoutParams(-1, -2));
@@ -995,13 +993,109 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private LinearLayout.LayoutParams weighted() { return new LinearLayout.LayoutParams(0, -1, 1f); }
     private void addGap(LinearLayout row, int width) { row.addView(new View(this), new LinearLayout.LayoutParams(dp(width), 1)); }
 
-    private TextView toolBubble(int shortTitleRes, int descriptionRes, View.OnClickListener listener) {
-        TextView view = label(getString(shortTitleRes), 13, 0xFF7D8490, true);
-        view.setGravity(Gravity.CENTER);
+    private View toolIconButton(int type, int descriptionRes, View.OnClickListener listener) {
+        ToolIconView view = new ToolIconView(this, type);
         view.setContentDescription(getString(descriptionRes));
-        view.setBackground(rounded(0xFFF3F4F6, dp(20), 0, 0));
+        view.setBackground(rounded(0xFFF4F5F7, dp(22), 0, 0));
         view.setOnClickListener(listener);
+        view.setElevation(dp(1));
         return view;
+    }
+
+    private static final class ToolIconView extends View {
+        static final int TYPE_SPEAKER = 1;
+        static final int TYPE_SPELLING = 2;
+        static final int TYPE_STROKE = 3;
+        static final int TYPE_MICROPHONE = 4;
+
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF rect = new RectF();
+        private final int type;
+
+        ToolIconView(Context context, int type) {
+            super(context);
+            this.type = type;
+            paint.setColor(0xFF6F7681);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            setClickable(true);
+            setFocusable(true);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float d = getResources().getDisplayMetrics().density;
+            float cx = getWidth() / 2f;
+            float cy = getHeight() / 2f;
+            paint.setColor(0xFF6F7681);
+            if (type == TYPE_SPEAKER) {
+                drawSpeaker(canvas, cx, cy, d);
+            } else if (type == TYPE_SPELLING) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+                paint.setTextAlign(Paint.Align.CENTER);
+                paint.setTextSize(15f * d);
+                canvas.drawText("ab", cx, cy - (paint.ascent() + paint.descent()) / 2f, paint);
+            } else if (type == TYPE_STROKE) {
+                drawPen(canvas, cx, cy, d);
+            } else {
+                drawMicrophone(canvas, cx, cy, d);
+            }
+        }
+
+        private void drawSpeaker(Canvas canvas, float cx, float cy, float d) {
+            paint.setStyle(Paint.Style.FILL);
+            rect.set(cx - 8.5f * d, cy - 4f * d, cx - 4.5f * d, cy + 4f * d);
+            canvas.drawRoundRect(rect, 1.2f * d, 1.2f * d, paint);
+            android.graphics.Path cone = new android.graphics.Path();
+            cone.moveTo(cx - 4.5f * d, cy - 4f * d);
+            cone.lineTo(cx + 0.5f * d, cy - 8f * d);
+            cone.lineTo(cx + 0.5f * d, cy + 8f * d);
+            cone.lineTo(cx - 4.5f * d, cy + 4f * d);
+            cone.close();
+            canvas.drawPath(cone, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(1.7f * d);
+            rect.set(cx - 1f * d, cy - 6f * d, cx + 9f * d, cy + 6f * d);
+            canvas.drawArc(rect, -48f, 96f, false, paint);
+            rect.set(cx, cy - 8.5f * d, cx + 12.5f * d, cy + 8.5f * d);
+            canvas.drawArc(rect, -45f, 90f, false, paint);
+        }
+
+        private void drawPen(Canvas canvas, float cx, float cy, float d) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(2f * d);
+            android.graphics.Path body = new android.graphics.Path();
+            body.moveTo(cx - 7f * d, cy + 7f * d);
+            body.lineTo(cx - 4.5f * d, cy + 1.5f * d);
+            body.lineTo(cx + 5.5f * d, cy - 8.5f * d);
+            body.lineTo(cx + 9f * d, cy - 5f * d);
+            body.lineTo(cx - 1f * d, cy + 5f * d);
+            body.close();
+            canvas.drawPath(body, paint);
+            canvas.drawLine(cx - 4.5f * d, cy + 1.5f * d, cx - 1f * d, cy + 5f * d, paint);
+            paint.setStyle(Paint.Style.FILL);
+            android.graphics.Path tip = new android.graphics.Path();
+            tip.moveTo(cx - 7f * d, cy + 7f * d);
+            tip.lineTo(cx - 1f * d, cy + 5f * d);
+            tip.lineTo(cx - 8.5f * d, cy + 8.5f * d);
+            tip.close();
+            canvas.drawPath(tip, paint);
+        }
+
+        private void drawMicrophone(Canvas canvas, float cx, float cy, float d) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(2f * d);
+            rect.set(cx - 4.5f * d, cy - 9f * d, cx + 4.5f * d, cy + 3f * d);
+            canvas.drawRoundRect(rect, 4.5f * d, 4.5f * d, paint);
+            android.graphics.Path cradle = new android.graphics.Path();
+            cradle.moveTo(cx - 8f * d, cy + 0.5f * d);
+            cradle.cubicTo(cx - 8f * d, cy + 7f * d, cx + 8f * d, cy + 7f * d, cx + 8f * d, cy + 0.5f * d);
+            canvas.drawPath(cradle, paint);
+            canvas.drawLine(cx, cy + 7f * d, cx, cy + 11f * d, paint);
+            canvas.drawLine(cx - 4f * d, cy + 11f * d, cx + 4f * d, cy + 11f * d, paint);
+        }
     }
 
     private View soundWaveButton() {

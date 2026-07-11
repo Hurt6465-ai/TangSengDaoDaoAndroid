@@ -3,18 +3,21 @@ package com.chat.learning;
 import android.annotation.SuppressLint;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.HorizontalScrollView;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -36,13 +39,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Full-screen Hanzi Writer stroke animation page.
- *
- * The Hanzi Writer runtime is bundled in assets. Character JSON is fetched from the pinned
- * hanzi-writer-data CDN on first use and then stored in the app's private files directory.
- * No JavaScript bridge is exposed to the page.
- */
+/** Centered Hanzi Writer popup. Tap outside to close. */
 public class WordStrokeActivity extends AppCompatActivity {
     public static final String EXTRA_WORD = "word";
     public static final String EXTRA_PINYIN = "pinyin";
@@ -52,8 +49,6 @@ public class WordStrokeActivity extends AppCompatActivity {
             "https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0.1/";
     private static final int MAX_CHARACTER_DATA_BYTES = 1024 * 1024;
 
-    private static final int COLOR_BG_TOP = 0xFFF8FAFD;
-    private static final int COLOR_BG_BOTTOM = 0xFFF0F4FA;
     private static final int COLOR_TEXT = 0xFF151922;
     private static final int COLOR_SUB = 0xFF747D8A;
     private static final int COLOR_ACCENT = 0xFF7067E8;
@@ -62,63 +57,68 @@ public class WordStrokeActivity extends AppCompatActivity {
     private String pinyin;
     private WebView webView;
     private boolean pageReady;
-    private String selectedCharacter = "";
-    private final List<TextView> characterButtons = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Window window = getWindow();
-        window.setStatusBarColor(COLOR_BG_TOP);
-        window.setNavigationBarColor(COLOR_BG_BOTTOM);
-
         word = safe(getIntent().getStringExtra(EXTRA_WORD), "你");
         pinyin = safe(getIntent().getStringExtra(EXTRA_PINYIN), "");
+        configureWindow();
         buildLayout();
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    private void configureWindow() {
+        Window window = getWindow();
+        window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        window.setStatusBarColor(Color.TRANSPARENT);
+        window.setNavigationBarColor(Color.TRANSPARENT);
+        window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        attributes.dimAmount = 0.48f;
+        window.setAttributes(attributes);
+    }
+
+    @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     private void buildLayout() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(18), dp(20), dp(18));
-        root.setBackground(new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{COLOR_BG_TOP, COLOR_BG_BOTTOM}));
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.TRANSPARENT);
+        root.setClickable(true);
+        root.setOnClickListener(v -> finish());
         setContentView(root);
 
-        TextView title = text(getString(R.string.stroke_title), 22, COLOR_TEXT, true);
-        root.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout popup = new LinearLayout(this);
+        popup.setOrientation(LinearLayout.VERTICAL);
+        popup.setPadding(dp(18), dp(16), dp(18), dp(18));
+        popup.setBackground(rounded(Color.WHITE, dp(24), 0x1F64748B, dp(1)));
+        popup.setElevation(dp(14));
+        popup.setClickable(true);
+        popup.setOnClickListener(v -> { });
 
-        TextView subtitle = text(getString(R.string.stroke_subtitle), 13, COLOR_SUB, false);
-        subtitle.setLineSpacing(dp(3), 1.05f);
-        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(-1, -2);
-        subtitleLp.setMargins(0, dp(6), 0, dp(14));
-        root.addView(subtitle, subtitleLp);
+        FrameLayout.LayoutParams popupLp = new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER);
+        popupLp.setMargins(dp(18), dp(30), dp(18), dp(30));
+        root.addView(popup, popupLp);
 
-        TextView wordView = text(word, 34, COLOR_TEXT, true);
+        FrameLayout header = new FrameLayout(this);
+        TextView wordView = text(word, 27, COLOR_TEXT, true);
         wordView.setGravity(Gravity.CENTER);
-        root.addView(wordView, new LinearLayout.LayoutParams(-1, -2));
+        header.addView(wordView, new FrameLayout.LayoutParams(-1, dp(38), Gravity.CENTER));
+
+        TextView replay = text("↻", 23, COLOR_SUB, true);
+        replay.setGravity(Gravity.CENTER);
+        replay.setContentDescription(getString(R.string.stroke_replay));
+        replay.setBackground(rounded(0xFFF2F3F5, dp(18), 0, 0));
+        replay.setOnClickListener(v -> playAll());
+        FrameLayout.LayoutParams replayLp = new FrameLayout.LayoutParams(dp(36), dp(36), Gravity.END | Gravity.CENTER_VERTICAL);
+        header.addView(replay, replayLp);
+        popup.addView(header, new LinearLayout.LayoutParams(-1, dp(38)));
 
         if (!pinyin.isEmpty()) {
-            TextView pinyinView = text(pinyin, 16, COLOR_ACCENT, true);
+            TextView pinyinView = text(pinyin, 15, COLOR_ACCENT, true);
             pinyinView.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams pinyinLp = new LinearLayout.LayoutParams(-1, -2);
-            pinyinLp.setMargins(0, dp(5), 0, dp(12));
-            root.addView(pinyinView, pinyinLp);
+            pinyinLp.setMargins(0, dp(2), 0, dp(8));
+            popup.addView(pinyinView, pinyinLp);
         }
-
-        HorizontalScrollView scroller = new HorizontalScrollView(this);
-        scroller.setHorizontalScrollBarEnabled(false);
-        LinearLayout chars = new LinearLayout(this);
-        chars.setOrientation(LinearLayout.HORIZONTAL);
-        chars.setGravity(Gravity.CENTER);
-        chars.setPadding(dp(2), 0, dp(2), 0);
-        scroller.addView(chars, new HorizontalScrollView.LayoutParams(-2, dp(42)));
-        LinearLayout.LayoutParams scrollerLp = new LinearLayout.LayoutParams(-1, dp(42));
-        scrollerLp.setMargins(0, 0, 0, dp(12));
-        root.addView(scroller, scrollerLp);
-        populateCharacterButtons(chars);
 
         webView = new WebView(this);
         webView.setBackgroundColor(Color.TRANSPARENT);
@@ -126,6 +126,10 @@ public class WordStrokeActivity extends AppCompatActivity {
         webView.setHorizontalScrollBarEnabled(false);
         webView.setLongClickable(false);
         webView.setOnLongClickListener(v -> true);
+        webView.removeJavascriptInterface("searchBoxJavaBridge_");
+        webView.removeJavascriptInterface("accessibility");
+        webView.removeJavascriptInterface("accessibilityTraversal");
+
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(false);
@@ -136,80 +140,43 @@ public class WordStrokeActivity extends AppCompatActivity {
         settings.setDisplayZoomControls(false);
         settings.setSupportZoom(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+
+        webView.addJavascriptInterface(new StrokeBridge(), "StrokeHost");
         webView.setWebViewClient(new StrokeWebViewClient());
 
-        LinearLayout.LayoutParams webLp = new LinearLayout.LayoutParams(-1, 0, 1f);
-        webLp.setMargins(0, 0, 0, dp(14));
-        root.addView(webView, webLp);
-
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.CENTER);
-
-        TextView replay = actionButton(getString(R.string.stroke_replay), 0xFFF0F1F4, 0xFF5D6570);
-        replay.setOnClickListener(v -> replay());
-        actions.addView(replay, new LinearLayout.LayoutParams(0, dp(46), 1f));
-
-        View gap = new View(this);
-        actions.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
-
-        TextView speak = actionButton(getString(R.string.stroke_speak_word), 0xFFECEBFF, COLOR_ACCENT);
-        speak.setOnClickListener(v -> LearningTtsBridge.speak(
-                this, word, LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_WORD));
-        actions.addView(speak, new LinearLayout.LayoutParams(0, dp(46), 1f));
-        root.addView(actions, new LinearLayout.LayoutParams(-1, dp(46)));
-
+        int count = Math.max(1, extractChineseCharacters(word).size());
+        int webHeight = count <= 1 ? dp(260) : count <= 2 ? dp(220) : count <= 4 ? dp(300) : dp(340);
+        popup.addView(webView, new LinearLayout.LayoutParams(-1, webHeight));
         webView.loadUrl("https://" + LOCAL_HOST + "/stroke.html");
     }
 
-    private void populateCharacterButtons(LinearLayout parent) {
-        List<String> characters = extractChineseCharacters(word);
-        if (characters.isEmpty()) characters.add("你");
-        for (int i = 0; i < characters.size(); i++) {
-            String character = characters.get(i);
-            TextView button = text(character, 20, COLOR_TEXT, true);
-            button.setGravity(Gravity.CENTER);
-            button.setOnClickListener(v -> selectCharacter(character));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(42), dp(42));
-            if (i > 0) lp.setMargins(dp(8), 0, 0, 0);
-            parent.addView(button, lp);
-            characterButtons.add(button);
-        }
-        selectedCharacter = characters.get(0);
-        updateCharacterButtons();
-    }
-
-    private void selectCharacter(String character) {
-        if (character == null || character.isEmpty()) return;
-        selectedCharacter = character;
-        updateCharacterButtons();
-        showSelectedCharacter();
-    }
-
-    private void updateCharacterButtons() {
-        for (TextView button : characterButtons) {
-            boolean selected = selectedCharacter.contentEquals(button.getText());
-            button.setTextColor(selected ? Color.WHITE : COLOR_TEXT);
-            button.setBackground(rounded(
-                    selected ? COLOR_ACCENT : 0xFFFFFFFF,
-                    dp(13), selected ? 0 : 0xFFE3E6EB, selected ? 0 : dp(1)));
-        }
-    }
-
-    private void showSelectedCharacter() {
-        if (!pageReady || webView == null || selectedCharacter.isEmpty()) return;
-        webView.evaluateJavascript(
-                "setCharacter(" + JSONObject.quote(selectedCharacter) + ")", null);
-    }
-
-    private void replay() {
+    private void playAll() {
         if (!pageReady || webView == null) return;
-        webView.evaluateJavascript("replayAnimation()", null);
+        webView.evaluateJavascript("playSequence(0)", null);
+    }
+
+    private void playCharacter(int index) {
+        if (!pageReady || webView == null) return;
+        webView.evaluateJavascript("playCharacter(" + Math.max(0, index) + ")", null);
+    }
+
+    private final class StrokeBridge {
+        @JavascriptInterface
+        public void onCharacterTapped(String character, int index) {
+            if (character == null || character.isEmpty()) return;
+            runOnUiThread(() -> {
+                boolean speaking = LearningTtsBridge.speak(WordStrokeActivity.this, character,
+                        LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_WORD);
+                if (webView != null) webView.postDelayed(
+                        () -> playCharacter(index), speaking ? 650L : 0L);
+            });
+        }
     }
 
     @Override
     protected void onDestroy() {
         if (webView != null) {
+            webView.removeJavascriptInterface("StrokeHost");
             webView.stopLoading();
             webView.loadUrl("about:blank");
             webView.setWebViewClient(null);
@@ -234,8 +201,7 @@ public class WordStrokeActivity extends AppCompatActivity {
                 }
                 if (path.startsWith("/data/") && path.endsWith(".json")) {
                     String encoded = path.substring("/data/".length(), path.length() - ".json".length());
-                    String character = Uri.decode(encoded);
-                    return characterDataResponse(character);
+                    return characterDataResponse(Uri.decode(encoded));
                 }
             } catch (Throwable ignored) {
                 return notFoundResponse();
@@ -250,7 +216,7 @@ public class WordStrokeActivity extends AppCompatActivity {
                 view.evaluateJavascript(
                         "setMessages(" + JSONObject.quote(getString(R.string.stroke_loading))
                                 + "," + JSONObject.quote(getString(R.string.stroke_data_missing)) + ")",
-                        value -> showSelectedCharacter());
+                        value -> view.evaluateJavascript("setWord(" + JSONObject.quote(word) + ")", null));
             }
         }
 
@@ -356,6 +322,7 @@ public class WordStrokeActivity extends AppCompatActivity {
 
     private List<String> extractChineseCharacters(String value) {
         ArrayList<String> result = new ArrayList<>();
+        if (value == null) return result;
         for (int offset = 0; offset < value.length(); ) {
             int codePoint = value.codePointAt(offset);
             if (isChinese(codePoint)) result.add(new String(Character.toChars(codePoint)));
@@ -370,13 +337,6 @@ public class WordStrokeActivity extends AppCompatActivity {
                 || (codePoint >= 0xF900 && codePoint <= 0xFAFF)
                 || (codePoint >= 0x20000 && codePoint <= 0x2EBEF)
                 || (codePoint >= 0x30000 && codePoint <= 0x323AF);
-    }
-
-    private TextView actionButton(String value, int background, int foreground) {
-        TextView view = text(value, 14, foreground, true);
-        view.setGravity(Gravity.CENTER);
-        view.setBackground(rounded(background, dp(15), 0, 0));
-        return view;
     }
 
     private TextView text(String value, int sp, int color, boolean bold) {
