@@ -43,7 +43,6 @@
     <string name="word_label_meaning_en">အင်္ဂလိပ်：</string>
     <string name="word_label_example">ဥပမာ：</string>
     <string name="word_label_usage">အသုံးပြုရာ：</string>
-    <string name="word_label_memory_tip">မှတ်မိရန်</string>
     <string name="word_label_notes">သတိပြုရန်：</string>
     <string name="word_label_synonyms">ဆင်တူ：</string>
     <string name="word_label_antonyms">ဆန့်ကျင်：</string>
@@ -112,6 +111,20 @@
     <string name="pronunciation_recognition_empty">အသံကို မသိရှိနိုင်ပါ။ ထပ်စမ်းပါ။</string>
     <string name="pronunciation_recognition_result">သိရှိသောစာ：%1$s
 စာသားကိုက်ညီမှု：%2$d%%（ပရော်ဖက်ရှင်နယ် အသံထွက်အမှတ် မဟုတ်ပါ）</string>
+
+    <string name="pronunciation_one_tap_hint">မိုက်ခရိုဖုန်းကို နှိပ်လျှင် အသံသွင်းခြင်းနှင့် အသံသိရှိခြင်းကို တစ်ပြိုင်နက် လုပ်မည်</string>
+    <string name="pronunciation_start_once">စတင်လေ့ကျင့်ရန်</string>
+    <string name="pronunciation_status_preparing">မိုက်ခရိုဖုန်း ပြင်ဆင်နေသည်…</string>
+    <string name="pronunciation_status_recording_and_recognizing">အသံသွင်းပြီး သိရှိနေသည်။ ပြီးရန် ထပ်နှိပ်ပါ။</string>
+    <string name="pronunciation_status_processing">ရလဒ် ပြင်ဆင်နေသည်…</string>
+    <string name="pronunciation_result_title">အသံသိရှိမှု ရလဒ်</string>
+    <string name="pronunciation_unrecognized">စာသား မသိရှိနိုင်ပါ</string>
+    <string name="pronunciation_match_value">စာသားကိုက်ညီမှု %1$d%%</string>
+    <string name="pronunciation_compare_hint">မူရင်းအသံနှင့် မိမိအသံကို ပြန်ဖွင့်ပြီး နှိုင်းယှဉ်နိုင်သည်</string>
+    <string name="pronunciation_original_short">မူရင်းအသံ</string>
+    <string name="pronunciation_mine_short">မိမိအသံ</string>
+    <string name="pronunciation_try_again">ထပ်စမ်းရန်</string>
+    <string name="pronunciation_result_ready">အသံသွင်းခြင်းနှင့် သိရှိခြင်း ပြီးပါပြီ</string>
 
     <string name="word_pack_unavailable">စကားလုံးအစုကို မဒေါင်းလုဒ်ရသေးပါ</string>
     <string name="word_loading_remote">စကားလုံးအစုကို တင်နေသည်…</string>
