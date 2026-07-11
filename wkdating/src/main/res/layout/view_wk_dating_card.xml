@@ -3,13 +3,11 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_marginStart="4dp"
-    android:layout_marginTop="0dp"
     android:layout_marginEnd="4dp"
-    android:layout_marginBottom="0dp"
     android:background="@drawable/bg_dating_card_round"
     android:clipChildren="true"
-    android:clipToPadding="true"
-    android:clipToOutline="true">
+    android:clipToOutline="true"
+    android:clipToPadding="true">
 
     <ImageView
         android:id="@+id/photoIv"
@@ -28,27 +26,21 @@
         android:layout_width="54dp"
         android:layout_height="3dp"
         android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="46dp"
+        android:layout_marginTop="92dp"
         android:gravity="center"
         android:orientation="horizontal" />
 
-    <TextView
+    <ImageView
         android:id="@+id/left_overlay"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="84dp"
+        android:layout_height="84dp"
         android:layout_gravity="top|end"
-        android:layout_marginTop="86dp"
+        android:layout_marginTop="126dp"
         android:layout_marginEnd="24dp"
         android:alpha="0"
-        android:rotation="13"
-        android:shadowColor="#99000000"
-        android:shadowDx="0"
-        android:shadowDy="2"
-        android:shadowRadius="8"
-        android:text="NOPE"
-        android:textColor="#FFFF4F6A"
-        android:textSize="31sp"
-        android:textStyle="bold" />
+        android:contentDescription="不喜欢"
+        android:rotation="10"
+        android:src="@drawable/ic_dating_broken_heart_gray" />
 
     <TextView
         android:id="@+id/right_overlay"
@@ -56,7 +48,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
         android:layout_marginStart="24dp"
-        android:layout_marginTop="86dp"
+        android:layout_marginTop="126dp"
         android:alpha="0"
         android:rotation="-13"
         android:shadowColor="#99000000"
@@ -73,7 +65,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="98dp"
+        android:layout_marginTop="138dp"
         android:alpha="0"
         android:shadowColor="#99000000"
         android:shadowDx="0"
@@ -103,14 +95,6 @@
         android:src="@drawable/ic_dating_chevron_up"
         android:tint="#FFFFFFFF" />
 
-    <com.chat.base.ui.components.AvatarView
-        android:id="@+id/avatarView"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="bottom|start"
-        android:layout_marginStart="20dp"
-        android:layout_marginBottom="106dp" />
-
     <LinearLayout
         android:id="@+id/infoPanel"
         android:layout_width="match_parent"
@@ -119,7 +103,7 @@
         android:background="@drawable/bg_dating_top_soft_mask"
         android:gravity="bottom"
         android:orientation="vertical"
-        android:paddingStart="80dp"
+        android:paddingStart="22dp"
         android:paddingTop="68dp"
         android:paddingEnd="62dp"
         android:paddingBottom="106dp">
@@ -143,7 +127,6 @@
             android:id="@+id/metaTv"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="0dp"
             android:ellipsize="end"
             android:includeFontPadding="false"
             android:maxLines="1"

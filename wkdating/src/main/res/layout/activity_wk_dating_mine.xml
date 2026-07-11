@@ -196,32 +196,5 @@
             </LinearLayout>
         </LinearLayout>
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="14dp"
-            android:layout_marginEnd="16dp"
-            android:background="@drawable/bg_dating_detail_card"
-            android:orientation="vertical">
-
-            <LinearLayout style="@style/WkDatingMenuRow">
-                <TextView style="@style/WkDatingMenuIcon" android:text="♪" />
-                <TextView style="@style/WkDatingMenuTitle" android:text="操作音效" />
-                <androidx.appcompat.widget.SwitchCompat
-                    android:id="@+id/soundSwitch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-            <View style="@style/WkDatingDivider" />
-            <LinearLayout style="@style/WkDatingMenuRow">
-                <TextView style="@style/WkDatingMenuIcon" android:text="⌁" />
-                <TextView style="@style/WkDatingMenuTitle" android:text="触感反馈" />
-                <androidx.appcompat.widget.SwitchCompat
-                    android:id="@+id/hapticSwitch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-        </LinearLayout>
     </LinearLayout>
 </ScrollView>

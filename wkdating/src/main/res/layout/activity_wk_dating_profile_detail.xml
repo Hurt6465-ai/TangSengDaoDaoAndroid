@@ -9,7 +9,7 @@
         android:layout_height="match_parent"
         android:clipToPadding="false"
         android:fillViewport="true"
-        android:paddingBottom="108dp">
+        android:paddingBottom="104dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -31,7 +31,7 @@
                     android:layout_height="30dp"
                     android:layout_gravity="bottom|end"
                     android:layout_marginEnd="16dp"
-                    android:layout_marginBottom="22dp"
+                    android:layout_marginBottom="26dp"
                     android:background="@drawable/bg_dating_photo_count"
                     android:gravity="center"
                     android:paddingStart="12dp"
@@ -45,24 +45,20 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_marginTop="-18dp"
-                android:layout_marginEnd="12dp"
-                android:layout_marginBottom="24dp"
+                android:layout_marginTop="-22dp"
+                android:layout_marginBottom="20dp"
                 android:background="@drawable/bg_dating_detail_card"
-                android:elevation="8dp"
                 android:orientation="vertical"
                 android:paddingStart="20dp"
                 android:paddingTop="22dp"
                 android:paddingEnd="20dp"
-                android:paddingBottom="22dp">
+                android:paddingBottom="8dp">
 
                 <TextView
                     android:id="@+id/nameTv"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:includeFontPadding="false"
-                    android:textColor="#FF1F2025"
+                    android:textColor="#FF202026"
                     android:textSize="27sp"
                     android:textStyle="bold" />
 
@@ -70,38 +66,59 @@
                     android:id="@+id/locationTv"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="7dp"
-                    android:textColor="#FF888891"
+                    android:layout_marginTop="6dp"
+                    android:textColor="#FF767681"
                     android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/aboutTitle"
-                    style="@style/WkDatingSectionTitle" />
+                    style="@style/WkDatingDetailTitle"
+                    android:text="关于我" />
 
                 <TextView
                     android:id="@+id/aboutTv"
-                    style="@style/WkDatingSectionBody" />
+                    style="@style/WkDatingDetailBody" />
 
                 <TextView
                     android:id="@+id/loveTitle"
-                    style="@style/WkDatingSectionTitle" />
+                    style="@style/WkDatingDetailTitle"
+                    android:text="恋爱期待" />
 
                 <TextView
                     android:id="@+id/loveTv"
-                    style="@style/WkDatingSectionBody" />
+                    style="@style/WkDatingDetailBody" />
+
+                <TextView
+                    android:id="@+id/idealTitle"
+                    style="@style/WkDatingDetailTitle"
+                    android:text="希望对方" />
+
+                <TextView
+                    android:id="@+id/idealTv"
+                    style="@style/WkDatingDetailBody" />
+
+                <TextView
+                    android:id="@+id/dealbreakersTitle"
+                    style="@style/WkDatingDetailTitle"
+                    android:text="我反感" />
+
+                <TextView
+                    android:id="@+id/dealbreakersTv"
+                    style="@style/WkDatingDetailBody" />
 
                 <TextView
                     android:id="@+id/basicTitle"
-                    style="@style/WkDatingSectionTitle" />
+                    style="@style/WkDatingDetailTitle"
+                    android:text="基本资料" />
 
                 <TextView
                     android:id="@+id/basicTv"
-                    style="@style/WkDatingSectionBody" />
+                    style="@style/WkDatingDetailBody" />
 
                 <TextView
                     android:id="@+id/tagsTitle"
-                    style="@style/WkDatingSectionTitle"
-                    android:text="标签" />
+                    style="@style/WkDatingDetailTitle"
+                    android:text="兴趣与性格" />
 
                 <com.chat.dating.DatingFlowLayout
                     android:id="@+id/tagsLayout"
@@ -149,19 +166,6 @@
             </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-
-    <ImageView
-        android:id="@+id/backBtn"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="top|start"
-        android:layout_marginStart="8dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/bg_dating_icon_glass"
-        android:contentDescription="返回"
-        android:padding="13dp"
-        android:src="@drawable/ic_dating_back"
-        android:tint="#FFFFFFFF" />
 
     <LinearLayout
         android:layout_width="match_parent"

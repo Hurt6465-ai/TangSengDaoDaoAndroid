@@ -23,11 +23,11 @@
     <FrameLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
-        android:layout_height="100dp"
+        android:layout_height="132dp"
         android:layout_gravity="top"
         android:background="@drawable/bg_dating_top_soft_mask"
         android:paddingStart="14dp"
-        android:paddingTop="18dp"
+        android:paddingTop="42dp"
         android:paddingEnd="14dp">
 
         <FrameLayout
@@ -134,18 +134,14 @@
         android:orientation="horizontal"
         android:paddingBottom="18dp">
 
-        <TextView
+        <ImageView
             android:id="@+id/rewindBtn"
             android:layout_width="52dp"
             android:layout_height="52dp"
-            android:background="@drawable/bg_dating_action_rewind"
-            android:elevation="12dp"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:text="↶"
-            android:textColor="#FFFFB64D"
-            android:textSize="29sp"
-            android:textStyle="bold" />
+            android:background="@android:color/transparent"
+            android:contentDescription="撤回"
+            android:padding="8dp"
+            android:src="@drawable/ic_dating_rewind_thick" />
 
         <Space android:layout_width="13dp" android:layout_height="1dp" />
 
