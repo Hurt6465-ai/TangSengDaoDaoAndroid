@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="learning_title">လေ့လာရန်</string>
     <string name="learning_subtitle">AI ဝဘ်စာမျက်နှာ၊ စကားပြောအခြေအနေ သို့မဟုတ် စခရစ်စီမံခန့်ခွဲမှုကို ရွေးပါ။ တရားဝင်အခြေအနေများကို App ထဲတွင် ထည့်သွင်းထားသည်။</string>
@@ -29,7 +29,7 @@
     <string name="word_pull_favorite_release">လွှတ်ပါ သိမ်းမည်</string>
     <string name="word_pull_unfavorite_release">လွှတ်ပါ သိမ်းထားမှု ပယ်ဖျက်မည်</string>
     <string name="word_front_tap">အဓိပ္ပါယ်ကြည့်ရန် နှိပ်ပါ</string>
-    <string name="word_front_hint"></string>
+    <string name="word_front_hint" />
     <string name="word_gesture_hint_short">ဘယ်ဆွဲ = မမှတ်မိ · ညာဆွဲ = မှတ်မိ · အောက်ဆွဲ = သိမ်းရန်</string>
     <string name="word_back_hint">ဘယ်ဆွဲ = မမှတ်မိ · ညာဆွဲ = မှတ်မိ</string>
     <string name="word_action_tts">အသံ</string>
@@ -112,7 +112,6 @@
     <string name="pronunciation_recognition_empty">အသံကို မသိရှိနိုင်ပါ။ ထပ်စမ်းပါ။</string>
     <string name="pronunciation_recognition_result">သိရှိသောစာ：%1$s
 စာသားကိုက်ညီမှု：%2$d%%（ပရော်ဖက်ရှင်နယ် အသံထွက်အမှတ် မဟုတ်ပါ）</string>
-
     <string name="word_pack_unavailable">စကားလုံးအစုကို မဒေါင်းလုဒ်ရသေးပါ</string>
     <string name="word_loading_remote">စကားလုံးအစုကို တင်နေသည်…</string>
     <string name="word_remote_load_failed">စကားလုံးအစု မတင်နိုင်ပါ။ နောက်မှ ထပ်စမ်းပါ။</string>
@@ -132,4 +131,17 @@
 လွယ်ကူ %4$d
 ကြာချိန် %5$d မိနစ်</string>
     <string name="word_finish">ပြီးပါပြီ</string>
+    <string name="pronunciation_compare_hint">မူရင်းအသံနှင့် မိမိအသံကို ပြန်ဖွင့်ပြီး နှိုင်းယှဉ်နိုင်သည်</string>
+    <string name="pronunciation_match_value">စာသားကိုက်ညီမှု %1$d%%</string>
+    <string name="pronunciation_mine_short">မိမိအသံ</string>
+    <string name="pronunciation_one_tap_hint">မိုက်ခရိုဖုန်းကို နှိပ်လျှင် အသံသွင်းခြင်းနှင့် အသံသိရှိခြင်းကို တစ်ပြိုင်နက် လုပ်မည်</string>
+    <string name="pronunciation_original_short">မူရင်းအသံ</string>
+    <string name="pronunciation_result_ready">အသံသွင်းခြင်းနှင့် သိရှိခြင်း ပြီးပါပြီ</string>
+    <string name="pronunciation_result_title">အသံသိရှိမှု ရလဒ်</string>
+    <string name="pronunciation_start_once">စတင်လေ့ကျင့်ရန်</string>
+    <string name="pronunciation_status_preparing">မိုက်ခရိုဖုန်း ပြင်ဆင်နေသည်…</string>
+    <string name="pronunciation_status_processing">ရလဒ် ပြင်ဆင်နေသည်…</string>
+    <string name="pronunciation_status_recording_and_recognizing">အသံသွင်းပြီး သိရှိနေသည်။ ပြီးရန် ထပ်နှိပ်ပါ။</string>
+    <string name="pronunciation_try_again">ထပ်စမ်းရန်</string>
+    <string name="pronunciation_unrecognized">စာသား မသိရှိနိုင်ပါ</string>
 </resources>
