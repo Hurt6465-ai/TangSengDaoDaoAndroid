@@ -43,6 +43,7 @@
     <string name="word_label_meaning_en">English: </string>
     <string name="word_label_example">Example: </string>
     <string name="word_label_usage">Scene: </string>
+    <string name="word_label_memory_tip">Memory tip</string>
     <string name="word_label_notes">Note: </string>
     <string name="word_label_synonyms">Similar: </string>
     <string name="word_label_antonyms">Opposite: </string>
@@ -63,7 +64,7 @@
     <string name="word_guide_title">How to study cards</string>
     <string name="word_guide_body">Tap card: see meaning
 Swipe left: Again, review later
-Swipe right: Known, review on schedule
+Swipe right: Known, review again in 7 days
 Pull down: Save
 Tap Hard: review tomorrow</string>
     <string name="word_guide_ok">Got it</string>
@@ -115,7 +116,7 @@ Text match: %2$d%% (not a professional pronunciation score)</string>
     <string name="word_pack_unavailable">Word pack is not downloaded</string>
     <string name="word_loading_remote">Loading word pack…</string>
     <string name="word_remote_load_failed">Failed to load the word pack. Try again later.</string>
-    <string name="word_today_plan">Today&apos;s plan</string>
+    <string name="word_today_plan">Today’s plan</string>
     <string name="word_action_easy">Easy</string>
     <string name="word_today_plan_count">Review %1$d · New %2$d</string>
     <string name="word_auto_read_on">Auto-read On</string>
