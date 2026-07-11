@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <script src="hanzi-writer.min.js"></script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; margin: 0; background: transparent; overflow: hidden; }
+    body { display: flex; align-items: center; justify-content: center; font-family: sans-serif; }
+    #stage { position: relative; width: min(78vw, 340px); height: min(78vw, 340px); }
+    #grid, #target { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #grid { border: 1px solid #E6E8EC; border-radius: 22px; background: #FFFFFF; overflow: hidden; }
+    .line { position: absolute; background: #EEF0F3; }
+    .v { width: 1px; height: 100%; left: 50%; top: 0; }
+    .h { height: 1px; width: 100%; top: 50%; left: 0; }
+    .d1, .d2 { position: absolute; width: 142%; height: 1px; background: #F2F3F5; left: -21%; top: 50%; transform-origin: center; }
+    .d1 { transform: rotate(45deg); }
+    .d2 { transform: rotate(-45deg); }
+    #loading, #error { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; color: #98A0AA; font-size: 14px; }
+    #error { display: none; color: #8B9098; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div id="grid">
+      <div class="line v"></div><div class="line h"></div><div class="d1"></div><div class="d2"></div>
+    </div>
+    <div id="target"></div>
+    <div id="loading">正在加载笔顺…</div>
+    <div id="error">笔顺数据加载失败</div>
+  </div>
+  <script>
+    let writer = null;
+    let currentCharacter = '';
+
+    function charLoader(char, onComplete, onError) {
+      fetch('data/' + encodeURIComponent(char) + '.json', { cache: 'force-cache' })
+        .then(function(response) {
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          return response.json();
+        })
+        .then(onComplete)
+        .catch(onError);
+    }
+
+    function showState(loading, error) {
+      document.getElementById('loading').style.display = loading ? 'flex' : 'none';
+      document.getElementById('error').style.display = error ? 'flex' : 'none';
+    }
+
+    function setMessages(loadingText, errorText) {
+      if (loadingText) document.getElementById('loading').textContent = loadingText;
+      if (errorText) document.getElementById('error').textContent = errorText;
+    }
+
+    function setCharacter(char) {
+      if (!char) return;
+      currentCharacter = char;
+      showState(true, false);
+      document.getElementById('target').innerHTML = '';
+      writer = HanziWriter.create('target', char, {
+        width: document.getElementById('stage').clientWidth,
+        height: document.getElementById('stage').clientHeight,
+        padding: 28,
+        showOutline: true,
+        showCharacter: false,
+        strokeColor: '#555B66',
+        outlineColor: '#D9DDE4',
+        radicalColor: '#8B7CF6',
+        strokeAnimationSpeed: 1.15,
+        delayBetweenStrokes: 120,
+        charDataLoader: charLoader,
+        onLoadCharDataSuccess: function() {
+          showState(false, false);
+          setTimeout(function() { if (writer) writer.animateCharacter(); }, 80);
+        },
+        onLoadCharDataError: function() {
+          showState(false, true);
+        }
+      });
+    }
+
+    function replayAnimation() {
+      if (!writer) {
+        if (currentCharacter) setCharacter(currentCharacter);
+        return;
+      }
+      showState(false, false);
+      writer.hideCharacter({ duration: 0 });
+      writer.animateCharacter();
+    }
+  </script>
+</body>
+</html>
