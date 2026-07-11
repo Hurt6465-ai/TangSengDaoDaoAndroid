@@ -89,18 +89,12 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
 
     @Override
     public void onBindViewHolder(@NonNull Holder holder, int position) {
-        ViewGroup.LayoutParams rawParams = holder.itemView.getLayoutParams();
-        if (rawParams != null) {
-            // 借鉴 DragRankSquare：第一张主图更高，右侧两张自动叠放，其余照片继续向下排列。
-            rawParams.height = dp(holder.itemView, position == 0 ? 280 : 135);
-            holder.itemView.setLayoutParams(rawParams);
-        }
         boolean occupied = position < photos.size();
         String url = occupied ? photos.get(position) : "";
         holder.binding.photoIv.setVisibility(occupied ? View.VISIBLE : View.GONE);
         holder.binding.addIcon.setVisibility(occupied ? View.GONE : View.VISIBLE);
         holder.binding.deleteBtn.setVisibility(occupied ? View.VISIBLE : View.GONE);
-        holder.binding.mainLabel.setVisibility(position == 0 ? View.VISIBLE : View.GONE);
+        holder.binding.mainLabel.setVisibility(position == 0 && occupied ? View.VISIBLE : View.GONE);
         if (occupied) {
             Glide.with(holder.itemView)
                     .load(DatingImageSource.resolve(holder.itemView.getContext(), url))
@@ -112,7 +106,7 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
         holder.itemView.setOnClickListener(v -> {
             if (occupied) {
                 if (listener != null) listener.onPreviewPhoto(position, url);
-            } else if (position == photos.size() && listener != null) {
+            } else if (listener != null) {
                 listener.onAddPhoto();
             }
         });
@@ -180,10 +174,6 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
         };
     }
 
-
-    private static int dp(View view, int value) {
-        return (int) (value * view.getResources().getDisplayMetrics().density + 0.5f);
-    }
 
     static final class Holder extends RecyclerView.ViewHolder {
         final ItemWkDatingPhotoSlotBinding binding;

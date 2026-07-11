@@ -9,15 +9,17 @@ import android.graphics.Color;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** 右滑/左滑强化动效。 */
+/** 首页滑卡完成后的强化动效。 */
 public class DatingSwipeFxView extends FrameLayout {
     public DatingSwipeFxView(Context context) { super(context); init(); }
     public DatingSwipeFxView(Context context, AttributeSet attrs) { super(context, attrs); init(); }
@@ -29,14 +31,74 @@ public class DatingSwipeFxView extends FrameLayout {
         setClickable(false);
     }
 
-    public void playLike() { playBurst("❤", Color.parseColor("#FF3B6D"), true); }
-    public void playPass() { playBurst("✕", Color.parseColor("#FF566B"), false); }
-    public void playFavorite() { playBurst("★", Color.parseColor("#5D95FF"), true); }
+    public void playLike() {
+        playTextBurst("❤", Color.parseColor("#FF3B6D"), 86, true);
+    }
 
-    private void playBurst(String text, int color, boolean rise) {
+    public void playFavorite() {
+        playTextBurst("★", Color.parseColor("#5D95FF"), 74, true);
+    }
+
+    public void playPass() {
         removeAllViews();
         post(() -> {
-            TextView center = build(text, 84, color, 0.98f);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(dp(96), dp(96), Gravity.CENTER);
+            ImageView center = brokenHeart();
+            addView(center, lp);
+            center.setScaleX(0.28f);
+            center.setScaleY(0.28f);
+            center.setAlpha(0f);
+
+            List<Animator> animators = new ArrayList<>();
+            AnimatorSet core = new AnimatorSet();
+            core.playTogether(
+                    ObjectAnimator.ofFloat(center, View.SCALE_X, 0.28f, 1.15f, 1.7f),
+                    ObjectAnimator.ofFloat(center, View.SCALE_Y, 0.28f, 1.15f, 1.7f),
+                    ObjectAnimator.ofFloat(center, View.ALPHA, 0f, 1f, 0f),
+                    ObjectAnimator.ofFloat(center, View.ROTATION, 0f, -7f, 5f)
+            );
+            core.setDuration(520);
+            core.setInterpolator(new DecelerateInterpolator());
+            animators.add(core);
+
+            int[][] points = new int[][]{
+                    {-118, -74}, {-78, 104}, {-12, -148}, {68, 112}, {126, -62}, {-140, 24}
+            };
+            for (int i = 0; i < points.length; i++) {
+                ImageView child = brokenHeart();
+                FrameLayout.LayoutParams childLp = new FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER);
+                addView(child, childLp);
+                child.setAlpha(0f);
+                child.setScaleX(0.3f);
+                child.setScaleY(0.3f);
+                AnimatorSet item = new AnimatorSet();
+                item.playTogether(
+                        ObjectAnimator.ofFloat(child, View.TRANSLATION_X, 0f, dp(points[i][0])),
+                        ObjectAnimator.ofFloat(child, View.TRANSLATION_Y, 0f, dp(points[i][1])),
+                        ObjectAnimator.ofFloat(child, View.SCALE_X, 0.3f, 1f, 0.72f),
+                        ObjectAnimator.ofFloat(child, View.SCALE_Y, 0.3f, 1f, 0.72f),
+                        ObjectAnimator.ofFloat(child, View.ALPHA, 0f, 0.9f, 0f),
+                        ObjectAnimator.ofFloat(child, View.ROTATION, 0f, (i % 2 == 0 ? -20f : 20f))
+                );
+                item.setStartDelay(i * 42L);
+                item.setDuration(430);
+                item.setInterpolator(new DecelerateInterpolator());
+                animators.add(item);
+            }
+
+            AnimatorSet all = new AnimatorSet();
+            all.playTogether(animators);
+            all.addListener(new AnimatorListenerAdapter() {
+                @Override public void onAnimationEnd(Animator animation) { removeAllViews(); }
+            });
+            all.start();
+        });
+    }
+
+    private void playTextBurst(String text, int color, int centerSp, boolean rise) {
+        removeAllViews();
+        post(() -> {
+            TextView center = buildText(text, centerSp, color);
             LayoutParams lp = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
             addView(center, lp);
             center.setScaleX(0.35f);
@@ -46,9 +108,9 @@ public class DatingSwipeFxView extends FrameLayout {
             List<Animator> list = new ArrayList<>();
             AnimatorSet core = new AnimatorSet();
             core.playTogether(
-                    ObjectAnimator.ofFloat(center, SCALE_X, 0.35f, 1.2f, 1.85f),
-                    ObjectAnimator.ofFloat(center, SCALE_Y, 0.35f, 1.2f, 1.85f),
-                    ObjectAnimator.ofFloat(center, ALPHA, 0f, 1f, 0f)
+                    ObjectAnimator.ofFloat(center, View.SCALE_X, 0.35f, 1.2f, 1.85f),
+                    ObjectAnimator.ofFloat(center, View.SCALE_Y, 0.35f, 1.2f, 1.85f),
+                    ObjectAnimator.ofFloat(center, View.ALPHA, 0f, 1f, 0f)
             );
             core.setDuration(520);
             core.setInterpolator(new DecelerateInterpolator());
@@ -59,20 +121,18 @@ public class DatingSwipeFxView extends FrameLayout {
                     : new int[][]{{-118, -26}, {-86, 108}, {0, -150}, {94, 116}, {138, -18}, {-146, -92}, {144, -92}};
 
             for (int i = 0; i < points.length; i++) {
-                TextView child = build(text, rise ? 26 : 24, color, 0.90f);
+                TextView child = buildText(text, 25, color);
                 addView(child, lp);
                 child.setAlpha(0f);
                 child.setScaleX(0.3f);
                 child.setScaleY(0.3f);
-                float tx = dp(points[i][0]);
-                float ty = dp(points[i][1]);
                 AnimatorSet item = new AnimatorSet();
                 item.playTogether(
-                        ObjectAnimator.ofFloat(child, TRANSLATION_X, 0f, tx),
-                        ObjectAnimator.ofFloat(child, TRANSLATION_Y, 0f, ty),
-                        ObjectAnimator.ofFloat(child, SCALE_X, 0.3f, 1.0f, 0.8f),
-                        ObjectAnimator.ofFloat(child, SCALE_Y, 0.3f, 1.0f, 0.8f),
-                        ObjectAnimator.ofFloat(child, ALPHA, 0f, 1f, 0f)
+                        ObjectAnimator.ofFloat(child, View.TRANSLATION_X, 0f, dp(points[i][0])),
+                        ObjectAnimator.ofFloat(child, View.TRANSLATION_Y, 0f, dp(points[i][1])),
+                        ObjectAnimator.ofFloat(child, View.SCALE_X, 0.3f, 1f, 0.8f),
+                        ObjectAnimator.ofFloat(child, View.SCALE_Y, 0.3f, 1f, 0.8f),
+                        ObjectAnimator.ofFloat(child, View.ALPHA, 0f, 1f, 0f)
                 );
                 item.setStartDelay(40L * i);
                 item.setDuration(460);
@@ -89,11 +149,17 @@ public class DatingSwipeFxView extends FrameLayout {
         });
     }
 
-    private TextView build(String text, int sp, int color, float alpha) {
+    private ImageView brokenHeart() {
+        ImageView view = new ImageView(getContext());
+        view.setImageResource(R.drawable.ic_dating_broken_heart_gray);
+        view.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        return view;
+    }
+
+    private TextView buildText(String text, int sp, int color) {
         TextView tv = new TextView(getContext());
         tv.setText(text);
         tv.setTextColor(color);
-        tv.setAlpha(alpha);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         tv.setShadowLayer(dp(8), 0f, dp(2), 0x66000000);
         tv.setGravity(Gravity.CENTER);
@@ -101,7 +167,7 @@ public class DatingSwipeFxView extends FrameLayout {
         return tv;
     }
 
-    private float dp(float value) {
-        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics());
+    private int dp(float value) {
+        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, getResources().getDisplayMetrics()));
     }
 }

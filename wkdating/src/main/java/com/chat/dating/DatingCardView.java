@@ -37,7 +37,6 @@ public class DatingCardView extends FrameLayout {
         this.profile = profile;
         int max = profile == null ? 0 : Math.max(0, profile.safePhotos().size() - 1);
         this.photoIndex = Math.max(0, Math.min(initialPhotoIndex, max));
-        bindAvatar();
         bindPhoto();
         resetDragProgress();
     }
@@ -93,13 +92,6 @@ public class DatingCardView extends FrameLayout {
         binding.profileArrowBtn.setAlpha(1f);
     }
 
-
-    private void bindAvatar() {
-        if (profile == null) return;
-        binding.avatarView.setSize(48, 24);
-        binding.avatarView.showAvatar(profile.safeUid(), (byte) 1);
-        binding.avatarView.showFlag(profile.safeCountryCode());
-    }
 
     private void bindPhoto() {
         if (profile == null) return;

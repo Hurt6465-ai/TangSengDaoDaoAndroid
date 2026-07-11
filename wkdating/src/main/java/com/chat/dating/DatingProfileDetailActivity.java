@@ -45,7 +45,6 @@ public class DatingProfileDetailActivity extends Activity {
     }
 
     private void initView() {
-        binding.backBtn.setOnClickListener(v -> finish());
         binding.passBtn.setOnClickListener(v -> returnAction(DatingSwipeAction.PASS));
         binding.favoriteBtn.setOnClickListener(v -> returnAction(DatingSwipeAction.FAVORITE));
         binding.likeBtn.setOnClickListener(v -> returnAction(DatingSwipeAction.LIKE));
@@ -72,6 +71,8 @@ public class DatingProfileDetailActivity extends Activity {
         binding.locationTv.setVisibility(TextUtils.isEmpty(location) ? View.GONE : View.VISIBLE);
         bindSection(binding.aboutTitle, binding.aboutTv, "关于我", profile.safeIntro());
         bindSection(binding.loveTitle, binding.loveTv, "恋爱期待", DatingUi.loveExpectation(profile));
+        bindSection(binding.idealTitle, binding.idealTv, "希望对方", profile.ideal_partner);
+        bindSection(binding.dealbreakersTitle, binding.dealbreakersTv, "我反感", TextUtils.join("、", profile.safeDealbreakers()));
         bindSection(binding.basicTitle, binding.basicTv, "基本资料", basicLine());
         bindTags(binding.tagsLayout, profile.safeTags());
     }

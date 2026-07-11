@@ -46,12 +46,6 @@ public class DatingMineActivity extends Activity {
         binding.whoLikesRow.setOnClickListener(v -> startActivity(new Intent(this, DatingWhoLikesActivity.class)));
         binding.matchesRow.setOnClickListener(v -> startActivity(new Intent(this, DatingMatchesActivity.class)));
         binding.quotaRow.setOnClickListener(v -> showQuota());
-        binding.soundSwitch.setChecked(DatingInteractionSettings.soundEnabled(this));
-        binding.hapticSwitch.setChecked(DatingInteractionSettings.hapticEnabled(this));
-        binding.soundSwitch.setOnCheckedChangeListener((buttonView, checked) ->
-                DatingInteractionSettings.setSoundEnabled(this, checked));
-        binding.hapticSwitch.setOnCheckedChangeListener((buttonView, checked) ->
-                DatingInteractionSettings.setHapticEnabled(this, checked));
         binding.enabledSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (!buttonView.isPressed()) return;
             buttonView.setEnabled(false);
