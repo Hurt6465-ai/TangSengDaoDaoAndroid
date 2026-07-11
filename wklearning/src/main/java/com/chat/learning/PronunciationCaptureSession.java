@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
+import android.os.SystemClock;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -22,21 +23,29 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 
 /**
- * Captures one microphone stream, saves it as WAV and feeds the same PCM stream to
- * the Android speech recognizer on Android 13+.
+ * One-tap pronunciation capture.
  *
- * On older Android versions the platform has no public audio-injection API, so the
- * class keeps a best-effort simultaneous AudioRecord + SpeechRecognizer fallback.
+ * Android 13+ records one PCM stream, saves it as WAV and feeds that same stream
+ * to the native SpeechRecognizer through RecognizerIntent.EXTRA_AUDIO_SOURCE.
+ * The session ends automatically after the learner stops speaking.
+ *
+ * Older Android versions do not expose the same reliable public PCM injection
+ * API. They use a best-effort simultaneous AudioRecord + SpeechRecognizer path.
  */
 final class PronunciationCaptureSession {
     private static final int SAMPLE_RATE = 16_000;
     private static final int CHANNEL_COUNT = 1;
     private static final int BITS_PER_SAMPLE = 16;
-    private static final long MAX_CAPTURE_MS = 7_000L;
-    private static final long RESULT_GRACE_MS = 2_500L;
 
-    // API 33 RecognizerIntent constants are kept as strings so this module still
-    // compiles in host projects whose compile SDK has not yet exposed the fields.
+    private static final long MAX_CAPTURE_MS = 7_000L;
+    private static final long WAIT_FOR_SPEECH_MS = 3_500L;
+    private static final long SILENCE_TO_FINISH_MS = 950L;
+    private static final long MIN_SPEECH_MS = 260L;
+    private static final long RESULT_GRACE_MS = 3_000L;
+    private static final float SPEECH_THRESHOLD_DB = -42.0f;
+
+    // Kept as strings so the module can still compile when the host exposes an
+    // older compile SDK while running on Android 13+.
     private static final String EXTRA_AUDIO_SOURCE = "android.speech.extra.AUDIO_SOURCE";
     private static final String EXTRA_AUDIO_SOURCE_CHANNEL_COUNT =
             "android.speech.extra.AUDIO_SOURCE_CHANNEL_COUNT";
@@ -96,6 +105,7 @@ final class PronunciationCaptureSession {
     private boolean delivered;
     private boolean sharedPcmStream;
     private String recognizedText = "";
+    private String bestPartialText = "";
     private float recognizerConfidence = -1f;
     private int recognitionError;
 
@@ -103,7 +113,10 @@ final class PronunciationCaptureSession {
     private final Runnable resultTimeout = () -> {
         if (!recognitionDone) {
             recognitionDone = true;
-            if (recognitionError == 0) recognitionError = SpeechRecognizer.ERROR_SPEECH_TIMEOUT;
+            promotePartialResult();
+            if (recognizedText.isEmpty() && recognitionError == 0) {
+                recognitionError = SpeechRecognizer.ERROR_SPEECH_TIMEOUT;
+            }
         }
         maybeDeliver();
     };
@@ -136,8 +149,8 @@ final class PronunciationCaptureSession {
 
             recognizer = SpeechRecognizer.createSpeechRecognizer(context);
             recognizer.setRecognitionListener(new InternalRecognitionListener());
-
             Intent intent = createRecognitionIntent();
+
             if (sharedPcmStream && pipeRead != null) {
                 intent.putExtra(EXTRA_AUDIO_SOURCE, pipeRead);
                 intent.putExtra(EXTRA_AUDIO_SOURCE_CHANNEL_COUNT, CHANNEL_COUNT);
@@ -145,16 +158,9 @@ final class PronunciationCaptureSession {
                 intent.putExtra(EXTRA_AUDIO_SOURCE_SAMPLING_RATE, SAMPLE_RATE);
             }
 
-            if (sharedPcmStream) {
-                recognizer.startListening(intent);
-                startCapture(true);
-            } else {
-                // Older Android has no public way to inject one captured stream into
-                // SpeechRecognizer. Start recording first, then recognition as the
-                // most compatible best-effort fallback.
-                startCapture(false);
-                recognizer.startListening(intent);
-            }
+            // Start recognition first so the service is ready before PCM begins.
+            recognizer.startListening(intent);
+            startCapture(sharedPcmStream);
         } catch (Throwable error) {
             recognitionDone = true;
             recognitionError = SpeechRecognizer.ERROR_CLIENT;
@@ -164,34 +170,20 @@ final class PronunciationCaptureSession {
         }
     }
 
+    /** Optional emergency stop; normal sessions finish automatically after silence. */
     void stop() {
         if (released) return;
-        if (captureRunning) {
-            captureRunning = false;
-            try {
-                if (audioRecord != null && audioRecord.getRecordingState()
-                        == AudioRecord.RECORDSTATE_RECORDING) {
-                    audioRecord.stop();
-                }
-            } catch (Throwable ignored) { }
-        }
+        requestCaptureStop();
         listener.onStateChanged(State.PROCESSING);
         main.removeCallbacks(maxDurationStop);
-        main.removeCallbacks(resultTimeout);
-        main.postDelayed(resultTimeout, RESULT_GRACE_MS);
+        scheduleResultTimeout();
     }
 
     void release() {
         released = true;
         main.removeCallbacks(maxDurationStop);
         main.removeCallbacks(resultTimeout);
-        captureRunning = false;
-        try {
-            if (audioRecord != null && audioRecord.getRecordingState()
-                    == AudioRecord.RECORDSTATE_RECORDING) {
-                audioRecord.stop();
-            }
-        } catch (Throwable ignored) { }
+        requestCaptureStop();
         try {
             if (recognizer != null) recognizer.cancel();
         } catch (Throwable ignored) { }
@@ -203,6 +195,16 @@ final class PronunciationCaptureSession {
         closePipeRead();
     }
 
+    private void requestCaptureStop() {
+        captureRunning = false;
+        try {
+            if (audioRecord != null
+                    && audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
+                audioRecord.stop();
+            }
+        } catch (Throwable ignored) { }
+    }
+
     private void resetResultState() {
         main.removeCallbacks(maxDurationStop);
         main.removeCallbacks(resultTimeout);
@@ -210,6 +212,7 @@ final class PronunciationCaptureSession {
         recognitionDone = false;
         delivered = false;
         recognizedText = "";
+        bestPartialText = "";
         recognizerConfidence = -1f;
         recognitionError = 0;
     }
@@ -223,9 +226,14 @@ final class PronunciationCaptureSession {
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
         intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false);
-        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 900L);
-        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 650L);
-        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 350L);
+        // Recognizers may ignore these values. Our own PCM silence detector remains
+        // the source of truth for automatic completion.
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                SILENCE_TO_FINISH_MS);
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                650L);
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
+                MIN_SPEECH_MS);
         if (!targetWord.isEmpty()) {
             ArrayList<String> bias = new ArrayList<>();
             bias.add(targetWord);
@@ -276,8 +284,8 @@ final class PronunciationCaptureSession {
             releaseAudioRecord();
             closePipeWrite();
             recordingDone = true;
-            recognitionDone = true;
-            recognitionError = SpeechRecognizer.ERROR_AUDIO;
+            if (recognitionError == 0) recognitionError = SpeechRecognizer.ERROR_AUDIO;
+            scheduleResultTimeout();
             maybeDeliver();
         }
     }
@@ -285,11 +293,17 @@ final class PronunciationCaptureSession {
     private void captureLoop(int bufferSize, boolean writeToRecognizerPipe) {
         long totalPcmBytes = 0L;
         OutputStream recognizerOutput = null;
+        long captureStartedAt = SystemClock.elapsedRealtime();
+        long speechStartedAt = 0L;
+        long lastSpeechAt = 0L;
+        boolean speechDetected = false;
+
         try (FileOutputStream rawOutput = new FileOutputStream(rawFile)) {
             if (writeToRecognizerPipe && pipeWrite != null) {
                 recognizerOutput = new ParcelFileDescriptor.AutoCloseOutputStream(pipeWrite);
-                pipeWrite = null; // AutoCloseOutputStream now owns it.
+                pipeWrite = null;
             }
+
             byte[] buffer = new byte[bufferSize];
             while (captureRunning && !released) {
                 int read = audioRecord.read(buffer, 0, buffer.length);
@@ -299,16 +313,37 @@ final class PronunciationCaptureSession {
                     if (recognizerOutput != null) {
                         try {
                             recognizerOutput.write(buffer, 0, read);
-                            recognizerOutput.flush();
                         } catch (IOException pipeClosed) {
                             closeQuietly(recognizerOutput);
                             recognizerOutput = null;
                         }
                     }
-                    final float rms = calculateRmsDb(buffer, read);
+
+                    float rms = calculateRmsDb(buffer, read);
+                    long now = SystemClock.elapsedRealtime();
+                    if (rms >= SPEECH_THRESHOLD_DB) {
+                        if (!speechDetected) {
+                            speechDetected = true;
+                            speechStartedAt = now;
+                        }
+                        lastSpeechAt = now;
+                    }
+
+                    final float callbackRms = rms;
                     main.post(() -> {
-                        if (!released) listener.onRms(rms);
+                        if (!released) listener.onRms(callbackRms);
                     });
+
+                    if (speechDetected
+                            && now - speechStartedAt >= MIN_SPEECH_MS
+                            && now - lastSpeechAt >= SILENCE_TO_FINISH_MS) {
+                        captureRunning = false;
+                    } else if (!speechDetected
+                            && now - captureStartedAt >= WAIT_FOR_SPEECH_MS) {
+                        captureRunning = false;
+                    } else if (now - captureStartedAt >= MAX_CAPTURE_MS) {
+                        captureRunning = false;
+                    }
                 } else if (read == AudioRecord.ERROR_INVALID_OPERATION
                         || read == AudioRecord.ERROR_BAD_VALUE
                         || read == AudioRecord.ERROR_DEAD_OBJECT) {
@@ -319,6 +354,8 @@ final class PronunciationCaptureSession {
         } catch (Throwable ignored) {
             if (recognitionError == 0) recognitionError = SpeechRecognizer.ERROR_AUDIO;
         } finally {
+            // Closing this stream is what tells an API 33+ recognizer that the
+            // injected utterance has ended.
             closeQuietly(recognizerOutput);
             releaseAudioRecord();
             captureRunning = false;
@@ -335,10 +372,16 @@ final class PronunciationCaptureSession {
             main.post(() -> {
                 if (!released) {
                     listener.onStateChanged(State.PROCESSING);
+                    scheduleResultTimeout();
                     maybeDeliver();
                 }
             });
         }
+    }
+
+    private void scheduleResultTimeout() {
+        main.removeCallbacks(resultTimeout);
+        if (!recognitionDone) main.postDelayed(resultTimeout, RESULT_GRACE_MS);
     }
 
     private void maybeDeliver() {
@@ -351,13 +394,28 @@ final class PronunciationCaptureSession {
             try { recognizer.destroy(); } catch (Throwable ignored) { }
             recognizer = null;
         }
-        File output = wavFile != null && wavFile.isFile() && wavFile.length() > 44 ? wavFile : null;
+        File output = wavFile != null && wavFile.isFile() && wavFile.length() > 44
+                ? wavFile : null;
         listener.onFinished(new Result(
                 recognizedText,
                 recognizerConfidence,
                 output,
                 recognitionError,
                 sharedPcmStream));
+    }
+
+    private String firstNonEmpty(ArrayList<String> values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) return value.trim();
+        }
+        return "";
+    }
+
+    private void promotePartialResult() {
+        if (recognizedText.isEmpty() && !bestPartialText.isEmpty()) {
+            recognizedText = bestPartialText;
+        }
     }
 
     private void releaseAudioRecord() {
@@ -437,37 +495,51 @@ final class PronunciationCaptureSession {
         @Override public void onReadyForSpeech(Bundle params) {
             if (!released) listener.onStateChanged(State.LISTENING);
         }
+
         @Override public void onBeginningOfSpeech() { }
         @Override public void onRmsChanged(float rmsdB) { }
         @Override public void onBufferReceived(byte[] buffer) { }
-        @Override public void onEndOfSpeech() { stop(); }
+
+        @Override public void onEndOfSpeech() {
+            // The recognizer may detect the endpoint before our own PCM detector.
+            stop();
+        }
 
         @Override public void onError(int error) {
-            recognitionError = error;
+            promotePartialResult();
+            recognitionError = recognizedText.isEmpty() ? error : 0;
             recognitionDone = true;
-            stop();
+            requestCaptureStop();
+            scheduleResultTimeout();
             maybeDeliver();
         }
 
         @Override public void onResults(Bundle results) {
             ArrayList<String> values = results == null ? null
                     : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-            if (values != null && !values.isEmpty() && values.get(0) != null) {
-                recognizedText = values.get(0).trim();
+            String finalText = firstNonEmpty(values);
+            if (!finalText.isEmpty()) {
+                recognizedText = finalText;
+            } else {
+                promotePartialResult();
             }
             float[] confidence = results == null ? null
                     : results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES);
-            if (confidence != null && confidence.length > 0) recognizerConfidence = confidence[0];
+            if (confidence != null && confidence.length > 0) {
+                recognizerConfidence = confidence[0];
+            }
             recognitionDone = true;
-            stop();
+            requestCaptureStop();
             maybeDeliver();
         }
 
         @Override public void onPartialResults(Bundle partialResults) {
             ArrayList<String> values = partialResults == null ? null
                     : partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-            if (values != null && !values.isEmpty() && values.get(0) != null && !released) {
-                listener.onPartialResult(values.get(0).trim());
+            String partial = firstNonEmpty(values);
+            if (!partial.isEmpty() && !released) {
+                bestPartialText = partial;
+                listener.onPartialResult(partial);
             }
         }
 

@@ -48,6 +48,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
     private TextView statusView;
     private TextView partialView;
     private TextView micButton;
+    private TextView micCaption;
     private LinearLayout resultGroup;
     private TextView recognizedView;
     private TextView matchView;
@@ -61,6 +62,9 @@ public class WordPronunciationActivity extends AppCompatActivity {
         pinyin = safe(getIntent().getStringExtra(EXTRA_PINYIN), "");
         configureWindow();
         buildLayout();
+        if (savedInstanceState == null) {
+            panel.postDelayed(this::ensurePermissionAndStart, 180L);
+        }
     }
 
     @Override
@@ -169,7 +173,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
         micLp.setMargins(0, dp(16), 0, 0);
         panel.addView(micButton, micLp);
 
-        TextView micCaption = text(getString(R.string.pronunciation_start_once), 13, COLOR_SUB, true);
+        micCaption = text(getString(R.string.pronunciation_start_once), 13, COLOR_SUB, true);
         micCaption.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams captionLp = new LinearLayout.LayoutParams(-1, -2);
         captionLp.setMargins(0, dp(7), 0, 0);
@@ -250,6 +254,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
         micButton.setScaleX(1f);
         micButton.setScaleY(1f);
         micButton.setAlpha(1f);
+        micCaption.setText(R.string.pronunciation_status_preparing);
 
         captureSession = new PronunciationCaptureSession(this, word,
                 new PronunciationCaptureSession.Listener() {
@@ -258,8 +263,10 @@ public class WordPronunciationActivity extends AppCompatActivity {
                             if (isFinishing()) return;
                             if (state == PronunciationCaptureSession.State.LISTENING) {
                                 statusView.setText(R.string.pronunciation_status_recording_and_recognizing);
+                                micCaption.setText(R.string.pronunciation_status_recording_and_recognizing);
                             } else if (state == PronunciationCaptureSession.State.PROCESSING) {
                                 statusView.setText(R.string.pronunciation_status_processing);
+                                micCaption.setText(R.string.pronunciation_status_processing);
                             }
                         });
                     }
@@ -293,6 +300,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
         practicing = false;
         micButton.setText("●");
         micButton.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(120).start();
+        micCaption.setText(R.string.pronunciation_start_once);
         recordingFile = result == null ? null : result.recordingFile;
         String recognized = result == null ? "" : safe(result.recognizedText, "");
         int match = recognized.isEmpty() ? 0 : textMatchPercent(word, recognized);
