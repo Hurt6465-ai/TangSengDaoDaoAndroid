@@ -59,13 +59,13 @@ final class WordCardContainer extends FrameLayout {
                 float dx = event.getX() - downX;
                 float dy = event.getY() - downY;
                 if (Math.max(Math.abs(dx), Math.abs(dy)) < touchSlop) return false;
-                if (Math.abs(dx) > Math.abs(dy) * 1.18f) {
+                if (Math.abs(dx) >= Math.abs(dy) * 0.78f) {
                     dragging = true;
                     direction = dx < 0 ? Direction.LEFT : Direction.RIGHT;
                     requestDisallowInterceptTouchEvent(true);
                     return true;
                 }
-                if (listener.isFrontFace() && dy > 0 && Math.abs(dy) > Math.abs(dx) * 1.18f) {
+                if (listener.isFrontFace() && dy > 0 && Math.abs(dy) >= Math.abs(dx) * 0.78f) {
                     dragging = true;
                     direction = Direction.DOWN;
                     requestDisallowInterceptTouchEvent(true);
@@ -95,10 +95,10 @@ final class WordCardContainer extends FrameLayout {
                 lastDy = dy;
                 if (!dragging) {
                     if (Math.max(Math.abs(dx), Math.abs(dy)) < touchSlop) return true;
-                    if (Math.abs(dx) > Math.abs(dy) * 1.18f) {
+                    if (Math.abs(dx) >= Math.abs(dy) * 0.78f) {
                         dragging = true;
                         direction = dx < 0 ? Direction.LEFT : Direction.RIGHT;
-                    } else if (listener.isFrontFace() && dy > 0 && Math.abs(dy) > Math.abs(dx) * 1.18f) {
+                    } else if (listener.isFrontFace() && dy > 0 && Math.abs(dy) >= Math.abs(dx) * 0.78f) {
                         dragging = true;
                         direction = Direction.DOWN;
                     } else {
@@ -130,14 +130,14 @@ final class WordCardContainer extends FrameLayout {
             setTranslationY(y);
             setTranslationX(0f);
             setRotation(0f);
-            float threshold = Math.max(dp(58), getHeight() * 0.13f);
+            float threshold = Math.max(dp(46), getHeight() * 0.10f);
             float progress = Math.min(1.35f, y / threshold);
             listener.onDrag(direction, progress, progress >= 1f);
         } else {
             setTranslationX(dx);
             setTranslationY(0f);
             setRotation(5.5f * dx / Math.max(1f, getWidth()));
-            float threshold = Math.max(dp(96), getWidth() * 0.30f);
+            float threshold = Math.max(dp(68), getWidth() * 0.26f);
             float progress = Math.min(1.35f, Math.abs(dx) / threshold);
             listener.onDrag(direction, progress, progress >= 1f);
         }
@@ -145,8 +145,8 @@ final class WordCardContainer extends FrameLayout {
 
     private void finishDrag() {
         float threshold = direction == Direction.DOWN
-                ? Math.max(dp(58), getHeight() * 0.13f)
-                : Math.max(dp(96), getWidth() * 0.30f);
+                ? Math.max(dp(46), getHeight() * 0.10f)
+                : Math.max(dp(68), getWidth() * 0.26f);
         float distance = direction == Direction.DOWN ? Math.max(0f, lastDy) : Math.abs(lastDx);
         if (distance >= threshold && listener.onCommit(direction)) {
             flyOut(direction);
