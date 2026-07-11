@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="learning_title">学习</string>
     <string name="learning_subtitle">选择 AI 网页、口语场景或脚本管理。官方场景先内置在 App，后续可热更新。</string>
@@ -29,7 +29,7 @@
     <string name="word_pull_favorite_release">松手收藏</string>
     <string name="word_pull_unfavorite_release">松手取消收藏</string>
     <string name="word_front_tap">点击查看释义</string>
-    <string name="word_front_hint" />
+    <string name="word_front_hint"></string>
     <string name="word_gesture_hint_short">左滑不认识 · 右滑认识 · 下拉收藏</string>
     <string name="word_back_hint">左滑不认识 · 右滑认识</string>
     <string name="word_action_tts">朗读</string>
@@ -47,7 +47,6 @@
     <string name="word_label_meaning_en">英文：</string>
     <string name="word_label_example">例句：</string>
     <string name="word_label_usage">场景：</string>
-    <string name="word_label_memory_tip">记忆提示</string>
     <string name="word_label_notes">注意：</string>
     <string name="word_label_synonyms">近义：</string>
     <string name="word_label_antonyms">反义：</string>
@@ -116,6 +115,7 @@
     <string name="pronunciation_recognition_empty">没有识别到文字，请再试一次</string>
     <string name="pronunciation_recognition_result">识别：%1$s
 文字匹配：%2$d%%（不是专业发音分）</string>
+
     <string name="word_pack_unavailable">词库尚未下载</string>
     <string name="word_loading_remote">正在加载词库…</string>
     <string name="word_remote_load_failed">词库加载失败，请稍后重试</string>
@@ -135,29 +135,18 @@
 简单 %4$d
 用时 %5$d 分钟</string>
     <string name="word_finish">完成</string>
-    <string name="pronunciation_compare_hint">可反复播放原音和我的录音进行对比</string>
-    <string name="pronunciation_match_value">文字匹配 %1$d%%</string>
-    <string name="pronunciation_mine_short">我的录音</string>
-    <string name="pronunciation_one_tap_hint">点击麦克风后会同时录音和语音识别</string>
-    <string name="pronunciation_original_short">原音</string>
-    <string name="pronunciation_result_ready">录音和识别已完成</string>
-    <string name="pronunciation_result_title">识别结果</string>
+
+    <string name="pronunciation_one_tap_hint">点击麦克风后会同时录音和语音识别，停顿后自动结束</string>
     <string name="pronunciation_start_once">开始跟读</string>
     <string name="pronunciation_status_preparing">正在准备麦克风…</string>
+    <string name="pronunciation_status_recording_and_recognizing">正在录音并识别，停顿后自动结束</string>
     <string name="pronunciation_status_processing">正在生成结果…</string>
-    <string name="pronunciation_status_recording_and_recognizing">正在录音并识别，再次点击可结束</string>
-    <string name="pronunciation_try_again">再试一次</string>
+    <string name="pronunciation_result_title">识别结果</string>
     <string name="pronunciation_unrecognized">未识别到文字</string>
-    <string name="pronunciation_diagnostic_log">诊断日志</string>
-    <string name="pronunciation_copy_log">复制日志</string>
-    <string name="pronunciation_log_copied">日志已复制</string>
-    <string name="pronunciation_close">关闭</string>
-    <string name="pronunciation_no_diagnostic_log">暂无诊断日志</string>
-    <string name="pronunciation_recording_saved_summary">录音成功 · %1$s 秒 · %2$d KB</string>
-    <string name="pronunciation_recording_missing_summary">没有生成有效录音</string>
-    <string name="pronunciation_recognition_error_summary">识别状态：%1$s（%2$d）</string>
-    <string name="pronunciation_recognition_unknown_error">识别状态未知</string>
-    <string name="pronunciation_recorded_but_unrecognized">录音已保存，但系统语音识别没有返回文字。可以播放“我的录音”；这不代表录音失败。</string>
-    <string name="pronunciation_record_and_recognition_failed">录音和语音识别均未成功</string>
-    <string name="word_restart_session">再学一遍</string>
+    <string name="pronunciation_match_value">文字匹配 %1$d%%</string>
+    <string name="pronunciation_compare_hint">可反复播放原音和我的录音进行对比</string>
+    <string name="pronunciation_original_short">原音</string>
+    <string name="pronunciation_mine_short">我的录音</string>
+    <string name="pronunciation_try_again">再试一次</string>
+    <string name="pronunciation_result_ready">录音和识别已完成</string>
 </resources>
