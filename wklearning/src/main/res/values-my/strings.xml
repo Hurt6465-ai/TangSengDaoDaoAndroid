@@ -111,4 +111,24 @@
     <string name="pronunciation_recognition_empty">အသံကို မသိရှိနိုင်ပါ။ ထပ်စမ်းပါ။</string>
     <string name="pronunciation_recognition_result">သိရှိသောစာ：%1$s
 စာသားကိုက်ညီမှု：%2$d%%（ပရော်ဖက်ရှင်နယ် အသံထွက်အမှတ် မဟုတ်ပါ）</string>
+
+    <string name="word_pack_unavailable">စကားလုံးအစုကို မဒေါင်းလုဒ်ရသေးပါ</string>
+    <string name="word_loading_remote">စကားလုံးအစုကို တင်နေသည်…</string>
+    <string name="word_remote_load_failed">စကားလုံးအစု မတင်နိုင်ပါ။ နောက်မှ ထပ်စမ်းပါ။</string>
+    <string name="word_today_plan">ယနေ့အစီအစဉ်</string>
+    <string name="word_action_easy">လွယ်ကူ</string>
+    <string name="word_today_plan_count">ပြန်လေ့ကျင့် %1$d · အသစ် %2$d</string>
+    <string name="word_auto_read_on">အလိုအလျောက်ဖတ် ဖွင့်</string>
+    <string name="word_auto_read_off">အလိုအလျောက်ဖတ် ပိတ်</string>
+    <string name="word_label_collocations">တွဲသုံးစကား：</string>
+    <string name="word_check_answer_first">အဖြေကို အရင်ကြည့်ပါ</string>
+    <string name="word_tts_settings_hint">အသံဆက်တင်တွင် အသံနှင့် အမြန်နှုန်းကို ပြင်ပါ</string>
+    <string name="word_plan_message">ယနေ့ ပြန်လေ့ကျင့်ရန် %1$d လုံး၊ အသစ် %2$d လုံး၊ လက်ရှိ ကျန် %3$d လုံး။</string>
+    <string name="word_session_complete">ဒီအုပ်စုပြီးပါပြီ</string>
+    <string name="word_session_stats">မမှတ်မိ %1$d
+မရှင်းသေး %2$d
+မှတ်မိ %3$d
+လွယ်ကူ %4$d
+ကြာချိန် %5$d မိနစ်</string>
+    <string name="word_finish">ပြီးပါပြီ</string>
 </resources>
