@@ -109,4 +109,14 @@
         <item name="android:textColorHint">#A0A0A8</item>
         <item name="android:textSize">14sp</item>
     </style>
+
+    <!-- 资料详情页专用别名。activity_wk_dating_profile_detail.xml 使用这两个名称。 -->
+    <style name="WkDatingDetailTitle" parent="WkDatingSectionTitle">
+        <item name="android:layout_marginTop">18dp</item>
+    </style>
+
+    <style name="WkDatingDetailBody" parent="WkDatingSectionBody">
+        <item name="android:layout_marginTop">7dp</item>
+    </style>
+
 </resources>
