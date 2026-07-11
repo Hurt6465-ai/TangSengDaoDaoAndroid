@@ -54,7 +54,7 @@
     <string name="word_favorite_removed">သိမ်းထားမှု ပယ်ဖျက်ပြီး</string>
     <string name="word_toast_my_phonetic_on">မြန်မာအသံညွှန်ပြချက် ဖွင့်ပြီး</string>
     <string name="word_toast_my_phonetic_off">မြန်မာအသံညွှန်ပြချက် ပိတ်ပြီး</string>
-    <string name="word_stroke_todo">ရေးပုံ/ခြေရာခံရေး ဝင်ပေါက်ကို ထားပြီး၊ Hanzi ဒေတာနဲ့ ချိတ်မည်</string>
+    <string name="word_stroke_todo">Hanzi Writer ဖြင့် မှန်ကန်သော ရေးစဉ် animation ကို ပြမည်</string>
     <string name="word_tts_plugin_missing">TTS ပလပ်အင် မရှိပါ သို့မဟုတ် မတုံ့ပြန်ပါ</string>
     <string name="word_menu_show_my_phonetic">မြန်မာအသံညွှန်ပြချက် ဖွင့်ရန်</string>
     <string name="word_menu_hide_my_phonetic">မြန်မာအသံညွှန်ပြချက် ပိတ်ရန်</string>
@@ -79,11 +79,11 @@
     <string name="word_tone_3">တတိယသံ</string>
     <string name="word_tone_4">စတုတ္ထသံ</string>
     <string name="pronunciation_title">အသံထွက် လေ့ကျင့်ရန်</string>
-    <string name="stroke_title">ရေးပုံ</string>
-    <string name="stroke_subtitle">အရင်ဆုံး native full-screen ဝင်ပေါက်ကို ထားထားသည်။ HanziWriter သို့မဟုတ် makemeahanzi ဒေတာချိတ်ပြီးနောက် ရေးပုံ animation၊ တစ်ချက်ချင်းလေ့ကျင့်မှုကို ပြနိုင်မည်။</string>
-    <string name="stroke_chars_title">အက္ခရာတစ်လုံးချင်း လေ့ကျင့်ရန်</string>
-    <string name="stroke_data_missing">လက်ရှိတွင် တရုတ်စာရေးပုံ ဒေတာ မချိတ်ရသေးပါ။ ဒေတာချိတ်ပြီးနောက် ဒီနေရာတွင် ရေးပုံ animation ကို ပြမည်။</string>
-    <string name="stroke_speak_word">ဒီစကားလုံးကို အသံဖွင့်ရန်</string>
+    <string name="stroke_title">စာလုံးရေးစဉ် animation</string>
+    <string name="stroke_subtitle">တရုတ်စာလုံးကို နှိပ်ပြီး ပြောင်းနိုင်သည်။ မှန်ကန်သော ရေးစဉ်ကို အလိုအလျောက် ပြမည်။ ပထမဆုံးဖွင့်ချိန်တွင် အင်တာနက်လိုပြီး နောက်ပိုင်း local cache ဖြင့် အသုံးပြုနိုင်သည်။</string>
+    <string name="stroke_chars_title">တရုတ်စာလုံး ရွေးရန်</string>
+    <string name="stroke_data_missing">ရေးစဉ်ဒေတာ မတင်နိုင်ပါ။ အင်တာနက်ကို စစ်ဆေးပြီး ထပ်စမ်းပါ။</string>
+    <string name="stroke_speak_word">စကားလုံး အသံဖွင့်ရန်</string>
     <string name="pronunciation_tip">စံအသံနှင့် ပင်ယင်ဖတ်ပြအသံကို နားထောင်ပြီး မိမိအသံကို မှတ်တမ်းတင်ပါ။ အခမဲ့ဗားရှင်းတွင် အသံနှိုင်းယှဉ်နိုင်ပြီး local ASR ပလပ်အင်ရှိလျှင် သိရှိ/အမှတ်ပေးနိုင်သည်။</string>
     <string name="pronunciation_play_standard">စံအသံ ဖွင့်ရန်</string>
     <string name="pronunciation_play_spelling">ပင်ယင်ဖတ်ပြအသံ ဖွင့်ရန်</string>
@@ -103,9 +103,14 @@
     <string name="pronunciation_need_permission">မိုက်ခရိုဖုန်းခွင့်ပြုချက် လိုအပ်သည်</string>
     <string name="pronunciation_asr_plugin_missing">Local ASR/အမှတ်ပေး ပလပ်အင် မရှိပါ။ အသံနှိုင်းယှဉ်ခြင်းကို သုံးနိုင်ပါသည်။</string>
 
+    <string name="word_action_tts_short">ဖတ်</string>
+    <string name="word_action_spelling_short">အသံခွဲ</string>
+    <string name="word_action_stroke_short">ရေးစဉ်</string>
+    <string name="word_action_pronunciation_short">လိုက်ပြော</string>
+
     <string name="word_action_easy">လွယ်ကူ</string>
     <string name="word_today_plan">ယနေ့အစီအစဉ်</string>
-    <string name="word_today_plan_count">ပြန်လေ့ကျင့် %1$d · စာရင်း %2$d</string>
+    <string name="word_today_plan_count">ပြန်လေ့ကျင့် %1$d · စကားလုံးသစ် %2$d</string>
     <string name="word_auto_read_on">အလိုအလျောက်အသံ ဖွင့်</string>
     <string name="word_auto_read_off">အလိုအလျောက်အသံ ပိတ်</string>
     <string name="word_core_meaning">အဓိကအဓိပ္ပါယ်</string>
@@ -115,9 +120,9 @@
     <string name="word_review_minutes">%1$d မိနစ်</string>
     <string name="word_review_months">%1$d လ</string>
     <string name="word_review_years">%1$d နှစ်</string>
-    <string name="word_plan_message">ယနေ့ပြန်လေ့ကျင့်ရန်：%1$d
-လက်ရှိစာရင်း：%2$d
-အစပြုစကားလုံး：%3$d</string>
+    <string name="word_plan_message">ဤအုပ်စုတွင် ပြန်လေ့ကျင့်ရန်：%1$d
+စကားလုံးသစ်：%2$d
+ကျန်ရှိ：%3$d</string>
     <string name="word_tts_settings_hint">လေ့လာရေးကိရိယာ သို့မဟုတ် အသံပလပ်အင်တွင် အသံနှင့် အမြန်နှုန်းကို သတ်မှတ်ပါ</string>
     <string name="word_session_complete">ဒီအုပ်စုပြီးပါပြီ</string>
     <string name="word_session_stats">မမှတ်မိ %1$d   မရှင်း %2$d
@@ -127,4 +132,6 @@
     <string name="word_loading_remote">စကားလုံးစာရင်းကို ဒေါင်းလုဒ်လုပ်နေသည်…</string>
     <string name="word_remote_load_failed">ဒေါင်းလုဒ်မအောင်မြင်ပါ။ ကွန်ရက် သို့မဟုတ် လင့်ခ်ကို စစ်ပါ။</string>
     <string name="word_pack_unavailable">ဤစကားလုံးစာရင်းကို မဒေါင်းလုဒ်ရသေးပါ။ Remote static host ကို သတ်မှတ်ပါ သို့မဟုတ် local preview ကို စစ်ပါ။</string>
+    <string name="stroke_replay">ရေးစဉ် ပြန်ဖွင့်ရန်</string>
+    <string name="stroke_loading">ရေးစဉ်ဒေတာ တင်နေသည်…</string>
 </resources>
