@@ -48,7 +48,7 @@
     <string name="word_label_antonyms">Opposite: </string>
     <string name="word_no_example">No example yet</string>
     <string name="word_toast_unknown">Again: review later</string>
-    <string name="word_toast_known">Known: scheduled by FSRS</string>
+    <string name="word_toast_known">Known: review again in 7 days</string>
     <string name="word_toast_hard">Hard: review again tomorrow</string>
     <string name="word_favorite_added">Saved</string>
     <string name="word_favorite_removed">Removed from saved</string>
@@ -63,7 +63,7 @@
     <string name="word_guide_title">How to study cards</string>
     <string name="word_guide_body">Tap card: see meaning
 Swipe left: Again, review later
-Swipe right after checking: Known, scheduled by FSRS
+Swipe right: Known, review again in 7 days
 Pull down: Save
 Tap Hard: review tomorrow</string>
     <string name="word_guide_ok">Got it</string>
@@ -84,7 +84,9 @@ Tap Hard: review tomorrow</string>
     <string name="stroke_chars_title">Choose a character</string>
     <string name="stroke_data_missing">Unable to load stroke-order data. Check the network and try again.</string>
     <string name="stroke_speak_word">Speak word</string>
-    <string name="pronunciation_tip">Listen to the standard audio and spelling audio, then record yourself. The free version compares recordings; a local ASR plugin can add recognition/scoring.</string>
+    <string name="stroke_replay">Replay strokes</string>
+    <string name="stroke_loading">Loading stroke order…</string>
+    <string name="pronunciation_tip">Listen to the standard audio, use Google speech recognition to check the text match, and record yourself for playback comparison.</string>
     <string name="pronunciation_play_standard">Play standard audio</string>
     <string name="pronunciation_play_spelling">Play spelling audio</string>
     <string name="pronunciation_start_record">Start recording</string>
@@ -102,36 +104,11 @@ Tap Hard: review tomorrow</string>
     <string name="pronunciation_no_record">Record first</string>
     <string name="pronunciation_need_permission">Microphone permission is required</string>
     <string name="pronunciation_asr_plugin_missing">Local ASR/scoring plugin is missing. Recording comparison is still available.</string>
-
-    <string name="word_action_tts_short">Read</string>
-    <string name="word_action_spelling_short">Spell</string>
-    <string name="word_action_stroke_short">Stroke</string>
-    <string name="word_action_pronunciation_short">Speak</string>
-
-    <string name="word_action_easy">Easy</string>
-    <string name="word_today_plan">Today</string>
-    <string name="word_today_plan_count">Review %1$d · New %2$d</string>
-    <string name="word_auto_read_on">Auto On</string>
-    <string name="word_auto_read_off">Auto Off</string>
-    <string name="word_core_meaning">Core meaning</string>
-    <string name="word_part_of_speech">Part of speech · %1$s</string>
-    <string name="word_label_collocations">Common combinations</string>
-    <string name="word_check_answer_first">Check the answer first</string>
-    <string name="word_review_minutes">%1$d min</string>
-    <string name="word_review_months">%1$d mo</string>
-    <string name="word_review_years">%1$d yr</string>
-    <string name="word_plan_message">Reviews in this session: %1$d
-New words in this session: %2$d
-Remaining: %3$d</string>
-    <string name="word_tts_settings_hint">Set voice and speed in the learning tools or speech plugin</string>
-    <string name="word_session_complete">Session complete</string>
-    <string name="word_session_stats">Again %1$d   Hard %2$d
-Good %3$d   Easy %4$d
-Study time %5$d min</string>
-    <string name="word_finish">Done</string>
-    <string name="word_loading_remote">Downloading word pack…</string>
-    <string name="word_remote_load_failed">Download failed. Check the network or remote URL.</string>
-    <string name="word_pack_unavailable">This word pack is not downloaded yet. Configure the remote static host or check the bundled preview.</string>
-    <string name="stroke_replay">Replay strokes</string>
-    <string name="stroke_loading">Loading stroke order…</string>
+    <string name="pronunciation_google_recognize">Google speech recognition</string>
+    <string name="pronunciation_google_unavailable">No Google/system speech recognition service is available</string>
+    <string name="pronunciation_recognition_prompt">Say: %1$s</string>
+    <string name="pronunciation_recognition_cancelled">Speech recognition cancelled</string>
+    <string name="pronunciation_recognition_empty">No speech was recognized. Try again.</string>
+    <string name="pronunciation_recognition_result">Recognized: %1$s
+Text match: %2$d%% (not a professional pronunciation score)</string>
 </resources>
