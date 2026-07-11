@@ -148,4 +148,16 @@
     <string name="pronunciation_status_recording_and_recognizing">正在录音并识别，再次点击可结束</string>
     <string name="pronunciation_try_again">再试一次</string>
     <string name="pronunciation_unrecognized">未识别到文字</string>
+    <string name="pronunciation_diagnostic_log">诊断日志</string>
+    <string name="pronunciation_copy_log">复制日志</string>
+    <string name="pronunciation_log_copied">日志已复制</string>
+    <string name="pronunciation_close">关闭</string>
+    <string name="pronunciation_no_diagnostic_log">暂无诊断日志</string>
+    <string name="pronunciation_recording_saved_summary">录音成功 · %1$s 秒 · %2$d KB</string>
+    <string name="pronunciation_recording_missing_summary">没有生成有效录音</string>
+    <string name="pronunciation_recognition_error_summary">识别状态：%1$s（%2$d）</string>
+    <string name="pronunciation_recognition_unknown_error">识别状态未知</string>
+    <string name="pronunciation_recorded_but_unrecognized">录音已保存，但系统语音识别没有返回文字。可以播放“我的录音”；这不代表录音失败。</string>
+    <string name="pronunciation_record_and_recognition_failed">录音和语音识别均未成功</string>
+    <string name="word_restart_session">再学一遍</string>
 </resources>
