@@ -6,7 +6,6 @@ import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -75,17 +74,8 @@ public class WordStrokeActivity extends AppCompatActivity {
         window.setNavigationBarColor(Color.TRANSPARENT);
         window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         WindowManager.LayoutParams attributes = window.getAttributes();
-        attributes.dimAmount = Build.VERSION.SDK_INT >= 31 ? 0.08f : 0.18f;
-        if (Build.VERSION.SDK_INT >= 31) {
-            try {
-                window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND);
-                attributes.getClass().getMethod("setBlurBehindRadius", int.class)
-                        .invoke(attributes, dp(26));
-            } catch (Throwable ignored) { }
-        }
+        attributes.dimAmount = 0.48f;
         window.setAttributes(attributes);
-        window.setLayout(WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT);
     }
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
@@ -99,7 +89,7 @@ public class WordStrokeActivity extends AppCompatActivity {
         LinearLayout popup = new LinearLayout(this);
         popup.setOrientation(LinearLayout.VERTICAL);
         popup.setPadding(dp(18), dp(16), dp(18), dp(18));
-        popup.setBackground(rounded(0xF7FFFFFF, dp(26), 0xCCFFFFFF, dp(1)));
+        popup.setBackground(rounded(Color.WHITE, dp(24), 0x1F64748B, dp(1)));
         popup.setElevation(dp(14));
         popup.setClickable(true);
         popup.setOnClickListener(v -> { });

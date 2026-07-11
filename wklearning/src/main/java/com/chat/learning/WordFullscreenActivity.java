@@ -529,9 +529,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
         addDivider(backContent, 14, 16);
         addCoreMeaning(backContent, item.partOfSpeech, item.meaningMy);
-        addExampleSection(backContent, item);
         addSection(backContent, R.string.word_label_usage, item.usageSceneMy, COLOR_ORANGE);
-        addSection(backContent, R.string.word_label_memory_tip, item.memoryTip, COLOR_PURPLE);
+        addExampleSection(backContent, item);
         addSection(backContent, R.string.word_label_collocations, join(item.collocations), COLOR_PURPLE);
         addSection(backContent, R.string.word_label_synonyms, join(item.synonyms), COLOR_GREEN);
         addSection(backContent, R.string.word_label_antonyms, join(item.antonyms), COLOR_RED);
