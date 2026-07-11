@@ -5,7 +5,9 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.os.Build;
@@ -20,6 +22,8 @@ import android.text.style.StyleSpan;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.MenuItem;
+import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 import android.view.View;
 import android.view.Window;
 import android.widget.FrameLayout;
@@ -60,6 +64,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private static final int COLOR_GOLD = 0xFFF59E0B;
     private static final int COLOR_DIVIDER = 0xFFE5E7EB;
     private static final String SP = "tsdd_word_study_v2";
+    private static final int DEFAULT_REVIEW_LIMIT = 30;
+    private static final int DEFAULT_NEW_LIMIT = 10;
 
     private String packId;
     private String title;
@@ -72,7 +78,6 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private final ArrayList<WordItem> queue = new ArrayList<>();
     private final Map<String, Integer> againRepeats = new HashMap<>();
     private final Map<String, Integer> hardRepeats = new HashMap<>();
-    private Map<WordFsrsScheduler.Rating, WordFsrsScheduler.Result> previews = new EnumMap<>(WordFsrsScheduler.Rating.class);
 
     private WordCardContainer card;
     private FrameLayout cardHost;
@@ -85,6 +90,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private LinearLayout front;
     private ScrollView backScroll;
     private LinearLayout backContent;
+    private LinearLayout ratingRow;
     private TextView wordView;
     private TextView pinyinView;
     private TextView phoneticView;
@@ -100,6 +106,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private boolean pendingGestureRender;
     private boolean sessionFinished;
     private int totalInitial;
+    private int sessionReviewInitial;
+    private int sessionNewInitial;
     private int countAgain;
     private int countHard;
     private int countGood;
@@ -174,6 +182,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         phoneticView.setVisibility(View.GONE);
         progressView.setText(title);
         favoriteView.setVisibility(View.GONE);
+        if (ratingRow != null) ratingRow.setVisibility(View.GONE);
         for (TextView button : ratingButtons.values()) button.setEnabled(false);
     }
 
@@ -187,6 +196,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         phoneticView.setVisibility(View.GONE);
         progressView.setText(title);
         favoriteView.setVisibility(View.GONE);
+        if (ratingRow != null) ratingRow.setVisibility(View.GONE);
         for (TextView button : ratingButtons.values()) button.setEnabled(false);
     }
 
@@ -199,14 +209,36 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private void setWords(List<WordItem> source) {
         queue.clear();
-        if (source != null) queue.addAll(source);
+        sessionReviewInitial = 0;
+        sessionNewInitial = 0;
+
         Map<String, WordFsrsScheduler.CardState> states = progressStore.loadPack(packId);
         long now = System.currentTimeMillis();
-        Collections.sort(queue, Comparator.comparingLong(item -> {
+        ArrayList<WordItem> due = new ArrayList<>();
+        ArrayList<WordItem> fresh = new ArrayList<>();
+
+        if (source != null) {
+            for (WordItem item : source) {
+                WordFsrsScheduler.CardState state = states.get(item.id);
+                if (state == null || state.reviewCount == 0) {
+                    fresh.add(item);
+                } else if (state.dueAt <= now) {
+                    due.add(item);
+                }
+            }
+        }
+
+        Collections.sort(due, Comparator.comparingLong(item -> {
             WordFsrsScheduler.CardState state = states.get(item.id);
-            if (state == null || state.reviewCount == 0) return Long.MAX_VALUE - 1;
-            return state.dueAt <= now ? state.dueAt : Long.MAX_VALUE;
+            return state == null ? Long.MAX_VALUE : state.dueAt;
         }));
+
+        int reviewLimit = Math.min(DEFAULT_REVIEW_LIMIT, due.size());
+        int newLimit = Math.min(DEFAULT_NEW_LIMIT, fresh.size());
+        queue.addAll(due.subList(0, reviewLimit));
+        queue.addAll(fresh.subList(0, newLimit));
+        sessionReviewInitial = reviewLimit;
+        sessionNewInitial = newLimit;
         totalInitial = queue.size();
         sessionFinished = false;
         renderCurrent();
@@ -283,23 +315,41 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
         front = buildFront();
         FrameLayout.LayoutParams faceLp = new FrameLayout.LayoutParams(-1, -1);
-        faceLp.setMargins(0, dp(52), 0, dp(90));
+        faceLp.setMargins(0, dp(52), 0, dp(14));
         card.addView(front, faceLp);
 
         backScroll = new ScrollView(this);
         backScroll.setFillViewport(true);
         backScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         backScroll.setVerticalScrollBarEnabled(false);
+        backScroll.setClickable(true);
         backContent = new LinearLayout(this);
         backContent.setOrientation(LinearLayout.VERTICAL);
         backContent.setPadding(dp(24), dp(8), dp(24), dp(28));
+        backContent.setClickable(false);
+        final int backTapSlop = Math.max(dp(18), ViewConfiguration.get(this).getScaledTouchSlop() * 2);
+        final float[] backTapDown = new float[2];
+        backScroll.setOnTouchListener((v, event) -> {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                backTapDown[0] = event.getX();
+                backTapDown[1] = event.getY();
+            } else if (event.getActionMasked() == MotionEvent.ACTION_UP && !frontFace) {
+                float dx = event.getX() - backTapDown[0];
+                float dy = event.getY() - backTapDown[1];
+                if (Math.hypot(dx, dy) <= backTapSlop) {
+                    flipCard();
+                    return true;
+                }
+            }
+            return false;
+        });
         backScroll.addView(backContent, new ScrollView.LayoutParams(-1, -2));
         card.addView(backScroll, faceLp);
 
-        LinearLayout ratingRow = buildRatingRow();
-        FrameLayout.LayoutParams ratingLp = new FrameLayout.LayoutParams(-1, dp(82), Gravity.BOTTOM);
-        ratingLp.setMargins(dp(12), 0, dp(12), dp(8));
-        card.addView(ratingRow, ratingLp);
+        ratingRow = buildRatingRow();
+        LinearLayout.LayoutParams ratingLp = new LinearLayout.LayoutParams(-1, dp(60));
+        ratingLp.setMargins(0, dp(12), 0, 0);
+        page.addView(ratingRow, ratingLp);
     }
 
     private View buildTopBar() {
@@ -376,14 +426,22 @@ public class WordFullscreenActivity extends AppCompatActivity {
         LinearLayout tools = new LinearLayout(this);
         tools.setOrientation(LinearLayout.HORIZONTAL);
         tools.setGravity(Gravity.CENTER);
-        tools.addView(toolChip("🔊", R.string.word_action_tts, 0xFFE7F0FF, COLOR_BLUE, v -> speakWord()), weighted());
-        addGap(tools, 7);
-        tools.addView(toolChip("拼", R.string.word_action_spelling, 0xFFF0E9FF, COLOR_PURPLE, v -> speakSpelling()), weighted());
-        addGap(tools, 7);
-        tools.addView(toolChip("笔", R.string.word_action_stroke, 0xFFFFEEDC, COLOR_ORANGE, v -> openStroke()), weighted());
-        addGap(tools, 7);
-        tools.addView(toolChip("录", R.string.word_action_pronunciation, 0xFFE1F7EC, COLOR_GREEN, v -> openPronunciation()), weighted());
-        box.addView(tools, new LinearLayout.LayoutParams(-1, dp(54)));
+        tools.addView(toolBubble(R.string.word_action_tts_short, R.string.word_action_tts,
+                new int[]{0xFF60A5FA, 0xFF22D3EE}, new int[]{0xFFF5FAFF, 0xFFEAF8FF}, v -> speakWord()),
+                new LinearLayout.LayoutParams(dp(48), dp(42)));
+        addGap(tools, 12);
+        tools.addView(toolBubble(R.string.word_action_spelling_short, R.string.word_action_spelling,
+                new int[]{0xFF8B5CF6, 0xFFEC4899}, new int[]{0xFFFAF7FF, 0xFFFFF4FB}, v -> speakSpelling()),
+                new LinearLayout.LayoutParams(dp(48), dp(42)));
+        addGap(tools, 12);
+        tools.addView(toolBubble(R.string.word_action_stroke_short, R.string.word_action_stroke,
+                new int[]{0xFFF59E0B, 0xFFFB7185}, new int[]{0xFFFFFAF0, 0xFFFFF4F2}, v -> openStroke()),
+                new LinearLayout.LayoutParams(dp(48), dp(42)));
+        addGap(tools, 12);
+        tools.addView(toolBubble(R.string.word_action_pronunciation_short, R.string.word_action_pronunciation,
+                new int[]{0xFF10B981, 0xFF22D3EE}, new int[]{0xFFF2FFF9, 0xFFEFFFFF}, v -> openPronunciation()),
+                new LinearLayout.LayoutParams(dp(48), dp(42)));
+        box.addView(tools, new LinearLayout.LayoutParams(-1, dp(50)));
         return box;
     }
 
@@ -402,12 +460,12 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void addRating(LinearLayout row, WordFsrsScheduler.Rating rating, int titleRes, int bg, int color) {
-        TextView button = label("", 12, color, true);
+        TextView button = label("", 13, color, true);
         button.setGravity(Gravity.CENTER);
-        button.setBackground(rounded(bg, dp(15), 0, 0));
+        button.setBackground(rounded(bg, dp(16), 0x18000000, dp(1)));
         button.setTag(titleRes);
         button.setOnClickListener(v -> onRatingClick(rating));
-        row.addView(button, new LinearLayout.LayoutParams(0, dp(64), 1f));
+        row.addView(button, new LinearLayout.LayoutParams(0, dp(54), 1f));
         ratingButtons.put(rating, button);
     }
 
@@ -417,6 +475,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
             return;
         }
         sessionFinished = false;
+        if (ratingRow != null) ratingRow.setVisibility(View.VISIBLE);
         favoriteView.setVisibility(View.VISIBLE);
         for (TextView button : ratingButtons.values()) button.setEnabled(true);
         frontFace = true;
@@ -428,14 +487,15 @@ public class WordFullscreenActivity extends AppCompatActivity {
         bindBack();
         bindFavorite();
         bindRatings();
+        bindRatingAvailability();
         resetBackdrop();
         card.resetImmediately();
         if (autoRead()) card.postDelayed(this::speakWord, 160);
     }
 
     private void bindTopControls() {
-        int due = progressStore.countDue(packId, System.currentTimeMillis());
-        planView.setText(getString(R.string.word_today_plan_count, due, queue.size()));
+        planView.setText(getString(R.string.word_today_plan_count,
+                sessionReviewInitial, sessionNewInitial));
         autoReadView.setText(autoRead() ? getString(R.string.word_auto_read_on) : getString(R.string.word_auto_read_off));
         pinyinToggleView.setText(showPinyin() ? getString(R.string.word_pinyin_on) : getString(R.string.word_pinyin_off));
     }
@@ -467,16 +527,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
         header.addView(backPinyin, new LinearLayout.LayoutParams(0, -2, 1f));
         backContent.addView(header, new LinearLayout.LayoutParams(-1, -2));
 
-        if (item.partOfSpeech.length() > 0) {
-            TextView pos = label(getString(R.string.word_part_of_speech, item.partOfSpeech), 12, COLOR_BRAND, true);
-            pos.setBackground(rounded(0xFFECEBFF, dp(10), 0, 0));
-            pos.setPadding(dp(9), dp(4), dp(9), dp(4));
-            LinearLayout.LayoutParams posLp = new LinearLayout.LayoutParams(-2, -2);
-            posLp.setMargins(0, dp(8), 0, 0);
-            backContent.addView(pos, posLp);
-        }
         addDivider(backContent, 14, 16);
-        addSection(backContent, R.string.word_core_meaning, item.meaningMy, COLOR_BRAND);
+        addCoreMeaning(backContent, item.partOfSpeech, item.meaningMy);
         addSection(backContent, R.string.word_label_usage, item.usageSceneMy, COLOR_ORANGE);
         addExampleSection(backContent, item);
         addSection(backContent, R.string.word_label_collocations, join(item.collocations), COLOR_PURPLE);
@@ -491,6 +543,37 @@ public class WordFullscreenActivity extends AppCompatActivity {
         backContent.addView(hint, hintLp);
     }
 
+    private void addCoreMeaning(LinearLayout parent, String partOfSpeech, String meaning) {
+        if ((partOfSpeech == null || partOfSpeech.trim().length() == 0)
+                && (meaning == null || meaning.trim().length() == 0)) return;
+
+        LinearLayout heading = new LinearLayout(this);
+        heading.setOrientation(LinearLayout.HORIZONTAL);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+
+        if (partOfSpeech != null && partOfSpeech.trim().length() > 0) {
+            TextView pos = label(partOfSpeech.trim(), 12, COLOR_BRAND, true);
+            pos.setPadding(dp(8), dp(3), dp(8), dp(3));
+            pos.setBackground(rounded(0xFFF0EFFF, dp(6), 0x225B5BD6, dp(1)));
+            heading.addView(pos, new LinearLayout.LayoutParams(-2, -2));
+
+            TextView dot = label(" · ", 14, 0xFF9CA3AF, true);
+            heading.addView(dot, new LinearLayout.LayoutParams(-2, -2));
+        }
+
+        TextView title = sectionTitle(getString(R.string.word_core_meaning), COLOR_BRAND);
+        heading.addView(title, new LinearLayout.LayoutParams(-2, -2));
+        parent.addView(heading, new LinearLayout.LayoutParams(-1, -2));
+
+        if (meaning != null && meaning.trim().length() > 0) {
+            TextView content = label(meaning.trim(), 17, COLOR_TEXT, false);
+            content.setLineSpacing(dp(5), 1.08f);
+            LinearLayout.LayoutParams contentLp = new LinearLayout.LayoutParams(-1, -2);
+            contentLp.setMargins(0, dp(8), 0, 0);
+            parent.addView(content, contentLp);
+        }
+    }
+
     private void addExampleSection(LinearLayout parent, WordItem item) {
         if (item.example.length() == 0) return;
         LinearLayout heading = new LinearLayout(this);
@@ -498,7 +581,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         heading.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = sectionTitle(getString(R.string.word_label_example), COLOR_BLUE);
         heading.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView speaker = chip("🔊", 0xFFE7F0FF, COLOR_BLUE);
+        TextView speaker = soundWaveButton();
         speaker.setOnClickListener(v -> LearningTtsBridge.speak(this, item.example,
                 LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_EXAMPLE));
         heading.addView(speaker, new LinearLayout.LayoutParams(dp(46), dp(34)));
@@ -559,16 +642,21 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void bindRatings() {
-        WordItem item = current();
-        if (item == null) return;
-        WordFsrsScheduler.CardState state = progressStore.load(item.packId, item.id);
-        previews = scheduler.preview(state, System.currentTimeMillis());
         for (WordFsrsScheduler.Rating rating : WordFsrsScheduler.Rating.values()) {
             TextView button = ratingButtons.get(rating);
             if (button == null) continue;
             int titleRes = (Integer) button.getTag();
-            WordFsrsScheduler.Result result = previews.get(rating);
-            button.setText(getString(titleRes) + "\n" + formatInterval(result == null ? 0 : result.intervalMillis));
+            button.setText(getString(titleRes));
+        }
+    }
+
+
+    private void bindRatingAvailability() {
+        for (WordFsrsScheduler.Rating rating : WordFsrsScheduler.Rating.values()) {
+            TextView button = ratingButtons.get(rating);
+            if (button == null) continue;
+            boolean canRateImmediately = !frontFace || rating == WordFsrsScheduler.Rating.AGAIN;
+            button.setAlpha(canRateImmediately ? 1f : 0.72f);
         }
     }
 
@@ -656,7 +744,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
                     ? R.string.word_pull_unfavorite_release : R.string.word_pull_favorite_release)
                     : getString(R.string.word_pull_favorite_hint));
         } else if (direction == WordCardContainer.Direction.RIGHT && frontFace) {
-            rightMark.setText(crossed ? getString(R.string.word_check_answer_first) : getString(R.string.word_mark_known));
+            rightMark.setText(R.string.word_check_answer_first);
         }
         if (crossed && !thresholdFeedbackSent) {
             thresholdFeedbackSent = true;
@@ -683,6 +771,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private void flipCard() {
         if (queue.isEmpty()) return;
         frontFace = !frontFace;
+        bindRatingAvailability();
         View hide = frontFace ? backScroll : front;
         View show = frontFace ? front : backScroll;
         card.animate().rotationY(86f).setDuration(100).withEndAction(() -> {
@@ -769,10 +858,10 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void showPlan() {
-        int due = progressStore.countDue(packId, System.currentTimeMillis());
         new AlertDialog.Builder(this)
                 .setTitle(R.string.word_today_plan)
-                .setMessage(getString(R.string.word_plan_message, due, queue.size(), totalInitial))
+                .setMessage(getString(R.string.word_plan_message,
+                        sessionReviewInitial, sessionNewInitial, queue.size()))
                 .setPositiveButton(android.R.string.ok, null)
                 .show();
     }
@@ -794,6 +883,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private void showCompletion() {
         sessionFinished = true;
+        if (ratingRow != null) ratingRow.setVisibility(View.GONE);
         cardHost.removeAllViews();
         LinearLayout done = new LinearLayout(this);
         done.setOrientation(LinearLayout.VERTICAL);
@@ -832,19 +922,6 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private boolean showPhonetic() { return settings.getBoolean("show_phonetic", true); }
     private WordItem current() { return queue.isEmpty() ? null : queue.get(0); }
 
-    private String formatInterval(long millis) {
-        if (millis < 60_000L) return getString(R.string.word_review_soon);
-        long minutes = Math.max(1, Math.round(millis / 60_000.0));
-        if (minutes < 60) return getString(R.string.word_review_minutes, minutes);
-        long hours = Math.max(1, Math.round(minutes / 60.0));
-        if (hours < 24) return getString(R.string.word_review_hours, hours);
-        long days = Math.max(1, Math.round(hours / 24.0));
-        if (days < 30) return getString(R.string.word_review_days, days);
-        long months = Math.max(1, Math.round(days / 30.0));
-        if (months < 12) return getString(R.string.word_review_months, months);
-        return getString(R.string.word_review_years, Math.max(1, Math.round(months / 12.0)));
-    }
-
     private String join(List<String> values) {
         if (values == null || values.isEmpty()) return "";
         StringBuilder out = new StringBuilder();
@@ -872,12 +949,37 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private LinearLayout.LayoutParams weighted() { return new LinearLayout.LayoutParams(0, -1, 1f); }
     private void addGap(LinearLayout row, int width) { row.addView(new View(this), new LinearLayout.LayoutParams(dp(width), 1)); }
 
-    private TextView toolChip(String icon, int titleRes, int bg, int color, View.OnClickListener listener) {
-        TextView view = label(icon + "  " + getString(titleRes), 12, color, true);
+    private TextView toolBubble(int shortTitleRes, int descriptionRes, int[] borderColors,
+                                int[] fillColors, View.OnClickListener listener) {
+        TextView view = label(getString(shortTitleRes), 16, COLOR_TEXT, true);
         view.setGravity(Gravity.CENTER);
-        view.setBackground(rounded(bg, dp(15), 0, 0));
+        view.setContentDescription(getString(descriptionRes));
+        view.setBackground(gradientBorder(borderColors, fillColors, dp(18), dp(1)));
+        view.setElevation(dp(2));
         view.setOnClickListener(listener);
         return view;
+    }
+
+    private TextView soundWaveButton() {
+        TextView view = label("▂▅▃", 12, COLOR_PURPLE, true);
+        view.setGravity(Gravity.CENTER);
+        view.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) view.setLetterSpacing(0.04f);
+        view.setContentDescription(getString(R.string.word_action_tts));
+        view.setBackground(gradientBorder(
+                new int[]{0xFF60A5FA, 0xFF8B5CF6},
+                new int[]{0xFFF7FAFF, 0xFFF6F3FF}, dp(13), dp(1)));
+        return view;
+    }
+
+    private Drawable gradientBorder(int[] borderColors, int[] fillColors, float radius, int width) {
+        GradientDrawable outer = new GradientDrawable(GradientDrawable.Orientation.TL_BR, borderColors);
+        outer.setCornerRadius(radius);
+        GradientDrawable inner = new GradientDrawable(GradientDrawable.Orientation.TL_BR, fillColors);
+        inner.setCornerRadius(Math.max(0f, radius - width));
+        LayerDrawable layers = new LayerDrawable(new Drawable[]{outer, inner});
+        layers.setLayerInset(1, width, width, width, width);
+        return layers;
     }
 
     private TextView chip(String text, int bg, int color) {
