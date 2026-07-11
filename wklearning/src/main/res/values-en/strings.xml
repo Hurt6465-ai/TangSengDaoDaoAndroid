@@ -54,7 +54,7 @@
     <string name="word_favorite_removed">Removed from saved</string>
     <string name="word_toast_my_phonetic_on">Burmese sound hint shown</string>
     <string name="word_toast_my_phonetic_off">Burmese sound hint hidden</string>
-    <string name="word_stroke_todo">Stroke order entry reserved for Hanzi data</string>
+    <string name="word_stroke_todo">Play the correct stroke order with Hanzi Writer</string>
     <string name="word_tts_plugin_missing">TTS plugin is missing or did not respond</string>
     <string name="word_menu_show_my_phonetic">Show Burmese sound hint</string>
     <string name="word_menu_hide_my_phonetic">Hide Burmese sound hint</string>
@@ -80,10 +80,10 @@ Tap Hard: review tomorrow</string>
     <string name="word_tone_4">fourth tone</string>
     <string name="pronunciation_title">Pronunciation practice</string>
     <string name="stroke_title">Stroke order</string>
-    <string name="stroke_subtitle">This keeps a native full-screen entry first. After HanziWriter or makemeahanzi data is connected, it can show stroke animation, step-by-step animation.</string>
-    <string name="stroke_chars_title">Practice each character</string>
-    <string name="stroke_data_missing">Stroke-order data is not connected yet. Once data is added, this page will show stroke animation and step-by-step playback.</string>
-    <string name="stroke_speak_word">Speak this word</string>
+    <string name="stroke_subtitle">Tap a character to switch. The correct stroke order plays automatically. A character needs internet the first time and is cached afterward.</string>
+    <string name="stroke_chars_title">Choose a character</string>
+    <string name="stroke_data_missing">Unable to load stroke-order data. Check the network and try again.</string>
+    <string name="stroke_speak_word">Speak word</string>
     <string name="pronunciation_tip">Listen to the standard audio and spelling audio, then record yourself. The free version compares recordings; a local ASR plugin can add recognition/scoring.</string>
     <string name="pronunciation_play_standard">Play standard audio</string>
     <string name="pronunciation_play_spelling">Play spelling audio</string>
@@ -103,9 +103,14 @@ Tap Hard: review tomorrow</string>
     <string name="pronunciation_need_permission">Microphone permission is required</string>
     <string name="pronunciation_asr_plugin_missing">Local ASR/scoring plugin is missing. Recording comparison is still available.</string>
 
+    <string name="word_action_tts_short">Read</string>
+    <string name="word_action_spelling_short">Spell</string>
+    <string name="word_action_stroke_short">Stroke</string>
+    <string name="word_action_pronunciation_short">Speak</string>
+
     <string name="word_action_easy">Easy</string>
     <string name="word_today_plan">Today</string>
-    <string name="word_today_plan_count">Due %1$d · Queue %2$d</string>
+    <string name="word_today_plan_count">Review %1$d · New %2$d</string>
     <string name="word_auto_read_on">Auto On</string>
     <string name="word_auto_read_off">Auto Off</string>
     <string name="word_core_meaning">Core meaning</string>
@@ -115,9 +120,9 @@ Tap Hard: review tomorrow</string>
     <string name="word_review_minutes">%1$d min</string>
     <string name="word_review_months">%1$d mo</string>
     <string name="word_review_years">%1$d yr</string>
-    <string name="word_plan_message">Due today: %1$d
-Current queue: %2$d
-Words at start: %3$d</string>
+    <string name="word_plan_message">Reviews in this session: %1$d
+New words in this session: %2$d
+Remaining: %3$d</string>
     <string name="word_tts_settings_hint">Set voice and speed in the learning tools or speech plugin</string>
     <string name="word_session_complete">Session complete</string>
     <string name="word_session_stats">Again %1$d   Hard %2$d
@@ -127,4 +132,6 @@ Study time %5$d min</string>
     <string name="word_loading_remote">Downloading word pack…</string>
     <string name="word_remote_load_failed">Download failed. Check the network or remote URL.</string>
     <string name="word_pack_unavailable">This word pack is not downloaded yet. Configure the remote static host or check the bundled preview.</string>
+    <string name="stroke_replay">Replay strokes</string>
+    <string name="stroke_loading">Loading stroke order…</string>
 </resources>
