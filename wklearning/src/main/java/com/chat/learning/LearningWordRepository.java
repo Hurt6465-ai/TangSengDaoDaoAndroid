@@ -103,7 +103,7 @@ final class LearningWordRepository {
                     word,
                     pinyin,
                     item.optString("phonetic_my", ""),
-                    first(item.optString("part_of_speech_my", ""), item.optString("part_of_speech", "")),
+                    first(item.optString("part_of_speech", ""), item.optString("part_of_speech_my", "")),
                     meaningMy,
                     first(item.optString("usage_scene_my", ""), item.optString("usage_scene", "")),
                     exampleText,
