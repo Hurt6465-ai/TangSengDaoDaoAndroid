@@ -138,9 +138,10 @@
             android:id="@+id/rewindBtn"
             android:layout_width="52dp"
             android:layout_height="52dp"
-            android:background="@android:color/transparent"
+            android:background="@drawable/bg_dating_action_rewind"
             android:contentDescription="撤回"
-            android:padding="8dp"
+            android:elevation="12dp"
+            android:padding="10dp"
             android:src="@drawable/ic_dating_rewind_thick" />
 
         <Space android:layout_width="13dp" android:layout_height="1dp" />

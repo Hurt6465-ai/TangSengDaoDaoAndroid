@@ -100,7 +100,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="@drawable/bg_dating_top_soft_mask"
         android:gravity="bottom"
         android:orientation="vertical"
         android:paddingStart="22dp"
