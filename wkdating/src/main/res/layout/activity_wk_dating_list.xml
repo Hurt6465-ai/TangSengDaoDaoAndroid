@@ -1,75 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#F6F6F8">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="64dp">
-            <ImageView
-                android:id="@+id/backBtn"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="start|center_vertical"
-                android:layout_marginStart="8dp"
-                android:contentDescription="返回"
-                android:foreground="?android:attr/selectableItemBackgroundBorderless"
-                android:padding="13dp"
-                android:src="@drawable/ic_dating_back"
-                android:tint="#24242A" />
-            <TextView
-                android:id="@+id/titleTv"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:textColor="#202026"
-                android:textSize="20sp"
-                android:textStyle="bold" />
+<FrameLayout xmlns:ns0="http://schemas.android.com/apk/res/android" ns0:layout_width="match_parent" ns0:layout_height="match_parent" ns0:background="#F6F6F8">
+    <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="match_parent" ns0:orientation="vertical">
+        <FrameLayout ns0:layout_width="match_parent" ns0:layout_height="64dp">
+            <ImageView ns0:id="@+id/backBtn" ns0:layout_width="48dp" ns0:layout_height="48dp" ns0:layout_gravity="start|center_vertical" ns0:layout_marginStart="8dp" ns0:contentDescription="@string/dating_back" ns0:foreground="?android:attr/selectableItemBackgroundBorderless" ns0:padding="13dp" ns0:src="@drawable/ic_dating_back" ns0:tint="#24242A" />
+            <TextView ns0:id="@+id/titleTv" ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:layout_gravity="center" ns0:textColor="#202026" ns0:textSize="20sp" ns0:textStyle="bold" />
         </FrameLayout>
-
-        <TextView
-            android:id="@+id/subtitleTv"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingStart="18dp"
-            android:paddingEnd="18dp"
-            android:paddingBottom="12dp"
-            android:textColor="#767681"
-            android:textSize="13sp" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerView"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingBottom="24dp" />
+        <TextView ns0:id="@+id/subtitleTv" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:paddingStart="18dp" ns0:paddingEnd="18dp" ns0:paddingBottom="12dp" ns0:textColor="#767681" ns0:textSize="13sp" />
+        <androidx.recyclerview.widget.RecyclerView ns0:id="@+id/recyclerView" ns0:layout_width="match_parent" ns0:layout_height="0dp" ns0:layout_weight="1" ns0:clipToPadding="false" ns0:paddingStart="12dp" ns0:paddingEnd="12dp" ns0:paddingBottom="24dp" />
     </LinearLayout>
-
-    <ProgressBar
-        android:id="@+id/loadingBar"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_gravity="center"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/emptyTv"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
-        android:padding="32dp"
-        android:text="暂无内容"
-        android:textColor="#888890"
-        android:textSize="15sp"
-        android:visibility="gone" />
+    <ProgressBar ns0:id="@+id/loadingBar" ns0:layout_width="40dp" ns0:layout_height="40dp" ns0:layout_gravity="center" ns0:visibility="gone" />
+    <TextView ns0:id="@+id/emptyTv" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_gravity="center" ns0:gravity="center" ns0:padding="32dp" ns0:text="@string/dating_empty_content" ns0:textColor="#888890" ns0:textSize="15sp" ns0:visibility="gone" />
 </FrameLayout>

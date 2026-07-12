@@ -1,95 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:padding="28dp">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:background="@drawable/bg_dating_match_dialog"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:paddingStart="24dp"
-        android:paddingTop="30dp"
-        android:paddingEnd="24dp"
-        android:paddingBottom="24dp">
-
-        <TextView
-            android:id="@+id/titleTv"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:textColor="#FFFF416C"
-            android:textSize="28sp"
-            android:textStyle="bold" />
-
-        <FrameLayout
-            android:layout_width="260dp"
-            android:layout_height="126dp"
-            android:layout_marginTop="22dp">
-
-            <ImageView
-                android:id="@+id/myPhoto"
-                android:layout_width="112dp"
-                android:layout_height="112dp"
-                android:layout_gravity="start|center_vertical"
-                android:background="@drawable/bg_dating_match_photo"
-                android:clipToOutline="true"
-                android:scaleType="centerCrop" />
-
-            <ImageView
-                android:id="@+id/targetPhoto"
-                android:layout_width="112dp"
-                android:layout_height="112dp"
-                android:layout_gravity="end|center_vertical"
-                android:background="@drawable/bg_dating_match_photo"
-                android:clipToOutline="true"
-                android:scaleType="centerCrop" />
-
-            <TextView
-                android:id="@+id/heartTv"
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:layout_gravity="center"
-                android:background="@drawable/bg_dating_match_heart"
-                android:gravity="center"
-                android:text="♥"
-                android:textColor="#FFFFFFFF"
-                android:textSize="36sp" />
+<FrameLayout xmlns:ns0="http://schemas.android.com/apk/res/android" ns0:layout_width="match_parent" ns0:layout_height="match_parent" ns0:padding="28dp">
+    <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_gravity="center" ns0:background="@drawable/bg_dating_match_dialog" ns0:gravity="center" ns0:orientation="vertical" ns0:paddingStart="24dp" ns0:paddingTop="30dp" ns0:paddingEnd="24dp" ns0:paddingBottom="24dp">
+        <TextView ns0:id="@+id/titleTv" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:gravity="center" ns0:textColor="#FFFF416C" ns0:textSize="28sp" ns0:textStyle="bold" />
+        <FrameLayout ns0:layout_width="260dp" ns0:layout_height="126dp" ns0:layout_marginTop="22dp">
+            <ImageView ns0:id="@+id/myPhoto" ns0:layout_width="112dp" ns0:layout_height="112dp" ns0:layout_gravity="start|center_vertical" ns0:background="@drawable/bg_dating_match_photo" ns0:clipToOutline="true" ns0:scaleType="centerCrop" />
+            <ImageView ns0:id="@+id/targetPhoto" ns0:layout_width="112dp" ns0:layout_height="112dp" ns0:layout_gravity="end|center_vertical" ns0:background="@drawable/bg_dating_match_photo" ns0:clipToOutline="true" ns0:scaleType="centerCrop" />
+            <TextView ns0:id="@+id/heartTv" ns0:layout_width="64dp" ns0:layout_height="64dp" ns0:layout_gravity="center" ns0:background="@drawable/bg_dating_match_heart" ns0:gravity="center" ns0:text="♥" ns0:textColor="#FFFFFFFF" ns0:textSize="36sp" />
         </FrameLayout>
-
-        <TextView
-            android:id="@+id/subtitleTv"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:gravity="center"
-            android:lineSpacingExtra="3dp"
-            android:textColor="#FF65656E"
-            android:textSize="15sp" />
-
-        <TextView
-            android:id="@+id/chatBtn"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:layout_marginTop="24dp"
-            android:background="@drawable/bg_dating_primary_button"
-            android:gravity="center"
-            android:text="立即聊天"
-            android:textColor="#FFFFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/keepBtn"
-            android:layout_width="match_parent"
-            android:layout_height="46dp"
-            android:layout_marginTop="8dp"
-            android:gravity="center"
-            android:text="继续匹配"
-            android:textColor="#FF8C8C95"
-            android:textSize="15sp" />
+        <TextView ns0:id="@+id/subtitleTv" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="18dp" ns0:gravity="center" ns0:lineSpacingExtra="3dp" ns0:textColor="#FF65656E" ns0:textSize="15sp" />
+        <TextView ns0:id="@+id/chatBtn" ns0:layout_width="match_parent" ns0:layout_height="50dp" ns0:layout_marginTop="24dp" ns0:background="@drawable/bg_dating_primary_button" ns0:gravity="center" ns0:text="@string/dating_chat_now" ns0:textColor="#FFFFFFFF" ns0:textSize="16sp" ns0:textStyle="bold" />
+        <TextView ns0:id="@+id/keepBtn" ns0:layout_width="match_parent" ns0:layout_height="46dp" ns0:layout_marginTop="8dp" ns0:gravity="center" ns0:text="@string/dating_keep_swiping" ns0:textColor="#FF8C8C95" ns0:textSize="15sp" />
     </LinearLayout>
 </FrameLayout>
