@@ -17,7 +17,7 @@
     <string name="partnerlist_complete_profile">完善我的资料</string>
     <string name="partnerlist_retry">重新加载</string>
     <string name="partnerlist_load_failed">语伴列表加载失败，请稍后重试</string>
-    <string name="partnerlist_greet">打招呼</string>
+    <string name="partnerlist_greet">👋 Hi</string>
     <string name="partnerlist_greeted">已打招呼</string>
     <string name="partnerlist_sending">发送中</string>
     <string name="partnerlist_limit_reached_short">已达上限</string>
