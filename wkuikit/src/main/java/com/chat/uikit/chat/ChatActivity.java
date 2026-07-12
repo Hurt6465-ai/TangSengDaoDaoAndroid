@@ -3389,6 +3389,15 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             wkVBinding.panelView.setOnTouchListener(null);
             return;
         }
+        if (state.replyObserved) {
+            // A reply is already visible. Keep the hidden gateway state only to
+            // bridge the short server webhook/whitelist race; the user must be able
+            // to type and send immediately.
+            wkVBinding.partnerPendingTip.setVisibility(View.GONE);
+            wkVBinding.panelView.setAlpha(1f);
+            wkVBinding.panelView.setOnTouchListener(null);
+            return;
+        }
         int remaining = state.remaining();
         wkVBinding.partnerPendingTip.setVisibility(View.VISIBLE);
         if (remaining <= 0) {
