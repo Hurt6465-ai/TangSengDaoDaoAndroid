@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:id="@+id/i_chat"
+        android:id="@+id/i_study"
         android:checked="true"
         android:title="" />
 
@@ -10,14 +10,14 @@
         android:title="" />
 
     <item
+        android:id="@+id/i_chat"
+        android:title="" />
+
+    <item
         android:id="@+id/i_discover"
         android:title="" />
 
     <item
         android:id="@+id/i_community"
-        android:title="" />
-
-    <item
-        android:id="@+id/i_study"
         android:title="" />
 </menu>
