@@ -90,11 +90,12 @@ public final class DatingUi {
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars()
                     | WindowInsetsCompat.Type.displayCutout());
-            topBar.setPadding(topBar.getPaddingLeft(), topBasePadding + bars.top,
+            int topExtra = dp(topBar, 4);
+            topBar.setPadding(topBar.getPaddingLeft(), topBasePadding + bars.top + topExtra,
                     topBar.getPaddingRight(), topBar.getPaddingBottom());
             actionBar.setPadding(actionBar.getPaddingLeft(), actionBar.getPaddingTop(),
                     actionBar.getPaddingRight(), bottomBasePadding + bars.bottom);
-            setLayoutHeight(topBar, topBaseHeight + bars.top);
+            setLayoutHeight(topBar, topBaseHeight + bars.top + topExtra);
             setLayoutHeight(actionBar, bottomBaseHeight + bars.bottom);
             return insets;
         });
@@ -111,6 +112,11 @@ public final class DatingUi {
         ViewGroup.LayoutParams params = view.getLayoutParams();
         params.height = height;
         view.setLayoutParams(params);
+    }
+
+    private static int dp(View view, int value) {
+        if (view == null || view.getResources() == null) return value;
+        return Math.round(value * view.getResources().getDisplayMetrics().density);
     }
 
     public static void openChat(Activity activity, String uid) {
