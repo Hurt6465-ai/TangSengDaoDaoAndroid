@@ -29,12 +29,14 @@ public final class PartnerPendingStore {
         public final boolean requester;
         public final int messageCount;
         public final int maxMessageCount;
+        public final boolean replyObserved;
 
-        Entry(boolean pending, boolean requester, int messageCount, int maxMessageCount) {
+        Entry(boolean pending, boolean requester, int messageCount, int maxMessageCount, boolean replyObserved) {
             this.pending = pending;
             this.requester = requester;
             this.messageCount = Math.max(0, messageCount);
             this.maxMessageCount = Math.max(1, maxMessageCount);
+            this.replyObserved = replyObserved;
         }
 
         public int remaining() {
@@ -61,7 +63,8 @@ public final class PartnerPendingStore {
                     json.optBoolean("pending", false),
                     json.optBoolean("requester", false),
                     json.optInt("message_count", 0),
-                    json.optInt("max_message_count", 3)
+                    json.optInt("max_message_count", 3),
+                    json.optBoolean("reply_observed", false)
             );
         } catch (Throwable ignored) {
             return null;
@@ -69,11 +72,22 @@ public final class PartnerPendingStore {
     }
 
     public static void markRequester(String peerUid, int messageCount, int maxMessageCount) {
-        save(peerUid, true, true, messageCount, maxMessageCount);
+        save(peerUid, true, true, messageCount, maxMessageCount, false);
     }
 
     public static void markReceiver(String peerUid, int messageCount, int maxMessageCount) {
-        save(peerUid, true, false, messageCount, maxMessageCount);
+        save(peerUid, true, false, messageCount, maxMessageCount, false);
+    }
+
+    /**
+     * The peer reply is visible locally before the server webhook/IM whitelist update
+     * is guaranteed to have finished. Keep the requester on the REST gateway for the
+     * next outgoing message, but unlock the input UI immediately.
+     */
+    public static void markReplyObserved(String peerUid) {
+        Entry old = get(peerUid);
+        if (old == null || !old.pending || !old.requester) return;
+        save(peerUid, true, true, old.messageCount, old.maxMessageCount, true);
     }
 
     public static void updateRequesterCount(String peerUid, int messageCount, int maxMessageCount) {
@@ -82,11 +96,11 @@ public final class PartnerPendingStore {
             markRequester(peerUid, messageCount, maxMessageCount);
             return;
         }
-        save(peerUid, true, true, messageCount, maxMessageCount);
+        save(peerUid, true, true, messageCount, maxMessageCount, old.replyObserved);
     }
 
     public static void markActive(String peerUid) {
-        save(peerUid, false, false, 0, 3);
+        save(peerUid, false, false, 0, 3, false);
     }
 
     public static void clearCurrentAccount() {
@@ -104,7 +118,7 @@ public final class PartnerPendingStore {
         if (listener != null) LISTENERS.remove(listener);
     }
 
-    private static void save(String peerUid, boolean pending, boolean requester, int messageCount, int maxMessageCount) {
+    private static void save(String peerUid, boolean pending, boolean requester, int messageCount, int maxMessageCount, boolean replyObserved) {
         if (TextUtils.isEmpty(peerUid)) return;
         Context context = appContext();
         String loginUid = WKConfig.getInstance().getUid();
@@ -115,6 +129,7 @@ public final class PartnerPendingStore {
             json.put("requester", requester);
             json.put("message_count", Math.max(0, messageCount));
             json.put("max_message_count", Math.max(1, maxMessageCount));
+            json.put("reply_observed", replyObserved);
             prefs(context, loginUid).edit().putString(peerUid, json.toString()).apply();
             notifyChanged(peerUid);
         } catch (Throwable ignored) {
