@@ -26,11 +26,11 @@
     <FrameLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
-        android:layout_height="138dp"
+        android:layout_height="112dp"
         android:layout_gravity="top"
         android:background="@drawable/bg_dating_top_soft_mask"
         android:paddingStart="14dp"
-        android:paddingTop="14dp"
+        android:paddingTop="0dp"
         android:paddingEnd="14dp">
 
         <LinearLayout
