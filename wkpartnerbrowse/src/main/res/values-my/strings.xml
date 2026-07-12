@@ -19,7 +19,7 @@
     <string name="partnerbrowse_active_days">%1$d ရက်အကြာ လှုပ်ရှားထားသည်</string>
     <string name="partnerbrowse_active_suffix">လှုပ်ရှားထားသည်</string>
     <string name="partnerbrowse_photo_required_tip">ဘာသာဖော်စာမျက်နှာ မကြည့်မီ ဓာတ်ပုံ အနည်းဆုံး ၁ ပုံ တင်ပါ။ Tag မဖြည့်လည်း ရပါတယ်။</string>
-    <string name="partnerbrowse_go_upload_photo">ပရိုဖိုင်တင်ရန်</string>
+    <string name="partnerbrowse_go_upload_photo">ကိုယ်ရေးအချက်အလက် ဖြည့်မည်</string>
     <string name="partnerbrowse_last_online_just_now">မကြာသေးမီက အွန်လိုင်း</string>
     <string name="partnerbrowse_last_online_format">နောက်ဆုံးအွန်လိုင်း %1$s</string>
     <string name="partnerbrowse_minutes_ago"> မိနစ်အကြာ</string>
