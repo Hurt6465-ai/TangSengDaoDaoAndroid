@@ -19,7 +19,7 @@
     <string name="partnerbrowse_active_days">Active %1$d d ago</string>
     <string name="partnerbrowse_active_suffix">active</string>
     <string name="partnerbrowse_photo_required_tip">Upload at least one partner photo before browsing. Tags are optional, but a photo is required.</string>
-    <string name="partnerbrowse_go_upload_photo">Upload profile</string>
+    <string name="partnerbrowse_go_upload_photo">Complete profile</string>
     <string name="partnerbrowse_last_online_just_now">Online just now</string>
     <string name="partnerbrowse_last_online_format">Last online %1$s</string>
     <string name="partnerbrowse_minutes_ago"> min ago</string>
