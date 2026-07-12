@@ -16,6 +16,10 @@ public class PartnerGreetingResponse {
     public int greeting_day_limit;
     public int greeting_day_used;
     public int greeting_day_remaining;
+    public String message_id;
+    public String client_msg_no;
+    public int message_seq;
+    public long timestamp;
 
     public boolean success() {
         return status == 200 || code == 200;

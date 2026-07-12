@@ -42,13 +42,8 @@ public class PartnerListUser {
 
     public String displayAvatar() {
         if (!TextUtils.isEmpty(avatar)) return avatar;
-        if (profile_images != null) {
-            for (String item : profile_images) {
-                if (!TextUtils.isEmpty(item)) return item;
-            }
-        }
-        if (!TextUtils.isEmpty(profile_cover)) return profile_cover;
-        return "";
+        String key = stableId();
+        return TextUtils.isEmpty(key) ? "" : "users/" + key + "/avatar";
     }
 
     public int age() {
