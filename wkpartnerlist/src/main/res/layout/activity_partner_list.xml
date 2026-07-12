@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_partnerlist_page">
 
     <LinearLayout
+        android:id="@+id/contentContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_marginBottom="64dp"
         android:orientation="vertical">
 
         <FrameLayout
@@ -20,6 +23,7 @@
 
             <ImageView
                 android:id="@+id/backBtn"
+                android:visibility="gone"
                 android:layout_width="42dp"
                 android:layout_height="42dp"
                 android:layout_gravity="start|center_vertical"
@@ -48,7 +52,7 @@
                         android:gravity="center"
                         android:includeFontPadding="false"
                         android:text="@string/partnerlist_mode_partner"
-                        android:textColor="#20232B"
+                        android:textColor="@color/partnerlist_mode_selected"
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
@@ -67,7 +71,7 @@
                     android:gravity="center"
                     android:includeFontPadding="false"
                     android:text="@string/partnerlist_mode_dating"
-                    android:textColor="#8E95A2"
+                    android:textColor="@color/partnerlist_mode_normal"
                     android:textSize="16sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -82,7 +86,7 @@
                 android:ellipsize="end"
                 android:singleLine="true"
                 android:text="@string/partnerlist_subtitle_loading"
-                android:textColor="#8E95A2"
+                android:textColor="@color/partnerlist_mode_normal"
                 android:textSize="11sp" />
 
             <TextView
@@ -92,7 +96,7 @@
                 android:layout_gravity="end|center_vertical"
                 android:background="@drawable/bg_partnerlist_quota"
                 android:text="@string/partnerlist_quota_default"
-                android:textColor="#6675D7"
+                android:textColor="@color/partnerlist_quota_text"
                 android:textSize="11sp"
                 android:textStyle="bold" />
         </FrameLayout>
@@ -106,7 +110,7 @@
             android:layout_marginEnd="15dp"
             android:background="@drawable/bg_partnerlist_hint"
             android:text="@string/partnerlist_status_preparing"
-            android:textColor="#6977B8"
+            android:textColor="@color/partnerlist_hint_text"
             android:textSize="12sp" />
 
         <FrameLayout
@@ -151,7 +155,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:gravity="center"
-                    android:textColor="#69707C"
+                    android:textColor="@color/partnerlist_surface_text"
                     android:textSize="14sp" />
 
                 <TextView
@@ -162,7 +166,7 @@
                     android:background="@drawable/bg_partnerlist_greeting"
                     android:gravity="center"
                     android:text="@string/partnerlist_retry"
-                    android:textColor="#6675D7"
+                    android:textColor="@color/partnerlist_quota_text"
                     android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -181,7 +185,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:text="@string/partnerlist_empty"
-                    android:textColor="#69707C"
+                    android:textColor="@color/partnerlist_surface_text"
                     android:textSize="14sp" />
 
                 <TextView
@@ -191,25 +195,23 @@
                     android:layout_marginTop="18dp"
                     android:background="@drawable/bg_partnerlist_hint"
                     android:text="@string/partnerlist_complete_profile"
-                    android:textColor="#6877C2"
+                    android:textColor="@color/partnerlist_hint_text"
                     android:textSize="13sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </FrameLayout>
 
-        <TextView
-            android:id="@+id/footerTv"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:paddingStart="20dp"
-            android:paddingTop="10dp"
-            android:paddingEnd="20dp"
-            android:paddingBottom="16dp"
-            android:textColor="#9AA0AA"
-            android:textSize="12sp"
-            android:visibility="gone" />
+
     </LinearLayout>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigation"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_gravity="bottom"
+        android:background="@color/tab_bg"
+        app:itemIconTint="@color/transparent"
+        app:menu="@menu/menu_navigation" />
 
     <TextView
         android:id="@+id/updateBanner"

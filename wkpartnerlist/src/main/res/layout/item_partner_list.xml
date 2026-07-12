@@ -2,28 +2,31 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/cardRoot"
     android:layout_width="match_parent"
-    android:layout_height="112dp"
+    android:layout_height="wrap_content"
     android:layout_marginStart="15dp"
-    android:layout_marginTop="5dp"
+    android:layout_marginTop="6dp"
     android:layout_marginEnd="15dp"
-    android:layout_marginBottom="5dp"
-    android:background="@drawable/bg_partnerlist_card"
+    android:layout_marginBottom="6dp"
+    android:background="@drawable/bg_partnerlist_card_mint"
     android:clickable="true"
     android:elevation="2dp"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground"
+    android:minHeight="116dp"
     android:paddingStart="14dp"
-    android:paddingEnd="12dp">
+    android:paddingTop="13dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="13dp">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <FrameLayout
-            android:layout_width="76dp"
-            android:layout_height="76dp">
+            android:layout_width="78dp"
+            android:layout_height="78dp">
 
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/avatarIv"
@@ -35,14 +38,14 @@
 
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/flagIv"
-                android:layout_width="24dp"
-                android:layout_height="16dp"
+                android:layout_width="23dp"
+                android:layout_height="23dp"
                 android:layout_gravity="start|bottom"
                 android:layout_marginStart="1dp"
-                android:layout_marginBottom="2dp"
+                android:layout_marginBottom="1dp"
                 android:background="@drawable/bg_partnerlist_flag"
-                android:padding="1dp"
-                android:scaleType="fitXY"
+                android:padding="1.5dp"
+                android:scaleType="centerCrop"
                 android:visibility="gone" />
 
             <View
@@ -51,7 +54,7 @@
                 android:layout_height="12dp"
                 android:layout_gravity="end|top"
                 android:layout_marginTop="2dp"
-                android:layout_marginEnd="2dp"
+                android:layout_marginEnd="3dp"
                 android:background="@drawable/bg_partnerlist_online"
                 android:visibility="gone" />
         </FrameLayout>
@@ -76,14 +79,26 @@
                     android:layout_weight="1"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:textColor="#20232B"
+                    android:textColor="@color/partnerlist_text_primary"
                     android:textSize="16sp"
                     android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/freshBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:background="@drawable/bg_partnerlist_new_badge"
+                    android:text="@string/partnerlist_new_recommendation"
+                    android:textColor="#6C62C8"
+                    android:textSize="10sp"
+                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/newBadge"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
                     android:background="@drawable/bg_partnerlist_new_badge"
                     android:text="@string/partnerlist_new"
                     android:textColor="#8068D7"
@@ -98,7 +113,7 @@
                 android:layout_marginTop="5dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="#7382D9"
+                android:textColor="@color/partnerlist_accent_text"
                 android:textSize="12sp" />
 
             <TextView
@@ -108,7 +123,7 @@
                 android:layout_marginTop="4dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="#69707C"
+                android:textColor="@color/partnerlist_text_secondary"
                 android:textSize="12sp" />
 
             <TextView
@@ -117,20 +132,20 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:maxLines="1"
-                android:textColor="#9AA0AA"
-                android:textSize="11sp" />
+                android:textColor="@color/partnerlist_text_muted"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/greetingBtn"
-            android:layout_width="74dp"
-            android:layout_height="38dp"
+            android:layout_width="78dp"
+            android:layout_height="46dp"
             android:layout_marginStart="10dp"
             android:background="@drawable/bg_partnerlist_greeting"
             android:gravity="center"
             android:maxLines="1"
             android:text="@string/partnerlist_greet"
-            android:textColor="#6575D6"
+            android:textColor="@color/partnerlist_button_text"
             android:textSize="13sp"
             android:textStyle="bold" />
     </LinearLayout>
