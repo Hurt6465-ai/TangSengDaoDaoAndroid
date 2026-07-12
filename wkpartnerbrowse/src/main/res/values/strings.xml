@@ -19,7 +19,7 @@
     <string name="partnerbrowse_active_days">%1$d天前活跃</string>
     <string name="partnerbrowse_active_suffix">活跃</string>
     <string name="partnerbrowse_photo_required_tip">进入语伴前，请先上传至少一张语伴图片。标签可以不填，但图片必须有。</string>
-    <string name="partnerbrowse_go_upload_photo">去上传资料</string>
+    <string name="partnerbrowse_go_upload_photo">完善资料</string>
     <string name="partnerbrowse_last_online_just_now">刚刚在线</string>
     <string name="partnerbrowse_last_online_format">最后在线 %1$s</string>
     <string name="partnerbrowse_minutes_ago">分钟前</string>
