@@ -48,7 +48,9 @@ class MainActivity : WKBaseActivity<ActivityMainBinding>() {
                     intent.putExtra("from", getIntent().getIntExtra("from", 0))
                     startActivity(intent)
                 } else {
-                    startActivity(Intent(this@MainActivity, TabActivity::class.java))
+                    val intent = Intent(this@MainActivity, TabActivity::class.java)
+                    intent.putExtra("from", getIntent().getIntExtra("from", 0))
+                    startActivity(intent)
                 }
             }
         } else {
