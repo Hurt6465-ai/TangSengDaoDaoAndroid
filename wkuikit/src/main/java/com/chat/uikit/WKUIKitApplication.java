@@ -570,6 +570,8 @@ public class WKUIKitApplication {
     public void exitLogin(int from) {
         MsgModel.getInstance().stopTimer();
         EndpointManager.getInstance().invoke("wk_logout", null);
+        // UID 仍可用时清理当前账号的列表推荐缓存和 Pending 会话镜像，避免切号串数据。
+        EndpointManager.getInstance().invoke("partnerlist_clear_account", null);
         WKConfig.getInstance().clearInfo();
         WKIM.getInstance().getConnectionManager().disconnect(true);
         ActManagerUtils.getInstance().clearAllActivity();
