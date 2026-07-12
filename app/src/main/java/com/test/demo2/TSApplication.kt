@@ -30,6 +30,7 @@ import com.chat.base.utils.WKTimeUtils
 import com.chat.base.utils.language.WKMultiLanguageUtil
 import com.chat.login.WKLoginApplication
 import com.chat.partner.profile.WKPartnerApplication
+import com.chat.partnerlist.PartnerListForegroundHeartbeat
 import com.chat.partnerlist.WKPartnerListApplication
 import com.chat.push.WKPushApplication
 import com.chat.room.WKRoomApplication
@@ -184,6 +185,7 @@ class TSApplication : MultiDexApplication() {
             override fun onFront() {
                 isAppInForeground = true
                 cancelBackgroundDisconnect()
+                PartnerListForegroundHeartbeat.onAppForeground()
 
                 if (!TextUtils.isEmpty(WKConfig.getInstance().token)) {
                     if (WKBaseApplication.getInstance().disconnect) {
@@ -210,6 +212,7 @@ class TSApplication : MultiDexApplication() {
 
             override fun onBack() {
                 isAppInForeground = false
+                PartnerListForegroundHeartbeat.onAppBackground()
 
                 val result = EndpointManager.getInstance().invoke("rtc_is_calling", null)
                 val isCalling = result as? Boolean ?: false
