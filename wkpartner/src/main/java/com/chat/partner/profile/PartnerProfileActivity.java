@@ -73,6 +73,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private float currentCollapsePercent;
     private boolean fixedTopBarSolid;
     private PartnerProfileEntity profile;
+    private String sourceVercode;
     private boolean feedWorksAttached;
     private Fragment feedWorksFragment;
 
@@ -101,6 +102,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void initPresenter() {
         uid = getIntent().getStringExtra(PartnerProfileRoute.EXTRA_UID);
+        sourceVercode = getIntent().getStringExtra(PartnerProfileRoute.EXTRA_VERCODE);
         if (TextUtils.isEmpty(uid)) uid = WKConfig.getInstance().getUid();
         isSelf = TextUtils.equals(uid, WKConfig.getInstance().getUid());
     }
@@ -428,6 +430,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void loadProfile() {
         PartnerProfileModel.getInstance().getUserProfile(uid, (code, msg, data) -> {
             if (code == HttpResponseCode.success && data != null) {
+                if (TextUtils.isEmpty(data.vercode) && !TextUtils.isEmpty(sourceVercode)) {
+                    data.vercode = sourceVercode;
+                }
                 profile = data;
                 bindProfile(data);
                 playEntranceAnimation();
@@ -909,6 +914,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             WKDialogUtils.getInstance().showInputDialog(this, getString(R.string.partner_add_friend), getString(R.string.partner_add_friend_hint), defaultGreeting(), defaultGreeting(), 40, text -> {
                 String remark = TextUtils.isEmpty(text) ? defaultGreeting() : text;
                 String vercode = profile == null ? "" : profile.vercode;
+                if (TextUtils.isEmpty(vercode)) vercode = sourceVercode;
                 animateButtonToProgress();
                 FriendModel.getInstance().applyAddFriend(uid, vercode, remark, (code, msg) -> {
                     if (code == HttpResponseCode.success) {
