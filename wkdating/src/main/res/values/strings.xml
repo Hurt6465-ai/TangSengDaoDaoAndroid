@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="dating_title">恋爱匹配</string>
     <string name="dating_tab_recommend">推荐</string>
@@ -43,4 +44,279 @@
     <string name="dating_filter_goal_love">意向：认真恋爱</string>
     <string name="dating_filter_goal_marriage">意向：奔结婚</string>
     <string name="dating_filter_goal_all">意向：不限</string>
+    <string name="dating_rewind">撤回</string>
+    <string name="dating_mine_title">我的交友</string>
+    <string name="dating_action_failed">操作失败</string>
+    <string name="dating_age_range_plain">%1$d-%2$d 岁</string>
+    <string name="dating_drinking_value">饮酒：%1$s</string>
+    <string name="dating_smoking_value">吸烟：%1$s</string>
+    <string name="dating_edit_intent">恋爱意向</string>
+    <string name="dating_favorite_remove">取消收藏</string>
+    <string name="dating_favorite_remove_title">取消收藏？</string>
+    <string name="dating_favorite_removed">已取消收藏</string>
+    <string name="dating_favorites_empty">还没有收藏的人</string>
+    <string name="dating_favorites_load_failed">加载收藏失败</string>
+    <string name="dating_favorites_subtitle">收藏不会触发匹配，可稍后再决定</string>
+    <string name="dating_favorites_title">我的收藏</string>
+    <string name="dating_like_quota_empty">今日喜欢额度已用完</string>
+    <string name="dating_photo_upload_done">图片上传完成</string>
+    <string name="dating_section_about">关于我</string>
+    <string name="dating_section_basic">基本资料</string>
+    <string name="dating_section_goal">恋爱意向</string>
+    <string name="dating_section_lifestyle">生活方式</string>
+    <string name="dating_intent_long_term">寻找长期伴侣</string>
+    <string name="dating_intent_long_term_open_short">长期伴侣，但不拒绝短期交往</string>
+    <string name="dating_intent_short_term_open_long">短期伴侣，但不拒绝长期交往</string>
+    <string name="dating_intent_short_term">享受短期交往的乐趣</string>
+    <string name="dating_intent_friends">结交新朋友</string>
+    <string name="dating_intent_open">顺其自然</string>
+    <string name="dating_edit_profile_title">编辑交友资料</string>
+    <string name="dating_my_photos">我的照片</string>
+    <string name="dating_shared_profile">共享资料</string>
+    <string name="dating_shared_profile_tip">年龄、性别、国籍等会从语伴资料自动同步</string>
+    <string name="dating_enable">开启交友</string>
+    <string name="dating_enable_tip">只有开启后，才能刷别人</string>
+    <string name="dating_edit_gender">想认识</string>
+    <string name="dating_edit_age">年龄偏好</string>
+    <string name="dating_edit_orientation">性取向</string>
+    <string name="dating_edit_drinking">饮酒</string>
+    <string name="dating_edit_smoking">吸烟</string>
+    <string name="dating_edit_dealbreakers">我反感</string>
+    <string name="dating_edit_ideal">希望对方</string>
+    <string name="dating_edit_tags">补充标签</string>
+    <string name="dating_save_profile">保存资料</string>
+    <string name="dating_empty_content">暂无内容</string>
+    <string name="dating_daily_quota">今日免费额度</string>
+    <string name="dating_edit_profile_menu">编辑交友资料</string>
+    <string name="dating_who_likes_me">谁喜欢我</string>
+    <string name="dating_membership">会员</string>
+    <string name="dating_my_matches">我的匹配</string>
+    <string name="dating_quota_rules">额度与规则</string>
+    <string name="dating_section_ideal">希望对方</string>
+    <string name="dating_section_dealbreakers">我反感</string>
+    <string name="dating_section_interests">兴趣与性格</string>
+    <string name="dating_block">屏蔽</string>
+    <string name="dating_report">举报</string>
+    <string name="dating_who_likes_title">看看谁对你心动</string>
+    <string name="dating_who_likes_tip">免费用户只显示人数与模糊预览。开通会员后可查看完整列表；双方喜欢后才可以聊天。</string>
+    <string name="dating_membership_benefits">了解会员权益</string>
+    <string name="dating_photo_count_tip">已上传 %1$d/5 · 第一张为主图 · 空位可继续添加</string>
+    <string name="dating_select">请选择</string>
+    <string name="dating_not_filled">未填写</string>
+    <string name="dating_uploading_wait">图片正在上传，请稍候</string>
+    <string name="dating_max_photos">最多上传 5 张照片</string>
+    <string name="dating_min_photo_enable">至少保留 1 张照片才能开启交友</string>
+    <string name="dating_saving">保存中…</string>
+    <string name="dating_saved">交友资料已保存</string>
+    <string name="dating_save_failed">保存失败</string>
+    <string name="dating_delete_photo_title">删除这张照片？</string>
+    <string name="dating_delete">删除</string>
+    <string name="dating_set_primary">设为主图</string>
+    <string name="dating_primary_photo">主图</string>
+    <string name="dating_photo_number">照片 %1$d</string>
+    <string name="dating_confirm">确定</string>
+    <string name="dating_location_failed">位置更新失败，请稍后重试</string>
+    <string name="dating_profile_load_failed">资料加载失败，请重试</string>
+    <string name="dating_enable_first">先开启交友，才能开始刷人</string>
+    <string name="dating_go_enable">去开启</string>
+    <string name="dating_operation_restored">操作未保存，已恢复卡片</string>
+    <string name="dating_no_undo">没有可以撤回的操作</string>
+    <string name="dating_rewind_quota_empty">今日免费撤回已用完，每天免费 3 次</string>
+    <string name="dating_rewind_failed">撤回失败，请稍后重试</string>
+    <string name="dating_rewind_synced_refresh">撤回已同步，推荐列表将刷新</string>
+    <string name="dating_rewind_record_synced">撤回记录已同步，推荐列表已刷新</string>
+    <string name="dating_refresh_after_profile">正在根据新资料刷新推荐…</string>
+    <string name="dating_demo_tip">当前为开发演示图片，正式版接口失败不会显示假用户</string>
+    <string-array name="dating_gender_options">
+        <item>不限</item>
+        <item>女生</item>
+        <item>男生</item>
+    </string-array>
+    <string-array name="dating_age_options">
+        <item>18-28</item>
+        <item>20-32</item>
+        <item>22-35</item>
+        <item>25-40</item>
+        <item>30-45</item>
+    </string-array>
+    <string-array name="dating_sexual_orientation_options">
+        <item>异性恋</item>
+        <item>同性恋</item>
+        <item>双性恋</item>
+        <item>泛性恋</item>
+        <item>保密</item>
+    </string-array>
+    <string-array name="dating_drinking_options">
+        <item>从不</item>
+        <item>偶尔</item>
+        <item>社交时</item>
+        <item>经常</item>
+        <item>保密</item>
+    </string-array>
+    <string-array name="dating_smoking_options">
+        <item>从不</item>
+        <item>偶尔</item>
+        <item>经常</item>
+        <item>正在戒烟</item>
+        <item>保密</item>
+    </string-array>
+    <string-array name="dating_dealbreaker_options">
+        <item>不真诚</item>
+        <item>冷暴力</item>
+        <item>控制欲强</item>
+        <item>不尊重边界</item>
+        <item>经常失联</item>
+        <item>撒谎</item>
+        <item>酗酒</item>
+        <item>赌博</item>
+        <item>不爱卫生</item>
+        <item>只聊暧昧</item>
+        <item>催见面</item>
+        <item>索要钱财</item>
+    </string-array>
+    <string name="dating_city">现居城市</string>
+    <string name="dating_height_hint">身高（cm）</string>
+    <string name="dating_weight_hint">体重（kg）</string>
+    <string name="dating_about_hint">写一点真实的你</string>
+    <string name="dating_ideal_hint">例如：真诚、情绪稳定、愿意沟通</string>
+    <string name="dating_tags_hint">如：爱旅行、会做饭、喜欢音乐</string>
+    <string name="dating_back">返回</string>
+    <string name="dating_enable_recommend">开启交友推荐</string>
+    <string name="dating_section_love_expectation">恋爱期待</string>
+    <string name="dating_chat_now">立即聊天</string>
+    <string name="dating_view_more">查看更多资料</string>
+    <string name="dating_dislike">不喜欢</string>
+    <string name="dating_primary">主图</string>
+    <string name="dating_shared_basic">基础：%1$s</string>
+    <string name="dating_shared_relationship">感情状态：%1$s</string>
+    <string name="dating_shared_personality">性格：%1$s</string>
+    <string name="dating_shared_interests">兴趣：%1$s</string>
+    <string name="dating_shared_career">职业与学历：%1$s</string>
+    <string name="dating_upload_prepare">正在准备图片</string>
+    <string name="dating_upload_processing">正在处理第 %1$d 张图片</string>
+    <string name="dating_upload_master">正在上传高清图 %1$d/%2$d</string>
+    <string name="dating_upload_card">正在上传推荐图 %1$d/%2$d</string>
+    <string name="dating_upload_failed">图片上传失败</string>
+    <string name="dating_upload_timeout">图片上传超时</string>
+    <string name="dating_upload_url_failed">获取上传地址失败</string>
+    <string name="dating_upload_url_timeout">获取上传地址超时</string>
+    <string name="dating_read_image_failed">无法读取图片</string>
+    <string name="dating_block_title">屏蔽此人？</string>
+    <string name="dating_block_message">屏蔽后将不再向你推荐此人。</string>
+    <string name="dating_blocked">已屏蔽</string>
+    <string name="dating_block_failed">屏蔽失败</string>
+    <string name="dating_report_reason">举报原因</string>
+    <string name="dating_reported">已提交举报</string>
+    <string name="dating_report_failed">举报失败</string>
+    <string name="dating_report_fake">虚假资料</string>
+    <string name="dating_report_harassment">色情或骚扰</string>
+    <string name="dating_report_scam">诈骗或引流</string>
+    <string name="dating_report_impersonation">冒用他人照片</string>
+    <string name="dating_report_other">其他</string>
+    <string name="dating_match_subtitle">你和 %1$s 都对彼此心动，可以开始聊天了</string>
+    <string name="dating_match_title_full">你们互相喜欢了</string>
+    <string name="dating_quota_like">今日喜欢额度已用完（%1$d 次）</string>
+    <string name="dating_quota_favorite">今日收藏额度已用完（%1$d 次）</string>
+    <string name="dating_matches_subtitle">互相喜欢后才能开始聊天</string>
+    <string name="dating_matches_load_failed">加载匹配失败</string>
+    <string name="dating_matches_empty">还没有匹配，继续去发现心动的人吧</string>
+    <string name="dating_unmatch_title">解除匹配？</string>
+    <string name="dating_unmatch_message">解除后双方将不能继续通过交友白名单聊天。</string>
+    <string name="dating_unmatch">解除</string>
+    <string name="dating_unmatched">已解除匹配</string>
+    <string name="dating_profile_complete_tip">完善资料后开始匹配</string>
+    <string name="dating_enabled">已开启交友推荐</string>
+    <string name="dating_disabled">已关闭交友推荐</string>
+    <string name="dating_profile_load_error">加载资料失败</string>
+    <string name="dating_like_quota_format">喜欢 %1$d/%2$d</string>
+    <string name="dating_favorite_quota_format">收藏 %1$d/%2$d</string>
+    <string name="dating_rewind_quota_format">撤回 %1$d/3</string>
+    <string name="dating_quota_message">%1$s
+%2$s
+%3$s
+
+不喜欢不限次数，但服务端会做频率防刷。</string>
+    <string name="dating_membership_pending">会员和支付接口接入后开放</string>
+    <string name="dating_filter_cross_tip">如果任意一方选择只接受本国，系统不会推荐异国用户。</string>
+    <string name="dating_filter_country_title">国家/地区</string>
+    <string name="dating_filter_country_smart_value">智能推荐</string>
+    <string name="dating_filter_country_same_value">只看本国恋</string>
+    <string name="dating_filter_country_foreign_value">只看可异国恋</string>
+    <string name="dating_filter_gender_title">性别</string>
+    <string name="dating_filter_gender_all_value">不限</string>
+    <string name="dating_filter_gender_female_value">女生</string>
+    <string name="dating_filter_gender_male_value">男生</string>
+    <string name="dating_filter_age_title">年龄</string>
+    <string name="dating_filter_goal_title">意向</string>
+    <string name="dating_filter_goal_serious_value">认真恋爱</string>
+    <string name="dating_filter_goal_marriage_value">奔结婚</string>
+    <string name="dating_filter_goal_all_value">不限</string>
+
+    <string name="dating_filter_country_format">国家：%1$s</string>
+    <string name="dating_filter_gender_format">性别：%1$s</string>
+    <string name="dating_filter_age_format">年龄：%1$d-%2$d 岁</string>
+    <string name="dating_filter_goal_format">意向：%1$s</string>
+    <string name="dating_delete_photo_action">删除照片</string>
+    <string name="dating_photo_cache_failed">无法创建图片缓存目录</string>
+    <string name="dating_photo_cache_unavailable">图片缓存目录不可用</string>
+    <string name="dating_photo_compress_failed">图片压缩失败</string>
+    <string name="dating_photo_too_large">图片太大，请重新选择</string>
+    <string name="dating_photo_too_small">图片太小，请选择更清晰的照片</string>
+    <string name="dating_photo_process_failed">图片处理失败</string>
+    <string name="dating_photo_decode_failed">图片解码失败</string>
+    <string name="dating_photo_encode_failed">图片编码失败</string>
+    <string name="dating_invalid_image_uri">图片地址无效</string>
+    <string name="dating_location_denied">未开启定位，无法查看附近的人</string>
+    <string name="dating_location_explain_again">为了继续查看附近的人，请重新开启定位权限。</string>
+    <string name="dating_location_explain_first">开启定位后才能查看附近的人。授权成功后，后续默认静默定位，不会重复询问。</string>
+    <string name="dating_location_title">开启定位</string>
+    <string name="dating_location_not_now">暂不</string>
+    <string name="dating_location_go_enable">去开启</string>
+    <string name="dating_location_back_recommend">未开启定位，已切回推荐</string>
+    <string name="dating_location_device_unavailable">当前设备无法获取定位</string>
+    <string name="dating_location_service_off">请先打开系统定位服务</string>
+    <string name="dating_location_permission_unavailable">定位权限不可用</string>
+    <string name="dating_location_retry">定位失败，请稍后重试</string>
+    <string name="dating_location_temporarily_unavailable">暂时无法获取位置，请稍后重试</string>
+    <string name="dating_photo_upload_percent">%1$s %2$d%%</string>
+    <string name="dating_section_relationship">恋爱期待</string>
+    <string name="dating_section_ideal_partner">希望对方</string>
+    <string name="dating_section_dealbreakers_title">我反感</string>
+    <string name="dating_filter_age_18_28">18-28 岁</string>
+    <string name="dating_filter_age_18_35">18-35 岁</string>
+    <string name="dating_filter_age_22_35">22-35 岁</string>
+    <string name="dating_filter_age_25_40">25-40 岁</string>
+    <string name="dating_filter_age_30_50">30-50 岁</string>
+    <string name="dating_filter_age_18_60">18-60 岁</string>
+
+    <string name="dating_shared_age_value">%1$d岁</string>
+    <string name="dating_shared_gender_female">女</string>
+    <string name="dating_shared_gender_male">男</string>
+    <string name="dating_shared_pets_value">宠物：%1$s</string>
+    <string name="dating_shared_sports_value">运动：%1$s</string>
+    <string name="dating_shared_movies_value">影视：%1$s</string>
+    <string name="dating_meta_separator"> · </string>
+    <string name="dating_list_separator">、</string>
+    <string-array name="dating_shared_relationship_values">
+        <item>保密</item><item>单身</item><item>在交往</item><item>已婚</item><item>离异</item>
+    </string-array>
+    <string-array name="dating_shared_personality_values">
+        <item>有耐心</item><item>外向</item><item>安静</item><item>内向</item><item>幽默</item><item>温柔</item><item>认真</item><item>慢热</item><item>高情商</item><item>好相处</item>
+    </string-array>
+    <string-array name="dating_shared_pet_values">
+        <item>狗</item><item>猫</item><item>兔子</item><item>鸟</item><item>鱼</item><item>仓鼠</item><item>爬宠</item><item>喜欢动物</item>
+    </string-array>
+    <string-array name="dating_shared_sport_values">
+        <item>跑步</item><item>篮球</item><item>足球</item><item>羽毛球</item><item>健身</item><item>瑜伽</item><item>游泳</item><item>骑行</item><item>徒步</item><item>滑板</item>
+    </string-array>
+    <string-array name="dating_shared_movie_values">
+        <item>电影</item><item>喜剧片</item><item>爱情片</item><item>动作片</item><item>悬疑片</item><item>纪录片</item><item>电视剧</item><item>动漫</item><item>综艺</item><item>短视频</item>
+    </string-array>
+    <string-array name="dating_shared_job_values">
+        <item>保密</item><item>在校生</item><item>普通职工</item><item>服务员</item><item>老师</item><item>警察</item><item>司机</item><item>销售</item><item>老板</item><item>自由职业</item><item>待业中</item><item>其他</item>
+    </string-array>
+    <string-array name="dating_shared_education_values">
+        <item>保密</item><item>初中及以下</item><item>高中</item><item>本科</item><item>硕士及以上</item><item>其他</item>
+    </string-array>
+
 </resources>
