@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="partnerlist_title">语伴</string>
+    <string name="partnerlist_back">返回</string>
+    <string name="partnerlist_avatar">语伴头像</string>
+    <string name="partnerlist_subtitle_loading">正在准备今日推荐</string>
+    <string name="partnerlist_quota_default">招呼 10/10</string>
+    <string name="partnerlist_quota_value">招呼 %1$d/%2$d</string>
+    <string name="partnerlist_status_preparing">正在从最近活跃的用户中为你挑选语伴</string>
+    <string name="partnerlist_status_finished">今天已为你推荐 %1$d/%2$d 位语伴</string>
+    <string name="partnerlist_status_updating">正在更新新的语伴</string>
+    <string name="partnerlist_status_minutes">约 %1$d 分钟后更新少量新语伴</string>
+    <string name="partnerlist_status_hours">约 %1$d 小时后更新少量新语伴</string>
+    <string name="partnerlist_footer_finished">今天已累计推荐 %1$d 位语伴，明天凌晨 4:00 更新</string>
+    <string name="partnerlist_footer_waiting">今天的语伴已经看完，稍后会加入少量新朋友</string>
+    <string name="partnerlist_empty">暂时没有更多合适的语伴\n我们会优先为你寻找最近活跃的新朋友</string>
+    <string name="partnerlist_complete_profile">完善我的资料</string>
+    <string name="partnerlist_retry">重新加载</string>
+    <string name="partnerlist_load_failed">语伴列表加载失败，请稍后重试</string>
+    <string name="partnerlist_greet">打招呼</string>
+    <string name="partnerlist_greeted">已打招呼</string>
+    <string name="partnerlist_sending">发送中</string>
+    <string name="partnerlist_limit_reached_short">已达上限</string>
+    <string name="partnerlist_daily_limit_message">今天已经向 10 位新朋友打过招呼，明天凌晨 4:00 恢复</string>
+    <string name="partnerlist_default_greeting">你好，很高兴认识你 👋</string>
+    <string name="partnerlist_greeting_success">已发送打招呼</string>
+    <string name="partnerlist_greeting_failed">打招呼失败，请稍后重试</string>
+    <string name="partnerlist_new">新加入</string>
+    <string name="partnerlist_intro_fallback">想认识认真学习语言的新朋友</string>
+    <string name="partnerlist_name_age">%1$s  %2$d</string>
+    <string name="partnerlist_learning_language">学习 %1$s</string>
+    <string name="partnerlist_online_now">当前在线</string>
+    <string name="partnerlist_active_just_now">刚刚活跃</string>
+    <string name="partnerlist_active_minutes">%1$d 分钟前活跃</string>
+    <string name="partnerlist_active_hours">%1$d 小时前活跃</string>
+    <string name="partnerlist_active_today">今天活跃</string>
+    <string name="partnerlist_active_recently">最近活跃</string>
+    <string name="partnerlist_lang_zh">中文</string>
+    <string name="partnerlist_lang_en">英语</string>
+    <string name="partnerlist_lang_my">缅甸语</string>
+    <string name="partnerlist_lang_ja">日语</string>
+    <string name="partnerlist_lang_ko">韩语</string>
+    <string name="partnerlist_lang_th">泰语</string>
+    <string name="partnerlist_lang_vi">越南语</string>
+    <string name="partnerlist_lang_id">印尼语</string>
+    <string name="partnerlist_lang_ms">马来语</string>
+    <string name="partnerlist_lang_fil">菲律宾语</string>
+    <string name="partnerlist_lang_km">高棉语</string>
+    <string name="partnerlist_lang_lo">老挝语</string>
+    <string name="partnerlist_lang_hi">印地语</string>
+    <string name="partnerlist_lang_fr">法语</string>
+    <string name="partnerlist_lang_de">德语</string>
+    <string name="partnerlist_lang_es">西班牙语</string>
+    <string name="partnerlist_lang_ru">俄语</string>
+
+    <plurals name="partnerlist_found_count">
+        <item quantity="other">今日推荐 %1$d 位</item>
+    </plurals>
+    <plurals name="partnerlist_updated_count">
+        <item quantity="other">已更新 %1$d 位新语伴</item>
+    </plurals>
+</resources>
