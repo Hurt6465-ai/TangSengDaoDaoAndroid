@@ -59,4 +59,8 @@
     <plurals name="partnerlist_updated_count">
         <item quantity="other">已更新 %1$d 位新语伴</item>
     </plurals>
+
+    <string name="partnerlist_mode_partner">语伴</string>
+    <string name="partnerlist_mode_dating">交友</string>
+    <string name="partnerlist_dating_unavailable">交友模块加载失败，请检查 wkdating 模块</string>
 </resources>
