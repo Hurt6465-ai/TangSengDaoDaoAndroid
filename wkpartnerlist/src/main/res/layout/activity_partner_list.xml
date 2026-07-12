@@ -11,11 +11,11 @@
 
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="76dp"
+            android:layout_height="86dp"
             android:background="@drawable/bg_partnerlist_toolbar"
             android:elevation="3dp"
             android:paddingStart="12dp"
-            android:paddingTop="8dp"
+            android:paddingTop="7dp"
             android:paddingEnd="14dp">
 
             <ImageView
@@ -29,29 +29,61 @@
                 android:src="@drawable/ic_partnerlist_back" />
 
             <LinearLayout
+                android:id="@+id/modeTabs"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_gravity="top|center_horizontal"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <FrameLayout
+                    android:layout_width="72dp"
+                    android:layout_height="48dp">
+
+                    <TextView
+                        android:id="@+id/partnerModeTab"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:text="@string/partnerlist_mode_partner"
+                        android:textColor="#20232B"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <View
+                        android:layout_width="24dp"
+                        android:layout_height="3dp"
+                        android:layout_gravity="bottom|center_horizontal"
+                        android:background="#7D8CFF" />
+                </FrameLayout>
+
+                <TextView
+                    android:id="@+id/datingModeTab"
+                    android:layout_width="72dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="@string/partnerlist_mode_dating"
+                    android:textColor="#8E95A2"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/subtitleTv"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="start|center_vertical"
-                android:layout_marginStart="48dp"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/partnerlist_title"
-                    android:textColor="#20232B"
-                    android:textSize="21sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/subtitleTv"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/partnerlist_subtitle_loading"
-                    android:textColor="#8E95A2"
-                    android:textSize="11sp" />
-            </LinearLayout>
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="6dp"
+                android:maxWidth="190dp"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="@string/partnerlist_subtitle_loading"
+                android:textColor="#8E95A2"
+                android:textSize="11sp" />
 
             <TextView
                 android:id="@+id/quotaTv"
