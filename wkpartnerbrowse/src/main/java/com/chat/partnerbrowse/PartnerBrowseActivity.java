@@ -216,7 +216,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
         PartnerBrowseModel.getInstance().getPartnerProfileMe((code, msg, data) -> {
             if (isFinishing() || isDestroyed()) return;
             checkingProfile = false;
-            if (code == HttpResponseCode.success && data != null && data.hasPartnerPhoto() && data.hasPartnerLanguages()) {
+            if (code == HttpResponseCode.success && data != null && data.hasPartnerLanguages()) {
                 profileGatePassed = true;
                 profileRequired = false;
                 requestLocationPermissionOnEntryIfAllowed();
@@ -238,10 +238,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
 
     private String profileRequiredMessage(PartnerBrowseProfileMe data) {
         if (data == null) return localProfileRequiredTip();
-        boolean hasPhoto = data.hasPartnerPhoto();
         boolean hasLanguages = data.hasPartnerLanguages();
-        if (!hasPhoto && !hasLanguages) return localProfileRequiredTip();
-        if (!hasPhoto) return getString(R.string.partnerbrowse_photo_required_tip);
         if (!hasLanguages) return localLanguageRequiredTip();
         return localProfileRequiredTip();
     }
@@ -260,12 +257,12 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
     private String localProfileRequiredTip() {
         String lang = getCurrentLanguage();
         if ("my".equals(lang) || "myanmar".equals(lang) || "burmese".equals(lang)) {
-            return "ဘာသာဖော်စာမျက်နှာ မကြည့်မီ ဓာတ်ပုံ၊ မိခင်ဘာသာစကားနှင့် လေ့လာနေသော ဘာသာစကားကို ဖြည့်ပါ။";
+            return "ဘာသာဖော်စာမျက်နှာ မကြည့်မီ မိခင်ဘာသာစကားနှင့် လေ့လာနေသော ဘာသာစကားကို ရွေးပါ။";
         }
         if ("en".equals(lang)) {
-            return "Complete your partner photo, native language and learning language before browsing.";
+            return "Choose your native language and learning language before browsing.";
         }
-        return "进入语伴前，请先补全语伴照片、母语和正在学习的语言。";
+        return "进入语伴前，请先选择母语和正在学习的语言。";
     }
 
     private String getCurrentLanguage() {
@@ -449,7 +446,7 @@ public class PartnerBrowseActivity extends WKBaseActivity<ActivityWkPartnerBrows
             if (old != null) existKeys.add(old.getStableKey());
         }
         for (PartnerBrowseBean item : list) {
-            if (item == null || !item.hasPartnerPhoto() || !item.hasPartnerLanguages()) continue;
+            if (item == null || !item.hasPartnerLanguages()) continue;
             String key = item.getStableKey();
             if (existKeys.add(key)) partners.add(item);
         }

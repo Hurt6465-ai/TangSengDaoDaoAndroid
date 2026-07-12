@@ -5,7 +5,6 @@ import android.text.TextUtils;
 import com.chat.partnerbrowse.model.PartnerBrowseBean;
 
 import java.util.Calendar;
-import java.util.List;
 import java.util.Random;
 
 public final class PartnerRecommendScorer {
@@ -56,15 +55,7 @@ public final class PartnerRecommendScorer {
     }
 
     private static int imageScore(PartnerBrowseBean item) {
-        List<String> images = item.getProfileImagesSafe();
-        int count = 0;
-        for (String image : images) if (!TextUtils.isEmpty(image)) count++;
-        if (count <= 0) return -999;
-        int score = 8;
-        if (count >= 2) score += 4;
-        if (count >= 3) score += 4;
-        if (count >= 5) score += 4;
-        return Math.min(score, 20);
+        return TextUtils.isEmpty(item.getAvatarPathSafe()) ? -999 : 8;
     }
 
     private static int stableRandomScore(String viewerUid, String candidateUid, int round) {
