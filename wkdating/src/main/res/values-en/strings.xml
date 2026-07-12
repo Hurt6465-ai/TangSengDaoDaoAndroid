@@ -327,4 +327,8 @@ Passes are unlimited, but the server rate-limits abuse.</string>
         <item>Private</item><item>Middle school or below</item><item>High school</item><item>Bachelor degree</item><item>Master degree or above</item><item>Other</item>
     </string-array>
 
+
+    <string name="dating_mode_partner">Partners</string>
+    <string name="dating_mode_dating">Dating</string>
+    <string name="dating_partner_unavailable">Partner list is unavailable. Please check wkpartnerlist.</string>
 </resources>
