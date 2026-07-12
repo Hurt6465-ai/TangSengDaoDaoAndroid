@@ -1,0 +1,2 @@
+-keep class com.chat.partnerlist.model.** { *; }
+-keep class com.chat.partnerlist.WKPartnerListApplication { *; }
