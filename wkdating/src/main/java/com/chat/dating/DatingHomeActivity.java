@@ -16,6 +16,7 @@ import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.chat.base.base.WKBaseActivity;
+import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.dating.databinding.ActivityWkDatingHomeBinding;
 import com.chat.dating.model.DatingProfile;
@@ -125,6 +126,10 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         wkVBinding.passBtn.setOnClickListener(v -> swipeTop(v, Direction.Left));
         wkVBinding.favoriteBtn.setOnClickListener(v -> swipeTop(v, Direction.Top));
         wkVBinding.likeBtn.setOnClickListener(v -> swipeTop(v, Direction.Right));
+        wkVBinding.partnerModeTab.setOnClickListener(v -> openPartnerList());
+        wkVBinding.datingModeTab.setOnClickListener(v -> {
+            // 当前已经是交友模式，不重复创建页面。
+        });
         wkVBinding.recommendTab.setOnClickListener(v -> selectScope("global"));
         wkVBinding.nearbyTab.setOnClickListener(v -> selectScope("nearby"));
         wkVBinding.filterBtn.setOnClickListener(v -> DatingFilterDialog.show(this, filter, value -> {
@@ -247,6 +252,29 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         wkVBinding.deckView.getRecycledViewPool().setMaxRecycledViews(0, 3);
         wkVBinding.deckView.setAdapter(cardAdapter);
         wkVBinding.deckView.setItemAnimator(null);
+    }
+
+    private void openPartnerList() {
+        if (getIntent().getBooleanExtra("from_partner_list", false)) {
+            finish();
+            return;
+        }
+        try {
+            Object handled = EndpointManager.getInstance().invoke("peipe_open_partner_list", this);
+            if (handled instanceof Boolean && (Boolean) handled) {
+                finish();
+                return;
+            }
+        } catch (Throwable ignored) {
+        }
+        try {
+            Class<?> clazz = Class.forName("com.chat.partnerlist.PartnerListActivity");
+            Intent intent = new Intent(this, clazz);
+            startActivity(intent);
+            finish();
+        } catch (Throwable ignored) {
+            showToast(getString(R.string.dating_partner_unavailable));
+        }
     }
 
     private void selectScope(String value) {
