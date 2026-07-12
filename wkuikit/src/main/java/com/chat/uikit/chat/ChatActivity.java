@@ -117,6 +117,7 @@ import com.chat.uikit.group.ChooseVideoCallMembersActivity;
 import com.chat.uikit.group.GroupDetailActivity;
 import com.chat.uikit.group.service.GroupModel;
 import com.chat.uikit.message.MsgModel;
+import com.chat.uikit.partner.PartnerPendingStore;
 import com.chat.uikit.robot.service.WKRobotModel;
 import com.chat.uikit.user.ProfileNavigator;
 import com.chat.uikit.user.service.UserModel;
@@ -224,6 +225,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private int hideChannelAllPinnedMessage = 0;
     private PanelSwitchHelper mHelper;
     private ChatPanelManager chatPanelManager;
+    private final PartnerPendingStore.Listener partnerPendingListener = peerUid -> {
+        if (TextUtils.equals(channelId, peerUid)) {
+            updatePartnerPendingUi();
+        }
+    };
     private ActChatLayoutBinding wkVBinding;
     private int unfilledHeight = 0;
     private final String loginUID = WKConfig.getInstance().getUid();
@@ -1483,6 +1489,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     protected void initView() {
         EndpointManager.getInstance().invoke("set_chat_bg", new SetChatBgMenu(channelId, channelType, wkVBinding.imageView, wkVBinding.rootView, wkVBinding.blurView));
+        PartnerPendingStore.addListener(partnerPendingListener);
+        updatePartnerPendingUi();
         loadLocalChatBackground();
         Object pinnedLayoutView = EndpointManager.getInstance().invoke("get_pinned_message_view", this);
         if (pinnedLayoutView instanceof View) {
@@ -3349,6 +3357,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     @Override
     protected void onDestroy() {
+        PartnerPendingStore.removeListener(partnerPendingListener);
         super.onDestroy();
         if (chatPanelManager != null) chatPanelManager.onDestroy();
         ActManagerUtils.getInstance().removeActivity(this);
@@ -3363,6 +3372,39 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         MsgModel.getInstance().startCheckFlameMsgTimer();
         saveEditContent();
 
+    }
+
+    private void updatePartnerPendingUi() {
+        if (wkVBinding == null || wkVBinding.partnerPendingTip == null || wkVBinding.panelView == null) return;
+        if (channelType != WKChannelType.PERSONAL) {
+            wkVBinding.partnerPendingTip.setVisibility(View.GONE);
+            wkVBinding.panelView.setAlpha(1f);
+            wkVBinding.panelView.setOnTouchListener(null);
+            return;
+        }
+        PartnerPendingStore.Entry state = PartnerPendingStore.get(channelId);
+        if (state == null || !state.pending || !state.requester) {
+            wkVBinding.partnerPendingTip.setVisibility(View.GONE);
+            wkVBinding.panelView.setAlpha(1f);
+            wkVBinding.panelView.setOnTouchListener(null);
+            return;
+        }
+        int remaining = state.remaining();
+        wkVBinding.partnerPendingTip.setVisibility(View.VISIBLE);
+        if (remaining <= 0) {
+            wkVBinding.partnerPendingTip.setText(R.string.partner_pending_waiting);
+            wkVBinding.panelView.setAlpha(0.55f);
+            wkVBinding.panelView.setOnTouchListener((v, event) -> {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    WKToastUtils.getInstance().showToast(getString(R.string.partner_pending_waiting));
+                }
+                return true;
+            });
+        } else {
+            wkVBinding.partnerPendingTip.setText(getString(R.string.partner_pending_remaining, remaining));
+            wkVBinding.panelView.setAlpha(1f);
+            wkVBinding.panelView.setOnTouchListener(null);
+        }
     }
 
     private void saveEditContent() {
