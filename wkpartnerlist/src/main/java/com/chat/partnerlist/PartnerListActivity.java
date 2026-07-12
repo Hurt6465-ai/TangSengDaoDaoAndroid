@@ -448,6 +448,8 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             @Override public void onSuccess(PartnerGreetingResponse result) {
                 adapter.markGreetingPending(uid, false);
                 if (result != null && result.success()) {
+                    String greetingText = getString(R.string.partnerlist_default_greeting);
+                    PartnerListHostBridge.saveOutgoingGreeting(uid, greetingText, result);
                     int maxPending = result.max_greeting_count > 0 ? result.max_greeting_count : 3;
                     int pendingCount = Math.max(1, result.requester_msg_count);
                     if (result.contact_status == 1) PartnerPendingStore.markActive(uid);
