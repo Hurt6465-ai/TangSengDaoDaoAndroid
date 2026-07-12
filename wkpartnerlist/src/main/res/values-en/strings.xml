@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="partnerlist_title">Language partners</string>
+    <string name="partnerlist_back">Back</string>
+    <string name="partnerlist_avatar">Partner avatar</string>
+    <string name="partnerlist_subtitle_loading">Preparing today’s recommendations</string>
+    <string name="partnerlist_quota_default">Hello 10/10</string>
+    <string name="partnerlist_quota_value">Hello %1$d/%2$d</string>
+    <string name="partnerlist_status_preparing">Finding recently active partners for you</string>
+    <string name="partnerlist_status_finished">Recommended %1$d/%2$d partners today</string>
+    <string name="partnerlist_status_updating">Updating new partners</string>
+    <string name="partnerlist_status_minutes">A few new partners in about %1$d min</string>
+    <string name="partnerlist_status_hours">A few new partners in about %1$d hr</string>
+    <string name="partnerlist_footer_finished">%1$d partners recommended today. Refreshes at 4:00 AM tomorrow.</string>
+    <string name="partnerlist_footer_waiting">You’ve reached the end. A few new people will arrive later.</string>
+    <string name="partnerlist_empty">No suitable partners right now.\nWe’ll prioritize recently active people.</string>
+    <string name="partnerlist_complete_profile">Complete my profile</string>
+    <string name="partnerlist_retry">Try again</string>
+    <string name="partnerlist_load_failed">Couldn’t load partners. Please try again later.</string>
+    <string name="partnerlist_greet">Say hello</string>
+    <string name="partnerlist_greeted">Sent</string>
+    <string name="partnerlist_sending">Sending</string>
+    <string name="partnerlist_limit_reached_short">Limit reached</string>
+    <string name="partnerlist_daily_limit_message">You’ve greeted 10 new people today. The limit resets at 4:00 AM.</string>
+    <string name="partnerlist_default_greeting">Hi, nice to meet you 👋</string>
+    <string name="partnerlist_greeting_success">Greeting sent</string>
+    <string name="partnerlist_greeting_failed">Couldn’t send greeting. Please try again.</string>
+    <string name="partnerlist_new">New</string>
+    <string name="partnerlist_intro_fallback">Looking for serious language-learning friends</string>
+    <string name="partnerlist_name_age">%1$s  %2$d</string>
+    <string name="partnerlist_learning_language">Learning %1$s</string>
+    <string name="partnerlist_online_now">Online now</string>
+    <string name="partnerlist_active_just_now">Active just now</string>
+    <string name="partnerlist_active_minutes">Active %1$d min ago</string>
+    <string name="partnerlist_active_hours">Active %1$d hr ago</string>
+    <string name="partnerlist_active_today">Active today</string>
+    <string name="partnerlist_active_recently">Recently active</string>
+    <string name="partnerlist_lang_zh">Chinese</string><string name="partnerlist_lang_en">English</string><string name="partnerlist_lang_my">Burmese</string><string name="partnerlist_lang_ja">Japanese</string><string name="partnerlist_lang_ko">Korean</string><string name="partnerlist_lang_th">Thai</string><string name="partnerlist_lang_vi">Vietnamese</string><string name="partnerlist_lang_id">Indonesian</string><string name="partnerlist_lang_ms">Malay</string><string name="partnerlist_lang_fil">Filipino</string><string name="partnerlist_lang_km">Khmer</string><string name="partnerlist_lang_lo">Lao</string><string name="partnerlist_lang_hi">Hindi</string><string name="partnerlist_lang_fr">French</string><string name="partnerlist_lang_de">German</string><string name="partnerlist_lang_es">Spanish</string><string name="partnerlist_lang_ru">Russian</string>
+    <plurals name="partnerlist_found_count"><item quantity="one">%1$d partner today</item><item quantity="other">%1$d partners today</item></plurals>
+    <plurals name="partnerlist_updated_count"><item quantity="one">Updated %1$d new partner</item><item quantity="other">Updated %1$d new partners</item></plurals>
+</resources>
