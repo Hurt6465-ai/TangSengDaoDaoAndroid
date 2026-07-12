@@ -61,6 +61,13 @@ public class WKSendMsgUtils {
     }
 
     public void sendMessage(WKMsg wkMsg) {
+        if (PartnerPendingMessageGateway.getInstance().handle(wkMsg)) {
+            return;
+        }
+        sendDirect(wkMsg);
+    }
+
+    private void sendDirect(WKMsg wkMsg) {
         WKSendOptions options = new WKSendOptions();
         options.robotID = wkMsg.robotID;
         int expireSeconds = getMessageExpireSeconds(wkMsg.type);
@@ -135,45 +142,68 @@ public class WKSendMsgUtils {
             }
 
         } else if (msg.type == WKContentType.WK_VIDEO) {
-            //视频
-            WKVideoContent videoMsgModel = (WKVideoContent) msg.baseContentMsgModel;
-            if (!TextUtils.isEmpty(videoMsgModel.cover) && !TextUtils.isEmpty(videoMsgModel.url)) {
-                listener.onUploadResult(true, msg.baseContentMsgModel);
-            } else {
-                if (TextUtils.isEmpty(videoMsgModel.cover)) {
-                    WKUploader.getInstance().getUploadFileUrl(msg.channelID, msg.channelType, videoMsgModel.coverLocalPath, (url, filePath) -> {
-                        if (!TextUtils.isEmpty(url)) {
-                            WKUploader.getInstance().upload(url, videoMsgModel.coverLocalPath, UUID.randomUUID().toString().replaceAll("-", ""),
-                                    new WKUploader.IUploadBack() {
-                                        @Override
-                                        public void onSuccess(String url) {
-                                            videoMsgModel.cover = url;
-                                            WKUploader.getInstance().getUploadFileUrl(msg.channelID, msg.channelType, videoMsgModel.localPath, (url1, fileUrl) -> WKUploader.getInstance().upload(url1, videoMsgModel.localPath, msg.clientSeq, new WKUploader.IUploadBack() {
-                                                @Override
-                                                public void onSuccess(String url1) {
-                                                    videoMsgModel.url = url1;
-                                                    listener.onUploadResult(true, videoMsgModel);
-                                                }
-
-                                                @Override
-                                                public void onError() {
-                                                    listener.onUploadResult(false, videoMsgModel);
-                                                }
-                                            }));
-                                        }
-
-                                        @Override
-                                        public void onError() {
-                                            listener.onUploadResult(false, msg.baseContentMsgModel);
-                                        }
-                                    });
-                        } else {
-                            listener.onUploadResult(false, msg.baseContentMsgModel);
-                        }
-                    });
-                }
-            }
+            uploadVideoAttachment(msg, (WKVideoContent) msg.baseContentMsgModel, listener);
+        } else {
+            listener.onUploadResult(true, msg.baseContentMsgModel);
         }
 
     }
+    private void uploadVideoAttachment(WKMsg msg, WKVideoContent video, IUploadAttacResultListener listener) {
+        if (video == null) {
+            listener.onUploadResult(false, msg.baseContentMsgModel);
+            return;
+        }
+        Runnable uploadMainVideo = () -> {
+            if (!TextUtils.isEmpty(video.url)) {
+                listener.onUploadResult(true, video);
+                return;
+            }
+            if (TextUtils.isEmpty(video.localPath)) {
+                listener.onUploadResult(false, video);
+                return;
+            }
+            WKUploader.getInstance().getUploadFileUrl(msg.channelID, msg.channelType, video.localPath, (uploadUrl, filePath) -> {
+                if (TextUtils.isEmpty(uploadUrl)) {
+                    listener.onUploadResult(false, video);
+                    return;
+                }
+                WKUploader.getInstance().upload(uploadUrl, video.localPath, msg.clientSeq, new WKUploader.IUploadBack() {
+                    @Override public void onSuccess(String remoteUrl) {
+                        video.url = remoteUrl;
+                        listener.onUploadResult(true, video);
+                    }
+
+                    @Override public void onError() {
+                        listener.onUploadResult(false, video);
+                    }
+                });
+            });
+        };
+
+        if (!TextUtils.isEmpty(video.cover)) {
+            uploadMainVideo.run();
+            return;
+        }
+        if (TextUtils.isEmpty(video.coverLocalPath)) {
+            listener.onUploadResult(false, video);
+            return;
+        }
+        WKUploader.getInstance().getUploadFileUrl(msg.channelID, msg.channelType, video.coverLocalPath, (uploadUrl, filePath) -> {
+            if (TextUtils.isEmpty(uploadUrl)) {
+                listener.onUploadResult(false, video);
+                return;
+            }
+            WKUploader.getInstance().upload(uploadUrl, video.coverLocalPath, UUID.randomUUID().toString().replaceAll("-", ""), new WKUploader.IUploadBack() {
+                @Override public void onSuccess(String remoteUrl) {
+                    video.cover = remoteUrl;
+                    uploadMainVideo.run();
+                }
+
+                @Override public void onError() {
+                    listener.onUploadResult(false, video);
+                }
+            });
+        });
+    }
+
 }

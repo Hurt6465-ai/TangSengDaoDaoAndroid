@@ -43,6 +43,7 @@ import com.chat.uikit.enity.ProhibitWord;
 import com.chat.uikit.group.service.GroupModel;
 import com.chat.uikit.message.MsgModel;
 import com.chat.uikit.message.ProhibitWordModel;
+import com.chat.uikit.partner.PartnerPendingStore;
 import com.chat.uikit.search.SearchUserActivity;
 import com.chat.uikit.user.UserDetailActivity;
 import com.chat.uikit.user.service.UserModel;
@@ -181,6 +182,7 @@ public class WKIMUtils {
                 channelID = msgList.get(msgList.size() - 1).channelID;
                 channelType = msgList.get(msgList.size() - 1).channelType;
                 for (int i = 0, size = msgList.size(); i < size; i++) {
+                    updatePartnerPendingState(msgList.get(i), loginUID);
                     if (msgList.get(i).type == WKContentType.setNewGroupAdmin) {
                         GroupModel.getInstance().groupMembersSync(msgList.get(i).channelID, null);
                     } else if (msgList.get(i).type == WKContentType.groupSystemInfo) {
@@ -725,5 +727,33 @@ public class WKIMUtils {
         WKIM.getInstance().getMsgManager().removeNewMsgListener("system");
     }
 
+
+    private static void updatePartnerPendingState(WKMsg msg, String loginUID) {
+        if (msg == null || msg.channelType != WKChannelType.PERSONAL
+                || TextUtils.isEmpty(msg.fromUID) || TextUtils.equals(msg.fromUID, loginUID)) {
+            return;
+        }
+        try {
+            JSONObject payload = null;
+            if (!TextUtils.isEmpty(msg.content)) {
+                payload = new JSONObject(msg.content);
+            } else if (msg.baseContentMsgModel != null) {
+                payload = msg.baseContentMsgModel.encodeMsg();
+            }
+            boolean greeting = payload != null && payload.optInt("partner_greeting", 0) == 1;
+            boolean pendingGateway = payload != null && payload.optInt("partner_pending_gateway", 0) == 1;
+            if (greeting || pendingGateway) {
+                int count = payload.optInt("requester_msg_count", greeting ? 1 : 0);
+                int max = payload.optInt("max_greeting_count", 3);
+                PartnerPendingStore.markReceiver(msg.fromUID, Math.max(1, count), Math.max(1, max));
+                return;
+            }
+        } catch (Throwable ignored) {
+        }
+        PartnerPendingStore.Entry state = PartnerPendingStore.get(msg.fromUID);
+        if (state != null && state.pending && state.requester) {
+            PartnerPendingStore.markActive(msg.fromUID);
+        }
+    }
 
 }
