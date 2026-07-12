@@ -17,7 +17,7 @@
     <string name="partnerlist_complete_profile">ကိုယ်ရေးအချက်အလက် ပြည့်စုံအောင်လုပ်မည်</string>
     <string name="partnerlist_retry">ထပ်စမ်းမည်</string>
     <string name="partnerlist_load_failed">စာရင်းမရနိုင်ပါ၊ နောက်မှ ထပ်စမ်းပါ</string>
-    <string name="partnerlist_greet">နှုတ်ဆက်မည်</string>
+    <string name="partnerlist_greet">👋 Hi</string>
     <string name="partnerlist_greeted">ပို့ပြီး</string>
     <string name="partnerlist_sending">ပို့နေသည်</string>
     <string name="partnerlist_limit_reached_short">ကန့်သတ်ချက်ပြည့်</string>
