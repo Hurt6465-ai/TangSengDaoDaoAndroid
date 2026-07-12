@@ -30,6 +30,7 @@ import com.chat.base.utils.WKTimeUtils
 import com.chat.base.utils.language.WKMultiLanguageUtil
 import com.chat.login.WKLoginApplication
 import com.chat.partner.profile.WKPartnerApplication
+import com.chat.partnerlist.WKPartnerListApplication
 import com.chat.push.WKPushApplication
 import com.chat.room.WKRoomApplication
 import com.chat.rtc.WKRTCApplication
@@ -127,6 +128,7 @@ class TSApplication : MultiDexApplication() {
         WKPushApplication.getInstance().init(getAppPackageName(), this)
         WKRoomApplication.getInstance().init(this)
         WKPartnerApplication.getInstance().init(this)
+        WKPartnerListApplication.getInstance().init(this)
         initDatingModuleSafely()
         addAppFrontBack()
         addListener()
