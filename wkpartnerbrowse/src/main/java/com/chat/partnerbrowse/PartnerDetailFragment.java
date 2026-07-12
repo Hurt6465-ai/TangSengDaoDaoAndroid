@@ -24,6 +24,7 @@ import com.chat.partnerbrowse.model.PartnerGreetingResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import com.chat.uikit.partner.PartnerPendingStore;
 
 public class PartnerDetailFragment extends Fragment {
     private static final String KEY_STABLE = "stable_key";
@@ -191,6 +192,13 @@ public class PartnerDetailFragment extends Fragment {
 
         binding.nameTv.setText(partner.getNameSafe());
         binding.ageSexTv.setVisibility(View.GONE);
+
+        // 用服务端列表携带的关系状态恢复本地发送路由，兼容升级前已经存在的 Pending 会话。
+        if (partner.follow == 1) {
+            PartnerPendingStore.markActive(partner.uid);
+        } else if (partner.isHelloSent() && !TextUtils.isEmpty(partner.uid)) {
+            PartnerPendingStore.markRequester(partner.uid, Math.max(1, partner.requester_msg_count), partner.getMaxGreetingCountSafe());
+        }
 
         bindLanguages();
 
@@ -463,8 +471,12 @@ public class PartnerDetailFragment extends Fragment {
             if (success) {
                 if (data != null) {
                     target.updateGreetingState(data.requester_msg_count, data.max_greeting_count, data.next_allowed_at);
+                    int maxPending = data.max_greeting_count > 0 ? data.max_greeting_count : 3;
+                    int pendingCount = Math.max(1, data.requester_msg_count);
+                    PartnerPendingStore.markRequester(target.uid, pendingCount, maxPending);
                 } else {
                     target.markHelloSent();
+                    PartnerPendingStore.markRequester(target.uid, 1, 3);
                 }
                 PartnerRepository.putOne(target);
                 String targetUid = TextUtils.isEmpty(target.uid) ? target.id : target.uid;
