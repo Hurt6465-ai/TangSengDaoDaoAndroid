@@ -1,4 +1,4 @@
-# wkdating 最终重构版
+# wkdating 交友最终重构版
 
 基于用户当前 `wkdating.zip` 重写，保留唐僧叨叨 Java/XML 架构，不引入 Compose、Flutter 或 Firebase。
 
