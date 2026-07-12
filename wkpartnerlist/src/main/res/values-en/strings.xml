@@ -38,4 +38,7 @@
     <string name="partnerlist_lang_zh">Chinese</string><string name="partnerlist_lang_en">English</string><string name="partnerlist_lang_my">Burmese</string><string name="partnerlist_lang_ja">Japanese</string><string name="partnerlist_lang_ko">Korean</string><string name="partnerlist_lang_th">Thai</string><string name="partnerlist_lang_vi">Vietnamese</string><string name="partnerlist_lang_id">Indonesian</string><string name="partnerlist_lang_ms">Malay</string><string name="partnerlist_lang_fil">Filipino</string><string name="partnerlist_lang_km">Khmer</string><string name="partnerlist_lang_lo">Lao</string><string name="partnerlist_lang_hi">Hindi</string><string name="partnerlist_lang_fr">French</string><string name="partnerlist_lang_de">German</string><string name="partnerlist_lang_es">Spanish</string><string name="partnerlist_lang_ru">Russian</string>
     <plurals name="partnerlist_found_count"><item quantity="one">%1$d partner today</item><item quantity="other">%1$d partners today</item></plurals>
     <plurals name="partnerlist_updated_count"><item quantity="one">Updated %1$d new partner</item><item quantity="other">Updated %1$d new partners</item></plurals>
+    <string name="partnerlist_go_chat">Chat</string>
+    <string name="partnerlist_new_recommendation">New pick</string>
+    <string name="partnerlist_active_10m">Active within 10 min</string>
 </resources>
