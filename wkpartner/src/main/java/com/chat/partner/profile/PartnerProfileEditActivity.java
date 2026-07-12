@@ -281,6 +281,13 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
 
         JSONObject mediaBody = new JSONObject();
         mediaBody.put("tags", new ArrayList<>(tags));
+        // 语伴资料不再单独上传“语伴图片”。旧后端/旧接口如果还用
+        // profile_images 判断是否完善资料，就把账号头像路径写进去，
+        // 列表和沉浸式语伴页统一显示头像，不再依赖旧的全屏语伴图片。
+        ArrayList<String> avatarAsPartnerImages = new ArrayList<>();
+        String avatarPartnerImage = currentAvatarAsPartnerImagePath();
+        if (!TextUtils.isEmpty(avatarPartnerImage)) avatarAsPartnerImages.add(avatarPartnerImage);
+        mediaBody.put("profile_images", avatarAsPartnerImages);
 
         wkVBinding.saveBtn.setEnabled(false);
         PartnerProfileModel.getInstance().updateCurrentProfile(coreBody, (code, msg, data) -> {
@@ -1163,6 +1170,12 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
     }
 
     private String safe(String value) { return value == null ? "" : value.trim(); }
+
+    private String currentAvatarAsPartnerImagePath() {
+        String uid = WKConfig.getInstance().getUid();
+        if (TextUtils.isEmpty(uid)) return "";
+        return "users/" + uid + "/avatar";
+    }
 
     private String joinLanguageWithFlag(List<String> values) {
         if (values == null || values.isEmpty()) return "";
