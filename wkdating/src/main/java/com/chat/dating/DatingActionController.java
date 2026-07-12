@@ -54,14 +54,20 @@ public final class DatingActionController {
         return DatingQuotaManager.consume(activity, myProfile, action);
     }
 
+    public void refund(String action) {
+        DatingQuotaManager.refund(activity, action);
+    }
+
     public boolean consumeRewind() {
         return DatingQuotaManager.consumeRewind(activity);
     }
 
     public String quotaMessage(String action) {
         int limit = DatingQuotaManager.dailyLimit(myProfile, action);
-        if (DatingSwipeAction.FAVORITE.equals(action)) return "今日收藏额度已用完（" + limit + " 次）";
-        return "今日喜欢额度已用完（" + limit + " 次）";
+        if (DatingSwipeAction.FAVORITE.equals(action)) {
+            return activity.getString(R.string.dating_quota_favorite, limit);
+        }
+        return activity.getString(R.string.dating_quota_like, limit);
     }
 
     public void buttonFeedback(View view, Direction direction) {

@@ -9,10 +9,12 @@ import com.chat.base.net.ApiService;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.base.net.entity.UploadFileUrl;
+import com.chat.dating.model.DatingFavoritesResponse;
 import com.chat.dating.model.DatingMatchesResponse;
 import com.chat.dating.model.DatingProfile;
 import com.chat.dating.model.DatingRecommendResponse;
 import com.chat.dating.model.DatingSwipeResult;
+import com.chat.dating.model.DatingUndoResult;
 import com.chat.dating.model.DatingUploadUrl;
 
 import java.io.File;
@@ -75,6 +77,7 @@ public class DatingModel extends WKBaseModel {
         body.put("lat", lat);
         body.put("lng", lng);
         body.put("city", city == null ? "" : city);
+        body.put("country_code", countryCode == null ? "" : countryCode);
         body.put("source", "android");
         request(createService(DatingService.class).updateLocation(body), listener(callback));
     }
@@ -91,14 +94,29 @@ public class DatingModel extends WKBaseModel {
         request(createService(DatingService.class).swipe(body), listener(callback));
     }
 
-    public void reportExposures(List<Map<String, Object>> items) {
-        if (items == null || items.isEmpty()) return;
+    public void undoSwipe(final Callback<DatingUndoResult> callback) {
+        request(createService(DatingService.class).undoSwipe(new HashMap<>()), listener(callback));
+    }
+
+    public void reportExposures(List<Map<String, Object>> items, final Callback<Object> callback) {
+        if (items == null || items.isEmpty()) {
+            if (callback != null) callback.onResult(HttpResponseCode.success, "", null);
+            return;
+        }
         Map<String, Object> body = new HashMap<>();
         body.put("items", items);
-        request(createService(DatingService.class).reportExposures(body), new IRequestResultListener<>() {
-            @Override public void onSuccess(Object result) {}
-            @Override public void onFail(int code, String msg) {}
-        });
+        request(createService(DatingService.class).reportExposures(body), listener(callback));
+    }
+
+    public void favorites(int limit, final Callback<DatingFavoritesResponse> callback) {
+        request(createService(DatingService.class).favorites(Math.max(1, Math.min(100, limit))), listener(callback));
+    }
+
+    public void removeFavorite(String targetUid, final Callback<Object> callback) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("to_uid", targetUid == null ? "" : targetUid);
+        body.put("target_uid", targetUid == null ? "" : targetUid);
+        request(createService(DatingService.class).removeFavorite(body), listener(callback));
     }
 
     public void matches(int limit, final Callback<DatingMatchesResponse> callback) {

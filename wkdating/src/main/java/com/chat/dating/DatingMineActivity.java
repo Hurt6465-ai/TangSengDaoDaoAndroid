@@ -28,6 +28,7 @@ public class DatingMineActivity extends Activity {
         DatingUi.applyDarkSystemBars(this, Color.rgb(247, 247, 249));
         binding = ActivityWkDatingMineBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        DatingUi.applyPageInsets(this, binding.getRoot());
         Object value = getIntent().getSerializableExtra(EXTRA_PROFILE);
         if (value instanceof DatingProfile) profile = (DatingProfile) value;
         initListeners();
@@ -54,10 +55,10 @@ public class DatingMineActivity extends Activity {
                 if (code == HttpResponseCode.success) {
                     if (profile != null) profile.enabled = isChecked ? 1 : 0;
                     changed = true;
-                    toast(isChecked ? "已开启交友推荐" : "已关闭交友推荐");
+                    toast(getString(isChecked ? R.string.dating_enabled : R.string.dating_disabled));
                 } else {
                     buttonView.setChecked(!isChecked);
-                    toast(TextUtils.isEmpty(msg) ? "操作失败" : msg);
+                    toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_action_failed) : msg);
                 }
             });
         });
@@ -69,7 +70,7 @@ public class DatingMineActivity extends Activity {
                 profile = data;
                 bindProfile();
             } else {
-                toast(TextUtils.isEmpty(msg) ? "加载资料失败" : msg);
+                toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_profile_load_error) : msg);
             }
         });
     }
@@ -79,21 +80,24 @@ public class DatingMineActivity extends Activity {
         Glide.with(this).load(DatingImageSource.resolve(this, profile.firstPhoto())).centerCrop().into(binding.avatarIv);
         binding.nameTv.setText(DatingUi.nameAgeFlag(profile));
         String meta = profile.displayLocation();
-        binding.metaTv.setText(TextUtils.isEmpty(meta) ? "完善资料后开始匹配" : meta);
+        binding.metaTv.setText(TextUtils.isEmpty(meta) ? getString(R.string.dating_profile_complete_tip) : meta);
         binding.enabledSwitch.setChecked(profile.enabled == 1);
-        binding.likeQuotaTv.setText("喜欢 " + DatingQuotaManager.remaining(this, profile, DatingSwipeAction.LIKE)
-                + "/" + DatingQuotaManager.dailyLimit(profile, DatingSwipeAction.LIKE));
-        binding.favoriteQuotaTv.setText("收藏 " + DatingQuotaManager.remaining(this, profile, DatingSwipeAction.FAVORITE)
-                + "/" + DatingQuotaManager.dailyLimit(profile, DatingSwipeAction.FAVORITE));
-        binding.rewindQuotaTv.setText("撤回 " + DatingQuotaManager.rewindRemaining(this) + "/3");
+        binding.likeQuotaTv.setText(getString(R.string.dating_like_quota_format,
+                DatingQuotaManager.remaining(this, profile, DatingSwipeAction.LIKE),
+                DatingQuotaManager.dailyLimit(profile, DatingSwipeAction.LIKE)));
+        binding.favoriteQuotaTv.setText(getString(R.string.dating_favorite_quota_format,
+                DatingQuotaManager.remaining(this, profile, DatingSwipeAction.FAVORITE),
+                DatingQuotaManager.dailyLimit(profile, DatingSwipeAction.FAVORITE)));
+        binding.rewindQuotaTv.setText(getString(R.string.dating_rewind_quota_format,
+                DatingQuotaManager.rewindRemaining(this)));
     }
 
     private void showQuota() {
         new android.app.AlertDialog.Builder(this)
-                .setTitle("今日免费额度")
-                .setMessage(binding.likeQuotaTv.getText() + "\n" + binding.favoriteQuotaTv.getText() + "\n" + binding.rewindQuotaTv.getText()
-                        + "\n\n不喜欢不限次数，但服务端应做频率防刷。")
-                .setPositiveButton("知道了", null)
+                .setTitle(R.string.dating_daily_quota)
+                .setMessage(getString(R.string.dating_quota_message,
+                        binding.likeQuotaTv.getText(), binding.favoriteQuotaTv.getText(), binding.rewindQuotaTv.getText()))
+                .setPositiveButton(R.string.dating_ok, null)
                 .show();
     }
 

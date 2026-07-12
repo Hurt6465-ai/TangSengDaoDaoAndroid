@@ -19,8 +19,13 @@ import com.yuyakaido.android.cardstackview.Direction;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 首页单张交友卡。CardStackView 原生负责 overlay alpha，这里只做图片/资料联动动画。 */
+/** 首页单张交友卡。只负责当前图片，周边图片统一由 DatingImagePreloader 管理。 */
 public class DatingCardView extends FrameLayout {
+    private static final int CARD_WIDTH = 720;
+    private static final int CARD_HEIGHT = 1280;
+    private static final float MAX_PHOTO_SCALE = 0.04f;
+    private static final float MIN_INFO_ALPHA = 0.90f;
+
     private final ViewWkDatingCardBinding binding;
     private DatingProfile profile;
     private int photoIndex;
@@ -35,27 +40,19 @@ public class DatingCardView extends FrameLayout {
 
     public void bind(DatingProfile profile, int initialPhotoIndex) {
         this.profile = profile;
-        int max = profile == null ? 0 : Math.max(0, profile.safePhotos().size() - 1);
+        int max = profile == null ? 0 : Math.max(0, profile.safeCardPhotos().size() - 1);
         this.photoIndex = Math.max(0, Math.min(initialPhotoIndex, max));
         bindPhoto();
         resetDragProgress();
     }
 
-    public DatingProfile getProfile() {
-        return profile;
-    }
-
-    public int getPhotoIndex() {
-        return photoIndex;
-    }
-
-    public View getProfileArrowView() {
-        return binding.profileArrowBtn;
-    }
+    public DatingProfile getProfile() { return profile; }
+    public int getPhotoIndex() { return photoIndex; }
+    public View getProfileArrowView() { return binding.profileArrowBtn; }
 
     public void showNextPhoto() {
         if (profile == null) return;
-        List<String> photos = profile.safePhotos();
+        List<String> photos = profile.safeCardPhotos();
         if (photoIndex < photos.size() - 1) {
             photoIndex++;
             bindPhoto();
@@ -71,16 +68,13 @@ public class DatingCardView extends FrameLayout {
 
     public void setDragProgress(Direction direction, float ratio) {
         float progress = Math.max(0f, Math.min(1f, ratio));
-        binding.photoIv.setScaleX(1f + progress * 0.022f);
-        binding.photoIv.setScaleY(1f + progress * 0.022f);
-        binding.infoPanel.setTranslationY(dp(6) * progress);
-        binding.infoPanel.setAlpha(1f - progress * 0.16f);
-        binding.profileArrowBtn.setAlpha(1f - progress * 0.35f);
-        if (direction == Direction.Top) {
-            binding.photoIv.setTranslationY(-dp(3) * progress);
-        } else {
-            binding.photoIv.setTranslationY(0f);
-        }
+        float scale = 1f + progress * MAX_PHOTO_SCALE;
+        binding.photoIv.setScaleX(scale);
+        binding.photoIv.setScaleY(scale);
+        binding.infoPanel.setTranslationY(dp(8) * progress);
+        binding.infoPanel.setAlpha(1f - progress * (1f - MIN_INFO_ALPHA));
+        binding.profileArrowBtn.setAlpha(1f - progress * 0.25f);
+        binding.photoIv.setTranslationY(direction == Direction.Top ? -dp(3) * progress : 0f);
     }
 
     public void resetDragProgress() {
@@ -92,23 +86,35 @@ public class DatingCardView extends FrameLayout {
         binding.profileArrowBtn.setAlpha(1f);
     }
 
+    /** ViewHolder 回收时终止请求并释放大图引用，避免低端机滑动后仍持有 Bitmap。 */
+    public void recycle() {
+        Glide.with(this).clear(binding.photoIv);
+        binding.photoIv.setImageDrawable(null);
+        binding.tagRow.removeAllViews();
+        binding.profileArrowBtn.setOnClickListener(null);
+        binding.profileArrowBtn.setOnTouchListener(null);
+        setOnTouchListener(null);
+        profile = null;
+        photoIndex = 0;
+        resetDragProgress();
+    }
 
     private void bindPhoto() {
         if (profile == null) return;
-        List<String> photos = profile.safePhotos();
+        List<String> photos = profile.safeCardPhotos();
         if (photos.isEmpty()) {
             Glide.with(this).clear(binding.photoIv);
             binding.photoIv.setImageDrawable(null);
         } else {
             int index = Math.max(0, Math.min(photoIndex, photos.size() - 1));
-            String url = photos.get(index);
+            photoIndex = index;
             Glide.with(this)
-                    .load(DatingImageSource.resolve(getContext(), url))
-                    .override(1080, 1920)
+                    .load(DatingImageSource.resolve(getContext(), photos.get(index)))
+                    .thumbnail(0.25f)
+                    .override(CARD_WIDTH, CARD_HEIGHT)
                     .centerCrop()
                     .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                     .into(binding.photoIv);
-            if (index + 1 < photos.size()) DatingImagePreloader.preload(getContext(), photos.get(index + 1));
         }
         bindIndicators(photos.size());
         bindTextForPhoto();
@@ -122,7 +128,6 @@ public class DatingCardView extends FrameLayout {
         binding.metaTv.setVisibility(TextUtils.isEmpty(meta) ? GONE : VISIBLE);
 
         if (photoIndex == 0) {
-            // 第一张只保留身份和一句话，避免挡住人像。
             binding.jobTv.setVisibility(GONE);
             binding.tagRow.setVisibility(GONE);
             binding.tagRow.removeAllViews();
@@ -136,26 +141,26 @@ public class DatingCardView extends FrameLayout {
         binding.jobTv.setVisibility(VISIBLE);
         binding.introTv.setMaxLines(2);
         if (photoIndex == 1) {
-            binding.jobTv.setText("关于我");
+            binding.jobTv.setText(R.string.dating_section_about);
             binding.introTv.setText(profile.safeIntro());
             binding.introTv.setVisibility(TextUtils.isEmpty(profile.safeIntro()) ? GONE : VISIBLE);
             bindPlainTags(profile.safeTags(), 4);
         } else if (photoIndex == 2) {
-            binding.jobTv.setText("恋爱意向");
-            String line = joinText(profile.safeRelationshipGoal(), profile.relationship_status);
+            binding.jobTv.setText(R.string.dating_section_goal);
+            String line = joinText(DatingIntent.displayLabel(getContext(), profile.safeRelationshipGoal()), profile.relationship_status);
             binding.introTv.setText(line);
             binding.introTv.setVisibility(TextUtils.isEmpty(line) ? GONE : VISIBLE);
             bindPlainTags(profile.love_tags, 4);
         } else if (photoIndex == 3) {
-            binding.jobTv.setText("生活方式");
+            binding.jobTv.setText(R.string.dating_section_lifestyle);
             String line = joinText(
-                    TextUtils.isEmpty(profile.drinking) ? "" : "饮酒：" + profile.drinking,
-                    TextUtils.isEmpty(profile.smoking) ? "" : "吸烟：" + profile.smoking);
+                    TextUtils.isEmpty(profile.drinking) ? "" : getResources().getString(R.string.dating_drinking_value, profile.drinking),
+                    TextUtils.isEmpty(profile.smoking) ? "" : getResources().getString(R.string.dating_smoking_value, profile.smoking));
             binding.introTv.setText(line);
             binding.introTv.setVisibility(TextUtils.isEmpty(line) ? GONE : VISIBLE);
             bindPlainTags(profile.lifestyle_tags, 4);
         } else {
-            binding.jobTv.setText("基本资料");
+            binding.jobTv.setText(R.string.dating_section_basic);
             ArrayList<String> basics = new ArrayList<>();
             if (profile.height_cm > 0) basics.add(profile.height_cm + "cm");
             if (profile.weight_kg > 0) basics.add(profile.weight_kg + "kg");

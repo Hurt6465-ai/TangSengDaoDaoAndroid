@@ -14,45 +14,44 @@ import com.chat.base.net.HttpResponseCode;
 import com.chat.dating.databinding.ActivityWkDatingListBinding;
 import com.chat.dating.model.DatingProfile;
 
-import java.util.List;
+import java.util.ArrayList;
 
+/** 我的收藏以服务端为唯一数据源，本地不再序列化完整用户资料。 */
 public class DatingFavoritesActivity extends Activity {
     private static final int REQ_DETAIL = 601;
     private ActivityWkDatingListBinding binding;
     private DatingProfileGridAdapter adapter;
     private DatingProfile selected;
     private DatingProfile myProfile;
+    private boolean loading;
 
-    @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
+    @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         DatingUi.applyDarkSystemBars(this, Color.rgb(247, 247, 249));
         binding = ActivityWkDatingListBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        binding.titleTv.setText("我的收藏");
-        binding.subtitleTv.setText("收藏不会触发匹配，可稍后再决定");
+        DatingUi.applyPageInsets(this, binding.getRoot());
+        DatingFavoriteStore.clearLegacyCache(this);
+        binding.titleTv.setText(R.string.dating_favorites_title);
+        binding.subtitleTv.setText(R.string.dating_favorites_subtitle);
         binding.backBtn.setOnClickListener(v -> finish());
         adapter = new DatingProfileGridAdapter();
         binding.recyclerView.setLayoutManager(new GridLayoutManager(this, 2));
         binding.recyclerView.setAdapter(adapter);
         adapter.setListener(new DatingProfileGridAdapter.Listener() {
-            @Override
-            public void onClick(DatingProfile profile, int position) {
+            @Override public void onClick(DatingProfile profile, int position) {
                 selected = profile;
                 Intent intent = new Intent(DatingFavoritesActivity.this, DatingProfileDetailActivity.class);
                 intent.putExtra(DatingProfileDetailActivity.EXTRA_PROFILE, profile);
                 startActivityForResult(intent, REQ_DETAIL);
             }
 
-            @Override
-            public void onLongClick(DatingProfile profile, int position) {
+            @Override public void onLongClick(DatingProfile profile, int position) {
                 new android.app.AlertDialog.Builder(DatingFavoritesActivity.this)
-                        .setTitle("取消收藏？")
-                        .setNegativeButton("取消", null)
-                        .setPositiveButton("取消收藏", (d, w) -> {
-                            DatingFavoriteStore.remove(DatingFavoritesActivity.this, profile.safeUid());
-                            refresh();
-                        }).show();
+                        .setTitle(R.string.dating_favorite_remove_title)
+                        .setNegativeButton(R.string.dating_cancel, null)
+                        .setPositiveButton(R.string.dating_favorite_remove, (d, w) -> removeFavorite(profile))
+                        .show();
             }
         });
         DatingModel.getInstance().getMyDatingProfile((code, msg, data) -> myProfile = data);
@@ -60,37 +59,65 @@ public class DatingFavoritesActivity extends Activity {
     }
 
     private void refresh() {
-        List<DatingProfile> values = DatingFavoriteStore.list(this);
-        adapter.setItems(values);
-        binding.emptyTv.setVisibility(values.isEmpty() ? View.VISIBLE : View.GONE);
+        if (loading) return;
+        loading = true;
+        binding.loadingBar.setVisibility(View.VISIBLE);
+        DatingModel.getInstance().favorites(100, (code, msg, data) -> {
+            if (isFinishing() || isDestroyed()) return;
+            loading = false;
+            binding.loadingBar.setVisibility(View.GONE);
+            if (code != HttpResponseCode.success || data == null) {
+                adapter.setItems(new ArrayList<>());
+                binding.emptyTv.setText(TextUtils.isEmpty(msg) ? getString(R.string.dating_favorites_load_failed) : msg);
+                binding.emptyTv.setVisibility(View.VISIBLE);
+                return;
+            }
+            adapter.setItems(data.getItems());
+            binding.emptyTv.setText(R.string.dating_favorites_empty);
+            binding.emptyTv.setVisibility(data.getItems().isEmpty() ? View.VISIBLE : View.GONE);
+        });
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+    private void removeFavorite(DatingProfile profile) {
+        if (profile == null) return;
+        DatingModel.getInstance().removeFavorite(profile.safeUid(), (code, msg, data) -> {
+            if (code == HttpResponseCode.success) {
+                toast(getString(R.string.dating_favorite_removed));
+                refresh();
+            } else {
+                toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_action_failed) : msg);
+            }
+        });
+    }
+
+    @Override protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != REQ_DETAIL || resultCode != RESULT_OK || data == null || selected == null) return;
         String action = data.getStringExtra(DatingProfileDetailActivity.EXTRA_ACTION);
         if (DatingSwipeAction.FAVORITE.equals(action)) return;
-        DatingFavoriteStore.remove(this, selected.safeUid());
         if (DatingSwipeAction.PASS.equals(action)) {
-            DatingModel.getInstance().swipe(selected.safeUid(), DatingSwipeAction.PASS, 0, "favorites", null);
-            refresh();
-            return;
-        }
-        if (DatingSwipeAction.LIKE.equals(action)) {
+            sendSwipe(selected, DatingSwipeAction.PASS, false);
+        } else if (DatingSwipeAction.LIKE.equals(action)) {
             if (!DatingQuotaManager.consume(this, myProfile, DatingSwipeAction.LIKE)) {
-                toast("今日喜欢额度已用完");
+                toast(getString(R.string.dating_like_quota_empty));
                 return;
             }
-            DatingProfile target = selected;
-            DatingModel.getInstance().swipe(target.safeUid(), DatingSwipeAction.LIKE, 0, "favorites", (code, msg, result) -> {
-                if (code != HttpResponseCode.success) toast(TextUtils.isEmpty(msg) ? "操作失败" : msg);
-                else if (result != null && result.isMatched()) {
-                    DatingMatchDialog.show(this, myProfile, target, () -> DatingUi.openChat(this, target.safeUid()));
-                }
-            });
-            refresh();
+            sendSwipe(selected, DatingSwipeAction.LIKE, true);
         }
+    }
+
+    private void sendSwipe(DatingProfile target, String action, boolean quotaConsumed) {
+        DatingModel.getInstance().swipe(target.safeUid(), action, 0, "favorites", (code, msg, result) -> {
+            if (code != HttpResponseCode.success) {
+                if (quotaConsumed) DatingQuotaManager.refund(this, action);
+                toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_action_failed) : msg);
+                return;
+            }
+            refresh();
+            if (result != null && result.isMatched()) {
+                DatingMatchDialog.show(this, myProfile, target, () -> DatingUi.openChat(this, target.safeUid()));
+            }
+        });
     }
 
     private void toast(String text) {

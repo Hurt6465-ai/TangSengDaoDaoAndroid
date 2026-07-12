@@ -16,8 +16,9 @@ public class DatingWhoLikesActivity extends Activity {
         DatingUi.applyDarkSystemBars(this, Color.rgb(247, 247, 249));
         ActivityWkDatingWhoLikesBinding binding = ActivityWkDatingWhoLikesBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        DatingUi.applyPageInsets(this, binding.getRoot());
         binding.backBtn.setOnClickListener(v -> finish());
         binding.actionBtn.setOnClickListener(v -> android.widget.Toast.makeText(this,
-                "会员和支付接口接入后开放", android.widget.Toast.LENGTH_SHORT).show());
+                getString(R.string.dating_membership_pending), android.widget.Toast.LENGTH_SHORT).show());
     }
 }

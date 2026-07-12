@@ -19,7 +19,7 @@ import com.chat.base.base.WKBaseActivity;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.dating.databinding.ActivityWkDatingHomeBinding;
 import com.chat.dating.model.DatingProfile;
-import com.chat.dating.model.DatingSwipeResult;
+import com.chat.dating.model.DatingUndoResult;
 import com.yuyakaido.android.cardstackview.CardStackLayoutManager;
 import com.yuyakaido.android.cardstackview.CardStackListener;
 import com.yuyakaido.android.cardstackview.Direction;
@@ -45,11 +45,13 @@ import java.util.UUID;
  */
 public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBinding> {
     private static final int PAGE_LIMIT = 12;
+    private static final int MAX_SWIPE_RETRY = 1;
     private static final int REQ_PROFILE_DETAIL = 401;
     private static final int REQ_MINE = 402;
 
     private final ArrayList<DatingProfile> profiles = new ArrayList<>();
     private final ArrayList<Map<String, Object>> pendingExposures = new ArrayList<>();
+    private final ArrayList<Map<String, Object>> inflightExposures = new ArrayList<>();
     private final HashSet<String> loadedUids = new HashSet<>();
 
     private String cursor = "";
@@ -63,6 +65,10 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private int visiblePosition;
     private final ArrayDeque<SwipeRecord> swipeHistory = new ArrayDeque<>();
     private SwipeRecord pendingRewindRecord;
+    private boolean pendingRewindRefundAction;
+    private boolean pendingRewindRemoveFavorite;
+    private boolean interactionLocked;
+    private boolean exposureUploading;
 
     private DatingProfile myProfile;
     private DatingFilter filter;
@@ -97,9 +103,11 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         filter = DatingFilter.load(this);
         actionController = new DatingActionController(this);
         locationHelper = new DatingLocationHelper(this);
+        pendingExposures.addAll(DatingExposureQueue.load(this));
+        DatingUi.applyHomeInsets(wkVBinding.getRoot(), wkVBinding.topBar, wkVBinding.actionBar);
         initCardStack();
         updateScopeTabs();
-        showLoading(true, "正在为你挑选合适的人…", false);
+        showLoading(true, getString(R.string.dating_loading), false);
     }
 
     @Override
@@ -140,7 +148,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         cardAdapter.setOnCardTapListener(new DatingCardStackAdapter.OnCardTapListener() {
             @Override public void onPreviousPhoto(DatingProfile profile, int position, int photoIndex) {}
             @Override public void onNextPhoto(DatingProfile profile, int position, int photoIndex) {
-                DatingImagePreloader.preloadAround(DatingHomeActivity.this, profiles, position);
+                // 周边预加载只由 onCardAppeared 统一触发，避免每次切图重复请求。
             }
             @Override public void onOpenProfile(DatingProfile profile, int position, int photoIndex) {
                 openProfileDetail(profile, photoIndex);
@@ -164,25 +172,19 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                 actionController.resetDragFeedback();
 
                 if (profile == null) return;
+                SwipeRecord record = new SwipeRecord(profile, swipedPosition, action, photoIndex);
                 if (!actionController.consume(action)) {
-                    showToast(actionController.quotaMessage(action));
-                    rewindTop(null, false);
+                    restoreSwipedCard(record, false, false, actionController.quotaMessage(action));
                     return;
                 }
                 playSwipeEffect(direction);
 
-                swipeHistory.addLast(new SwipeRecord(profile, swipedPosition, action, photoIndex));
+                swipeHistory.addLast(record);
                 while (swipeHistory.size() > 30) swipeHistory.removeFirst();
                 finishExposure(true);
 
-                if (DatingSwipeAction.FAVORITE.equals(action)) {
-                    DatingFavoriteStore.add(DatingHomeActivity.this, profile);
-                }
-                reportSwipe(profile, action, photoIndex);
-
-                int top = cardStackManager.getTopPosition();
-                if (!loading && !noMore && cardAdapter.getItemCount() - top <= 4) loadMore(false);
-                if (top >= cardAdapter.getItemCount() && noMore) showEmpty();
+                setInteractionLocked(true);
+                reportSwipe(record, 0);
             }
 
             @Override
@@ -190,10 +192,12 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                 int top = cardStackManager.getTopPosition();
                 visiblePosition = Math.max(0, top);
                 SwipeRecord record = pendingRewindRecord;
+                boolean refundAction = pendingRewindRefundAction;
                 pendingRewindRecord = null;
-                if (record != null && DatingSwipeAction.FAVORITE.equals(record.action) && record.profile != null) {
-                    DatingFavoriteStore.remove(DatingHomeActivity.this, record.profile.safeUid());
-                }
+                pendingRewindRefundAction = false;
+                pendingRewindRemoveFavorite = false;
+                if (record != null && refundAction) actionController.refund(record.action);
+                setInteractionLocked(false);
                 DatingProfile profile = cardAdapter.getProfile(visiblePosition);
                 if (profile != null) startExposure(profile);
             }
@@ -238,6 +242,9 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         cardStackManager.setOverlayInterpolator(new LinearInterpolator());
 
         wkVBinding.deckView.setLayoutManager(cardStackManager);
+        // 保留上一批卡片内存优化：只缓存可见栈所需的少量 ViewHolder。
+        wkVBinding.deckView.setItemViewCacheSize(0);
+        wkVBinding.deckView.getRecycledViewPool().setMaxRecycledViews(0, 3);
         wkVBinding.deckView.setAdapter(cardAdapter);
         wkVBinding.deckView.setItemAnimator(null);
     }
@@ -253,9 +260,11 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         locationHelper.ensureLocation(new DatingLocationHelper.Callback() {
             @Override
             public void onSuccess(Location location) {
-                DatingModel.getInstance().updateLocation(location.getLatitude(), location.getLongitude(), (code, msg, data) -> {
+                DatingModel.getInstance().updateLocation(location.getLatitude(), location.getLongitude(),
+                        myProfile == null ? "" : myProfile.city,
+                        myProfile == null ? "" : myProfile.safeCountryCode(), (code, msg, data) -> {
                     if (code != HttpResponseCode.success) {
-                        showToast(TextUtils.isEmpty(msg) ? "位置更新失败，请稍后重试" : msg);
+                        showToast(TextUtils.isEmpty(msg) ? getString(R.string.dating_location_failed) : msg);
                         scope = "global";
                         updateScopeTabs();
                         return;
@@ -289,19 +298,19 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             if (myProfile == null && BuildConfig.DEBUG) myProfile = DatingMockData.demoMyProfile();
             actionController.setMyProfile(myProfile);
             if (myProfile == null) {
-                showLoading(true, TextUtils.isEmpty(msg) ? "资料加载失败，请重试" : msg, true);
-                wkVBinding.retryBtn.setText("重试");
+                showLoading(true, TextUtils.isEmpty(msg) ? getString(R.string.dating_profile_load_failed) : msg, true);
+                wkVBinding.retryBtn.setText(R.string.dating_retry);
                 return;
             }
             if (myProfile.enabled != 1) {
                 profiles.clear();
                 loadedUids.clear();
                 cardAdapter.submitProfiles(profiles);
-                showLoading(true, "先开启交友，才能开始刷人", true);
-                wkVBinding.retryBtn.setText("去开启");
+                showLoading(true, getString(R.string.dating_enable_first), true);
+                wkVBinding.retryBtn.setText(R.string.dating_go_enable);
                 return;
             }
-            wkVBinding.retryBtn.setText("重试");
+            wkVBinding.retryBtn.setText(R.string.dating_retry);
             requestInitialLocationThenLoad(resetRecommendation);
         });
     }
@@ -316,7 +325,9 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         locationHelper.ensureLocation(new DatingLocationHelper.Callback() {
             @Override
             public void onSuccess(Location location) {
-                DatingModel.getInstance().updateLocation(location.getLatitude(), location.getLongitude(), (code, msg, data) -> {
+                DatingModel.getInstance().updateLocation(location.getLatitude(), location.getLongitude(),
+                        myProfile == null ? "" : myProfile.city,
+                        myProfile == null ? "" : myProfile.safeCountryCode(), (code, msg, data) -> {
                     if (resetRecommendation) reload();
                     else loadMore(true);
                 });
@@ -338,21 +349,24 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         loading = false;
         profiles.clear();
         loadedUids.clear();
-        pendingExposures.clear();
+        flushExposures();
         visiblePosition = 0;
         swipeHistory.clear();
         pendingRewindRecord = null;
+        pendingRewindRefundAction = false;
+        pendingRewindRemoveFavorite = false;
+        setInteractionLocked(false);
         cardAdapter.submitProfiles(profiles);
         cardStackManager.setTopPosition(0);
         wkVBinding.deckView.scrollToPosition(0);
-        showLoading(true, "正在为你挑选合适的人…", false);
+        showLoading(true, getString(R.string.dating_loading), false);
         loadMore(true);
     }
 
     private void loadMore(boolean firstPage) {
         if (loading) return;
         loading = true;
-        if (firstPage) showLoading(true, "正在为你挑选合适的人…", false);
+        if (firstPage) showLoading(true, getString(R.string.dating_loading), false);
         DatingModel.getInstance().recommend(cursor, PAGE_LIMIT, scope, sessionId, filter, (code, msg, data) -> {
             if (isFinishing() || isDestroyed()) return;
             loading = false;
@@ -366,7 +380,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                 appendProfiles(DatingMockData.demoProfiles(), true, true);
                 noMore = true;
             } else if (firstPage) {
-                showLoading(true, TextUtils.isEmpty(msg) ? "暂时没有新的推荐" : msg, true);
+                showLoading(true, TextUtils.isEmpty(msg) ? getString(R.string.dating_empty) : msg, true);
             } else {
                 noMore = true;
             }
@@ -391,8 +405,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         }
         if (profiles.isEmpty()) showEmpty();
         else showContent();
-        if (demo) showToast("当前为开发演示图片，正式版接口失败不会显示假用户");
-        DatingImagePreloader.preloadAround(this, profiles, cardStackManager.getTopPosition());
+        if (demo) showToast(getString(R.string.dating_demo_tip));
     }
 
     private List<DatingProfile> cleanProfiles(List<DatingProfile> data) {
@@ -410,6 +423,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     }
 
     private void swipeTop(View source, Direction direction) {
+        if (interactionLocked) return;
         int top = cardStackManager.getTopPosition();
         if (top < 0 || top >= cardAdapter.getItemCount()) return;
         String action = actionForDirection(direction);
@@ -428,24 +442,52 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     }
 
     private void rewindTop(View source, boolean consumeQuota) {
-        if (cardStackManager.getTopPosition() <= 0) return;
-        if (consumeQuota && swipeHistory.isEmpty()) {
-            showToast("没有可以撤回的操作");
+        if (interactionLocked || !consumeQuota) return;
+        if (cardStackManager.getTopPosition() <= 0 || swipeHistory.isEmpty()) {
+            showToast(getString(R.string.dating_no_undo));
             return;
         }
-        if (consumeQuota && !actionController.consumeRewind()) {
-            showToast("今日免费撤回已用完，每天免费 3 次");
+        if (DatingQuotaManager.rewindRemaining(this) <= 0) {
+            showToast(getString(R.string.dating_rewind_quota_empty));
             return;
         }
-        pendingRewindRecord = consumeQuota ? swipeHistory.pollLast() : null;
+
+        SwipeRecord record = swipeHistory.peekLast();
+        if (record == null || record.profile == null) {
+            showToast(getString(R.string.dating_no_undo));
+            return;
+        }
+        setInteractionLocked(true);
         actionController.animateButton(source);
-        RewindAnimationSetting setting = new RewindAnimationSetting.Builder()
-                .setDirection(Direction.Bottom)
-                .setDuration(300)
-                .setInterpolator(new DecelerateInterpolator(1.6f))
-                .build();
-        cardStackManager.setRewindAnimationSetting(setting);
-        wkVBinding.deckView.rewind();
+        DatingModel.getInstance().undoSwipe((code, msg, result) -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (code != HttpResponseCode.success || result == null) {
+                setInteractionLocked(false);
+                showToast(TextUtils.isEmpty(msg) ? getString(R.string.dating_rewind_failed) : msg);
+                return;
+            }
+            if (!actionController.consumeRewind()) {
+                // 理论上不会发生：请求前已检查额度且交互已锁定。服务端已撤回时刷新保持一致。
+                applyServerUndoFallback(result);
+                swipeHistory.clear();
+                setInteractionLocked(false);
+                showToast(getString(R.string.dating_rewind_synced_refresh));
+                reload();
+                return;
+            }
+            String serverTarget = result.target_uid == null ? "" : result.target_uid.trim();
+            if (!TextUtils.equals(serverTarget, record.profile.safeUid())) {
+                // 历史版本可能留下本地/服务端不一致记录。服务端是最终权威，直接刷新推荐池。
+                applyServerUndoFallback(result);
+                swipeHistory.clear();
+                setInteractionLocked(false);
+                showToast(getString(R.string.dating_rewind_record_synced));
+                reload();
+                return;
+            }
+            swipeHistory.pollLast();
+            restoreSwipedCard(record, true, false, null);
+        });
     }
 
     private String actionForDirection(Direction direction) {
@@ -454,18 +496,81 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         return DatingSwipeAction.PASS;
     }
 
-    private void reportSwipe(DatingProfile profile, String action, int photoIndex) {
-        if (profile == null) return;
-        DatingModel.getInstance().swipe(profile.safeUid(), action, photoIndex, sessionId, (code, msg, result) -> {
+    private void reportSwipe(SwipeRecord record, int retryCount) {
+        if (record == null || record.profile == null) {
+            setInteractionLocked(false);
+            return;
+        }
+        DatingProfile profile = record.profile;
+        DatingModel.getInstance().swipe(profile.safeUid(), record.action, record.photoIndex, sessionId, (code, msg, result) -> {
+            if (isFinishing() || isDestroyed()) return;
             if (code != HttpResponseCode.success) {
-                if (!TextUtils.isEmpty(msg)) showToast(msg);
+                // 网络/服务异常先原样重试一次。后端已有短时幂等，响应丢失也不会重复扣额度。
+                if (retryCount < MAX_SWIPE_RETRY && (code <= 0 || code >= 500)) {
+                    reportSwipe(record, retryCount + 1);
+                    return;
+                }
+                swipeHistory.remove(record);
+                restoreSwipedCard(record, true, false,
+                        TextUtils.isEmpty(msg) ? getString(R.string.dating_operation_restored) : msg);
                 return;
             }
+            setInteractionLocked(false);
+            afterSwipeConfirmed();
             if (result != null && result.isMatched()) {
                 DatingMatchDialog.show(DatingHomeActivity.this, myProfile, profile,
                         () -> DatingUi.openChat(DatingHomeActivity.this, profile.safeUid()));
             }
         });
+    }
+
+    private void afterSwipeConfirmed() {
+        int top = cardStackManager == null ? 0 : cardStackManager.getTopPosition();
+        if (!loading && !noMore && cardAdapter.getItemCount() - top <= 4) loadMore(false);
+        if (top >= cardAdapter.getItemCount() && noMore) showEmpty();
+    }
+
+    private void restoreSwipedCard(SwipeRecord record, boolean refundAction,
+                                   boolean removeFavorite, String message) {
+        if (record == null || cardStackManager == null || wkVBinding == null) {
+            setInteractionLocked(false);
+            return;
+        }
+        setInteractionLocked(true);
+        pendingRewindRecord = record;
+        pendingRewindRefundAction = refundAction;
+        pendingRewindRemoveFavorite = removeFavorite;
+        if (!TextUtils.isEmpty(message)) showToast(message);
+        RewindAnimationSetting setting = new RewindAnimationSetting.Builder()
+                .setDirection(Direction.Bottom)
+                .setDuration(260)
+                .setInterpolator(new DecelerateInterpolator(1.6f))
+                .build();
+        cardStackManager.setRewindAnimationSetting(setting);
+        wkVBinding.deckView.rewind();
+    }
+
+    private void applyServerUndoFallback(DatingUndoResult result) {
+        if (result == null) return;
+        actionController.refund(result.action);
+    }
+
+    private void setInteractionLocked(boolean locked) {
+        interactionLocked = locked;
+        if (cardStackManager != null) {
+            cardStackManager.setSwipeableMethod(locked
+                    ? SwipeableMethod.None : SwipeableMethod.AutomaticAndManual);
+        }
+        setActionEnabled(wkVBinding == null ? null : wkVBinding.rewindBtn, !locked);
+        setActionEnabled(wkVBinding == null ? null : wkVBinding.passBtn, !locked);
+        setActionEnabled(wkVBinding == null ? null : wkVBinding.favoriteBtn, !locked);
+        setActionEnabled(wkVBinding == null ? null : wkVBinding.likeBtn, !locked);
+    }
+
+    private void setActionEnabled(View view, boolean enabled) {
+        if (view == null) return;
+        view.setEnabled(enabled);
+        view.setAlpha(enabled ? 1f : 0.58f);
     }
 
     private void openProfileDetail(DatingProfile profile, int photoIndex) {
@@ -476,7 +581,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         event.put("source", "wkdating");
         event.put("duration_ms", 0);
         event.put("photo_index", photoIndex);
-        pendingExposures.add(event);
+        queueExposure(event);
         Intent intent = new Intent(this, DatingProfileDetailActivity.class);
         intent.putExtra(DatingProfileDetailActivity.EXTRA_PROFILE, profile);
         intent.putExtra(DatingProfileDetailActivity.EXTRA_PHOTO_INDEX, photoIndex);
@@ -492,7 +597,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             else if (DatingSwipeAction.FAVORITE.equals(action)) swipeTop(null, Direction.Top);
             else if (DatingSwipeAction.LIKE.equals(action)) swipeTop(null, Direction.Right);
         } else if (requestCode == REQ_MINE && resultCode == RESULT_OK) {
-            showLoading(true, "正在根据新资料刷新推荐…", false);
+            showLoading(true, getString(R.string.dating_refresh_after_profile), false);
             fetchMyProfile(true);
         }
     }
@@ -512,18 +617,50 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             item.put("source", "wkdating");
             item.put("duration_ms", duration);
             item.put("photo_index", cardAdapter.getPhotoIndex(Math.max(0, visiblePosition)));
-            pendingExposures.add(item);
+            queueExposure(item);
         }
         exposureUid = "";
         exposureStartMs = 0L;
         if (forceFlush || pendingExposures.size() >= 5) flushExposures();
     }
 
+    private void queueExposure(Map<String, Object> item) {
+        if (item == null) return;
+        pendingExposures.add(item);
+        while (pendingExposures.size() > 100) pendingExposures.remove(0);
+        persistExposureQueue();
+    }
+
+    private void persistExposureQueue() {
+        ArrayList<Map<String, Object>> all = new ArrayList<>(inflightExposures);
+        all.addAll(pendingExposures);
+        DatingExposureQueue.save(this, all);
+    }
+
     private void flushExposures() {
-        if (pendingExposures.isEmpty()) return;
-        ArrayList<Map<String, Object>> copy = new ArrayList<>(pendingExposures);
+        if (exposureUploading || pendingExposures.isEmpty()) return;
+        exposureUploading = true;
+        ArrayList<Map<String, Object>> batch = new ArrayList<>(pendingExposures);
         pendingExposures.clear();
-        DatingModel.getInstance().reportExposures(copy);
+        inflightExposures.clear();
+        inflightExposures.addAll(batch);
+        persistExposureQueue();
+        DatingModel.getInstance().reportExposures(batch, (code, msg, data) -> {
+            exposureUploading = false;
+            inflightExposures.clear();
+            if (code != HttpResponseCode.success) {
+                // 失败批次放回队首，下一次切卡、暂停或重新进入页面时继续上报。
+                ArrayList<Map<String, Object>> merged = new ArrayList<>(batch);
+                merged.addAll(pendingExposures);
+                pendingExposures.clear();
+                int start = Math.max(0, merged.size() - 100);
+                pendingExposures.addAll(merged.subList(start, merged.size()));
+                persistExposureQueue();
+                return;
+            }
+            persistExposureQueue();
+            if (pendingExposures.size() >= 5) flushExposures();
+        });
     }
 
     private DatingCardView topCardView() {
@@ -569,7 +706,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     }
 
     private void showEmpty() {
-        String text = String.format(Locale.getDefault(), "%s\n%s", "暂时没有新的推荐", "可以放宽筛选，或稍后再来看看。");
+        String text = String.format(Locale.getDefault(), "%s\n%s", getString(R.string.dating_empty), getString(R.string.dating_empty_tip));
         showLoading(true, text, true);
     }
 
@@ -591,6 +728,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     protected void onDestroy() {
         finishExposure(true);
         flushExposures();
+        persistExposureQueue();
         if (actionController != null) actionController.release();
         if (locationHelper != null) locationHelper.release();
         super.onDestroy();

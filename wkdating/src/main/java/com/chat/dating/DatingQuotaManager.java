@@ -31,11 +31,11 @@ public final class DatingQuotaManager {
     }
 
     public static int dailyLimit(DatingProfile myProfile, String action) {
-        boolean female = myProfile != null && myProfile.isFemale();
+        if (myProfile == null || !myProfile.hasKnownSex()) return 0;
         if (DatingSwipeAction.FAVORITE.equals(action)) {
-            return female ? FEMALE_FAVORITE_LIMIT : MALE_FAVORITE_LIMIT;
+            return myProfile.isFemale() ? FEMALE_FAVORITE_LIMIT : MALE_FAVORITE_LIMIT;
         }
-        return female ? FEMALE_LIKE_LIMIT : MALE_LIKE_LIMIT;
+        return myProfile.isFemale() ? FEMALE_LIKE_LIMIT : MALE_LIKE_LIMIT;
     }
 
     public static int used(Context context, String action) {
@@ -59,6 +59,18 @@ public final class DatingQuotaManager {
         String key = key(action);
         preferences.edit().putInt(key, preferences.getInt(key, 0) + 1).apply();
         return true;
+    }
+
+    /**
+     * 请求失败或服务端成功撤回时退回一次本地额度。
+     * 服务端仍是最终权威，这里只修正客户端即时提示。
+     */
+    public static void refund(Context context, String action) {
+        if (context == null || !needsQuota(action)) return;
+        SharedPreferences preferences = sp(context);
+        String key = key(action);
+        int used = preferences.getInt(key, 0);
+        if (used > 0) preferences.edit().putInt(key, used - 1).apply();
     }
 
     public static int rewindDailyLimit() {

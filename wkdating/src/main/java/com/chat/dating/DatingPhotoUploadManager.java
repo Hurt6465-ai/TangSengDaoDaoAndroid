@@ -24,13 +24,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * 交友照片真实上传链路：content Uri -> 缓存 -> WebP 约 200KB -> common file/upload -> 返回可保存路径。
- */
+/** content Uri -> 主图 + 720 卡片派生图 -> 分别上传。 */
 public final class DatingPhotoUploadManager {
     public interface Callback {
         void onProgress(int progress, String message);
-        void onSuccess(List<String> uploadedUrls);
+        void onSuccess(List<String> masterUrls, List<String> cardUrls);
         void onError(String message);
     }
 
@@ -44,11 +42,10 @@ public final class DatingPhotoUploadManager {
 
     public void upload(List<Uri> uris, Callback callback) {
         if (uris == null || uris.isEmpty()) {
-            if (callback != null) callback.onSuccess(new ArrayList<>());
+            if (callback != null) callback.onSuccess(new ArrayList<>(), new ArrayList<>());
             return;
         }
-        ArrayList<Uri> copy = new ArrayList<>(uris);
-        executor.execute(() -> doUpload(copy, callback));
+        executor.execute(() -> doUpload(new ArrayList<>(uris), callback));
     }
 
     public void shutdown() {
@@ -58,29 +55,45 @@ public final class DatingPhotoUploadManager {
     private void doUpload(List<Uri> uris, Callback callback) {
         try {
             File cacheDir = new File(context.getCacheDir(), "dating_upload");
-            if (!cacheDir.exists()) cacheDir.mkdirs();
-            ArrayList<String> uploaded = new ArrayList<>();
+            if (!cacheDir.exists() && !cacheDir.mkdirs()) throw new IllegalStateException(context.getString(R.string.dating_photo_cache_failed));
+            ArrayList<String> masters = new ArrayList<>();
+            ArrayList<String> cards = new ArrayList<>();
             for (int i = 0; i < uris.size(); i++) {
                 File raw = null;
-                File webp = null;
+                DatingPhotoCompressor.Result compressed = null;
                 try {
                     int base = Math.round(i * 100f / uris.size());
-                    postProgress(callback, base, "正在压缩第 " + (i + 1) + " 张图片");
+                    postProgress(callback, base, context.getString(R.string.dating_upload_processing, i + 1));
                     raw = copyUriToCache(uris.get(i), cacheDir);
-                    webp = DatingPhotoCompressor.compressToWebp(raw, cacheDir);
-                    int uploadBase = Math.round((i + 0.35f) * 100f / uris.size());
-                    postProgress(callback, uploadBase, "正在上传第 " + (i + 1) + " 张图片");
-                    uploaded.add(uploadOne(webp));
+                    compressed = DatingPhotoCompressor.compress(raw, cacheDir);
+
+                    int masterProgress = Math.round((i + 0.35f) * 100f / uris.size());
+                    postProgress(callback, masterProgress, context.getString(R.string.dating_upload_master, i + 1, uris.size()));
+                    String masterUrl = uploadOne(compressed.master);
+
+                    int cardProgress = Math.round((i + 0.68f) * 100f / uris.size());
+                    postProgress(callback, cardProgress, context.getString(R.string.dating_upload_card, i + 1, uris.size()));
+                    String cardUrl = uploadOne(compressed.card);
+                    masters.add(masterUrl);
+                    cards.add(TextUtils.isEmpty(cardUrl) ? masterUrl : cardUrl);
                 } finally {
-                    if (raw != null && raw.exists()) raw.delete();
-                    if (webp != null && webp.exists()) webp.delete();
+                    deleteQuietly(raw);
+                    if (compressed != null) {
+                        deleteQuietly(compressed.master);
+                        deleteQuietly(compressed.card);
+                    }
                 }
             }
             mainHandler.post(() -> {
-                if (callback != null) callback.onSuccess(uploaded);
+                if (callback != null) callback.onSuccess(masters, cards);
             });
         } catch (Exception e) {
-            String message = TextUtils.isEmpty(e.getMessage()) ? "图片上传失败" : e.getMessage();
+            String message;
+            if (e instanceof DatingPhotoCompressor.PhotoException) {
+                message = context.getString(((DatingPhotoCompressor.PhotoException) e).messageRes);
+            } else {
+                message = TextUtils.isEmpty(e.getMessage()) ? context.getString(R.string.dating_upload_failed) : e.getMessage();
+            }
             mainHandler.post(() -> {
                 if (callback != null) callback.onError(message);
             });
@@ -89,25 +102,22 @@ public final class DatingPhotoUploadManager {
 
     private String uploadOne(File file) throws Exception {
         DatingUploadUrl uploadUrl = awaitUploadUrl(file.getAbsolutePath());
-        if (uploadUrl == null || TextUtils.isEmpty(uploadUrl.url)) throw new IllegalStateException("获取上传地址失败");
+        if (uploadUrl == null || TextUtils.isEmpty(uploadUrl.url)) throw new IllegalStateException(context.getString(R.string.dating_upload_url_failed));
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<String> result = new AtomicReference<>("");
         AtomicReference<Exception> error = new AtomicReference<>();
         String tag = "dating_upload_" + UUID.randomUUID();
         WKUploader.getInstance().upload(uploadUrl.url, file.getAbsolutePath(), tag, new WKUploader.IUploadBack() {
-            @Override
-            public void onSuccess(String url) {
+            @Override public void onSuccess(String url) {
                 result.set(TextUtils.isEmpty(url) ? uploadUrl.path : url);
                 latch.countDown();
             }
-
-            @Override
-            public void onError() {
-                error.set(new IllegalStateException("图片上传失败"));
+            @Override public void onError() {
+                error.set(new IllegalStateException(context.getString(R.string.dating_upload_failed)));
                 latch.countDown();
             }
         });
-        if (!latch.await(120, TimeUnit.SECONDS)) throw new IllegalStateException("图片上传超时");
+        if (!latch.await(120, TimeUnit.SECONDS)) throw new IllegalStateException(context.getString(R.string.dating_upload_timeout));
         if (error.get() != null) throw error.get();
         return normalizeUploadedPath(result.get());
     }
@@ -118,16 +128,16 @@ public final class DatingPhotoUploadManager {
         AtomicReference<Exception> error = new AtomicReference<>();
         DatingModel.getInstance().getUploadFileUrl(localPath, (code, msg, data) -> {
             if (code == HttpResponseCode.success && data != null) result.set(data);
-            else error.set(new IllegalStateException(TextUtils.isEmpty(msg) ? "获取上传地址失败" : msg));
+            else error.set(new IllegalStateException(TextUtils.isEmpty(msg) ? context.getString(R.string.dating_upload_url_failed) : msg));
             latch.countDown();
         });
-        if (!latch.await(30, TimeUnit.SECONDS)) throw new IllegalStateException("获取上传地址超时");
+        if (!latch.await(30, TimeUnit.SECONDS)) throw new IllegalStateException(context.getString(R.string.dating_upload_url_timeout));
         if (error.get() != null) throw error.get();
         return result.get();
     }
 
     private File copyUriToCache(Uri uri, File dir) throws Exception {
-        if (uri == null) throw new IllegalArgumentException("图片地址无效");
+        if (uri == null) throw new IllegalArgumentException(context.getString(R.string.dating_invalid_image_uri));
         String name = displayName(uri);
         String ext = ".jpg";
         int dot = name.lastIndexOf('.');
@@ -135,11 +145,15 @@ public final class DatingPhotoUploadManager {
         File out = new File(dir, "dating_src_" + System.currentTimeMillis() + "_" + Math.abs(uri.hashCode()) + ext);
         try (InputStream input = context.getContentResolver().openInputStream(uri);
              FileOutputStream output = new FileOutputStream(out)) {
-            if (input == null) throw new IllegalStateException("无法读取图片");
+            if (input == null) throw new IllegalStateException(context.getString(R.string.dating_read_image_failed));
             byte[] buffer = new byte[128 * 1024];
             int len;
             while ((len = input.read(buffer)) != -1) output.write(buffer, 0, len);
             output.flush();
+        } catch (Throwable error) {
+            deleteQuietly(out);
+            if (error instanceof Exception) throw (Exception) error;
+            throw new IllegalStateException(context.getString(R.string.dating_read_image_failed), error);
         }
         return out;
     }
@@ -176,5 +190,9 @@ public final class DatingPhotoUploadManager {
         mainHandler.post(() -> {
             if (callback != null) callback.onProgress(Math.max(0, Math.min(100, progress)), message);
         });
+    }
+
+    private static void deleteQuietly(File file) {
+        if (file != null && file.exists()) file.delete();
     }
 }

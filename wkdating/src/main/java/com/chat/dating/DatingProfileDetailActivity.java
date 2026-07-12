@@ -34,6 +34,7 @@ public class DatingProfileDetailActivity extends Activity {
         DatingUi.applyDarkSystemBars(this, Color.rgb(242, 242, 245));
         binding = ActivityWkDatingProfileDetailBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        DatingUi.applyPageInsets(this, binding.getRoot());
         Object value = getIntent().getSerializableExtra(EXTRA_PROFILE);
         if (!(value instanceof DatingProfile)) {
             finish();
@@ -69,11 +70,11 @@ public class DatingProfileDetailActivity extends Activity {
         String location = profile.displayLocation();
         binding.locationTv.setText(location);
         binding.locationTv.setVisibility(TextUtils.isEmpty(location) ? View.GONE : View.VISIBLE);
-        bindSection(binding.aboutTitle, binding.aboutTv, "关于我", profile.safeIntro());
-        bindSection(binding.loveTitle, binding.loveTv, "恋爱期待", DatingUi.loveExpectation(profile));
-        bindSection(binding.idealTitle, binding.idealTv, "希望对方", profile.ideal_partner);
-        bindSection(binding.dealbreakersTitle, binding.dealbreakersTv, "我反感", TextUtils.join("、", profile.safeDealbreakers()));
-        bindSection(binding.basicTitle, binding.basicTv, "基本资料", basicLine());
+        bindSection(binding.aboutTitle, binding.aboutTv, R.string.dating_section_about, profile.safeIntro());
+        bindSection(binding.loveTitle, binding.loveTv, R.string.dating_section_relationship, DatingUi.loveExpectation(this, profile));
+        bindSection(binding.idealTitle, binding.idealTv, R.string.dating_section_ideal_partner, profile.ideal_partner);
+        bindSection(binding.dealbreakersTitle, binding.dealbreakersTv, R.string.dating_section_dealbreakers_title, TextUtils.join("、", profile.safeDealbreakers()));
+        bindSection(binding.basicTitle, binding.basicTv, R.string.dating_section_basic, basicLine());
         bindTags(binding.tagsLayout, profile.safeTags());
     }
 
@@ -102,18 +103,18 @@ public class DatingProfileDetailActivity extends Activity {
         }
         if (!TextUtils.isEmpty(profile.drinking)) {
             if (out.length() > 0) out.append(" · ");
-            out.append("饮酒").append(profile.drinking);
+            out.append(getString(R.string.dating_drinking_value, profile.drinking));
         }
         if (!TextUtils.isEmpty(profile.smoking)) {
             if (out.length() > 0) out.append(" · ");
-            out.append("吸烟").append(profile.smoking);
+            out.append(getString(R.string.dating_smoking_value, profile.smoking));
         }
         return out.toString();
     }
 
-    private void bindSection(TextView title, TextView body, String titleText, String value) {
+    private void bindSection(TextView title, TextView body, int titleRes, String value) {
         boolean visible = !TextUtils.isEmpty(value);
-        title.setText(titleText);
+        title.setText(titleRes);
         title.setVisibility(visible ? View.VISIBLE : View.GONE);
         body.setText(value);
         body.setVisibility(visible ? View.VISIBLE : View.GONE);
@@ -154,22 +155,22 @@ public class DatingProfileDetailActivity extends Activity {
 
     private void confirmBlock() {
         new AlertDialog.Builder(this)
-                .setTitle("屏蔽此人？")
-                .setMessage("屏蔽后将不再向你推荐此人。")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("屏蔽", (dialog, which) -> DatingModel.getInstance().block(profile.safeUid(), (code, msg, data) -> {
-                    toast(code == HttpResponseCode.success ? "已屏蔽" : (TextUtils.isEmpty(msg) ? "屏蔽失败" : msg));
+                .setTitle(R.string.dating_block_title)
+                .setMessage(R.string.dating_block_message)
+                .setNegativeButton(R.string.dating_cancel, null)
+                .setPositiveButton(R.string.dating_block, (dialog, which) -> DatingModel.getInstance().block(profile.safeUid(), (code, msg, data) -> {
+                    toast(code == HttpResponseCode.success ? getString(R.string.dating_blocked) : (TextUtils.isEmpty(msg) ? getString(R.string.dating_block_failed) : msg));
                     if (code == HttpResponseCode.success) returnAction(DatingSwipeAction.PASS);
                 }))
                 .show();
     }
 
     private void confirmReport() {
-        String[] reasons = {"虚假资料", "色情或骚扰", "诈骗或引流", "冒用他人照片", "其他"};
+        String[] reasons = {getString(R.string.dating_report_fake), getString(R.string.dating_report_harassment), getString(R.string.dating_report_scam), getString(R.string.dating_report_impersonation), getString(R.string.dating_report_other)};
         new AlertDialog.Builder(this)
-                .setTitle("举报原因")
+                .setTitle(R.string.dating_report_reason)
                 .setItems(reasons, (dialog, which) -> DatingModel.getInstance().report(profile.safeUid(), reasons[which], "dating_profile", (code, msg, data) ->
-                        toast(code == HttpResponseCode.success ? "已提交举报" : (TextUtils.isEmpty(msg) ? "举报失败" : msg))))
+                        toast(code == HttpResponseCode.success ? getString(R.string.dating_reported) : (TextUtils.isEmpty(msg) ? getString(R.string.dating_report_failed) : msg))))
                 .show();
     }
 

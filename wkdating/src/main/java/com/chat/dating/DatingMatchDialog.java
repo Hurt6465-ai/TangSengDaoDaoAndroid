@@ -32,8 +32,8 @@ public final class DatingMatchDialog {
 
         Glide.with(activity).load(DatingImageSource.resolve(activity, me == null ? "" : me.firstPhoto())).centerCrop().into(binding.myPhoto);
         Glide.with(activity).load(DatingImageSource.resolve(activity, target.firstPhoto())).centerCrop().into(binding.targetPhoto);
-        binding.titleTv.setText("你们互相喜欢了");
-        binding.subtitleTv.setText("你和 " + target.safeName() + " 都对彼此心动，可以开始聊天了");
+        binding.titleTv.setText(R.string.dating_match_title_full);
+        binding.subtitleTv.setText(activity.getString(R.string.dating_match_subtitle, target.safeName()));
         binding.keepBtn.setOnClickListener(v -> dialog.dismiss());
         binding.chatBtn.setOnClickListener(v -> {
             dialog.dismiss();

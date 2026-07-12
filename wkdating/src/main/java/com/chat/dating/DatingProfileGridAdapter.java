@@ -9,6 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.chat.dating.databinding.ItemWkDatingProfileGridBinding;
 import com.chat.dating.model.DatingProfile;
 
@@ -54,8 +55,11 @@ public final class DatingProfileGridAdapter extends RecyclerView.Adapter<DatingP
     public void onBindViewHolder(@NonNull Holder holder, int position) {
         DatingProfile profile = items.get(position);
         Glide.with(holder.itemView)
-                .load(DatingImageSource.resolve(holder.itemView.getContext(), profile.firstPhoto()))
+                .load(DatingImageSource.resolve(holder.itemView.getContext(), profile.safeCardPhotos().isEmpty() ? profile.firstPhoto() : profile.safeCardPhotos().get(0)))
+                .thumbnail(0.25f)
+                .override(540, 720)
                 .centerCrop()
+                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                 .into(holder.binding.photoIv);
         holder.binding.nameTv.setText(DatingUi.nameAgeFlag(profile));
         String meta = profile.displayLocation();
@@ -71,6 +75,15 @@ public final class DatingProfileGridAdapter extends RecyclerView.Adapter<DatingP
             if (p != RecyclerView.NO_POSITION && listener != null) listener.onLongClick(items.get(p), p);
             return true;
         });
+    }
+
+    @Override
+    public void onViewRecycled(@NonNull Holder holder) {
+        Glide.with(holder.itemView).clear(holder.binding.photoIv);
+        holder.binding.photoIv.setImageDrawable(null);
+        holder.itemView.setOnClickListener(null);
+        holder.itemView.setOnLongClickListener(null);
+        super.onViewRecycled(holder);
     }
 
     @Override

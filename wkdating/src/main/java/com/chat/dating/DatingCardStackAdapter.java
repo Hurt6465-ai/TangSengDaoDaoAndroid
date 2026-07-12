@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStackAdapter.CardHolder> {
     public interface OnCardTapListener {
@@ -27,13 +28,8 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
     private final Map<String, Integer> photoPositions = new HashMap<>();
     private OnCardTapListener tapListener;
 
-    public DatingCardStackAdapter() {
-        setHasStableIds(true);
-    }
-
-    public void setOnCardTapListener(OnCardTapListener listener) {
-        this.tapListener = listener;
-    }
+    public DatingCardStackAdapter() { setHasStableIds(true); }
+    public void setOnCardTapListener(OnCardTapListener listener) { this.tapListener = listener; }
 
     public void submitProfiles(List<DatingProfile> data) {
         ArrayList<DatingProfile> next = new ArrayList<>();
@@ -46,16 +42,12 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
                 return TextUtils.equals(old.get(oldItemPosition).safeUid(), next.get(newItemPosition).safeUid());
             }
             @Override public boolean areContentsTheSame(int oldItemPosition, int newItemPosition) {
-                DatingProfile a = old.get(oldItemPosition);
-                DatingProfile b = next.get(newItemPosition);
-                return TextUtils.equals(a.safeName(), b.safeName())
-                        && a.age == b.age
-                        && a.safePhotos().equals(b.safePhotos())
-                        && TextUtils.equals(a.safeIntro(), b.safeIntro());
+                return contentSignature(old.get(oldItemPosition)).equals(contentSignature(next.get(newItemPosition)));
             }
         }, false);
         profiles.clear();
         profiles.addAll(next);
+        prunePhotoPositions(next);
         result.dispatchUpdatesTo(this);
     }
 
@@ -67,8 +59,7 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
     }
 
     public DatingProfile getProfile(int position) {
-        if (position < 0 || position >= profiles.size()) return null;
-        return profiles.get(position);
+        return position < 0 || position >= profiles.size() ? null : profiles.get(position);
     }
 
     public int getPhotoIndex(int position) {
@@ -78,14 +69,12 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
         return index == null ? 0 : Math.max(0, index);
     }
 
-    @Override
-    public long getItemId(int position) {
+    @Override public long getItemId(int position) {
         DatingProfile profile = getProfile(position);
-        return profile == null ? RecyclerView.NO_ID : profile.safeUid().hashCode();
+        return profile == null ? RecyclerView.NO_ID : fnv1a64(profile.safeUid());
     }
 
-    @NonNull
-    @Override
+    @NonNull @Override
     public CardHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         DatingCardView card = new DatingCardView(parent.getContext());
         card.setLayoutParams(new RecyclerView.LayoutParams(
@@ -99,7 +88,6 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
         holder.card.bind(profile, getPhotoIndex(position));
         holder.card.setOnTouchListener(new TapRouter(holder.card, profile, holder));
         holder.card.getProfileArrowView().setOnTouchListener((v, event) -> {
-            // 借鉴 CardSlidePanel 的可拖动区域：资料按钮点击时不让父层把它误判为滑卡。
             if (event.getActionMasked() == MotionEvent.ACTION_DOWN) v.getParent().requestDisallowInterceptTouchEvent(true);
             if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
                 v.getParent().requestDisallowInterceptTouchEvent(false);
@@ -109,27 +97,54 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
         holder.card.getProfileArrowView().setOnClickListener(v -> {
             int current = holder.getBindingAdapterPosition();
             if (current != RecyclerView.NO_POSITION && tapListener != null) {
-                tapListener.onOpenProfile(profile, current, holder.card.getPhotoIndex());
+                DatingProfile currentProfile = getProfile(current);
+                if (currentProfile != null) tapListener.onOpenProfile(currentProfile, current, holder.card.getPhotoIndex());
             }
         });
     }
 
-    @Override
-    public int getItemCount() {
-        return profiles.size();
+    @Override public void onViewRecycled(@NonNull CardHolder holder) {
+        holder.card.recycle();
+        super.onViewRecycled(holder);
     }
+
+    @Override public int getItemCount() { return profiles.size(); }
 
     private void savePhotoIndex(DatingProfile profile, int index) {
         if (profile == null || TextUtils.isEmpty(profile.safeUid())) return;
         photoPositions.put(profile.safeUid(), Math.max(0, index));
     }
 
+    private void prunePhotoPositions(List<DatingProfile> values) {
+        ArrayList<String> valid = new ArrayList<>();
+        for (DatingProfile value : values) if (value != null) valid.add(value.safeUid());
+        photoPositions.keySet().retainAll(valid);
+    }
+
+    private static long fnv1a64(String value) {
+        long hash = 0xcbf29ce484222325L;
+        String source = value == null ? "" : value;
+        for (int i = 0; i < source.length(); i++) {
+            hash ^= source.charAt(i);
+            hash *= 0x100000001b3L;
+        }
+        return hash == RecyclerView.NO_ID ? hash + 1 : hash;
+    }
+
+    private static String contentSignature(DatingProfile p) {
+        if (p == null) return "";
+        return Objects.toString(p.safeName(), "") + '|' + p.age + '|' + p.normalizedSex() + '|'
+                + Objects.toString(p.displayLocation(), "") + '|' + p.online + '|'
+                + Objects.toString(p.safeIntro(), "") + '|' + Objects.toString(p.safeRelationshipGoal(), "") + '|'
+                + Objects.toString(p.job, "") + '|' + Objects.toString(p.education, "") + '|'
+                + Objects.toString(p.relationship_status, "") + '|' + Objects.toString(p.sexual_orientation, "") + '|'
+                + p.height_cm + '|' + p.weight_kg + '|' + p.profile_score + '|'
+                + p.safePhotos().toString() + '|' + p.safeCardPhotos().toString() + '|' + p.safeTags().toString();
+    }
+
     public static class CardHolder extends RecyclerView.ViewHolder {
         public final DatingCardView card;
-        CardHolder(@NonNull DatingCardView itemView) {
-            super(itemView);
-            card = itemView;
-        }
+        CardHolder(@NonNull DatingCardView itemView) { super(itemView); card = itemView; }
     }
 
     private final class TapRouter implements View.OnTouchListener {
@@ -147,14 +162,10 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
             this.holder = holder;
         }
 
-        @Override
-        public boolean onTouch(View v, MotionEvent event) {
+        @Override public boolean onTouch(View v, MotionEvent event) {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    downX = event.getX();
-                    downY = event.getY();
-                    downAt = System.currentTimeMillis();
-                    moved = false;
+                    downX = event.getX(); downY = event.getY(); downAt = System.currentTimeMillis(); moved = false;
                     return false;
                 case MotionEvent.ACTION_MOVE:
                     if (Math.hypot(event.getX() - downX, event.getY() - downY)
@@ -165,7 +176,6 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
                         int position = holder.getBindingAdapterPosition();
                         if (position == RecyclerView.NO_POSITION) return false;
                         float width = Math.max(1f, v.getWidth());
-                        // 箭头有独立点击监听；卡片左右区域只负责切图。
                         if (event.getX() < width * 0.42f) {
                             card.showPreviousPhoto();
                             savePhotoIndex(profile, card.getPhotoIndex());
@@ -177,8 +187,7 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
                         }
                     }
                     return false;
-                default:
-                    return false;
+                default: return false;
             }
         }
     }

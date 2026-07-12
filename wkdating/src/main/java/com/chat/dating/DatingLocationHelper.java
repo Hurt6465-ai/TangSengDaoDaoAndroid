@@ -74,7 +74,7 @@ public final class DatingLocationHelper {
             locateNow();
         } else {
             sp.edit().putBoolean(KEY_GRANTED_ONCE, false).apply();
-            deny("未开启定位，无法查看附近的人");
+            deny(activity.getString(R.string.dating_location_denied));
         }
         return true;
     }
@@ -86,13 +86,13 @@ public final class DatingLocationHelper {
 
     private void showPermissionExplain() {
         String message = sp.getBoolean(KEY_GRANTED_ONCE, false)
-                ? "为了继续查看附近的人，请重新开启定位权限。"
-                : "开启定位后才能查看附近的人。授权成功后，后续默认静默定位，不会重复询问。";
+                ? activity.getString(R.string.dating_location_explain_again)
+                : activity.getString(R.string.dating_location_explain_first);
         new AlertDialog.Builder(activity)
-                .setTitle("开启定位")
+                .setTitle(R.string.dating_location_title)
                 .setMessage(message)
-                .setNegativeButton("暂不", (dialog, which) -> deny("未开启定位，已切回推荐"))
-                .setPositiveButton("去开启", (dialog, which) -> ActivityCompat.requestPermissions(
+                .setNegativeButton(R.string.dating_location_not_now, (dialog, which) -> deny(activity.getString(R.string.dating_location_back_recommend)))
+                .setPositiveButton(R.string.dating_location_go_enable, (dialog, which) -> ActivityCompat.requestPermissions(
                         activity,
                         new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
                         REQUEST_LOCATION))
@@ -106,7 +106,7 @@ public final class DatingLocationHelper {
 
     private void locateNow() {
         if (!hasPermission() || locationManager == null) {
-            deny("当前设备无法获取定位");
+            deny(activity.getString(R.string.dating_location_device_unavailable));
             return;
         }
 
@@ -128,7 +128,7 @@ public final class DatingLocationHelper {
 
         if (providers.isEmpty()) {
             if (cached != null) success(cached);
-            else deny("请先打开系统定位服务");
+            else deny(activity.getString(R.string.dating_location_service_off));
             return;
         }
 
@@ -150,11 +150,11 @@ public final class DatingLocationHelper {
                 locationManager.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper());
             }
         } catch (SecurityException error) {
-            deny("定位权限不可用");
+            deny(activity.getString(R.string.dating_location_permission_unavailable));
             return;
         } catch (Throwable error) {
             if (cached != null) success(cached);
-            else deny("定位失败，请稍后重试");
+            else deny(activity.getString(R.string.dating_location_retry));
             return;
         }
 
@@ -162,7 +162,7 @@ public final class DatingLocationHelper {
         timeoutTask = () -> {
             stopListening();
             if (fallback != null) success(fallback);
-            else deny("暂时无法获取位置，请稍后重试");
+            else deny(activity.getString(R.string.dating_location_temporarily_unavailable));
         };
         handler.postDelayed(timeoutTask, 8000L);
     }

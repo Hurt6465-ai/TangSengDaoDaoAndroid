@@ -5,19 +5,22 @@ import android.text.TextUtils;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * 交友照片上传规则。
- * 1. 最多 5 张；至少 1 张才允许开启交友；
- * 2. 前端统一压缩为 WebP，卡片图目标约 200KB；
- * 3. 本地只做尺寸/格式/数量校验，头像与唐僧叨叨主头像共用，当未上传交友图时可用主头像兜底展示。
- */
+/** 交友照片数量、尺寸与上传压缩策略。 */
 public final class DatingPhotoPolicy {
     public static final int MAX_PHOTO_COUNT = 5;
     public static final int MIN_PHOTO_COUNT_TO_ENABLE = 1;
+
+    /** 推荐卡派生图：真实上传一份 720x1280 边界内的 WebP。 */
+    public static final int CARD_MAX_WIDTH = 720;
+    public static final int CARD_MAX_HEIGHT = 1280;
     public static final int CARD_TARGET_MAX_BYTES = 200 * 1024;
-    public static final int UPLOAD_MAX_EDGE = 1440;
+
+    /** 详情主图：保留更高分辨率，最长边 1440。 */
+    public static final int MASTER_MAX_EDGE = 1440;
+    public static final int MASTER_TARGET_MAX_BYTES = 650 * 1024;
+
     public static final int UPLOAD_MIN_EDGE = 480;
-    public static final int WEBP_START_QUALITY = 82;
+    public static final int WEBP_START_QUALITY = 84;
     public static final int WEBP_MIN_QUALITY = 62;
 
     private DatingPhotoPolicy() {}

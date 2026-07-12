@@ -1,9 +1,11 @@
 package com.chat.dating;
 
+import com.chat.dating.model.DatingFavoritesResponse;
 import com.chat.dating.model.DatingMatchesResponse;
 import com.chat.dating.model.DatingProfile;
 import com.chat.dating.model.DatingRecommendResponse;
 import com.chat.dating.model.DatingSwipeResult;
+import com.chat.dating.model.DatingUndoResult;
 
 import java.util.Map;
 
@@ -44,8 +46,18 @@ public interface DatingService {
     @POST("dating/swipes")
     Observable<DatingSwipeResult> swipe(@Body Map<String, Object> body);
 
+    @POST("dating/swipes/undo")
+    Observable<DatingUndoResult> undoSwipe(@Body Map<String, Object> body);
+
     @POST("dating/exposures")
     Observable<Object> reportExposures(@Body Map<String, Object> body);
+
+
+    @GET("dating/favorites")
+    Observable<DatingFavoritesResponse> favorites(@Query("limit") int limit);
+
+    @POST("dating/favorites/remove")
+    Observable<Object> removeFavorite(@Body Map<String, Object> body);
 
     @GET("dating/matches")
     Observable<DatingMatchesResponse> matches(@Query("limit") int limit);

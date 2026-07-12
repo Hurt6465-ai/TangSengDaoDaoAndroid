@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** 5 图编辑网格：点击空位添加、删除后自动前移、长按拖动排序。 */
+/** 5 图编辑网格：主图与推荐卡派生图始终按同一索引移动、删除。 */
 public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPhotoGridAdapter.Holder> {
     public interface Listener {
         void onAddPhoto();
@@ -27,17 +27,24 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
     }
 
     private final ArrayList<String> photos = new ArrayList<>();
+    private final ArrayList<String> cardPhotos = new ArrayList<>();
     private Listener listener;
 
     public void setListener(Listener listener) {
         this.listener = listener;
     }
 
-    public void setPhotos(List<String> values) {
+    public void setPhotos(List<String> masters, List<String> cards) {
         photos.clear();
-        if (values != null) {
-            for (String value : values) {
-                if (!TextUtils.isEmpty(value) && photos.size() < DatingPhotoPolicy.MAX_PHOTO_COUNT) photos.add(value.trim());
+        cardPhotos.clear();
+        if (masters != null) {
+            for (int i = 0; i < masters.size() && photos.size() < DatingPhotoPolicy.MAX_PHOTO_COUNT; i++) {
+                String master = masters.get(i);
+                if (TextUtils.isEmpty(master)) continue;
+                String cleanMaster = master.trim();
+                String card = cards != null && i < cards.size() ? cards.get(i) : "";
+                photos.add(cleanMaster);
+                cardPhotos.add(TextUtils.isEmpty(card) ? cleanMaster : card.trim());
             }
         }
         notifyDataSetChanged();
@@ -47,17 +54,24 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
         return new ArrayList<>(photos);
     }
 
+    public ArrayList<String> getCardPhotos() {
+        return new ArrayList<>(cardPhotos);
+    }
+
     public int photoCount() {
         return photos.size();
     }
 
-    public void appendPhotos(List<String> values) {
-        if (values == null || values.isEmpty()) return;
+    public void appendPhotos(List<String> masters, List<String> cards) {
+        if (masters == null || masters.isEmpty()) return;
         int old = photos.size();
-        for (String value : values) {
-            if (photos.size() >= DatingPhotoPolicy.MAX_PHOTO_COUNT) break;
-            if (TextUtils.isEmpty(value) || photos.contains(value.trim())) continue;
-            photos.add(value.trim());
+        for (int i = 0; i < masters.size() && photos.size() < DatingPhotoPolicy.MAX_PHOTO_COUNT; i++) {
+            String master = masters.get(i);
+            if (TextUtils.isEmpty(master) || photos.contains(master.trim())) continue;
+            String cleanMaster = master.trim();
+            String card = cards != null && i < cards.size() ? cards.get(i) : "";
+            photos.add(cleanMaster);
+            cardPhotos.add(TextUtils.isEmpty(card) ? cleanMaster : card.trim());
         }
         if (photos.size() != old) notifyDataSetChanged();
     }
@@ -65,6 +79,7 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
     public void removePhoto(int position) {
         if (position < 0 || position >= photos.size()) return;
         photos.remove(position);
+        if (position < cardPhotos.size()) cardPhotos.remove(position);
         notifyDataSetChanged();
     }
 
@@ -72,6 +87,7 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
         if (from < 0 || to < 0 || from >= photos.size() || to >= photos.size()) return false;
         if (from == to) return true;
         Collections.swap(photos, from, to);
+        if (from < cardPhotos.size() && to < cardPhotos.size()) Collections.swap(cardPhotos, from, to);
         notifyItemMoved(from, to);
         return true;
     }
@@ -83,21 +99,22 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
     @NonNull
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        ItemWkDatingPhotoSlotBinding binding = ItemWkDatingPhotoSlotBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
-        return new Holder(binding);
+        return new Holder(ItemWkDatingPhotoSlotBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
     }
 
     @Override
     public void onBindViewHolder(@NonNull Holder holder, int position) {
         boolean occupied = position < photos.size();
-        String url = occupied ? photos.get(position) : "";
+        String master = occupied ? photos.get(position) : "";
+        String preview = occupied && position < cardPhotos.size() ? cardPhotos.get(position) : master;
         holder.binding.photoIv.setVisibility(occupied ? View.VISIBLE : View.GONE);
         holder.binding.addIcon.setVisibility(occupied ? View.GONE : View.VISIBLE);
         holder.binding.deleteBtn.setVisibility(occupied ? View.VISIBLE : View.GONE);
         holder.binding.mainLabel.setVisibility(position == 0 && occupied ? View.VISIBLE : View.GONE);
         if (occupied) {
             Glide.with(holder.itemView)
-                    .load(DatingImageSource.resolve(holder.itemView.getContext(), url))
+                    .load(DatingImageSource.resolve(holder.itemView.getContext(), preview))
+                    .override(360, 640)
                     .centerCrop()
                     .into(holder.binding.photoIv);
         } else {
@@ -105,13 +122,13 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
         }
         holder.itemView.setOnClickListener(v -> {
             if (occupied) {
-                if (listener != null) listener.onPreviewPhoto(position, url);
+                if (listener != null) listener.onPreviewPhoto(position, master);
             } else if (listener != null) {
                 listener.onAddPhoto();
             }
         });
         holder.binding.deleteBtn.setOnClickListener(v -> {
-            if (occupied && listener != null) listener.onDeletePhoto(position, url);
+            if (occupied && listener != null) listener.onDeletePhoto(position, master);
         });
         holder.itemView.setOnLongClickListener(v -> {
             if (occupied && listener != null) {
@@ -128,6 +145,12 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
     }
 
     @Override
+    public void onViewRecycled(@NonNull Holder holder) {
+        Glide.with(holder.itemView).clear(holder.binding.photoIv);
+        super.onViewRecycled(holder);
+    }
+
+    @Override
     public int getItemCount() {
         return DatingPhotoPolicy.MAX_PHOTO_COUNT;
     }
@@ -140,14 +163,8 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
                 return adapter.movePhoto(viewHolder.getBindingAdapterPosition(), target.getBindingAdapterPosition());
             }
 
-            @Override
-            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
-            }
-
-            @Override
-            public boolean isLongPressDragEnabled() {
-                return false;
-            }
+            @Override public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {}
+            @Override public boolean isLongPressDragEnabled() { return false; }
 
             @Override
             public int getMovementFlags(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
@@ -174,10 +191,8 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
         };
     }
 
-
     static final class Holder extends RecyclerView.ViewHolder {
         final ItemWkDatingPhotoSlotBinding binding;
-
         Holder(ItemWkDatingPhotoSlotBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
