@@ -27,8 +27,12 @@ public final class PartnerBrowseHostBridge {
     }
 
     public static void openProfile(Context context, String uid) {
+        openProfile(context, uid, "");
+    }
+
+    public static void openProfile(Context context, String uid, String vercode) {
         if (context == null || TextUtils.isEmpty(uid)) return;
-        if (tryOpenPartnerProfileRoute(context, uid)) return;
+        if (tryOpenPartnerProfileRoute(context, uid, vercode)) return;
         EndpointManager.getInstance().invoke(EndpointSID.userDetailView, new UserDetailMenu(context, uid));
     }
 
@@ -40,7 +44,7 @@ public final class PartnerBrowseHostBridge {
             if (!(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(intent);
         } catch (Throwable ignored) {
-            tryOpenPartnerProfileRoute(context, null);
+            tryOpenPartnerProfileRoute(context, null, null);
         }
     }
 
@@ -64,14 +68,19 @@ public final class PartnerBrowseHostBridge {
         }
     }
 
-    private static boolean tryOpenPartnerProfileRoute(Context context, String uid) {
+    private static boolean tryOpenPartnerProfileRoute(Context context, String uid, String vercode) {
         try {
             Class<?> route = Class.forName("com.chat.partner.profile.PartnerProfileRoute");
-            Method open = TextUtils.isEmpty(uid)
-                    ? route.getMethod("open", Context.class)
-                    : route.getMethod("open", Context.class, String.class);
-            if (TextUtils.isEmpty(uid)) open.invoke(null, context);
-            else open.invoke(null, context, uid);
+            if (TextUtils.isEmpty(uid)) {
+                route.getMethod("open", Context.class).invoke(null, context);
+            } else {
+                try {
+                    route.getMethod("open", Context.class, String.class, String.class)
+                            .invoke(null, context, uid, vercode);
+                } catch (NoSuchMethodException ignored) {
+                    route.getMethod("open", Context.class, String.class).invoke(null, context, uid);
+                }
+            }
             return true;
         } catch (Throwable ignored) {
             return false;

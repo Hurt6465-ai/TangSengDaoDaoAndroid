@@ -416,7 +416,7 @@ public class PartnerDetailFragment extends Fragment {
         if (!isViewAlive() || partner == null || TextUtils.isEmpty(targetUid)) return;
         PartnerBrowseModel.getInstance().reportPartnerEvent(targetUid, "profile_open", 0, currentImageIndex);
         Context context = getContext();
-        if (context != null) PartnerBrowseHostBridge.openProfile(context, targetUid);
+        if (context != null) PartnerBrowseHostBridge.openProfile(context, targetUid, partner.vercode);
     }
 
     private String buildLastOnline() {
