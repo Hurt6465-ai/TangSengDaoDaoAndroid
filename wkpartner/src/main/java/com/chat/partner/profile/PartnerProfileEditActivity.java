@@ -156,7 +156,9 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         forceComplete = intent != null && intent.getBooleanExtra(EXTRA_FORCE_COMPLETE, false);
         hideBack = intent != null && intent.getBooleanExtra(EXTRA_HIDE_BACK, false);
         hideSkip = intent != null && intent.getBooleanExtra(EXTRA_HIDE_SKIP, false);
-        requireProfileImage = intent != null && (intent.getBooleanExtra(EXTRA_REQUIRE_PROFILE_IMAGE, false) || forceComplete || fromRegister);
+        // Partner list/fullscreen partner cards now use the account avatar. A separate partner
+        // photo is no longer required, including during registration completion.
+        requireProfileImage = false;
         wkVBinding.avatarView.setSize(88);
         wkVBinding.avatarView.showAvatar(WKConfig.getInstance().getUid(), WKChannelType.PERSONAL);
         updateCountryText();
@@ -164,8 +166,6 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         updateBirthdayText();
         updateLanguageText();
         updateTagsText();
-        updateCoverPreview();
-        updatePhotoPreview();
         updateProgress(0, false);
         setupIntroCounter();
     }
@@ -236,7 +236,6 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         tags.clear();
         tags.addAll(PartnerTagLocalizer.toKeyList(data.getTagsSafe()));
         profileImages.clear();
-        profileImages.addAll(limitList(cleanList(data.getProfileImagesSafe()), MAX_PROFILE_IMAGES));
 
         wkVBinding.introEt.setText(safe(data.intro));
         wkVBinding.avatarView.setSize(88);
@@ -246,8 +245,6 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
         updateBirthdayText();
         updateLanguageText();
         updateTagsText();
-        updateCoverPreview();
-        updatePhotoPreview();
     }
 
     private void saveProfile() {
@@ -272,11 +269,6 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
             showToast(getString(R.string.partner_learning_language_required));
             return;
         }
-        if (requireProfileImage && profileImages.isEmpty()) {
-            showToast(getString(R.string.partner_profile_image_required));
-            return;
-        }
-
         JSONObject coreBody = new JSONObject();
         coreBody.put("name", name);
         coreBody.put("sex", sexValue);
@@ -289,8 +281,6 @@ public class PartnerProfileEditActivity extends WKBaseActivity<ActPartnerProfile
 
         JSONObject mediaBody = new JSONObject();
         mediaBody.put("tags", new ArrayList<>(tags));
-        mediaBody.put("profile_cover", profileCover);
-        mediaBody.put("profile_images", new ArrayList<>(limitList(profileImages, MAX_PROFILE_IMAGES)));
 
         wkVBinding.saveBtn.setEnabled(false);
         PartnerProfileModel.getInstance().updateCurrentProfile(coreBody, (code, msg, data) -> {
