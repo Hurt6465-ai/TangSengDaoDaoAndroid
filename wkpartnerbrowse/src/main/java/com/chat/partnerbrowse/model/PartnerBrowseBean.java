@@ -79,8 +79,7 @@ public class PartnerBrowseBean {
     }
 
     public boolean hasPartnerPhoto() {
-        if (!getProfileImagesSafe().isEmpty()) return true;
-        return !safeImageList(images).isEmpty();
+        return !TextUtils.isEmpty(getAvatarPathSafe());
     }
 
     public boolean hasPartnerLanguages() {
@@ -168,10 +167,8 @@ public class PartnerBrowseBean {
 
     public List<String> getDisplayImagesSafe() {
         ArrayList<String> out = new ArrayList<>();
-        addAll(out, getProfileImagesSafe());
-        addAll(out, safeImageList(images));
-        if (!TextUtils.isEmpty(profile_cover)) out.add(profile_cover);
-        if (!TextUtils.isEmpty(avatar)) out.add(avatar);
+        String avatarPath = getAvatarPathSafe();
+        if (!TextUtils.isEmpty(avatarPath)) out.add(avatarPath);
         ArrayList<String> deduped = dedupe(out);
         if (deduped.isEmpty()) deduped.add("");
         return deduped;
