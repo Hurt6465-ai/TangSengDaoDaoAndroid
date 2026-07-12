@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="partnerlist_text_primary">#20232B</color>
+    <color name="partnerlist_text_secondary">#626A77</color>
+    <color name="partnerlist_text_muted">#747B87</color>
+    <color name="partnerlist_accent_text">#6675C9</color>
+    <color name="partnerlist_mode_selected">#20232B</color>
+    <color name="partnerlist_mode_normal">#747B87</color>
+    <color name="partnerlist_hint_text">#5F6FAE</color>
+    <color name="partnerlist_quota_text">#5C6CC8</color>
+    <color name="partnerlist_button_text">#5D6DCB</color>
+    <color name="partnerlist_surface_text">#626A77</color>
+</resources>
