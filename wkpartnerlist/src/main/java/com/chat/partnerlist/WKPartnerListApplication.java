@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 
 import com.chat.base.endpoint.EndpointManager;
+import com.chat.uikit.partner.PartnerPendingStore;
 
 import java.lang.ref.WeakReference;
 
@@ -29,6 +30,12 @@ public final class WKPartnerListApplication {
             open(object instanceof Context ? (Context) object : null);
             return true;
         });
+        EndpointManager.getInstance().setMethod("partnerlist_clear_account", object -> {
+            Context app = contextRef == null ? null : contextRef.get();
+            if (app != null) PartnerListCache.clearCurrentAccount(app);
+            PartnerPendingStore.clearCurrentAccount();
+            return true;
+        });
     }
 
     public void open(Context source) {
@@ -36,6 +43,7 @@ public final class WKPartnerListApplication {
         if (context == null && contextRef != null) context = contextRef.get();
         if (context == null) return;
         Intent intent = new Intent(context, PartnerListActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         if (!(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(intent);
     }

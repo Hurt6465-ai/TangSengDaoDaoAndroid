@@ -1,6 +1,7 @@
 package com.chat.partnerlist;
 
 import android.graphics.drawable.ColorDrawable;
+import android.os.Build;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -17,20 +18,25 @@ import com.bumptech.glide.request.RequestOptions;
 import com.chat.base.config.WKApiConfig;
 import com.chat.partnerlist.databinding.ItemPartnerListBinding;
 import com.chat.partnerlist.model.PartnerListUser;
+import com.chat.uikit.partner.PartnerPendingStore;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerListAdapter.VH> {
     public interface Listener {
         void onOpenProfile(PartnerListUser user);
         void onGreeting(PartnerListUser user, int position);
+        void onOpenChat(PartnerListUser user);
     }
 
     private final Listener listener;
     private final Set<String> greetingPending = new HashSet<>();
     private final Set<String> greeted = new HashSet<>();
+    private Set<String> recentlyAdded = Collections.emptySet();
     private long serverTime;
     private int greetingRemaining = 10;
 
@@ -42,18 +48,22 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
 
     @Override public long getItemId(int position) {
         PartnerListUser user = getItem(position);
-        String id = user == null ? "" : user.stableId();
-        return id.hashCode();
+        return (user == null ? "" : user.stableId()).hashCode();
     }
 
-    public void setServerTime(long serverTime) {
-        this.serverTime = serverTime;
-        notifyItemRangeChanged(0, getItemCount(), "time");
+    public void setServerTime(long value) {
+        serverTime = value;
+        if (getItemCount() > 0) notifyItemRangeChanged(0, getItemCount(), "time");
     }
 
     public void setGreetingRemaining(int remaining) {
         greetingRemaining = Math.max(0, remaining);
-        notifyItemRangeChanged(0, getItemCount(), "quota");
+        if (getItemCount() > 0) notifyItemRangeChanged(0, getItemCount(), "quota");
+    }
+
+    public void setRecentlyAdded(List<String> ids) {
+        recentlyAdded = ids == null ? Collections.emptySet() : new HashSet<>(ids);
+        if (getItemCount() > 0) notifyItemRangeChanged(0, getItemCount(), "fresh");
     }
 
     public void markGreetingPending(String uid, boolean pending) {
@@ -67,6 +77,13 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         greetingPending.remove(uid);
         greeted.add(uid);
         notifyUid(uid);
+    }
+
+    public void refreshVisible(int first, int last) {
+        if (getItemCount() == 0) return;
+        int start = Math.max(0, first);
+        int end = Math.min(getItemCount() - 1, Math.max(start, last));
+        notifyItemRangeChanged(start, end - start + 1, "time");
     }
 
     private void notifyUid(String uid) {
@@ -89,17 +106,18 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     }
 
     @Override public void onBindViewHolder(@NonNull VH holder, int position, @NonNull List<Object> payloads) {
-        if (payloads.isEmpty()) bind(holder, getItem(position)); else bind(holder, getItem(position));
+        bind(holder, getItem(position));
     }
 
     private void bind(VH holder, PartnerListUser user) {
         if (user == null) return;
         ItemPartnerListBinding b = holder.binding;
         String uid = user.stableId();
-        String avatar = showUrl(user.displayAvatar());
+        b.cardRoot.setBackgroundResource(cardBackground(uid));
+
         int avatarPx = Math.round(72f * b.getRoot().getResources().getDisplayMetrics().density);
         Glide.with(b.avatarIv)
-                .load(avatar)
+                .load(showUrl(user.displayAvatar()))
                 .apply(RequestOptions.circleCropTransform())
                 .override(avatarPx, avatarPx)
                 .placeholder(new ColorDrawable(0xFFE9ECF4))
@@ -108,12 +126,15 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
                 .dontAnimate()
                 .into(b.avatarIv);
 
-        PartnerListFlagResolver.bind(b.flagIv, user.country_code);
-        b.onlineDot.setVisibility(user.online == 1 ? View.VISIBLE : View.GONE);
+        PartnerListFlagResolver.bind(b.flagIv, user.country_code, user.country);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) b.flagIv.setClipToOutline(true);
+        b.onlineDot.setVisibility(PartnerListTime.isRecentlyActive(user.online, user.last_active_at, serverTime)
+                ? View.VISIBLE : View.GONE);
         b.newBadge.setVisibility(user.is_new == 1 ? View.VISIBLE : View.GONE);
+        b.freshBadge.setVisibility(recentlyAdded.contains(uid) ? View.VISIBLE : View.GONE);
 
-        int age = user.age();
-        b.nameTv.setText(age > 0 ? b.getRoot().getContext().getString(R.string.partnerlist_name_age, user.displayName(), age) : user.displayName());
+        // 列表语伴只突出名字和语言，不显示性别、年龄。
+        b.nameTv.setText(user.displayName());
         String relation = PartnerListLanguage.relation(b.getRoot().getContext(), user.nativeLanguages(), user.learningLanguages());
         b.languageTv.setText(relation);
         b.languageTv.setVisibility(TextUtils.isEmpty(relation) ? View.GONE : View.VISIBLE);
@@ -125,19 +146,23 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         b.introTv.setText(intro);
         b.activeTv.setText(PartnerListTime.activeLabel(b.getRoot().getContext(), user.online, user.last_active_at, serverTime));
 
-        boolean isPending = greetingPending.contains(uid);
-        boolean isGreeted = greeted.contains(uid);
-        b.greetingBtn.setEnabled(!isPending && !isGreeted && greetingRemaining > 0);
-        if (isPending) {
+        boolean sending = greetingPending.contains(uid);
+        PartnerPendingStore.Entry relationState = PartnerPendingStore.get(uid);
+        boolean contacted = greeted.contains(uid) || relationState != null;
+        if (sending) {
+            b.greetingBtn.setEnabled(false);
             b.greetingBtn.setText(R.string.partnerlist_sending);
             b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_disabled);
-        } else if (isGreeted) {
-            b.greetingBtn.setText(R.string.partnerlist_greeted);
-            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_disabled);
+        } else if (contacted) {
+            b.greetingBtn.setEnabled(true);
+            b.greetingBtn.setText(R.string.partnerlist_go_chat);
+            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting);
         } else if (greetingRemaining <= 0) {
+            b.greetingBtn.setEnabled(false);
             b.greetingBtn.setText(R.string.partnerlist_limit_reached_short);
             b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_disabled);
         } else {
+            b.greetingBtn.setEnabled(true);
             b.greetingBtn.setText(R.string.partnerlist_greet);
             b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting);
         }
@@ -146,11 +171,22 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
             if (listener != null) listener.onOpenProfile(user);
         });
         b.greetingBtn.setOnClickListener(v -> {
-            int adapterPosition = holder.getBindingAdapterPosition();
-            if (adapterPosition == RecyclerView.NO_POSITION || listener == null) return;
+            if (listener == null) return;
             animatePress(v);
-            listener.onGreeting(user, adapterPosition);
+            if (contacted) listener.onOpenChat(user);
+            else {
+                int pos = holder.getBindingAdapterPosition();
+                if (pos != RecyclerView.NO_POSITION) listener.onGreeting(user, pos);
+            }
         });
+    }
+
+    private int cardBackground(String uid) {
+        int bucket = Math.floorMod(uid == null ? 0 : uid.hashCode(), 4);
+        if (bucket == 1) return R.drawable.bg_partnerlist_card_lavender;
+        if (bucket == 2) return R.drawable.bg_partnerlist_card_peach;
+        if (bucket == 3) return R.drawable.bg_partnerlist_card_sky;
+        return R.drawable.bg_partnerlist_card_mint;
     }
 
     private void animatePress(View view) {
@@ -183,14 +219,21 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
             return TextUtils.equals(oldItem.stableId(), newItem.stableId());
         }
 
-        @Override public boolean areContentsTheSame(@NonNull PartnerListUser oldItem, @NonNull PartnerListUser newItem) {
-            return TextUtils.equals(oldItem.displayName(), newItem.displayName())
-                    && TextUtils.equals(oldItem.displayAvatar(), newItem.displayAvatar())
-                    && TextUtils.equals(oldItem.intro, newItem.intro)
-                    && TextUtils.equals(oldItem.country_code, newItem.country_code)
-                    && oldItem.online == newItem.online
-                    && oldItem.last_active_at == newItem.last_active_at
-                    && oldItem.is_new == newItem.is_new;
+        @Override public boolean areContentsTheSame(@NonNull PartnerListUser a, @NonNull PartnerListUser b) {
+            if (a.profile_version > 0 && b.profile_version > 0 && a.profile_version != b.profile_version) return false;
+            return TextUtils.equals(a.displayName(), b.displayName())
+                    && TextUtils.equals(a.displayAvatar(), b.displayAvatar())
+                    && TextUtils.equals(a.intro, b.intro)
+                    && TextUtils.equals(a.country_code, b.country_code)
+                    && TextUtils.equals(a.country, b.country)
+                    && Objects.equals(a.nativeLanguages(), b.nativeLanguages())
+                    && Objects.equals(a.learningLanguages(), b.learningLanguages())
+                    && Objects.equals(a.tags(), b.tags())
+                    && Objects.equals(a.profile_images, b.profile_images)
+                    && TextUtils.equals(a.profile_cover, b.profile_cover)
+                    && a.online == b.online
+                    && a.last_active_at == b.last_active_at
+                    && a.is_new == b.is_new;
         }
     };
 }

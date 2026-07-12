@@ -6,24 +6,32 @@ import android.view.View;
 import android.widget.ImageView;
 
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class PartnerListFlagResolver {
+    private static final Map<String, Integer> RESOURCE_CACHE = new ConcurrentHashMap<>();
+
     private PartnerListFlagResolver() {}
 
-    public static void bind(ImageView imageView, String countryCode) {
+    public static void bind(ImageView imageView, String countryCode, String countryName) {
         if (imageView == null) return;
         Context context = imageView.getContext();
-        String code = normalize(countryCode);
+        String code = normalize(!TextUtils.isEmpty(countryCode) ? countryCode : countryName);
         if (TextUtils.isEmpty(code)) {
             imageView.setVisibility(View.GONE);
             imageView.setImageDrawable(null);
             return;
         }
-        String name = "ic_flag_" + code.toLowerCase(Locale.US);
-        int id = context.getResources().getIdentifier(name, "drawable", context.getPackageName());
-        if (id == 0) id = context.getResources().getIdentifier("ic_flag_other", "drawable", context.getPackageName());
+        int id = RESOURCE_CACHE.computeIfAbsent(code, key -> {
+            String name = "ic_flag_" + key.toLowerCase(Locale.US);
+            int found = context.getResources().getIdentifier(name, "drawable", context.getPackageName());
+            if (found == 0) found = context.getResources().getIdentifier("ic_flag_other", "drawable", context.getPackageName());
+            return found;
+        });
         if (id == 0) {
             imageView.setVisibility(View.GONE);
+            imageView.setImageDrawable(null);
             return;
         }
         imageView.setImageResource(id);
@@ -40,7 +48,10 @@ public final class PartnerListFlagResolver {
         if (code.contains("JAPAN") || code.contains("日本")) return "JP";
         if (code.contains("THAILAND") || code.contains("泰国")) return "TH";
         if (code.contains("VIETNAM") || code.contains("越南")) return "VN";
-        if (code.contains("UNITED STATES") || code.contains("美国")) return "US";
+        if (code.contains("UNITED STATES") || code.contains("USA") || code.contains("美国")) return "US";
+        if (code.contains("FRANCE") || code.contains("法国")) return "FR";
+        if (code.contains("GERMANY") || code.contains("德国")) return "DE";
+        if (code.contains("UNITED KINGDOM") || code.contains("BRITAIN") || code.contains("英国")) return "GB";
         return "";
     }
 }

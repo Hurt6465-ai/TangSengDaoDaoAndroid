@@ -21,9 +21,16 @@ public final class PartnerListTime {
         return ZonedDateTime.now(BUSINESS_ZONE).minusHours(4).format(DAY_FORMAT);
     }
 
+    public static boolean isRecentlyActive(int online, long lastActiveAt, long serverTime) {
+        if (online == 1) return true;
+        long now = serverTime > 0 ? serverTime : System.currentTimeMillis();
+        long ts = normalizeMillis(lastActiveAt);
+        return ts > 0 && Math.max(0L, now - ts) < 10L * 60L * 1000L;
+    }
+
     public static String activeLabel(Context context, int online, long lastActiveAt, long serverTime) {
         if (context == null) return "";
-        if (online == 1) return context.getString(R.string.partnerlist_online_now);
+        if (online == 1) return context.getString(R.string.partnerlist_active_10m);
         long now = serverTime > 0 ? serverTime : System.currentTimeMillis();
         long ts = normalizeMillis(lastActiveAt);
         if (ts <= 0) return context.getString(R.string.partnerlist_active_recently);
@@ -31,7 +38,7 @@ public final class PartnerListTime {
         long minute = 60_000L;
         long hour = 60L * minute;
         long day = 24L * hour;
-        if (diff < minute) return context.getString(R.string.partnerlist_active_just_now);
+        if (diff < 10L * minute) return context.getString(R.string.partnerlist_active_10m);
         if (diff < hour) return context.getString(R.string.partnerlist_active_minutes, Math.max(1, diff / minute));
         if (diff < day) return context.getString(R.string.partnerlist_active_hours, Math.max(1, diff / hour));
         if (diff < 3L * day) return context.getString(R.string.partnerlist_active_today);
@@ -46,4 +53,11 @@ public final class PartnerListTime {
     public static long nextDueAt(long rotateAt, long retryAt) {
         return Math.max(normalizeMillis(rotateAt), normalizeMillis(retryAt));
     }
+    public static long nextDayBoundaryMillis() {
+        ZonedDateTime now = ZonedDateTime.now(BUSINESS_ZONE);
+        ZonedDateTime boundary = now.toLocalDate().atTime(4, 0).atZone(BUSINESS_ZONE);
+        if (!boundary.isAfter(now)) boundary = boundary.plusDays(1);
+        return boundary.toInstant().toEpochMilli();
+    }
+
 }

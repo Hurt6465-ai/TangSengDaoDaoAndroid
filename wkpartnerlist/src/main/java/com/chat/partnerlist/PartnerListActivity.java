@@ -5,8 +5,11 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.View;
+import android.widget.FrameLayout;
 import android.view.Window;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -20,11 +23,12 @@ import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.partnerlist.databinding.ActivityPartnerListBinding;
 import com.chat.partnerlist.model.PartnerGreetingResponse;
-import com.chat.partnerlist.model.PartnerHeartbeatResponse;
 import com.chat.partnerlist.model.PartnerListResponse;
 import com.chat.partnerlist.model.PartnerListUser;
 import com.chat.partnerlist.model.PartnerOnlineBatchResponse;
 import com.chat.partnerlist.model.PartnerOnlineState;
+import com.chat.uikit.GlobalBottomNavigationController;
+import com.chat.uikit.partner.PartnerPendingStore;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,27 +38,22 @@ import java.util.Map;
 import java.util.Set;
 
 public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBinding> implements PartnerListAdapter.Listener {
-    private static final long HEARTBEAT_INTERVAL_MS = 55_000L;
-    private static final long ONLINE_REFRESH_INTERVAL_MS = 90_000L;
+    private static final long ONLINE_REFRESH_INTERVAL_MS = 4L * 60L * 1000L;
+    private static final long CLOCK_TICK_MS = 60_000L;
+    private static final int REQ_PROFILE_EDIT = 7301;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private PartnerListAdapter adapter;
     private LinearLayoutManager layoutManager;
     private PartnerListResponse currentResponse;
     private boolean requesting;
+    private boolean onlineRequesting;
+    private int onlineRequestSequence;
     private boolean hasRenderedData;
     private boolean resumed;
-
-    private final Runnable heartbeatRunnable = new Runnable() {
-        @Override public void run() {
-            if (!resumed || isFinishing() || isDestroyed()) return;
-            PartnerListModel.getInstance().heartbeat(new IRequestResultListener<>() {
-                @Override public void onSuccess(PartnerHeartbeatResponse result) {}
-                @Override public void onFail(int code, String msg) {}
-            });
-            handler.postDelayed(this, HEARTBEAT_INTERVAL_MS);
-        }
-    };
+    private boolean refreshAfterProfileEdit;
+    private long serverTimeBase;
+    private long elapsedTimeBase;
 
     private final Runnable onlineRunnable = new Runnable() {
         @Override public void run() {
@@ -64,26 +63,44 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         }
     };
 
+    private final Runnable clockRunnable = new Runnable() {
+        @Override public void run() {
+            if (!resumed || isFinishing() || isDestroyed()) return;
+            if (currentResponse != null) updateHeader(currentResponse);
+            refreshVisibleTimeLabels();
+            handler.postDelayed(this, CLOCK_TICK_MS);
+        }
+    };
+
     private final Runnable rotationRunnable = () -> {
         if (resumed && !requesting && currentResponse != null && !currentResponse.rotation_done) {
             requestRecommendations(false);
         }
     };
 
+    private final Runnable dayBoundaryRunnable = () -> {
+        if (!resumed) return;
+        PartnerListCache.clearCurrentAccount(this);
+        currentResponse = null;
+        hasRenderedData = false;
+        showSkeleton(true);
+        requestRecommendations(false);
+    };
+
     @Override protected ActivityPartnerListBinding getViewBinding() {
         return ActivityPartnerListBinding.inflate(getLayoutInflater());
     }
 
-    @Override public boolean supportSlideBack() { return true; }
-
+    @Override public boolean supportSlideBack() { return false; }
     @Override protected void setTitle(TextView titleTv) {}
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         Window window = getWindow();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            window.setStatusBarColor(0xFFF5F7FF);
+            window.setStatusBarColor(getResources().getColor(com.chat.uikit.R.color.tab_bg));
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && (getResources().getConfiguration().uiMode & 0x30) != 0x20) {
             window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         }
         super.onCreate(savedInstanceState);
@@ -98,28 +115,32 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         wkVBinding.recyclerView.setItemViewCacheSize(8);
         wkVBinding.recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         wkVBinding.recyclerView.setClipToPadding(false);
+        GlobalBottomNavigationController.attach(this, wkVBinding.bottomNavigation, com.chat.uikit.R.id.i_partner);
+        applyTabletContentWidth();
 
-        PartnerListResponse cached = PartnerListCache.load(this);
-        if (cached != null && !cached.usersSafe().isEmpty()) {
+        showSkeleton(true);
+        PartnerListCache.loadAsync(this, cached -> {
+            if (isFinishing() || isDestroyed() || currentResponse != null || cached == null) return;
             render(cached, true);
-        } else {
-            showSkeleton(true);
-        }
+        });
     }
 
     @Override protected void initListener() {
         wkVBinding.backBtn.setOnClickListener(v -> finish());
         wkVBinding.partnerModeTab.setOnClickListener(v -> {
-            if (layoutManager != null) wkVBinding.recyclerView.smoothScrollToPosition(0);
+            if (adapter != null && adapter.getItemCount() > 0) wkVBinding.recyclerView.smoothScrollToPosition(0);
         });
         wkVBinding.datingModeTab.setOnClickListener(v -> openDatingHome());
         wkVBinding.retryBtn.setOnClickListener(v -> requestRecommendations(true));
-        wkVBinding.completeProfileBtn.setOnClickListener(v -> PartnerListHostBridge.openProfileEdit(this));
+        wkVBinding.completeProfileBtn.setOnClickListener(v -> {
+            refreshAfterProfileEdit = true;
+            PartnerListHostBridge.openProfileEdit(this, REQ_PROFILE_EDIT);
+        });
         wkVBinding.recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
                 if (newState == RecyclerView.SCROLL_STATE_IDLE) {
                     handler.removeCallbacks(onlineRunnable);
-                    handler.postDelayed(onlineRunnable, 250L);
+                    handler.postDelayed(onlineRunnable, 500L);
                 }
             }
         });
@@ -132,18 +153,25 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     @Override protected void onResume() {
         super.onResume();
         resumed = true;
-        handler.removeCallbacks(heartbeatRunnable);
-        handler.removeCallbacks(onlineRunnable);
-        handler.post(heartbeatRunnable);
-        handler.postDelayed(onlineRunnable, 400L);
-        if (currentResponse != null) scheduleRotation(currentResponse);
+        if (currentResponse != null && !TextUtils.equals(currentResponse.day_key, PartnerListTime.currentDayKey())) {
+            PartnerListCache.clearCurrentAccount(this);
+            currentResponse = null;
+            hasRenderedData = false;
+            showSkeleton(true);
+            requestRecommendations(false);
+        } else if (refreshAfterProfileEdit) {
+            refreshAfterProfileEdit = false;
+            requestRecommendations(false);
+        }
+        scheduleAll();
     }
 
     @Override protected void onPause() {
         resumed = false;
-        handler.removeCallbacks(heartbeatRunnable);
         handler.removeCallbacks(onlineRunnable);
+        handler.removeCallbacks(clockRunnable);
         handler.removeCallbacks(rotationRunnable);
+        handler.removeCallbacks(dayBoundaryRunnable);
         super.onPause();
     }
 
@@ -154,10 +182,18 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         super.onDestroy();
     }
 
+    @Override protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_PROFILE_EDIT) {
+            refreshAfterProfileEdit = false;
+            requestRecommendations(false);
+        }
+    }
+
     private void requestRecommendations(boolean explicitRetry) {
         if (requesting) return;
         requesting = true;
-        if (!hasRenderedData) showSkeleton(true);
+        if (!hasRenderedData && currentResponse == null) showSkeleton(true);
         wkVBinding.retryBtn.setEnabled(false);
         PartnerListModel.getInstance().recommendations(new IRequestResultListener<>() {
             @Override public void onSuccess(PartnerListResponse result) {
@@ -168,10 +204,11 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                     showError(getString(R.string.partnerlist_load_failed));
                     return;
                 }
-                PartnerListCache.save(PartnerListActivity.this, result);
+                PartnerListCache.saveAsync(PartnerListActivity.this, result);
                 render(result, false);
                 if (result.updated_count > 0) {
-                    showUpdateBanner(getResources().getQuantityString(R.plurals.partnerlist_updated_count, result.updated_count, result.updated_count));
+                    showUpdateBanner(getResources().getQuantityString(R.plurals.partnerlist_updated_count,
+                            result.updated_count, result.updated_count));
                 }
             }
 
@@ -179,61 +216,84 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                 requesting = false;
                 if (isFinishing() || isDestroyed()) return;
                 wkVBinding.retryBtn.setEnabled(true);
-                if (!hasRenderedData) showError(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg);
-                else if (explicitRetry) toast(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg);
+                if (currentResponse == null && !hasRenderedData) {
+                    showError(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg);
+                } else if (explicitRetry) {
+                    toast(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg);
+                }
             }
         });
     }
 
     private void render(PartnerListResponse response, boolean fromCache) {
         currentResponse = response;
+        updateServerClock(response.server_time);
         List<PartnerListUser> users = new ArrayList<>(response.usersSafe());
         hasRenderedData = !users.isEmpty();
         showSkeleton(false);
         wkVBinding.errorLayout.setVisibility(View.GONE);
         wkVBinding.recyclerView.setVisibility(hasRenderedData ? View.VISIBLE : View.GONE);
         wkVBinding.emptyLayout.setVisibility(hasRenderedData ? View.GONE : View.VISIBLE);
+        configureEmptyState(response);
 
-        adapter.setServerTime(response.server_time > 0 ? response.server_time : System.currentTimeMillis());
+        String anchorUid = null;
+        int anchorOffset = 0;
+        int first = layoutManager == null ? RecyclerView.NO_POSITION : layoutManager.findFirstVisibleItemPosition();
+        if (first != RecyclerView.NO_POSITION && first < adapter.getItemCount()) {
+            PartnerListUser anchor = adapter.getCurrentList().get(first);
+            anchorUid = anchor == null ? null : anchor.stableId();
+            View view = layoutManager.findViewByPosition(first);
+            if (view != null) anchorOffset = view.getTop();
+        }
+        final String restoreUid = anchorUid;
+        final int restoreOffset = anchorOffset;
+
+        adapter.setServerTime(nowServer());
         adapter.setGreetingRemaining(response.greeting_remaining);
-        adapter.submitList(users);
+        adapter.setRecentlyAdded(response.added_user_ids);
+        adapter.submitList(users, () -> restoreScrollAnchor(restoreUid, restoreOffset));
         updateHeader(response);
-        updateFooter(response, users.size());
-        scheduleRotation(response);
-        if (!fromCache) handler.postDelayed(this::refreshVisibleOnline, 300L);
+        scheduleAll();
+        if (!fromCache) handler.postDelayed(this::refreshVisibleOnline, 500L);
+    }
+
+    private void restoreScrollAnchor(String uid, int offset) {
+        if (TextUtils.isEmpty(uid) || layoutManager == null) return;
+        List<PartnerListUser> list = adapter.getCurrentList();
+        for (int i = 0; i < list.size(); i++) {
+            PartnerListUser user = list.get(i);
+            if (user != null && TextUtils.equals(uid, user.stableId())) {
+                layoutManager.scrollToPositionWithOffset(i, offset);
+                return;
+            }
+        }
+    }
+
+    private void configureEmptyState(PartnerListResponse response) {
+        boolean dailyFinished = response != null && (response.rotation_done
+                || response.unique_assigned_count >= Math.max(1, response.daily_candidate_limit));
+        wkVBinding.completeProfileBtn.setVisibility(dailyFinished ? View.GONE : View.VISIBLE);
     }
 
     private void updateHeader(PartnerListResponse response) {
         int total = response.usersSafe().size();
         wkVBinding.subtitleTv.setText(getResources().getQuantityString(R.plurals.partnerlist_found_count, total, total));
-        wkVBinding.quotaTv.setText(getString(R.string.partnerlist_quota_value, Math.max(0, response.greeting_remaining), Math.max(1, response.greeting_limit)));
+        wkVBinding.quotaTv.setText(getString(R.string.partnerlist_quota_value,
+                Math.max(0, response.greeting_remaining), Math.max(1, response.greeting_limit)));
         if (response.rotation_done) {
-            wkVBinding.statusHint.setText(getString(R.string.partnerlist_status_finished, response.unique_assigned_count, response.daily_candidate_limit));
-        } else {
-            long dueAt = PartnerListTime.nextDueAt(response.rotate_at, response.rotation_retry_at);
-            if (dueAt <= 0) {
-                wkVBinding.statusHint.setText(R.string.partnerlist_status_preparing);
-                return;
-            }
-            long now = response.server_time > 0 ? response.server_time : System.currentTimeMillis();
-            long minutes = Math.max(0L, (dueAt - now + 59_999L) / 60_000L);
-            if (minutes <= 0) wkVBinding.statusHint.setText(R.string.partnerlist_status_updating);
-            else if (minutes < 60) wkVBinding.statusHint.setText(getString(R.string.partnerlist_status_minutes, minutes));
-            else wkVBinding.statusHint.setText(getString(R.string.partnerlist_status_hours, Math.max(1L, minutes / 60L)));
-        }
-    }
-
-    private void updateFooter(PartnerListResponse response, int count) {
-        if (count <= 0) {
-            wkVBinding.footerTv.setVisibility(View.GONE);
+            wkVBinding.statusHint.setText(getString(R.string.partnerlist_status_finished,
+                    response.unique_assigned_count, response.daily_candidate_limit));
             return;
         }
-        wkVBinding.footerTv.setVisibility(View.VISIBLE);
-        if (response.rotation_done || response.unique_assigned_count >= response.daily_candidate_limit) {
-            wkVBinding.footerTv.setText(getString(R.string.partnerlist_footer_finished, response.unique_assigned_count));
-        } else {
-            wkVBinding.footerTv.setText(R.string.partnerlist_footer_waiting);
+        long dueAt = PartnerListTime.nextDueAt(response.rotate_at, response.rotation_retry_at);
+        if (dueAt <= 0) {
+            wkVBinding.statusHint.setText(R.string.partnerlist_status_preparing);
+            return;
         }
+        long minutes = Math.max(0L, (dueAt - nowServer() + 59_999L) / 60_000L);
+        if (minutes <= 0) wkVBinding.statusHint.setText(R.string.partnerlist_status_updating);
+        else if (minutes < 60) wkVBinding.statusHint.setText(getString(R.string.partnerlist_status_minutes, minutes));
+        else wkVBinding.statusHint.setText(getString(R.string.partnerlist_status_hours, Math.max(1L, minutes / 60L)));
     }
 
     private void showSkeleton(boolean show) {
@@ -267,19 +327,30 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                         .withEndAction(() -> wkVBinding.updateBanner.setVisibility(View.GONE)).start(), 2200L)).start();
     }
 
+    private void scheduleAll() {
+        if (!resumed) return;
+        handler.removeCallbacks(onlineRunnable);
+        handler.removeCallbacks(clockRunnable);
+        handler.removeCallbacks(dayBoundaryRunnable);
+        handler.postDelayed(onlineRunnable, 700L);
+        handler.postDelayed(clockRunnable, CLOCK_TICK_MS);
+        long dayDelay = Math.max(1_000L, PartnerListTime.nextDayBoundaryMillis() - System.currentTimeMillis());
+        handler.postDelayed(dayBoundaryRunnable, dayDelay);
+        if (currentResponse != null) scheduleRotation(currentResponse);
+    }
+
     private void scheduleRotation(PartnerListResponse response) {
         handler.removeCallbacks(rotationRunnable);
         if (response == null || response.rotation_done) return;
         long dueAt = PartnerListTime.nextDueAt(response.rotate_at, response.rotation_retry_at);
         if (dueAt <= 0) return;
-        long serverNow = response.server_time > 0 ? response.server_time : System.currentTimeMillis();
-        long delay = dueAt - serverNow;
-        if (delay <= 0) delay = 1000L;
+        long delay = dueAt - nowServer();
+        if (delay <= 0) delay = 1_000L;
         handler.postDelayed(rotationRunnable, Math.min(delay, 6L * 60L * 60L * 1000L));
     }
 
     private void refreshVisibleOnline() {
-        if (!hasRenderedData || layoutManager == null || adapter == null || requesting) return;
+        if (!hasRenderedData || layoutManager == null || adapter == null || requesting || onlineRequesting) return;
         int first = layoutManager.findFirstVisibleItemPosition();
         int last = layoutManager.findLastVisibleItemPosition();
         if (first == RecyclerView.NO_POSITION) first = 0;
@@ -292,37 +363,77 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             if (user != null && !TextUtils.isEmpty(user.stableId())) ids.add(user.stableId());
         }
         if (ids.isEmpty()) return;
+        onlineRequesting = true;
+        int requestId = ++onlineRequestSequence;
+        final int visibleFirst = first;
+        final int visibleLast = last;
         PartnerListModel.getInstance().onlineBatch(new ArrayList<>(ids), new IRequestResultListener<>() {
             @Override public void onSuccess(PartnerOnlineBatchResponse result) {
-                if (result == null || result.usersSafe().isEmpty() || isFinishing() || isDestroyed()) return;
+                if (requestId != onlineRequestSequence) return;
+                onlineRequesting = false;
+                if (result == null || isFinishing() || isDestroyed()) return;
+                updateServerClock(result.server_time);
                 Map<String, PartnerOnlineState> map = new HashMap<>();
-                for (PartnerOnlineState state : result.usersSafe()) if (state != null && !TextUtils.isEmpty(state.uid)) map.put(state.uid, state);
-                ArrayList<PartnerListUser> updated = new ArrayList<>();
-                for (PartnerListUser original : adapter.getCurrentList()) updated.add(original == null ? null : original.copy());
-                boolean changed = false;
-                for (PartnerListUser user : updated) {
-                    PartnerOnlineState state = map.get(user.stableId());
-                    if (state == null) continue;
-                    if (user.online != state.online || user.last_active_at != state.last_active_at) changed = true;
-                    user.online = state.online;
-                    user.last_active_at = state.last_active_at;
+                for (PartnerOnlineState state : result.usersSafe()) {
+                    if (state != null && !TextUtils.isEmpty(state.uid)) map.put(state.uid, state);
                 }
+                ArrayList<PartnerListUser> updated = new ArrayList<>();
+                boolean changed = false;
+                for (PartnerListUser original : adapter.getCurrentList()) {
+                    PartnerListUser user = original == null ? null : original.copy();
+                    if (user != null) {
+                        PartnerOnlineState state = map.get(user.stableId());
+                        if (state != null) {
+                            changed |= user.online != state.online || user.last_active_at != state.last_active_at;
+                            user.online = state.online;
+                            user.last_active_at = state.last_active_at;
+                        }
+                    }
+                    updated.add(user);
+                }
+                adapter.setServerTime(nowServer());
                 if (changed) {
                     if (currentResponse != null) {
                         currentResponse.users = updated;
-                        currentResponse.server_time = result.server_time;
-                        PartnerListCache.save(PartnerListActivity.this, currentResponse);
+                        currentResponse.server_time = nowServer();
+                        PartnerListCache.saveAsync(PartnerListActivity.this, currentResponse);
                     }
-                    adapter.setServerTime(result.server_time > 0 ? result.server_time : System.currentTimeMillis());
                     adapter.submitList(new ArrayList<>(updated));
+                } else {
+                    adapter.refreshVisible(visibleFirst, visibleLast);
                 }
             }
-            @Override public void onFail(int code, String msg) {}
+
+            @Override public void onFail(int code, String msg) {
+                if (requestId == onlineRequestSequence) onlineRequesting = false;
+            }
         });
+    }
+
+    private void refreshVisibleTimeLabels() {
+        if (layoutManager == null || adapter == null) return;
+        adapter.setServerTime(nowServer());
+        int first = layoutManager.findFirstVisibleItemPosition();
+        int last = layoutManager.findLastVisibleItemPosition();
+        if (first != RecyclerView.NO_POSITION && last != RecyclerView.NO_POSITION) adapter.refreshVisible(first, last);
+    }
+
+    private void updateServerClock(long serverTime) {
+        serverTimeBase = serverTime > 0 ? PartnerListTime.normalizeMillis(serverTime) : System.currentTimeMillis();
+        elapsedTimeBase = SystemClock.elapsedRealtime();
+    }
+
+    private long nowServer() {
+        if (serverTimeBase <= 0) return System.currentTimeMillis();
+        return serverTimeBase + Math.max(0L, SystemClock.elapsedRealtime() - elapsedTimeBase);
     }
 
     @Override public void onOpenProfile(PartnerListUser user) {
         if (user != null) PartnerListHostBridge.openProfile(this, user.stableId());
+    }
+
+    @Override public void onOpenChat(PartnerListUser user) {
+        if (user != null) PartnerListHostBridge.openChat(this, user.stableId());
     }
 
     @Override public void onGreeting(PartnerListUser user, int position) {
@@ -337,6 +448,10 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             @Override public void onSuccess(PartnerGreetingResponse result) {
                 adapter.markGreetingPending(uid, false);
                 if (result != null && result.success()) {
+                    int maxPending = result.max_greeting_count > 0 ? result.max_greeting_count : 3;
+                    int pendingCount = Math.max(1, result.requester_msg_count);
+                    if (result.contact_status == 1) PartnerPendingStore.markActive(uid);
+                    else PartnerPendingStore.markRequester(uid, pendingCount, maxPending);
                     adapter.markGreeted(uid);
                     if (result.greeting_day_limit > 0) {
                         currentResponse.greeting_limit = result.greeting_day_limit;
@@ -348,10 +463,11 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                     }
                     adapter.setGreetingRemaining(currentResponse.greeting_remaining);
                     updateHeader(currentResponse);
-                    PartnerListCache.save(PartnerListActivity.this, currentResponse);
+                    PartnerListCache.saveAsync(PartnerListActivity.this, currentResponse);
                     showUpdateBanner(getString(R.string.partnerlist_greeting_success));
                 } else {
-                    toast(result == null || TextUtils.isEmpty(result.messageSafe()) ? getString(R.string.partnerlist_greeting_failed) : result.messageSafe());
+                    toast(result == null || TextUtils.isEmpty(result.messageSafe())
+                            ? getString(R.string.partnerlist_greeting_failed) : result.messageSafe());
                 }
             }
 
@@ -363,7 +479,6 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     }
 
     private void openDatingHome() {
-        // 优先直接启动并标记来源，交友页点击“语伴”时可直接 finish 返回，不叠加 Activity。
         try {
             Class<?> clazz = Class.forName("com.chat.dating.DatingHomeActivity");
             Intent intent = new Intent(this, clazz);
@@ -377,12 +492,19 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             if (handled instanceof Boolean && (Boolean) handled) return;
         } catch (Throwable ignored) {
         }
-        try {
-            Object handled = EndpointManager.getInstance().invoke("peipe_open_dating", this);
-            if (handled instanceof Boolean && (Boolean) handled) return;
-        } catch (Throwable ignored) {
-        }
         toast(getString(R.string.partnerlist_dating_unavailable));
+    }
+
+    private void applyTabletContentWidth() {
+        float density = getResources().getDisplayMetrics().density;
+        float widthDp = getResources().getDisplayMetrics().widthPixels / Math.max(1f, density);
+        if (widthDp < 800f || wkVBinding.contentContainer == null) return;
+        View parent = (View) wkVBinding.contentContainer.getParent();
+        if (!(wkVBinding.contentContainer.getLayoutParams() instanceof FrameLayout.LayoutParams)) return;
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) wkVBinding.contentContainer.getLayoutParams();
+        params.width = dp(760);
+        params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        wkVBinding.contentContainer.setLayoutParams(params);
     }
 
     private void toast(String message) {
