@@ -59,11 +59,12 @@ import java.util.List;
  * tab导航栏
  */
 public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
-    private static final int TAB_CHAT = 0;
+    // 底部顺序：学习｜语伴｜聊天｜发现｜社区。聊天保持正中间，默认打开学习。
+    private static final int TAB_STUDY = 0;
     private static final int TAB_PARTNER = 1;
-    private static final int TAB_DISCOVER = 2;
-    private static final int TAB_COMMUNITY = 3;
-    private static final int TAB_STUDY = 4;
+    private static final int TAB_CHAT = 2;
+    private static final int TAB_DISCOVER = 3;
+    private static final int TAB_COMMUNITY = 4;
 
     private static final String ICON_CHAT = "faw-comments";
     private static final String ICON_PARTNER = "faw-user-friends";
@@ -122,7 +123,10 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         notificationManager.cancelAll();
         WKCommonModel.getInstance().getAppConfig(null);
 
-        playAnimation(TAB_CHAT);
+        int launchTab = getIntent().getIntExtra("from", 0) != 0 ? TAB_CHAT : TAB_STUDY;
+        wkVBinding.vp.setCurrentItem(launchTab, false);
+        wkVBinding.bottomNavigation.setSelectedItemId(getMenuIdByIndex(launchTab));
+        playAnimation(launchTab);
         setBottomNavigationVisible(true);
     }
 
@@ -159,15 +163,13 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         partnerTV = createTabTextView(R.string.tab_text_partner);
         discoverTV = createTabTextView(R.string.tab_text_discover);
         communityTV = createTabTextView(R.string.tab_text_community);
-        // 临时把原 NodeBB 社区入口改成交友；先不改语言文件，直接覆盖显示文案。
-        communityTV.setText("交友");
         studyTV = createTabTextView(R.string.tab_text_study);
 
-        addTabView(R.id.i_chat, chatIV, chatTV, true);
+        addTabView(R.id.i_study, studyIV, studyTV, false);
         addTabView(R.id.i_partner, partnerIV, partnerTV, false);
+        addTabView(R.id.i_chat, chatIV, chatTV, true);
         addTabView(R.id.i_discover, discoverIV, discoverTV, false);
         addTabView(R.id.i_community, communityIV, communityTV, false);
-        addTabView(R.id.i_study, studyIV, studyTV, false);
     }
 
     private TextView createTabTextView(int textResId) {
@@ -210,16 +212,15 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
 
     private void initFragments() {
         fragments.clear();
-        fragments.add(new ChatFragment());
-        fragments.add(PlaceholderTabFragment.newInstance("语伴", "语伴模块加载失败，请重新安装或检查 wkpartnerbrowse 模块"));
-        fragments.add(PlaceholderTabFragment.newInstance("发现", "发现模块加载失败，请重新安装或检查 wkfeed 模块"));
-        fragments.add(PlaceholderTabFragment.newInstance("交友", "交友模块加载失败，请重新安装或检查 wkdating 模块"));
         fragments.add(new LearningFragment());
+        fragments.add(PlaceholderTabFragment.newInstance("语伴", "语伴模块加载失败，请重新安装或检查 wkpartnerlist 模块"));
+        fragments.add(new ChatFragment());
+        fragments.add(PlaceholderTabFragment.newInstance("发现", "发现模块加载失败，请重新安装或检查 wkfeed 模块"));
+        fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_HOME_URL)));
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
-        // 底部是一级导航，只允许点击切换；横滑手势留给聊天页内部二级导航使用。
+        // 底部一级导航只允许点击切换。聊天、交友和发现内部都有自己的手势，避免横滑冲突。
         wkVBinding.vp.setUserInputEnabled(false);
-        // 语伴/发现现在是独立原生全屏 Activity，这里只保留占位 Fragment，
-        // 用于模块缺失时显示明确提示，不再预加载旧 WebView。
+        // 默认学习页仅预加载语伴占位和聊天；社区 WebView 到用户点击时再创建。
         wkVBinding.vp.setOffscreenPageLimit(2);
     }
 
@@ -248,7 +249,11 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
 
         wkVBinding.bottomNavigation.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
-            if (itemId == R.id.i_chat) {
+            if (itemId == R.id.i_study) {
+                switchToTab(TAB_STUDY);
+            } else if (itemId == R.id.i_partner) {
+                openPartnerList();
+            } else if (itemId == R.id.i_chat) {
                 long nowTime = WKTimeUtils.getInstance().getCurrentMills();
                 if (wkVBinding.vp.getCurrentItem() == TAB_CHAT) {
                     if (nowTime - lastClickChatTabTime <= 300) {
@@ -258,14 +263,10 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
                     return true;
                 }
                 switchToTab(TAB_CHAT);
-            } else if (itemId == R.id.i_partner) {
-                openPartnerBrowse();
             } else if (itemId == R.id.i_discover) {
                 openFeedDiscover();
             } else if (itemId == R.id.i_community) {
-                openDatingHome();
-            } else if (itemId == R.id.i_study) {
-                switchToTab(TAB_STUDY);
+                switchToTab(TAB_COMMUNITY);
             }
             return true;
         });
@@ -273,18 +274,18 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         EndpointManager.getInstance().setMethod("tab_activity", EndpointCategory.wkRefreshMailList, object -> null);
     }
 
-    private void openPartnerBrowse() {
+    private void openPartnerList() {
         try {
-            Object handled = EndpointManager.getInstance().invoke("peipe_open_partner_browse", this);
+            Object handled = EndpointManager.getInstance().invoke("peipe_open_partner_list", this);
             if (handled instanceof Boolean && (Boolean) handled) return;
         } catch (Throwable ignored) {
         }
         try {
-            Class<?> clazz = Class.forName("com.chat.partnerbrowse.PartnerBrowseActivity");
+            Class<?> clazz = Class.forName("com.chat.partnerlist.PartnerListActivity");
             android.content.Intent intent = new android.content.Intent(this, clazz);
             startActivity(intent);
         } catch (Throwable ignored) {
-            showToast("语伴模块加载失败，请检查 wkpartnerbrowse 模块");
+            showToast("语伴列表模块加载失败，请检查 wkpartnerlist 模块");
             switchToTab(TAB_PARTNER);
         }
     }
@@ -303,27 +304,6 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         } catch (Throwable ignored) {
             showToast("发现模块加载失败，请检查 wkfeed 模块");
             switchToTab(TAB_DISCOVER);
-        }
-    }
-
-    private void openDatingHome() {
-        try {
-            Object handled = EndpointManager.getInstance().invoke("dating_open", this);
-            if (handled instanceof Boolean && (Boolean) handled) return;
-        } catch (Throwable ignored) {
-        }
-        try {
-            Object handled = EndpointManager.getInstance().invoke("peipe_open_dating", this);
-            if (handled instanceof Boolean && (Boolean) handled) return;
-        } catch (Throwable ignored) {
-        }
-        try {
-            Class<?> clazz = Class.forName("com.chat.dating.DatingHomeActivity");
-            android.content.Intent intent = new android.content.Intent(this, clazz);
-            startActivity(intent);
-        } catch (Throwable ignored) {
-            showToast("交友模块加载失败，请检查 wkdating 模块");
-            switchToTab(TAB_COMMUNITY);
         }
     }
 
@@ -368,16 +348,19 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     }
 
     private int getMenuIdByIndex(int index) {
-        if (index == TAB_PARTNER) return R.id.i_partner;
-        if (index == TAB_DISCOVER) return R.id.i_discover;
-        if (index == TAB_COMMUNITY) return R.id.i_community;
         if (index == TAB_STUDY) return R.id.i_study;
-        return R.id.i_chat;
+        if (index == TAB_PARTNER) return R.id.i_partner;
+        if (index == TAB_CHAT) return R.id.i_chat;
+        if (index == TAB_DISCOVER) return R.id.i_discover;
+        return R.id.i_community;
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        if (wkVBinding != null && wkVBinding.vp != null) {
+            wkVBinding.bottomNavigation.setSelectedItemId(getMenuIdByIndex(wkVBinding.vp.getCurrentItem()));
+        }
         syncBottomNavigationForCurrentTab();
         disableBottomNavigationSelectedBackground();
 
