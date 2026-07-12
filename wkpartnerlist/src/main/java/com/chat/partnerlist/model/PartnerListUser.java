@@ -27,6 +27,7 @@ public class PartnerListUser {
     public int last_offline;
     public long last_active_at;
     public int is_new;
+    public long profile_version;
 
     public String stableId() {
         if (!TextUtils.isEmpty(uid)) return uid;
@@ -85,6 +86,7 @@ public class PartnerListUser {
         out.last_offline = last_offline;
         out.last_active_at = last_active_at;
         out.is_new = is_new;
+        out.profile_version = profile_version;
         return out;
     }
 

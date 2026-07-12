@@ -18,7 +18,7 @@ public class PartnerGreetingResponse {
     public int greeting_day_remaining;
 
     public boolean success() {
-        return status == 1 || status == 200 || code == 200 || hello_sent == 1 || greeting_status == 1 || requester_msg_count > 0;
+        return status == 200 || code == 200;
     }
 
     public String messageSafe() {
