@@ -52,6 +52,7 @@ public class DatingProfile implements Serializable {
     public double distance_km;
     public int distance_meters;
     public List<String> photos;
+    public List<String> card_photos;
     public List<String> profile_images;
     public List<String> native_languages;
     public List<String> learning_languages;
@@ -80,16 +81,20 @@ public class DatingProfile implements Serializable {
         return safeUid();
     }
 
-    public boolean isFemale() {
-        if (gender == 2) return true;
-        if (gender == 1) return false;
-        if (sex == 0) return true;
-        if (sex == 1) return false;
-        return false;
+    /**
+     * 统一为后端 sex 约定：0=女，1=男，-1=未知。
+     * 未填写、脏数据或未来扩展值都不能再被默认归为男性。
+     */
+    public int normalizedSex() {
+        if (gender == 2) return 0;
+        if (gender == 1) return 1;
+        if (sex == 0 || sex == 1) return sex;
+        return -1;
     }
 
-    public boolean isMale() { return !isFemale(); }
-    public int normalizedSex() { return isFemale() ? 0 : 1; }
+    public boolean isFemale() { return normalizedSex() == 0; }
+    public boolean isMale() { return normalizedSex() == 1; }
+    public boolean hasKnownSex() { return normalizedSex() >= 0; }
 
     public String safeCountryCode() {
         return TextUtils.isEmpty(country_code) ? "" : country_code.trim().toUpperCase(Locale.US);
@@ -151,6 +156,16 @@ public class DatingProfile implements Serializable {
         if (list.isEmpty() && !TextUtils.isEmpty(avatar)) list.add(avatar.trim());
         return list;
     }
+    public List<String> safeCardPhotos() {
+        List<String> master = safePhotos();
+        ArrayList<String> cards = new ArrayList<>();
+        for (int i = 0; i < master.size(); i++) {
+            String value = card_photos != null && i < card_photos.size() ? card_photos.get(i) : "";
+            cards.add(TextUtils.isEmpty(value) ? master.get(i) : value.trim());
+        }
+        return cards;
+    }
+
 
     private void appendPhotos(ArrayList<String> out, List<String> source) {
         if (source == null) return;
