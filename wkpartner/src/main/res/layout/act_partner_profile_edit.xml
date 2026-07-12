@@ -93,7 +93,8 @@
                 android:text="@string/partner_photos"
                 android:textColor="#30303A"
                 android:textSize="16sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -101,14 +102,16 @@
                 android:layout_marginTop="4dp"
                 android:text="@string/partner_profile_photo_batch_tip"
                 android:textColor="#888888"
-                android:textSize="13sp" />
+                android:textSize="13sp"
+                android:visibility="gone" />
 
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:overScrollMode="never"
-                android:scrollbars="none">
+                android:scrollbars="none"
+                android:visibility="gone">
 
                 <LinearLayout
                     android:id="@+id/imagePreviewLayout"
@@ -127,7 +130,8 @@
                 android:text="@string/partner_add_photo"
                 android:textColor="#5B4BFF"
                 android:textSize="15sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:id="@+id/countryRow"
