@@ -63,4 +63,7 @@
     <string name="partnerlist_mode_partner">语伴</string>
     <string name="partnerlist_mode_dating">交友</string>
     <string name="partnerlist_dating_unavailable">交友模块加载失败，请检查 wkdating 模块</string>
+    <string name="partnerlist_go_chat">去聊天</string>
+    <string name="partnerlist_new_recommendation">新推荐</string>
+    <string name="partnerlist_active_10m">10分钟内活跃</string>
 </resources>
