@@ -85,7 +85,7 @@ public class PerfectUserInfoActivity extends WKBaseActivity<ActPerfectUserInfoLa
             intent.putExtra(EXTRA_FORCE_COMPLETE, true);
             intent.putExtra(EXTRA_HIDE_BACK, true);
             intent.putExtra(EXTRA_HIDE_SKIP, true);
-            intent.putExtra(EXTRA_REQUIRE_PROFILE_IMAGE, true);
+            intent.putExtra(EXTRA_REQUIRE_PROFILE_IMAGE, false);
             intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
             startActivity(intent);
             finish();
