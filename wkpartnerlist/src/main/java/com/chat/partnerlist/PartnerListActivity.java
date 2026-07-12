@@ -1,6 +1,7 @@
 package com.chat.partnerlist;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -9,12 +10,18 @@ import android.os.SystemClock;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.view.Window;
+import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -54,6 +61,11 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     private boolean refreshAfterProfileEdit;
     private long serverTimeBase;
     private long elapsedTimeBase;
+    private boolean lastErrorProfileRequired;
+
+    private int topBarBaseHeight;
+    private int topBarBasePaddingTop;
+    private int updateBannerBaseMarginTop;
 
     private final Runnable onlineRunnable = new Runnable() {
         @Override public void run() {
@@ -95,15 +107,13 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     @Override protected void setTitle(TextView titleTv) {}
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
-        Window window = getWindow();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            window.setStatusBarColor(getResources().getColor(com.chat.uikit.R.color.tab_bg));
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-                && (getResources().getConfiguration().uiMode & 0x30) != 0x20) {
-            window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        }
+        configureEdgeToEdgeWindow();
         super.onCreate(savedInstanceState);
+    }
+
+    @Override protected void toggleStatusBarMode() {
+        super.toggleStatusBarMode();
+        configureEdgeToEdgeWindow();
     }
 
     @Override protected void initView() {
@@ -116,6 +126,7 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         wkVBinding.recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         wkVBinding.recyclerView.setClipToPadding(false);
         GlobalBottomNavigationController.attach(this, wkVBinding.bottomNavigation, com.chat.uikit.R.id.i_partner);
+        applyPartnerListInsets();
         applyTabletContentWidth();
 
         showSkeleton(true);
@@ -131,7 +142,14 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             if (adapter != null && adapter.getItemCount() > 0) wkVBinding.recyclerView.smoothScrollToPosition(0);
         });
         wkVBinding.datingModeTab.setOnClickListener(v -> openDatingHome());
-        wkVBinding.retryBtn.setOnClickListener(v -> requestRecommendations(true));
+        wkVBinding.retryBtn.setOnClickListener(v -> {
+            if (lastErrorProfileRequired) {
+                refreshAfterProfileEdit = true;
+                PartnerListHostBridge.openProfileEdit(this, REQ_PROFILE_EDIT);
+            } else {
+                requestRecommendations(true);
+            }
+        });
         wkVBinding.completeProfileBtn.setOnClickListener(v -> {
             refreshAfterProfileEdit = true;
             PartnerListHostBridge.openProfileEdit(this, REQ_PROFILE_EDIT);
@@ -200,8 +218,10 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                 requesting = false;
                 if (isFinishing() || isDestroyed()) return;
                 wkVBinding.retryBtn.setEnabled(true);
+                lastErrorProfileRequired = false;
+                wkVBinding.retryBtn.setText(R.string.partnerlist_retry);
                 if (result == null) {
-                    showError(getString(R.string.partnerlist_load_failed));
+                    showError(getString(R.string.partnerlist_load_failed), false);
                     return;
                 }
                 PartnerListCache.saveAsync(PartnerListActivity.this, result);
@@ -217,7 +237,8 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                 if (isFinishing() || isDestroyed()) return;
                 wkVBinding.retryBtn.setEnabled(true);
                 if (currentResponse == null && !hasRenderedData) {
-                    showError(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg);
+                    boolean profileRequired = isProfileRequiredError(code, msg);
+                    showError(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg, profileRequired);
                 } else if (explicitRetry) {
                     toast(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg);
                 }
@@ -309,12 +330,23 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         }
     }
 
-    private void showError(String message) {
+    private void showError(String message, boolean profileRequired) {
+        lastErrorProfileRequired = profileRequired;
         showSkeleton(false);
         wkVBinding.recyclerView.setVisibility(View.GONE);
         wkVBinding.emptyLayout.setVisibility(View.GONE);
         wkVBinding.errorLayout.setVisibility(View.VISIBLE);
         wkVBinding.errorTv.setText(message);
+        wkVBinding.retryBtn.setText(profileRequired ? R.string.partnerlist_complete_profile : R.string.partnerlist_retry);
+    }
+
+    private boolean isProfileRequiredError(int code, String msg) {
+        if (code == 412 || code == 428) return true;
+        if (TextUtils.isEmpty(msg)) return false;
+        String text = msg.toLowerCase();
+        return text.contains("profile") || text.contains("language")
+                || text.contains("资料") || text.contains("完善") || text.contains("语言")
+                || text.contains("ဘာသာ") || text.contains("ကိုယ်ရေး");
     }
 
     private void showUpdateBanner(String text) {
@@ -495,6 +527,72 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         } catch (Throwable ignored) {
         }
         toast(getString(R.string.partnerlist_dating_unavailable));
+    }
+
+    private void configureEdgeToEdgeWindow() {
+        Window window = getWindow();
+        if (window == null) return;
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            window.setStatusBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(getResources().getColor(com.chat.uikit.R.color.tab_bg));
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            window.setAttributes(params);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            int flags = window.getDecorView().getSystemUiVisibility()
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            window.getDecorView().setSystemUiVisibility(flags);
+        }
+    }
+
+    private void applyPartnerListInsets() {
+        if (wkVBinding == null || wkVBinding.getRoot() == null || wkVBinding.topBar == null) return;
+        topBarBaseHeight = layoutHeight(wkVBinding.topBar);
+        topBarBasePaddingTop = wkVBinding.topBar.getPaddingTop();
+        if (wkVBinding.updateBanner.getLayoutParams() instanceof FrameLayout.LayoutParams) {
+            updateBannerBaseMarginTop = ((FrameLayout.LayoutParams) wkVBinding.updateBanner.getLayoutParams()).topMargin;
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(wkVBinding.getRoot(), (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars()
+                    | WindowInsetsCompat.Type.displayCutout());
+            int topExtra = dp(4);
+            setLayoutHeight(wkVBinding.topBar, topBarBaseHeight + bars.top + topExtra);
+            wkVBinding.topBar.setPadding(wkVBinding.topBar.getPaddingLeft(),
+                    topBarBasePaddingTop + bars.top + topExtra,
+                    wkVBinding.topBar.getPaddingRight(),
+                    wkVBinding.topBar.getPaddingBottom());
+            if (wkVBinding.updateBanner.getLayoutParams() instanceof FrameLayout.LayoutParams) {
+                FrameLayout.LayoutParams bannerLp = (FrameLayout.LayoutParams) wkVBinding.updateBanner.getLayoutParams();
+                int target = updateBannerBaseMarginTop + bars.top + topExtra;
+                if (bannerLp.topMargin != target) {
+                    bannerLp.topMargin = target;
+                    wkVBinding.updateBanner.setLayoutParams(bannerLp);
+                }
+            }
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(wkVBinding.getRoot());
+    }
+
+    private int layoutHeight(View view) {
+        ViewGroup.LayoutParams params = view == null ? null : view.getLayoutParams();
+        return params == null || params.height < 0 ? 0 : params.height;
+    }
+
+    private void setLayoutHeight(View view, int height) {
+        if (view == null || height <= 0 || view.getLayoutParams() == null) return;
+        ViewGroup.LayoutParams params = view.getLayoutParams();
+        if (params.height == height) return;
+        params.height = height;
+        view.setLayoutParams(params);
     }
 
     private void applyTabletContentWidth() {
