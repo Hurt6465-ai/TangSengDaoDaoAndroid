@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_partnerlist_page">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="76dp"
+            android:background="@drawable/bg_partnerlist_toolbar"
+            android:elevation="3dp"
+            android:paddingStart="12dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="14dp">
+
+            <ImageView
+                android:id="@+id/backBtn"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_gravity="start|center_vertical"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/partnerlist_back"
+                android:padding="9dp"
+                android:src="@drawable/ic_partnerlist_back" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start|center_vertical"
+                android:layout_marginStart="48dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/partnerlist_title"
+                    android:textColor="#20232B"
+                    android:textSize="21sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/subtitleTv"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/partnerlist_subtitle_loading"
+                    android:textColor="#8E95A2"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/quotaTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end|center_vertical"
+                android:background="@drawable/bg_partnerlist_quota"
+                android:text="@string/partnerlist_quota_default"
+                android:textColor="#6675D7"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/statusHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="15dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="15dp"
+            android:background="@drawable/bg_partnerlist_hint"
+            android:text="@string/partnerlist_status_preparing"
+            android:textColor="#6977B8"
+            android:textSize="12sp" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:paddingTop="6dp"
+                android:paddingBottom="14dp"
+                android:visibility="gone" />
+
+            <com.chat.partnerlist.SkeletonPulseLayout
+                android:id="@+id/skeletonLayout"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:paddingTop="6dp">
+
+                <include layout="@layout/item_partner_list_skeleton" />
+                <include layout="@layout/item_partner_list_skeleton" />
+                <include layout="@layout/item_partner_list_skeleton" />
+                <include layout="@layout/item_partner_list_skeleton" />
+                <include layout="@layout/item_partner_list_skeleton" />
+                <include layout="@layout/item_partner_list_skeleton" />
+            </com.chat.partnerlist.SkeletonPulseLayout>
+
+            <LinearLayout
+                android:id="@+id/errorLayout"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="32dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/errorTv"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:textColor="#69707C"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/retryBtn"
+                    android:layout_width="112dp"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="18dp"
+                    android:background="@drawable/bg_partnerlist_greeting"
+                    android:gravity="center"
+                    android:text="@string/partnerlist_retry"
+                    android:textColor="#6675D7"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/emptyLayout"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="32dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="@string/partnerlist_empty"
+                    android:textColor="#69707C"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/completeProfileBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:background="@drawable/bg_partnerlist_hint"
+                    android:text="@string/partnerlist_complete_profile"
+                    android:textColor="#6877C2"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/footerTv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingStart="20dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="16dp"
+            android:textColor="#9AA0AA"
+            android:textSize="12sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/updateBanner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="92dp"
+        android:background="@drawable/bg_partnerlist_update_banner"
+        android:elevation="8dp"
+        android:textColor="#FFFFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+</FrameLayout>
