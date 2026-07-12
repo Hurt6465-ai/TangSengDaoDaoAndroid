@@ -354,5 +354,7 @@
     <string name="destroy_account_success">账号已注销</string>
     <string name="resend_after_seconds">%1$d 秒后重发</string>
     <string name="operation_failed">操作失败</string>
+    <string name="partner_pending_remaining">对方未回复，还可以发送 %1$d 条</string>
+    <string name="partner_pending_waiting">已发送 3 条，等待对方回复后可继续聊天</string>
 </resources>
 
