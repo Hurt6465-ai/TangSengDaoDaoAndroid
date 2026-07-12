@@ -1,94 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:ns0="http://schemas.android.com/apk/res/android" ns0:layout_width="match_parent" ns0:layout_height="match_parent" ns0:background="#F7F7F9" ns0:orientation="vertical">
-    <FrameLayout ns0:layout_width="match_parent" ns0:layout_height="58dp">
-        <TextView ns0:id="@+id/backBtn" ns0:layout_width="48dp" ns0:layout_height="48dp" ns0:layout_gravity="start|center_vertical" ns0:gravity="center" ns0:text="←" ns0:textColor="#16181E" ns0:textSize="24sp" ns0:textStyle="bold" />
-        <TextView ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:layout_gravity="center" ns0:text="@string/dating_edit_profile_title" ns0:textColor="#16181E" ns0:textSize="18sp" ns0:textStyle="bold" />
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#F7F7F9" android:orientation="vertical">
+    <FrameLayout android:layout_width="match_parent" android:layout_height="58dp">
+        <TextView android:id="@+id/backBtn" android:layout_width="48dp" android:layout_height="48dp" android:layout_gravity="start|center_vertical" android:gravity="center" android:text="←" android:textColor="#16181E" android:textSize="24sp" android:textStyle="bold" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:text="@string/dating_edit_profile_title" android:textColor="#16181E" android:textSize="18sp" android:textStyle="bold" />
     </FrameLayout>
-    <ScrollView ns0:layout_width="match_parent" ns0:layout_height="0dp" ns0:layout_weight="1" ns0:fillViewport="true" ns0:overScrollMode="never">
-        <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:orientation="vertical" ns0:paddingStart="16dp" ns0:paddingEnd="16dp" ns0:paddingBottom="24dp">
-            <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:background="#FFFFFFFF" ns0:orientation="vertical" ns0:padding="14dp">
-                <TextView ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:text="@string/dating_my_photos" ns0:textColor="#16181E" ns0:textSize="16sp" ns0:textStyle="bold" />
-                <TextView ns0:id="@+id/photoTip" ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:layout_marginTop="6dp" ns0:textColor="#6C7380" ns0:textSize="12sp" />
-                <androidx.recyclerview.widget.RecyclerView ns0:id="@+id/photoRecycler" ns0:layout_width="match_parent" ns0:layout_height="228dp" ns0:layout_marginTop="10dp" ns0:clipToPadding="false" ns0:nestedScrollingEnabled="false" ns0:overScrollMode="never" />
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:fillViewport="true" android:overScrollMode="never">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingBottom="24dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:background="#FFFFFFFF" android:orientation="vertical" android:padding="14dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/dating_my_photos" android:textColor="#16181E" android:textSize="16sp" android:textStyle="bold" />
+                <TextView android:id="@+id/photoTip" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="#6C7380" android:textSize="12sp" />
+                <androidx.recyclerview.widget.RecyclerView android:id="@+id/photoRecycler" android:layout_width="match_parent" android:layout_height="228dp" android:layout_marginTop="10dp" android:clipToPadding="false" android:nestedScrollingEnabled="false" android:overScrollMode="never" />
             </LinearLayout>
-            <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="14dp" ns0:background="#FFFFFFFF" ns0:orientation="vertical" ns0:padding="14dp">
-                <TextView ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:text="@string/dating_shared_profile" ns0:textColor="#16181E" ns0:textSize="16sp" ns0:textStyle="bold" />
-                <TextView ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:layout_marginTop="4dp" ns0:text="@string/dating_shared_profile_tip" ns0:textColor="#8A909B" ns0:textSize="12sp" />
-                <TextView ns0:id="@+id/sharedBasicTv" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="12dp" ns0:textColor="#343740" ns0:textSize="14sp" ns0:textStyle="bold" />
-                <TextView ns0:id="@+id/sharedRelationshipTv" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="8dp" ns0:textColor="#555B66" ns0:textSize="13sp" />
-                <TextView ns0:id="@+id/sharedPersonalityTv" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="8dp" ns0:textColor="#555B66" ns0:textSize="13sp" />
-                <TextView ns0:id="@+id/sharedInterestTv" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="8dp" ns0:lineSpacingExtra="3dp" ns0:textColor="#555B66" ns0:textSize="13sp" />
-                <TextView ns0:id="@+id/sharedCareerTv" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="8dp" ns0:textColor="#555B66" ns0:textSize="13sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:background="#FFFFFFFF" android:orientation="vertical" android:padding="14dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/dating_shared_profile" android:textColor="#16181E" android:textSize="16sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="@string/dating_shared_profile_tip" android:textColor="#8A909B" android:textSize="12sp" />
+                <TextView android:id="@+id/sharedBasicTv" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:textColor="#343740" android:textSize="14sp" android:textStyle="bold" />
+                <TextView android:id="@+id/sharedRelationshipTv" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textColor="#555B66" android:textSize="13sp" />
+                <TextView android:id="@+id/sharedPersonalityTv" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textColor="#555B66" android:textSize="13sp" />
+                <TextView android:id="@+id/sharedInterestTv" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:lineSpacingExtra="3dp" android:textColor="#555B66" android:textSize="13sp" />
+                <TextView android:id="@+id/sharedCareerTv" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textColor="#555B66" android:textSize="13sp" />
             </LinearLayout>
-            <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="14dp" ns0:background="#FFFFFFFF" ns0:gravity="center_vertical" ns0:orientation="horizontal" ns0:padding="14dp">
-                <LinearLayout ns0:layout_width="0dp" ns0:layout_height="wrap_content" ns0:layout_weight="1" ns0:orientation="vertical">
-                    <TextView ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:text="@string/dating_enable" ns0:textColor="#16181E" ns0:textSize="16sp" ns0:textStyle="bold" />
-                    <TextView ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:layout_marginTop="4dp" ns0:text="@string/dating_enable_tip" ns0:textColor="#6C7380" ns0:textSize="12sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:background="#FFFFFFFF" android:gravity="center_vertical" android:orientation="horizontal" android:padding="14dp">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/dating_enable" android:textColor="#16181E" android:textSize="16sp" android:textStyle="bold" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="@string/dating_enable_tip" android:textColor="#6C7380" android:textSize="12sp" />
                 </LinearLayout>
-                <androidx.appcompat.widget.SwitchCompat ns0:id="@+id/enabledSwitch" ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" />
+                <androidx.appcompat.widget.SwitchCompat android:id="@+id/enabledSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             </LinearLayout>
-            <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="14dp" ns0:background="#FFFFFFFF" ns0:orientation="vertical" ns0:paddingStart="14dp" ns0:paddingEnd="14dp">
-                <LinearLayout ns0:id="@+id/intentRow" ns0:layout_width="match_parent" ns0:layout_height="54dp" ns0:gravity="center_vertical" ns0:orientation="horizontal">
-                    <TextView ns0:layout_width="0dp" ns0:layout_height="wrap_content" ns0:layout_weight="1" ns0:text="@string/dating_edit_intent" ns0:textColor="#16181E" ns0:textSize="15sp" />
-                    <TextView ns0:id="@+id/intentValue" ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:ellipsize="end" ns0:maxWidth="220dp" ns0:maxLines="1" ns0:textColor="#6C7380" ns0:textSize="14sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:background="#FFFFFFFF" android:orientation="vertical" android:paddingStart="14dp" android:paddingEnd="14dp">
+                <LinearLayout android:id="@+id/intentRow" android:layout_width="match_parent" android:layout_height="54dp" android:gravity="center_vertical" android:orientation="horizontal">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/dating_edit_intent" android:textColor="#16181E" android:textSize="15sp" />
+                    <TextView android:id="@+id/intentValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:ellipsize="end" android:maxWidth="220dp" android:maxLines="1" android:textColor="#6C7380" android:textSize="14sp" />
                 </LinearLayout>
-                <View ns0:layout_width="match_parent" ns0:layout_height="1dp" ns0:background="#EEF0F4" />
-                <LinearLayout ns0:id="@+id/genderRow" ns0:layout_width="match_parent" ns0:layout_height="54dp" ns0:gravity="center_vertical" ns0:orientation="horizontal">
-                    <TextView ns0:layout_width="0dp" ns0:layout_height="wrap_content" ns0:layout_weight="1" ns0:text="@string/dating_edit_gender" ns0:textColor="#16181E" ns0:textSize="15sp" />
-                    <TextView ns0:id="@+id/genderValue" ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:textColor="#6C7380" ns0:textSize="14sp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEF0F4" />
+                <LinearLayout android:id="@+id/genderRow" android:layout_width="match_parent" android:layout_height="54dp" android:gravity="center_vertical" android:orientation="horizontal">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/dating_edit_gender" android:textColor="#16181E" android:textSize="15sp" />
+                    <TextView android:id="@+id/genderValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#6C7380" android:textSize="14sp" />
                 </LinearLayout>
-                <View ns0:layout_width="match_parent" ns0:layout_height="1dp" ns0:background="#EEF0F4" />
-                <LinearLayout ns0:id="@+id/ageRow" ns0:layout_width="match_parent" ns0:layout_height="54dp" ns0:gravity="center_vertical" ns0:orientation="horizontal">
-                    <TextView ns0:layout_width="0dp" ns0:layout_height="wrap_content" ns0:layout_weight="1" ns0:text="@string/dating_edit_age" ns0:textColor="#16181E" ns0:textSize="15sp" />
-                    <TextView ns0:id="@+id/ageValue" ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:textColor="#6C7380" ns0:textSize="14sp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEF0F4" />
+                <LinearLayout android:id="@+id/ageRow" android:layout_width="match_parent" android:layout_height="54dp" android:gravity="center_vertical" android:orientation="horizontal">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/dating_edit_age" android:textColor="#16181E" android:textSize="15sp" />
+                    <TextView android:id="@+id/ageValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#6C7380" android:textSize="14sp" />
                 </LinearLayout>
-                <View ns0:layout_width="match_parent" ns0:layout_height="1dp" ns0:background="#EEF0F4" />
-                <LinearLayout ns0:id="@+id/sexualOrientationRow" ns0:layout_width="match_parent" ns0:layout_height="54dp" ns0:gravity="center_vertical" ns0:orientation="horizontal">
-                    <TextView ns0:layout_width="0dp" ns0:layout_height="wrap_content" ns0:layout_weight="1" ns0:text="@string/dating_edit_orientation" ns0:textColor="#16181E" ns0:textSize="15sp" />
-                    <TextView ns0:id="@+id/sexualOrientationValue" ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:textColor="#6C7380" ns0:textSize="14sp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEF0F4" />
+                <LinearLayout android:id="@+id/sexualOrientationRow" android:layout_width="match_parent" android:layout_height="54dp" android:gravity="center_vertical" android:orientation="horizontal">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/dating_edit_orientation" android:textColor="#16181E" android:textSize="15sp" />
+                    <TextView android:id="@+id/sexualOrientationValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#6C7380" android:textSize="14sp" />
                 </LinearLayout>
-                <View ns0:layout_width="match_parent" ns0:layout_height="1dp" ns0:background="#EEF0F4" />
-                <LinearLayout ns0:id="@+id/drinkingRow" ns0:layout_width="match_parent" ns0:layout_height="54dp" ns0:gravity="center_vertical" ns0:orientation="horizontal">
-                    <TextView ns0:layout_width="0dp" ns0:layout_height="wrap_content" ns0:layout_weight="1" ns0:text="@string/dating_edit_drinking" ns0:textColor="#16181E" ns0:textSize="15sp" />
-                    <TextView ns0:id="@+id/drinkingValue" ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:textColor="#6C7380" ns0:textSize="14sp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEF0F4" />
+                <LinearLayout android:id="@+id/drinkingRow" android:layout_width="match_parent" android:layout_height="54dp" android:gravity="center_vertical" android:orientation="horizontal">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/dating_edit_drinking" android:textColor="#16181E" android:textSize="15sp" />
+                    <TextView android:id="@+id/drinkingValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#6C7380" android:textSize="14sp" />
                 </LinearLayout>
-                <View ns0:layout_width="match_parent" ns0:layout_height="1dp" ns0:background="#EEF0F4" />
-                <LinearLayout ns0:id="@+id/smokingRow" ns0:layout_width="match_parent" ns0:layout_height="54dp" ns0:gravity="center_vertical" ns0:orientation="horizontal">
-                    <TextView ns0:layout_width="0dp" ns0:layout_height="wrap_content" ns0:layout_weight="1" ns0:text="@string/dating_edit_smoking" ns0:textColor="#16181E" ns0:textSize="15sp" />
-                    <TextView ns0:id="@+id/smokingValue" ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:textColor="#6C7380" ns0:textSize="14sp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEF0F4" />
+                <LinearLayout android:id="@+id/smokingRow" android:layout_width="match_parent" android:layout_height="54dp" android:gravity="center_vertical" android:orientation="horizontal">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/dating_edit_smoking" android:textColor="#16181E" android:textSize="15sp" />
+                    <TextView android:id="@+id/smokingValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#6C7380" android:textSize="14sp" />
                 </LinearLayout>
-                <View ns0:layout_width="match_parent" ns0:layout_height="1dp" ns0:background="#EEF0F4" />
-                <LinearLayout ns0:id="@+id/dealbreakersRow" ns0:layout_width="match_parent" ns0:layout_height="54dp" ns0:gravity="center_vertical" ns0:orientation="horizontal">
-                    <TextView ns0:layout_width="0dp" ns0:layout_height="wrap_content" ns0:layout_weight="1" ns0:text="@string/dating_edit_dealbreakers" ns0:textColor="#16181E" ns0:textSize="15sp" />
-                    <TextView ns0:id="@+id/dealbreakersValue" ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:ellipsize="end" ns0:maxWidth="220dp" ns0:maxLines="1" ns0:textColor="#6C7380" ns0:textSize="14sp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEF0F4" />
+                <LinearLayout android:id="@+id/dealbreakersRow" android:layout_width="match_parent" android:layout_height="54dp" android:gravity="center_vertical" android:orientation="horizontal">
+                    <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/dating_edit_dealbreakers" android:textColor="#16181E" android:textSize="15sp" />
+                    <TextView android:id="@+id/dealbreakersValue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:ellipsize="end" android:maxWidth="220dp" android:maxLines="1" android:textColor="#6C7380" android:textSize="14sp" />
                 </LinearLayout>
             </LinearLayout>
-            <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="14dp" ns0:background="#FFFFFFFF" ns0:orientation="vertical" ns0:padding="14dp">
-                <EditText ns0:id="@+id/cityEt" ns0:layout_width="match_parent" ns0:layout_height="48dp" ns0:background="#00000000" ns0:hint="@string/dating_city" ns0:textColor="#16181E" ns0:textColorHint="#9AA1AE" ns0:textSize="15sp" />
-                <View ns0:layout_width="match_parent" ns0:layout_height="1dp" ns0:background="#EEF0F4" />
-                <EditText ns0:id="@+id/heightEt" ns0:layout_width="match_parent" ns0:layout_height="48dp" ns0:background="#00000000" ns0:hint="@string/dating_height_hint" ns0:inputType="number" ns0:textColor="#16181E" ns0:textColorHint="#9AA1AE" ns0:textSize="15sp" />
-                <View ns0:layout_width="match_parent" ns0:layout_height="1dp" ns0:background="#EEF0F4" />
-                <EditText ns0:id="@+id/weightEt" ns0:layout_width="match_parent" ns0:layout_height="48dp" ns0:background="#00000000" ns0:hint="@string/dating_weight_hint" ns0:inputType="number" ns0:textColor="#16181E" ns0:textColorHint="#9AA1AE" ns0:textSize="15sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:background="#FFFFFFFF" android:orientation="vertical" android:padding="14dp">
+                <EditText android:id="@+id/cityEt" android:layout_width="match_parent" android:layout_height="48dp" android:background="#00000000" android:hint="@string/dating_city" android:textColor="#16181E" android:textColorHint="#9AA1AE" android:textSize="15sp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEF0F4" />
+                <EditText android:id="@+id/heightEt" android:layout_width="match_parent" android:layout_height="48dp" android:background="#00000000" android:hint="@string/dating_height_hint" android:inputType="number" android:textColor="#16181E" android:textColorHint="#9AA1AE" android:textSize="15sp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#EEF0F4" />
+                <EditText android:id="@+id/weightEt" android:layout_width="match_parent" android:layout_height="48dp" android:background="#00000000" android:hint="@string/dating_weight_hint" android:inputType="number" android:textColor="#16181E" android:textColorHint="#9AA1AE" android:textSize="15sp" />
             </LinearLayout>
-            <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="14dp" ns0:background="#FFFFFFFF" ns0:orientation="vertical" ns0:padding="14dp">
-                <TextView ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:text="@string/dating_section_about" ns0:textColor="#16181E" ns0:textSize="15sp" ns0:textStyle="bold" />
-                <EditText ns0:id="@+id/bioEt" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="8dp" ns0:background="#00000000" ns0:gravity="top" ns0:hint="@string/dating_about_hint" ns0:inputType="textMultiLine" ns0:lines="4" ns0:maxLength="500" ns0:maxLines="6" ns0:textColor="#16181E" ns0:textColorHint="#9AA1AE" ns0:textSize="14sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:background="#FFFFFFFF" android:orientation="vertical" android:padding="14dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/dating_section_about" android:textColor="#16181E" android:textSize="15sp" android:textStyle="bold" />
+                <EditText android:id="@+id/bioEt" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:background="#00000000" android:gravity="top" android:hint="@string/dating_about_hint" android:inputType="textMultiLine" android:lines="4" android:maxLength="500" android:maxLines="6" android:textColor="#16181E" android:textColorHint="#9AA1AE" android:textSize="14sp" />
             </LinearLayout>
-            <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="14dp" ns0:background="#FFFFFFFF" ns0:orientation="vertical" ns0:padding="14dp">
-                <TextView ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:text="@string/dating_section_ideal" ns0:textColor="#16181E" ns0:textSize="15sp" ns0:textStyle="bold" />
-                <EditText ns0:id="@+id/idealPartnerEt" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="8dp" ns0:background="#00000000" ns0:gravity="top" ns0:hint="@string/dating_ideal_hint" ns0:inputType="textMultiLine" ns0:lines="3" ns0:maxLength="200" ns0:maxLines="4" ns0:textColor="#16181E" ns0:textColorHint="#9AA1AE" ns0:textSize="14sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:background="#FFFFFFFF" android:orientation="vertical" android:padding="14dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/dating_section_ideal" android:textColor="#16181E" android:textSize="15sp" android:textStyle="bold" />
+                <EditText android:id="@+id/idealPartnerEt" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:background="#00000000" android:gravity="top" android:hint="@string/dating_ideal_hint" android:inputType="textMultiLine" android:lines="3" android:maxLength="200" android:maxLines="4" android:textColor="#16181E" android:textColorHint="#9AA1AE" android:textSize="14sp" />
             </LinearLayout>
-            <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="14dp" ns0:background="#FFFFFFFF" ns0:orientation="vertical" ns0:padding="14dp">
-                <TextView ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:text="@string/dating_edit_tags" ns0:textColor="#16181E" ns0:textSize="15sp" ns0:textStyle="bold" />
-                <EditText ns0:id="@+id/tagsEt" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="8dp" ns0:background="#00000000" ns0:hint="@string/dating_tags_hint" ns0:inputType="textMultiLine" ns0:lines="2" ns0:textColor="#16181E" ns0:textColorHint="#9AA1AE" ns0:textSize="14sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:background="#FFFFFFFF" android:orientation="vertical" android:padding="14dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/dating_edit_tags" android:textColor="#16181E" android:textSize="15sp" android:textStyle="bold" />
+                <EditText android:id="@+id/tagsEt" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:background="#00000000" android:hint="@string/dating_tags_hint" android:inputType="textMultiLine" android:lines="2" android:textColor="#16181E" android:textColorHint="#9AA1AE" android:textSize="14sp" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
-    <FrameLayout ns0:layout_width="match_parent" ns0:layout_height="68dp" ns0:paddingStart="16dp" ns0:paddingTop="8dp" ns0:paddingEnd="16dp" ns0:paddingBottom="12dp">
-        <TextView ns0:id="@+id/saveBtn" ns0:layout_width="match_parent" ns0:layout_height="48dp" ns0:background="@drawable/bg_dating_loading_button" ns0:gravity="center" ns0:text="@string/dating_save_profile" ns0:textColor="#FFFFFFFF" ns0:textSize="16sp" ns0:textStyle="bold" />
+    <FrameLayout android:layout_width="match_parent" android:layout_height="68dp" android:paddingStart="16dp" android:paddingTop="8dp" android:paddingEnd="16dp" android:paddingBottom="12dp">
+        <TextView android:id="@+id/saveBtn" android:layout_width="match_parent" android:layout_height="48dp" android:background="@drawable/bg_dating_loading_button" android:gravity="center" android:text="@string/dating_save_profile" android:textColor="#FFFFFFFF" android:textSize="16sp" android:textStyle="bold" />
     </FrameLayout>
-    <LinearLayout ns0:id="@+id/uploadOverlay" ns0:layout_width="match_parent" ns0:layout_height="match_parent" ns0:background="#80000000" ns0:gravity="center" ns0:orientation="vertical" ns0:visibility="gone">
-        <ProgressBar ns0:id="@+id/uploadProgress" style="?android:attr/progressBarStyleHorizontal" ns0:layout_width="220dp" ns0:layout_height="wrap_content" ns0:max="100" />
-        <TextView ns0:id="@+id/uploadText" ns0:layout_width="wrap_content" ns0:layout_height="wrap_content" ns0:layout_marginTop="12dp" ns0:textColor="#FFFFFFFF" ns0:textSize="14sp" />
+    <LinearLayout android:id="@+id/uploadOverlay" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#80000000" android:gravity="center" android:orientation="vertical" android:visibility="gone">
+        <ProgressBar android:id="@+id/uploadProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="220dp" android:layout_height="wrap_content" android:max="100" />
+        <TextView android:id="@+id/uploadText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:textColor="#FFFFFFFF" android:textSize="14sp" />
     </LinearLayout>
 </LinearLayout>

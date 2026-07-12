@@ -1,40 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:ns0="http://schemas.android.com/apk/res/android" ns0:layout_width="match_parent" ns0:layout_height="match_parent" ns0:background="#F2F2F5">
-    <androidx.core.widget.NestedScrollView ns0:layout_width="match_parent" ns0:layout_height="match_parent" ns0:clipToPadding="false" ns0:fillViewport="true" ns0:paddingBottom="104dp">
-        <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:orientation="vertical">
-            <FrameLayout ns0:layout_width="match_parent" ns0:layout_height="520dp">
-                <androidx.viewpager2.widget.ViewPager2 ns0:id="@+id/photoPager" ns0:layout_width="match_parent" ns0:layout_height="match_parent" />
-                <TextView ns0:id="@+id/photoCountTv" ns0:layout_width="wrap_content" ns0:layout_height="30dp" ns0:layout_gravity="bottom|end" ns0:layout_marginEnd="16dp" ns0:layout_marginBottom="26dp" ns0:background="@drawable/bg_dating_photo_count" ns0:gravity="center" ns0:paddingStart="12dp" ns0:paddingEnd="12dp" ns0:text="1/1" ns0:textColor="#FFFFFFFF" ns0:textSize="12sp" ns0:textStyle="bold" />
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#F2F2F5">
+    <androidx.core.widget.NestedScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:clipToPadding="false" android:fillViewport="true" android:paddingBottom="104dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <FrameLayout android:layout_width="match_parent" android:layout_height="520dp">
+                <androidx.viewpager2.widget.ViewPager2 android:id="@+id/photoPager" android:layout_width="match_parent" android:layout_height="match_parent" />
+                <TextView android:id="@+id/photoCountTv" android:layout_width="wrap_content" android:layout_height="30dp" android:layout_gravity="bottom|end" android:layout_marginEnd="16dp" android:layout_marginBottom="26dp" android:background="@drawable/bg_dating_photo_count" android:gravity="center" android:paddingStart="12dp" android:paddingEnd="12dp" android:text="1/1" android:textColor="#FFFFFFFF" android:textSize="12sp" android:textStyle="bold" />
             </FrameLayout>
-            <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="-22dp" ns0:layout_marginBottom="20dp" ns0:background="@drawable/bg_dating_detail_card" ns0:orientation="vertical" ns0:paddingStart="20dp" ns0:paddingTop="22dp" ns0:paddingEnd="20dp" ns0:paddingBottom="8dp">
-                <TextView ns0:id="@+id/nameTv" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:textColor="#FF202026" ns0:textSize="27sp" ns0:textStyle="bold" />
-                <TextView ns0:id="@+id/locationTv" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="6dp" ns0:textColor="#FF767681" ns0:textSize="14sp" />
-                <TextView ns0:id="@+id/aboutTitle" style="@style/WkDatingDetailTitle" ns0:text="@string/dating_section_about" />
-                <TextView ns0:id="@+id/aboutTv" style="@style/WkDatingDetailBody" />
-                <TextView ns0:id="@+id/loveTitle" style="@style/WkDatingDetailTitle" ns0:text="@string/dating_section_love_expectation" />
-                <TextView ns0:id="@+id/loveTv" style="@style/WkDatingDetailBody" />
-                <TextView ns0:id="@+id/idealTitle" style="@style/WkDatingDetailTitle" ns0:text="@string/dating_section_ideal" />
-                <TextView ns0:id="@+id/idealTv" style="@style/WkDatingDetailBody" />
-                <TextView ns0:id="@+id/dealbreakersTitle" style="@style/WkDatingDetailTitle" ns0:text="@string/dating_edit_dealbreakers" />
-                <TextView ns0:id="@+id/dealbreakersTv" style="@style/WkDatingDetailBody" />
-                <TextView ns0:id="@+id/basicTitle" style="@style/WkDatingDetailTitle" ns0:text="@string/dating_section_basic" />
-                <TextView ns0:id="@+id/basicTv" style="@style/WkDatingDetailBody" />
-                <TextView ns0:id="@+id/tagsTitle" style="@style/WkDatingDetailTitle" ns0:text="@string/dating_section_interests" />
-                <com.chat.dating.DatingFlowLayout ns0:id="@+id/tagsLayout" ns0:layout_width="match_parent" ns0:layout_height="wrap_content" ns0:layout_marginTop="10dp" />
-                <View ns0:layout_width="match_parent" ns0:layout_height="1dp" ns0:layout_marginTop="20dp" ns0:background="#FFEDEDF0" />
-                <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="52dp" ns0:gravity="center" ns0:orientation="horizontal">
-                    <TextView ns0:id="@+id/blockBtn" ns0:layout_width="0dp" ns0:layout_height="match_parent" ns0:layout_weight="1" ns0:gravity="center" ns0:text="@string/dating_block" ns0:textColor="#FF8C8C95" ns0:textSize="14sp" />
-                    <View ns0:layout_width="1dp" ns0:layout_height="20dp" ns0:background="#FFE2E2E7" />
-                    <TextView ns0:id="@+id/reportBtn" ns0:layout_width="0dp" ns0:layout_height="match_parent" ns0:layout_weight="1" ns0:gravity="center" ns0:text="@string/dating_report" ns0:textColor="#FFFF526C" ns0:textSize="14sp" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="-22dp" android:layout_marginBottom="20dp" android:background="@drawable/bg_dating_detail_card" android:orientation="vertical" android:paddingStart="20dp" android:paddingTop="22dp" android:paddingEnd="20dp" android:paddingBottom="8dp">
+                <TextView android:id="@+id/nameTv" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#FF202026" android:textSize="27sp" android:textStyle="bold" />
+                <TextView android:id="@+id/locationTv" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="#FF767681" android:textSize="14sp" />
+                <TextView android:id="@+id/aboutTitle" style="@style/WkDatingDetailTitle" android:text="@string/dating_section_about" />
+                <TextView android:id="@+id/aboutTv" style="@style/WkDatingDetailBody" />
+                <TextView android:id="@+id/loveTitle" style="@style/WkDatingDetailTitle" android:text="@string/dating_section_love_expectation" />
+                <TextView android:id="@+id/loveTv" style="@style/WkDatingDetailBody" />
+                <TextView android:id="@+id/idealTitle" style="@style/WkDatingDetailTitle" android:text="@string/dating_section_ideal" />
+                <TextView android:id="@+id/idealTv" style="@style/WkDatingDetailBody" />
+                <TextView android:id="@+id/dealbreakersTitle" style="@style/WkDatingDetailTitle" android:text="@string/dating_edit_dealbreakers" />
+                <TextView android:id="@+id/dealbreakersTv" style="@style/WkDatingDetailBody" />
+                <TextView android:id="@+id/basicTitle" style="@style/WkDatingDetailTitle" android:text="@string/dating_section_basic" />
+                <TextView android:id="@+id/basicTv" style="@style/WkDatingDetailBody" />
+                <TextView android:id="@+id/tagsTitle" style="@style/WkDatingDetailTitle" android:text="@string/dating_section_interests" />
+                <com.chat.dating.DatingFlowLayout android:id="@+id/tagsLayout" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:layout_marginTop="20dp" android:background="#FFEDEDF0" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="52dp" android:gravity="center" android:orientation="horizontal">
+                    <TextView android:id="@+id/blockBtn" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:text="@string/dating_block" android:textColor="#FF8C8C95" android:textSize="14sp" />
+                    <View android:layout_width="1dp" android:layout_height="20dp" android:background="#FFE2E2E7" />
+                    <TextView android:id="@+id/reportBtn" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:text="@string/dating_report" android:textColor="#FFFF526C" android:textSize="14sp" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-    <LinearLayout ns0:layout_width="match_parent" ns0:layout_height="96dp" ns0:layout_gravity="bottom" ns0:background="@drawable/bg_dating_detail_bottom" ns0:gravity="center" ns0:orientation="horizontal" ns0:paddingBottom="12dp">
-        <TextView ns0:id="@+id/passBtn" ns0:layout_width="62dp" ns0:layout_height="62dp" ns0:background="@drawable/bg_dating_detail_action_pass" ns0:gravity="center" ns0:includeFontPadding="false" ns0:text="×" ns0:textColor="#FFFF4F6A" ns0:textSize="41sp" ns0:textStyle="bold" />
-        <Space ns0:layout_width="22dp" ns0:layout_height="1dp" />
-        <TextView ns0:id="@+id/favoriteBtn" ns0:layout_width="56dp" ns0:layout_height="56dp" ns0:background="@drawable/bg_dating_detail_action_favorite" ns0:gravity="center" ns0:includeFontPadding="false" ns0:text="★" ns0:textColor="#FF68A2FF" ns0:textSize="29sp" ns0:textStyle="bold" />
-        <Space ns0:layout_width="22dp" ns0:layout_height="1dp" />
-        <TextView ns0:id="@+id/likeBtn" ns0:layout_width="68dp" ns0:layout_height="68dp" ns0:background="@drawable/bg_dating_detail_action_like" ns0:gravity="center" ns0:includeFontPadding="false" ns0:text="♥" ns0:textColor="#FFFF426D" ns0:textSize="40sp" ns0:textStyle="bold" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="96dp" android:layout_gravity="bottom" android:background="@drawable/bg_dating_detail_bottom" android:gravity="center" android:orientation="horizontal" android:paddingBottom="12dp">
+        <TextView android:id="@+id/passBtn" android:layout_width="62dp" android:layout_height="62dp" android:background="@drawable/bg_dating_detail_action_pass" android:gravity="center" android:includeFontPadding="false" android:text="×" android:textColor="#FFFF4F6A" android:textSize="41sp" android:textStyle="bold" />
+        <Space android:layout_width="22dp" android:layout_height="1dp" />
+        <TextView android:id="@+id/favoriteBtn" android:layout_width="56dp" android:layout_height="56dp" android:background="@drawable/bg_dating_detail_action_favorite" android:gravity="center" android:includeFontPadding="false" android:text="★" android:textColor="#FF68A2FF" android:textSize="29sp" android:textStyle="bold" />
+        <Space android:layout_width="22dp" android:layout_height="1dp" />
+        <TextView android:id="@+id/likeBtn" android:layout_width="68dp" android:layout_height="68dp" android:background="@drawable/bg_dating_detail_action_like" android:gravity="center" android:includeFontPadding="false" android:text="♥" android:textColor="#FFFF426D" android:textSize="40sp" android:textStyle="bold" />
     </LinearLayout>
 </FrameLayout>
