@@ -32,6 +32,7 @@ include ':wkpush'
 include ':wkroom'
 include ':wkpartner'
 include ':wkpartnerbrowse'
+include ':wkpartnerlist'
 include ':wkfeed'
 include ':wkrtc'
 
