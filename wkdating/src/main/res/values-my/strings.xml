@@ -327,4 +327,8 @@
         <item>မဖော်ပြထား</item><item>အလယ်တန်းနှင့်အောက်</item><item>အထက်တန်း</item><item>ဘွဲ့</item><item>မဟာဘွဲ့နှင့်အထက်</item><item>အခြား</item>
     </string-array>
 
+
+    <string name="dating_mode_partner">ဘာသာမိတ်ဖက်</string>
+    <string name="dating_mode_dating">မိတ်ဆက်ချစ်ရေး</string>
+    <string name="dating_partner_unavailable">ဘာသာမိတ်ဖက်စာရင်း module ကို မဖွင့်နိုင်ပါ</string>
 </resources>
