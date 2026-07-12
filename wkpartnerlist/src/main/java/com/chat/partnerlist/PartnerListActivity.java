@@ -1,5 +1,6 @@
 package com.chat.partnerlist;
 
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -15,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.chat.base.base.WKBaseActivity;
+import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.partnerlist.databinding.ActivityPartnerListBinding;
 import com.chat.partnerlist.model.PartnerGreetingResponse;
@@ -107,6 +109,10 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
 
     @Override protected void initListener() {
         wkVBinding.backBtn.setOnClickListener(v -> finish());
+        wkVBinding.partnerModeTab.setOnClickListener(v -> {
+            if (layoutManager != null) wkVBinding.recyclerView.smoothScrollToPosition(0);
+        });
+        wkVBinding.datingModeTab.setOnClickListener(v -> openDatingHome());
         wkVBinding.retryBtn.setOnClickListener(v -> requestRecommendations(true));
         wkVBinding.completeProfileBtn.setOnClickListener(v -> PartnerListHostBridge.openProfileEdit(this));
         wkVBinding.recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -354,6 +360,29 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                 toast(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_greeting_failed) : msg);
             }
         });
+    }
+
+    private void openDatingHome() {
+        // 优先直接启动并标记来源，交友页点击“语伴”时可直接 finish 返回，不叠加 Activity。
+        try {
+            Class<?> clazz = Class.forName("com.chat.dating.DatingHomeActivity");
+            Intent intent = new Intent(this, clazz);
+            intent.putExtra("from_partner_list", true);
+            startActivity(intent);
+            return;
+        } catch (Throwable ignored) {
+        }
+        try {
+            Object handled = EndpointManager.getInstance().invoke("dating_open", this);
+            if (handled instanceof Boolean && (Boolean) handled) return;
+        } catch (Throwable ignored) {
+        }
+        try {
+            Object handled = EndpointManager.getInstance().invoke("peipe_open_dating", this);
+            if (handled instanceof Boolean && (Boolean) handled) return;
+        } catch (Throwable ignored) {
+        }
+        toast(getString(R.string.partnerlist_dating_unavailable));
     }
 
     private void toast(String message) {
