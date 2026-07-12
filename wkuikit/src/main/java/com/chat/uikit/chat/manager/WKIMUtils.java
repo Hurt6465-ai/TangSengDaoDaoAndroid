@@ -752,7 +752,11 @@ public class WKIMUtils {
         }
         PartnerPendingStore.Entry state = PartnerPendingStore.get(msg.fromUID);
         if (state != null && state.pending && state.requester) {
-            PartnerPendingStore.markActive(msg.fromUID);
+            // The reply reaches the device before the server webhook and both IM
+            // whitelist directions are guaranteed to be committed. Unlock the UI,
+            // but keep the next outgoing message on the REST gateway until the
+            // backend explicitly returns contact_status=active.
+            PartnerPendingStore.markReplyObserved(msg.fromUID);
         }
     }
 
