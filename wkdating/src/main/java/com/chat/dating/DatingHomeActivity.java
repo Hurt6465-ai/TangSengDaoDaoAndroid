@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import com.chat.uikit.GlobalBottomNavigationController;
 
 /**
  * 交友首页只保留：首页推荐、滑卡、分页、曝光、动作回调。
@@ -106,6 +107,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         locationHelper = new DatingLocationHelper(this);
         pendingExposures.addAll(DatingExposureQueue.load(this));
         DatingUi.applyHomeInsets(wkVBinding.getRoot(), wkVBinding.topBar, wkVBinding.actionBar);
+        GlobalBottomNavigationController.attach(this, wkVBinding.bottomNavigation, com.chat.uikit.R.id.i_partner);
         initCardStack();
         updateScopeTabs();
         showLoading(true, getString(R.string.dating_loading), false);
