@@ -4,6 +4,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.NotificationManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -59,6 +60,7 @@ import java.util.List;
  * tab导航栏
  */
 public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
+    public static final String EXTRA_OPEN_MENU_ID = "open_menu_id";
     // 底部顺序：学习｜语伴｜聊天｜发现｜社区。聊天保持正中间，默认打开学习。
     private static final int TAB_STUDY = 0;
     private static final int TAB_PARTNER = 1;
@@ -123,7 +125,11 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         notificationManager.cancelAll();
         WKCommonModel.getInstance().getAppConfig(null);
 
-        int launchTab = getIntent().getIntExtra("from", 0) != 0 ? TAB_CHAT : TAB_STUDY;
+        int requestedMenuId = getIntent().getIntExtra(EXTRA_OPEN_MENU_ID, 0);
+        int launchTab = requestedMenuId == R.id.i_chat ? TAB_CHAT
+                : requestedMenuId == R.id.i_community ? TAB_COMMUNITY
+                : requestedMenuId == R.id.i_study ? TAB_STUDY
+                : getIntent().getIntExtra("from", 0) != 0 ? TAB_CHAT : TAB_STUDY;
         wkVBinding.vp.setCurrentItem(launchTab, false);
         wkVBinding.bottomNavigation.setSelectedItemId(getMenuIdByIndex(launchTab));
         playAnimation(launchTab);
@@ -353,6 +359,36 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         if (index == TAB_CHAT) return R.id.i_chat;
         if (index == TAB_DISCOVER) return R.id.i_discover;
         return R.id.i_community;
+    }
+
+    @Override
+    protected void initData() {
+        int menuId = getIntent().getIntExtra(EXTRA_OPEN_MENU_ID, 0);
+        if (menuId == R.id.i_partner || menuId == R.id.i_discover) {
+            wkVBinding.getRoot().post(() -> handleExternalMenu(menuId));
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        int menuId = intent == null ? 0 : intent.getIntExtra(EXTRA_OPEN_MENU_ID, 0);
+        if (menuId != 0) handleExternalMenu(menuId);
+    }
+
+    private void handleExternalMenu(int menuId) {
+        if (menuId == R.id.i_partner) {
+            openPartnerList();
+        } else if (menuId == R.id.i_discover) {
+            openFeedDiscover();
+        } else if (menuId == R.id.i_chat) {
+            switchToTab(TAB_CHAT);
+        } else if (menuId == R.id.i_community) {
+            switchToTab(TAB_COMMUNITY);
+        } else {
+            switchToTab(TAB_STUDY);
+        }
     }
 
     @Override
