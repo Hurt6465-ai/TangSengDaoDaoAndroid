@@ -38,4 +38,7 @@
     <string name="partnerlist_lang_zh">တရုတ်</string><string name="partnerlist_lang_en">အင်္ဂလိပ်</string><string name="partnerlist_lang_my">မြန်မာ</string><string name="partnerlist_lang_ja">ဂျပန်</string><string name="partnerlist_lang_ko">ကိုရီးယား</string><string name="partnerlist_lang_th">ထိုင်း</string><string name="partnerlist_lang_vi">ဗီယက်နမ်</string><string name="partnerlist_lang_id">အင်ဒိုနီးရှား</string><string name="partnerlist_lang_ms">မလေး</string><string name="partnerlist_lang_fil">ဖိလစ်ပိုင်</string><string name="partnerlist_lang_km">ခမာ</string><string name="partnerlist_lang_lo">လာအို</string><string name="partnerlist_lang_hi">ဟိန္ဒီ</string><string name="partnerlist_lang_fr">ပြင်သစ်</string><string name="partnerlist_lang_de">ဂျာမန်</string><string name="partnerlist_lang_es">စပိန်</string><string name="partnerlist_lang_ru">ရုရှား</string>
     <plurals name="partnerlist_found_count"><item quantity="other">ယနေ့ %1$d ယောက် အကြံပြုထားသည်</item></plurals>
     <plurals name="partnerlist_updated_count"><item quantity="other">မိတ်ဖက်အသစ် %1$d ယောက် ထည့်ပြီး</item></plurals>
+    <string name="partnerlist_go_chat">စကားပြောမည်</string>
+    <string name="partnerlist_new_recommendation">အသစ်ရွေးပေး</string>
+    <string name="partnerlist_active_10m">၁၀ မိနစ်အတွင်း လှုပ်ရှားထားသည်</string>
 </resources>
