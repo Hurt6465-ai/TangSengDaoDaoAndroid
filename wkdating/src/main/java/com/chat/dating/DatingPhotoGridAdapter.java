@@ -104,6 +104,13 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
 
     @Override
     public void onBindViewHolder(@NonNull Holder holder, int position) {
+        // 3 列瀑布流：第 1 张纵向占满两行，其余 4 张组成右侧 2x2，正好 5 个位置。
+        ViewGroup.LayoutParams params = holder.itemView.getLayoutParams();
+        int targetHeight = dp(holder.itemView, position == 0 ? 218 : 104);
+        if (params != null && params.height != targetHeight) {
+            params.height = targetHeight;
+            holder.itemView.setLayoutParams(params);
+        }
         boolean occupied = position < photos.size();
         String master = occupied ? photos.get(position) : "";
         String preview = occupied && position < cardPhotos.size() ? cardPhotos.get(position) : master;
@@ -121,17 +128,23 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
             Glide.with(holder.itemView).clear(holder.binding.photoIv);
         }
         holder.itemView.setOnClickListener(v -> {
-            if (occupied) {
-                if (listener != null) listener.onPreviewPhoto(position, master);
+            int current = holder.getBindingAdapterPosition();
+            if (current == RecyclerView.NO_POSITION) return;
+            if (current < photos.size()) {
+                if (listener != null) listener.onPreviewPhoto(current, photos.get(current));
             } else if (listener != null) {
                 listener.onAddPhoto();
             }
         });
         holder.binding.deleteBtn.setOnClickListener(v -> {
-            if (occupied && listener != null) listener.onDeletePhoto(position, master);
+            int current = holder.getBindingAdapterPosition();
+            if (current != RecyclerView.NO_POSITION && current < photos.size() && listener != null) {
+                listener.onDeletePhoto(current, photos.get(current));
+            }
         });
         holder.itemView.setOnLongClickListener(v -> {
-            if (occupied && listener != null) {
+            int current = holder.getBindingAdapterPosition();
+            if (current != RecyclerView.NO_POSITION && current < photos.size() && listener != null) {
                 listener.onStartDrag(holder);
                 return true;
             }
@@ -189,6 +202,10 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
                 viewHolder.itemView.setElevation(0f);
             }
         };
+    }
+
+    private static int dp(View view, int value) {
+        return (int) (value * view.getResources().getDisplayMetrics().density + 0.5f);
     }
 
     static final class Holder extends RecyclerView.ViewHolder {

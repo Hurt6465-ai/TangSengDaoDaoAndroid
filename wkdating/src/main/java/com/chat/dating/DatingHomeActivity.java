@@ -1,8 +1,6 @@
 package com.chat.dating;
 
 import android.content.Intent;
-import android.graphics.Color;
-import android.location.Location;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -11,7 +9,6 @@ import android.view.animation.DecelerateInterpolator;
 import android.view.animation.LinearInterpolator;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -50,6 +47,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private static final int MAX_SWIPE_RETRY = 1;
     private static final int REQ_PROFILE_DETAIL = 401;
     private static final int REQ_MINE = 402;
+    private static final String RECOMMEND_SCOPE = "global";
 
     private final ArrayList<DatingProfile> profiles = new ArrayList<>();
     private final ArrayList<Map<String, Object>> pendingExposures = new ArrayList<>();
@@ -57,11 +55,9 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private final HashSet<String> loadedUids = new HashSet<>();
 
     private String cursor = "";
-    private String scope = "global";
     private String sessionId;
     private boolean loading;
     private boolean noMore;
-    private boolean initialLocationRequested;
     private long exposureStartMs;
     private String exposureUid = "";
     private int visiblePosition;
@@ -77,7 +73,6 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private DatingCardStackAdapter cardAdapter;
     private CardStackLayoutManager cardStackManager;
     private DatingActionController actionController;
-    private DatingLocationHelper locationHelper;
 
     @Override
     protected ActivityWkDatingHomeBinding getViewBinding() {
@@ -102,14 +97,13 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     @Override
     protected void initView() {
         sessionId = UUID.randomUUID().toString();
-        filter = DatingFilter.load(this);
+        // 首页不再显示筛选/附近入口；请求只使用中性参数，实际偏好由交友资料控制。
+        filter = DatingFilter.recommendationDefaults();
         actionController = new DatingActionController(this);
-        locationHelper = new DatingLocationHelper(this);
         pendingExposures.addAll(DatingExposureQueue.load(this));
         DatingUi.applyHomeInsets(wkVBinding.getRoot(), wkVBinding.topBar, wkVBinding.actionBar);
         GlobalBottomNavigationController.attach(this, wkVBinding.bottomNavigation, com.chat.uikit.R.id.i_partner);
         initCardStack();
-        updateScopeTabs();
         showLoading(true, getString(R.string.dating_loading), false);
     }
 
@@ -132,12 +126,6 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         wkVBinding.datingModeTab.setOnClickListener(v -> {
             // 当前已经是交友模式，不重复创建页面。
         });
-        wkVBinding.recommendTab.setOnClickListener(v -> selectScope("global"));
-        wkVBinding.nearbyTab.setOnClickListener(v -> selectScope("nearby"));
-        wkVBinding.filterBtn.setOnClickListener(v -> DatingFilterDialog.show(this, filter, value -> {
-            filter = value;
-            reload();
-        }));
         wkVBinding.mineBtn.setOnClickListener(v -> {
             Intent intent = new Intent(this, DatingMineActivity.class);
             intent.putExtra(DatingMineActivity.EXTRA_PROFILE, myProfile);
@@ -279,41 +267,6 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         }
     }
 
-    private void selectScope(String value) {
-        if (TextUtils.equals(scope, value)) return;
-        if (!"nearby".equals(value)) {
-            scope = value;
-            updateScopeTabs();
-            reload();
-            return;
-        }
-        locationHelper.ensureLocation(new DatingLocationHelper.Callback() {
-            @Override
-            public void onSuccess(Location location) {
-                DatingModel.getInstance().updateLocation(location.getLatitude(), location.getLongitude(),
-                        myProfile == null ? "" : myProfile.city,
-                        myProfile == null ? "" : myProfile.safeCountryCode(), (code, msg, data) -> {
-                    if (code != HttpResponseCode.success) {
-                        showToast(TextUtils.isEmpty(msg) ? getString(R.string.dating_location_failed) : msg);
-                        scope = "global";
-                        updateScopeTabs();
-                        return;
-                    }
-                    scope = "nearby";
-                    updateScopeTabs();
-                    reload();
-                });
-            }
-
-            @Override
-            public void onDenied(String message) {
-                showToast(message);
-                scope = "global";
-                updateScopeTabs();
-            }
-        });
-    }
-
     private void loadMyProfileThenRecommend() {
         fetchMyProfile(false);
     }
@@ -325,7 +278,6 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private void fetchMyProfile(boolean resetRecommendation) {
         DatingModel.getInstance().getMyDatingProfile((code, msg, data) -> {
             if (data != null) myProfile = data;
-            if (myProfile == null && BuildConfig.DEBUG) myProfile = DatingMockData.demoMyProfile();
             actionController.setMyProfile(myProfile);
             if (myProfile == null) {
                 showLoading(true, TextUtils.isEmpty(msg) ? getString(R.string.dating_profile_load_failed) : msg, true);
@@ -341,34 +293,8 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                 return;
             }
             wkVBinding.retryBtn.setText(R.string.dating_retry);
-            requestInitialLocationThenLoad(resetRecommendation);
-        });
-    }
-
-    private void requestInitialLocationThenLoad(boolean resetRecommendation) {
-        if (initialLocationRequested) {
             if (resetRecommendation) reload();
             else loadMore(true);
-            return;
-        }
-        initialLocationRequested = true;
-        locationHelper.ensureLocation(new DatingLocationHelper.Callback() {
-            @Override
-            public void onSuccess(Location location) {
-                DatingModel.getInstance().updateLocation(location.getLatitude(), location.getLongitude(),
-                        myProfile == null ? "" : myProfile.city,
-                        myProfile == null ? "" : myProfile.safeCountryCode(), (code, msg, data) -> {
-                    if (resetRecommendation) reload();
-                    else loadMore(true);
-                });
-            }
-
-            @Override
-            public void onDenied(String message) {
-                if (!TextUtils.isEmpty(message)) showToast(message);
-                if (resetRecommendation) reload();
-                else loadMore(true);
-            }
         });
     }
 
@@ -397,7 +323,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         if (loading) return;
         loading = true;
         if (firstPage) showLoading(true, getString(R.string.dating_loading), false);
-        DatingModel.getInstance().recommend(cursor, PAGE_LIMIT, scope, sessionId, filter, (code, msg, data) -> {
+        DatingModel.getInstance().recommend(cursor, PAGE_LIMIT, RECOMMEND_SCOPE, sessionId, filter, (code, msg, data) -> {
             if (isFinishing() || isDestroyed()) return;
             loading = false;
             if (code == HttpResponseCode.success && data != null && data.getItems() != null && !data.getItems().isEmpty()) {
@@ -406,10 +332,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                 appendProfiles(data.getItems(), firstPage, false);
                 return;
             }
-            if (firstPage && BuildConfig.DEBUG) {
-                appendProfiles(DatingMockData.demoProfiles(), true, true);
-                noMore = true;
-            } else if (firstPage) {
+            if (firstPage) {
                 showLoading(true, TextUtils.isEmpty(msg) ? getString(R.string.dating_empty) : msg, true);
             } else {
                 noMore = true;
@@ -446,7 +369,6 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             if (profile == null || TextUtils.isEmpty(profile.safeUid()) || profile.safePhotos().isEmpty()) continue;
             if (loadedUids.contains(profile.safeUid())) continue;
             if (profile.last_active_at > 0 && profile.last_active_at < thirtyDaysAgo) continue;
-            if (!filter.accepts(myProfile, profile)) continue;
             clean.add(profile);
         }
         return clean;
@@ -578,6 +500,22 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                 .build();
         cardStackManager.setRewindAnimationSetting(setting);
         wkVBinding.deckView.rewind();
+        // CardStackView 在极少数边界状态（只剩一张卡、布局尚未完成）可能不回调
+        // onCardRewound。兜底恢复顶部位置并解除锁，避免第二张卡永久不能操作。
+        wkVBinding.deckView.postDelayed(() -> {
+            if (!interactionLocked || pendingRewindRecord != record || cardStackManager == null) return;
+            pendingRewindRecord = null;
+            pendingRewindRefundAction = false;
+            pendingRewindRemoveFavorite = false;
+            if (refundAction) actionController.refund(record.action);
+            int restoredPosition = Math.max(0, Math.min(record.position, Math.max(0, cardAdapter.getItemCount() - 1)));
+            cardStackManager.setTopPosition(restoredPosition);
+            wkVBinding.deckView.scrollToPosition(restoredPosition);
+            visiblePosition = restoredPosition;
+            setInteractionLocked(false);
+            DatingProfile restored = cardAdapter.getProfile(restoredPosition);
+            if (restored != null) startExposure(restored);
+        }, 800L);
     }
 
     private void applyServerUndoFallback(DatingUndoResult result) {
@@ -707,19 +645,6 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         else if (direction == Direction.Top) wkVBinding.swipeFxView.playFavorite();
     }
 
-    private void updateScopeTabs() {
-        styleScopeTab(wkVBinding.recommendTab, "global".equals(scope));
-        styleScopeTab(wkVBinding.nearbyTab, "nearby".equals(scope));
-    }
-
-    private void styleScopeTab(TextView tab, boolean selected) {
-        tab.animate().cancel();
-        tab.setTextSize(selected ? 22 : 17);
-        tab.setTextColor(selected ? Color.WHITE : 0x88FFFFFF);
-        tab.setAlpha(selected ? 1f : 0.82f);
-        tab.setScaleX(selected ? 1f : 0.96f);
-        tab.setScaleY(selected ? 1f : 0.96f);
-    }
 
     private void showLoading(boolean show, String text, boolean retry) {
         wkVBinding.loadingLayout.setVisibility(show ? View.VISIBLE : View.GONE);
@@ -742,12 +667,6 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
 
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (locationHelper != null) locationHelper.handlePermissionResult(requestCode, grantResults);
-    }
-
-    @Override
     protected void onPause() {
         finishExposure(true);
         flushExposures();
@@ -760,7 +679,6 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         flushExposures();
         persistExposureQueue();
         if (actionController != null) actionController.release();
-        if (locationHelper != null) locationHelper.release();
         super.onDestroy();
     }
 

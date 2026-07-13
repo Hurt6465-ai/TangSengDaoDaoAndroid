@@ -21,8 +21,20 @@ public class DatingFilter {
     public String countryMode = COUNTRY_SMART;
     public String gender = "all";
     public int ageMin = 18;
-    public int ageMax = 35;
-    public String goal = "love";
+    public int ageMax = 99;
+    public String goal = "";
+
+
+    /** 交友首页默认就是推荐，不附加旧版筛选面板保存的额外条件。 */
+    public static DatingFilter recommendationDefaults() {
+        DatingFilter f = new DatingFilter();
+        f.countryMode = COUNTRY_SMART;
+        f.gender = "all";
+        f.ageMin = 18;
+        f.ageMax = 99;
+        f.goal = "";
+        return f;
+    }
 
     public static DatingFilter load(Context context) {
         DatingFilter f = new DatingFilter();

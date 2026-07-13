@@ -14,7 +14,7 @@ import android.view.View;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
-import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.StaggeredGridLayoutManager;
 import androidx.recyclerview.widget.ItemTouchHelper;
 
 import com.chat.base.net.HttpResponseCode;
@@ -82,7 +82,7 @@ public class DatingEditProfileActivity extends Activity {
 
     private void initPhotoGrid() {
         photoAdapter = new DatingPhotoGridAdapter();
-        binding.photoRecycler.setLayoutManager(new GridLayoutManager(this, 3));
+        binding.photoRecycler.setLayoutManager(new StaggeredGridLayoutManager(3, StaggeredGridLayoutManager.VERTICAL));
         binding.photoRecycler.setAdapter(photoAdapter);
         binding.photoRecycler.setNestedScrollingEnabled(false);
         touchHelper = new ItemTouchHelper(DatingPhotoGridAdapter.touchCallback(photoAdapter));
