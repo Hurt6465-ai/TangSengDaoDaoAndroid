@@ -15,6 +15,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.core.view.WindowCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -54,6 +55,7 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     private boolean refreshAfterProfileEdit;
     private long serverTimeBase;
     private long elapsedTimeBase;
+    private boolean lastErrorProfileRequired;
 
     private final Runnable onlineRunnable = new Runnable() {
         @Override public void run() {
@@ -96,6 +98,8 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         Window window = getWindow();
+        // 与聊天首页一致，由系统只避让一次状态栏/刘海；不要再把安全区累加到 56dp 标签栏。
+        WindowCompat.setDecorFitsSystemWindows(window, true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             window.setStatusBarColor(getResources().getColor(com.chat.uikit.R.color.tab_bg));
         }
@@ -131,7 +135,14 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             if (adapter != null && adapter.getItemCount() > 0) wkVBinding.recyclerView.smoothScrollToPosition(0);
         });
         wkVBinding.datingModeTab.setOnClickListener(v -> openDatingHome());
-        wkVBinding.retryBtn.setOnClickListener(v -> requestRecommendations(true));
+        wkVBinding.retryBtn.setOnClickListener(v -> {
+            if (lastErrorProfileRequired) {
+                refreshAfterProfileEdit = true;
+                PartnerListHostBridge.openProfileEdit(this, REQ_PROFILE_EDIT);
+            } else {
+                requestRecommendations(true);
+            }
+        });
         wkVBinding.completeProfileBtn.setOnClickListener(v -> {
             refreshAfterProfileEdit = true;
             PartnerListHostBridge.openProfileEdit(this, REQ_PROFILE_EDIT);
@@ -200,8 +211,10 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                 requesting = false;
                 if (isFinishing() || isDestroyed()) return;
                 wkVBinding.retryBtn.setEnabled(true);
+                lastErrorProfileRequired = false;
+                wkVBinding.retryBtn.setText(R.string.partnerlist_retry);
                 if (result == null) {
-                    showError(getString(R.string.partnerlist_load_failed));
+                    showError(getString(R.string.partnerlist_load_failed), false);
                     return;
                 }
                 PartnerListCache.saveAsync(PartnerListActivity.this, result);
@@ -217,7 +230,8 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                 if (isFinishing() || isDestroyed()) return;
                 wkVBinding.retryBtn.setEnabled(true);
                 if (currentResponse == null && !hasRenderedData) {
-                    showError(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg);
+                    boolean profileRequired = isProfileRequiredError(code, msg);
+                    showError(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg, profileRequired);
                 } else if (explicitRetry) {
                     toast(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg);
                 }
@@ -309,12 +323,23 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         }
     }
 
-    private void showError(String message) {
+    private void showError(String message, boolean profileRequired) {
+        lastErrorProfileRequired = profileRequired;
         showSkeleton(false);
         wkVBinding.recyclerView.setVisibility(View.GONE);
         wkVBinding.emptyLayout.setVisibility(View.GONE);
         wkVBinding.errorLayout.setVisibility(View.VISIBLE);
         wkVBinding.errorTv.setText(message);
+        wkVBinding.retryBtn.setText(profileRequired ? R.string.partnerlist_complete_profile : R.string.partnerlist_retry);
+    }
+
+    private boolean isProfileRequiredError(int code, String msg) {
+        if (code == 412 || code == 428) return true;
+        if (TextUtils.isEmpty(msg)) return false;
+        String text = msg.toLowerCase();
+        return text.contains("profile") || text.contains("language")
+                || text.contains("资料") || text.contains("完善") || text.contains("语言")
+                || text.contains("ဘာသာ") || text.contains("ကိုယ်ရေး");
     }
 
     private void showUpdateBanner(String text) {
