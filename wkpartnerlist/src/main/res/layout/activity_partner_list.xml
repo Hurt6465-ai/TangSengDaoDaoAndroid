@@ -17,7 +17,6 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:background="@drawable/bg_partnerlist_toolbar"
-            android:elevation="3dp"
             android:paddingStart="12dp"
             android:paddingTop="0dp"
             android:paddingEnd="14dp">
@@ -41,39 +40,33 @@
                 android:gravity="center"
                 android:orientation="horizontal">
 
-                <FrameLayout
-                    android:layout_width="72dp"
-                    android:layout_height="52dp">
-
-                    <TextView
-                        android:id="@+id/partnerModeTab"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:gravity="center"
-                        android:includeFontPadding="false"
-                        android:text="@string/partnerlist_mode_partner"
-                        android:textColor="@color/partnerlist_mode_selected"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <View
-                        android:layout_width="24dp"
-                        android:layout_height="3dp"
-                        android:layout_gravity="bottom|center_horizontal"
-                        android:background="#7D8CFF" />
-                </FrameLayout>
+                <TextView
+                    android:id="@+id/partnerModeTab"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:minWidth="62dp"
+                    android:paddingStart="3dp"
+                    android:paddingEnd="3dp"
+                    android:text="@string/partnerlist_mode_partner"
+                    android:textColor="@color/partnerlist_mode_selected"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/datingModeTab"
-                    android:layout_width="72dp"
-                    android:layout_height="48dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:minWidth="62dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:gravity="center"
                     android:includeFontPadding="false"
                     android:text="@string/partnerlist_mode_dating"
                     android:textColor="@color/partnerlist_mode_normal"
-                    android:textSize="14sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
