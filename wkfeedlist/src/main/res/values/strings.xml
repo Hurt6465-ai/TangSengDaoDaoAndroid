@@ -1,0 +1,71 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="feedlist_title">发现</string>
+    <string name="feedlist_latest">最新</string>
+    <string name="feedlist_following">关注</string>
+    <string name="feedlist_publish">发布</string>
+    <string name="feedlist_empty_latest">还没有动态，发布第一条日常吧</string>
+    <string name="feedlist_empty_following">关注的人还没有发布动态</string>
+    <string name="feedlist_loading">正在加载动态…</string>
+    <string name="feedlist_retry">加载失败，点击重试</string>
+    <string name="feedlist_end">没有更多了</string>
+    <string name="feedlist_like">点赞</string>
+    <string name="feedlist_comment">评论</string>
+    <string name="feedlist_share">分享</string>
+    <string name="feedlist_more">更多操作</string>
+    <string name="feedlist_image">动态图片</string>
+    <string name="feedlist_play">播放视频</string>
+    <string name="feedlist_report">举报</string>
+    <string name="feedlist_block">拉黑</string>
+    <string name="feedlist_delete">删除动态</string>
+    <string name="feedlist_reported">已举报</string>
+    <string name="feedlist_blocked">已拉黑</string>
+    <string name="feedlist_deleted">已删除</string>
+    <string name="feedlist_action_failed">操作失败</string>
+    <string name="feedlist_block_confirm">拉黑后将不再看到对方的动态和评论，确定拉黑？</string>
+    <string name="feedlist_block_now">拉黑</string>
+    <string name="feedlist_not_now">暂不</string>
+    <string name="feedlist_delete_confirm">确定删除这条动态？</string>
+    <string name="feedlist_expand">展开</string>
+    <string name="feedlist_tiktok">TikTok</string>
+    <string name="feedlist_tiktok_failed">视频暂时无法播放</string>
+    <string name="feedlist_open_tiktok">在 TikTok 中打开</string>
+    <string name="feedlist_report_reason_title">举报原因</string>
+    <string name="feedlist_just_now">刚刚</string>
+    <string name="feedlist_minutes_ago">%1$d分钟前</string>
+    <string name="feedlist_hours_ago">%1$d小时前</string>
+    <string name="feedlist_days_ago">%1$d天前</string>
+    <string-array name="feedlist_report_reasons">
+        <item>色情或不适内容</item>
+        <item>骚扰辱骂</item>
+        <item>垃圾广告</item>
+        <item>诈骗</item>
+        <item>侵犯隐私</item>
+        <item>其他</item>
+    </string-array>
+    <string name="feedlist_publish_title">发布动态</string>
+    <string name="feedlist_publish_text_hint">说点什么…</string>
+    <string name="feedlist_publish_storage_hint">最多 6 张图片，手机端压缩为不超过 200KB 的 WebP；也可以发布 TikTok 链接。</string>
+    <string name="feedlist_pick_images">选择图片</string>
+    <string name="feedlist_pick_tiktok">TikTok</string>
+    <string name="feedlist_publish_submit">发布</string>
+    <string name="feedlist_publish_max_images">最多选择 %1$d 张图片</string>
+    <string name="feedlist_publish_wait_upload">正在上传，请稍等</string>
+    <string name="feedlist_publish_compressing_image">正在压缩图片</string>
+    <string name="feedlist_publish_uploading">正在上传</string>
+    <string name="feedlist_publish_saving">正在发布</string>
+    <string name="feedlist_publish_success">发布成功</string>
+    <string name="feedlist_publish_failed">发布失败</string>
+    <string name="feedlist_publish_file_missing">文件不存在</string>
+    <string name="feedlist_publish_source_too_large">原图不能超过 %1$dMB</string>
+    <string name="feedlist_publish_upload_url_failed">获取上传地址失败</string>
+    <string name="feedlist_publish_upload_failed">上传失败</string>
+    <string name="feedlist_publish_upload_timeout">上传超时</string>
+    <string name="feedlist_publish_select_media">请选择图片或 TikTok 视频</string>
+    <string name="feedlist_tiktok_publish_url_hint">粘贴 TikTok 视频链接</string>
+    <string name="feedlist_tiktok_publish_preview">读取封面</string>
+    <string name="feedlist_tiktok_publish_resolving">正在读取…</string>
+    <string name="feedlist_tiktok_publish_url_required">请输入 TikTok 链接</string>
+    <string name="feedlist_tiktok_publish_resolve_failed">TikTok 视频信息读取失败</string>
+    <string name="feedlist_tiktok_publish_preview_first">请先读取 TikTok 封面</string>
+</resources>
