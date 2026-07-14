@@ -34,6 +34,7 @@ include ':wkpartner'
 include ':wkpartnerbrowse'
 include ':wkpartnerlist'
 include ':wkfeed'
+include ':wkfeedlist'
 include ':wkrtc'
 
 include ':wkuserscript'
