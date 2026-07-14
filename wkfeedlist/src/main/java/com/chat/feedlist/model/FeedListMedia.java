@@ -50,8 +50,9 @@ public class FeedListMedia implements Serializable {
     }
 
     public String thumbUrl() {
-        String raw = !TextUtils.isEmpty(thumb_url) ? thumb_url : display_url;
-        if (TextUtils.isEmpty(raw)) raw = cover_url;
+        String raw = !TextUtils.isEmpty(thumb_url) ? thumb_url
+                : (!TextUtils.isEmpty(display_url) ? display_url
+                : (!TextUtils.isEmpty(origin_url) ? origin_url : cover_url));
         return showUrl(raw);
     }
 
