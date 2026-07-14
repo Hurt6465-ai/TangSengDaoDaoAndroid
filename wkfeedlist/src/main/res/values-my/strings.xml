@@ -1,0 +1,71 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="feedlist_title">ရှာဖွေ</string>
+    <string name="feedlist_latest">နောက်ဆုံး</string>
+    <string name="feedlist_following">စောင့်ကြည့်ထားသူများ</string>
+    <string name="feedlist_publish">တင်မည်</string>
+    <string name="feedlist_empty_latest">ပို့စ်မရှိသေးပါ။ ပထမဆုံးနေ့စဉ်ပို့စ်ကို တင်လိုက်ပါ</string>
+    <string name="feedlist_empty_following">သင်စောင့်ကြည့်ထားသူများက ပို့စ်မတင်ရသေးပါ</string>
+    <string name="feedlist_loading">ပို့စ်များကို ဖွင့်နေသည်…</string>
+    <string name="feedlist_retry">ဖွင့်မရပါ၊ ပြန်ကြိုးစားရန် နှိပ်ပါ</string>
+    <string name="feedlist_end">ပို့စ်အားလုံးကို ကြည့်ပြီးပါပြီ</string>
+    <string name="feedlist_like">သဘောကျ</string>
+    <string name="feedlist_comment">မှတ်ချက်</string>
+    <string name="feedlist_share">မျှဝေ</string>
+    <string name="feedlist_more">နောက်ထပ်လုပ်ဆောင်ချက်များ</string>
+    <string name="feedlist_image">ပို့စ်ပုံ</string>
+    <string name="feedlist_play">ဗီဒီယိုဖွင့်မည်</string>
+    <string name="feedlist_report">တိုင်ကြားရန်</string>
+    <string name="feedlist_block">ပိတ်ဆို့ရန်</string>
+    <string name="feedlist_delete">ပို့စ်ဖျက်ရန်</string>
+    <string name="feedlist_reported">တိုင်ကြားပြီးပါပြီ</string>
+    <string name="feedlist_blocked">ပိတ်ဆို့ပြီးပါပြီ</string>
+    <string name="feedlist_deleted">ပို့စ်ဖျက်ပြီးပါပြီ</string>
+    <string name="feedlist_action_failed">လုပ်ဆောင်မှု မအောင်မြင်ပါ</string>
+    <string name="feedlist_block_confirm">ပိတ်ဆို့ပြီးနောက် ဤသူ၏ပို့စ်နှင့် မှတ်ချက်များကို မမြင်ရတော့ပါ။ ပိတ်ဆို့မည်လား။</string>
+    <string name="feedlist_block_now">ပိတ်ဆို့မည်</string>
+    <string name="feedlist_not_now">ယခုမလုပ်သေးပါ</string>
+    <string name="feedlist_delete_confirm">ဤပို့စ်ကို ဖျက်မည်လား။</string>
+    <string name="feedlist_expand">နောက်ထပ်</string>
+    <string name="feedlist_tiktok">TikTok</string>
+    <string name="feedlist_tiktok_failed">ဤဗီဒီယိုကို ယခုဖွင့်မရပါ</string>
+    <string name="feedlist_open_tiktok">TikTok တွင်ဖွင့်မည်</string>
+    <string name="feedlist_report_reason_title">တိုင်ကြားရသည့်အကြောင်းရင်း</string>
+    <string name="feedlist_just_now">ယခုလေးတင်</string>
+    <string name="feedlist_minutes_ago">%1$d မိနစ်အကြာ</string>
+    <string name="feedlist_hours_ago">%1$d နာရီအကြာ</string>
+    <string name="feedlist_days_ago">%1$d ရက်အကြာ</string>
+    <string-array name="feedlist_report_reasons">
+        <item>မသင့်လျော်သော သို့မဟုတ် အနှောင့်အယှက်ဖြစ်စေသော အကြောင်းအရာ</item>
+        <item>နှောင့်ယှက်ခြင်း သို့မဟုတ် ဆဲဆိုခြင်း</item>
+        <item>စပမ်း သို့မဟုတ် ကြော်ငြာ</item>
+        <item>လိမ်လည်မှု</item>
+        <item>ကိုယ်ရေးကိုယ်တာ ချိုးဖောက်မှု</item>
+        <item>အခြား</item>
+    </string-array>
+    <string name="feedlist_publish_title">ပို့စ်တင်ရန်</string>
+    <string name="feedlist_publish_text_hint">တစ်ခုခုပြောပါ…</string>
+    <string name="feedlist_publish_storage_hint">ပုံ ၆ ပုံအထိ ရွေးနိုင်သည်။ ဖုန်းတွင် 200KB မကျော်သော WebP အဖြစ် ချုံ့မည်။ TikTok လင့်ခ်လည်း တင်နိုင်သည်။</string>
+    <string name="feedlist_pick_images">ပုံရွေးရန်</string>
+    <string name="feedlist_pick_tiktok">TikTok</string>
+    <string name="feedlist_publish_submit">တင်မည်</string>
+    <string name="feedlist_publish_max_images">အများဆုံး %1$d ပုံ ရွေးနိုင်သည်</string>
+    <string name="feedlist_publish_wait_upload">တင်နေပါသည်၊ ခဏစောင့်ပါ</string>
+    <string name="feedlist_publish_compressing_image">ပုံကို ချုံ့နေသည်</string>
+    <string name="feedlist_publish_uploading">တင်နေသည်</string>
+    <string name="feedlist_publish_saving">ပို့စ်တင်နေသည်</string>
+    <string name="feedlist_publish_success">တင်ပြီးပါပြီ</string>
+    <string name="feedlist_publish_failed">တင်ခြင်း မအောင်မြင်ပါ</string>
+    <string name="feedlist_publish_file_missing">ဖိုင်မရှိပါ</string>
+    <string name="feedlist_publish_source_too_large">မူရင်းပုံသည် %1$dMB မကျော်ရ</string>
+    <string name="feedlist_publish_upload_url_failed">တင်ရန်လိပ်စာ မရနိုင်ပါ</string>
+    <string name="feedlist_publish_upload_failed">တင်ခြင်း မအောင်မြင်ပါ</string>
+    <string name="feedlist_publish_upload_timeout">တင်ချိန်ကုန်သွားပါပြီ</string>
+    <string name="feedlist_publish_select_media">ပုံ သို့မဟုတ် TikTok ဗီဒီယို ရွေးပါ</string>
+    <string name="feedlist_tiktok_publish_url_hint">TikTok ဗီဒီယိုလင့်ခ် ထည့်ပါ</string>
+    <string name="feedlist_tiktok_publish_preview">အကြိုကြည့်ရန်</string>
+    <string name="feedlist_tiktok_publish_resolving">ဖွင့်နေသည်…</string>
+    <string name="feedlist_tiktok_publish_url_required">TikTok လင့်ခ် ထည့်ပါ</string>
+    <string name="feedlist_tiktok_publish_resolve_failed">TikTok ဗီဒီယိုအချက်အလက် မရနိုင်ပါ</string>
+    <string name="feedlist_tiktok_publish_preview_first">TikTok အကြိုကြည့်ခြင်းကို အရင်ဖွင့်ပါ</string>
+</resources>
