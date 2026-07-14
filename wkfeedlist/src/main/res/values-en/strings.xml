@@ -1,0 +1,71 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="feedlist_title">Discover</string>
+    <string name="feedlist_latest">Latest</string>
+    <string name="feedlist_following">Following</string>
+    <string name="feedlist_publish">Post</string>
+    <string name="feedlist_empty_latest">No posts yet. Share the first update.</string>
+    <string name="feedlist_empty_following">People you follow have not posted yet.</string>
+    <string name="feedlist_loading">Loading posts…</string>
+    <string name="feedlist_retry">Couldn’t load. Tap to retry.</string>
+    <string name="feedlist_end">You’re all caught up</string>
+    <string name="feedlist_like">Like</string>
+    <string name="feedlist_comment">Comment</string>
+    <string name="feedlist_share">Share</string>
+    <string name="feedlist_more">More actions</string>
+    <string name="feedlist_image">Post image</string>
+    <string name="feedlist_play">Play video</string>
+    <string name="feedlist_report">Report</string>
+    <string name="feedlist_block">Block</string>
+    <string name="feedlist_delete">Delete post</string>
+    <string name="feedlist_reported">Reported</string>
+    <string name="feedlist_blocked">Blocked</string>
+    <string name="feedlist_deleted">Post deleted</string>
+    <string name="feedlist_action_failed">Action failed</string>
+    <string name="feedlist_block_confirm">After blocking, you will no longer see this person’s posts or comments. Block them?</string>
+    <string name="feedlist_block_now">Block</string>
+    <string name="feedlist_not_now">Not now</string>
+    <string name="feedlist_delete_confirm">Delete this post?</string>
+    <string name="feedlist_expand">More</string>
+    <string name="feedlist_tiktok">TikTok</string>
+    <string name="feedlist_tiktok_failed">This video can’t be played right now.</string>
+    <string name="feedlist_open_tiktok">Open in TikTok</string>
+    <string name="feedlist_report_reason_title">Reason for reporting</string>
+    <string name="feedlist_just_now">Just now</string>
+    <string name="feedlist_minutes_ago">%1$d min ago</string>
+    <string name="feedlist_hours_ago">%1$d hr ago</string>
+    <string name="feedlist_days_ago">%1$d days ago</string>
+    <string-array name="feedlist_report_reasons">
+        <item>Sexual or disturbing content</item>
+        <item>Harassment or abuse</item>
+        <item>Spam or advertising</item>
+        <item>Scam or fraud</item>
+        <item>Privacy violation</item>
+        <item>Other</item>
+    </string-array>
+    <string name="feedlist_publish_title">New Post</string>
+    <string name="feedlist_publish_text_hint">Say something…</string>
+    <string name="feedlist_publish_storage_hint">Up to 6 images. Images are compressed on your phone to WebP under 200 KB. You can also post a TikTok link.</string>
+    <string name="feedlist_pick_images">Select images</string>
+    <string name="feedlist_pick_tiktok">TikTok</string>
+    <string name="feedlist_publish_submit">Post</string>
+    <string name="feedlist_publish_max_images">You can select up to %1$d images</string>
+    <string name="feedlist_publish_wait_upload">Uploading, please wait</string>
+    <string name="feedlist_publish_compressing_image">Compressing image…</string>
+    <string name="feedlist_publish_uploading">Uploading…</string>
+    <string name="feedlist_publish_saving">Posting…</string>
+    <string name="feedlist_publish_success">Published successfully</string>
+    <string name="feedlist_publish_failed">Publish failed</string>
+    <string name="feedlist_publish_file_missing">File not found</string>
+    <string name="feedlist_publish_source_too_large">The original image must be under %1$d MB</string>
+    <string name="feedlist_publish_upload_url_failed">Failed to get upload URL</string>
+    <string name="feedlist_publish_upload_failed">Upload failed</string>
+    <string name="feedlist_publish_upload_timeout">Upload timed out</string>
+    <string name="feedlist_publish_select_media">Select images or a TikTok video</string>
+    <string name="feedlist_tiktok_publish_url_hint">Paste a TikTok video link</string>
+    <string name="feedlist_tiktok_publish_preview">Load preview</string>
+    <string name="feedlist_tiktok_publish_resolving">Loading…</string>
+    <string name="feedlist_tiktok_publish_url_required">Enter a TikTok link</string>
+    <string name="feedlist_tiktok_publish_resolve_failed">Could not load the TikTok video information</string>
+    <string name="feedlist_tiktok_publish_preview_first">Load the TikTok preview first</string>
+</resources>
