@@ -301,17 +301,35 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     private void setupKeyboardAvoidance() {
         if (rootView == null || inputBar == null) return;
         keyboardListener = () -> {
-            if (rootView == null || inputBar == null) return;
-            Rect rect = new Rect();
-            rootView.getWindowVisibleDisplayFrame(rect);
-            int rootHeight = rootView.getRootView() == null ? rootView.getHeight() : rootView.getRootView().getHeight();
-            int keyboardHeight = Math.max(0, rootHeight - rect.bottom);
+            if (rootView == null || inputBar == null || !inputBar.isLaidOut()) return;
+            Rect visibleFrame = new Rect();
+            rootView.getWindowVisibleDisplayFrame(visibleFrame);
+            View root = rootView.getRootView();
+            int rootHeight = root == null ? rootView.getHeight() : root.getHeight();
+            int keyboardHeight = Math.max(0, rootHeight - visibleFrame.bottom);
             boolean keyboardVisible = keyboardHeight > dp(140);
-            int offset = keyboardVisible ? keyboardHeight : 0;
-            inputBar.setTranslationY(-offset);
-            if (recordHintTv != null) recordHintTv.setTranslationY(-offset);
+
+            float translation = 0f;
+            if (keyboardVisible) {
+                int[] location = new int[2];
+                inputBar.getLocationOnScreen(location);
+                // getLocationOnScreen includes the current translation. Remove it first,
+                // then move the bar only by the exact overlap with the IME. This avoids
+                // double-moving on devices where ADJUST_RESIZE has already done the work.
+                int baseBottom = location[1] + inputBar.getHeight() - Math.round(inputBar.getTranslationY());
+                int overlap = Math.max(0, baseBottom - visibleFrame.bottom);
+                translation = -overlap;
+            }
+
+            if (Math.abs(inputBar.getTranslationY() - translation) > 0.5f) {
+                inputBar.setTranslationY(translation);
+            }
+            if (recordHintTv != null && Math.abs(recordHintTv.getTranslationY() - translation) > 0.5f) {
+                recordHintTv.setTranslationY(translation);
+            }
             if (commentRecyclerView != null) {
-                int bottom = recyclerBasePaddingBottom + (keyboardVisible ? keyboardHeight + dp(58) : 0);
+                int overlap = Math.max(0, Math.round(-translation));
+                int bottom = recyclerBasePaddingBottom + overlap;
                 if (commentRecyclerView.getPaddingBottom() != bottom) {
                     commentRecyclerView.setPadding(
                             commentRecyclerView.getPaddingLeft(),
