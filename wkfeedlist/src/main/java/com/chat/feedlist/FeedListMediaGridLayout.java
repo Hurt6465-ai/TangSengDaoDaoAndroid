@@ -73,7 +73,9 @@ public class FeedListMediaGridLayout extends ViewGroup {
         mediaSignature = nextSignature;
         setVisibility(media.isEmpty() ? GONE : VISIBLE);
         for (int i = 0; i < MAX; i++) views[i].setVisibility(i < media.size() ? VISIBLE : GONE);
-        pendingLoad = changed && !media.isEmpty();
+        // RecyclerView may bind the same holder again before the queued Glide task runs.
+        // Always keep a non-empty grid pending so the second bind cannot cancel first paint.
+        pendingLoad = !media.isEmpty();
         requestLayout();
         if (isLaidOut()) postOnAnimation(this::loadImagesIfReady);
     }
@@ -111,6 +113,12 @@ public class FeedListMediaGridLayout extends ViewGroup {
                     .into(image);
         }
         if (pendingLoad) postOnAnimation(this::loadImagesIfReady);
+    }
+
+    public void reloadImages() {
+        if (media.isEmpty()) return;
+        pendingLoad = true;
+        postOnAnimation(this::loadImagesIfReady);
     }
 
     public void clearImages() {
