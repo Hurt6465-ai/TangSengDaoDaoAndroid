@@ -72,10 +72,11 @@ public class PartnerBrowseBean {
     }
 
     public String getAvatarPathSafe() {
-        if (!TextUtils.isEmpty(avatar)) return avatar;
+        // 语伴图片已改为账号头像：优先使用 uid 的稳定头像接口，
+        // 不再让历史 profile_images 或旧服务器绝对地址覆盖它。
         if (!TextUtils.isEmpty(uid)) return "users/" + uid + "/avatar";
         if (!TextUtils.isEmpty(id)) return "users/" + id + "/avatar";
-        return "";
+        return avatar == null ? "" : avatar.trim();
     }
 
     public boolean hasPartnerPhoto() {
