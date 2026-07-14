@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="feedlist_page_bg">#F5F6F8</color>
+    <color name="feedlist_surface">#FFFFFF</color>
+    <color name="feedlist_bg">#FFFFFF</color>
+    <color name="feedlist_text">#17191D</color>
+    <color name="feedlist_secondary">#707681</color>
+    <color name="feedlist_muted">#9CA2AC</color>
+    <color name="feedlist_action">#626975</color>
+    <color name="feedlist_accent">#2F6FED</color>
+    <color name="feedlist_link">#4C6388</color>
+    <color name="feedlist_like">#E94A68</color>
+    <color name="feedlist_danger">#E23D4F</color>
+    <color name="feedlist_divider">#E9ECF1</color>
+    <color name="feedlist_divider_soft">#EFF1F4</color>
+    <color name="feedlist_media_placeholder">#EDF0F4</color>
+    <color name="feedlist_language_bg">#EEF4FF</color>
+    <color name="feedlist_language_text">#4B6592</color>
+    <color name="feedlist_ripple">#1A2F6FED</color>
+    <color name="feedlist_pressed">#F1F3F6</color>
+    <color name="feedlist_on_accent">#FFFFFF</color>
+    <color name="feedlist_media_scrim">#99000000</color>
+</resources>
