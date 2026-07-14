@@ -28,6 +28,7 @@ import com.chat.base.utils.ActManagerUtils
 import com.chat.base.utils.WKPlaySound
 import com.chat.base.utils.WKTimeUtils
 import com.chat.base.utils.language.WKMultiLanguageUtil
+import com.chat.feedlist.WKFeedListApplication
 import com.chat.login.WKLoginApplication
 import com.chat.partner.profile.WKPartnerApplication
 import com.chat.partnerlist.PartnerListForegroundHeartbeat
@@ -130,6 +131,7 @@ class TSApplication : MultiDexApplication() {
         WKRoomApplication.getInstance().init(this)
         WKPartnerApplication.getInstance().init(this)
         WKPartnerListApplication.getInstance().init(this)
+        WKFeedListApplication.getInstance().init(this)
         initDatingModuleSafely()
         addAppFrontBack()
         addListener()
