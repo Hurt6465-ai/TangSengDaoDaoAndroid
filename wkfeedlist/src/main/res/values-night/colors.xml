@@ -1,0 +1,22 @@
+<resources>
+    <color name="feedlist_page_bg">#111317</color>
+    <color name="feedlist_surface">#181B20</color>
+    <color name="feedlist_bg">#181B20</color>
+    <color name="feedlist_text">#F3F5F7</color>
+    <color name="feedlist_secondary">#A6ACB6</color>
+    <color name="feedlist_muted">#7E858F</color>
+    <color name="feedlist_action">#B4BAC4</color>
+    <color name="feedlist_accent">#6F9BFF</color>
+    <color name="feedlist_link">#9FB7E5</color>
+    <color name="feedlist_like">#FF6C88</color>
+    <color name="feedlist_danger">#FF6A78</color>
+    <color name="feedlist_divider">#292D34</color>
+    <color name="feedlist_divider_soft">#242830</color>
+    <color name="feedlist_media_placeholder">#272B32</color>
+    <color name="feedlist_language_bg">#222D43</color>
+    <color name="feedlist_language_text">#B9CCF2</color>
+    <color name="feedlist_ripple">#336F9BFF</color>
+    <color name="feedlist_pressed">#22262D</color>
+    <color name="feedlist_on_accent">#FFFFFF</color>
+    <color name="feedlist_media_scrim">#99000000</color>
+</resources>
