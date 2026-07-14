@@ -221,7 +221,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         fragments.add(new LearningFragment());
         fragments.add(PlaceholderTabFragment.newInstance("语伴", "语伴模块加载失败，请重新安装或检查 wkpartnerlist 模块"));
         fragments.add(new ChatFragment());
-        fragments.add(PlaceholderTabFragment.newInstance("发现", "发现模块加载失败，请重新安装或检查 wkfeed 模块"));
+        fragments.add(PlaceholderTabFragment.newInstance("发现", "发现列表模块加载失败，请重新安装或检查 wkfeedlist 模块"));
         fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_HOME_URL)));
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
         // 底部一级导航只允许点击切换。聊天、交友和发现内部都有自己的手势，避免横滑冲突。
@@ -303,12 +303,12 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         } catch (Throwable ignored) {
         }
         try {
-            Class<?> clazz = Class.forName("com.chat.feed.browse.FeedBrowseActivity");
+            Class<?> clazz = Class.forName("com.chat.feedlist.FeedTimelineActivity");
             android.content.Intent intent = new android.content.Intent(this, clazz);
             intent.putExtra("mode", "discover");
             startActivity(intent);
         } catch (Throwable ignored) {
-            showToast("发现模块加载失败，请检查 wkfeed 模块");
+            showToast("发现列表模块加载失败，请检查 wkfeedlist 模块");
             switchToTab(TAB_DISCOVER);
         }
     }
