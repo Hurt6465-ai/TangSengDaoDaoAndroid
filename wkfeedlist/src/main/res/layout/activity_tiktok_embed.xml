@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="#000000" android:orientation="vertical">
+    <FrameLayout android:layout_width="match_parent" android:layout_height="56dp" android:paddingTop="10dp">
+        <TextView android:id="@+id/backBtn" android:layout_width="56dp" android:layout_height="match_parent" android:gravity="center" android:text="‹" android:textColor="#FFFFFF" android:textSize="36sp" />
+        <TextView android:layout_width="wrap_content" android:layout_height="match_parent" android:layout_gravity="center" android:gravity="center" android:text="TikTok" android:textColor="#FFFFFF" android:textSize="17sp" android:textStyle="bold" />
+    </FrameLayout>
+    <FrameLayout android:id="@+id/contentBox" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <android.webkit.WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" />
+        <LinearLayout android:id="@+id/errorPanel" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:padding="28dp" android:visibility="gone">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/feedlist_tiktok_failed" android:textColor="#FFFFFF" android:textSize="15sp" />
+            <TextView android:id="@+id/openExternalBtn" android:layout_width="wrap_content" android:layout_height="46dp" android:layout_marginTop="16dp" android:gravity="center" android:paddingStart="18dp" android:paddingEnd="18dp" android:text="@string/feedlist_open_tiktok" android:textColor="#FFFFFF" android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>
