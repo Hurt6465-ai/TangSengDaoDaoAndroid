@@ -138,15 +138,25 @@ class TSApplication : MultiDexApplication() {
     }
 
     private fun initApi() {
-        // 默认使用你部署的唐僧叨叨业务 API 地址。
-        // 注意：这里不要加 /v1，WKApiConfig 会自动拼接 /v1/ 和 /web/。
-        val defaultApiURL = "http://107.172.79.50:8090"
-        val apiURL = WKSharedPreferencesUtil.getInstance().getSP("api_base_url")
-        if (TextUtils.isEmpty(apiURL)) {
-            WKApiConfig.initBaseURLIncludeIP(defaultApiURL)
-        } else {
-            WKApiConfig.initBaseURLIncludeIP(apiURL)
+        // 业务 API 统一走正式 HTTPS 域名。WKApiConfig 会自动拼接 /v1/ 和 /web/。
+        // 旧版本可能已经把测试 IP 写入 SharedPreferences，因此不能只修改默认值；
+        // 启动时同步迁移旧值，避免接口缓存能显示文字但头像和图片继续请求失效地址。
+        val defaultApiURL = "https://api.886.best"
+        val legacyApiURL = "http://107.172.79.50:8090"
+        val preferences = WKSharedPreferencesUtil.getInstance()
+        var savedApiURL = preferences.getSP("api_base_url").trim().trimEnd('/')
+        if (savedApiURL.endsWith("/v1")) {
+            savedApiURL = savedApiURL.removeSuffix("/v1").trimEnd('/')
         }
+        val resolvedApiURL = if (savedApiURL.isEmpty() || savedApiURL.equals(legacyApiURL, ignoreCase = true)) {
+            defaultApiURL
+        } else {
+            savedApiURL
+        }
+        if (resolvedApiURL != savedApiURL) {
+            preferences.putSP("api_base_url", resolvedApiURL)
+        }
+        WKApiConfig.initBaseURLIncludeIP(resolvedApiURL)
     }
 
     private fun getAppPackageName(): String {
