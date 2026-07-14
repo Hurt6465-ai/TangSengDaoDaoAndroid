@@ -191,10 +191,9 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
 
     @Override public void onViewAttachedToWindow(@NonNull Holder holder) {
         super.onViewAttachedToWindow(holder);
-        int position = holder.getBindingAdapterPosition();
-        if (position != RecyclerView.NO_POSITION && position < getItemCount()) {
-            bindMedia(holder, getItem(position));
-        }
+        // A cached ViewHolder can be reattached without onBindViewHolder. Reload only
+        // the existing image targets instead of rebinding the whole media block.
+        holder.binding.mediaGrid.reloadImages();
     }
 
     @Override public void onViewRecycled(@NonNull Holder holder) {
