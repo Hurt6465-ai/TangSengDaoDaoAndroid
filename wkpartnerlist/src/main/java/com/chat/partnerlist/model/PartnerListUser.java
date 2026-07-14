@@ -41,9 +41,11 @@ public class PartnerListUser {
     }
 
     public String displayAvatar() {
-        if (!TextUtils.isEmpty(avatar)) return avatar;
+        // 语伴头像统一使用唐僧账号头像。历史 profile_images/旧域名路径即使非空，
+        // 也不能覆盖稳定的用户头像接口，否则旧缓存会一直显示空白图片。
         String key = stableId();
-        return TextUtils.isEmpty(key) ? "" : "users/" + key + "/avatar";
+        if (!TextUtils.isEmpty(key)) return "users/" + key + "/avatar";
+        return avatar == null ? "" : avatar.trim();
     }
 
     public int age() {
