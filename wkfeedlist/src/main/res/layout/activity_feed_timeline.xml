@@ -1,309 +1,182 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/root"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="@color/feedlist_surface"
+    android:layout_height="match_parent"
+    android:background="@color/feedlist_page_bg"
     android:orientation="vertical">
 
-    <LinearLayout
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="14dp"
-        android:layout_marginEnd="10dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
-        <com.chat.base.ui.components.AvatarView
-            android:id="@+id/avatarView"
-            android:layout_width="46dp"
-            android:layout_height="46dp" />
-
-        <LinearLayout
-            android:id="@+id/userArea"
-            android:layout_width="0dp"
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/appBar"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:orientation="vertical"
-            android:paddingTop="1dp"
-            android:paddingBottom="1dp">
+            android:background="@color/feedlist_surface"
+            android:elevation="0dp"
+            app:elevation="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="26dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                app:layout_scrollFlags="scroll|enterAlways|snap">
+
+                <FrameLayout
+                    android:id="@+id/topBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@color/feedlist_surface">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="52dp"
+                        android:layout_gravity="center_horizontal|bottom"
+                        android:gravity="bottom"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:id="@+id/latestTab"
+                            android:layout_width="70dp"
+                            android:layout_height="52dp"
+                            android:background="@drawable/bg_feedlist_tab_ripple"
+                            android:gravity="center_horizontal|bottom"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/latestTabText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="45dp"
+                                android:fontFamily="sans-serif-medium"
+                                android:gravity="center"
+                                android:includeFontPadding="false"
+                                android:text="@string/feedlist_latest"
+                                android:textColor="@color/feedlist_text"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <View
+                                android:id="@+id/latestIndicator"
+                                android:layout_width="22dp"
+                                android:layout_height="3dp"
+                                android:background="@drawable/bg_feedlist_tab_selected" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/followingTab"
+                            android:layout_width="70dp"
+                            android:layout_height="52dp"
+                            android:background="@drawable/bg_feedlist_tab_ripple"
+                            android:gravity="center_horizontal|bottom"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/followingTabText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="45dp"
+                                android:fontFamily="sans-serif-medium"
+                                android:gravity="center"
+                                android:includeFontPadding="false"
+                                android:text="@string/feedlist_following"
+                                android:textColor="@color/feedlist_secondary"
+                                android:textSize="16sp" />
+
+                            <View
+                                android:id="@+id/followingIndicator"
+                                android:layout_width="22dp"
+                                android:layout_height="3dp"
+                                android:background="@drawable/bg_feedlist_tab_selected"
+                                android:visibility="invisible" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/publishBtn"
+                        android:layout_width="46dp"
+                        android:layout_height="46dp"
+                        android:layout_gravity="end|bottom"
+                        android:layout_marginEnd="10dp"
+                        android:layout_marginBottom="3dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/feedlist_publish"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_feedlist_camera"
+                        app:tint="@color/feedlist_text" />
+                </FrameLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/feedlist_divider" />
+            </LinearLayout>
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+            <com.scwang.smart.refresh.layout.SmartRefreshLayout
+                android:id="@+id/refreshLayout"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:srlEnableLoadMore="false">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="true"
+                    android:overScrollMode="never"
+                    android:paddingBottom="16dp"
+                    android:scrollbarStyle="outsideOverlay"
+                    android:scrollbars="vertical" />
+            </com.scwang.smart.refresh.layout.SmartRefreshLayout>
+
+            <LinearLayout
+                android:id="@+id/statePanel"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/feedlist_page_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="32dp"
+                android:visibility="gone">
+
+                <ProgressBar
+                    android:id="@+id/loadingView"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:indeterminateTint="@color/feedlist_accent" />
 
                 <TextView
-                    android:id="@+id/nameTv"
+                    android:id="@+id/stateText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:fontFamily="sans-serif-medium"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:maxWidth="190dp"
-                    android:textColor="@color/feedlist_text"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/followBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="28dp"
-                    android:layout_marginStart="3dp"
-                    android:background="@null"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:fontFamily="sans-serif-medium"
-                    android:gravity="center_vertical"
-                    android:includeFontPadding="false"
-                    android:paddingStart="0dp"
-                    android:paddingEnd="0dp"
-                    android:textColor="@color/feedlist_accent"
-                    android:textSize="13sp"
-                    android:visibility="gone" />
+                    android:layout_marginTop="14dp"
+                    android:gravity="center"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="@color/feedlist_secondary"
+                    android:textSize="14sp" />
             </LinearLayout>
+        </FrameLayout>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
 
-            <TextView
-                android:id="@+id/languageTv"
-                android:layout_width="wrap_content"
-                android:layout_height="21dp"
-                android:layout_marginTop="2dp"
-                android:ellipsize="end"
-                android:fontFamily="sans-serif-medium"
-                android:gravity="center_vertical"
-                android:includeFontPadding="false"
-                android:maxLines="1"
-                android:textColor="@color/feedlist_secondary"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <ImageView
-            android:id="@+id/moreBtn"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_feedlist_icon_ripple"
-            android:contentDescription="@string/feedlist_more"
-            android:padding="9dp"
-            android:src="@drawable/ic_feedlist_more"
-            app:tint="@color/feedlist_action" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/contentTv"
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="11dp"
-        android:layout_marginEnd="16dp"
-        android:breakStrategy="high_quality"
-        android:ellipsize="end"
-        android:hyphenationFrequency="none"
-        android:includeFontPadding="true"
-        android:lineSpacingExtra="2dp"
-        android:maxLines="4"
-        android:textColor="@color/feedlist_text"
-        android:textSize="16sp" />
-
-    <TextView
-        android:id="@+id/expandTv"
-        android:layout_width="wrap_content"
-        android:layout_height="30dp"
-        android:layout_marginStart="16dp"
-        android:gravity="center_vertical"
-        android:includeFontPadding="false"
-        android:text="@string/feedlist_expand"
-        android:textColor="@color/feedlist_link"
-        android:textSize="13sp"
-        android:visibility="gone" />
-
-    <com.chat.feedlist.FeedListMediaGridLayout
-        android:id="@+id/mediaGrid"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp" />
-
-    <FrameLayout
-        android:id="@+id/tiktokBox"
-        android:layout_width="match_parent"
-        android:layout_height="228dp"
-        android:layout_marginTop="10dp"
-        android:visibility="gone">
-
-        <ImageView
-            android:id="@+id/tiktokCoverIv"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:contentDescription="@string/feedlist_tiktok"
-            android:scaleType="centerCrop" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/bg_feedlist_tiktok_scrim" />
-
-        <ImageView
-            android:layout_width="54dp"
-            android:layout_height="54dp"
-            android:layout_gravity="center"
-            android:background="@drawable/bg_feedlist_play"
-            android:contentDescription="@string/feedlist_play"
-            android:padding="15dp"
-            android:src="@drawable/ic_feedlist_play"
-            app:tint="@android:color/white" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:orientation="vertical"
-            android:paddingStart="14dp"
-            android:paddingTop="22dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="12dp">
-
-            <TextView
-                android:id="@+id/tiktokTitleTv"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="sans-serif-medium"
-                android:maxLines="2"
-                android:textColor="@android:color/white"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tiktokAuthorTv"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="#E6FFFFFF"
-                android:textSize="11sp" />
-        </LinearLayout>
-    </FrameLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/feedlist_divider_soft" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingEnd="8dp">
-
-        <TextView
-            android:id="@+id/timeTv"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:textColor="@color/feedlist_muted"
-            android:textSize="11sp" />
-
-        <Space
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1" />
-
-        <LinearLayout
-            android:id="@+id/shareAction"
-            android:layout_width="58dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_feedlist_action_ripple"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:layout_width="21dp"
-                android:layout_height="21dp"
-                android:contentDescription="@string/feedlist_share"
-                android:src="@drawable/ic_feedlist_share"
-                app:tint="@color/feedlist_action" />
-
-            <TextView
-                android:id="@+id/shareCountTv"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="3dp"
-                android:includeFontPadding="false"
-                android:textColor="@color/feedlist_action"
-                android:textSize="12sp"
-                android:visibility="gone" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/likeAction"
-            android:layout_width="66dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_feedlist_action_ripple"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:id="@+id/likeIcon"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:contentDescription="@string/feedlist_like"
-                android:src="@drawable/ic_feedlist_heart_outline"
-                app:tint="@color/feedlist_action" />
-
-            <TextView
-                android:id="@+id/likeCountTv"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:includeFontPadding="false"
-                android:textColor="@color/feedlist_action"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/commentAction"
-            android:layout_width="70dp"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_feedlist_action_ripple"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:contentDescription="@string/feedlist_comment"
-                android:src="@drawable/ic_feedlist_comment"
-                app:tint="@color/feedlist_action" />
-
-            <TextView
-                android:id="@+id/commentCountTv"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:includeFontPadding="false"
-                android:textColor="@color/feedlist_action"
-                android:textSize="12sp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="10dp"
-        android:background="@color/feedlist_page_bg" />
+        android:layout_height="64dp"
+        android:background="@color/feedlist_surface"
+        android:elevation="0dp"
+        app:itemIconTint="@null"
+        app:itemTextColor="@android:color/transparent"
+        app:labelVisibilityMode="unlabeled"
+        app:menu="@menu/menu_navigation" />
 </LinearLayout>
