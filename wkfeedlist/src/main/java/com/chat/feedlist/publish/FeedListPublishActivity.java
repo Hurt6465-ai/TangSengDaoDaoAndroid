@@ -67,7 +67,7 @@ public class FeedListPublishActivity extends AppCompatActivity {
     private TextView progressTv;
     private ProgressBar progressBar;
     private LinearLayout previewRow;
-    private FrameLayout tiktokBox;
+    private LinearLayout tiktokBox;
     private EditText tiktokUrlEt;
     private TextView tiktokResolveBtn;
     private FrameLayout tiktokPreviewBox;
