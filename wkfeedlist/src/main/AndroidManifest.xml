@@ -4,7 +4,8 @@
         <activity
             android:name=".publish.FeedListPublishActivity"
             android:exported="false"
-            android:screenOrientation="portrait" />
+            android:screenOrientation="portrait"
+            android:theme="@style/FeedListPublishTheme" />
         <activity
             android:name=".FeedTimelineActivity"
             android:exported="false"
