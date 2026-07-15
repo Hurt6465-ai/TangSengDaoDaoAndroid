@@ -93,6 +93,7 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     private View inputBar;
     private ViewTreeObserver.OnGlobalLayoutListener keyboardListener;
     private int recyclerBasePaddingBottom;
+    private int inputBasePaddingBottom;
     private EditText editText;
     private TextView titleTv;
     private ImageButton actionBtn;
@@ -210,6 +211,7 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         editText = view.findViewById(R.id.commentEditText);
         actionBtn = view.findViewById(R.id.commentSendBtn);
         inputBar = view.findViewById(R.id.commentInputBar);
+        inputBasePaddingBottom = inputBar == null ? 0 : inputBar.getPaddingBottom();
         recordHintTv = view.findViewById(R.id.commentRecordHintTv);
         recordPanel = view.findViewById(R.id.commentRecordPanel);
         recordWaveView = view.findViewById(R.id.commentRecordWaveView);
@@ -323,6 +325,10 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
 
             if (Math.abs(inputBar.getTranslationY() - translation) > 0.5f) {
                 inputBar.setTranslationY(translation);
+            }
+            int inputBottomPadding = keyboardVisible ? dp(2) : inputBasePaddingBottom;
+            if (inputBar.getPaddingBottom() != inputBottomPadding) {
+                inputBar.setPadding(inputBar.getPaddingLeft(), inputBar.getPaddingTop(), inputBar.getPaddingRight(), inputBottomPadding);
             }
             if (recordHintTv != null && Math.abs(recordHintTv.getTranslationY() - translation) > 0.5f) {
                 recordHintTv.setTranslationY(translation);
