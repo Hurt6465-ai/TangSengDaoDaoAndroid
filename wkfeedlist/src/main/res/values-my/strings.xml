@@ -44,7 +44,7 @@
         <item>အခြား</item>
     </string-array>
     <string name="feedlist_publish_title">ပို့စ်တင်ရန်</string>
-    <string name="feedlist_publish_text_hint">တစ်ခုခုပြောပါ…</string>
+    <string name="feedlist_publish_text_hint">သင့်နေ့စဉ်ဘဝကို မျှဝေပါ၊ ပုံတင်ပါ သို့မဟုတ် TikTok လင့်ခ်ထည့်ပါ</string>
     <string name="feedlist_publish_storage_hint">ပုံ ၆ ပုံအထိ ရွေးနိုင်သည်။ ဖုန်းတွင် 200KB မကျော်သော WebP အဖြစ် ချုံ့မည်။ TikTok လင့်ခ်လည်း တင်နိုင်သည်။</string>
     <string name="feedlist_pick_images">ပုံရွေးရန်</string>
     <string name="feedlist_pick_tiktok">TikTok</string>
@@ -74,4 +74,6 @@
     <string name="feedlist_publish_open_failed">တင်ရန်စာမျက်နှာကို ဖွင့်မရပါ။ Feed list module ကို စစ်ဆေးပါ။</string>
     <string name="feedlist_months_ago">လွန်ခဲ့သော %1$d လက တင်ခဲ့သည်</string>
     <string name="feedlist_years_ago">လွန်ခဲ့သော %1$d နှစ်က တင်ခဲ့သည်</string>
+    <string name="feedlist_tiktok_copyright_notice">TikTok ဗီဒီယိုနှင့် ဆက်စပ်အကြောင်းအရာများသည် မူရင်းဖန်တီးသူများ၏ ပိုင်ဆိုင်မှုဖြစ်သည်။ မူပိုင်ခွင့်ပြဿနာရှိပါက ဖျက်ပေးရန် စီမံခန့်ခွဲသူကို ဆက်သွယ်ပါ။</string>
+    <string name="feedlist_tiktok_images_conflict">ပုံနှင့် TikTok ဗီဒီယိုကို တစ်ခါတည်း မတင်နိုင်ပါ</string>
 </resources>
