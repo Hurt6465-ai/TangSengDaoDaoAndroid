@@ -44,7 +44,7 @@
         <item>其他</item>
     </string-array>
     <string name="feedlist_publish_title">发布动态</string>
-    <string name="feedlist_publish_text_hint">说点什么…</string>
+    <string name="feedlist_publish_text_hint">分享你的日常，上传图片或粘贴 TikTok 视频链接</string>
     <string name="feedlist_publish_storage_hint">最多 6 张图片，手机端压缩为不超过 200KB 的 WebP；也可以发布 TikTok 链接。</string>
     <string name="feedlist_pick_images">选择图片</string>
     <string name="feedlist_pick_tiktok">TikTok</string>
@@ -74,4 +74,6 @@
     <string name="feedlist_publish_open_failed">发布页面打开失败，请重新安装或检查发现列表模块</string>
     <string name="feedlist_months_ago">%1$d个月前发布</string>
     <string name="feedlist_years_ago">%1$d年前发布</string>
+    <string name="feedlist_tiktok_copyright_notice">TikTok 视频及相关内容归原作者所有。如有侵权，请联系管理员删除。</string>
+    <string name="feedlist_tiktok_images_conflict">图片和 TikTok 视频不能同时发布</string>
 </resources>
