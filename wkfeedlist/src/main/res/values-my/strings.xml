@@ -31,10 +31,10 @@
     <string name="feedlist_tiktok_failed">ဤဗီဒီယိုကို ယခုဖွင့်မရပါ</string>
     <string name="feedlist_open_tiktok">TikTok တွင်ဖွင့်မည်</string>
     <string name="feedlist_report_reason_title">တိုင်ကြားရသည့်အကြောင်းရင်း</string>
-    <string name="feedlist_just_now">ယခုလေးတင်</string>
-    <string name="feedlist_minutes_ago">%1$d မိနစ်အကြာ</string>
-    <string name="feedlist_hours_ago">%1$d နာရီအကြာ</string>
-    <string name="feedlist_days_ago">%1$d ရက်အကြာ</string>
+    <string name="feedlist_just_now">ယခုလေးတင် တင်ခဲ့သည်</string>
+    <string name="feedlist_minutes_ago">လွန်ခဲ့သော %1$d မိနစ်က တင်ခဲ့သည်</string>
+    <string name="feedlist_hours_ago">လွန်ခဲ့သော %1$d နာရီက တင်ခဲ့သည်</string>
+    <string name="feedlist_days_ago">လွန်ခဲ့သော %1$d ရက်က တင်ခဲ့သည်</string>
     <string-array name="feedlist_report_reasons">
         <item>မသင့်လျော်သော သို့မဟုတ် အနှောင့်အယှက်ဖြစ်စေသော အကြောင်းအရာ</item>
         <item>နှောင့်ယှက်ခြင်း သို့မဟုတ် ဆဲဆိုခြင်း</item>
@@ -68,4 +68,10 @@
     <string name="feedlist_tiktok_publish_url_required">TikTok လင့်ခ် ထည့်ပါ</string>
     <string name="feedlist_tiktok_publish_resolve_failed">TikTok ဗီဒီယိုအချက်အလက် မရနိုင်ပါ</string>
     <string name="feedlist_tiktok_publish_preview_first">TikTok အကြိုကြည့်ခြင်းကို အရင်ဖွင့်ပါ</string>
+    <string name="feedlist_follow">လိုက်မည်</string>
+    <string name="feedlist_followed">လိုက်ထားသည်</string>
+    <string name="feedlist_date_published">%1$s တွင် တင်ခဲ့သည်</string>
+    <string name="feedlist_publish_open_failed">တင်ရန်စာမျက်နှာကို ဖွင့်မရပါ။ Feed list module ကို စစ်ဆေးပါ။</string>
+    <string name="feedlist_months_ago">လွန်ခဲ့သော %1$d လက တင်ခဲ့သည်</string>
+    <string name="feedlist_years_ago">လွန်ခဲ့သော %1$d နှစ်က တင်ခဲ့သည်</string>
 </resources>
