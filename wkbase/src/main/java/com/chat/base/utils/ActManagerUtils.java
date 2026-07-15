@@ -59,12 +59,17 @@ public class ActManagerUtils {
      * 退出整个app时，kill所有activity
      */
     public void clearAllActivity() {
-        for (int i = 0, size = activityList.size(); i < size; i++) {
-            if (activityList.get(i) != null) {
-                activityList.get(i).finish();
+        // finish() may synchronously trigger onDestroy(), which removes the same
+        // Activity from activityList. Iterating the live list can therefore skip
+        // entries or throw IndexOutOfBoundsException on some devices. Work on a
+        // snapshot and clear the registry first so callbacks are harmless.
+        List<Activity> snapshot = new ArrayList<>(activityList);
+        activityList.clear();
+        for (Activity activity : snapshot) {
+            if (activity != null && !activity.isFinishing()) {
+                activity.finish();
             }
         }
-        activityList.clear();
     }
 
     public boolean isActivityTop(String className, Context mContext) {
