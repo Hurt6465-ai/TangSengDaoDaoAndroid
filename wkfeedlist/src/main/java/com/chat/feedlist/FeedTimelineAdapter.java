@@ -115,9 +115,9 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         boolean mine = TextUtils.equals(uid, com.chat.base.config.WKConfig.getInstance().getUid());
         boolean followed = user != null && user.follow == 1;
         b.followBtn.setVisibility(!mine && !TextUtils.isEmpty(uid) ? View.VISIBLE : View.GONE);
-        b.followBtn.setText(followed ? R.string.feedlist_followed : R.string.feedlist_follow);
-        b.followBtn.setTextColor(ContextCompat.getColor(b.getRoot().getContext(), followed ? R.color.feedlist_secondary : R.color.feedlist_accent));
-        b.followBtn.setBackgroundResource(followed ? R.drawable.bg_feedlist_followed : R.drawable.bg_feedlist_follow);
+        String followLabel = b.getRoot().getContext().getString(followed ? R.string.feedlist_followed : R.string.feedlist_follow);
+        b.followBtn.setText("\u00B7 " + followLabel);
+        b.followBtn.setTextColor(ContextCompat.getColor(b.getRoot().getContext(), followed ? R.color.feedlist_muted : R.color.feedlist_like));
         b.followBtn.setEnabled(!TextUtils.isEmpty(uid));
         b.followBtn.setOnClickListener(v -> listener.onFollow(item));
 
@@ -199,7 +199,8 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         b.likeCountTv.setTextColor(likeColor);
         b.likeCountTv.setText(countLabel(item.like_count, context.getString(R.string.feedlist_like)));
         b.commentCountTv.setText(countLabel(item.comment_count, context.getString(R.string.feedlist_comment)));
-        b.shareCountTv.setText(countLabel(item.share_count, context.getString(R.string.feedlist_share)));
+        b.shareCountTv.setVisibility(item.share_count > 0 ? View.VISIBLE : View.GONE);
+        b.shareCountTv.setText(item.share_count > 0 ? String.valueOf(item.share_count) : "");
 
         b.likeAction.setOnClickListener(v -> listener.onLike(item, holder.getBindingAdapterPosition()));
         b.commentAction.setOnClickListener(v -> listener.onComment(item, holder.getBindingAdapterPosition()));
