@@ -15,10 +15,10 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.chat.feedlist.databinding.ItemFeedTimelineBinding;
 import com.chat.feedlist.model.FeedListItem;
 import com.chat.feedlist.model.FeedListMedia;
 import com.chat.feedlist.model.FeedListUser;
-import com.chat.feedlist.databinding.ItemFeedTimelineBinding;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -38,21 +38,24 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         void onComment(FeedListItem item, int position);
         void onShare(FeedListItem item);
         void onImages(FeedListItem item, int index, List<FeedListMedia> media);
-        void onTikTok(FeedListItem item, FeedListMedia media);
+        void onOpenTikTok(FeedListItem item, FeedListMedia media);
     }
 
     private final Listener listener;
+    private final TikTokInlinePlayerManager playerManager;
     private final Set<String> expanded = new HashSet<>();
     private long serverTime;
     private long serverTimeLocalAt;
 
-    public FeedTimelineAdapter(Listener listener) {
+    public FeedTimelineAdapter(Listener listener, TikTokInlinePlayerManager playerManager) {
         super(DIFF);
         this.listener = listener;
+        this.playerManager = playerManager;
         setHasStableIds(true);
     }
 
     @Override public long getItemId(int position) { return getItem(position).stableId(); }
+
     public void setServerTime(long serverTime) {
         this.serverTime = serverTime;
         this.serverTimeLocalAt = System.currentTimeMillis();
@@ -70,15 +73,34 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         }
     }
 
-    @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public void preloadTikTokCovers(@NonNull Context context, int startPosition, int count) {
+        if (getItemCount() == 0 || count <= 0) return;
+        int start = Math.max(0, startPosition);
+        int end = Math.min(getItemCount(), start + count);
+        for (int i = start; i < end; i++) {
+            FeedListItem item = getItem(i);
+            FeedListMedia media = item == null ? null : item.firstMedia();
+            if (media == null || !media.isTikTok() || TextUtils.isEmpty(media.displayUrl())) continue;
+            Glide.with(context)
+                    .load(media.displayUrl())
+                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .preload();
+        }
+    }
+
+    @NonNull
+    @Override
+    public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         return new Holder(ItemFeedTimelineBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
     }
 
-    @Override public void onBindViewHolder(@NonNull Holder holder, int position) {
+    @Override
+    public void onBindViewHolder(@NonNull Holder holder, int position) {
         bind(holder, getItem(position));
     }
 
-    @Override public void onBindViewHolder(@NonNull Holder holder, int position, @NonNull List<Object> payloads) {
+    @Override
+    public void onBindViewHolder(@NonNull Holder holder, int position, @NonNull List<Object> payloads) {
         if (!payloads.isEmpty() && payloads.contains(PAYLOAD_INTERACTION)) {
             bindActions(holder, getItem(position));
             return;
@@ -87,6 +109,12 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
     }
 
     private void bind(Holder holder, FeedListItem item) {
+        long newItemId = item.stableId();
+        if (holder.boundItemId != RecyclerView.NO_ID && holder.boundItemId != newItemId) {
+            playerManager.detachIfOwner(holder.boundItemId);
+        }
+        holder.boundItemId = newItemId;
+
         ItemFeedTimelineBinding b = holder.binding;
         FeedListUser user = item.user;
         String uid = item.authorUid();
@@ -117,7 +145,10 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         b.followBtn.setVisibility(!mine && !TextUtils.isEmpty(uid) ? View.VISIBLE : View.GONE);
         String followLabel = b.getRoot().getContext().getString(followed ? R.string.feedlist_followed : R.string.feedlist_follow);
         b.followBtn.setText("\u00B7 " + followLabel);
-        b.followBtn.setTextColor(ContextCompat.getColor(b.getRoot().getContext(), followed ? R.color.feedlist_muted : R.color.feedlist_like));
+        b.followBtn.setTextColor(ContextCompat.getColor(
+                b.getRoot().getContext(),
+                followed ? R.color.feedlist_muted : R.color.feedlist_like
+        ));
         b.followBtn.setEnabled(!TextUtils.isEmpty(uid));
         b.followBtn.setOnClickListener(v -> listener.onFollow(item));
 
@@ -165,12 +196,23 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         boolean tiktok = first != null && first.isTikTok();
         b.tiktokBox.setVisibility(tiktok ? View.VISIBLE : View.GONE);
         b.mediaGrid.setVisibility(tiktok ? View.GONE : View.VISIBLE);
+
         if (tiktok) {
             b.mediaGrid.bind(null);
-            Context context = b.getRoot().getContext();
-            b.tiktokTitleTv.setText(TextUtils.isEmpty(first.external_title) ? context.getString(R.string.feedlist_tiktok) : first.external_title);
             String author = first.external_author == null ? "" : first.external_author.trim();
-            b.tiktokAuthorTv.setText(TextUtils.isEmpty(author) ? "TikTok" : (author.startsWith("@") ? author : "@" + author));
+            if (author.startsWith("@")) author = author.substring(1);
+            b.tiktokSourceTv.setText(TextUtils.isEmpty(author) ? "TikTok" : "TikTok · @" + author);
+            boolean hasOriginalUrl = !TextUtils.isEmpty(first.external_url);
+            b.tiktokOpenTv.setVisibility(hasOriginalUrl ? View.VISIBLE : View.GONE);
+            b.tiktokSourceTv.setClickable(hasOriginalUrl);
+
+            if (!playerManager.isOwner(item.stableId())) {
+                b.tiktokCoverIv.setVisibility(View.VISIBLE);
+                b.tiktokShade.setVisibility(View.VISIBLE);
+                b.tiktokPlayBtn.setVisibility(View.VISIBLE);
+                b.tiktokProgress.setVisibility(View.GONE);
+            }
+
             Glide.with(b.tiktokCoverIv)
                     .load(first.displayUrl())
                     .placeholder(R.color.feedlist_media_placeholder)
@@ -179,10 +221,27 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                     .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                     .dontAnimate()
                     .into(b.tiktokCoverIv);
-            b.tiktokBox.setOnClickListener(v -> listener.onTikTok(item, first));
+
+            View.OnClickListener playClick = v -> playerManager.play(
+                    item.stableId(),
+                    first.external_id == null ? "" : first.external_id.trim(),
+                    b.tiktokBox,
+                    b.tiktokCoverIv,
+                    b.tiktokShade,
+                    b.tiktokPlayBtn,
+                    b.tiktokProgress
+            );
+            b.tiktokCoverIv.setOnClickListener(playClick);
+            b.tiktokPlayBtn.setOnClickListener(playClick);
+            b.tiktokSourceTv.setOnClickListener(hasOriginalUrl ? v -> listener.onOpenTikTok(item, first) : null);
+            b.tiktokOpenTv.setOnClickListener(hasOriginalUrl ? v -> listener.onOpenTikTok(item, first) : null);
         } else {
+            playerManager.detachIfOwner(holder.boundItemId);
             Glide.with(b.tiktokCoverIv).clear(b.tiktokCoverIv);
-            b.tiktokBox.setOnClickListener(null);
+            b.tiktokCoverIv.setOnClickListener(null);
+            b.tiktokPlayBtn.setOnClickListener(null);
+            b.tiktokSourceTv.setOnClickListener(null);
+            b.tiktokOpenTv.setOnClickListener(null);
             b.mediaGrid.setListener((index, media) -> listener.onImages(item, index, media));
             b.mediaGrid.bind(item.safeMedia());
         }
@@ -192,8 +251,10 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         ItemFeedTimelineBinding b = holder.binding;
         Context context = b.getRoot().getContext();
         boolean liked = item.liked == 1;
-        b.likeIcon.setImageDrawable(AppCompatResources.getDrawable(context,
-                liked ? R.drawable.ic_feedlist_heart_filled : R.drawable.ic_feedlist_heart_outline));
+        b.likeIcon.setImageDrawable(AppCompatResources.getDrawable(
+                context,
+                liked ? R.drawable.ic_feedlist_heart_filled : R.drawable.ic_feedlist_heart_outline
+        ));
         int likeColor = ContextCompat.getColor(context, liked ? R.color.feedlist_like : R.color.feedlist_action);
         b.likeIcon.setColorFilter(likeColor);
         b.likeCountTv.setTextColor(likeColor);
@@ -207,21 +268,25 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         b.shareAction.setOnClickListener(v -> listener.onShare(item));
     }
 
-    @Override public void onViewAttachedToWindow(@NonNull Holder holder) {
+    @Override
+    public void onViewAttachedToWindow(@NonNull Holder holder) {
         super.onViewAttachedToWindow(holder);
-        // A cached ViewHolder can be reattached without onBindViewHolder. Reload only
-        // the existing image targets instead of rebinding the whole media block.
         holder.binding.mediaGrid.reloadImages();
     }
 
-    @Override public void onViewRecycled(@NonNull Holder holder) {
+    @Override
+    public void onViewRecycled(@NonNull Holder holder) {
+        playerManager.detachIfOwner(holder.boundItemId);
+        holder.boundItemId = RecyclerView.NO_ID;
         holder.binding.contentTv.setTag(null);
         holder.binding.mediaGrid.clearImages();
         Glide.with(holder.binding.tiktokCoverIv).clear(holder.binding.tiktokCoverIv);
         super.onViewRecycled(holder);
     }
 
-    private String countLabel(int count, String fallback) { return count > 0 ? String.valueOf(count) : fallback; }
+    private String countLabel(int count, String fallback) {
+        return count > 0 ? String.valueOf(count) : fallback;
+    }
 
     private String avatarCacheKey(FeedListUser user) {
         if (user == null) return "";
@@ -247,7 +312,9 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         if (value <= 0) return context.getString(R.string.feedlist_just_now);
         long time = value < 10_000_000_000L ? value * 1000L : value;
         long normalizedServer = server < 10_000_000_000L ? server * 1000L : server;
-        long now = server > 0 ? normalizedServer + Math.max(0L, System.currentTimeMillis() - serverTimeLocalAt) : System.currentTimeMillis();
+        long now = server > 0
+                ? normalizedServer + Math.max(0L, System.currentTimeMillis() - serverTimeLocalAt)
+                : System.currentTimeMillis();
         long sec = Math.max(0, (now - time) / 1000L);
         if (sec < 60) return context.getString(R.string.feedlist_just_now);
         if (sec < 3600) return context.getString(R.string.feedlist_minutes_ago, sec / 60);
@@ -259,6 +326,8 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
 
     static final class Holder extends RecyclerView.ViewHolder {
         final ItemFeedTimelineBinding binding;
+        long boundItemId = RecyclerView.NO_ID;
+
         Holder(ItemFeedTimelineBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
@@ -266,11 +335,13 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
     }
 
     private static final DiffUtil.ItemCallback<FeedListItem> DIFF = new DiffUtil.ItemCallback<>() {
-        @Override public boolean areItemsTheSame(@NonNull FeedListItem oldItem, @NonNull FeedListItem newItem) {
+        @Override
+        public boolean areItemsTheSame(@NonNull FeedListItem oldItem, @NonNull FeedListItem newItem) {
             return TextUtils.equals(oldItem.stableKey(), newItem.stableKey());
         }
 
-        @Override public boolean areContentsTheSame(@NonNull FeedListItem oldItem, @NonNull FeedListItem newItem) {
+        @Override
+        public boolean areContentsTheSame(@NonNull FeedListItem oldItem, @NonNull FeedListItem newItem) {
             return sameInteraction(oldItem, newItem)
                     && TextUtils.equals(oldItem.displayTitle(), newItem.displayTitle())
                     && oldItem.created_at == newItem.created_at
@@ -278,7 +349,8 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                     && sameMedia(oldItem.safeMedia(), newItem.safeMedia());
         }
 
-        @Override public Object getChangePayload(@NonNull FeedListItem oldItem, @NonNull FeedListItem newItem) {
+        @Override
+        public Object getChangePayload(@NonNull FeedListItem oldItem, @NonNull FeedListItem newItem) {
             boolean onlyInteractionChanged = !sameInteraction(oldItem, newItem)
                     && TextUtils.equals(oldItem.displayTitle(), newItem.displayTitle())
                     && oldItem.created_at == newItem.created_at
@@ -289,8 +361,10 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
     };
 
     private static boolean sameInteraction(FeedListItem a, FeedListItem b) {
-        return a.liked == b.liked && a.like_count == b.like_count
-                && a.comment_count == b.comment_count && a.share_count == b.share_count;
+        return a.liked == b.liked
+                && a.like_count == b.like_count
+                && a.comment_count == b.comment_count
+                && a.share_count == b.share_count;
     }
 
     private static boolean sameUser(FeedListUser a, FeedListUser b) {
@@ -312,7 +386,8 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         List<FeedListMedia> right = b == null ? Collections.emptyList() : b;
         if (left.size() != right.size()) return false;
         for (int i = 0; i < left.size(); i++) {
-            FeedListMedia x = left.get(i), y = right.get(i);
+            FeedListMedia x = left.get(i);
+            FeedListMedia y = right.get(i);
             if (x == y) continue;
             if (x == null || y == null) return false;
             if (!Objects.equals(x.type, y.type)
@@ -324,7 +399,10 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                     || !Objects.equals(x.external_url, y.external_url)
                     || !Objects.equals(x.external_title, y.external_title)
                     || !Objects.equals(x.external_author, y.external_author)
-                    || x.width != y.width || x.height != y.height) return false;
+                    || x.width != y.width
+                    || x.height != y.height) {
+                return false;
+            }
         }
         return true;
     }

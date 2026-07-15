@@ -1,6 +1,7 @@
 package com.chat.feedlist;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.graphics.Typeface;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -9,6 +10,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
@@ -55,13 +57,15 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     private TimelineState current = latest;
     private FeedTimelineAdapter adapter;
     private LinearLayoutManager layoutManager;
+    private TikTokInlinePlayerManager tiktokPlayerManager;
 
     @Override protected ActivityFeedTimelineBinding getViewBinding() { return ActivityFeedTimelineBinding.inflate(getLayoutInflater()); }
     @Override protected boolean supportSlideBack() { return false; }
     @Override protected void setTitle(TextView titleTv) {}
 
     @Override protected void initView() {
-        adapter = new FeedTimelineAdapter(this);
+        tiktokPlayerManager = new TikTokInlinePlayerManager(this);
+        adapter = new FeedTimelineAdapter(this, tiktokPlayerManager);
         layoutManager = new LinearLayoutManager(this);
         layoutManager.setInitialPrefetchItemCount(4);
         wkVBinding.recyclerView.setLayoutManager(layoutManager);
@@ -110,9 +114,14 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         wkVBinding.recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
                 saveScrollState(current);
+                if (tiktokPlayerManager != null) tiktokPlayerManager.detachIfMostlyHidden();
                 if (dy <= 0 || current.loading || !current.hasMore || current.items.isEmpty()) return;
                 int last = layoutManager.findLastVisibleItemPosition();
                 if (last >= adapter.getItemCount() - 4) requestPage(current, false);
+            }
+
+            @Override public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) preloadTikTokCovers();
             }
         });
     }
@@ -151,6 +160,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
             return;
         }
         saveScrollState(current);
+        if (tiktokPlayerManager != null) tiktokPlayerManager.pauseAndDetach();
         // One SmartRefreshLayout is shared by both tabs. Stop the visual spinner before
         // changing modes; the old tab's in-flight callback must not control the new tab UI.
         wkVBinding.refreshLayout.finishRefresh(false);
@@ -243,12 +253,21 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
                 int position = Math.min(state.firstVisiblePosition, Math.max(0, adapter.getItemCount() - 1));
                 layoutManager.scrollToPositionWithOffset(position, state.firstVisibleOffset);
             }
+            preloadTikTokCovers();
         });
         boolean empty = state.items.isEmpty();
         wkVBinding.statePanel.setVisibility(empty ? View.VISIBLE : View.GONE);
         wkVBinding.loadingView.setVisibility(View.GONE);
         if (empty) wkVBinding.stateText.setText(state == latest ? R.string.feedlist_empty_latest : R.string.feedlist_empty_following);
         wkVBinding.recyclerView.setVisibility(empty ? View.GONE : View.VISIBLE);
+    }
+
+
+    private void preloadTikTokCovers() {
+        if (adapter == null || layoutManager == null || adapter.getItemCount() == 0) return;
+        int first = layoutManager.findFirstVisibleItemPosition();
+        if (first == RecyclerView.NO_POSITION) first = 0;
+        adapter.preloadTikTokCovers(this, first, 4);
     }
 
     private void saveScrollState(TimelineState state) {
@@ -288,6 +307,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
 
     @Override public void onMore(FeedListItem item) {
         if (item == null) return;
+        if (tiktokPlayerManager != null) tiktokPlayerManager.pauseAndDetach();
         boolean mine = TextUtils.equals(WKConfig.getInstance().getUid(), item.authorUid());
         BottomSheetDialog dialog = new BottomSheetDialog(this);
         LinearLayout container = new LinearLayout(this);
@@ -462,6 +482,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
 
     @Override public void onComment(FeedListItem item, int position) {
         if (item == null) return;
+        if (tiktokPlayerManager != null) tiktokPlayerManager.pauseAndDetach();
         FeedListUser user = item.user;
         FeedCommentBottomSheet sheet = FeedCommentBottomSheet.newInstance(item.feed_id, item.comment_count,
                 item.authorUid(), item.userName(), user == null ? "" : user.avatar, user == null ? "" : user.avatar_cache_key,
@@ -514,8 +535,14 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         FeedImageViewerActivity.open(this, urls, Math.min(selected, Math.max(0, urls.size() - 1)));
     }
 
-    @Override public void onTikTok(FeedListItem item, FeedListMedia media) {
-        if (media != null) TikTokEmbedActivity.open(this, media.external_id, media.external_url);
+    @Override public void onOpenTikTok(FeedListItem item, FeedListMedia media) {
+        if (media == null || TextUtils.isEmpty(media.external_url)) return;
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(media.external_url));
+            startActivity(intent);
+        } catch (Throwable error) {
+            toast(getString(R.string.feedlist_tiktok_failed));
+        }
     }
 
     private void notifyInteraction(String feedId) {
@@ -589,8 +616,14 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         }
     }
 
+    @Override protected void onPause() {
+        if (tiktokPlayerManager != null) tiktokPlayerManager.pauseAndDetach();
+        super.onPause();
+    }
+
     @Override protected void onDestroy() {
         saveScrollState(current);
+        if (tiktokPlayerManager != null) tiktokPlayerManager.release();
         if (wkVBinding != null) wkVBinding.recyclerView.setAdapter(null);
         super.onDestroy();
     }
