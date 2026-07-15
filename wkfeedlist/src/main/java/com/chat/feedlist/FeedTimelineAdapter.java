@@ -20,9 +20,7 @@ import com.chat.feedlist.model.FeedListMedia;
 import com.chat.feedlist.model.FeedListUser;
 import com.chat.feedlist.databinding.ItemFeedTimelineBinding;
 
-import java.text.SimpleDateFormat;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -35,6 +33,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
     public interface Listener {
         void onProfile(FeedListItem item);
         void onMore(FeedListItem item);
+        void onFollow(FeedListItem item);
         void onLike(FeedListItem item, int position);
         void onComment(FeedListItem item, int position);
         void onShare(FeedListItem item);
@@ -63,6 +62,14 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         if (position >= 0 && position < getItemCount()) notifyItemChanged(position, PAYLOAD_INTERACTION);
     }
 
+    public void notifyUserChanged(String uid) {
+        if (TextUtils.isEmpty(uid)) return;
+        for (int i = 0; i < getItemCount(); i++) {
+            FeedListItem item = getItem(i);
+            if (item != null && TextUtils.equals(uid, item.authorUid())) notifyItemChanged(i);
+        }
+    }
+
     @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         return new Holder(ItemFeedTimelineBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
     }
@@ -82,10 +89,10 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
     private void bind(Holder holder, FeedListItem item) {
         ItemFeedTimelineBinding b = holder.binding;
         FeedListUser user = item.user;
-        String uid = !TextUtils.isEmpty(item.uid) ? item.uid : (user == null ? "" : user.uid);
+        String uid = item.authorUid();
         String name = item.userName();
 
-        b.avatarView.setSize(44);
+        b.avatarView.setSize(46);
         String avatarCacheKey = avatarCacheKey(user);
         if (user != null && !TextUtils.isEmpty(user.avatar)) {
             b.avatarView.showAvatarUrl(user.avatar, avatarCacheKey, name, uid);
@@ -105,6 +112,15 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         b.avatarView.setOnClickListener(v -> listener.onProfile(item));
         b.moreBtn.setOnClickListener(v -> listener.onMore(item));
 
+        boolean mine = TextUtils.equals(uid, com.chat.base.config.WKConfig.getInstance().getUid());
+        boolean followed = user != null && user.follow == 1;
+        b.followBtn.setVisibility(!mine && !TextUtils.isEmpty(uid) ? View.VISIBLE : View.GONE);
+        b.followBtn.setText(followed ? R.string.feedlist_followed : R.string.feedlist_follow);
+        b.followBtn.setTextColor(ContextCompat.getColor(b.getRoot().getContext(), followed ? R.color.feedlist_secondary : R.color.feedlist_accent));
+        b.followBtn.setBackgroundResource(followed ? R.drawable.bg_feedlist_followed : R.drawable.bg_feedlist_follow);
+        b.followBtn.setEnabled(!TextUtils.isEmpty(uid));
+        b.followBtn.setOnClickListener(v -> listener.onFollow(item));
+
         bindContent(holder, item);
         bindMedia(holder, item);
         bindActions(holder, item);
@@ -112,7 +128,8 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
 
     private void bindContent(Holder holder, FeedListItem item) {
         ItemFeedTimelineBinding b = holder.binding;
-        boolean hasText = !TextUtils.isEmpty(item.text);
+        String content = item.displayTitle();
+        boolean hasText = !TextUtils.isEmpty(content);
         b.contentTv.setVisibility(hasText ? View.VISIBLE : View.GONE);
         b.expandTv.setVisibility(View.GONE);
         if (!hasText) {
@@ -124,7 +141,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         String key = item.stableKey();
         boolean isExpanded = expanded.contains(key);
         b.contentTv.setTag(key);
-        b.contentTv.setText(item.text);
+        b.contentTv.setText(content);
         b.contentTv.setMaxLines(isExpanded ? Integer.MAX_VALUE : 4);
         b.expandTv.setOnClickListener(v -> {
             expanded.add(key);
@@ -226,6 +243,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
     }
 
     private String relativeTime(Context context, long value, long server) {
+        if (value <= 0) return context.getString(R.string.feedlist_just_now);
         long time = value < 10_000_000_000L ? value * 1000L : value;
         long normalizedServer = server < 10_000_000_000L ? server * 1000L : server;
         long now = server > 0 ? normalizedServer + Math.max(0L, System.currentTimeMillis() - serverTimeLocalAt) : System.currentTimeMillis();
@@ -233,8 +251,9 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         if (sec < 60) return context.getString(R.string.feedlist_just_now);
         if (sec < 3600) return context.getString(R.string.feedlist_minutes_ago, sec / 60);
         if (sec < 86400) return context.getString(R.string.feedlist_hours_ago, sec / 3600);
-        if (sec < 604800) return context.getString(R.string.feedlist_days_ago, sec / 86400);
-        return new SimpleDateFormat("MM-dd", Locale.getDefault()).format(new Date(time));
+        if (sec < 2_592_000L) return context.getString(R.string.feedlist_days_ago, Math.max(1L, sec / 86_400L));
+        if (sec < 31_536_000L) return context.getString(R.string.feedlist_months_ago, Math.max(1L, sec / 2_592_000L));
+        return context.getString(R.string.feedlist_years_ago, Math.max(1L, sec / 31_536_000L));
     }
 
     static final class Holder extends RecyclerView.ViewHolder {
@@ -252,7 +271,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
 
         @Override public boolean areContentsTheSame(@NonNull FeedListItem oldItem, @NonNull FeedListItem newItem) {
             return sameInteraction(oldItem, newItem)
-                    && TextUtils.equals(oldItem.text, newItem.text)
+                    && TextUtils.equals(oldItem.displayTitle(), newItem.displayTitle())
                     && oldItem.created_at == newItem.created_at
                     && sameUser(oldItem.user, newItem.user)
                     && sameMedia(oldItem.safeMedia(), newItem.safeMedia());
@@ -260,7 +279,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
 
         @Override public Object getChangePayload(@NonNull FeedListItem oldItem, @NonNull FeedListItem newItem) {
             boolean onlyInteractionChanged = !sameInteraction(oldItem, newItem)
-                    && TextUtils.equals(oldItem.text, newItem.text)
+                    && TextUtils.equals(oldItem.displayTitle(), newItem.displayTitle())
                     && oldItem.created_at == newItem.created_at
                     && sameUser(oldItem.user, newItem.user)
                     && sameMedia(oldItem.safeMedia(), newItem.safeMedia());

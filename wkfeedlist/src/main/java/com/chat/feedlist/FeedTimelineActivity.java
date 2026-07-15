@@ -51,6 +51,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     private final TimelineState latest = new TimelineState(MODE_LATEST);
     private final TimelineState following = new TimelineState(MODE_FOLLOWING);
     private final Set<String> likeInFlight = new HashSet<>();
+    private final Set<String> followInFlight = new HashSet<>();
     private TimelineState current = latest;
     private FeedTimelineAdapter adapter;
     private LinearLayoutManager layoutManager;
@@ -97,7 +98,13 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     @Override protected void initListener() {
         wkVBinding.latestTab.setOnClickListener(v -> switchMode(latest));
         wkVBinding.followingTab.setOnClickListener(v -> switchMode(following));
-        wkVBinding.publishBtn.setOnClickListener(v -> startActivityForResult(new Intent(this, FeedListPublishActivity.class), REQ_PUBLISH));
+        wkVBinding.publishBtn.setOnClickListener(v -> {
+            try {
+                FeedListPublishActivity.openForResult(this, REQ_PUBLISH);
+            } catch (Throwable error) {
+                toast(getString(R.string.feedlist_publish_open_failed));
+            }
+        });
         wkVBinding.refreshLayout.setOnRefreshListener(layout -> requestPage(current, true));
         wkVBinding.statePanel.setOnClickListener(v -> requestPage(current, true));
         wkVBinding.recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -126,7 +133,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
                 state.cursor = page.cursor == null ? "" : page.cursor;
                 state.hasMore = page.has_more == 1;
                 long elapsedSinceSave = Math.max(0L, System.currentTimeMillis() - page.saved_at);
-                state.serverTime = page.server_time > 0 ? page.server_time + elapsedSinceSave : 0L;
+                state.serverTime = page.server_time > 0 ? normalizeEpochMillis(page.server_time) + elapsedSinceSave : 0L;
                 state.serverTimeLocalAt = System.currentTimeMillis();
                 if (current == state) render(true);
             }
@@ -196,7 +203,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
                 merge(state.items, incoming);
                 state.cursor = result.cursor == null ? "" : result.cursor;
                 state.hasMore = result.has_more == 1 && !TextUtils.isEmpty(state.cursor);
-                state.serverTime = result.server_time;
+                state.serverTime = normalizeEpochMillis(result.server_time);
                 state.serverTimeLocalAt = System.currentTimeMillis();
                 FeedListCache.save(FeedTimelineActivity.this, state.mode, state.items, state.cursor, state.hasMore, currentServerTime(state));
                 if (current == state) render(true);
@@ -270,10 +277,10 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     }
 
     @Override public void onProfile(FeedListItem item) {
-        if (item == null || TextUtils.isEmpty(item.uid)) return;
+        if (item == null || TextUtils.isEmpty(item.authorUid())) return;
         try {
             Class<?> route = Class.forName("com.chat.partner.profile.PartnerProfileRoute");
-            route.getMethod("open", android.content.Context.class, String.class).invoke(null, this, item.uid);
+            route.getMethod("open", android.content.Context.class, String.class).invoke(null, this, item.authorUid());
         } catch (Throwable ignored) {
             toast(getString(R.string.feedlist_action_failed));
         }
@@ -281,7 +288,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
 
     @Override public void onMore(FeedListItem item) {
         if (item == null) return;
-        boolean mine = TextUtils.equals(WKConfig.getInstance().getUid(), item.uid);
+        boolean mine = TextUtils.equals(WKConfig.getInstance().getUid(), item.authorUid());
         BottomSheetDialog dialog = new BottomSheetDialog(this);
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
@@ -335,7 +342,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
 
     private void confirmBlock(FeedListItem item) {
         new AlertDialog.Builder(this).setMessage(R.string.feedlist_block_confirm)
-                .setPositiveButton(R.string.feedlist_block_now, (dialog, which) -> block(item.uid))
+                .setPositiveButton(R.string.feedlist_block_now, (dialog, which) -> block(item.authorUid()))
                 .setNegativeButton(R.string.feedlist_not_now, null).show();
     }
 
@@ -382,6 +389,45 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         render(false);
     }
 
+    @Override public void onFollow(FeedListItem item) {
+        if (item == null) return;
+        String uid = item.authorUid();
+        if (TextUtils.isEmpty(uid) || TextUtils.equals(uid, WKConfig.getInstance().getUid()) || followInFlight.contains(uid)) return;
+        FeedListUser user = item.user;
+        boolean oldFollowed = user != null && user.follow == 1;
+        boolean desired = !oldFollowed;
+        followInFlight.add(uid);
+        syncFollow(uid, desired);
+        adapter.notifyUserChanged(uid);
+        persistStates();
+        FeedListCache.updateFollow(this, uid, desired, false);
+        FeedListModel.getInstance().setFollow(uid, desired, new IRequestResultListener<CommonResponse>() {
+            @Override public void onSuccess(CommonResponse result) {
+                followInFlight.remove(uid);
+                if (isUnavailable()) return;
+                syncFollow(uid, desired);
+                if (!desired) {
+                    removeUser(following.items, uid);
+                    render(false);
+                } else {
+                    adapter.notifyUserChanged(uid);
+                }
+                persistStates();
+                FeedListCache.updateFollow(FeedTimelineActivity.this, uid, desired, true);
+            }
+
+            @Override public void onFail(int code, String msg) {
+                followInFlight.remove(uid);
+                if (isUnavailable()) return;
+                syncFollow(uid, oldFollowed);
+                adapter.notifyUserChanged(uid);
+                persistStates();
+                FeedListCache.updateFollow(FeedTimelineActivity.this, uid, oldFollowed, false);
+                toast(TextUtils.isEmpty(msg) ? getString(R.string.feedlist_action_failed) : msg);
+            }
+        });
+    }
+
     @Override public void onLike(FeedListItem item, int position) {
         if (item == null || TextUtils.isEmpty(item.feed_id) || likeInFlight.contains(item.feed_id)) return;
         likeInFlight.add(item.feed_id);
@@ -418,8 +464,8 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         if (item == null) return;
         FeedListUser user = item.user;
         FeedCommentBottomSheet sheet = FeedCommentBottomSheet.newInstance(item.feed_id, item.comment_count,
-                item.uid, item.userName(), user == null ? "" : user.avatar, user == null ? "" : user.avatar_cache_key,
-                user == null ? "" : user.country_code, user != null && user.follow == 1, item.text);
+                item.authorUid(), item.userName(), user == null ? "" : user.avatar, user == null ? "" : user.avatar_cache_key,
+                user == null ? "" : user.country_code, user != null && user.follow == 1, item.displayTitle());
         sheet.setOnCommentSentListener(delta -> {
             if (isUnavailable()) return;
             int count = Math.max(0, item.comment_count + delta);
@@ -441,7 +487,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
             }
             @Override public void onFail(int code, String msg) {}
         });
-        String shareText = item.text == null ? "" : item.text;
+        String shareText = item.displayTitle();
         FeedListMedia first = item.firstMedia();
         if (first != null && first.isTikTok() && !TextUtils.isEmpty(first.external_url)) {
             shareText += (TextUtils.isEmpty(shareText) ? "" : "\n") + first.external_url;
@@ -495,7 +541,16 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     private void removeUser(ArrayList<FeedListItem> items, String uid) {
         for (int i = items.size() - 1; i >= 0; i--) {
             FeedListItem item = items.get(i);
-            if (item == null || TextUtils.equals(uid, item.uid)) items.remove(i);
+            if (item == null || TextUtils.equals(uid, item.authorUid())) items.remove(i);
+        }
+    }
+
+    private void syncFollow(String uid, boolean followed) {
+        for (TimelineState state : new TimelineState[]{latest, following}) {
+            for (FeedListItem candidate : state.items) {
+                if (candidate == null || !TextUtils.equals(uid, candidate.authorUid()) || candidate.user == null) continue;
+                candidate.user.follow = followed ? 1 : 0;
+            }
         }
     }
 
@@ -543,6 +598,11 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
 
     private boolean isUnavailable() {
         return isFinishing() || isDestroyed() || wkVBinding == null;
+    }
+
+    private static long normalizeEpochMillis(long value) {
+        if (value <= 0) return 0L;
+        return value < 10_000_000_000L ? value * 1000L : value;
     }
 
     private long currentServerTime(TimelineState state) {

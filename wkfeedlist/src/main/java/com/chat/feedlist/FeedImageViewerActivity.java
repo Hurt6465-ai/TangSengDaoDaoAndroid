@@ -46,7 +46,6 @@ public class FeedImageViewerActivity extends Activity {
         binding.pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override public void onPageSelected(int position) { updateIndicator(position, urls.size()); }
         });
-        binding.closeBtn.setOnClickListener(v -> finish());
     }
 
     private void updateIndicator(int position, int size) { binding.indicator.setText((position + 1) + "/" + size); }

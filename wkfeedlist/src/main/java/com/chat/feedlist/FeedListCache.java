@@ -115,7 +115,45 @@ public final class FeedListCache {
     }
 
     public static void removeFeed(Context context, String feedId) { mutate(context, item -> !TextUtils.equals(feedId, item.feed_id)); }
-    public static void removeUser(Context context, String uid) { mutate(context, item -> !TextUtils.equals(uid, item.uid)); }
+    public static void removeUser(Context context, String uid) { mutate(context, item -> !TextUtils.equals(uid, item.authorUid())); }
+
+    public static void updateFollow(Context context, String targetUid, boolean followed, boolean removeFromFollowing) {
+        if (context == null || TextUtils.isEmpty(targetUid)) return;
+        String uid = WKConfig.getInstance().getUid();
+        if (TextUtils.isEmpty(uid)) return;
+        Context app = context.getApplicationContext();
+        IO.execute(() -> {
+            SharedPreferences prefs = app.getSharedPreferences(PREF, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
+            String prefix = PREFIX + uid + ":";
+            for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+                if (!entry.getKey().startsWith(prefix) || !(entry.getValue() instanceof String)) continue;
+                try {
+                    CachedPage page = GSON.fromJson((String) entry.getValue(), CachedPage.class);
+                    if (page == null || page.items == null) continue;
+                    boolean changed = false;
+                    boolean followingMode = "following".equals(page.mode) || entry.getKey().endsWith(":following");
+                    for (int i = page.items.size() - 1; i >= 0; i--) {
+                        FeedListItem item = page.items.get(i);
+                        if (item == null || !TextUtils.equals(targetUid, item.authorUid())) continue;
+                        if (removeFromFollowing && followingMode && !followed) {
+                            page.items.remove(i);
+                            page.cursor = "";
+                            page.has_more = 0;
+                        } else if (item.user != null) {
+                            item.user.follow = followed ? 1 : 0;
+                        }
+                        changed = true;
+                    }
+                    if (changed) {
+                        page.saved_at = System.currentTimeMillis();
+                        editor.putString(entry.getKey(), GSON.toJson(page));
+                    }
+                } catch (Throwable ignored) {}
+            }
+            editor.apply();
+        });
+    }
 
     private interface Keep { boolean test(FeedListItem item); }
     private static void mutate(Context context, Keep keep) {

@@ -35,7 +35,7 @@ public class FeedListMediaGridLayout extends ViewGroup {
 
     public FeedListMediaGridLayout(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
-        gap = dp(3);
+        gap = dp(2);
         setClipChildren(true);
         setClipToPadding(true);
         for (int i = 0; i < MAX; i++) {

@@ -53,6 +53,20 @@ public final class FeedListModel extends WKBaseModel {
         request(createService(FeedListService.class).like(feedId, body), listener);
     }
 
+    public void setFollow(String uid, boolean follow, IRequestResultListener<CommonResponse> listener) {
+        if (TextUtils.isEmpty(uid)) {
+            if (listener != null) listener.onFail(400, "用户不存在");
+            return;
+        }
+        if (follow) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("uid", uid);
+            request(createService(FeedListService.class).follow(body), listener);
+        } else {
+            request(createService(FeedListService.class).unfollow(uid), listener);
+        }
+    }
+
     public void share(String feedId, IRequestResultListener<FeedListInteractionResponse> listener) {
         if (TextUtils.isEmpty(feedId)) {
             if (listener != null) listener.onFail(400, "动态不存在");
