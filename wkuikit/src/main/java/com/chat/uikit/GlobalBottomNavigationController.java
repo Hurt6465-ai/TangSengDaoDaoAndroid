@@ -17,13 +17,24 @@ import com.chat.base.utils.LayoutHelper;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.mikepenz.iconics.IconicsDrawable;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /** 给独立沉浸 Activity 复用主页底部导航，交友仍归属于“语伴”一级入口。 */
 public final class GlobalBottomNavigationController {
     private static final int SELECTED = 0xFF1877F2;
     private static final int NORMAL = 0xFF65676B;
-    private static long lastNavigationAt;
+    private static final AtomicInteger PENDING_MENU_ID = new AtomicInteger(0);
 
     private GlobalBottomNavigationController() {}
+
+    /**
+     * Independent feature Activities (feed/partner/dating) sit on top of TabActivity.
+     * Returning by finish() is safer than launching the singleTask TabActivity with
+     * CLEAR_TOP, which caused lifecycle races on some vendor ROMs.
+     */
+    public static int consumePendingMenuId() {
+        return PENDING_MENU_ID.getAndSet(0);
+    }
 
     public static void attach(Activity activity, BottomNavigationView navigation, int selectedMenuId) {
         if (activity == null || navigation == null) return;
@@ -47,14 +58,24 @@ public final class GlobalBottomNavigationController {
                         if (handled instanceof Boolean && (Boolean) handled) return true;
                     } catch (Throwable ignored) {
                     }
-                    return TabActivity.openFromChild(activity, R.id.i_partner);
+                    PENDING_MENU_ID.set(R.id.i_partner);
+                    activity.finish();
+                    activity.overridePendingTransition(0, 0);
                 }
                 return true;
             }
-            long now = android.os.SystemClock.elapsedRealtime();
-            if (now - lastNavigationAt < 450L) return true;
-            lastNavigationAt = now;
-            return TabActivity.openFromChild(activity, id);
+
+            PENDING_MENU_ID.set(id);
+            navigation.setEnabled(false);
+            try {
+                activity.finish();
+                activity.overridePendingTransition(0, 0);
+                return true;
+            } catch (Throwable error) {
+                PENDING_MENU_ID.compareAndSet(id, 0);
+                navigation.setEnabled(true);
+                return false;
+            }
         });
     }
 
