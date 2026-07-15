@@ -1,7 +1,6 @@
 package com.chat.uikit;
 
 import android.app.Activity;
-import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -49,33 +48,14 @@ public final class GlobalBottomNavigationController {
                         }
                     } catch (Throwable ignored) {
                     }
-                    Intent intent = new Intent(activity, TabActivity.class);
-                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                    intent.putExtra(TabActivity.EXTRA_OPEN_MENU_ID, R.id.i_partner);
-                    activity.startActivity(intent);
-                    activity.overridePendingTransition(0, 0);
+                    TabActivity.openFromChild(activity, R.id.i_partner);
                 }
                 return true;
             }
-            Intent intent = new Intent(activity, TabActivity.class);
-            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            intent.putExtra(TabActivity.EXTRA_OPEN_MENU_ID, id);
-            try {
-                navigation.setEnabled(false);
-                intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                activity.startActivity(intent);
-                activity.overridePendingTransition(0, 0);
-                navigation.postDelayed(() -> {
-                    if (!activity.isFinishing() && !activity.isDestroyed()) navigation.setEnabled(true);
-                }, 350L);
-                // CLEAR_TOP removes this child activity when an existing TabActivity is below it.
-                // If TabActivity must be created, its own initPresenter clears old activities.
-                // Do not call finish() here: doing both caused a lifecycle race on some devices.
-                return true;
-            } catch (Throwable ignored) {
-                navigation.setEnabled(true);
-                return false;
-            }
+            navigation.setEnabled(false);
+            boolean opened = TabActivity.openFromChild(activity, id);
+            if (!opened) navigation.setEnabled(true);
+            return opened;
         });
     }
 
