@@ -21,6 +21,7 @@ import com.mikepenz.iconics.IconicsDrawable;
 public final class GlobalBottomNavigationController {
     private static final int SELECTED = 0xFF1877F2;
     private static final int NORMAL = 0xFF65676B;
+    private static long lastNavigationAt;
 
     private GlobalBottomNavigationController() {}
 
@@ -43,19 +44,17 @@ public final class GlobalBottomNavigationController {
                 if (id == R.id.i_partner && activity.getClass().getName().contains("Dating")) {
                     try {
                         Object handled = EndpointManager.getInstance().invoke("peipe_open_partner_list", activity);
-                        if (handled instanceof Boolean && (Boolean) handled) {
-                            return true;
-                        }
+                        if (handled instanceof Boolean && (Boolean) handled) return true;
                     } catch (Throwable ignored) {
                     }
-                    TabActivity.openFromChild(activity, R.id.i_partner);
+                    return TabActivity.openFromChild(activity, R.id.i_partner);
                 }
                 return true;
             }
-            navigation.setEnabled(false);
-            boolean opened = TabActivity.openFromChild(activity, id);
-            if (!opened) navigation.setEnabled(true);
-            return opened;
+            long now = android.os.SystemClock.elapsedRealtime();
+            if (now - lastNavigationAt < 450L) return true;
+            lastNavigationAt = now;
+            return TabActivity.openFromChild(activity, id);
         });
     }
 
