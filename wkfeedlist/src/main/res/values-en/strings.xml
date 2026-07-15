@@ -31,10 +31,10 @@
     <string name="feedlist_tiktok_failed">This video can’t be played right now.</string>
     <string name="feedlist_open_tiktok">Open in TikTok</string>
     <string name="feedlist_report_reason_title">Reason for reporting</string>
-    <string name="feedlist_just_now">Just now</string>
-    <string name="feedlist_minutes_ago">%1$d min ago</string>
-    <string name="feedlist_hours_ago">%1$d hr ago</string>
-    <string name="feedlist_days_ago">%1$d days ago</string>
+    <string name="feedlist_just_now">Published just now</string>
+    <string name="feedlist_minutes_ago">Published %1$d min ago</string>
+    <string name="feedlist_hours_ago">Published %1$d hr ago</string>
+    <string name="feedlist_days_ago">Published %1$d days ago</string>
     <string-array name="feedlist_report_reasons">
         <item>Sexual or disturbing content</item>
         <item>Harassment or abuse</item>
@@ -68,4 +68,10 @@
     <string name="feedlist_tiktok_publish_url_required">Enter a TikTok link</string>
     <string name="feedlist_tiktok_publish_resolve_failed">Could not load the TikTok video information</string>
     <string name="feedlist_tiktok_publish_preview_first">Load the TikTok preview first</string>
+    <string name="feedlist_follow">Follow</string>
+    <string name="feedlist_followed">Following</string>
+    <string name="feedlist_date_published">Published %1$s</string>
+    <string name="feedlist_publish_open_failed">Unable to open the publisher. Please reinstall or check the feed list module.</string>
+    <string name="feedlist_months_ago">Published %1$d months ago</string>
+    <string name="feedlist_years_ago">Published %1$d years ago</string>
 </resources>
