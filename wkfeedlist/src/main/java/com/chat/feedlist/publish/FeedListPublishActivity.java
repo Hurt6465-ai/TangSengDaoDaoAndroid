@@ -24,6 +24,7 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.bumptech.glide.Glide;
 import com.chat.base.net.IRequestResultListener;
@@ -32,7 +33,6 @@ import com.chat.base.net.ud.WKProgressManager;
 import com.chat.base.net.ud.WKUploader;
 import com.chat.feedlist.FeedListModel;
 import com.chat.feedlist.R;
-
 import com.chat.feedlist.model.FeedListTikTokPreview;
 
 import java.io.File;
@@ -48,70 +48,69 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-/** Image or TikTok publisher. Local video publishing remains in the old full-screen plugin only. */
+/** Publishes images or a TikTok link detected directly from the normal content input. */
 public class FeedListPublishActivity extends AppCompatActivity {
     private static final int REQ_PICK_IMAGES = 101;
+    private static final long TIKTOK_DETECT_DELAY_MS = 550L;
+    private static final Pattern TIKTOK_URL_PATTERN = Pattern.compile(
+            "https?://(?:[a-z0-9-]+\\.)*tiktok\\.com/[^\\s<]+",
+            Pattern.CASE_INSENSITIVE
+    );
 
     public static void openForResult(Activity activity, int requestCode) {
         if (activity == null || activity.isFinishing()) return;
-        Intent intent = new Intent(activity, FeedListPublishActivity.class);
-        activity.startActivityForResult(intent, requestCode);
+        activity.startActivityForResult(new Intent(activity, FeedListPublishActivity.class), requestCode);
     }
 
     private EditText textEt;
     private TextView pickImagesBtn;
-    private TextView pickTikTokBtn;
     private TextView publishBtn;
     private TextView hintTv;
     private TextView progressTv;
     private ProgressBar progressBar;
     private LinearLayout previewRow;
-    private LinearLayout tiktokBox;
-    private EditText tiktokUrlEt;
-    private TextView tiktokResolveBtn;
     private FrameLayout tiktokPreviewBox;
     private ImageView tiktokCoverIv;
     private TextView tiktokTitleTv;
+    private TextView tiktokAuthorTv;
 
     private final ArrayList<Uri> imageUris = new ArrayList<>();
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+
     private FeedListTikTokPreview tiktokPreview;
-    private boolean tiktokMode;
+    private String resolvedTikTokInputUrl = "";
+    private String lastConflictUrl = "";
+    private Runnable pendingTikTokDetection;
+    private int tiktokResolveGeneration;
     private volatile boolean uploading;
     private volatile boolean resolvingTikTok;
-    private boolean updatingTikTokUrl;
 
-    @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        try {
-            setContentView(R.layout.activity_feedlist_publish);
-            bindViews();
-            bindListeners();
-            refreshState();
-            worker.execute(this::cleanupOldUploadCache);
-        } catch (Throwable error) {
-            Toast.makeText(this, getString(R.string.feedlist_publish_open_failed), Toast.LENGTH_LONG).show();
-            finish();
-        }
+        setContentView(R.layout.activity_feedlist_publish);
+        bindViews();
+        bindListeners();
+        refreshState();
+        worker.execute(this::cleanupOldUploadCache);
     }
 
     private void bindViews() {
         textEt = findViewById(R.id.feedlistPublishTextEt);
         pickImagesBtn = findViewById(R.id.feedlistPickImagesBtn);
-        pickTikTokBtn = findViewById(R.id.feedlistPickTikTokBtn);
         publishBtn = findViewById(R.id.feedlistPublishSubmitBtn);
         hintTv = findViewById(R.id.feedlistPublishHintTv);
         progressTv = findViewById(R.id.feedlistUploadProgressTv);
         progressBar = findViewById(R.id.feedlistUploadProgressBar);
         previewRow = findViewById(R.id.feedlistPreviewRow);
-        tiktokBox = findViewById(R.id.feedlistTikTokBox);
-        tiktokUrlEt = findViewById(R.id.feedlistTikTokUrlEt);
-        tiktokResolveBtn = findViewById(R.id.feedlistTikTokResolveBtn);
         tiktokPreviewBox = findViewById(R.id.feedlistTikTokPreview);
         tiktokCoverIv = findViewById(R.id.feedlistTikTokCoverIv);
         tiktokTitleTv = findViewById(R.id.feedlistTikTokTitleTv);
+        tiktokAuthorTv = findViewById(R.id.feedlistTikTokAuthorTv);
     }
 
     private void bindListeners() {
@@ -119,32 +118,26 @@ public class FeedListPublishActivity extends AppCompatActivity {
             if (uploading || resolvingTikTok) toast(getString(R.string.feedlist_publish_wait_upload));
             else finish();
         });
+
         pickImagesBtn.setOnClickListener(v -> {
             if (uploading || resolvingTikTok) return;
-            tiktokMode = false;
-            clearTikTok();
+            String link = extractTikTokUrl(currentText());
+            if (!TextUtils.isEmpty(link) || tiktokPreview != null) {
+                toast(getString(R.string.feedlist_tiktok_images_conflict));
+                return;
+            }
             openImagePicker();
         });
-        pickTikTokBtn.setOnClickListener(v -> {
-            if (uploading || resolvingTikTok) return;
-            tiktokMode = true;
-            imageUris.clear();
-            renderImagePreviews();
-            refreshState();
-        });
-        tiktokResolveBtn.setOnClickListener(v -> resolveTikTok());
-        tiktokUrlEt.addTextChangedListener(new TextWatcher() {
+
+        textEt.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override public void afterTextChanged(Editable editable) {
-                if (updatingTikTokUrl || tiktokPreview == null) return;
-                String value = editable == null ? "" : editable.toString().trim();
-                if (!TextUtils.equals(value, tiktokPreview.url)) {
-                    clearTikTok();
-                    refreshState();
-                }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                scheduleTikTokDetection(String.valueOf(s));
+                refreshState();
             }
+            @Override public void afterTextChanged(Editable s) {}
         });
+
         publishBtn.setOnClickListener(v -> startPublish());
     }
 
@@ -173,17 +166,23 @@ public class FeedListPublishActivity extends AppCompatActivity {
         startActivityForResult(intent, REQ_PICK_IMAGES);
     }
 
-    @Override protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != REQ_PICK_IMAGES || resultCode != RESULT_OK || data == null) return;
-        tiktokMode = false;
-        clearTikTok();
+        if (!TextUtils.isEmpty(extractTikTokUrl(currentText()))) {
+            toast(getString(R.string.feedlist_tiktok_images_conflict));
+            return;
+        }
         ClipData clip = data.getClipData();
         if (clip != null) {
-            for (int i = 0; i < clip.getItemCount() && imageUris.size() < FeedListPublishConfig.IMAGE_MAX_SELECT_COUNT; i++) {
+            for (int i = 0; i < clip.getItemCount()
+                    && imageUris.size() < FeedListPublishConfig.IMAGE_MAX_SELECT_COUNT; i++) {
                 addImage(clip.getItemAt(i).getUri());
             }
-        } else addImage(data.getData());
+        } else {
+            addImage(data.getData());
+        }
         renderImagePreviews();
         refreshState();
     }
@@ -194,58 +193,117 @@ public class FeedListPublishActivity extends AppCompatActivity {
         imageUris.add(uri);
     }
 
-    private void resolveTikTok() {
-        String url = tiktokUrlEt.getText() == null ? "" : tiktokUrlEt.getText().toString().trim();
-        if (TextUtils.isEmpty(url) || resolvingTikTok || uploading) {
-            if (TextUtils.isEmpty(url)) toast(getString(R.string.feedlist_tiktok_publish_url_required));
+    private void scheduleTikTokDetection(String text) {
+        if (pendingTikTokDetection != null) main.removeCallbacks(pendingTikTokDetection);
+        pendingTikTokDetection = () -> detectTikTokUrl(text);
+        main.postDelayed(pendingTikTokDetection, TIKTOK_DETECT_DELAY_MS);
+    }
+
+    private void detectTikTokUrl(String text) {
+        if (isFinishing() || isDestroyed() || uploading) return;
+        String url = extractTikTokUrl(text);
+        if (TextUtils.isEmpty(url)) {
+            lastConflictUrl = "";
+            tiktokResolveGeneration++;
+            resolvingTikTok = false;
+            clearTikTokPreview();
+            refreshState();
             return;
         }
+
+        if (!imageUris.isEmpty()) {
+            tiktokResolveGeneration++;
+            resolvingTikTok = false;
+            clearTikTokPreview();
+            if (!TextUtils.equals(lastConflictUrl, url)) {
+                lastConflictUrl = url;
+                toast(getString(R.string.feedlist_tiktok_images_conflict));
+            }
+            refreshState();
+            return;
+        }
+
+        lastConflictUrl = "";
+        if (tiktokPreview != null && TextUtils.equals(url, resolvedTikTokInputUrl)) {
+            refreshState();
+            return;
+        }
+        resolveTikTok(url);
+    }
+
+    private void resolveTikTok(String url) {
+        int generation = ++tiktokResolveGeneration;
         resolvingTikTok = true;
-        setInputsEnabled(false);
-        tiktokResolveBtn.setText(R.string.feedlist_tiktok_publish_resolving);
+        clearTikTokPreview();
+        refreshState();
+
         FeedListModel.getInstance().tiktokPreview(url, new IRequestResultListener<>() {
-            @Override public void onSuccess(FeedListTikTokPreview result) {
+            @Override
+            public void onSuccess(FeedListTikTokPreview result) {
+                if (isFinishing() || isDestroyed() || generation != tiktokResolveGeneration) return;
                 resolvingTikTok = false;
-                if (isFinishing() || isDestroyed()) return;
-                setInputsEnabled(true);
-                tiktokResolveBtn.setText(R.string.feedlist_tiktok_publish_preview);
+                String currentUrl = extractTikTokUrl(currentText());
+                if (!TextUtils.equals(url, currentUrl)) return;
                 if (result == null || TextUtils.isEmpty(result.video_id) || TextUtils.isEmpty(result.cover_url)) {
                     toast(getString(R.string.feedlist_tiktok_publish_resolve_failed));
+                    refreshState();
                     return;
                 }
                 tiktokPreview = result;
-                updatingTikTokUrl = true;
-                tiktokUrlEt.setText(result.url);
-                tiktokUrlEt.setSelection(tiktokUrlEt.length());
-                updatingTikTokUrl = false;
+                resolvedTikTokInputUrl = url;
                 tiktokPreviewBox.setVisibility(View.VISIBLE);
                 tiktokTitleTv.setText(TextUtils.isEmpty(result.title) ? "TikTok" : result.title);
-                Glide.with(FeedListPublishActivity.this).load(result.cover_url).centerCrop().into(tiktokCoverIv);
+                String author = result.author_name == null ? "" : result.author_name.trim();
+                if (!TextUtils.isEmpty(author) && !author.startsWith("@")) author = "@" + author;
+                tiktokAuthorTv.setText(TextUtils.isEmpty(author) ? "TikTok" : author);
+                Glide.with(FeedListPublishActivity.this)
+                        .load(result.cover_url)
+                        .centerCrop()
+                        .into(tiktokCoverIv);
                 refreshState();
             }
 
-            @Override public void onFail(int code, String msg) {
+            @Override
+            public void onFail(int code, String msg) {
+                if (isFinishing() || isDestroyed() || generation != tiktokResolveGeneration) return;
                 resolvingTikTok = false;
-                if (isFinishing() || isDestroyed()) return;
-                setInputsEnabled(true);
-                tiktokResolveBtn.setText(R.string.feedlist_tiktok_publish_preview);
-                toast(TextUtils.isEmpty(msg) ? getString(R.string.feedlist_tiktok_publish_resolve_failed) : msg);
+                toast(TextUtils.isEmpty(msg)
+                        ? getString(R.string.feedlist_tiktok_publish_resolve_failed)
+                        : msg);
+                refreshState();
             }
         });
     }
 
-    private void clearTikTok() {
+    private void clearTikTokPreview() {
         tiktokPreview = null;
+        resolvedTikTokInputUrl = "";
         if (tiktokPreviewBox != null) tiktokPreviewBox.setVisibility(View.GONE);
         if (tiktokCoverIv != null) Glide.with(this).clear(tiktokCoverIv);
+        if (tiktokTitleTv != null) tiktokTitleTv.setText("");
+        if (tiktokAuthorTv != null) tiktokAuthorTv.setText("");
     }
 
     private void refreshState() {
-        tiktokBox.setVisibility(tiktokMode ? View.VISIBLE : View.GONE);
-        hintTv.setText(getString(R.string.feedlist_publish_storage_hint));
-        boolean hasMedia = !imageUris.isEmpty() || (tiktokMode && tiktokPreview != null);
-        publishBtn.setEnabled(hasMedia && !uploading && !resolvingTikTok);
+        boolean hasTikTokUrl = !TextUtils.isEmpty(extractTikTokUrl(currentText()));
+        boolean conflict = hasTikTokUrl && !imageUris.isEmpty();
+        if (conflict) {
+            hintTv.setText(R.string.feedlist_tiktok_images_conflict);
+            hintTv.setTextColor(ContextCompat.getColor(this, R.color.feedlist_danger));
+        } else if (resolvingTikTok) {
+            hintTv.setText(R.string.feedlist_tiktok_publish_resolving);
+            hintTv.setTextColor(ContextCompat.getColor(this, R.color.feedlist_secondary));
+        } else {
+            hintTv.setText(R.string.feedlist_publish_storage_hint);
+            hintTv.setTextColor(ContextCompat.getColor(this, R.color.feedlist_secondary));
+        }
+
+        boolean previewMatches = tiktokPreview != null && TextUtils.equals(hasTikTokUrl ? extractTikTokUrl(currentText()) : "", resolvedTikTokInputUrl);
+        boolean hasMedia = !imageUris.isEmpty() || previewMatches;
+        publishBtn.setEnabled(hasMedia && !conflict && !uploading && !resolvingTikTok);
         publishBtn.setAlpha(publishBtn.isEnabled() ? 1f : 0.45f);
+        pickImagesBtn.setEnabled(!uploading && !resolvingTikTok && !hasTikTokUrl && tiktokPreview == null);
+        pickImagesBtn.setAlpha(pickImagesBtn.isEnabled() ? 1f : 0.45f);
     }
 
     private void renderImagePreviews() {
@@ -263,6 +321,7 @@ public class FeedListPublishActivity extends AppCompatActivity {
                 if (!uploading && index < imageUris.size()) {
                     imageUris.remove(index);
                     renderImagePreviews();
+                    scheduleTikTokDetection(currentText());
                     refreshState();
                 }
             });
@@ -272,24 +331,38 @@ public class FeedListPublishActivity extends AppCompatActivity {
 
     private void startPublish() {
         if (uploading) return;
-        if (tiktokMode && tiktokPreview == null) {
-            toast(getString(R.string.feedlist_tiktok_publish_preview_first));
+        if (resolvingTikTok) {
+            toast(getString(R.string.feedlist_tiktok_publish_resolving));
             return;
         }
-        if (!tiktokMode && imageUris.isEmpty()) {
+
+        String currentUrl = extractTikTokUrl(currentText());
+        if (!TextUtils.isEmpty(currentUrl) && !imageUris.isEmpty()) {
+            toast(getString(R.string.feedlist_tiktok_images_conflict));
+            return;
+        }
+        if (!TextUtils.isEmpty(currentUrl)
+                && (tiktokPreview == null || !TextUtils.equals(currentUrl, resolvedTikTokInputUrl))) {
+            toast(getString(R.string.feedlist_tiktok_publish_preview_first));
+            scheduleTikTokDetection(currentText());
+            return;
+        }
+        if (TextUtils.isEmpty(currentUrl) && imageUris.isEmpty()) {
             toast(getString(R.string.feedlist_publish_select_media));
             return;
         }
+
         FeedListTikTokPreview previewSnapshot = tiktokPreview;
         ArrayList<Uri> imageSnapshot = new ArrayList<>(imageUris);
-        boolean publishTikTokMode = tiktokMode;
+        boolean publishTikTok = previewSnapshot != null && TextUtils.equals(currentUrl, resolvedTikTokInputUrl);
         uploading = true;
         setInputsEnabled(false);
         refreshState();
-        String raw = textEt.getText() == null ? "" : textEt.getText().toString();
+
+        String raw = stripTikTokUrl(currentText(), currentUrl);
         int codePoints = raw.codePointCount(0, raw.length());
         String text = codePoints > 280 ? raw.substring(0, raw.offsetByCodePoints(0, 280)) : raw;
-        if (publishTikTokMode) worker.execute(() -> publishTikTok(text, previewSnapshot));
+        if (publishTikTok) worker.execute(() -> publishTikTok(text, previewSnapshot));
         else worker.execute(() -> publishImages(text, imageSnapshot));
     }
 
@@ -355,7 +428,9 @@ public class FeedListPublishActivity extends AppCompatActivity {
 
     private String uploadFile(File file, int index, int total) throws Exception {
         FeedListModel.FeedUploadUrl upload = awaitUploadUrl(file.getAbsolutePath());
-        if (upload == null || TextUtils.isEmpty(upload.url)) throw new IllegalStateException(getString(R.string.feedlist_publish_upload_url_failed));
+        if (upload == null || TextUtils.isEmpty(upload.url)) {
+            throw new IllegalStateException(getString(R.string.feedlist_publish_upload_url_failed));
+        }
         String tag = "feedlist_upload_" + UUID.randomUUID();
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<String> result = new AtomicReference<>("");
@@ -379,7 +454,9 @@ public class FeedListPublishActivity extends AppCompatActivity {
             }
         });
         try {
-            if (!latch.await(120, TimeUnit.SECONDS)) throw new IllegalStateException(getString(R.string.feedlist_publish_upload_timeout));
+            if (!latch.await(120, TimeUnit.SECONDS)) {
+                throw new IllegalStateException(getString(R.string.feedlist_publish_upload_timeout));
+            }
             if (error.get() != null) throw error.get();
             return normalizeUploadedPath(result.get());
         } finally {
@@ -392,10 +469,18 @@ public class FeedListPublishActivity extends AppCompatActivity {
         AtomicReference<FeedListModel.FeedUploadUrl> value = new AtomicReference<>();
         AtomicReference<Exception> error = new AtomicReference<>();
         FeedListModel.getInstance().getUploadUrl(path, new IRequestResultListener<>() {
-            @Override public void onSuccess(FeedListModel.FeedUploadUrl result) { value.set(result); latch.countDown(); }
-            @Override public void onFail(int code, String msg) { error.set(new IllegalStateException(msg)); latch.countDown(); }
+            @Override public void onSuccess(FeedListModel.FeedUploadUrl result) {
+                value.set(result);
+                latch.countDown();
+            }
+            @Override public void onFail(int code, String msg) {
+                error.set(new IllegalStateException(msg));
+                latch.countDown();
+            }
         });
-        if (!latch.await(30, TimeUnit.SECONDS)) throw new IllegalStateException(getString(R.string.feedlist_publish_upload_url_failed));
+        if (!latch.await(30, TimeUnit.SECONDS)) {
+            throw new IllegalStateException(getString(R.string.feedlist_publish_upload_url_failed));
+        }
         if (error.get() != null) throw error.get();
         return value.get();
     }
@@ -405,9 +490,14 @@ public class FeedListPublishActivity extends AppCompatActivity {
         AtomicReference<Exception> error = new AtomicReference<>();
         FeedListModel.getInstance().publish(text, media, new IRequestResultListener<CommonResponse>() {
             @Override public void onSuccess(CommonResponse result) { latch.countDown(); }
-            @Override public void onFail(int code, String msg) { error.set(new IllegalStateException(msg)); latch.countDown(); }
+            @Override public void onFail(int code, String msg) {
+                error.set(new IllegalStateException(msg));
+                latch.countDown();
+            }
         });
-        if (!latch.await(30, TimeUnit.SECONDS)) throw new IllegalStateException(getString(R.string.feedlist_publish_failed));
+        if (!latch.await(30, TimeUnit.SECONDS)) {
+            throw new IllegalStateException(getString(R.string.feedlist_publish_failed));
+        }
         if (error.get() != null) throw error.get();
     }
 
@@ -415,14 +505,18 @@ public class FeedListPublishActivity extends AppCompatActivity {
         File out = new File(dir, "raw_" + System.nanoTime() + ".img");
         long maxBytes = FeedListPublishConfig.IMAGE_MAX_SOURCE_MB * 1024L * 1024L;
         long total = 0L;
-        try (InputStream input = getContentResolver().openInputStream(uri); FileOutputStream output = new FileOutputStream(out)) {
+        try (InputStream input = getContentResolver().openInputStream(uri);
+             FileOutputStream output = new FileOutputStream(out)) {
             if (input == null) throw new IllegalStateException(getString(R.string.feedlist_publish_file_missing));
             byte[] buffer = new byte[128 * 1024];
             int read;
             while ((read = input.read(buffer)) != -1) {
                 total += read;
                 if (total > maxBytes) {
-                    throw new IllegalStateException(getString(R.string.feedlist_publish_source_too_large, FeedListPublishConfig.IMAGE_MAX_SOURCE_MB));
+                    throw new IllegalStateException(getString(
+                            R.string.feedlist_publish_source_too_large,
+                            FeedListPublishConfig.IMAGE_MAX_SOURCE_MB
+                    ));
                 }
                 output.write(buffer, 0, read);
             }
@@ -461,24 +555,25 @@ public class FeedListPublishActivity extends AppCompatActivity {
             uploading = false;
             setInputsEnabled(true);
             refreshState();
-            String message = error == null || TextUtils.isEmpty(error.getMessage()) ? getString(R.string.feedlist_publish_failed) : error.getMessage();
+            String message = error == null || TextUtils.isEmpty(error.getMessage())
+                    ? getString(R.string.feedlist_publish_failed)
+                    : error.getMessage();
             setProgress(0, message);
             toast(message);
         });
     }
 
-
     private void setInputsEnabled(boolean enabled) {
         textEt.setEnabled(enabled);
-        pickImagesBtn.setEnabled(enabled);
-        pickTikTokBtn.setEnabled(enabled);
-        tiktokUrlEt.setEnabled(enabled);
-        tiktokResolveBtn.setEnabled(enabled && !resolvingTikTok);
+        pickImagesBtn.setEnabled(enabled && TextUtils.isEmpty(extractTikTokUrl(currentText())) && tiktokPreview == null);
     }
 
     private static void deleteQuietly(File file) {
         if (file == null) return;
-        try { if (file.exists()) file.delete(); } catch (Throwable ignored) {}
+        try {
+            if (file.exists()) file.delete();
+        } catch (Throwable ignored) {
+        }
     }
 
     private void setProgressAsync(int value, String text) {
@@ -486,11 +581,41 @@ public class FeedListPublishActivity extends AppCompatActivity {
             if (!isFinishing() && !isDestroyed()) setProgress(value, text);
         });
     }
+
     private void setProgress(int value, String text) {
         progressBar.setVisibility(View.VISIBLE);
         progressTv.setVisibility(View.VISIBLE);
         progressBar.setProgress(Math.max(0, Math.min(100, value)));
         progressTv.setText(text);
+    }
+
+    private String currentText() {
+        return textEt == null || textEt.getText() == null ? "" : textEt.getText().toString();
+    }
+
+    private String extractTikTokUrl(String text) {
+        if (TextUtils.isEmpty(text)) return "";
+        Matcher matcher = TIKTOK_URL_PATTERN.matcher(text);
+        if (!matcher.find()) return "";
+        String url = matcher.group();
+        while (!TextUtils.isEmpty(url)) {
+            char last = url.charAt(url.length() - 1);
+            if (last == ')' || last == ']' || last == '}' || last == ',' || last == '.'
+                    || last == '，' || last == '。' || last == ';' || last == '；') {
+                url = url.substring(0, url.length() - 1);
+            } else {
+                break;
+            }
+        }
+        return url.trim();
+    }
+
+    private String stripTikTokUrl(String text, String url) {
+        if (TextUtils.isEmpty(text) || TextUtils.isEmpty(url)) return text == null ? "" : text.trim();
+        return text.replace(url, "")
+                .replaceAll("[ \\t]+\\n", "\\n")
+                .replaceAll("\\n{3,}", "\\n\\n")
+                .trim();
     }
 
     private String normalizeUploadedPath(String path) {
@@ -505,10 +630,16 @@ public class FeedListPublishActivity extends AppCompatActivity {
         return value;
     }
 
-    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
-    private void toast(String text) { Toast.makeText(this, text, Toast.LENGTH_SHORT).show(); }
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
 
-    @Override public void onBackPressed() {
+    private void toast(String text) {
+        Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onBackPressed() {
         if (uploading || resolvingTikTok) {
             toast(getString(R.string.feedlist_publish_wait_upload));
             return;
@@ -516,7 +647,11 @@ public class FeedListPublishActivity extends AppCompatActivity {
         super.onBackPressed();
     }
 
-    @Override protected void onDestroy() {
+    @Override
+    protected void onDestroy() {
+        tiktokResolveGeneration++;
+        if (pendingTikTokDetection != null) main.removeCallbacks(pendingTikTokDetection);
+        if (tiktokCoverIv != null) Glide.with(this).clear(tiktokCoverIv);
         worker.shutdownNow();
         super.onDestroy();
     }
