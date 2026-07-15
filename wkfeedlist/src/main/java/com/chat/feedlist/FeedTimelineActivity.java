@@ -529,8 +529,9 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     }
 
     @Override public void onTikTok(FeedListItem item, FeedListMedia media) {
-        if (media == null) return;
-        TikTokEmbedActivity.open(this, media.tiktokVideoId(), media.external_url);
+        if (media != null) {
+            TikTokEmbedActivity.open(this, media.external_id, media.external_url);
+        }
     }
 
     @Override public void onOpenTikTok(FeedListItem item, FeedListMedia media) {

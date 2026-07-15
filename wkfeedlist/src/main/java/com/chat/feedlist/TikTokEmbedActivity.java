@@ -17,9 +17,13 @@ import android.webkit.WebViewClient;
 
 import androidx.annotation.Nullable;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.chat.feedlist.databinding.ActivityTiktokEmbedBinding;
 
 public class TikTokEmbedActivity extends Activity {
+    private static final Pattern VIDEO_ID_PATTERN = Pattern.compile("(?:/video/|/v/)([0-9]{8,32})", Pattern.CASE_INSENSITIVE);
     private static final String EXTRA_ID = "video_id";
     private static final String EXTRA_URL = "external_url";
     private ActivityTiktokEmbedBinding binding;
@@ -27,9 +31,11 @@ public class TikTokEmbedActivity extends Activity {
     private String externalUrl;
 
     public static void open(Context context, String videoId, String externalUrl) {
-        if (context == null || TextUtils.isEmpty(videoId)) return;
+        if (context == null) return;
+        String resolvedId = resolveVideoId(videoId, externalUrl);
+        if (TextUtils.isEmpty(resolvedId) && !isAllowedTikTokUri(Uri.parse(String.valueOf(externalUrl)))) return;
         Intent intent = new Intent(context, TikTokEmbedActivity.class);
-        intent.putExtra(EXTRA_ID, videoId);
+        intent.putExtra(EXTRA_ID, resolvedId);
         intent.putExtra(EXTRA_URL, externalUrl);
         context.startActivity(intent);
     }
@@ -39,9 +45,12 @@ public class TikTokEmbedActivity extends Activity {
         super.onCreate(savedInstanceState);
         binding = ActivityTiktokEmbedBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        videoId = getIntent().getStringExtra(EXTRA_ID);
+        videoId = resolveVideoId(getIntent().getStringExtra(EXTRA_ID), getIntent().getStringExtra(EXTRA_URL));
         externalUrl = getIntent().getStringExtra(EXTRA_URL);
-        if (TextUtils.isEmpty(videoId) || !videoId.matches("[0-9]{8,32}")) { finish(); return; }
+        if (TextUtils.isEmpty(videoId) && !isAllowedTikTokUri(Uri.parse(String.valueOf(externalUrl)))) {
+            finish();
+            return;
+        }
         binding.backBtn.setOnClickListener(v -> finish());
         binding.openExternalBtn.setOnClickListener(v -> openExternal());
         WebSettings settings = binding.webView.getSettings();
@@ -67,7 +76,12 @@ public class TikTokEmbedActivity extends Activity {
                 if (request != null && request.isForMainFrame() && response != null && response.getStatusCode() >= 400) showError();
             }
         });
-        binding.webView.loadUrl("https://www.tiktok.com/player/v1/" + videoId + "?autoplay=1&controls=1");
+        if (!TextUtils.isEmpty(videoId)) {
+            binding.webView.loadUrl("https://www.tiktok.com/player/v1/" + videoId + "?autoplay=1&controls=1");
+        } else {
+            // Last-resort compatibility for old/short-link rows whose video_id was never stored.
+            binding.webView.loadUrl(externalUrl);
+        }
     }
 
     private void showError() {
@@ -82,6 +96,14 @@ public class TikTokEmbedActivity extends Activity {
         if (!isAllowedTikTokUri(uri)) return;
         try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
         catch (Throwable ignored) {}
+    }
+
+    private static String resolveVideoId(String videoId, String externalUrl) {
+        String value = videoId == null ? "" : videoId.trim();
+        if (value.matches("[0-9]{8,32}")) return value;
+        String url = externalUrl == null ? "" : externalUrl.trim();
+        Matcher matcher = VIDEO_ID_PATTERN.matcher(url);
+        return matcher.find() ? matcher.group(1) : "";
     }
 
     private static boolean isAllowedTikTokUri(Uri uri) {
