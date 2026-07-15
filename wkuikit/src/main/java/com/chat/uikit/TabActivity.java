@@ -53,6 +53,7 @@ import com.chat.uikit.fragment.WebTabFragment;
 import com.chat.uikit.user.service.UserModel;
 import com.mikepenz.iconics.IconicsDrawable;
 
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -63,6 +64,7 @@ import java.util.List;
 public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     public static final String EXTRA_OPEN_MENU_ID = "open_menu_id";
     private static volatile int pendingOpenMenuId;
+    private static WeakReference<TabActivity> activeInstance = new WeakReference<>(null);
     // 底部顺序：学习｜语伴｜聊天｜发现｜社区。聊天保持正中间，默认打开学习。
     private static final int TAB_STUDY = 0;
     private static final int TAB_PARTNER = 1;
@@ -88,26 +90,37 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private final List<Fragment> fragments = new ArrayList<>(5);
     private int initialRequestedMenuId;
 
-    /** Bring the singleTask root page to front without CLEAR_TOP lifecycle races. */
+    /**
+     * Return from a child full-screen page to the already existing root TabActivity.
+     * The normal path only finishes the child; TabActivity.onResume consumes the pending menu.
+     * This avoids CLEAR_TOP/REORDER_TO_FRONT lifecycle races on customized Android ROMs.
+     */
     public static boolean openFromChild(Activity source, int menuId) {
         if (source == null || source.isFinishing()) return false;
         pendingOpenMenuId = menuId;
+        TabActivity host = activeInstance.get();
+        if (host != null && !host.isFinishing() && !host.isDestroyed()) {
+            try {
+                source.finish();
+                source.overridePendingTransition(0, 0);
+                return true;
+            } catch (Throwable error) {
+                pendingOpenMenuId = 0;
+                return false;
+            }
+        }
+
         Intent intent = new Intent(source, TabActivity.class);
         intent.putExtra(EXTRA_OPEN_MENU_ID, menuId);
-        intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
                 | Intent.FLAG_ACTIVITY_SINGLE_TOP
                 | Intent.FLAG_ACTIVITY_NO_ANIMATION);
         try {
             source.startActivity(intent);
             source.overridePendingTransition(0, 0);
-            source.getWindow().getDecorView().post(() -> {
-                if (!source.isFinishing() && !source.isDestroyed()) {
-                    source.finish();
-                    source.overridePendingTransition(0, 0);
-                }
-            });
+            source.finish();
             return true;
-        } catch (Throwable ignored) {
+        } catch (Throwable error) {
             pendingOpenMenuId = 0;
             return false;
         }
@@ -429,8 +442,16 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     }
 
     @Override
+    protected void onDestroy() {
+        TabActivity host = activeInstance.get();
+        if (host == this) activeInstance.clear();
+        super.onDestroy();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        activeInstance = new WeakReference<>(this);
         int pendingMenu = takeRequestedMenuId(null);
         if (pendingMenu != 0) handleExternalMenu(pendingMenu);
         if (wkVBinding != null && wkVBinding.vp != null) {
