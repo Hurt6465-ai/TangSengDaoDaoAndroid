@@ -5,4 +5,12 @@
         <item name="android:navigationBarColor">#000000</item>
         <item name="android:windowBackground">#000000</item>
     </style>
+    <style name="FeedListPublishTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/feedlist_page_bg</item>
+        <item name="android:navigationBarColor">@color/feedlist_page_bg</item>
+        <item name="colorPrimary">@color/feedlist_accent</item>
+        <item name="colorAccent">@color/feedlist_accent</item>
+    </style>
 </resources>
