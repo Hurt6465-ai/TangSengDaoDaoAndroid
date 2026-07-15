@@ -45,7 +45,6 @@ public final class GlobalBottomNavigationController {
                     try {
                         Object handled = EndpointManager.getInstance().invoke("peipe_open_partner_list", activity);
                         if (handled instanceof Boolean && (Boolean) handled) {
-                            activity.finish();
                             return true;
                         }
                     } catch (Throwable ignored) {
@@ -54,16 +53,29 @@ public final class GlobalBottomNavigationController {
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                     intent.putExtra(TabActivity.EXTRA_OPEN_MENU_ID, R.id.i_partner);
                     activity.startActivity(intent);
-                    activity.finish();
+                    activity.overridePendingTransition(0, 0);
                 }
                 return true;
             }
             Intent intent = new Intent(activity, TabActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             intent.putExtra(TabActivity.EXTRA_OPEN_MENU_ID, id);
-            activity.startActivity(intent);
-            activity.finish();
-            return true;
+            try {
+                navigation.setEnabled(false);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                activity.startActivity(intent);
+                activity.overridePendingTransition(0, 0);
+                navigation.postDelayed(() -> {
+                    if (!activity.isFinishing() && !activity.isDestroyed()) navigation.setEnabled(true);
+                }, 350L);
+                // CLEAR_TOP removes this child activity when an existing TabActivity is below it.
+                // If TabActivity must be created, its own initPresenter clears old activities.
+                // Do not call finish() here: doing both caused a lifecycle race on some devices.
+                return true;
+            } catch (Throwable ignored) {
+                navigation.setEnabled(true);
+                return false;
+            }
         });
     }
 
