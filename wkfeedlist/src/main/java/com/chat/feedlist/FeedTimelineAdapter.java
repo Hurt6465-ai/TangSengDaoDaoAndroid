@@ -51,11 +51,11 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         void onComment(FeedListItem item, int position);
         void onShare(FeedListItem item);
         void onImages(FeedListItem item, int index, List<FeedListMedia> media);
+        void onTikTok(FeedListItem item, FeedListMedia media);
         void onOpenTikTok(FeedListItem item, FeedListMedia media);
     }
 
     private final Listener listener;
-    private final TikTokInlinePlayerManager playerManager;
     private final Set<String> expanded = new HashSet<>();
     private final Set<String> tiktokResolveInFlight = new HashSet<>();
     private final Map<String, Long> tiktokResolveFailedAt = new HashMap<>();
@@ -63,10 +63,9 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
     private long serverTime;
     private long serverTimeLocalAt;
 
-    public FeedTimelineAdapter(Listener listener, TikTokInlinePlayerManager playerManager) {
+    public FeedTimelineAdapter(Listener listener) {
         super(DIFF);
         this.listener = listener;
-        this.playerManager = playerManager;
         setHasStableIds(true);
     }
 
@@ -130,12 +129,6 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
     }
 
     private void bind(Holder holder, FeedListItem item) {
-        long newItemId = item.stableId();
-        if (holder.boundItemId != RecyclerView.NO_ID && holder.boundItemId != newItemId) {
-            playerManager.detachIfOwner(holder.boundItemId);
-        }
-        holder.boundItemId = newItemId;
-
         ItemFeedTimelineBinding b = holder.binding;
         FeedListUser user = item.user;
         String uid = item.authorUid();
@@ -223,16 +216,16 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             String author = first.external_author == null ? "" : first.external_author.trim();
             if (author.startsWith("@")) author = author.substring(1);
             b.tiktokSourceTv.setText(TextUtils.isEmpty(author) ? "TikTok" : "TikTok · @" + author);
+
             boolean hasOriginalUrl = !TextUtils.isEmpty(first.external_url);
             b.tiktokOpenTv.setVisibility(hasOriginalUrl ? View.VISIBLE : View.GONE);
-            b.tiktokSourceTv.setClickable(hasOriginalUrl);
+            b.tiktokOpenTv.setOnClickListener(hasOriginalUrl ? v -> listener.onOpenTikTok(item, first) : null);
+            b.tiktokSourceTv.setOnClickListener(hasOriginalUrl ? v -> listener.onOpenTikTok(item, first) : null);
 
-            if (!playerManager.isOwner(item.stableId())) {
-                b.tiktokCoverIv.setVisibility(View.VISIBLE);
-                b.tiktokShade.setVisibility(View.VISIBLE);
-                b.tiktokPlayBtn.setVisibility(View.VISIBLE);
-                b.tiktokProgress.setVisibility(View.GONE);
-            }
+            b.tiktokCoverIv.setVisibility(View.VISIBLE);
+            b.tiktokShade.setVisibility(View.VISIBLE);
+            b.tiktokPlayBtn.setVisibility(View.VISIBLE);
+            b.tiktokProgress.setVisibility(View.GONE);
 
             String coverUrl = first.tiktokCoverUrl();
             if (TextUtils.isEmpty(coverUrl)) {
@@ -281,23 +274,14 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                     resolveTikTokMetadata(item, first, holder, true);
                     return;
                 }
-                playerManager.play(
-                        item.stableId(),
-                        videoId,
-                        b.tiktokBox,
-                        b.tiktokCoverIv,
-                        b.tiktokShade,
-                        b.tiktokPlayBtn,
-                        b.tiktokProgress
-                );
+                listener.onTikTok(item, first);
             };
+            b.tiktokBox.setOnClickListener(playClick);
             b.tiktokCoverIv.setOnClickListener(playClick);
             b.tiktokPlayBtn.setOnClickListener(playClick);
-            b.tiktokSourceTv.setOnClickListener(hasOriginalUrl ? v -> listener.onOpenTikTok(item, first) : null);
-            b.tiktokOpenTv.setOnClickListener(hasOriginalUrl ? v -> listener.onOpenTikTok(item, first) : null);
         } else {
-            playerManager.detachIfOwner(holder.boundItemId);
             Glide.with(b.tiktokCoverIv).clear(b.tiktokCoverIv);
+            b.tiktokBox.setOnClickListener(null);
             b.tiktokCoverIv.setOnClickListener(null);
             b.tiktokPlayBtn.setOnClickListener(null);
             b.tiktokSourceTv.setOnClickListener(null);
@@ -344,19 +328,13 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                 int position = findPosition(item.stableId());
                 if (position != RecyclerView.NO_POSITION) notifyItemChanged(position);
 
-                if (autoPlay && holder != null && holder.boundItemId == item.stableId()) {
+                if (autoPlay && holder != null) {
                     holder.itemView.post(() -> {
-                        if (holder.boundItemId != item.stableId()) return;
-                        ItemFeedTimelineBinding binding = holder.binding;
-                        playerManager.play(
-                                item.stableId(),
-                                media.tiktokVideoId(),
-                                binding.tiktokBox,
-                                binding.tiktokCoverIv,
-                                binding.tiktokShade,
-                                binding.tiktokPlayBtn,
-                                binding.tiktokProgress
-                        );
+                        int positionNow = holder.getBindingAdapterPosition();
+                        if (positionNow == RecyclerView.NO_POSITION) return;
+                        FeedListItem current = getItem(positionNow);
+                        if (current == null || current.stableId() != item.stableId()) return;
+                        listener.onTikTok(item, media);
                     });
                 }
             }
@@ -430,8 +408,6 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
 
     @Override
     public void onViewRecycled(@NonNull Holder holder) {
-        playerManager.detachIfOwner(holder.boundItemId);
-        holder.boundItemId = RecyclerView.NO_ID;
         holder.binding.contentTv.setTag(null);
         holder.binding.mediaGrid.clearImages();
         Glide.with(holder.binding.tiktokCoverIv).clear(holder.binding.tiktokCoverIv);
@@ -480,8 +456,6 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
 
     static final class Holder extends RecyclerView.ViewHolder {
         final ItemFeedTimelineBinding binding;
-        long boundItemId = RecyclerView.NO_ID;
-
         Holder(ItemFeedTimelineBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
