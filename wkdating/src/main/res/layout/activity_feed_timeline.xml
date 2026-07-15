@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/feedlist_page_bg"
+    android:orientation="vertical">
+
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <com.google.android.material.appbar.AppBarLayout
+            android:id="@+id/appBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/feedlist_surface"
+            android:elevation="0dp"
+            app:elevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                app:layout_scrollFlags="scroll|enterAlways|snap">
+
+                <FrameLayout
+                    android:id="@+id/topBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@color/feedlist_surface">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="52dp"
+                        android:layout_gravity="center_horizontal|bottom"
+                        android:gravity="bottom"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:id="@+id/latestTab"
+                            android:layout_width="70dp"
+                            android:layout_height="52dp"
+                            android:background="@drawable/bg_feedlist_tab_ripple"
+                            android:gravity="center_horizontal|bottom"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/latestTabText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="45dp"
+                                android:fontFamily="sans-serif-medium"
+                                android:gravity="center"
+                                android:includeFontPadding="false"
+                                android:text="@string/feedlist_latest"
+                                android:textColor="@color/feedlist_text"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <View
+                                android:id="@+id/latestIndicator"
+                                android:layout_width="22dp"
+                                android:layout_height="3dp"
+                                android:background="@drawable/bg_feedlist_tab_selected" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/followingTab"
+                            android:layout_width="70dp"
+                            android:layout_height="52dp"
+                            android:background="@drawable/bg_feedlist_tab_ripple"
+                            android:gravity="center_horizontal|bottom"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/followingTabText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="45dp"
+                                android:fontFamily="sans-serif-medium"
+                                android:gravity="center"
+                                android:includeFontPadding="false"
+                                android:text="@string/feedlist_following"
+                                android:textColor="@color/feedlist_secondary"
+                                android:textSize="16sp" />
+
+                            <View
+                                android:id="@+id/followingIndicator"
+                                android:layout_width="22dp"
+                                android:layout_height="3dp"
+                                android:background="@drawable/bg_feedlist_tab_selected"
+                                android:visibility="invisible" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/publishBtn"
+                        android:layout_width="46dp"
+                        android:layout_height="46dp"
+                        android:layout_gravity="end|bottom"
+                        android:layout_marginEnd="10dp"
+                        android:layout_marginBottom="3dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/feedlist_publish"
+                        android:padding="10dp"
+                        android:src="@drawable/ic_feedlist_camera"
+                        app:tint="@color/feedlist_text" />
+                </FrameLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/feedlist_divider" />
+            </LinearLayout>
+        </com.google.android.material.appbar.AppBarLayout>
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+            <com.scwang.smart.refresh.layout.SmartRefreshLayout
+                android:id="@+id/refreshLayout"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                app:srlEnableLoadMore="false">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="true"
+                    android:overScrollMode="never"
+                    android:paddingBottom="16dp"
+                    android:scrollbarStyle="outsideOverlay"
+                    android:scrollbars="vertical" />
+            </com.scwang.smart.refresh.layout.SmartRefreshLayout>
+
+            <LinearLayout
+                android:id="@+id/statePanel"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/feedlist_page_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="32dp"
+                android:visibility="gone">
+
+                <ProgressBar
+                    android:id="@+id/loadingView"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:indeterminateTint="@color/feedlist_accent" />
+
+                <TextView
+                    android:id="@+id/stateText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="@color/feedlist_secondary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </FrameLayout>
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNavigation"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:background="@color/feedlist_surface"
+        android:elevation="0dp"
+        app:itemIconTint="@null"
+        app:itemTextColor="@android:color/transparent"
+        app:labelVisibilityMode="unlabeled"
+        app:menu="@menu/menu_navigation" />
+</LinearLayout>
