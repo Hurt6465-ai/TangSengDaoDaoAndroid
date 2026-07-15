@@ -57,15 +57,15 @@
                     android:layout_width="wrap_content"
                     android:layout_height="28dp"
                     android:layout_marginStart="3dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:background="@null"
                     android:clickable="true"
                     android:focusable="true"
                     android:fontFamily="sans-serif-medium"
                     android:gravity="center_vertical"
                     android:includeFontPadding="false"
-                    android:paddingStart="2dp"
-                    android:paddingEnd="5dp"
-                    android:textColor="@color/feedlist_accent"
+                    android:paddingStart="0dp"
+                    android:paddingEnd="0dp"
+                    android:textColor="@color/feedlist_like"
                     android:textSize="13sp"
                     android:visibility="gone" />
             </LinearLayout>
@@ -129,11 +129,14 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp" />
 
-    <FrameLayout
+    <com.chat.feedlist.TikTokInlineContainer
         android:id="@+id/tiktokBox"
         android:layout_width="match_parent"
-        android:layout_height="228dp"
+        android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
+        android:background="@android:color/black"
+        android:clipChildren="true"
+        android:clipToPadding="true"
         android:visibility="gone">
 
         <ImageView
@@ -144,52 +147,67 @@
             android:scaleType="centerCrop" />
 
         <View
+            android:id="@+id/tiktokShade"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@drawable/bg_feedlist_tiktok_scrim" />
 
         <ImageView
-            android:layout_width="54dp"
-            android:layout_height="54dp"
+            android:id="@+id/tiktokPlayBtn"
+            android:layout_width="58dp"
+            android:layout_height="58dp"
             android:layout_gravity="center"
             android:background="@drawable/bg_feedlist_play"
             android:contentDescription="@string/feedlist_play"
-            android:padding="15dp"
+            android:padding="16dp"
             android:src="@drawable/ic_feedlist_play"
             app:tint="@android:color/white" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:orientation="vertical"
-            android:paddingStart="14dp"
-            android:paddingTop="22dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="12dp">
+        <ProgressBar
+            android:id="@+id/tiktokProgress"
+            style="?android:attr/progressBarStyle"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="@android:color/white"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tiktokTitleTv"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="sans-serif-medium"
-                android:maxLines="2"
-                android:textColor="@android:color/white"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+        <TextView
+            android:id="@+id/tiktokSourceTv"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_gravity="top|start"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_feedlist_tiktok_badge"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:maxWidth="210dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textColor="@android:color/white"
+            android:textSize="11sp"
+            android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/tiktokAuthorTv"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="#E6FFFFFF"
-                android:textSize="11sp" />
-        </LinearLayout>
-    </FrameLayout>
+        <TextView
+            android:id="@+id/tiktokOpenTv"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/bg_feedlist_tiktok_badge"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="@string/feedlist_open_tiktok"
+            android:textColor="@android:color/white"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </com.chat.feedlist.TikTokInlineContainer>
 
     <View
         android:layout_width="match_parent"
