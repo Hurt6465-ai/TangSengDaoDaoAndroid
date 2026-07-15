@@ -23,6 +23,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
 import com.chat.base.net.IRequestResultListener;
@@ -49,8 +50,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /** Image or TikTok publisher. Local video publishing remains in the old full-screen plugin only. */
-public class FeedListPublishActivity extends Activity {
+public class FeedListPublishActivity extends AppCompatActivity {
     private static final int REQ_PICK_IMAGES = 101;
+
+    public static void openForResult(Activity activity, int requestCode) {
+        if (activity == null || activity.isFinishing()) return;
+        Intent intent = new Intent(activity, FeedListPublishActivity.class);
+        activity.startActivityForResult(intent, requestCode);
+    }
 
     private EditText textEt;
     private TextView pickImagesBtn;
@@ -78,11 +85,16 @@ public class FeedListPublishActivity extends Activity {
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_feedlist_publish);
-        bindViews();
-        bindListeners();
-        refreshState();
-        worker.execute(this::cleanupOldUploadCache);
+        try {
+            setContentView(R.layout.activity_feedlist_publish);
+            bindViews();
+            bindListeners();
+            refreshState();
+            worker.execute(this::cleanupOldUploadCache);
+        } catch (Throwable error) {
+            Toast.makeText(this, getString(R.string.feedlist_publish_open_failed), Toast.LENGTH_LONG).show();
+            finish();
+        }
     }
 
     private void bindViews() {
