@@ -171,7 +171,7 @@
                 android:textSize="14sp" />
 
             <ImageButton
-                android:id="@+id/commentSendBtn"
+                android:id="@+id/commentVoiceBtn"
                 android:layout_width="46dp"
                 android:layout_height="46dp"
                 android:layout_marginStart="8dp"
@@ -180,6 +180,18 @@
                 android:padding="11dp"
                 android:scaleType="centerInside"
                 android:src="@drawable/ic_feed_mic_white" />
+
+            <ImageButton
+                android:id="@+id/commentSendBtn"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_feed_comment_send_button"
+                android:contentDescription="@string/feed_comment_send"
+                android:padding="11dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_feed_send_white"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 
