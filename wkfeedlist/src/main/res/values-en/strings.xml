@@ -44,7 +44,7 @@
         <item>Other</item>
     </string-array>
     <string name="feedlist_publish_title">New Post</string>
-    <string name="feedlist_publish_text_hint">Say something…</string>
+    <string name="feedlist_publish_text_hint">Share your day, upload photos or paste a TikTok link</string>
     <string name="feedlist_publish_storage_hint">Up to 6 images. Images are compressed on your phone to WebP under 200 KB. You can also post a TikTok link.</string>
     <string name="feedlist_pick_images">Select images</string>
     <string name="feedlist_pick_tiktok">TikTok</string>
@@ -74,4 +74,6 @@
     <string name="feedlist_publish_open_failed">Unable to open the publisher. Please reinstall or check the feed list module.</string>
     <string name="feedlist_months_ago">Published %1$d months ago</string>
     <string name="feedlist_years_ago">Published %1$d years ago</string>
+    <string name="feedlist_tiktok_copyright_notice">TikTok videos and related content belong to their original creators. Contact the administrator for removal if any rights are infringed.</string>
+    <string name="feedlist_tiktok_images_conflict">Photos and a TikTok video cannot be published together</string>
 </resources>
