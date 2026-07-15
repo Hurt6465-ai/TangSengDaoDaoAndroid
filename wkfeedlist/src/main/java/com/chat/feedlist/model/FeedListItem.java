@@ -69,6 +69,12 @@ public class FeedListItem implements Serializable {
         return TextUtils.isEmpty(text) ? "" : text;
     }
 
+
+    public String authorUid() {
+        if (!TextUtils.isEmpty(uid)) return uid;
+        return user == null || TextUtils.isEmpty(user.uid) ? "" : user.uid;
+    }
+
     public String userName() {
         if (user != null && !TextUtils.isEmpty(user.name)) return user.name;
         return TextUtils.isEmpty(uid) ? "" : uid;
