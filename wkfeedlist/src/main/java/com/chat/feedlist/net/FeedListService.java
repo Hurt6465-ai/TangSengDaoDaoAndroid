@@ -28,6 +28,12 @@ public interface FeedListService {
     @POST("feed/{feed_id}/like")
     Observable<FeedListInteractionResponse> like(@Path("feed_id") String feedId, @Body Map<String, Object> body);
 
+    @POST("feed/follow")
+    Observable<CommonResponse> follow(@Body Map<String, Object> body);
+
+    @DELETE("feed/follow")
+    Observable<CommonResponse> unfollow(@Query("uid") String uid);
+
     @POST("feed/{feed_id}/share")
     Observable<FeedListInteractionResponse> share(@Path("feed_id") String feedId, @Body Map<String, Object> body);
 
