@@ -96,7 +96,8 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     private int inputBasePaddingBottom;
     private EditText editText;
     private TextView titleTv;
-    private ImageButton actionBtn;
+    private ImageButton voiceBtn;
+    private ImageButton sendBtn;
     private TextView recordHintTv;
     private View recordPanel;
     private LineWaveVoiceView recordWaveView;
@@ -209,7 +210,8 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         });
         titleTv = view.findViewById(R.id.commentTitleTv);
         editText = view.findViewById(R.id.commentEditText);
-        actionBtn = view.findViewById(R.id.commentSendBtn);
+        voiceBtn = view.findViewById(R.id.commentVoiceBtn);
+        sendBtn = view.findViewById(R.id.commentSendBtn);
         inputBar = view.findViewById(R.id.commentInputBar);
         inputBasePaddingBottom = inputBar == null ? 0 : inputBar.getPaddingBottom();
         recordHintTv = view.findViewById(R.id.commentRecordHintTv);
@@ -350,12 +352,11 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void bindInputBar() {
-        updateActionButton();
-        actionBtn.setOnClickListener(v -> {
+        updateActionButtons();
+        sendBtn.setOnClickListener(v -> {
             if (hasInputText()) sendCommentFromInput();
         });
-        actionBtn.setOnTouchListener((v, event) -> {
-            if (hasInputText()) return false;
+        voiceBtn.setOnTouchListener((v, event) -> {
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     return startRecord(event);
@@ -394,7 +395,7 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         editText.setOnClickListener(v -> expandCommentSheet(true));
         editText.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { updateActionButton(); }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { updateActionButtons(); }
             @Override public void afterTextChanged(Editable s) {}
         });
     }
@@ -403,16 +404,14 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         return editText != null && !TextUtils.isEmpty(editText.getText().toString().trim());
     }
 
-    private void updateActionButton() {
-        if (actionBtn == null) return;
-        if (hasInputText()) {
-            actionBtn.setImageResource(R.drawable.ic_feed_send_white);
-            actionBtn.setBackgroundResource(R.drawable.bg_feed_comment_send_button);
-            actionBtn.setContentDescription(getString(R.string.feed_comment_send));
-        } else {
-            actionBtn.setImageResource(R.drawable.ic_feed_mic_white);
-            actionBtn.setBackgroundResource(R.drawable.bg_feed_comment_voice_button);
-            actionBtn.setContentDescription(getString(R.string.feed_voice_hold_to_talk));
+    private void updateActionButtons() {
+        if (voiceBtn != null) {
+            voiceBtn.setVisibility(View.VISIBLE);
+            voiceBtn.setContentDescription(getString(R.string.feed_voice_hold_to_talk));
+        }
+        if (sendBtn != null) {
+            sendBtn.setVisibility(hasInputText() ? View.VISIBLE : View.GONE);
+            sendBtn.setEnabled(hasInputText());
         }
     }
 
@@ -433,9 +432,9 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
             recordStartTime = System.currentTimeMillis();
             recordCancel = false;
             recording = true;
-            if (actionBtn != null) {
-                actionBtn.setSelected(true);
-                actionBtn.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            if (voiceBtn != null) {
+                voiceBtn.setSelected(true);
+                voiceBtn.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
             }
             AudioRecordManager.getInstance().init(recordPath);
             AudioRecordManager.getInstance().startRecord();
@@ -517,7 +516,7 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
         if (recordWaveView != null) recordWaveView.stopRecord();
         if (recordPanel != null) recordPanel.setVisibility(View.GONE);
         if (recordHintTv != null) recordHintTv.setVisibility(View.GONE);
-        if (actionBtn != null) actionBtn.setSelected(false);
+        if (voiceBtn != null) voiceBtn.setSelected(false);
     }
 
     private void hideKeyboard() {
@@ -663,17 +662,24 @@ public class FeedCommentBottomSheet extends BottomSheetDialogFragment {
                 String remotePath = uploadVoiceFile(new File(localPath));
                 String remoteContent = buildVoiceContent("voice", remotePath, seconds, waveform);
                 mainHandler.post(() -> {
+                    if (!isAdded() || adapter == null) return;
                     adapter.updateLocalContent(local.comment_id, remoteContent);
                     local.content = remoteContent;
                     sendLocalComment(local, true);
+                    try { new File(localPath).delete(); } catch (Throwable ignored) {}
                 });
             } catch (Exception e) {
                 mainHandler.post(() -> {
+                    if (!isAdded() || adapter == null) return;
                     adapter.markLocalFailed(local.comment_id);
                     commentCount = Math.max(0, commentCount - 1);
                     updateTitle();
                     if (onCommentSentListener != null) onCommentSentListener.onCommentSent(-1);
-                    Toast.makeText(requireContext(), TextUtils.isEmpty(e.getMessage()) ? getString(R.string.feed_voice_upload_failed) : e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Context context = getContext();
+                    if (context != null) {
+                        String message = TextUtils.isEmpty(e.getMessage()) ? getString(R.string.feed_voice_upload_failed) : e.getMessage();
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+                    }
                 });
             }
         });
