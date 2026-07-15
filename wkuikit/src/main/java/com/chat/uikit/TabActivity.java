@@ -1,6 +1,7 @@
 package com.chat.uikit;
 
 import android.Manifest;
+import android.app.Activity;
 import android.annotation.SuppressLint;
 import android.app.NotificationManager;
 import android.content.Context;
@@ -61,6 +62,7 @@ import java.util.List;
  */
 public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     public static final String EXTRA_OPEN_MENU_ID = "open_menu_id";
+    private static volatile int pendingOpenMenuId;
     // 底部顺序：学习｜语伴｜聊天｜发现｜社区。聊天保持正中间，默认打开学习。
     private static final int TAB_STUDY = 0;
     private static final int TAB_PARTNER = 1;
@@ -84,6 +86,39 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private long lastClickChatTabTime = 0L;
     private final boolean isShowTabText = true;
     private final List<Fragment> fragments = new ArrayList<>(5);
+    private int initialRequestedMenuId;
+
+    /** Bring the singleTask root page to front without CLEAR_TOP lifecycle races. */
+    public static boolean openFromChild(Activity source, int menuId) {
+        if (source == null || source.isFinishing()) return false;
+        pendingOpenMenuId = menuId;
+        Intent intent = new Intent(source, TabActivity.class);
+        intent.putExtra(EXTRA_OPEN_MENU_ID, menuId);
+        intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        try {
+            source.startActivity(intent);
+            source.overridePendingTransition(0, 0);
+            source.getWindow().getDecorView().post(() -> {
+                if (!source.isFinishing() && !source.isDestroyed()) {
+                    source.finish();
+                    source.overridePendingTransition(0, 0);
+                }
+            });
+            return true;
+        } catch (Throwable ignored) {
+            pendingOpenMenuId = 0;
+            return false;
+        }
+    }
+
+    private static int takeRequestedMenuId(Intent intent) {
+        int fromIntent = intent == null ? 0 : intent.getIntExtra(EXTRA_OPEN_MENU_ID, 0);
+        int pending = pendingOpenMenuId;
+        pendingOpenMenuId = 0;
+        return pending != 0 ? pending : fromIntent;
+    }
 
     @Override
     protected ActTabMainBinding getViewBinding() {
@@ -125,7 +160,8 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         notificationManager.cancelAll();
         WKCommonModel.getInstance().getAppConfig(null);
 
-        int requestedMenuId = getIntent().getIntExtra(EXTRA_OPEN_MENU_ID, 0);
+        int requestedMenuId = takeRequestedMenuId(getIntent());
+        initialRequestedMenuId = requestedMenuId;
         int launchTab = requestedMenuId == R.id.i_chat ? TAB_CHAT
                 : requestedMenuId == R.id.i_community ? TAB_COMMUNITY
                 : requestedMenuId == R.id.i_study ? TAB_STUDY
@@ -363,7 +399,8 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
 
     @Override
     protected void initData() {
-        int menuId = getIntent().getIntExtra(EXTRA_OPEN_MENU_ID, 0);
+        int menuId = initialRequestedMenuId;
+        initialRequestedMenuId = 0;
         if (menuId == R.id.i_partner || menuId == R.id.i_discover) {
             wkVBinding.getRoot().post(() -> handleExternalMenu(menuId));
         }
@@ -373,7 +410,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        int menuId = intent == null ? 0 : intent.getIntExtra(EXTRA_OPEN_MENU_ID, 0);
+        int menuId = takeRequestedMenuId(intent);
         if (menuId != 0) handleExternalMenu(menuId);
     }
 
@@ -394,6 +431,8 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     @Override
     protected void onResume() {
         super.onResume();
+        int pendingMenu = takeRequestedMenuId(null);
+        if (pendingMenu != 0) handleExternalMenu(pendingMenu);
         if (wkVBinding != null && wkVBinding.vp != null) {
             wkVBinding.bottomNavigation.setSelectedItemId(getMenuIdByIndex(wkVBinding.vp.getCurrentItem()));
         }
