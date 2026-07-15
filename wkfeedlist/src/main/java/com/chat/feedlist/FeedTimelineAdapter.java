@@ -1,12 +1,15 @@
 package com.chat.feedlist;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.webkit.WebSettings;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.DiffUtil;
@@ -14,15 +17,25 @@ import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.load.model.GlideUrl;
+import com.bumptech.glide.load.model.LazyHeaders;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
+import com.chat.base.net.IRequestResultListener;
 import com.chat.feedlist.databinding.ItemFeedTimelineBinding;
 import com.chat.feedlist.model.FeedListItem;
 import com.chat.feedlist.model.FeedListMedia;
+import com.chat.feedlist.model.FeedListTikTokPreview;
 import com.chat.feedlist.model.FeedListUser;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -44,6 +57,9 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
     private final Listener listener;
     private final TikTokInlinePlayerManager playerManager;
     private final Set<String> expanded = new HashSet<>();
+    private final Set<String> tiktokResolveInFlight = new HashSet<>();
+    private final Map<String, Long> tiktokResolveFailedAt = new HashMap<>();
+    private String coverUserAgent = "";
     private long serverTime;
     private long serverTimeLocalAt;
 
@@ -80,9 +96,14 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         for (int i = start; i < end; i++) {
             FeedListItem item = getItem(i);
             FeedListMedia media = item == null ? null : item.firstMedia();
-            if (media == null || !media.isTikTok() || TextUtils.isEmpty(media.displayUrl())) continue;
+            if (media == null || !media.isTikTok()) continue;
+            String coverUrl = media.tiktokCoverUrl();
+            if (TextUtils.isEmpty(coverUrl)) {
+                resolveTikTokMetadata(item, media, null, false);
+                continue;
+            }
             Glide.with(context)
-                    .load(media.displayUrl())
+                    .load(coverModel(context, coverUrl))
                     .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                     .preload();
         }
@@ -213,24 +234,63 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                 b.tiktokProgress.setVisibility(View.GONE);
             }
 
-            Glide.with(b.tiktokCoverIv)
-                    .load(first.displayUrl())
-                    .placeholder(R.color.feedlist_media_placeholder)
-                    .error(R.color.feedlist_media_placeholder)
-                    .centerCrop()
-                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                    .dontAnimate()
-                    .into(b.tiktokCoverIv);
+            String coverUrl = first.tiktokCoverUrl();
+            if (TextUtils.isEmpty(coverUrl)) {
+                Glide.with(b.tiktokCoverIv).clear(b.tiktokCoverIv);
+                b.tiktokCoverIv.setImageResource(R.color.feedlist_media_placeholder);
+                resolveTikTokMetadata(item, first, holder, false);
+            } else {
+                Glide.with(b.tiktokCoverIv)
+                        .load(coverModel(b.getRoot().getContext(), coverUrl))
+                        .placeholder(R.color.feedlist_media_placeholder)
+                        .error(R.color.feedlist_media_placeholder)
+                        .centerCrop()
+                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                        .dontAnimate()
+                        .listener(new RequestListener<Drawable>() {
+                            @Override
+                            public boolean onLoadFailed(
+                                    @Nullable GlideException e,
+                                    Object model,
+                                    Target<Drawable> target,
+                                    boolean isFirstResource
+                            ) {
+                                resolveTikTokMetadata(item, first, holder, false);
+                                return false;
+                            }
 
-            View.OnClickListener playClick = v -> playerManager.play(
-                    item.stableId(),
-                    first.external_id == null ? "" : first.external_id.trim(),
-                    b.tiktokBox,
-                    b.tiktokCoverIv,
-                    b.tiktokShade,
-                    b.tiktokPlayBtn,
-                    b.tiktokProgress
-            );
+                            @Override
+                            public boolean onResourceReady(
+                                    Drawable resource,
+                                    Object model,
+                                    Target<Drawable> target,
+                                    DataSource dataSource,
+                                    boolean isFirstResource
+                            ) {
+                                return false;
+                            }
+                        })
+                        .into(b.tiktokCoverIv);
+            }
+
+            View.OnClickListener playClick = v -> {
+                String videoId = first.tiktokVideoId();
+                if (TextUtils.isEmpty(videoId)) {
+                    b.tiktokPlayBtn.setVisibility(View.GONE);
+                    b.tiktokProgress.setVisibility(View.VISIBLE);
+                    resolveTikTokMetadata(item, first, holder, true);
+                    return;
+                }
+                playerManager.play(
+                        item.stableId(),
+                        videoId,
+                        b.tiktokBox,
+                        b.tiktokCoverIv,
+                        b.tiktokShade,
+                        b.tiktokPlayBtn,
+                        b.tiktokProgress
+                );
+            };
             b.tiktokCoverIv.setOnClickListener(playClick);
             b.tiktokPlayBtn.setOnClickListener(playClick);
             b.tiktokSourceTv.setOnClickListener(hasOriginalUrl ? v -> listener.onOpenTikTok(item, first) : null);
@@ -245,6 +305,100 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             b.mediaGrid.setListener((index, media) -> listener.onImages(item, index, media));
             b.mediaGrid.bind(item.safeMedia());
         }
+    }
+
+    private void resolveTikTokMetadata(
+            @Nullable FeedListItem item,
+            @Nullable FeedListMedia media,
+            @Nullable Holder holder,
+            boolean autoPlay
+    ) {
+        if (item == null || media == null || TextUtils.isEmpty(media.external_url)) {
+            restoreTikTokLoading(holder);
+            return;
+        }
+        String key = media.external_url.trim();
+        long now = System.currentTimeMillis();
+        Long failedAt = tiktokResolveFailedAt.get(key);
+        if (!autoPlay && failedAt != null && now - failedAt < 5L * 60L * 1000L) return;
+        if (!tiktokResolveInFlight.add(key)) return;
+
+        FeedListModel.getInstance().tiktokPreview(key, new IRequestResultListener<FeedListTikTokPreview>() {
+            @Override
+            public void onSuccess(FeedListTikTokPreview result) {
+                tiktokResolveInFlight.remove(key);
+                if (result == null || TextUtils.isEmpty(result.video_id)) {
+                    tiktokResolveFailedAt.put(key, System.currentTimeMillis());
+                    restoreTikTokLoading(holder);
+                    return;
+                }
+                tiktokResolveFailedAt.remove(key);
+                media.type = FeedListMedia.TYPE_TIKTOK;
+                media.external_provider = "tiktok";
+                media.external_id = result.video_id;
+                if (!TextUtils.isEmpty(result.url)) media.external_url = result.url;
+                if (!TextUtils.isEmpty(result.cover_url)) media.cover_url = result.cover_url;
+                if (!TextUtils.isEmpty(result.title)) media.external_title = result.title;
+                if (!TextUtils.isEmpty(result.author_name)) media.external_author = result.author_name;
+
+                int position = findPosition(item.stableId());
+                if (position != RecyclerView.NO_POSITION) notifyItemChanged(position);
+
+                if (autoPlay && holder != null && holder.boundItemId == item.stableId()) {
+                    holder.itemView.post(() -> {
+                        if (holder.boundItemId != item.stableId()) return;
+                        ItemFeedTimelineBinding binding = holder.binding;
+                        playerManager.play(
+                                item.stableId(),
+                                media.tiktokVideoId(),
+                                binding.tiktokBox,
+                                binding.tiktokCoverIv,
+                                binding.tiktokShade,
+                                binding.tiktokPlayBtn,
+                                binding.tiktokProgress
+                        );
+                    });
+                }
+            }
+
+            @Override
+            public void onFail(int code, String msg) {
+                tiktokResolveInFlight.remove(key);
+                tiktokResolveFailedAt.put(key, System.currentTimeMillis());
+                restoreTikTokLoading(holder);
+            }
+        });
+    }
+
+    private void restoreTikTokLoading(@Nullable Holder holder) {
+        if (holder == null) return;
+        holder.binding.tiktokCoverIv.setVisibility(View.VISIBLE);
+        holder.binding.tiktokShade.setVisibility(View.VISIBLE);
+        holder.binding.tiktokPlayBtn.setVisibility(View.VISIBLE);
+        holder.binding.tiktokProgress.setVisibility(View.GONE);
+    }
+
+    private int findPosition(long itemId) {
+        for (int i = 0; i < getItemCount(); i++) {
+            FeedListItem candidate = getItem(i);
+            if (candidate != null && candidate.stableId() == itemId) return i;
+        }
+        return RecyclerView.NO_POSITION;
+    }
+
+    private Object coverModel(@NonNull Context context, @NonNull String url) {
+        if (TextUtils.isEmpty(coverUserAgent)) {
+            try {
+                coverUserAgent = WebSettings.getDefaultUserAgent(context.getApplicationContext());
+            } catch (Throwable ignored) {
+                coverUserAgent = "Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 Mobile Safari/537.36";
+            }
+        }
+        LazyHeaders headers = new LazyHeaders.Builder()
+                .addHeader("User-Agent", coverUserAgent)
+                .addHeader("Referer", "https://www.tiktok.com/")
+                .build();
+        return new GlideUrl(url, headers);
     }
 
     private void bindActions(Holder holder, FeedListItem item) {

@@ -13,10 +13,10 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
-import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -28,20 +28,22 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Owns the only TikTok WebView used by the timeline.
- * Video and player resources are loaded directly from tiktok.com on the user's device.
+ * The user taps to start playback; all video bytes are loaded directly from TikTok.
  */
 public final class TikTokInlinePlayerManager {
     private static final String TIKTOK_ORIGIN = "https://www.tiktok.com";
     private static final int DEFAULT_CROP_RIGHT_DP = 60;
     private static final float MIN_VISIBLE_RATIO = 0.50f;
+    private static final long LOAD_TIMEOUT_MS = 8_000L;
 
     private final Activity activity;
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final PlayerBridge bridge = new PlayerBridge();
 
     private WebView webView;
     private TikTokInlineContainer currentContainer;
@@ -73,26 +75,26 @@ public final class TikTokInlinePlayerManager {
             @NonNull ImageView play,
             @NonNull ProgressBar progress
     ) {
-        if (released || activity.isFinishing() || TextUtils.isEmpty(videoId)
-                || !videoId.matches("\\d{6,32}")) {
+        String normalizedId = videoId.trim();
+        if (released || activity.isFinishing() || TextUtils.isEmpty(normalizedId)
+                || !normalizedId.matches("[0-9]{8,32}")) {
             restoreUi(cover, shade, play, progress);
             return;
         }
 
         if (currentItemId == itemId
-                && TextUtils.equals(currentVideoId, videoId)
+                && TextUtils.equals(currentVideoId, normalizedId)
                 && webView != null
                 && webView.getParent() == container) {
-            showLoadingUi(cover, shade, play, progress);
-            sendPlayWithSound();
-            schedulePlayFallback(sessionId);
+            webView.onResume();
+            webView.requestFocus();
             return;
         }
 
         pauseAndDetach();
 
         currentItemId = itemId;
-        currentVideoId = videoId;
+        currentVideoId = normalizedId;
         currentContainer = container;
         currentCover = cover;
         currentShade = shade;
@@ -129,32 +131,22 @@ public final class TikTokInlinePlayerManager {
         container.addView(player, 0, params);
         player.setVisibility(View.VISIBLE);
         player.onResume();
+        player.requestFocus();
 
-        player.loadDataWithBaseURL(
-                TIKTOK_ORIGIN + "/",
-                buildPlayerHtml(currentVideoId, expectedSession),
-                "text/html",
-                "UTF-8",
-                null
-        );
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Referer", TIKTOK_ORIGIN + "/");
+        player.loadUrl(buildPlayerUrl(currentVideoId), headers);
 
-        schedulePlayFallback(expectedSession);
-    }
-
-
-    private void schedulePlayFallback(long expectedSession) {
-        // Some older TikTok player builds do not emit state messages reliably.
         main.postDelayed(() -> {
             if (expectedSession != sessionId || currentContainer == null) return;
-            sendPlayWithSound();
             if (currentProgress != null && currentProgress.getVisibility() == View.VISIBLE) {
-                // Keep the cover instead of exposing a black player if TikTok did not report playing.
-                restoreCurrentUi();
+                // Do not expose a permanent black panel. Restore the cover and allow retry.
+                pauseAndDetach();
             }
-        }, 3200L);
+        }, LOAD_TIMEOUT_MS);
     }
 
-    @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
+    @SuppressLint("SetJavaScriptEnabled")
     private WebView ensureWebView() {
         if (webView != null) return webView;
 
@@ -179,7 +171,6 @@ public final class TikTokInlinePlayerManager {
         player.setVerticalScrollBarEnabled(false);
         player.setHorizontalScrollBarEnabled(false);
         player.setWebChromeClient(new WebChromeClient());
-        player.addJavascriptInterface(bridge, "TalkamiTikTokBridge");
         player.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -192,6 +183,18 @@ public final class TikTokInlinePlayerManager {
             }
 
             @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (!isTikTokUrl(url) || currentContainer == null || view != webView) return;
+                long expectedSession = sessionId;
+                main.postDelayed(() -> {
+                    if (expectedSession == sessionId && currentContainer != null && view == webView) {
+                        showPlayingUi();
+                    }
+                }, 350L);
+            }
+
+            @Override
             public void onReceivedError(
                     @NonNull WebView view,
                     @NonNull WebResourceRequest request,
@@ -200,13 +203,22 @@ public final class TikTokInlinePlayerManager {
                 if (request.isForMainFrame()) failCurrent();
             }
 
+            @Override
+            public void onReceivedHttpError(
+                    @NonNull WebView view,
+                    @NonNull WebResourceRequest request,
+                    @NonNull WebResourceResponse errorResponse
+            ) {
+                if (request.isForMainFrame() && errorResponse.getStatusCode() >= 400) failCurrent();
+            }
+
         });
         webView = player;
         return player;
     }
 
-    private String buildPlayerHtml(String videoId, long expectedSession) {
-        String playerUrl = TIKTOK_ORIGIN + "/player/v1/" + Uri.encode(videoId)
+    private String buildPlayerUrl(String videoId) {
+        return TIKTOK_ORIGIN + "/player/v1/" + Uri.encode(videoId)
                 + "?autoplay=1"
                 + "&muted=0"
                 + "&loop=0"
@@ -218,46 +230,14 @@ public final class TikTokInlinePlayerManager {
                 + "&timestamp=0"
                 + "&music_info=0"
                 + "&description=0"
-                + "&native_context_menu=0";
-
-        return "<!doctype html><html><head>"
-                + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no\">"
-                + "<link rel=\"preconnect\" href=\"https://www.tiktok.com\">"
-                + "<style>html,body,#shell{margin:0;width:100%;height:100%;overflow:hidden;background:#000;}"
-                + "iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;}</style>"
-                + "</head><body><div id=\"shell\">"
-                + "<iframe id=\"player\" src=\"" + playerUrl + "\""
-                + " allow=\"autoplay; encrypted-media; picture-in-picture\""
-                + " referrerpolicy=\"strict-origin-when-cross-origin\"></iframe>"
-                + "</div><script>"
-                + "const SESSION=" + expectedSession + ";"
-                + "const ORIGIN='https://www.tiktok.com';"
-                + "function post(type,value){const f=document.getElementById('player');if(!f||!f.contentWindow)return;"
-                + "const m={'x-tiktok-player':true,type:type};if(value!==undefined)m.value=value;f.contentWindow.postMessage(m,ORIGIN);}"
-                + "function playSound(){post('unMute');post('play');setTimeout(()=>{post('unMute');post('play');},280);}"
-                + "function pausePlayer(){post('pause');}"
-                + "window.addEventListener('message',function(e){if(e.origin!==ORIGIN)return;const d=e.data;"
-                + "if(!d||!d['x-tiktok-player'])return;"
-                + "if(d.type==='onPlayerReady'){TalkamiTikTokBridge.onReady(SESSION);}"
-                + "if(d.type==='onStateChange'&&Number(d.value)===1){TalkamiTikTokBridge.onPlaying(SESSION);}});"
-                + "</script></body></html>";
-    }
-
-    private void sendPlayWithSound() {
-        WebView player = webView;
-        if (player == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) return;
-        player.evaluateJavascript("window.playSound&&window.playSound()", null);
-    }
-
-    private void sendPause() {
-        WebView player = webView;
-        if (player == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) return;
-        player.evaluateJavascript("window.pausePlayer&&window.pausePlayer()", null);
+                + "&native_context_menu=0"
+                + "&rel=0";
     }
 
     public void detachIfMostlyHidden() {
         TikTokInlineContainer container = currentContainer;
         if (container == null || container.getHeight() <= 0) return;
+
         Rect visible = new Rect();
         boolean shown = container.isShown() && container.getGlobalVisibleRect(visible);
         float ratio = shown ? visible.height() / (float) container.getHeight() : 0f;
@@ -274,24 +254,20 @@ public final class TikTokInlinePlayerManager {
 
     public void pauseAndDetach() {
         sessionId++;
-        sendPause();
         restoreCurrentUi();
 
         WebView player = webView;
         if (player != null) {
-            player.loadUrl("about:blank");
-            player.onPause();
-            ViewParent parent = player.getParent();
-            if (parent instanceof ViewGroup) ((ViewGroup) parent).removeView(player);
+            try {
+                player.onPause();
+                player.stopLoading();
+                player.loadUrl("about:blank");
+                ViewParent parent = player.getParent();
+                if (parent instanceof ViewGroup) ((ViewGroup) parent).removeView(player);
+            } catch (Throwable ignored) {
+            }
         }
-
-        currentContainer = null;
-        currentCover = null;
-        currentShade = null;
-        currentPlay = null;
-        currentProgress = null;
-        currentItemId = RecyclerView.NO_ID;
-        currentVideoId = "";
+        clearOwner();
     }
 
     public void release() {
@@ -309,7 +285,6 @@ public final class TikTokInlinePlayerManager {
         try {
             ViewParent parent = player.getParent();
             if (parent instanceof ViewGroup) ((ViewGroup) parent).removeView(player);
-            player.removeJavascriptInterface("TalkamiTikTokBridge");
             player.stopLoading();
             player.loadUrl("about:blank");
             player.clearHistory();
@@ -317,6 +292,16 @@ public final class TikTokInlinePlayerManager {
             player.destroy();
         } catch (Throwable ignored) {
         }
+    }
+
+    private void clearOwner() {
+        currentContainer = null;
+        currentCover = null;
+        currentShade = null;
+        currentPlay = null;
+        currentProgress = null;
+        currentItemId = RecyclerView.NO_ID;
+        currentVideoId = "";
     }
 
     private void failCurrent() {
@@ -360,6 +345,7 @@ public final class TikTokInlinePlayerManager {
 
     private boolean isTikTokUrl(String value) {
         if (TextUtils.isEmpty(value)) return false;
+        if ("about:blank".equalsIgnoreCase(value)) return true;
         try {
             Uri uri = Uri.parse(value);
             String host = uri.getHost();
@@ -373,23 +359,5 @@ public final class TikTokInlinePlayerManager {
 
     private int dp(int value) {
         return Math.round(value * activity.getResources().getDisplayMetrics().density);
-    }
-
-    private final class PlayerBridge {
-        @JavascriptInterface
-        public void onReady(long callbackSession) {
-            main.post(() -> {
-                if (released || callbackSession != sessionId || currentContainer == null) return;
-                sendPlayWithSound();
-            });
-        }
-
-        @JavascriptInterface
-        public void onPlaying(long callbackSession) {
-            main.post(() -> {
-                if (released || callbackSession != sessionId || currentContainer == null) return;
-                showPlayingUi();
-            });
-        }
     }
 }
