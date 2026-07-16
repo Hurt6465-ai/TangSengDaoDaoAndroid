@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_pressed="true"><shape><solid android:color="#467D8CFF"/><corners android:radius="11dp"/><stroke android:width="1dp" android:color="#8A9AA6FF"/></shape></item>
-    <item><shape><gradient android:angle="0" android:startColor="#357D8CFF" android:endColor="#359A82F6"/><corners android:radius="11dp"/><stroke android:width="1dp" android:color="#7593A0FF"/></shape></item>
-</selector>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/partnerlist_button_ripple">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="135"
+                android:startColor="#FF29483F"
+                android:centerColor="#FF31434F"
+                android:endColor="#FF3B3F68" />
+            <corners android:radius="15dp" />
+            <stroke android:width="1dp" android:color="#806E80C7" />
+        </shape>
+    </item>
+</ripple>
