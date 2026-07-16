@@ -29,6 +29,7 @@ import com.chat.feed.comment.FeedCommentBottomSheet;
 import com.chat.feedlist.model.FeedListItem;
 import com.chat.feedlist.model.FeedListInteractionResponse;
 import com.chat.feedlist.model.FeedListResponse;
+import com.chat.feedlist.model.FeedListTikTokPreview;
 import com.chat.feedlist.model.FeedListMedia;
 import com.chat.feedlist.model.FeedListUser;
 import com.chat.feedlist.publish.FeedListPublishActivity;
@@ -38,9 +39,11 @@ import com.chat.uikit.user.service.UserModel;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBinding> implements FeedTimelineAdapter.Listener {
@@ -48,11 +51,16 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     private static final int REQ_PUBLISH = 5101;
     private static final String MODE_LATEST = "latest";
     private static final String MODE_FOLLOWING = "following";
+    private static final long TIKTOK_RETRY_COOLDOWN_MS = 5L * 60L * 1000L;
 
     private final TimelineState latest = new TimelineState(MODE_LATEST);
     private final TimelineState following = new TimelineState(MODE_FOLLOWING);
     private final Set<String> likeInFlight = new HashSet<>();
     private final Set<String> followInFlight = new HashSet<>();
+    private final Set<String> tiktokResolveInFlight = new HashSet<>();
+    private final Set<String> tiktokOpenAfterResolve = new HashSet<>();
+    private final Map<String, Long> tiktokResolveFailedAt = new HashMap<>();
+    private final Map<String, Long> tiktokResolvedAt = new HashMap<>();
     private TimelineState current = latest;
     private FeedTimelineAdapter adapter;
     private LinearLayoutManager layoutManager;
@@ -529,9 +537,17 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     }
 
     @Override public void onTikTok(FeedListItem item, FeedListMedia media) {
-        if (media != null) {
-            TikTokEmbedActivity.open(this, media.external_id, media.external_url);
+        if (media == null) return;
+        String videoId = media.tiktokVideoId();
+        if (!TextUtils.isEmpty(videoId)) {
+            TikTokEmbedActivity.open(this, videoId, media.external_url);
+            return;
         }
+        resolveTikTokMetadata(item, media, true);
+    }
+
+    @Override public void onTikTokMetadataNeeded(FeedListItem item, FeedListMedia media) {
+        resolveTikTokMetadata(item, media, false);
     }
 
     @Override public void onOpenTikTok(FeedListItem item, FeedListMedia media) {
@@ -555,6 +571,85 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
             if (item != null && TextUtils.equals(feedId, item.feed_id)) return i;
         }
         return -1;
+    }
+
+    private void resolveTikTokMetadata(FeedListItem item, FeedListMedia media, boolean openAfterResolve) {
+        if (media == null || isUnavailable()) return;
+        String sourceUrl = media.external_url == null ? "" : media.external_url.trim();
+        if (TextUtils.isEmpty(sourceUrl)) {
+            if (openAfterResolve) toast(getString(R.string.feedlist_tiktok_failed));
+            return;
+        }
+
+        if (openAfterResolve) tiktokOpenAfterResolve.add(sourceUrl);
+        if (tiktokResolveInFlight.contains(sourceUrl)) return;
+
+        long now = System.currentTimeMillis();
+        Long failedAt = tiktokResolveFailedAt.get(sourceUrl);
+        Long resolvedAt = tiktokResolvedAt.get(sourceUrl);
+        if (!openAfterResolve && ((failedAt != null && now - failedAt < TIKTOK_RETRY_COOLDOWN_MS)
+                || (resolvedAt != null && now - resolvedAt < TIKTOK_RETRY_COOLDOWN_MS))) {
+            return;
+        }
+
+        tiktokResolveInFlight.add(sourceUrl);
+        FeedListModel.getInstance().tiktokPreview(sourceUrl, new IRequestResultListener<>() {
+            @Override public void onSuccess(FeedListTikTokPreview result) {
+                tiktokResolveInFlight.remove(sourceUrl);
+                boolean shouldOpen = tiktokOpenAfterResolve.remove(sourceUrl);
+                if (isUnavailable()) return;
+                if (result == null || TextUtils.isEmpty(result.video_id) || TextUtils.isEmpty(result.url)) {
+                    tiktokResolveFailedAt.put(sourceUrl, System.currentTimeMillis());
+                    if (shouldOpen) toast(getString(R.string.feedlist_tiktok_failed));
+                    return;
+                }
+                tiktokResolveFailedAt.remove(sourceUrl);
+                tiktokResolvedAt.put(sourceUrl, System.currentTimeMillis());
+                updateTikTokMetadata(item == null ? "" : item.feed_id, sourceUrl, result);
+                persistStates();
+                refreshTikTokRows(item == null ? "" : item.feed_id, sourceUrl);
+                if (shouldOpen) TikTokEmbedActivity.open(FeedTimelineActivity.this, result.video_id, result.url);
+            }
+
+            @Override public void onFail(int code, String msg) {
+                tiktokResolveInFlight.remove(sourceUrl);
+                boolean shouldOpen = tiktokOpenAfterResolve.remove(sourceUrl);
+                tiktokResolveFailedAt.put(sourceUrl, System.currentTimeMillis());
+                if (isUnavailable()) return;
+                if (shouldOpen) toast(TextUtils.isEmpty(msg) ? getString(R.string.feedlist_tiktok_failed) : msg);
+            }
+        });
+    }
+
+    private void updateTikTokMetadata(String feedId, String oldUrl, FeedListTikTokPreview result) {
+        for (TimelineState state : new TimelineState[]{latest, following}) {
+            for (FeedListItem candidate : state.items) {
+                if (candidate == null) continue;
+                boolean sameFeed = !TextUtils.isEmpty(feedId) && TextUtils.equals(feedId, candidate.feed_id);
+                for (FeedListMedia value : candidate.safeMedia()) {
+                    if (value == null || !value.isTikTok()) continue;
+                    boolean sameUrl = !TextUtils.isEmpty(oldUrl) && TextUtils.equals(oldUrl, value.external_url);
+                    if (!sameFeed && !sameUrl) continue;
+                    value.external_provider = TextUtils.isEmpty(result.provider) ? "tiktok" : result.provider;
+                    value.external_id = result.video_id;
+                    value.external_url = result.url;
+                    value.cover_url = result.cover_url;
+                    value.external_title = result.title == null ? "" : result.title;
+                    value.external_author = result.author_name == null ? "" : result.author_name;
+                }
+            }
+        }
+    }
+
+    private void refreshTikTokRows(String feedId, String oldUrl) {
+        for (int i = 0; i < adapter.getItemCount(); i++) {
+            FeedListItem candidate = adapter.getItemAt(i);
+            if (candidate == null) continue;
+            boolean sameFeed = !TextUtils.isEmpty(feedId) && TextUtils.equals(feedId, candidate.feed_id);
+            FeedListMedia media = candidate.firstMedia();
+            boolean sameUrl = media != null && !TextUtils.isEmpty(oldUrl) && TextUtils.equals(oldUrl, media.external_url);
+            if (sameFeed || sameUrl) adapter.notifyItemChanged(i);
+        }
     }
 
     private void removeFeed(ArrayList<FeedListItem> items, String feedId) {

@@ -1,6 +1,8 @@
 package com.chat.feedlist;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
+import android.webkit.WebSettings;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -14,7 +16,13 @@ import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.load.model.GlideUrl;
+import com.bumptech.glide.load.model.LazyHeaders;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 import com.chat.feedlist.databinding.ItemFeedTimelineBinding;
 import com.chat.feedlist.model.FeedListItem;
 import com.chat.feedlist.model.FeedListMedia;
@@ -29,6 +37,7 @@ import java.util.Set;
 
 public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineAdapter.Holder> {
     private static final String PAYLOAD_INTERACTION = "interaction";
+    private static volatile String coverUserAgent;
 
     public interface Listener {
         void onProfile(FeedListItem item);
@@ -40,6 +49,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         void onImages(FeedListItem item, int index, List<FeedListMedia> media);
         void onTikTok(FeedListItem item, FeedListMedia media);
         void onOpenTikTok(FeedListItem item, FeedListMedia media);
+        void onTikTokMetadataNeeded(FeedListItem item, FeedListMedia media);
     }
 
     private final Listener listener;
@@ -54,6 +64,10 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
     }
 
     @Override public long getItemId(int position) { return getItem(position).stableId(); }
+
+    public FeedListItem getItemAt(int position) {
+        return position >= 0 && position < getItemCount() ? getItem(position) : null;
+    }
 
     public void setServerTime(long serverTime) {
         this.serverTime = serverTime;
@@ -80,10 +94,14 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             FeedListItem item = getItem(i);
             FeedListMedia media = item == null ? null : item.firstMedia();
             if (media == null || !media.isTikTok()) continue;
-            String coverUrl = media.displayUrl();
+            String coverUrl = media.tiktokCoverUrl();
             if (TextUtils.isEmpty(coverUrl)) continue;
+            GlideUrl requestUrl = new GlideUrl(coverUrl, new LazyHeaders.Builder()
+                    .addHeader("Referer", "https://www.tiktok.com/")
+                    .addHeader("User-Agent", safeUserAgent(context))
+                    .build());
             Glide.with(context)
-                    .load(coverUrl)
+                    .load(requestUrl)
                     .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                     .preload();
         }
@@ -203,17 +221,40 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                     ? "TikTok"
                     : (author.startsWith("@") ? author : "@" + author));
 
-            Glide.with(b.tiktokCoverIv)
-                    .load(first.displayUrl())
-                    .placeholder(R.color.feedlist_media_placeholder)
-                    .error(R.color.feedlist_media_placeholder)
-                    .centerCrop()
-                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                    .dontAnimate()
-                    .into(b.tiktokCoverIv);
+            String coverUrl = first.tiktokCoverUrl();
+            if (TextUtils.isEmpty(coverUrl)) {
+                Glide.with(b.tiktokCoverIv).clear(b.tiktokCoverIv);
+                b.tiktokCoverIv.setImageResource(R.color.feedlist_media_placeholder);
+                listener.onTikTokMetadataNeeded(item, first);
+            } else {
+                GlideUrl requestUrl = new GlideUrl(coverUrl, new LazyHeaders.Builder()
+                        .addHeader("Referer", "https://www.tiktok.com/")
+                        .addHeader("User-Agent", safeUserAgent(context))
+                        .addHeader("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
+                        .build());
+                Glide.with(b.tiktokCoverIv)
+                        .load(requestUrl)
+                        .placeholder(R.color.feedlist_media_placeholder)
+                        .error(R.color.feedlist_media_placeholder)
+                        .centerCrop()
+                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                        .dontAnimate()
+                        .listener(new RequestListener<Drawable>() {
+                            @Override
+                            public boolean onLoadFailed(GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
+                                listener.onTikTokMetadataNeeded(item, first);
+                                return false;
+                            }
 
-            // Restore the original working path: one click opens the dedicated
-            // full-screen TikTok player. No inline WebView or metadata re-resolve.
+                            @Override
+                            public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
+                                return false;
+                            }
+                        })
+                        .into(b.tiktokCoverIv);
+            }
+
+            // Keep the stable, dedicated full-screen playback path.
             b.tiktokBox.setOnClickListener(v -> listener.onTikTok(item, first));
         } else {
             Glide.with(b.tiktokCoverIv).clear(b.tiktokCoverIv);
@@ -266,6 +307,18 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         if (user == null) return "";
         if (!TextUtils.isEmpty(user.avatar_cache_key)) return user.avatar_cache_key;
         return user.vercode == null ? "" : user.vercode;
+    }
+
+    private static String safeUserAgent(Context context) {
+        String cached = coverUserAgent;
+        if (!TextUtils.isEmpty(cached)) return cached;
+        try {
+            String value = WebSettings.getDefaultUserAgent(context.getApplicationContext());
+            coverUserAgent = TextUtils.isEmpty(value) ? "Mozilla/5.0" : value;
+        } catch (Throwable ignored) {
+            coverUserAgent = "Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36";
+        }
+        return coverUserAgent;
     }
 
     private String languageText(FeedListUser user) {
