@@ -270,4 +270,10 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- 每条用户作品之间的浅灰分割线 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/feedlist_divider_soft" />
+
 </LinearLayout>
