@@ -17,6 +17,7 @@ import com.chat.base.utils.LayoutHelper;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.mikepenz.iconics.IconicsDrawable;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** 给独立沉浸 Activity 复用主页底部导航，交友仍归属于“语伴”一级入口。 */
@@ -48,6 +49,7 @@ public final class GlobalBottomNavigationController {
         addItem(activity, navigation, R.id.i_discover, "faw-compass", R.string.tab_text_discover, selectedMenuId == R.id.i_discover);
         addItem(activity, navigation, R.id.i_community, "faw-heart", R.string.tab_text_community, selectedMenuId == R.id.i_community);
 
+        AtomicBoolean navigating = new AtomicBoolean(false);
         navigation.setSelectedItemId(selectedMenuId);
         navigation.setOnItemSelectedListener(item -> {
             int id = item.getItemId();
@@ -58,23 +60,35 @@ public final class GlobalBottomNavigationController {
                         if (handled instanceof Boolean && (Boolean) handled) return true;
                     } catch (Throwable ignored) {
                     }
+                    if (!navigating.compareAndSet(false, true)) return true;
                     PENDING_MENU_ID.set(R.id.i_partner);
-                    activity.finish();
-                    activity.overridePendingTransition(0, 0);
+                    navigation.setEnabled(false);
+                    postFinish(activity, navigation, navigating, R.id.i_partner);
                 }
                 return true;
             }
 
+            if (!navigating.compareAndSet(false, true)) return true;
             PENDING_MENU_ID.set(id);
             navigation.setEnabled(false);
+            postFinish(activity, navigation, navigating, id);
+            return true;
+        });
+    }
+
+    private static void postFinish(Activity activity, BottomNavigationView navigation,
+                                   AtomicBoolean navigating, int pendingId) {
+        View decor = activity.getWindow() == null ? navigation : activity.getWindow().getDecorView();
+        decor.post(() -> {
             try {
-                activity.finish();
-                activity.overridePendingTransition(0, 0);
-                return true;
+                if (!activity.isFinishing() && !activity.isDestroyed()) {
+                    activity.finish();
+                    activity.overridePendingTransition(0, 0);
+                }
             } catch (Throwable error) {
-                PENDING_MENU_ID.compareAndSet(id, 0);
+                PENDING_MENU_ID.compareAndSet(pendingId, 0);
+                navigating.set(false);
                 navigation.setEnabled(true);
-                return false;
             }
         });
     }
