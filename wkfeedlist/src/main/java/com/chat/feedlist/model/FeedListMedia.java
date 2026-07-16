@@ -99,8 +99,10 @@ public class FeedListMedia implements Serializable {
 
     private String showUrl(String value) {
         if (TextUtils.isEmpty(value)) return "";
-        if (value.startsWith("http://") || value.startsWith("https://")) return value;
-        return WKApiConfig.getShowUrl(value);
+        String normalized = value.trim();
+        if (normalized.startsWith("//")) return "https:" + normalized;
+        if (normalized.startsWith("http://") || normalized.startsWith("https://")) return normalized;
+        return WKApiConfig.getShowUrl(normalized);
     }
 
     private static String firstNonEmpty(String... values) {
