@@ -13,4 +13,12 @@
         <item name="colorPrimary">@color/feedlist_accent</item>
         <item name="colorAccent">@color/feedlist_accent</item>
     </style>
+    <style name="FeedListTikTokEmbedTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">#000000</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
 </resources>
