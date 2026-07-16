@@ -4,11 +4,7 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="8dp"
-    android:layout_marginTop="6dp"
-    android:layout_marginEnd="8dp"
-    android:layout_marginBottom="6dp"
-    android:background="@drawable/bg_feedlist_post_card"
+    android:background="@color/feedlist_surface"
     android:orientation="vertical">
 
     <LinearLayout
@@ -204,7 +200,7 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:contentDescription="@string/feedlist_share"
-                android:src="@drawable/ic_feedlist_share_alt"
+                android:src="@drawable/ic_feedlist_share"
                 app:tint="@color/feedlist_action" />
 
             <TextView
