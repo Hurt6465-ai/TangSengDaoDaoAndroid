@@ -30,6 +30,7 @@ public class FeedListMediaGridLayout extends ViewGroup {
     private int measuredContentHeight;
     private String mediaSignature = "";
     private boolean pendingLoad;
+    private final Runnable imageLoadRunnable = this::loadImagesIfReady;
 
     public FeedListMediaGridLayout(Context context) { this(context, null); }
 
@@ -77,7 +78,7 @@ public class FeedListMediaGridLayout extends ViewGroup {
         // Always keep a non-empty grid pending so the second bind cannot cancel first paint.
         pendingLoad = !media.isEmpty();
         requestLayout();
-        if (isLaidOut()) postOnAnimation(this::loadImagesIfReady);
+        if (isLaidOut()) postOnAnimation(imageLoadRunnable);
     }
 
     private String signature(List<FeedListMedia> items) {
@@ -91,7 +92,7 @@ public class FeedListMediaGridLayout extends ViewGroup {
     }
 
     private void loadImagesIfReady() {
-        if (!pendingLoad || getWidth() <= 0 || media.isEmpty()) return;
+        if (!pendingLoad || !isAttachedToWindow() || getWidth() <= 0 || media.isEmpty()) return;
         pendingLoad = false;
         for (int i = 0; i < media.size() && i < MAX; i++) {
             ImageView image = views[i];
@@ -102,7 +103,7 @@ public class FeedListMediaGridLayout extends ViewGroup {
                 pendingLoad = true;
                 continue;
             }
-            Glide.with(image)
+            Glide.with(image.getContext().getApplicationContext())
                     .load(media.size() == 1 ? item.displayUrl() : item.thumbUrl())
                     .placeholder(R.color.feedlist_media_placeholder)
                     .error(R.color.feedlist_media_placeholder)
@@ -112,13 +113,13 @@ public class FeedListMediaGridLayout extends ViewGroup {
                     .dontAnimate()
                     .into(image);
         }
-        if (pendingLoad) postOnAnimation(this::loadImagesIfReady);
+        if (pendingLoad && isAttachedToWindow()) postOnAnimation(imageLoadRunnable);
     }
 
     public void reloadImages() {
         if (media.isEmpty()) return;
         pendingLoad = true;
-        postOnAnimation(this::loadImagesIfReady);
+        postOnAnimation(imageLoadRunnable);
     }
 
     public void clearImages() {
@@ -128,7 +129,12 @@ public class FeedListMediaGridLayout extends ViewGroup {
     }
 
     private void clearImageRequests() {
-        for (ImageView image : views) Glide.with(image).clear(image);
+        // Do not use Glide.with(View) while the hosting Activity is being destroyed.
+        // RequestManagerRetriever rejects destroyed Activity contexts, which caused
+        // bottom-navigation exits to crash from onDetachedFromWindow().
+        for (ImageView image : views) {
+            Glide.with(image.getContext().getApplicationContext()).clear(image);
+        }
     }
 
     @Override protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -237,7 +243,7 @@ public class FeedListMediaGridLayout extends ViewGroup {
                 layoutChild(views[i], lx, ly);
             }
         }
-        if (pendingLoad) postOnAnimation(this::loadImagesIfReady);
+        if (pendingLoad && isAttachedToWindow()) postOnAnimation(imageLoadRunnable);
     }
 
     private static void layoutChild(View view, int x, int y) {
@@ -250,11 +256,12 @@ public class FeedListMediaGridLayout extends ViewGroup {
         super.onAttachedToWindow();
         if (!media.isEmpty()) {
             pendingLoad = true;
-            postOnAnimation(this::loadImagesIfReady);
+            postOnAnimation(imageLoadRunnable);
         }
     }
 
     @Override protected void onDetachedFromWindow() {
+        removeCallbacks(imageLoadRunnable);
         // RecyclerView may keep a detached ViewHolder in its item cache and reattach it
         // without rebinding. Clear Glide targets to release resources, but keep the media
         // signature and mark them pending so onAttachedToWindow restores the images.
