@@ -2,6 +2,7 @@ package com.chat.feedlist.publish;
 
 import android.app.Activity;
 import android.content.ClipData;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -55,14 +56,40 @@ import java.util.regex.Pattern;
 public class FeedListPublishActivity extends AppCompatActivity {
     private static final int REQ_PICK_IMAGES = 101;
     private static final long TIKTOK_DETECT_DELAY_MS = 550L;
+    private static final String PUBLISH_STATE_PREFS = "feedlist_publish_state";
+    private static final String KEY_PUBLISH_SUCCESS_PENDING = "publish_success_pending";
     private static final Pattern TIKTOK_URL_PATTERN = Pattern.compile(
             "https?://(?:[a-z0-9-]+\\.)*tiktok\\.com/[^\\s<]+",
             Pattern.CASE_INSENSITIVE
     );
 
-    public static void openForResult(Activity activity, int requestCode) {
+    public static void open(Activity activity) {
         if (activity == null || activity.isFinishing()) return;
-        activity.startActivityForResult(new Intent(activity, FeedListPublishActivity.class), requestCode);
+        activity.startActivity(new Intent(activity, FeedListPublishActivity.class));
+    }
+
+    /** Kept for source compatibility; result delivery is intentionally no longer used. */
+    public static void openForResult(Activity activity, int requestCode) {
+        open(activity);
+    }
+
+    public static boolean consumePublishSuccess(Context context) {
+        if (context == null) return false;
+        android.content.SharedPreferences prefs = context.getSharedPreferences(
+                PUBLISH_STATE_PREFS,
+                Context.MODE_PRIVATE
+        );
+        boolean pending = prefs.getBoolean(KEY_PUBLISH_SUCCESS_PENDING, false);
+        if (pending) prefs.edit().remove(KEY_PUBLISH_SUCCESS_PENDING).commit();
+        return pending;
+    }
+
+    private static void markPublishSuccess(Context context) {
+        if (context == null) return;
+        context.getSharedPreferences(PUBLISH_STATE_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_PUBLISH_SUCCESS_PENDING, true)
+                .commit();
     }
 
     private EditText textEt;
@@ -538,13 +565,14 @@ public class FeedListPublishActivity extends AppCompatActivity {
     }
 
     private void finishSuccess() {
+        // Persist success before closing. The feed consumes this flag from onResume, avoiding
+        // the old Activity-result/RecyclerView lifecycle race that could crash after a valid post.
+        markPublishSuccess(getApplicationContext());
         main.post(() -> {
             if (isFinishing() || isDestroyed()) return;
             uploading = false;
-            setInputsEnabled(true);
             setProgress(100, getString(R.string.feedlist_publish_success));
             toast(getString(R.string.feedlist_publish_success));
-            setResult(RESULT_OK);
             finish();
         });
     }
@@ -652,7 +680,7 @@ public class FeedListPublishActivity extends AppCompatActivity {
         tiktokResolveGeneration++;
         if (pendingTikTokDetection != null) main.removeCallbacks(pendingTikTokDetection);
         if (tiktokCoverIv != null) Glide.with(this).clear(tiktokCoverIv);
-        worker.shutdownNow();
+        worker.shutdown();
         super.onDestroy();
     }
 }
