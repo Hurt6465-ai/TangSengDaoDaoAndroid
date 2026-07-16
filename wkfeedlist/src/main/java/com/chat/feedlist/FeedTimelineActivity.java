@@ -10,7 +10,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
@@ -48,7 +47,6 @@ import java.util.Set;
 
 public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBinding> implements FeedTimelineAdapter.Listener {
     private static final int PAGE_SIZE = 12;
-    private static final int REQ_PUBLISH = 5101;
     private static final String MODE_LATEST = "latest";
     private static final String MODE_FOLLOWING = "following";
     private static final long TIKTOK_RETRY_COOLDOWN_MS = 5L * 60L * 1000L;
@@ -109,7 +107,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         wkVBinding.followingTab.setOnClickListener(v -> switchMode(following));
         wkVBinding.publishBtn.setOnClickListener(v -> {
             try {
-                FeedListPublishActivity.openForResult(this, REQ_PUBLISH);
+                FeedListPublishActivity.open(this);
             } catch (Throwable error) {
                 toast(getString(R.string.feedlist_publish_open_failed));
             }
@@ -268,6 +266,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
 
     private void preloadTikTokCovers() {
         if (adapter == null || layoutManager == null || adapter.getItemCount() == 0) return;
+        TikTokEmbedActivity.prewarm(this);
         int first = layoutManager.findFirstVisibleItemPosition();
         if (first == RecyclerView.NO_POSITION) first = 0;
         adapter.preloadTikTokCovers(this, first, 4);
@@ -540,7 +539,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         if (media == null) return;
         String videoId = media.tiktokVideoId();
         if (!TextUtils.isEmpty(videoId)) {
-            TikTokEmbedActivity.open(this, videoId, media.external_url);
+            TikTokEmbedActivity.open(this, videoId, media.external_url, media.tiktokCoverUrl());
             return;
         }
         resolveTikTokMetadata(item, media, true);
@@ -608,7 +607,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
                 updateTikTokMetadata(item == null ? "" : item.feed_id, sourceUrl, result);
                 persistStates();
                 refreshTikTokRows(item == null ? "" : item.feed_id, sourceUrl);
-                if (shouldOpen) TikTokEmbedActivity.open(FeedTimelineActivity.this, result.video_id, result.url);
+                if (shouldOpen) TikTokEmbedActivity.open(FeedTimelineActivity.this, result.video_id, result.url, result.cover_url);
             }
 
             @Override public void onFail(int code, String msg) {
@@ -697,17 +696,22 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         }
     }
 
-    @Override protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQ_PUBLISH && resultCode == RESULT_OK) {
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (!FeedListPublishActivity.consumePublishSuccess(this) || wkVBinding == null) return;
+        // Refresh after the activity is fully resumed instead of mutating RecyclerView from
+        // onActivityResult while the old publish window is still being destroyed.
+        wkVBinding.getRoot().post(() -> {
+            if (isUnavailable()) return;
             current = latest;
             latest.firstVisiblePosition = 0;
             latest.firstVisibleOffset = 0;
-            latest.hasScrollState = true;
+            latest.hasScrollState = false;
             updateTabs();
-            render(true);
+            wkVBinding.recyclerView.scrollToPosition(0);
             requestPage(latest, true);
-        }
+        });
     }
 
     @Override protected void onDestroy() {

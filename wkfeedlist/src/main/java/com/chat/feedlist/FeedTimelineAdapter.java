@@ -213,13 +213,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         if (tiktok) {
             b.mediaGrid.bind(null);
             Context context = b.getRoot().getContext();
-            b.tiktokTitleTv.setText(TextUtils.isEmpty(first.external_title)
-                    ? context.getString(R.string.feedlist_tiktok)
-                    : first.external_title);
-            String author = first.external_author == null ? "" : first.external_author.trim();
-            b.tiktokAuthorTv.setText(TextUtils.isEmpty(author)
-                    ? "TikTok"
-                    : (author.startsWith("@") ? author : "@" + author));
+            applyTikTokCoverSize(b);
 
             String coverUrl = first.tiktokCoverUrl();
             if (TextUtils.isEmpty(coverUrl)) {
@@ -261,6 +255,20 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             b.tiktokBox.setOnClickListener(null);
             b.mediaGrid.setListener((index, media) -> listener.onImages(item, index, media));
             b.mediaGrid.bind(item.safeMedia());
+        }
+    }
+
+
+    private void applyTikTokCoverSize(ItemFeedTimelineBinding binding) {
+        Context context = binding.getRoot().getContext();
+        int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
+        int screenHeight = context.getResources().getDisplayMetrics().heightPixels;
+        int targetHeight = Math.round(screenWidth * 1.25f); // 4:5, visibly larger than the old 228dp card.
+        targetHeight = Math.min(targetHeight, Math.round(screenHeight * 0.72f));
+        ViewGroup.LayoutParams params = binding.tiktokBox.getLayoutParams();
+        if (params.height != targetHeight) {
+            params.height = targetHeight;
+            binding.tiktokBox.setLayoutParams(params);
         }
     }
 
