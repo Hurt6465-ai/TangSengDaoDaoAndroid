@@ -311,6 +311,45 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         return user.vercode == null ? "" : user.vercode;
     }
 
+    private String languageText(FeedListUser user) {
+        if (user == null) return "";
+        String nativeLang = firstUpper(user.nativeLanguageList());
+        String learning = firstUpper(user.learningLanguageList());
+        if (TextUtils.isEmpty(nativeLang)) return learning;
+        if (TextUtils.isEmpty(learning)) return nativeLang;
+        return nativeLang + " ⇋ " + learning;
+    }
+
+    private String firstUpper(List<String> values) {
+        if (values == null || values.isEmpty() || TextUtils.isEmpty(values.get(0))) return "";
+        return values.get(0).trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String relativeTime(Context context, long value, long server) {
+        if (value <= 0) return context.getString(R.string.feedlist_just_now);
+        long time = value < 10_000_000_000L ? value * 1000L : value;
+        long normalizedServer = server < 10_000_000_000L ? server * 1000L : server;
+        long now = server > 0
+                ? normalizedServer + Math.max(0L, System.currentTimeMillis() - serverTimeLocalAt)
+                : System.currentTimeMillis();
+        long sec = Math.max(0, (now - time) / 1000L);
+        if (sec < 60) return context.getString(R.string.feedlist_just_now);
+        if (sec < 3600) return context.getString(R.string.feedlist_minutes_ago, sec / 60);
+        if (sec < 86400) return context.getString(R.string.feedlist_hours_ago, sec / 3600);
+        if (sec < 2_592_000L) return context.getString(R.string.feedlist_days_ago, Math.max(1L, sec / 86_400L));
+        if (sec < 31_536_000L) return context.getString(R.string.feedlist_months_ago, Math.max(1L, sec / 2_592_000L));
+        return context.getString(R.string.feedlist_years_ago, Math.max(1L, sec / 31_536_000L));
+    }
+
+    static final class Holder extends RecyclerView.ViewHolder {
+        final ItemFeedTimelineBinding binding;
+
+        Holder(ItemFeedTimelineBinding binding) {
+            super(binding.getRoot());
+            this.binding = binding;
+        }
+    }
+
     private static final DiffUtil.ItemCallback<FeedListItem> DIFF = new DiffUtil.ItemCallback<>() {
         @Override
         public boolean areItemsTheSame(@NonNull FeedListItem oldItem, @NonNull FeedListItem newItem) {
