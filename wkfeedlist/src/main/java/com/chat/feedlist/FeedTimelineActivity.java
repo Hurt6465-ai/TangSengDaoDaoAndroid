@@ -10,6 +10,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
@@ -47,6 +48,7 @@ import java.util.Set;
 
 public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBinding> implements FeedTimelineAdapter.Listener {
     private static final int PAGE_SIZE = 12;
+    private static final int REQ_PUBLISH = 5101;
     private static final String MODE_LATEST = "latest";
     private static final String MODE_FOLLOWING = "following";
     private static final long TIKTOK_RETRY_COOLDOWN_MS = 5L * 60L * 1000L;
@@ -107,7 +109,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         wkVBinding.followingTab.setOnClickListener(v -> switchMode(following));
         wkVBinding.publishBtn.setOnClickListener(v -> {
             try {
-                FeedListPublishActivity.open(this);
+                FeedListPublishActivity.openForResult(this, REQ_PUBLISH);
             } catch (Throwable error) {
                 toast(getString(R.string.feedlist_publish_open_failed));
             }
@@ -539,14 +541,18 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         if (media == null) return;
         String videoId = media.tiktokVideoId();
         if (!TextUtils.isEmpty(videoId)) {
-            TikTokEmbedActivity.open(this, videoId, media.external_url, media.tiktokCoverUrl());
+            TikTokEmbedActivity.open(this, videoId, media.tiktokSourceUrl(), media.tiktokCoverUrl());
             return;
         }
-        resolveTikTokMetadata(item, media, true);
+        resolveTikTokMetadata(item, media, true, false);
     }
 
     @Override public void onTikTokMetadataNeeded(FeedListItem item, FeedListMedia media) {
-        resolveTikTokMetadata(item, media, false);
+        resolveTikTokMetadata(item, media, false, false);
+    }
+
+    @Override public void onTikTokCoverLoadFailed(FeedListItem item, FeedListMedia media) {
+        resolveTikTokMetadata(item, media, false, true);
     }
 
     @Override public void onOpenTikTok(FeedListItem item, FeedListMedia media) {
@@ -572,9 +578,10 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         return -1;
     }
 
-    private void resolveTikTokMetadata(FeedListItem item, FeedListMedia media, boolean openAfterResolve) {
+    private void resolveTikTokMetadata(FeedListItem item, FeedListMedia media,
+                                       boolean openAfterResolve, boolean forceFreshCover) {
         if (media == null || isUnavailable()) return;
-        String sourceUrl = media.external_url == null ? "" : media.external_url.trim();
+        String sourceUrl = media.tiktokSourceUrl();
         if (TextUtils.isEmpty(sourceUrl)) {
             if (openAfterResolve) toast(getString(R.string.feedlist_tiktok_failed));
             return;
@@ -586,58 +593,155 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         long now = System.currentTimeMillis();
         Long failedAt = tiktokResolveFailedAt.get(sourceUrl);
         Long resolvedAt = tiktokResolvedAt.get(sourceUrl);
-        if (!openAfterResolve && ((failedAt != null && now - failedAt < TIKTOK_RETRY_COOLDOWN_MS)
+        if (forceFreshCover && failedAt != null && now - failedAt < TIKTOK_RETRY_COOLDOWN_MS) {
+            return;
+        }
+        if (!forceFreshCover && !openAfterResolve
+                && ((failedAt != null && now - failedAt < TIKTOK_RETRY_COOLDOWN_MS)
                 || (resolvedAt != null && now - resolvedAt < TIKTOK_RETRY_COOLDOWN_MS))) {
             return;
         }
 
+        String feedId = item == null ? "" : item.feed_id;
         tiktokResolveInFlight.add(sourceUrl);
+
+        // A failed/expired CDN thumbnail must bypass the app server cache. Ask TikTok oEmbed
+        // directly for a new signed thumbnail before trying the normal server preview path.
+        if (forceFreshCover) {
+            tiktokResolvedAt.remove(sourceUrl);
+            boolean shouldOpen = tiktokOpenAfterResolve.remove(sourceUrl);
+            resolveTikTokWithOEmbed(feedId, sourceUrl, null, shouldOpen);
+            return;
+        }
+
         FeedListModel.getInstance().tiktokPreview(sourceUrl, new IRequestResultListener<>() {
-            @Override public void onSuccess(FeedListTikTokPreview result) {
-                tiktokResolveInFlight.remove(sourceUrl);
+            @Override public void onSuccess(FeedListTikTokPreview serverResult) {
                 boolean shouldOpen = tiktokOpenAfterResolve.remove(sourceUrl);
-                if (isUnavailable()) return;
-                if (result == null || TextUtils.isEmpty(result.video_id) || TextUtils.isEmpty(result.url)) {
-                    tiktokResolveFailedAt.put(sourceUrl, System.currentTimeMillis());
-                    if (shouldOpen) toast(getString(R.string.feedlist_tiktok_failed));
+                if (isUnavailable()) {
+                    tiktokResolveInFlight.remove(sourceUrl);
                     return;
                 }
-                tiktokResolveFailedAt.remove(sourceUrl);
-                tiktokResolvedAt.put(sourceUrl, System.currentTimeMillis());
-                updateTikTokMetadata(item == null ? "" : item.feed_id, sourceUrl, result);
-                persistStates();
-                refreshTikTokRows(item == null ? "" : item.feed_id, sourceUrl);
-                if (shouldOpen) TikTokEmbedActivity.open(FeedTimelineActivity.this, result.video_id, result.url, result.cover_url);
+                if (serverResult != null && serverResult.hasPlayableVideo()
+                        && !TextUtils.isEmpty(serverResult.bestCoverUrl())) {
+                    finishTikTokResolveSuccess(feedId, sourceUrl, serverResult, shouldOpen);
+                    return;
+                }
+                resolveTikTokWithOEmbed(feedId, sourceUrl, serverResult, shouldOpen);
             }
 
             @Override public void onFail(int code, String msg) {
-                tiktokResolveInFlight.remove(sourceUrl);
                 boolean shouldOpen = tiktokOpenAfterResolve.remove(sourceUrl);
-                tiktokResolveFailedAt.put(sourceUrl, System.currentTimeMillis());
-                if (isUnavailable()) return;
-                if (shouldOpen) toast(TextUtils.isEmpty(msg) ? getString(R.string.feedlist_tiktok_failed) : msg);
+                if (isUnavailable()) {
+                    tiktokResolveInFlight.remove(sourceUrl);
+                    return;
+                }
+                resolveTikTokWithOEmbed(feedId, sourceUrl, null, shouldOpen);
             }
         });
     }
 
+    private void resolveTikTokWithOEmbed(String feedId, String sourceUrl,
+                                         FeedListTikTokPreview serverResult, boolean shouldOpen) {
+        TikTokMetadataResolver.resolve(sourceUrl, new TikTokMetadataResolver.Callback() {
+            @Override public void onSuccess(FeedListTikTokPreview oEmbedResult) {
+                if (isUnavailable()) {
+                    tiktokResolveInFlight.remove(sourceUrl);
+                    return;
+                }
+                FeedListTikTokPreview merged = mergeTikTokPreview(serverResult, oEmbedResult, sourceUrl);
+                if (merged == null || !merged.hasPlayableVideo()
+                        || (!shouldOpen && TextUtils.isEmpty(merged.bestCoverUrl()))) {
+                    finishTikTokResolveFailure(sourceUrl, shouldOpen, "");
+                    return;
+                }
+                finishTikTokResolveSuccess(feedId, sourceUrl, merged, shouldOpen);
+            }
+
+            @Override public void onFail(String message) {
+                if (serverResult != null && serverResult.hasPlayableVideo()
+                        && (shouldOpen || !TextUtils.isEmpty(serverResult.bestCoverUrl()))) {
+                    finishTikTokResolveSuccess(feedId, sourceUrl,
+                            mergeTikTokPreview(serverResult, null, sourceUrl), shouldOpen);
+                    return;
+                }
+                finishTikTokResolveFailure(sourceUrl, shouldOpen, message);
+            }
+        });
+    }
+
+    private FeedListTikTokPreview mergeTikTokPreview(FeedListTikTokPreview primary,
+                                                      FeedListTikTokPreview fallback,
+                                                      String sourceUrl) {
+        if (primary == null && fallback == null) return null;
+        FeedListTikTokPreview out = new FeedListTikTokPreview();
+        out.provider = firstNonEmpty(primary == null ? "" : primary.bestProvider(),
+                fallback == null ? "" : fallback.bestProvider(), "tiktok");
+        out.video_id = firstNonEmpty(primary == null ? "" : primary.bestVideoId(),
+                fallback == null ? "" : fallback.bestVideoId());
+        out.url = firstNonEmpty(primary == null ? "" : primary.bestUrl(),
+                fallback == null ? "" : fallback.bestUrl(), sourceUrl);
+        out.cover_url = firstNonEmpty(fallback == null ? "" : fallback.bestCoverUrl(),
+                primary == null ? "" : primary.bestCoverUrl());
+        out.title = firstNonEmpty(primary == null ? "" : primary.title,
+                fallback == null ? "" : fallback.title);
+        out.author_name = firstNonEmpty(primary == null ? "" : primary.author_name,
+                fallback == null ? "" : fallback.author_name);
+        return out;
+    }
+
+    private void finishTikTokResolveSuccess(String feedId, String sourceUrl,
+                                            FeedListTikTokPreview result, boolean shouldOpen) {
+        tiktokResolveInFlight.remove(sourceUrl);
+        tiktokResolveFailedAt.remove(sourceUrl);
+        tiktokResolvedAt.put(sourceUrl, System.currentTimeMillis());
+        updateTikTokMetadata(feedId, sourceUrl, result);
+        persistStates();
+        refreshTikTokRows(feedId, sourceUrl);
+        if (shouldOpen) {
+            TikTokEmbedActivity.open(this, result.bestVideoId(),
+                    firstNonEmpty(result.bestUrl(), sourceUrl), result.bestCoverUrl());
+        }
+    }
+
+    private void finishTikTokResolveFailure(String sourceUrl, boolean shouldOpen, String message) {
+        tiktokResolveInFlight.remove(sourceUrl);
+        tiktokResolveFailedAt.put(sourceUrl, System.currentTimeMillis());
+        if (isUnavailable() || !shouldOpen) return;
+        toast(TextUtils.isEmpty(message) ? getString(R.string.feedlist_tiktok_failed) : message);
+    }
+
     private void updateTikTokMetadata(String feedId, String oldUrl, FeedListTikTokPreview result) {
+        String resolvedId = result == null ? "" : result.bestVideoId();
+        String resolvedUrl = result == null ? "" : result.bestUrl();
+        String resolvedCover = result == null ? "" : result.bestCoverUrl();
+        String resolvedProvider = result == null ? "tiktok" : result.bestProvider();
         for (TimelineState state : new TimelineState[]{latest, following}) {
             for (FeedListItem candidate : state.items) {
                 if (candidate == null) continue;
                 boolean sameFeed = !TextUtils.isEmpty(feedId) && TextUtils.equals(feedId, candidate.feed_id);
                 for (FeedListMedia value : candidate.safeMedia()) {
                     if (value == null || !value.isTikTok()) continue;
-                    boolean sameUrl = !TextUtils.isEmpty(oldUrl) && TextUtils.equals(oldUrl, value.external_url);
+                    boolean sameUrl = !TextUtils.isEmpty(oldUrl)
+                            && (TextUtils.equals(oldUrl, value.external_url)
+                            || TextUtils.equals(oldUrl, value.tiktokSourceUrl()));
                     if (!sameFeed && !sameUrl) continue;
-                    value.external_provider = TextUtils.isEmpty(result.provider) ? "tiktok" : result.provider;
-                    value.external_id = result.video_id;
-                    value.external_url = result.url;
-                    value.cover_url = result.cover_url;
-                    value.external_title = result.title == null ? "" : result.title;
-                    value.external_author = result.author_name == null ? "" : result.author_name;
+                    value.external_provider = firstNonEmpty(resolvedProvider, "tiktok");
+                    if (!TextUtils.isEmpty(resolvedId)) value.external_id = resolvedId;
+                    if (!TextUtils.isEmpty(resolvedUrl)) value.external_url = resolvedUrl;
+                    if (!TextUtils.isEmpty(resolvedCover)) value.cover_url = resolvedCover;
+                    if (result != null && !TextUtils.isEmpty(result.title)) value.external_title = result.title;
+                    if (result != null && !TextUtils.isEmpty(result.author_name)) value.external_author = result.author_name;
                 }
             }
         }
+    }
+
+    private static String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (!TextUtils.isEmpty(value) && !TextUtils.isEmpty(value.trim())) return value.trim();
+        }
+        return "";
     }
 
     private void refreshTikTokRows(String feedId, String oldUrl) {
@@ -696,22 +800,17 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         }
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (!FeedListPublishActivity.consumePublishSuccess(this) || wkVBinding == null) return;
-        // Refresh after the activity is fully resumed instead of mutating RecyclerView from
-        // onActivityResult while the old publish window is still being destroyed.
-        wkVBinding.getRoot().post(() -> {
-            if (isUnavailable()) return;
+    @Override protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_PUBLISH && resultCode == RESULT_OK) {
             current = latest;
             latest.firstVisiblePosition = 0;
             latest.firstVisibleOffset = 0;
-            latest.hasScrollState = false;
+            latest.hasScrollState = true;
             updateTabs();
-            wkVBinding.recyclerView.scrollToPosition(0);
+            render(true);
             requestPage(latest, true);
-        });
+        }
     }
 
     @Override protected void onDestroy() {

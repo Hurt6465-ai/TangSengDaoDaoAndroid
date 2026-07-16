@@ -2,7 +2,6 @@ package com.chat.feedlist;
 
 import android.content.Context;
 import android.graphics.drawable.Drawable;
-import android.webkit.WebSettings;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -19,8 +18,6 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.bumptech.glide.load.engine.GlideException;
-import com.bumptech.glide.load.model.GlideUrl;
-import com.bumptech.glide.load.model.LazyHeaders;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.target.Target;
 import com.chat.feedlist.databinding.ItemFeedTimelineBinding;
@@ -37,7 +34,6 @@ import java.util.Set;
 
 public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineAdapter.Holder> {
     private static final String PAYLOAD_INTERACTION = "interaction";
-    private static volatile String coverUserAgent;
 
     public interface Listener {
         void onProfile(FeedListItem item);
@@ -50,6 +46,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         void onTikTok(FeedListItem item, FeedListMedia media);
         void onOpenTikTok(FeedListItem item, FeedListMedia media);
         void onTikTokMetadataNeeded(FeedListItem item, FeedListMedia media);
+        void onTikTokCoverLoadFailed(FeedListItem item, FeedListMedia media);
     }
 
     private final Listener listener;
@@ -94,17 +91,13 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             FeedListItem item = getItem(i);
             FeedListMedia media = item == null ? null : item.firstMedia();
             if (media == null || !media.isTikTok()) continue;
-            // TikTok cover links are temporary. Refresh metadata while the row is being
-            // preloaded instead of waiting for a visibly broken image request.
-            listener.onTikTokMetadataNeeded(item, media);
             String coverUrl = media.tiktokCoverUrl();
-            if (TextUtils.isEmpty(coverUrl)) continue;
-            GlideUrl requestUrl = new GlideUrl(coverUrl, new LazyHeaders.Builder()
-                    .addHeader("User-Agent", safeUserAgent(context))
-                    .addHeader("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
-                    .build());
+            if (TextUtils.isEmpty(coverUrl) || media.isTikTokCoverProbablyExpired(System.currentTimeMillis())) {
+                listener.onTikTokMetadataNeeded(item, media);
+                continue;
+            }
             Glide.with(context)
-                    .load(requestUrl)
+                    .load(coverUrl)
                     .diskCacheStrategy(DiskCacheStrategy.DATA)
                     .preload();
         }
@@ -215,24 +208,21 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
 
         if (tiktok) {
             b.mediaGrid.bind(null);
-            Context context = b.getRoot().getContext();
             applyTikTokCoverSize(b);
-
-            // Do this even when an old cover still exists. TikTok thumbnails can expire, and
-            // the activity-level request guard prevents duplicate preview calls while scrolling.
+            // TikTok cover links are temporary. Refresh metadata once per activity cooldown even
+            // when an old URL still exists, so an expired CDN URL is replaced before Glide needs it.
             listener.onTikTokMetadataNeeded(item, first);
 
             String coverUrl = first.tiktokCoverUrl();
-            if (TextUtils.isEmpty(coverUrl)) {
+            boolean expired = first.isTikTokCoverProbablyExpired(System.currentTimeMillis());
+            if (TextUtils.isEmpty(coverUrl) || expired) {
                 Glide.with(b.tiktokCoverIv).clear(b.tiktokCoverIv);
                 b.tiktokCoverIv.setImageResource(R.color.feedlist_media_placeholder);
+                if (expired) listener.onTikTokCoverLoadFailed(item, first);
+                else listener.onTikTokMetadataNeeded(item, first);
             } else {
-                GlideUrl requestUrl = new GlideUrl(coverUrl, new LazyHeaders.Builder()
-                        .addHeader("User-Agent", safeUserAgent(context))
-                        .addHeader("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
-                        .build());
                 Glide.with(b.tiktokCoverIv)
-                        .load(requestUrl)
+                        .load(coverUrl)
                         .placeholder(R.color.feedlist_media_placeholder)
                         .error(R.color.feedlist_media_placeholder)
                         .centerCrop()
@@ -241,7 +231,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                         .listener(new RequestListener<Drawable>() {
                             @Override
                             public boolean onLoadFailed(GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
-                                listener.onTikTokMetadataNeeded(item, first);
+                                listener.onTikTokCoverLoadFailed(item, first);
                                 return false;
                             }
 
@@ -263,12 +253,11 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         }
     }
 
-
     private void applyTikTokCoverSize(ItemFeedTimelineBinding binding) {
         Context context = binding.getRoot().getContext();
         int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
         int screenHeight = context.getResources().getDisplayMetrics().heightPixels;
-        int targetHeight = Math.round(screenWidth * 1.25f); // 4:5, visibly larger than the old 228dp card.
+        int targetHeight = Math.round(screenWidth * 1.25f);
         targetHeight = Math.min(targetHeight, Math.round(screenHeight * 0.72f));
         ViewGroup.LayoutParams params = binding.tiktokBox.getLayoutParams();
         if (params.height != targetHeight) {
@@ -320,56 +309,6 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         if (user == null) return "";
         if (!TextUtils.isEmpty(user.avatar_cache_key)) return user.avatar_cache_key;
         return user.vercode == null ? "" : user.vercode;
-    }
-
-    private static String safeUserAgent(Context context) {
-        String cached = coverUserAgent;
-        if (!TextUtils.isEmpty(cached)) return cached;
-        try {
-            String value = WebSettings.getDefaultUserAgent(context.getApplicationContext());
-            coverUserAgent = TextUtils.isEmpty(value) ? "Mozilla/5.0" : value;
-        } catch (Throwable ignored) {
-            coverUserAgent = "Mozilla/5.0 (Linux; Android) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36";
-        }
-        return coverUserAgent;
-    }
-
-    private String languageText(FeedListUser user) {
-        if (user == null) return "";
-        String nativeLang = firstUpper(user.nativeLanguageList());
-        String learning = firstUpper(user.learningLanguageList());
-        if (TextUtils.isEmpty(nativeLang)) return learning;
-        if (TextUtils.isEmpty(learning)) return nativeLang;
-        return nativeLang + " ⇋ " + learning;
-    }
-
-    private String firstUpper(List<String> values) {
-        if (values == null || values.isEmpty() || TextUtils.isEmpty(values.get(0))) return "";
-        return values.get(0).trim().toUpperCase(Locale.ROOT);
-    }
-
-    private String relativeTime(Context context, long value, long server) {
-        if (value <= 0) return context.getString(R.string.feedlist_just_now);
-        long time = value < 10_000_000_000L ? value * 1000L : value;
-        long normalizedServer = server < 10_000_000_000L ? server * 1000L : server;
-        long now = server > 0
-                ? normalizedServer + Math.max(0L, System.currentTimeMillis() - serverTimeLocalAt)
-                : System.currentTimeMillis();
-        long sec = Math.max(0, (now - time) / 1000L);
-        if (sec < 60) return context.getString(R.string.feedlist_just_now);
-        if (sec < 3600) return context.getString(R.string.feedlist_minutes_ago, sec / 60);
-        if (sec < 86400) return context.getString(R.string.feedlist_hours_ago, sec / 3600);
-        if (sec < 2_592_000L) return context.getString(R.string.feedlist_days_ago, Math.max(1L, sec / 86_400L));
-        if (sec < 31_536_000L) return context.getString(R.string.feedlist_months_ago, Math.max(1L, sec / 2_592_000L));
-        return context.getString(R.string.feedlist_years_ago, Math.max(1L, sec / 31_536_000L));
-    }
-
-    static final class Holder extends RecyclerView.ViewHolder {
-        final ItemFeedTimelineBinding binding;
-        Holder(ItemFeedTimelineBinding binding) {
-            super(binding.getRoot());
-            this.binding = binding;
-        }
     }
 
     private static final DiffUtil.ItemCallback<FeedListItem> DIFF = new DiffUtil.ItemCallback<>() {
