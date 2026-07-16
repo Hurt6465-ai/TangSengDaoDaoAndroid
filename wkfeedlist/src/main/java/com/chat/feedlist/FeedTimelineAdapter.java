@@ -92,12 +92,8 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             FeedListMedia media = item == null ? null : item.firstMedia();
             if (media == null || !media.isTikTok()) continue;
             String coverUrl = media.tiktokCoverUrl();
-            if (TextUtils.isEmpty(coverUrl)) {
+            if (TextUtils.isEmpty(coverUrl) || media.isTikTokCoverProbablyExpired(System.currentTimeMillis())) {
                 listener.onTikTokMetadataNeeded(item, media);
-                continue;
-            }
-            if (media.isTikTokCoverProbablyExpired(System.currentTimeMillis())) {
-                listener.onTikTokCoverLoadFailed(item, media);
                 continue;
             }
             Glide.with(context)
@@ -220,12 +216,10 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                 b.tiktokCoverIv.setImageResource(R.color.feedlist_media_placeholder);
                 listener.onTikTokMetadataNeeded(item, first);
             } else {
-                // An expired signed URL can still have valid bytes in Glide's DATA disk cache.
-                // Keep showing that cached poster while metadata refreshes in the background instead
-                // of replacing it with a black placeholder immediately. Do not start the normal
-                // metadata request first, otherwise its in-flight lock would swallow the forced refresh.
+                // Keep a previously cached poster visible even when the signed CDN URL has expired.
+                // The Activity refreshes an expired/failed cover directly through official oEmbed,
+                // bypassing a stale server preview response.
                 if (expired) listener.onTikTokCoverLoadFailed(item, first);
-                else listener.onTikTokMetadataNeeded(item, first);
                 Glide.with(b.tiktokCoverIv)
                         .load(coverUrl)
                         .placeholder(R.color.feedlist_media_placeholder)

@@ -3,7 +3,6 @@ package com.chat.feedlist;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemClock;
 import android.text.TextUtils;
 
 import com.chat.feedlist.model.FeedListTikTokPreview;
@@ -34,9 +33,6 @@ public final class TikTokMetadataResolver {
                     + "(KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36";
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(2);
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
-    private static final Object OEMBED_RATE_LOCK = new Object();
-    private static final long MIN_OEMBED_INTERVAL_MS = 1_200L;
-    private static long nextOEmbedRequestAt;
 
     public interface Callback {
         void onSuccess(FeedListTikTokPreview preview);
@@ -55,7 +51,6 @@ public final class TikTokMetadataResolver {
         EXECUTOR.execute(() -> {
             try {
                 String canonicalUrl = resolveCanonicalUrl(safeSource);
-                awaitOEmbedSlot();
                 FeedListTikTokPreview preview = requestOEmbed(canonicalUrl);
                 if (TextUtils.isEmpty(preview.url)) preview.url = canonicalUrl;
                 if (TextUtils.isEmpty(preview.video_id)) preview.video_id = preview.bestVideoId();
@@ -89,16 +84,6 @@ public final class TikTokMetadataResolver {
             if (connection != null) connection.disconnect();
         }
         return sourceUrl;
-    }
-
-    private static void awaitOEmbedSlot() {
-        long waitMs;
-        synchronized (OEMBED_RATE_LOCK) {
-            long now = SystemClock.elapsedRealtime();
-            waitMs = Math.max(0L, nextOEmbedRequestAt - now);
-            nextOEmbedRequestAt = Math.max(now, nextOEmbedRequestAt) + MIN_OEMBED_INTERVAL_MS;
-        }
-        if (waitMs > 0L) SystemClock.sleep(waitMs);
     }
 
     private static FeedListTikTokPreview requestOEmbed(String canonicalUrl) throws Exception {
