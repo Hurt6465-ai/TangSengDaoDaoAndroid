@@ -1,15 +1,126 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent" android:background="#000000" android:orientation="vertical">
-    <FrameLayout android:layout_width="match_parent" android:layout_height="56dp" android:paddingTop="10dp">
-        <TextView android:id="@+id/backBtn" android:layout_width="56dp" android:layout_height="match_parent" android:gravity="center" android:text="‹" android:textColor="#FFFFFF" android:textSize="36sp" />
-        <TextView android:layout_width="wrap_content" android:layout_height="match_parent" android:layout_gravity="center" android:gravity="center" android:text="TikTok" android:textColor="#FFFFFF" android:textSize="17sp" android:textStyle="bold" />
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:paddingTop="10dp">
+
+        <TextView
+            android:id="@+id/backBtn"
+            android:layout_width="56dp"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="‹"
+            android:textColor="#FFFFFF"
+            android:textSize="36sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:text="TikTok"
+            android:textColor="#FFFFFF"
+            android:textSize="17sp"
+            android:textStyle="bold" />
     </FrameLayout>
-    <FrameLayout android:id="@+id/contentBox" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
-        <android.webkit.WebView android:id="@+id/webView" android:layout_width="match_parent" android:layout_height="match_parent" />
-        <LinearLayout android:id="@+id/errorPanel" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:padding="28dp" android:visibility="gone">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/feedlist_tiktok_failed" android:textColor="#FFFFFF" android:textSize="15sp" />
-            <TextView android:id="@+id/openExternalBtn" android:layout_width="wrap_content" android:layout_height="46dp" android:layout_marginTop="16dp" android:gravity="center" android:paddingStart="18dp" android:paddingEnd="18dp" android:text="@string/feedlist_open_tiktok" android:textColor="#FFFFFF" android:textStyle="bold" />
+
+    <FrameLayout
+        android:id="@+id/contentBox"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <android.webkit.WebView
+            android:id="@+id/webView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Cached list cover is shown immediately while Chromium/TikTok initializes. -->
+        <ImageView
+            android:id="@+id/posterIv"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#000000"
+            android:contentDescription="@string/feedlist_tiktok"
+            android:scaleType="centerCrop" />
+
+        <ProgressBar
+            android:id="@+id/loadingView"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="#FFFFFF" />
+
+        <!-- Only the middle area toggles play/pause, leaving the bottom progress/volume controls usable. -->
+        <View
+            android:id="@+id/centerTap"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:layout_marginStart="34dp"
+            android:layout_marginTop="96dp"
+            android:layout_marginEnd="92dp"
+            android:layout_marginBottom="100dp"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <ImageView
+            android:id="@+id/centerPlayIndicator"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_feedlist_play"
+            android:contentDescription="@string/feedlist_play"
+            android:padding="19dp"
+            android:src="@drawable/ic_feedlist_play"
+            android:visibility="gone" />
+
+        <!-- Blocks author/like/comment/share controls without covering the bottom progress area. -->
+        <View
+            android:id="@+id/rightActionBlocker"
+            android:layout_width="84dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:layout_marginBottom="86dp"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <LinearLayout
+            android:id="@+id/errorPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#000000"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="28dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/feedlist_tiktok_failed"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/retryBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="46dp"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:text="@string/feedlist_retry"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold" />
         </LinearLayout>
     </FrameLayout>
 </LinearLayout>
