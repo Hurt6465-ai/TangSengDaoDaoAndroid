@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/pageRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_partnerlist_page">
@@ -17,7 +18,9 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:background="@drawable/bg_partnerlist_toolbar"
-            android:paddingStart="12dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:paddingStart="14dp"
             android:paddingTop="0dp"
             android:paddingEnd="14dp">
 
@@ -119,8 +122,8 @@
                 android:id="@+id/recyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:paddingTop="6dp"
-                android:paddingBottom="14dp"
+                android:paddingTop="9dp"
+                android:paddingBottom="16dp"
                 android:visibility="gone" />
 
             <com.chat.partnerlist.SkeletonPulseLayout
@@ -128,7 +131,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:paddingTop="6dp">
+                android:paddingTop="9dp">
 
                 <include layout="@layout/item_partner_list_skeleton" />
                 <include layout="@layout/item_partner_list_skeleton" />
@@ -207,6 +210,7 @@
         android:layout_height="64dp"
         android:layout_gravity="bottom"
         android:background="@color/tab_bg"
+        android:clipToPadding="false"
         app:itemIconTint="@color/transparent"
         app:menu="@menu/menu_navigation" />
 
