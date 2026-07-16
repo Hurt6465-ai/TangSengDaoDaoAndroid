@@ -67,8 +67,10 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     private TimelineState current = latest;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable publishRefreshTask = this::refreshAfterPublish;
+    private final Runnable tiktokVideoPreloadTask = this::preloadFirstVisibleTikTokVideo;
     private FeedTimelineAdapter adapter;
     private LinearLayoutManager layoutManager;
+    private TikTokPlaybackPreloader tiktokPlaybackPreloader;
     private RecyclerView.OnScrollListener timelineScrollListener;
     private boolean resumed;
     private boolean destroyed;
@@ -87,6 +89,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         wkVBinding.recyclerView.setItemViewCacheSize(5);
         wkVBinding.recyclerView.getRecycledViewPool().setMaxRecycledViews(0, 10);
         wkVBinding.recyclerView.setClipToPadding(false);
+        tiktokPlaybackPreloader = new TikTokPlaybackPreloader(this, wkVBinding.tiktokPreloadHost);
         if (wkVBinding.recyclerView.getItemAnimator() instanceof DefaultItemAnimator) {
             ((DefaultItemAnimator) wkVBinding.recyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
         }
@@ -136,6 +139,9 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
             @Override public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
                 if (newState == RecyclerView.SCROLL_STATE_IDLE) {
                     preloadTikTokCovers();
+                    scheduleTikTokVideoPreload();
+                } else {
+                    mainHandler.removeCallbacks(tiktokVideoPreloadTask);
                 }
             }
         };
@@ -272,6 +278,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
                 layoutManager.scrollToPositionWithOffset(position, state.firstVisibleOffset);
             }
             preloadTikTokCovers();
+            scheduleTikTokVideoPreload();
         });
         boolean empty = state.items.isEmpty();
         wkVBinding.statePanel.setVisibility(empty ? View.VISIBLE : View.GONE);
@@ -287,6 +294,34 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         int first = layoutManager.findFirstVisibleItemPosition();
         if (first == RecyclerView.NO_POSITION) first = 0;
         adapter.preloadTikTokCovers(this, first, 4);
+    }
+
+    private void scheduleTikTokVideoPreload() {
+        mainHandler.removeCallbacks(tiktokVideoPreloadTask);
+        if (!resumed || isUnavailable()) return;
+        mainHandler.postDelayed(tiktokVideoPreloadTask, 650L);
+    }
+
+    private void preloadFirstVisibleTikTokVideo() {
+        if (!resumed || isUnavailable() || tiktokPlaybackPreloader == null
+                || adapter == null || layoutManager == null || adapter.getItemCount() == 0) {
+            return;
+        }
+        int first = layoutManager.findFirstVisibleItemPosition();
+        if (first == RecyclerView.NO_POSITION) first = 0;
+        int end = Math.min(adapter.getItemCount(), first + 8);
+        for (int position = Math.max(0, first); position < end; position++) {
+            FeedListItem item = adapter.getItemAt(position);
+            FeedListMedia media = item == null ? null : item.firstMedia();
+            if (media == null || !media.isTikTok()) continue;
+            String videoId = media.tiktokVideoId();
+            if (TextUtils.isEmpty(videoId)) {
+                resolveTikTokMetadata(item, media, false, false);
+                continue;
+            }
+            tiktokPlaybackPreloader.preload(videoId);
+            return;
+        }
     }
 
     private void saveScrollState(TimelineState state) {
@@ -554,6 +589,8 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
 
     @Override public void onTikTok(FeedListItem item, FeedListMedia media) {
         if (media == null || isUnavailable()) return;
+        mainHandler.removeCallbacks(tiktokVideoPreloadTask);
+        if (tiktokPlaybackPreloader != null) tiktokPlaybackPreloader.pause();
         String videoId = media.tiktokVideoId();
         if (!TextUtils.isEmpty(videoId)) {
             TikTokEmbedActivity.open(this, videoId, media.tiktokSourceUrl(), media.tiktokCoverUrl());
@@ -712,6 +749,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         updateTikTokMetadata(feedId, sourceUrl, result);
         persistStates();
         refreshTikTokRows(feedId, sourceUrl);
+        scheduleTikTokVideoPreload();
         if (shouldOpen) {
             TikTokEmbedActivity.open(this, result.bestVideoId(),
                     firstNonEmpty(result.bestUrl(), sourceUrl), result.bestCoverUrl());
@@ -818,17 +856,26 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     @Override protected void onResume() {
         super.onResume();
         resumed = true;
+        if (tiktokPlaybackPreloader == null && wkVBinding != null) {
+            tiktokPlaybackPreloader = new TikTokPlaybackPreloader(this, wkVBinding.tiktokPreloadHost);
+        }
         mainHandler.removeCallbacks(publishRefreshTask);
         if (FeedListPublishActivity.consumePublishSuccess(this)) {
             mainHandler.post(publishRefreshTask);
         } else {
             mainHandler.post(this::preloadTikTokCovers);
         }
+        scheduleTikTokVideoPreload();
     }
 
     @Override protected void onPause() {
         resumed = false;
         mainHandler.removeCallbacks(publishRefreshTask);
+        mainHandler.removeCallbacks(tiktokVideoPreloadTask);
+        if (tiktokPlaybackPreloader != null) {
+            tiktokPlaybackPreloader.release();
+            tiktokPlaybackPreloader = null;
+        }
         if (wkVBinding != null) {
             try {
                 wkVBinding.recyclerView.stopScroll();
@@ -864,6 +911,10 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         destroyed = true;
         resumed = false;
         mainHandler.removeCallbacksAndMessages(null);
+        if (tiktokPlaybackPreloader != null) {
+            tiktokPlaybackPreloader.release();
+            tiktokPlaybackPreloader = null;
+        }
         if (adapter != null) adapter.release();
         if (wkVBinding != null) {
             try {
