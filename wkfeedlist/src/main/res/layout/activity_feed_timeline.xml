@@ -166,6 +166,17 @@
                     android:textColor="@color/feedlist_secondary"
                     android:textSize="14sp" />
             </LinearLayout>
+
+            <!-- Keeps one muted TikTok iframe warm off-screen. It is never reparented. -->
+            <FrameLayout
+                android:id="@+id/tiktokPreloadHost"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:alpha="0.01"
+                android:clickable="false"
+                android:focusable="false"
+                android:importantForAccessibility="noHideDescendants"
+                android:translationX="10000dp" />
         </FrameLayout>
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 

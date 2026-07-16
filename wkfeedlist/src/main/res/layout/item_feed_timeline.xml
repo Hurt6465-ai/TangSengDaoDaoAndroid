@@ -4,7 +4,11 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@color/feedlist_surface"
+    android:layout_marginStart="8dp"
+    android:layout_marginTop="6dp"
+    android:layout_marginEnd="8dp"
+    android:layout_marginBottom="6dp"
+    android:background="@drawable/bg_feedlist_post_card"
     android:orientation="vertical">
 
     <LinearLayout
@@ -197,10 +201,10 @@
             android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="21dp"
-                android:layout_height="21dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
                 android:contentDescription="@string/feedlist_share"
-                android:src="@drawable/ic_feedlist_share"
+                android:src="@drawable/ic_feedlist_share_alt"
                 app:tint="@color/feedlist_action" />
 
             <TextView
@@ -270,8 +274,4 @@
         </LinearLayout>
     </LinearLayout>
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="10dp"
-        android:background="@color/feedlist_page_bg" />
 </LinearLayout>
