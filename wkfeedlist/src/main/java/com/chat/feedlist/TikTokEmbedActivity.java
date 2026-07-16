@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,8 +15,14 @@ import android.view.View;
 import androidx.annotation.Nullable;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 import com.chat.feedlist.databinding.ActivityTiktokEmbedBinding;
+import com.chat.feedlist.model.FeedListTikTokPreview;
+import com.chat.base.net.IRequestResultListener;
 
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -48,6 +55,8 @@ public class TikTokEmbedActivity extends Activity implements TikTokPlayerPool.Li
     private boolean playing = true;
     private boolean resumed;
     private boolean fallbackTried;
+    private boolean posterResolveStarted;
+    private int posterLoadGeneration;
     private int unmuteAttempts;
 
     private final Runnable loadTimeout = () -> {
@@ -87,6 +96,7 @@ public class TikTokEmbedActivity extends Activity implements TikTokPlayerPool.Li
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        overridePendingTransition(0, 0);
         binding = ActivityTiktokEmbedBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
@@ -139,21 +149,85 @@ public class TikTokEmbedActivity extends Activity implements TikTokPlayerPool.Li
         binding.loadingView.setVisibility(View.VISIBLE);
         binding.centerPlayIndicator.setVisibility(View.GONE);
         binding.errorPanel.setVisibility(View.GONE);
-        if (TextUtils.isEmpty(coverUrl)) {
+        loadPoster(coverUrl, true, false);
+    }
+
+    private void loadPoster(String value, boolean allowMetadataRefresh, boolean allowOEmbedFallback) {
+        if (binding == null) return;
+        String safeCover = safeHttpsUrl(value);
+        if (TextUtils.isEmpty(safeCover)) {
             binding.posterIv.setImageResource(android.R.color.black);
+            if (allowMetadataRefresh) refreshPosterMetadata();
             return;
         }
+        coverUrl = safeCover;
+        int generation = ++posterLoadGeneration;
         Glide.with(this)
-                .load(coverUrl)
+                .load(safeCover)
                 .diskCacheStrategy(DiskCacheStrategy.DATA)
                 .centerCrop()
                 .dontAnimate()
+                .listener(new RequestListener<Drawable>() {
+                    @Override
+                    public boolean onLoadFailed(@Nullable GlideException e, Object model,
+                                                Target<Drawable> target, boolean isFirstResource) {
+                        if (generation == posterLoadGeneration) {
+                            if (allowMetadataRefresh) refreshPosterMetadata();
+                            else if (allowOEmbedFallback) refreshPosterWithOEmbed();
+                        }
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onResourceReady(Drawable resource, Object model,
+                                                   Target<Drawable> target, DataSource dataSource,
+                                                   boolean isFirstResource) {
+                        return false;
+                    }
+                })
                 .error(android.R.color.black)
                 .into(binding.posterIv);
     }
 
+    /** Server refresh first; direct oEmbed remains only a last-resort foreground fallback. */
+    private void refreshPosterMetadata() {
+        if (posterResolveStarted || binding == null || TextUtils.isEmpty(externalUrl)) return;
+        posterResolveStarted = true;
+        FeedListModel.getInstance().tiktokPreview(externalUrl, new IRequestResultListener<>() {
+            @Override public void onSuccess(FeedListTikTokPreview result) {
+                if (binding == null) return;
+                String fresh = result == null ? "" : result.bestCoverUrl();
+                if (!TextUtils.isEmpty(fresh)) {
+                    loadPoster(fresh, false, true);
+                    return;
+                }
+                refreshPosterWithOEmbed();
+            }
+
+            @Override public void onFail(int code, String msg) {
+                refreshPosterWithOEmbed();
+            }
+        });
+    }
+
+    private void refreshPosterWithOEmbed() {
+        if (binding == null || TextUtils.isEmpty(externalUrl)) return;
+        TikTokMetadataResolver.resolve(externalUrl, new TikTokMetadataResolver.Callback() {
+            @Override public void onSuccess(FeedListTikTokPreview result) {
+                if (binding == null) return;
+                String fresh = result == null ? "" : result.bestCoverUrl();
+                if (!TextUtils.isEmpty(fresh)) loadPoster(fresh, false, false);
+            }
+
+            @Override public void onFail(String message) {
+                // Playback may still succeed without a poster; keep the native loading state.
+            }
+        });
+    }
+
     private void reloadPlayer() {
         if (binding == null || playerPool == null) return;
+        posterResolveStarted = false;
         showPoster();
         resetLoadState();
         playerPool.reloadHost(videoId);
@@ -398,6 +472,11 @@ public class TikTokEmbedActivity extends Activity implements TikTokPlayerPool.Li
         resumed = false;
         if (playerPool != null) playerPool.onPause();
         super.onPause();
+    }
+
+    @Override public void finish() {
+        super.finish();
+        overridePendingTransition(0, 0);
     }
 
     @Override protected void onDestroy() {

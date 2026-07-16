@@ -33,6 +33,8 @@ import androidx.annotation.Nullable;
 import java.lang.ref.WeakReference;
 import java.util.Locale;
 
+import org.json.JSONObject;
+
 /**
  * Process-wide single TikTok WebView.
  *
@@ -89,7 +91,7 @@ public final class TikTokPlayerPool {
                 && webView != null;
     }
 
-    /** Loads one muted real player into a 1x1 transparent host. */
+    /** Loads one muted real player into an off-screen portrait host. */
     public void preload(@NonNull Activity activity, @NonNull ViewGroup hiddenHost, @NonNull String videoId) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             main.post(() -> preload(activity, hiddenHost, videoId));
@@ -100,13 +102,15 @@ public final class TikTokPlayerPool {
 
         String normalized = videoId.trim();
         cancelIdleDestroy();
-        attachWebView(activity, hiddenHost, false);
+        if (!attachWebView(activity, hiddenHost, false)) return;
 
         if (TextUtils.equals(currentVideoId, normalized) && webView != null && hostMode) {
             preloading = true;
             listener = null;
-            if (playerReady) sendCommand("mute", null);
-            sendCommand("pause", null);
+            if (playerReady) {
+                sendCommand("mute", null);
+                sendCommand("pause", null);
+            }
             return;
         }
         loadHost(normalized, true);
@@ -141,14 +145,22 @@ public final class TikTokPlayerPool {
         if (activity.isFinishing() || !isValidVideoId(videoId)) return false;
 
         String normalized = videoId.trim();
-        boolean reused = TextUtils.equals(currentVideoId, normalized) && webView != null;
+        boolean reused = TextUtils.equals(currentVideoId, normalized)
+                && webView != null && hostMode && playerReady;
         cancelIdleDestroy();
         listener = callback;
         preloading = false;
         fullScreenOwner = new WeakReference<>(activity);
-        attachWebView(activity, host, true);
+        if (!attachWebView(activity, host, true)) {
+            listener = null;
+            fullScreenOwner.clear();
+            return false;
+        }
 
         if (!reused) {
+            // A matching but not-ready hidden preload must not be treated as reusable. Some WebView
+            // implementations defer a tiny/off-screen iframe; reload after the real full-screen size
+            // is attached so the user does not wait on a permanently half-initialized player.
             loadHost(normalized, false);
         } else {
             // Moving a WebView can require one fresh compositor frame. Do not reuse a hidden-host
@@ -271,8 +283,12 @@ public final class TikTokPlayerPool {
         main.removeCallbacks(destroyWhenIdle);
     }
 
-    private void attachWebView(Activity activity, ViewGroup host, boolean fullSize) {
+    private boolean attachWebView(Activity activity, ViewGroup host, boolean fullSize) {
+        if (activity.isFinishing() || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1
+                && activity.isDestroyed())) return false;
         WebView player = ensureWebView(activity);
+        if (activity.isFinishing() || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1
+                && activity.isDestroyed())) return false;
         if (contextWrapper != null) contextWrapper.setBaseContext(activity);
         ViewParent oldParent = player.getParent();
         if (oldParent instanceof ViewGroup && oldParent != host) {
@@ -281,19 +297,20 @@ public final class TikTokPlayerPool {
         currentHost = host;
         if (player.getParent() != host) {
             FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                    fullSize ? ViewGroup.LayoutParams.MATCH_PARENT : 1,
-                    fullSize ? ViewGroup.LayoutParams.MATCH_PARENT : 1
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
             );
             host.addView(player, 0, params);
         } else {
             ViewGroup.LayoutParams params = player.getLayoutParams();
-            params.width = fullSize ? ViewGroup.LayoutParams.MATCH_PARENT : 1;
-            params.height = fullSize ? ViewGroup.LayoutParams.MATCH_PARENT : 1;
+            params.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            params.height = ViewGroup.LayoutParams.MATCH_PARENT;
             player.setLayoutParams(params);
         }
-        player.setAlpha(fullSize ? 1f : 0f);
+        player.setAlpha(fullSize ? 1f : 0.01f);
         player.setVisibility(View.VISIBLE);
         player.onResume();
+        return true;
     }
 
     private void detachFromParent() {
@@ -350,14 +367,24 @@ public final class TikTokPlayerPool {
         player.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
-                if (consoleMessage != null) Log.d(TAG, "js: " + consoleMessage.message());
+                if (BuildConfig.DEBUG && consoleMessage != null) {
+                    Log.d(TAG, "js: " + consoleMessage.message());
+                }
                 return true;
             }
         });
         player.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                return shouldBlockMainNavigation(url == null ? null : Uri.parse(url));
+                // This legacy callback does not expose isForMainFrame. Do not accidentally block
+                // the TikTok iframe itself; the API-24 request overload below enforces main-frame
+                // navigation rules precisely.
+                if (TextUtils.isEmpty(url)) return true;
+                Uri uri = Uri.parse(url);
+                String scheme = uri.getScheme();
+                if ("about".equalsIgnoreCase(scheme) || "data".equalsIgnoreCase(scheme)
+                        || "blob".equalsIgnoreCase(scheme)) return false;
+                return !isAllowedTikTokUri(uri);
             }
 
             @Override
@@ -592,7 +619,7 @@ public final class TikTokPlayerPool {
                         pool.sendCommand("pause", null);
                     }
                 }
-                if ("onStateChange".equals(type) && value != null && value.matches(".*\\b1\\b.*")) {
+                if ("onStateChange".equals(type) && parseStateValue(value) == 1) {
                     pool.firstVisual = true;
                 }
                 if ("onCurrentTime".equals(type) && parsePositiveNumber(value) > 0.02d) {
@@ -617,6 +644,26 @@ public final class TikTokPlayerPool {
         @JavascriptInterface
         public void onHostError(String type, String value) {
             Log.e(TAG, "host js error " + type + ": " + value);
+        }
+
+        private static int parseStateValue(String value) {
+            if (TextUtils.isEmpty(value)) return -1;
+            String normalized = value.trim();
+            try {
+                if (normalized.startsWith("{")) {
+                    JSONObject object = new JSONObject(normalized);
+                    if (object.has("state")) return object.optInt("state", -1);
+                    if (object.has("value")) return object.optInt("value", -1);
+                    return -1;
+                }
+                if (normalized.length() >= 2 && normalized.startsWith("\"")
+                        && normalized.endsWith("\"")) {
+                    normalized = normalized.substring(1, normalized.length() - 1);
+                }
+                return (int) Double.parseDouble(normalized);
+            } catch (Throwable ignored) {
+                return -1;
+            }
         }
 
         private static double parsePositiveNumber(String value) {

@@ -53,6 +53,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBinding> implements FeedTimelineAdapter.Listener {
     private static final int PAGE_SIZE = 12;
@@ -60,7 +62,11 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     private static final String MODE_LATEST = "latest";
     private static final String MODE_FOLLOWING = "following";
     private static final long TIKTOK_RETRY_COOLDOWN_MS = 5L * 60L * 1000L;
+    private static final long TIKTOK_COVER_RETRY_COOLDOWN_MS = 30L * 1000L;
     private static final long TIKTOK_PLAYER_PRELOAD_DELAY_MS = 650L;
+    private static final Pattern TIKTOK_COVER_EXPIRES_PATTERN = Pattern.compile(
+            "(?:[?&]|&amp;)(?:x-)?expires=([0-9]{10,13})", Pattern.CASE_INSENSITIVE
+    );
 
     private final TimelineState latest = new TimelineState(MODE_LATEST);
     private final TimelineState following = new TimelineState(MODE_FOLLOWING);
@@ -88,9 +94,14 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         layoutManager = new LinearLayoutManager(this);
         tiktokPlayerPool = TikTokPlayerPool.get(this);
         tiktokPreloadHost = new FrameLayout(this);
-        tiktokPreloadHost.setAlpha(0f);
+        // TikTok may postpone/skip player initialization in a 1x1 WebView. Keep a real portrait
+        // viewport off-screen so the official iframe can become ready without covering the list.
+        int preloadWidth = Math.min(getResources().getDisplayMetrics().widthPixels, dp(420));
+        int preloadHeight = Math.min(getResources().getDisplayMetrics().heightPixels, dp(740));
+        tiktokPreloadHost.setAlpha(0.01f);
+        tiktokPreloadHost.setTranslationX(-preloadWidth * 2f);
         tiktokPreloadHost.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-        addContentView(tiktokPreloadHost, new ViewGroup.LayoutParams(1, 1));
+        addContentView(tiktokPreloadHost, new ViewGroup.LayoutParams(preloadWidth, preloadHeight));
         layoutManager.setInitialPrefetchItemCount(4);
         wkVBinding.recyclerView.setLayoutManager(layoutManager);
         wkVBinding.recyclerView.setAdapter(adapter);
@@ -341,17 +352,14 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         try {
             ConnectivityManager manager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
             if (manager == null) return false;
-            for (Network network : manager.getAllNetworks()) {
-                NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
-                if (capabilities != null
-                        && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                        && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-                    return true;
-                }
-            }
+            Network active = manager.getActiveNetwork();
+            NetworkCapabilities capabilities = active == null ? null : manager.getNetworkCapabilities(active);
+            return capabilities != null
+                    && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                    && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
         } catch (Throwable ignored) {
+            return false;
         }
-        return false;
     }
 
     private void saveScrollState(TimelineState state) {
@@ -675,7 +683,9 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         long now = System.currentTimeMillis();
         Long failedAt = tiktokResolveFailedAt.get(sourceUrl);
         Long resolvedAt = tiktokResolvedAt.get(sourceUrl);
-        if (forceFreshCover && failedAt != null && now - failedAt < TIKTOK_RETRY_COOLDOWN_MS) {
+        if (forceFreshCover
+                && ((failedAt != null && now - failedAt < TIKTOK_COVER_RETRY_COOLDOWN_MS)
+                || (resolvedAt != null && now - resolvedAt < TIKTOK_COVER_RETRY_COOLDOWN_MS))) {
             return;
         }
         if (!forceFreshCover && !openAfterResolve
@@ -687,14 +697,9 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         String feedId = item == null ? "" : item.feed_id;
         tiktokResolveInFlight.add(sourceUrl);
 
-        // A failed/expired CDN thumbnail must bypass the app server cache. Ask TikTok oEmbed
-        // directly for a new signed thumbnail before trying the normal server preview path.
-        if (forceFreshCover) {
-            tiktokResolvedAt.remove(sourceUrl);
-            boolean shouldOpen = tiktokOpenAfterResolve.remove(sourceUrl);
-            resolveTikTokWithOEmbed(feedId, sourceUrl, null, shouldOpen);
-            return;
-        }
+        // Always ask our server first. It can centralize caching/rate limiting and refresh signed
+        // thumbnails. Client oEmbed is only the fallback when the server has no usable fresh cover.
+        if (forceFreshCover) tiktokResolvedAt.remove(sourceUrl);
 
         FeedListModel.getInstance().tiktokPreview(sourceUrl, new IRequestResultListener<>() {
             @Override public void onSuccess(FeedListTikTokPreview serverResult) {
@@ -704,7 +709,8 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
                     return;
                 }
                 if (serverResult != null && serverResult.hasPlayableVideo()
-                        && !TextUtils.isEmpty(serverResult.bestCoverUrl())) {
+                        && !TextUtils.isEmpty(serverResult.bestCoverUrl())
+                        && (!forceFreshCover || !isTikTokCoverUrlExpired(serverResult.bestCoverUrl(), now))) {
                     finishTikTokResolveSuccess(feedId, sourceUrl, serverResult, shouldOpen);
                     return;
                 }
@@ -817,6 +823,19 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
                     if (result != null && !TextUtils.isEmpty(result.author_name)) value.external_author = result.author_name;
                 }
             }
+        }
+    }
+
+    private static boolean isTikTokCoverUrlExpired(String value, long nowMillis) {
+        if (TextUtils.isEmpty(value)) return true;
+        Matcher matcher = TIKTOK_COVER_EXPIRES_PATTERN.matcher(value);
+        if (!matcher.find()) return false;
+        try {
+            long expires = Long.parseLong(matcher.group(1));
+            if (expires < 10_000_000_000L) expires *= 1000L;
+            return expires <= nowMillis + 60_000L;
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 

@@ -92,8 +92,12 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             FeedListMedia media = item == null ? null : item.firstMedia();
             if (media == null || !media.isTikTok()) continue;
             String coverUrl = media.tiktokCoverUrl();
-            if (TextUtils.isEmpty(coverUrl) || media.isTikTokCoverProbablyExpired(System.currentTimeMillis())) {
+            if (TextUtils.isEmpty(coverUrl)) {
                 listener.onTikTokMetadataNeeded(item, media);
+                continue;
+            }
+            if (media.isTikTokCoverProbablyExpired(System.currentTimeMillis())) {
+                listener.onTikTokCoverLoadFailed(item, media);
                 continue;
             }
             Glide.with(context)
@@ -209,18 +213,19 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         if (tiktok) {
             b.mediaGrid.bind(null);
             applyTikTokCoverSize(b);
-            // TikTok cover links are temporary. Refresh metadata once per activity cooldown even
-            // when an old URL still exists, so an expired CDN URL is replaced before Glide needs it.
-            listener.onTikTokMetadataNeeded(item, first);
-
             String coverUrl = first.tiktokCoverUrl();
             boolean expired = first.isTikTokCoverProbablyExpired(System.currentTimeMillis());
-            if (TextUtils.isEmpty(coverUrl) || expired) {
+            if (TextUtils.isEmpty(coverUrl)) {
                 Glide.with(b.tiktokCoverIv).clear(b.tiktokCoverIv);
                 b.tiktokCoverIv.setImageResource(R.color.feedlist_media_placeholder);
+                listener.onTikTokMetadataNeeded(item, first);
+            } else {
+                // An expired signed URL can still have valid bytes in Glide's DATA disk cache.
+                // Keep showing that cached poster while metadata refreshes in the background instead
+                // of replacing it with a black placeholder immediately. Do not start the normal
+                // metadata request first, otherwise its in-flight lock would swallow the forced refresh.
                 if (expired) listener.onTikTokCoverLoadFailed(item, first);
                 else listener.onTikTokMetadataNeeded(item, first);
-            } else {
                 Glide.with(b.tiktokCoverIv)
                         .load(coverUrl)
                         .placeholder(R.color.feedlist_media_placeholder)
