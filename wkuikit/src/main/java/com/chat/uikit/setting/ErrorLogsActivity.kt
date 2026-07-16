@@ -1,8 +1,14 @@
 package com.chat.uikit.setting
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.os.Build
+import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import com.chad.library.adapter.base.BaseQuickAdapter
 import com.chad.library.adapter.base.viewholder.BaseViewHolder
 import com.chat.base.base.WKBaseActivity
@@ -19,9 +25,11 @@ import com.chat.base.utils.WKTimeUtils
 import com.chat.uikit.R
 import com.chat.uikit.databinding.ActCommonListLayoutBinding
 import java.io.File
+import java.nio.charset.Charset
 
 class ErrorLogsActivity : WKBaseActivity<ActCommonListLayoutBinding>() {
     private lateinit var adapter: FileAdapter
+
     override fun getViewBinding(): ActCommonListLayoutBinding {
         return ActCommonListLayoutBinding.inflate(layoutInflater)
     }
@@ -39,10 +47,7 @@ class ErrorLogsActivity : WKBaseActivity<ActCommonListLayoutBinding>() {
             WKPermissions.getInstance().checkPermissions(
                 object : IPermissionResult {
                     override fun onResult(result: Boolean) {}
-
-                    override fun clickResult(isCancel: Boolean) {
-                        finish()
-                    }
+                    override fun clickResult(isCancel: Boolean) { finish() }
                 },
                 this,
                 desc,
@@ -53,10 +58,7 @@ class ErrorLogsActivity : WKBaseActivity<ActCommonListLayoutBinding>() {
             WKPermissions.getInstance().checkPermissions(
                 object : IPermissionResult {
                     override fun onResult(result: Boolean) {}
-
-                    override fun clickResult(isCancel: Boolean) {
-                        finish()
-                    }
+                    override fun clickResult(isCancel: Boolean) { finish() }
                 },
                 this,
                 desc,
@@ -73,40 +75,75 @@ class ErrorLogsActivity : WKBaseActivity<ActCommonListLayoutBinding>() {
     }
 
     override fun initListener() {
+        adapter.setOnItemClickListener { _, _, position ->
+            val item = adapter.data.getOrNull(position) ?: return@setOnItemClickListener
+            showLogPreview(item)
+        }
     }
 
     override fun initData() {
         val list = getData()
         adapter.setList(list)
+        if (list.isEmpty()) {
+            Toast.makeText(this, "暂无崩溃日志，复现闪退后再进入这里", Toast.LENGTH_LONG).show()
+        }
     }
 
     fun getData(): ArrayList<LogEntity> {
         val path = WKFileUtils.getInstance().getNormalFileSavePath("wkCrash")
-
         val fileList: ArrayList<LogEntity> = ArrayList()
-
-        val file = File(path)
-        val tempList: Array<File>? = file.listFiles()
-
-        for (i in tempList!!.indices) {
-            if (tempList[i].isFile) {
-                val size = WKFileUtils.getInstance().getFileSize(File(tempList[i].toString()))
+        val dir = File(path)
+        val tempList: Array<File> = dir.listFiles() ?: return fileList
+        for (log in tempList) {
+            if (log.isFile && log.name.endsWith(".log")) {
+                val size = WKFileUtils.getInstance().getFileSize(log)
                 val sizeStr = DataCleanManager.getFormatSize(size.toDouble())
-                fileList.add(
-                    LogEntity(
-                        tempList[i].name,
-                        tempList[i].toString(),
-                        sizeStr,
-                        tempList[i].lastModified(),
-                        size
-                    )
-                )
+                fileList.add(LogEntity(log.name, log.toString(), sizeStr, log.lastModified(), size))
             }
         }
-        if (WKReader.isNotEmpty(fileList))
-            fileList.sortWith { t: LogEntity, t1: LogEntity -> (t.time - t1.time).toInt() }
+        if (WKReader.isNotEmpty(fileList)) {
+            fileList.sortWith { left: LogEntity, right: LogEntity -> right.time.compareTo(left.time) }
+        }
         return fileList
     }
+
+    private fun showLogPreview(item: LogEntity) {
+        val file = File(item.path)
+        if (!file.exists()) {
+            Toast.makeText(this, "日志文件不存在", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val fullText = runCatching { file.readText(Charset.defaultCharset()) }.getOrElse { error ->
+            "读取日志失败：${error.message}"
+        }
+        val preview = if (fullText.length > 20000) {
+            "日志较长，仅显示最后 20000 字符。\n\n" + fullText.takeLast(20000)
+        } else {
+            fullText
+        }
+        val textView = TextView(this)
+        textView.text = preview
+        textView.textSize = 12f
+        val padding = dp(16)
+        textView.setPadding(padding, padding, padding, padding)
+        textView.setTextIsSelectable(true)
+        val scrollView = ScrollView(this)
+        scrollView.addView(textView)
+        AlertDialog.Builder(this)
+            .setTitle(item.name)
+            .setView(scrollView)
+            .setPositiveButton("复制") { _, _ -> copyText(fullText) }
+            .setNegativeButton("关闭", null)
+            .show()
+    }
+
+    private fun copyText(text: String) {
+        val manager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        manager.setPrimaryClip(ClipData.newPlainText("crash_log", text))
+        Toast.makeText(this, "已复制崩溃日志", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
 
     class LogEntity(
         val name: String,
@@ -147,7 +184,6 @@ class ErrorLogsActivity : WKBaseActivity<ActCommonListLayoutBinding>() {
             )
             WKDialogUtils.getInstance()
                 .setViewLongClickPopup(holder.getView(R.id.contentLayout), list)
-
         }
     }
 }
