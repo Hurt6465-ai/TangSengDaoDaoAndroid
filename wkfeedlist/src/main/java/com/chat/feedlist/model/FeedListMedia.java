@@ -1,10 +1,12 @@
 package com.chat.feedlist.model;
 
+import android.net.Uri;
 import android.text.TextUtils;
 
 import com.chat.base.config.WKApiConfig;
 
 import java.io.Serializable;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -14,7 +16,11 @@ public class FeedListMedia implements Serializable {
     public static final String TYPE_TIKTOK = "tiktok";
 
     private static final Pattern TIKTOK_VIDEO_ID_PATTERN = Pattern.compile(
-            "(?:/video/|/v/)([0-9]{8,32})",
+            "(?:/video/|/v/|/player/v1/)([0-9]{8,32})|(?:video_id|item_id)=([0-9]{8,32})",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern EXPIRES_PATTERN = Pattern.compile(
+            "(?:[?&]|&amp;)(?:x-)?expires=([0-9]{10,13})",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -49,37 +55,64 @@ public class FeedListMedia implements Serializable {
                 || !TextUtils.isEmpty(play_url);
     }
 
-    /**
-     * Returns the cover with compatibility fallbacks for older feed rows.
-     * Older TikTok posts may have stored the thumbnail in thumb/display/origin.
-     */
+    /** Returns only an image-like URL; canonical TikTok page/player URLs are never sent to Glide. */
     public String tiktokCoverUrl() {
-        String raw = firstNonEmpty(cover_url, thumb_url, display_url, origin_url);
-        return showUrl(raw);
+        String[] candidates = {cover_url, thumb_url, display_url, origin_url};
+        for (String candidate : candidates) {
+            String normalized = showUrl(candidate);
+            if (isLikelyImageUrl(normalized)) return normalized;
+        }
+        return "";
     }
 
-    /**
-     * Returns the persisted TikTok ID, or derives it from a canonical TikTok URL.
-     * This keeps old posts playable even when external_id was not stored yet.
-     */
+    public boolean isTikTokCoverProbablyExpired(long nowMillis) {
+        String value = tiktokCoverUrl();
+        if (TextUtils.isEmpty(value)) return true;
+        Matcher matcher = EXPIRES_PATTERN.matcher(value);
+        if (!matcher.find()) return false;
+        try {
+            long expires = Long.parseLong(matcher.group(1));
+            if (expires < 10_000_000_000L) expires *= 1000L;
+            return expires <= nowMillis + 60_000L;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    public String tiktokSourceUrl() {
+        String[] candidates = {external_url, play_url, display_url, origin_url};
+        for (String candidate : candidates) {
+            String normalized = normalizeAbsolute(candidate);
+            if (isTikTokPageUrl(normalized)) return normalized;
+        }
+        return "";
+    }
+
     public String tiktokVideoId() {
         String saved = trim(external_id);
         if (saved.matches("[0-9]{8,32}")) return saved;
 
-        String[] candidates = {external_url, play_url, play_url_540p, play_url_480p, play_url_720p};
+        String[] candidates = {
+                external_url, play_url, play_url_540p, play_url_480p, play_url_720p,
+                display_url, origin_url
+        };
         for (String candidate : candidates) {
             if (TextUtils.isEmpty(candidate)) continue;
             Matcher matcher = TIKTOK_VIDEO_ID_PATTERN.matcher(candidate);
-            if (matcher.find()) return matcher.group(1);
+            if (matcher.find()) {
+                String value = !TextUtils.isEmpty(matcher.group(1)) ? matcher.group(1) : matcher.group(2);
+                if (!TextUtils.isEmpty(value)) return value;
+            }
         }
         return "";
     }
 
     public String displayUrl() {
         String raw;
-        if (isTikTok()) raw = firstNonEmpty(cover_url, thumb_url, display_url, origin_url);
+        if (isTikTok()) return tiktokCoverUrl();
         else if (isVideo()) raw = !TextUtils.isEmpty(cover_url) ? cover_url : thumb_url;
-        else raw = !TextUtils.isEmpty(display_url) ? display_url : (!TextUtils.isEmpty(thumb_url) ? thumb_url : origin_url);
+        else raw = !TextUtils.isEmpty(display_url) ? display_url
+                : (!TextUtils.isEmpty(thumb_url) ? thumb_url : origin_url);
         return showUrl(raw);
     }
 
@@ -99,18 +132,66 @@ public class FeedListMedia implements Serializable {
 
     private String showUrl(String value) {
         if (TextUtils.isEmpty(value)) return "";
-        String normalized = value.trim();
-        if (normalized.startsWith("//")) return "https:" + normalized;
-        if (normalized.startsWith("http://") || normalized.startsWith("https://")) return normalized;
+        String normalized = normalizeAbsolute(value);
+        if (normalized.startsWith("https://") || normalized.startsWith("http://")) return normalized;
         return WKApiConfig.getShowUrl(normalized);
     }
 
-    private static String firstNonEmpty(String... values) {
-        if (values == null) return "";
-        for (String value : values) {
-            if (!TextUtils.isEmpty(value)) return value;
+    private static String normalizeAbsolute(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        String normalized = value.trim()
+                .replace("&amp;", "&")
+                .replace("\\u0026", "&")
+                .replace("\\u002F", "/")
+                .replace("\\/", "/");
+        if (normalized.startsWith("//")) normalized = "https:" + normalized;
+        if (normalized.startsWith("http://") && looksLikeTikTokHost(normalized)) {
+            normalized = "https://" + normalized.substring(7);
         }
-        return "";
+        return normalized;
+    }
+
+    private static boolean isLikelyImageUrl(String value) {
+        if (TextUtils.isEmpty(value)) return false;
+        try {
+            Uri uri = Uri.parse(value);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            if (!("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
+                    || TextUtils.isEmpty(host)) return false;
+            String lowerHost = host.toLowerCase(Locale.ROOT);
+            String path = uri.getPath() == null ? "" : uri.getPath().toLowerCase(Locale.ROOT);
+            if ((lowerHost.equals("tiktok.com") || lowerHost.endsWith(".tiktok.com"))
+                    && (path.contains("/video/") || path.startsWith("/player/") || path.isEmpty())) {
+                return false;
+            }
+            return !path.endsWith(".mp4") && !path.endsWith(".m3u8");
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isTikTokPageUrl(String value) {
+        if (TextUtils.isEmpty(value)) return false;
+        try {
+            Uri uri = Uri.parse(value);
+            if (!"https".equalsIgnoreCase(uri.getScheme())) return false;
+            String host = uri.getHost();
+            if (TextUtils.isEmpty(host)) return false;
+            host = host.toLowerCase(Locale.ROOT);
+            return host.equals("tiktok.com") || host.endsWith(".tiktok.com");
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean looksLikeTikTokHost(String value) {
+        String lower = value.toLowerCase(Locale.ROOT);
+        return lower.contains("tiktok")
+                || lower.contains("muscdn")
+                || lower.contains("byteimg")
+                || lower.contains("ibytedtos")
+                || lower.contains("tiktokcdn");
     }
 
     private static String trim(String value) {
