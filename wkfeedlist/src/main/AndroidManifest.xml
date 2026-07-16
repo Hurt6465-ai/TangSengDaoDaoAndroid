@@ -13,7 +13,8 @@
         <activity
             android:name=".TikTokEmbedActivity"
             android:exported="false"
-            android:screenOrientation="portrait" />
+            android:screenOrientation="portrait"
+            android:theme="@style/FeedListTikTokEmbedTheme" />
         <activity
             android:name=".FeedImageViewerActivity"
             android:exported="false"
