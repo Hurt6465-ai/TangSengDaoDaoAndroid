@@ -678,9 +678,19 @@ public class FeedListPublishActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         tiktokResolveGeneration++;
-        if (pendingTikTokDetection != null) main.removeCallbacks(pendingTikTokDetection);
-        if (tiktokCoverIv != null) Glide.with(this).clear(tiktokCoverIv);
-        worker.shutdown();
+        if (pendingTikTokDetection != null) {
+            main.removeCallbacks(pendingTikTokDetection);
+            pendingTikTokDetection = null;
+        }
+        main.removeCallbacksAndMessages(null);
+        resolvingTikTok = false;
+        if (tiktokCoverIv != null) {
+            try {
+                Glide.with(getApplicationContext()).clear(tiktokCoverIv);
+            } catch (Throwable ignored) {
+            }
+        }
+        worker.shutdownNow();
         super.onDestroy();
     }
 }
