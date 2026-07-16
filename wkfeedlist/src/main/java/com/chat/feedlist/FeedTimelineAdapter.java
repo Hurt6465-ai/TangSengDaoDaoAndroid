@@ -94,15 +94,18 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             FeedListItem item = getItem(i);
             FeedListMedia media = item == null ? null : item.firstMedia();
             if (media == null || !media.isTikTok()) continue;
+            // TikTok cover links are temporary. Refresh metadata while the row is being
+            // preloaded instead of waiting for a visibly broken image request.
+            listener.onTikTokMetadataNeeded(item, media);
             String coverUrl = media.tiktokCoverUrl();
             if (TextUtils.isEmpty(coverUrl)) continue;
             GlideUrl requestUrl = new GlideUrl(coverUrl, new LazyHeaders.Builder()
-                    .addHeader("Referer", "https://www.tiktok.com/")
                     .addHeader("User-Agent", safeUserAgent(context))
+                    .addHeader("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
                     .build());
             Glide.with(context)
                     .load(requestUrl)
-                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .diskCacheStrategy(DiskCacheStrategy.DATA)
                     .preload();
         }
     }
@@ -215,14 +218,16 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             Context context = b.getRoot().getContext();
             applyTikTokCoverSize(b);
 
+            // Do this even when an old cover still exists. TikTok thumbnails can expire, and
+            // the activity-level request guard prevents duplicate preview calls while scrolling.
+            listener.onTikTokMetadataNeeded(item, first);
+
             String coverUrl = first.tiktokCoverUrl();
             if (TextUtils.isEmpty(coverUrl)) {
                 Glide.with(b.tiktokCoverIv).clear(b.tiktokCoverIv);
                 b.tiktokCoverIv.setImageResource(R.color.feedlist_media_placeholder);
-                listener.onTikTokMetadataNeeded(item, first);
             } else {
                 GlideUrl requestUrl = new GlideUrl(coverUrl, new LazyHeaders.Builder()
-                        .addHeader("Referer", "https://www.tiktok.com/")
                         .addHeader("User-Agent", safeUserAgent(context))
                         .addHeader("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
                         .build());
@@ -231,7 +236,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                         .placeholder(R.color.feedlist_media_placeholder)
                         .error(R.color.feedlist_media_placeholder)
                         .centerCrop()
-                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                        .diskCacheStrategy(DiskCacheStrategy.DATA)
                         .dontAnimate()
                         .listener(new RequestListener<Drawable>() {
                             @Override
