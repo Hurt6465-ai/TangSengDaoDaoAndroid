@@ -818,8 +818,6 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     @Override protected void onResume() {
         super.onResume();
         resumed = true;
-        if (tiktokPlaybackPreloader == null && wkVBinding != null) {
-            }
         mainHandler.removeCallbacks(publishRefreshTask);
         if (FeedListPublishActivity.consumePublishSuccess(this)) {
             mainHandler.post(publishRefreshTask);
