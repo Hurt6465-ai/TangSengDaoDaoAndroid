@@ -1,11 +1,19 @@
 package com.chat.feedlist;
 
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.graphics.Typeface;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -52,6 +60,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     private static final String MODE_LATEST = "latest";
     private static final String MODE_FOLLOWING = "following";
     private static final long TIKTOK_RETRY_COOLDOWN_MS = 5L * 60L * 1000L;
+    private static final long TIKTOK_PLAYER_PRELOAD_DELAY_MS = 650L;
 
     private final TimelineState latest = new TimelineState(MODE_LATEST);
     private final TimelineState following = new TimelineState(MODE_FOLLOWING);
@@ -61,9 +70,14 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     private final Set<String> tiktokOpenAfterResolve = new HashSet<>();
     private final Map<String, Long> tiktokResolveFailedAt = new HashMap<>();
     private final Map<String, Long> tiktokResolvedAt = new HashMap<>();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private TimelineState current = latest;
     private FeedTimelineAdapter adapter;
     private LinearLayoutManager layoutManager;
+    private TikTokPlayerPool tiktokPlayerPool;
+    private FrameLayout tiktokPreloadHost;
+    private Runnable pendingTikTokPlayerPreload;
+    private boolean handingTikTokPlayerToFullscreen;
 
     @Override protected ActivityFeedTimelineBinding getViewBinding() { return ActivityFeedTimelineBinding.inflate(getLayoutInflater()); }
     @Override protected boolean supportSlideBack() { return false; }
@@ -72,6 +86,11 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     @Override protected void initView() {
         adapter = new FeedTimelineAdapter(this);
         layoutManager = new LinearLayoutManager(this);
+        tiktokPlayerPool = TikTokPlayerPool.get(this);
+        tiktokPreloadHost = new FrameLayout(this);
+        tiktokPreloadHost.setAlpha(0f);
+        tiktokPreloadHost.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        addContentView(tiktokPreloadHost, new ViewGroup.LayoutParams(1, 1));
         layoutManager.setInitialPrefetchItemCount(4);
         wkVBinding.recyclerView.setLayoutManager(layoutManager);
         wkVBinding.recyclerView.setAdapter(adapter);
@@ -125,7 +144,12 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
             }
 
             @Override public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
-                if (newState == RecyclerView.SCROLL_STATE_IDLE) preloadTikTokCovers();
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    preloadTikTokCovers();
+                    scheduleTikTokPlayerPreload();
+                } else {
+                    cancelTikTokPlayerPreload();
+                }
             }
         });
     }
@@ -257,6 +281,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
                 layoutManager.scrollToPositionWithOffset(position, state.firstVisibleOffset);
             }
             preloadTikTokCovers();
+            scheduleTikTokPlayerPreload();
         });
         boolean empty = state.items.isEmpty();
         wkVBinding.statePanel.setVisibility(empty ? View.VISIBLE : View.GONE);
@@ -268,10 +293,65 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
 
     private void preloadTikTokCovers() {
         if (adapter == null || layoutManager == null || adapter.getItemCount() == 0) return;
-        TikTokEmbedActivity.prewarm(this);
         int first = layoutManager.findFirstVisibleItemPosition();
         if (first == RecyclerView.NO_POSITION) first = 0;
         adapter.preloadTikTokCovers(this, first, 4);
+    }
+
+    private void scheduleTikTokPlayerPreload() {
+        cancelTikTokPlayerPreload();
+        if (isUnavailable() || adapter == null || adapter.getItemCount() == 0
+                || tiktokPlayerPool == null || tiktokPreloadHost == null || !hasWifiTransport()) return;
+        pendingTikTokPlayerPreload = this::preloadFirstVisibleTikTokPlayer;
+        mainHandler.postDelayed(pendingTikTokPlayerPreload, TIKTOK_PLAYER_PRELOAD_DELAY_MS);
+    }
+
+    private void cancelTikTokPlayerPreload() {
+        if (pendingTikTokPlayerPreload != null) {
+            mainHandler.removeCallbacks(pendingTikTokPlayerPreload);
+            pendingTikTokPlayerPreload = null;
+        }
+    }
+
+    /** Only the first visible/near-visible TikTok gets a real WebView player preload. */
+    private void preloadFirstVisibleTikTokPlayer() {
+        pendingTikTokPlayerPreload = null;
+        if (isUnavailable() || adapter == null || layoutManager == null || tiktokPlayerPool == null
+                || tiktokPreloadHost == null || !hasWifiTransport()) return;
+        int first = layoutManager.findFirstVisibleItemPosition();
+        int last = layoutManager.findLastVisibleItemPosition();
+        if (first == RecyclerView.NO_POSITION) first = 0;
+        if (last == RecyclerView.NO_POSITION) last = Math.min(adapter.getItemCount() - 1, first + 2);
+        int end = Math.min(adapter.getItemCount() - 1, last + 2);
+        for (int i = Math.max(0, first); i <= end; i++) {
+            FeedListItem item = adapter.getItemAt(i);
+            FeedListMedia media = item == null ? null : item.firstMedia();
+            if (media == null || !media.isTikTok()) continue;
+            String videoId = media.tiktokVideoId();
+            if (TextUtils.isEmpty(videoId)) {
+                resolveTikTokMetadata(item, media, false, false);
+                return;
+            }
+            tiktokPlayerPool.preload(this, tiktokPreloadHost, videoId);
+            return;
+        }
+    }
+
+    private boolean hasWifiTransport() {
+        try {
+            ConnectivityManager manager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (manager == null) return false;
+            for (Network network : manager.getAllNetworks()) {
+                NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
+                if (capabilities != null
+                        && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                        && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
     }
 
     private void saveScrollState(TimelineState state) {
@@ -541,6 +621,8 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         if (media == null) return;
         String videoId = media.tiktokVideoId();
         if (!TextUtils.isEmpty(videoId)) {
+            handingTikTokPlayerToFullscreen = true;
+            if (tiktokPlayerPool != null) tiktokPlayerPool.promoteFromUserGesture(videoId);
             TikTokEmbedActivity.open(this, videoId, media.tiktokSourceUrl(), media.tiktokCoverUrl());
             return;
         }
@@ -697,7 +779,9 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         updateTikTokMetadata(feedId, sourceUrl, result);
         persistStates();
         refreshTikTokRows(feedId, sourceUrl);
+        scheduleTikTokPlayerPreload();
         if (shouldOpen) {
+            handingTikTokPlayerToFullscreen = true;
             TikTokEmbedActivity.open(this, result.bestVideoId(),
                     firstNonEmpty(result.bestUrl(), sourceUrl), result.bestCoverUrl());
         }
@@ -813,8 +897,33 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         }
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        scheduleTikTokPlayerPreload();
+    }
+
+    @Override protected void onPause() {
+        cancelTikTokPlayerPreload();
+        if (handingTikTokPlayerToFullscreen) {
+            // Keep the user-gesture-started WebView alive; the full-screen Activity reparents it.
+            handingTikTokPlayerToFullscreen = false;
+        } else if (tiktokPlayerPool != null && tiktokPreloadHost != null) {
+            tiktokPlayerPool.detachPreloadHost(tiktokPreloadHost);
+        }
+        super.onPause();
+    }
+
     @Override protected void onDestroy() {
+        cancelTikTokPlayerPreload();
+        mainHandler.removeCallbacksAndMessages(null);
         saveScrollState(current);
+        if (tiktokPlayerPool != null && tiktokPreloadHost != null) {
+            tiktokPlayerPool.detachPreloadHost(tiktokPreloadHost);
+        }
+        if (tiktokPreloadHost != null && tiktokPreloadHost.getParent() instanceof ViewGroup) {
+            ((ViewGroup) tiktokPreloadHost.getParent()).removeView(tiktokPreloadHost);
+        }
+        tiktokPreloadHost = null;
         if (wkVBinding != null) wkVBinding.recyclerView.setAdapter(null);
         super.onDestroy();
     }
