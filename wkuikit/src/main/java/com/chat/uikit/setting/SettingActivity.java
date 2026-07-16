@@ -69,6 +69,7 @@ public class SettingActivity extends WKBaseActivity<ActSettingLayoutBinding> {
         SingleClickUtil.onSingleClick(wkVBinding.safetyLayout, view -> startActivity(new Intent(this, SecurityPrivacyActivity.class)));
         SingleClickUtil.onSingleClick(wkVBinding.blacklistLayout, view -> startActivity(new Intent(this, BlacklistActivity.class)));
         SingleClickUtil.onSingleClick(wkVBinding.aboutLayout, view -> startActivity(new Intent(this, WKAboutActivity.class)));
+        SingleClickUtil.onSingleClick(wkVBinding.errorLogsLayout, view -> startActivity(new Intent(this, ErrorLogsActivity.class)));
 
         wkVBinding.clearImgCacheLayout.setOnClickListener(v -> showDialog(getString(R.string.clear_img_cache_tips), index -> {
             if (index == 1) {
