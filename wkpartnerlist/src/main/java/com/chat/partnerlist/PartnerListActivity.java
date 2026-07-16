@@ -1,6 +1,7 @@
 package com.chat.partnerlist;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -9,15 +10,21 @@ import android.os.SystemClock;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.view.Window;
+import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.SimpleItemAnimator;
 
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.endpoint.EndpointManager;
@@ -98,16 +105,32 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
 
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         Window window = getWindow();
-        // 与聊天首页一致，由系统只避让一次状态栏/刘海；不要再把安全区累加到 56dp 标签栏。
-        WindowCompat.setDecorFitsSystemWindows(window, true);
+        // 与交友首页统一为 edge-to-edge；真实状态栏和刘海高度交给 WindowInsets 处理。
+        WindowCompat.setDecorFitsSystemWindows(window, false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            window.setStatusBarColor(getResources().getColor(com.chat.uikit.R.color.tab_bg));
+            window.setStatusBarColor(Color.TRANSPARENT);
+            window.setNavigationBarColor(Color.TRANSPARENT);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-                && (getResources().getConfiguration().uiMode & 0x30) != 0x20) {
-            window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            window.setAttributes(params);
         }
+        boolean lightBars = (getResources().getConfiguration().uiMode & 0x30) != 0x20;
+        int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+        if (lightBars && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+        }
+        if (lightBars && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        }
+        window.getDecorView().setSystemUiVisibility(flags);
         super.onCreate(savedInstanceState);
+        // WKBaseActivity 会在 super.onCreate() 内再次设置状态栏模式，这里恢复本页的完整布局标志。
+        window.getDecorView().setSystemUiVisibility(flags);
     }
 
     @Override protected void initView() {
@@ -115,11 +138,16 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         layoutManager = new LinearLayoutManager(this);
         wkVBinding.recyclerView.setLayoutManager(layoutManager);
         wkVBinding.recyclerView.setAdapter(adapter);
+        if (wkVBinding.recyclerView.getItemAnimator() instanceof SimpleItemAnimator) {
+            // 在线时间和额度使用 payload 局部刷新，关闭 change 动画可避免卡片每分钟轻微闪烁。
+            ((SimpleItemAnimator) wkVBinding.recyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
+        }
         wkVBinding.recyclerView.setHasFixedSize(false);
         wkVBinding.recyclerView.setItemViewCacheSize(8);
         wkVBinding.recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         wkVBinding.recyclerView.setClipToPadding(false);
         GlobalBottomNavigationController.attach(this, wkVBinding.bottomNavigation, com.chat.uikit.R.id.i_partner);
+        applySystemBarInsets();
         applyTabletContentWidth();
 
         showSkeleton(true);
@@ -423,7 +451,8 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                         currentResponse.server_time = nowServer();
                         PartnerListCache.saveAsync(PartnerListActivity.this, currentResponse);
                     }
-                    adapter.submitList(new ArrayList<>(updated));
+                    adapter.submitList(new ArrayList<>(updated),
+                            () -> adapter.refreshVisible(visibleFirst, visibleLast));
                 } else {
                     adapter.refreshVisible(visibleFirst, visibleLast);
                 }
@@ -520,6 +549,92 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         } catch (Throwable ignored) {
         }
         toast(getString(R.string.partnerlist_dating_unavailable));
+    }
+
+
+    /**
+     * 顶部标签与交友页使用同一套规则：56dp 内容高度 + 真实刘海/状态栏高度 + 4dp 呼吸距离。
+     * 底部导航同时扩展到手势区，避免全面屏设备出现遮挡或额外黑条。
+     */
+    private void applySystemBarInsets() {
+        if (wkVBinding == null || wkVBinding.pageRoot == null) return;
+        final int topBaseHeight = layoutHeight(wkVBinding.topBar);
+        final int topBasePaddingLeft = wkVBinding.topBar.getPaddingLeft();
+        final int topBasePaddingTop = wkVBinding.topBar.getPaddingTop();
+        final int topBasePaddingRight = wkVBinding.topBar.getPaddingRight();
+        final int topBasePaddingBottom = wkVBinding.topBar.getPaddingBottom();
+        final int bottomBaseHeight = layoutHeight(wkVBinding.bottomNavigation);
+        final int bottomBasePaddingLeft = wkVBinding.bottomNavigation.getPaddingLeft();
+        final int bottomBasePaddingTop = wkVBinding.bottomNavigation.getPaddingTop();
+        final int bottomBasePaddingRight = wkVBinding.bottomNavigation.getPaddingRight();
+        final int bottomBasePaddingBottom = wkVBinding.bottomNavigation.getPaddingBottom();
+        final int contentBaseBottomMargin = marginBottom(wkVBinding.contentContainer);
+        final int bannerBaseTopMargin = marginTop(wkVBinding.updateBanner);
+        final int topExtra = dp(4);
+
+        ViewCompat.setOnApplyWindowInsetsListener(wkVBinding.pageRoot, (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars()
+                    | WindowInsetsCompat.Type.displayCutout());
+
+            wkVBinding.topBar.setPadding(
+                    topBasePaddingLeft + bars.left,
+                    topBasePaddingTop + bars.top + topExtra,
+                    topBasePaddingRight + bars.right,
+                    topBasePaddingBottom);
+            setLayoutHeight(wkVBinding.topBar, topBaseHeight + bars.top + topExtra);
+
+            wkVBinding.bottomNavigation.setPadding(
+                    bottomBasePaddingLeft + bars.left,
+                    bottomBasePaddingTop,
+                    bottomBasePaddingRight + bars.right,
+                    bottomBasePaddingBottom + bars.bottom);
+            setLayoutHeight(wkVBinding.bottomNavigation, bottomBaseHeight + bars.bottom);
+            setBottomMargin(wkVBinding.contentContainer, contentBaseBottomMargin + bars.bottom);
+            setTopMargin(wkVBinding.updateBanner, bannerBaseTopMargin + bars.top + topExtra);
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(wkVBinding.pageRoot);
+    }
+
+    private int layoutHeight(View view) {
+        ViewGroup.LayoutParams params = view == null ? null : view.getLayoutParams();
+        return params == null || params.height < 0 ? 0 : params.height;
+    }
+
+    private int marginTop(View view) {
+        ViewGroup.LayoutParams params = view == null ? null : view.getLayoutParams();
+        return params instanceof ViewGroup.MarginLayoutParams
+                ? ((ViewGroup.MarginLayoutParams) params).topMargin : 0;
+    }
+
+    private int marginBottom(View view) {
+        ViewGroup.LayoutParams params = view == null ? null : view.getLayoutParams();
+        return params instanceof ViewGroup.MarginLayoutParams
+                ? ((ViewGroup.MarginLayoutParams) params).bottomMargin : 0;
+    }
+
+    private void setLayoutHeight(View view, int height) {
+        if (view == null || height <= 0 || view.getLayoutParams() == null
+                || view.getLayoutParams().height == height) return;
+        ViewGroup.LayoutParams params = view.getLayoutParams();
+        params.height = height;
+        view.setLayoutParams(params);
+    }
+
+    private void setTopMargin(View view, int margin) {
+        if (view == null || !(view.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return;
+        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
+        if (params.topMargin == margin) return;
+        params.topMargin = margin;
+        view.setLayoutParams(params);
+    }
+
+    private void setBottomMargin(View view, int margin) {
+        if (view == null || !(view.getLayoutParams() instanceof ViewGroup.MarginLayoutParams)) return;
+        ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
+        if (params.bottomMargin == margin) return;
+        params.bottomMargin = margin;
+        view.setLayoutParams(params);
     }
 
     private void applyTabletContentWidth() {
