@@ -49,7 +49,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         void onTikTokCoverLoadFailed(FeedListItem item, FeedListMedia media);
     }
 
-    private final Listener listener;
+    private Listener listener;
     private final Set<String> expanded = new HashSet<>();
     private long serverTime;
     private long serverTimeLocalAt;
@@ -58,6 +58,10 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         super(DIFF);
         this.listener = listener;
         setHasStableIds(true);
+    }
+
+    public void release() {
+        listener = null;
     }
 
     @Override public long getItemId(int position) { return getItem(position).stableId(); }
@@ -93,10 +97,11 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             if (media == null || !media.isTikTok()) continue;
             String coverUrl = media.tiktokCoverUrl();
             if (TextUtils.isEmpty(coverUrl) || media.isTikTokCoverProbablyExpired(System.currentTimeMillis())) {
-                listener.onTikTokMetadataNeeded(item, media);
+                Listener callback = listener;
+                if (callback != null) callback.onTikTokMetadataNeeded(item, media);
                 continue;
             }
-            Glide.with(context)
+            Glide.with(context.getApplicationContext())
                     .load(coverUrl)
                     .diskCacheStrategy(DiskCacheStrategy.DATA)
                     .preload();
@@ -145,9 +150,9 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         b.languageTv.setText(language);
         b.languageTv.setVisibility(TextUtils.isEmpty(language) ? View.GONE : View.VISIBLE);
         b.timeTv.setText(relativeTime(b.getRoot().getContext(), item.created_at, serverTime));
-        b.userArea.setOnClickListener(v -> listener.onProfile(item));
-        b.avatarView.setOnClickListener(v -> listener.onProfile(item));
-        b.moreBtn.setOnClickListener(v -> listener.onMore(item));
+        b.userArea.setOnClickListener(v -> { Listener callback = listener; if (callback != null) callback.onProfile(item); });
+        b.avatarView.setOnClickListener(v -> { Listener callback = listener; if (callback != null) callback.onProfile(item); });
+        b.moreBtn.setOnClickListener(v -> { Listener callback = listener; if (callback != null) callback.onMore(item); });
 
         boolean mine = TextUtils.equals(uid, com.chat.base.config.WKConfig.getInstance().getUid());
         boolean followed = user != null && user.follow == 1;
@@ -159,7 +164,7 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                 followed ? R.color.feedlist_muted : R.color.feedlist_like
         ));
         b.followBtn.setEnabled(!TextUtils.isEmpty(uid));
-        b.followBtn.setOnClickListener(v -> listener.onFollow(item));
+        b.followBtn.setOnClickListener(v -> { Listener callback = listener; if (callback != null) callback.onFollow(item); });
 
         bindContent(holder, item);
         bindMedia(holder, item);
@@ -214,12 +219,13 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             if (TextUtils.isEmpty(coverUrl)) {
                 Glide.with(b.tiktokCoverIv).clear(b.tiktokCoverIv);
                 b.tiktokCoverIv.setImageResource(R.color.feedlist_media_placeholder);
-                listener.onTikTokMetadataNeeded(item, first);
+                Listener callback = listener;
+                if (callback != null) callback.onTikTokMetadataNeeded(item, first);
             } else {
                 // Keep a previously cached poster visible even when the signed CDN URL has expired.
                 // The Activity refreshes an expired/failed cover directly through official oEmbed,
                 // bypassing a stale server preview response.
-                if (expired) listener.onTikTokCoverLoadFailed(item, first);
+                if (expired) { Listener callback = listener; if (callback != null) callback.onTikTokCoverLoadFailed(item, first); }
                 Glide.with(b.tiktokCoverIv)
                         .load(coverUrl)
                         .placeholder(R.color.feedlist_media_placeholder)
@@ -230,7 +236,8 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
                         .listener(new RequestListener<Drawable>() {
                             @Override
                             public boolean onLoadFailed(GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
-                                listener.onTikTokCoverLoadFailed(item, first);
+                                Listener callback = listener;
+                                if (callback != null) callback.onTikTokCoverLoadFailed(item, first);
                                 return false;
                             }
 
@@ -243,11 +250,11 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
             }
 
             // Keep the stable, dedicated full-screen playback path.
-            b.tiktokBox.setOnClickListener(v -> listener.onTikTok(item, first));
+            b.tiktokBox.setOnClickListener(v -> { Listener callback = listener; if (callback != null) callback.onTikTok(item, first); });
         } else {
             Glide.with(b.tiktokCoverIv).clear(b.tiktokCoverIv);
             b.tiktokBox.setOnClickListener(null);
-            b.mediaGrid.setListener((index, media) -> listener.onImages(item, index, media));
+            b.mediaGrid.setListener((index, media) -> { Listener callback = listener; if (callback != null) callback.onImages(item, index, media); });
             b.mediaGrid.bind(item.safeMedia());
         }
     }
@@ -281,9 +288,9 @@ public class FeedTimelineAdapter extends ListAdapter<FeedListItem, FeedTimelineA
         b.shareCountTv.setVisibility(item.share_count > 0 ? View.VISIBLE : View.GONE);
         b.shareCountTv.setText(item.share_count > 0 ? String.valueOf(item.share_count) : "");
 
-        b.likeAction.setOnClickListener(v -> listener.onLike(item, holder.getBindingAdapterPosition()));
-        b.commentAction.setOnClickListener(v -> listener.onComment(item, holder.getBindingAdapterPosition()));
-        b.shareAction.setOnClickListener(v -> listener.onShare(item));
+        b.likeAction.setOnClickListener(v -> { Listener callback = listener; if (callback != null) callback.onLike(item, holder.getBindingAdapterPosition()); });
+        b.commentAction.setOnClickListener(v -> { Listener callback = listener; if (callback != null) callback.onComment(item, holder.getBindingAdapterPosition()); });
+        b.shareAction.setOnClickListener(v -> { Listener callback = listener; if (callback != null) callback.onShare(item); });
     }
 
     @Override

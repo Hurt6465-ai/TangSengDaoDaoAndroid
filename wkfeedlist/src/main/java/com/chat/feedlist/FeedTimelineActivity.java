@@ -3,6 +3,8 @@ package com.chat.feedlist;
 import android.content.Intent;
 import android.net.Uri;
 import android.graphics.Typeface;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
@@ -63,8 +65,15 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     private final Map<String, Long> tiktokResolveFailedAt = new HashMap<>();
     private final Map<String, Long> tiktokResolvedAt = new HashMap<>();
     private TimelineState current = latest;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable publishRefreshTask = this::refreshAfterPublish;
+    private final Runnable tiktokVideoPreloadTask = this::preloadFirstVisibleTikTokVideo;
     private FeedTimelineAdapter adapter;
     private LinearLayoutManager layoutManager;
+    private TikTokPlaybackPreloader tiktokPlaybackPreloader;
+    private RecyclerView.OnScrollListener timelineScrollListener;
+    private boolean resumed;
+    private boolean destroyed;
 
     @Override protected ActivityFeedTimelineBinding getViewBinding() { return ActivityFeedTimelineBinding.inflate(getLayoutInflater()); }
     @Override protected boolean supportSlideBack() { return false; }
@@ -80,6 +89,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         wkVBinding.recyclerView.setItemViewCacheSize(5);
         wkVBinding.recyclerView.getRecycledViewPool().setMaxRecycledViews(0, 10);
         wkVBinding.recyclerView.setClipToPadding(false);
+        tiktokPlaybackPreloader = new TikTokPlaybackPreloader(this, wkVBinding.tiktokPreloadHost);
         if (wkVBinding.recyclerView.getItemAnimator() instanceof DefaultItemAnimator) {
             ((DefaultItemAnimator) wkVBinding.recyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
         }
@@ -117,8 +127,9 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         });
         wkVBinding.refreshLayout.setOnRefreshListener(layout -> requestPage(current, true));
         wkVBinding.statePanel.setOnClickListener(v -> requestPage(current, true));
-        wkVBinding.recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+        timelineScrollListener = new RecyclerView.OnScrollListener() {
             @Override public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                if (isUnavailable()) return;
                 saveScrollState(current);
                 if (dy <= 0 || current.loading || !current.hasMore || current.items.isEmpty()) return;
                 int last = layoutManager.findLastVisibleItemPosition();
@@ -126,9 +137,15 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
             }
 
             @Override public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
-                if (newState == RecyclerView.SCROLL_STATE_IDLE) preloadTikTokCovers();
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    preloadTikTokCovers();
+                    scheduleTikTokVideoPreload();
+                } else {
+                    mainHandler.removeCallbacks(tiktokVideoPreloadTask);
+                }
             }
-        });
+        };
+        wkVBinding.recyclerView.addOnScrollListener(timelineScrollListener);
     }
 
     @Override protected void initData() { loadCacheThenRefresh(latest); }
@@ -140,7 +157,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         }
         state.cacheRequested = true;
         FeedListCache.load(this, state.mode, page -> {
-            if (isFinishing() || isDestroyed()) return;
+            if (isUnavailable()) return;
             state.cacheLoaded = true;
             if (page != null && state.items.isEmpty()) {
                 state.items.addAll(page.items == null ? new ArrayList<>() : page.items);
@@ -187,6 +204,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     }
 
     private void requestPage(TimelineState state, boolean refresh) {
+        if (state == null || isUnavailable()) return;
         if (state.loading) {
             if (refresh) {
                 state.pendingRefresh = true;
@@ -205,7 +223,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
                 state.loading = false;
                 boolean runPendingRefresh = state.pendingRefresh;
                 state.pendingRefresh = false;
-                if (isFinishing() || isDestroyed()) return;
+                if (isUnavailable()) return;
                 if (refresh && current == state) wkVBinding.refreshLayout.finishRefresh(result != null);
                 if (result == null) {
                     if (current == state) renderErrorIfEmpty();
@@ -228,7 +246,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
                 state.loading = false;
                 boolean runPendingRefresh = state.pendingRefresh;
                 state.pendingRefresh = false;
-                if (isFinishing() || isDestroyed()) return;
+                if (isUnavailable()) return;
                 if (refresh && current == state) wkVBinding.refreshLayout.finishRefresh(false);
                 if (current == state) {
                     if (state.items.isEmpty()) renderErrorIfEmpty();
@@ -250,14 +268,17 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     }
 
     private void render(boolean restorePosition) {
+        if (isUnavailable() || adapter == null || layoutManager == null) return;
         TimelineState state = current;
         adapter.setServerTime(currentServerTime(state));
         adapter.submitList(new ArrayList<>(state.items), () -> {
+            if (isUnavailable() || adapter == null || layoutManager == null) return;
             if (restorePosition && current == state && state.hasScrollState && !state.items.isEmpty()) {
                 int position = Math.min(state.firstVisiblePosition, Math.max(0, adapter.getItemCount() - 1));
                 layoutManager.scrollToPositionWithOffset(position, state.firstVisibleOffset);
             }
             preloadTikTokCovers();
+            scheduleTikTokVideoPreload();
         });
         boolean empty = state.items.isEmpty();
         wkVBinding.statePanel.setVisibility(empty ? View.VISIBLE : View.GONE);
@@ -268,11 +289,39 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
 
 
     private void preloadTikTokCovers() {
-        if (adapter == null || layoutManager == null || adapter.getItemCount() == 0) return;
-        TikTokEmbedActivity.prewarm(this);
+        if (!resumed || isUnavailable() || adapter == null || layoutManager == null || adapter.getItemCount() == 0) return;
+        TikTokEmbedActivity.prewarm(getApplicationContext());
         int first = layoutManager.findFirstVisibleItemPosition();
         if (first == RecyclerView.NO_POSITION) first = 0;
         adapter.preloadTikTokCovers(this, first, 4);
+    }
+
+    private void scheduleTikTokVideoPreload() {
+        mainHandler.removeCallbacks(tiktokVideoPreloadTask);
+        if (!resumed || isUnavailable()) return;
+        mainHandler.postDelayed(tiktokVideoPreloadTask, 650L);
+    }
+
+    private void preloadFirstVisibleTikTokVideo() {
+        if (!resumed || isUnavailable() || tiktokPlaybackPreloader == null
+                || adapter == null || layoutManager == null || adapter.getItemCount() == 0) {
+            return;
+        }
+        int first = layoutManager.findFirstVisibleItemPosition();
+        if (first == RecyclerView.NO_POSITION) first = 0;
+        int end = Math.min(adapter.getItemCount(), first + 8);
+        for (int position = Math.max(0, first); position < end; position++) {
+            FeedListItem item = adapter.getItemAt(position);
+            FeedListMedia media = item == null ? null : item.firstMedia();
+            if (media == null || !media.isTikTok()) continue;
+            String videoId = media.tiktokVideoId();
+            if (TextUtils.isEmpty(videoId)) {
+                resolveTikTokMetadata(item, media, false, false);
+                continue;
+            }
+            tiktokPlaybackPreloader.preload(videoId);
+            return;
+        }
     }
 
     private void saveScrollState(TimelineState state) {
@@ -539,7 +588,9 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
     }
 
     @Override public void onTikTok(FeedListItem item, FeedListMedia media) {
-        if (media == null) return;
+        if (media == null || isUnavailable()) return;
+        mainHandler.removeCallbacks(tiktokVideoPreloadTask);
+        if (tiktokPlaybackPreloader != null) tiktokPlaybackPreloader.pause();
         String videoId = media.tiktokVideoId();
         if (!TextUtils.isEmpty(videoId)) {
             TikTokEmbedActivity.open(this, videoId, media.tiktokSourceUrl(), media.tiktokCoverUrl());
@@ -698,6 +749,7 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         updateTikTokMetadata(feedId, sourceUrl, result);
         persistStates();
         refreshTikTokRows(feedId, sourceUrl);
+        scheduleTikTokVideoPreload();
         if (shouldOpen) {
             TikTokEmbedActivity.open(this, result.bestVideoId(),
                     firstNonEmpty(result.bestUrl(), sourceUrl), result.bestCoverUrl());
@@ -801,28 +853,88 @@ public class FeedTimelineActivity extends WKBaseActivity<ActivityFeedTimelineBin
         }
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        resumed = true;
+        if (tiktokPlaybackPreloader == null && wkVBinding != null) {
+            tiktokPlaybackPreloader = new TikTokPlaybackPreloader(this, wkVBinding.tiktokPreloadHost);
+        }
+        mainHandler.removeCallbacks(publishRefreshTask);
+        if (FeedListPublishActivity.consumePublishSuccess(this)) {
+            mainHandler.post(publishRefreshTask);
+        } else {
+            mainHandler.post(this::preloadTikTokCovers);
+        }
+        scheduleTikTokVideoPreload();
+    }
+
+    @Override protected void onPause() {
+        resumed = false;
+        mainHandler.removeCallbacks(publishRefreshTask);
+        mainHandler.removeCallbacks(tiktokVideoPreloadTask);
+        if (tiktokPlaybackPreloader != null) {
+            tiktokPlaybackPreloader.release();
+            tiktokPlaybackPreloader = null;
+        }
+        if (wkVBinding != null) {
+            try {
+                wkVBinding.recyclerView.stopScroll();
+                wkVBinding.refreshLayout.finishRefresh(false);
+            } catch (Throwable ignored) {
+            }
+        }
+        super.onPause();
+    }
+
+    private void refreshAfterPublish() {
+        if (!resumed || isUnavailable()) return;
+        current = latest;
+        latest.firstVisiblePosition = 0;
+        latest.firstVisibleOffset = 0;
+        latest.hasScrollState = true;
+        updateTabs();
+        render(true);
+        requestPage(latest, true);
+    }
+
     @Override protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_PUBLISH && resultCode == RESULT_OK) {
-            current = latest;
-            latest.firstVisiblePosition = 0;
-            latest.firstVisibleOffset = 0;
-            latest.hasScrollState = true;
-            updateTabs();
-            render(true);
-            requestPage(latest, true);
+            FeedListPublishActivity.consumePublishSuccess(this);
+            mainHandler.removeCallbacks(publishRefreshTask);
+            mainHandler.post(publishRefreshTask);
         }
     }
 
     @Override protected void onDestroy() {
         saveScrollState(current);
-        if (wkVBinding != null) wkVBinding.recyclerView.setAdapter(null);
+        destroyed = true;
+        resumed = false;
+        mainHandler.removeCallbacksAndMessages(null);
+        if (tiktokPlaybackPreloader != null) {
+            tiktokPlaybackPreloader.release();
+            tiktokPlaybackPreloader = null;
+        }
+        if (adapter != null) adapter.release();
+        if (wkVBinding != null) {
+            try {
+                if (timelineScrollListener != null) {
+                    wkVBinding.recyclerView.removeOnScrollListener(timelineScrollListener);
+                }
+                wkVBinding.recyclerView.stopScroll();
+                wkVBinding.recyclerView.setAdapter(null);
+            } catch (Throwable ignored) {
+            }
+        }
+        timelineScrollListener = null;
+        adapter = null;
+        layoutManager = null;
         super.onDestroy();
     }
 
 
     private boolean isUnavailable() {
-        return isFinishing() || isDestroyed() || wkVBinding == null;
+        return destroyed || isFinishing() || isDestroyed() || wkVBinding == null;
     }
 
     private static long normalizeEpochMillis(long value) {
