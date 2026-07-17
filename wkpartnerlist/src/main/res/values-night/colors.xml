@@ -15,7 +15,9 @@
     <color name="partnerlist_native_language_text">#A8E3CF</color>
     <color name="partnerlist_learning_language_text">#9DCCF0</color>
     <color name="partnerlist_language_exchange">#8993A2</color>
+    <color name="partnerlist_tag_text">#D2D8E3</color>
     <color name="partnerlist_badge_text">#D4CEFF</color>
+    <color name="partnerlist_joined_badge_text">#FF9BC4</color>
     <color name="partnerlist_card_base">#FF1D232D</color>
     <color name="partnerlist_card_ripple">#24B7C2FF</color>
     <color name="partnerlist_button_ripple">#2EFF91BE</color>
