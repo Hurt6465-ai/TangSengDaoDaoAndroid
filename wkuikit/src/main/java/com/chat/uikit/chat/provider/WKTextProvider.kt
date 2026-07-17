@@ -20,7 +20,6 @@ import android.text.Spanned
 import android.text.TextUtils
 import android.text.method.LinkMovementMethod
 import android.text.style.ForegroundColorSpan
-import android.text.style.RelativeSizeSpan
 import android.text.style.SubscriptSpan
 import android.text.style.SuperscriptSpan
 import android.text.style.StyleSpan
@@ -36,6 +35,7 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.core.widget.ImageViewCompat
 import androidx.emoji2.widget.EmojiTextView
 import com.chat.base.WKBaseApplication
 import com.chat.base.act.WKWebViewActivity
@@ -277,14 +277,6 @@ open class WKTextProvider : WKChatBaseProvider() {
         return false
     }
 
-    private fun makeTranslateIconText(): SpannableString {
-        val text = SpannableString("文A")
-        text.setSpan(StyleSpan(Typeface.BOLD), 0, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        text.setSpan(RelativeSizeSpan(0.98f), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        text.setSpan(RelativeSizeSpan(0.88f), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        return text
-    }
-
     private fun addQuickTranslateButton(
         parent: ViewGroup,
         uiChatMsgItemEntity: WKUIChatMsgItemEntity,
@@ -292,33 +284,30 @@ open class WKTextProvider : WKChatBaseProvider() {
         cacheKey: String,
         cached: TranslationCache?
     ) {
-        val btn = AppCompatTextView(context)
-        btn.tag = translationButtonTag
-        btn.text = when {
-            cached == null -> makeTranslateIconText()
-            cached.expanded -> "⌃"
-            else -> "⌄"
-        }
-        btn.includeFontPadding = false
-        btn.rotation = if (cached == null) -10f else 0f
-        btn.typeface = Typeface.DEFAULT_BOLD
-        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (cached == null) 9.2f else 11.5f)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-            btn.letterSpacing = -0.14f
-        }
-        btn.setTextColor(ContextCompat.getColor(context, R.color.colorAccent))
-        btn.gravity = Gravity.CENTER
-        btn.minWidth = 0
-        btn.minHeight = 0
-        btn.setPadding(0, 0, 0, 0)
-        btn.background = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            // 浅粉白，避免按钮太重。
-            setColor(Color.rgb(255, 248, 252))
-            setStroke(dp(1), ColorUtils.setAlphaComponent(ContextCompat.getColor(context, R.color.colorAccent), 55))
-        }
-        btn.elevation = dp(1).toFloat()
-        btn.setOnClickListener {
+        val button = AppCompatImageView(context)
+        button.tag = translationButtonTag
+        button.setImageResource(R.drawable.ic_chat_translate_wa)
+        button.contentDescription = context.getString(R.string.chat_inline_translate_description)
+        button.scaleType = ImageView.ScaleType.CENTER_INSIDE
+        button.setPadding(dp(3), dp(3), dp(3), dp(3))
+        button.setBackgroundResource(R.drawable.bg_chat_inline_translate_ripple)
+        button.isClickable = true
+        button.isFocusable = true
+        button.alpha = if (cached?.status == "loading") 0.46f else 0.94f
+        ImageViewCompat.setImageTintList(
+            button,
+            android.content.res.ColorStateList.valueOf(
+                ContextCompat.getColor(
+                    context,
+                    if (cached?.expanded == true) {
+                        R.color.chat_inline_translate_active
+                    } else {
+                        R.color.chat_inline_translate_idle
+                    }
+                )
+            )
+        )
+        button.setOnClickListener {
             val latest = readTranslationCache(cacheKey)
             when {
                 latest?.status == "loading" -> return@setOnClickListener
@@ -336,11 +325,11 @@ open class WKTextProvider : WKChatBaseProvider() {
                 else -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
             }
         }
-        val lp = LinearLayout.LayoutParams(dp(20), dp(20))
+        val lp = LinearLayout.LayoutParams(dp(32), dp(32))
         lp.gravity = Gravity.BOTTOM
-        lp.leftMargin = dp(2)
+        lp.leftMargin = dp(5)
         lp.bottomMargin = dp(1)
-        parent.addView(btn, lp)
+        parent.addView(button, lp)
     }
 
     private fun addTranslationView(parent: ViewGroup, cacheKey: String, text: String, status: String = "ok") {
