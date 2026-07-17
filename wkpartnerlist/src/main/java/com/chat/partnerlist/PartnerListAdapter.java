@@ -138,7 +138,7 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         String uid = user.stableId();
         b.cardSurface.setBackgroundResource(cardBackground(uid));
 
-        int avatarPx = Math.round(70f * b.getRoot().getResources().getDisplayMetrics().density);
+        int avatarPx = Math.round(72f * b.getRoot().getResources().getDisplayMetrics().density);
         int avatarPlaceholder = ContextCompat.getColor(b.getRoot().getContext(), R.color.partnerlist_avatar_placeholder);
         Glide.with(b.avatarIv)
                 .load(showUrl(user.displayAvatar()))
@@ -174,8 +174,12 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     }
 
     private void bindPresence(ItemPartnerListBinding b, PartnerListUser user) {
-        boolean active = PartnerListTime.isRecentlyActive(user.online, user.last_active_at, serverTime);
-        b.onlineDot.setVisibility(active ? View.VISIBLE : View.GONE);
+        // 光环和绿点只表示“当前在线”，避免把“最近活跃”误显示成在线。
+        boolean online = user.online == 1;
+        b.onlineDot.setVisibility(online ? View.VISIBLE : View.GONE);
+        b.avatarRing.setVisibility(online ? View.VISIBLE : View.INVISIBLE);
+        b.avatarGap.setVisibility(online ? View.VISIBLE : View.INVISIBLE);
+        if (online) b.avatarRing.setBackgroundResource(avatarRingBackground(user.stableId()));
         b.activeTv.setText(PartnerListTime.activeLabel(
                 b.getRoot().getContext(), user.online, user.last_active_at, serverTime));
     }
@@ -235,6 +239,16 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         if (bucket == 2) return R.drawable.bg_partnerlist_card_peach;
         if (bucket == 3) return R.drawable.bg_partnerlist_card_sky;
         return R.drawable.bg_partnerlist_card_mint;
+    }
+
+    private int avatarRingBackground(String uid) {
+        int bucket = Math.floorMod(uid == null ? 0 : uid.hashCode(), 6);
+        if (bucket == 1) return R.drawable.bg_partnerlist_avatar_ring_lavender_rose;
+        if (bucket == 2) return R.drawable.bg_partnerlist_avatar_ring_sunset;
+        if (bucket == 3) return R.drawable.bg_partnerlist_avatar_ring_sky_violet;
+        if (bucket == 4) return R.drawable.bg_partnerlist_avatar_ring_aqua_lime;
+        if (bucket == 5) return R.drawable.bg_partnerlist_avatar_ring_coral_gold;
+        return R.drawable.bg_partnerlist_avatar_ring_mint_sky;
     }
 
     private void animatePress(View view) {
