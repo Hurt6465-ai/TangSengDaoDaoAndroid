@@ -14,7 +14,6 @@ import android.provider.ContactsContract
 import android.os.Handler
 import android.os.Looper
 import android.text.Spannable
-import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextUtils
@@ -35,7 +34,6 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
-import androidx.core.widget.ImageViewCompat
 import androidx.emoji2.widget.EmojiTextView
 import com.chat.base.WKBaseApplication
 import com.chat.base.act.WKWebViewActivity
@@ -284,30 +282,20 @@ open class WKTextProvider : WKChatBaseProvider() {
         cacheKey: String,
         cached: TranslationCache?
     ) {
-        val button = AppCompatImageView(context)
-        button.tag = translationButtonTag
-        button.setImageResource(R.drawable.ic_chat_translate_wa)
-        button.contentDescription = context.getString(R.string.chat_inline_translate_description)
-        button.scaleType = ImageView.ScaleType.CENTER_INSIDE
-        button.setPadding(dp(3), dp(3), dp(3), dp(3))
-        button.setBackgroundResource(R.drawable.bg_chat_inline_translate_ripple)
-        button.isClickable = true
-        button.isFocusable = true
-        button.alpha = if (cached?.status == "loading") 0.46f else 0.94f
-        ImageViewCompat.setImageTintList(
-            button,
-            android.content.res.ColorStateList.valueOf(
-                ContextCompat.getColor(
-                    context,
-                    if (cached?.expanded == true) {
-                        R.color.chat_inline_translate_active
-                    } else {
-                        R.color.chat_inline_translate_idle
-                    }
-                )
-            )
-        )
-        button.setOnClickListener {
+        val btn = AppCompatImageView(context)
+        btn.tag = translationButtonTag
+        btn.setImageResource(R.drawable.ic_chat_translate_wa)
+        btn.scaleType = ImageView.ScaleType.CENTER_INSIDE
+        btn.contentDescription = context.getString(com.chat.translate.R.string.wktranslate_translate)
+        btn.isSelected = cached?.expanded == true
+        btn.minWidth = 0
+        btn.minHeight = 0
+        btn.setPadding(dp(4), dp(4), dp(4), dp(4))
+        btn.setBackgroundResource(R.drawable.bg_chat_translate_quick)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            btn.elevation = dp(1).toFloat()
+        }
+        btn.setOnClickListener {
             val latest = readTranslationCache(cacheKey)
             when {
                 latest?.status == "loading" -> return@setOnClickListener
@@ -325,11 +313,11 @@ open class WKTextProvider : WKChatBaseProvider() {
                 else -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
             }
         }
-        val lp = LinearLayout.LayoutParams(dp(32), dp(32))
+        val lp = LinearLayout.LayoutParams(dp(30), dp(30))
         lp.gravity = Gravity.BOTTOM
-        lp.leftMargin = dp(5)
+        lp.leftMargin = dp(3)
         lp.bottomMargin = dp(1)
-        parent.addView(button, lp)
+        parent.addView(btn, lp)
     }
 
     private fun addTranslationView(parent: ViewGroup, cacheKey: String, text: String, status: String = "ok") {
