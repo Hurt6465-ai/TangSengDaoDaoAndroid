@@ -45,6 +45,7 @@ import com.chat.uikit.GlobalBottomNavigationController;
 public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBinding> {
     private static final int PAGE_LIMIT = 12;
     private static final int MAX_SWIPE_RETRY = 1;
+    private static final int MAX_EMPTY_ROUND_RETRY = 1;
     private static final int REQ_PROFILE_DETAIL = 401;
     private static final int REQ_MINE = 402;
     private static final String RECOMMEND_SCOPE = "global";
@@ -67,6 +68,9 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private boolean pendingRewindRemoveFavorite;
     private boolean interactionLocked;
     private boolean exposureUploading;
+    private int recommendationRound;
+    private int consecutiveEmptyRounds;
+    private boolean restartingRound;
 
     private DatingProfile myProfile;
     private DatingFilter filter;
@@ -104,6 +108,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         DatingUi.applyHomeInsets(wkVBinding.getRoot(), wkVBinding.topBar, wkVBinding.actionBar);
         GlobalBottomNavigationController.attach(this, wkVBinding.bottomNavigation, com.chat.uikit.R.id.i_partner);
         initCardStack();
+        keepPersistentChromeOnTop();
         showLoading(true, getString(R.string.dating_loading), false);
     }
 
@@ -301,6 +306,10 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private void reload() {
         finishExposure(true);
         cursor = "";
+        sessionId = UUID.randomUUID().toString();
+        recommendationRound = 0;
+        consecutiveEmptyRounds = 0;
+        restartingRound = false;
         noMore = false;
         loading = false;
         profiles.clear();
@@ -323,24 +332,39 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         if (loading) return;
         loading = true;
         if (firstPage) showLoading(true, getString(R.string.dating_loading), false);
-        DatingModel.getInstance().recommend(cursor, PAGE_LIMIT, RECOMMEND_SCOPE, sessionId, filter, (code, msg, data) -> {
+        DatingModel.getInstance().recommend(cursor, PAGE_LIMIT, RECOMMEND_SCOPE, sessionId, filter,
+                recommendationRound > 0, (code, msg, data) -> {
             if (isFinishing() || isDestroyed()) return;
             loading = false;
-            if (code == HttpResponseCode.success && data != null && data.getItems() != null && !data.getItems().isEmpty()) {
-                cursor = data.cursor == null ? "" : data.cursor;
-                noMore = !data.hasMore();
-                appendProfiles(data.getItems(), firstPage, false);
+            if (code == HttpResponseCode.success && data != null) {
+                List<DatingProfile> items = data.getItems();
+                if (items != null && !items.isEmpty()) {
+                    cursor = data.cursor == null ? "" : data.cursor;
+                    noMore = !data.hasMore();
+                    int appended = appendProfiles(items, firstPage, false);
+                    if (appended > 0) {
+                        consecutiveEmptyRounds = 0;
+                        restartingRound = false;
+                        return;
+                    }
+                }
+                if (firstPage) {
+                    startNextRecommendationRound();
+                } else {
+                    noMore = true;
+                }
                 return;
             }
+            restartingRound = false;
             if (firstPage) {
-                showLoading(true, TextUtils.isEmpty(msg) ? getString(R.string.dating_empty) : msg, true);
+                showLoading(true, TextUtils.isEmpty(msg) ? getString(R.string.dating_profile_load_failed) : msg, true);
             } else {
                 noMore = true;
             }
         });
     }
 
-    private void appendProfiles(List<DatingProfile> data, boolean reset, boolean demo) {
+    private int appendProfiles(List<DatingProfile> data, boolean reset, boolean demo) {
         List<DatingProfile> clean = cleanProfiles(data);
         if (reset) {
             profiles.clear();
@@ -356,9 +380,9 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             for (DatingProfile item : clean) loadedUids.add(item.safeUid());
             cardAdapter.appendProfiles(clean);
         }
-        if (profiles.isEmpty()) showEmpty();
-        else showContent();
+        if (!profiles.isEmpty()) showContent();
         if (demo) showToast(getString(R.string.dating_demo_tip));
+        return clean.size();
     }
 
     private List<DatingProfile> cleanProfiles(List<DatingProfile> data) {
@@ -479,7 +503,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private void afterSwipeConfirmed() {
         int top = cardStackManager == null ? 0 : cardStackManager.getTopPosition();
         if (!loading && !noMore && cardAdapter.getItemCount() - top <= 4) loadMore(false);
-        if (top >= cardAdapter.getItemCount() && noMore) showEmpty();
+        if (top >= cardAdapter.getItemCount() && noMore) startNextRecommendationRound();
     }
 
     private void restoreSwipedCard(SwipeRecord record, boolean refundAction,
@@ -646,18 +670,57 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     }
 
 
+
+    private void startNextRecommendationRound() {
+        if (loading || restartingRound) return;
+        if (consecutiveEmptyRounds >= MAX_EMPTY_ROUND_RETRY) {
+            restartingRound = false;
+            showEmpty();
+            return;
+        }
+        restartingRound = true;
+        consecutiveEmptyRounds++;
+        recommendationRound++;
+        sessionId = UUID.randomUUID().toString();
+        cursor = "";
+        noMore = false;
+        profiles.clear();
+        loadedUids.clear();
+        visiblePosition = 0;
+        swipeHistory.clear();
+        pendingRewindRecord = null;
+        pendingRewindRefundAction = false;
+        pendingRewindRemoveFavorite = false;
+        setInteractionLocked(false);
+        cardAdapter.submitProfiles(profiles);
+        cardStackManager.setTopPosition(0);
+        wkVBinding.deckView.scrollToPosition(0);
+        showLoading(true, getString(R.string.dating_loading), false);
+        restartingRound = false;
+        loadMore(true);
+    }
+
+    private void keepPersistentChromeOnTop() {
+        if (wkVBinding == null) return;
+        wkVBinding.topBar.setVisibility(View.VISIBLE);
+        wkVBinding.topBar.bringToFront();
+        wkVBinding.bottomNavigation.bringToFront();
+    }
+
     private void showLoading(boolean show, String text, boolean retry) {
         wkVBinding.loadingLayout.setVisibility(show ? View.VISIBLE : View.GONE);
         wkVBinding.loadingTv.setText(text);
         wkVBinding.retryBtn.setVisibility(retry ? View.VISIBLE : View.GONE);
         wkVBinding.actionBar.setVisibility(show ? View.GONE : View.VISIBLE);
         wkVBinding.deckView.setVisibility(show ? View.GONE : View.VISIBLE);
+        keepPersistentChromeOnTop();
     }
 
     private void showContent() {
         wkVBinding.loadingLayout.setVisibility(View.GONE);
         wkVBinding.actionBar.setVisibility(View.VISIBLE);
         wkVBinding.deckView.setVisibility(View.VISIBLE);
+        keepPersistentChromeOnTop();
     }
 
     private void showEmpty() {

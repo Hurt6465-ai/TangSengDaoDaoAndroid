@@ -29,7 +29,8 @@ public interface DatingService {
                                                    @Query("gender") String gender,
                                                    @Query("age_min") int ageMin,
                                                    @Query("age_max") int ageMax,
-                                                   @Query("intent") String intent);
+                                                   @Query("intent") String intent,
+                                                   @Query("repeat") int repeat);
 
     @POST("dating/profile")
     Observable<DatingProfile> saveProfile(@Body Map<String, Object> body);

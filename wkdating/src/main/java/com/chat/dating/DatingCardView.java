@@ -1,6 +1,7 @@
 package com.chat.dating;
 
 import android.content.Context;
+import android.graphics.drawable.ColorDrawable;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -108,11 +109,24 @@ public class DatingCardView extends FrameLayout {
         } else {
             int index = Math.max(0, Math.min(photoIndex, photos.size() - 1));
             photoIndex = index;
+            Object source = DatingImageSource.resolve(getContext(), photos.get(index));
+            String avatarPath = TextUtils.isEmpty(profile.avatar)
+                    ? "users/" + profile.safeUid() + "/avatar"
+                    : profile.avatar;
+            Object fallback = DatingImageSource.resolve(getContext(), avatarPath);
+            ColorDrawable placeholder = new ColorDrawable(0xFF202124);
+            com.bumptech.glide.RequestBuilder<android.graphics.drawable.Drawable> fallbackRequest = Glide.with(this)
+                    .load(fallback)
+                    .override(CARD_WIDTH, CARD_HEIGHT)
+                    .centerCrop()
+                    .error(placeholder);
             Glide.with(this)
-                    .load(DatingImageSource.resolve(getContext(), photos.get(index)))
+                    .load(source)
                     .thumbnail(0.25f)
                     .override(CARD_WIDTH, CARD_HEIGHT)
                     .centerCrop()
+                    .placeholder(placeholder)
+                    .error(fallbackRequest)
                     .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                     .into(binding.photoIv);
         }

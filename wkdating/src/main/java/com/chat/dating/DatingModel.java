@@ -39,7 +39,7 @@ public class DatingModel extends WKBaseModel {
     }
 
     public void recommend(String cursor, int limit, String scope, String sessionId, DatingFilter filter,
-                          final Callback<DatingRecommendResponse> callback) {
+                          boolean allowRepeat, final Callback<DatingRecommendResponse> callback) {
         DatingFilter f = filter == null ? new DatingFilter() : filter;
         request(createService(DatingService.class).recommend(
                 cursor == null ? "" : cursor,
@@ -50,7 +50,8 @@ public class DatingModel extends WKBaseModel {
                 f.gender,
                 f.ageMin,
                 f.ageMax,
-                f.goal
+                f.goal,
+                allowRepeat ? 1 : 0
         ), listener(callback));
     }
 
