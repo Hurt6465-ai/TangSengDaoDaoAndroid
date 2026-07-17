@@ -50,26 +50,16 @@
             app:layout_constraintStart_toStartOf="@id/avatarRing"
             app:layout_constraintTop_toTopOf="@id/avatarRing" />
 
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/avatarIv"
+        <!-- 与会话列表、全屏语伴共用 AvatarView：国旗嵌入头像时会自动挖出极细间隙。 -->
+        <com.chat.base.ui.components.AvatarView
+            android:id="@+id/avatarView"
             android:layout_width="72dp"
             android:layout_height="72dp"
             android:contentDescription="@string/partnerlist_avatar"
-            android:scaleType="centerCrop"
             app:layout_constraintBottom_toBottomOf="@id/avatarRing"
             app:layout_constraintEnd_toEndOf="@id/avatarRing"
             app:layout_constraintStart_toStartOf="@id/avatarRing"
             app:layout_constraintTop_toTopOf="@id/avatarRing" />
-
-        <!-- 国旗 PNG 本身已经是透明圆形，不再叠白底或白色描边。 -->
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/flagIv"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:scaleType="fitCenter"
-            android:visibility="gone"
-            app:layout_constraintBottom_toBottomOf="@id/avatarIv"
-            app:layout_constraintStart_toStartOf="@id/avatarIv" />
 
         <View
             android:id="@+id/onlineDot"
@@ -178,45 +168,45 @@
             <TextView
                 android:id="@+id/nativeLanguageTv"
                 android:layout_width="wrap_content"
-                android:layout_height="25dp"
+                android:layout_height="22dp"
                 android:background="@drawable/bg_partnerlist_language_native"
                 android:ellipsize="end"
                 android:gravity="center"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:maxWidth="60dp"
-                android:minWidth="36dp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
+                android:maxWidth="52dp"
+                android:minWidth="30dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
                 android:textColor="@color/partnerlist_native_language_text"
-                android:textSize="11sp"
+                android:textSize="10.5sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/languageExchangeTv"
-                android:layout_width="21dp"
-                android:layout_height="25dp"
+                android:layout_width="18dp"
+                android:layout_height="22dp"
                 android:gravity="center"
                 android:includeFontPadding="false"
-                android:text="⇄"
+                android:text="⇋"
                 android:textColor="@color/partnerlist_language_exchange"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
 
             <TextView
                 android:id="@+id/learningLanguageTv"
                 android:layout_width="wrap_content"
-                android:layout_height="25dp"
+                android:layout_height="22dp"
                 android:background="@drawable/bg_partnerlist_language_learning"
                 android:ellipsize="end"
                 android:gravity="center"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:maxWidth="60dp"
-                android:minWidth="36dp"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
+                android:maxWidth="52dp"
+                android:minWidth="30dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
                 android:textColor="@color/partnerlist_learning_language_text"
-                android:textSize="11sp"
+                android:textSize="10.5sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -237,28 +227,29 @@
             app:layout_constraintTop_toBottomOf="@id/languageRow"
             app:layout_goneMarginTop="5dp" />
 
-        <!-- 小型悬浮 Hi 按钮上移，H 由代码单独使用粗斜体。 -->
+        <!-- 左尾气泡式 Hi：浅蓝气泡、粉红字，保持轻量且不抢头像。 -->
         <TextView
             android:id="@+id/greetingBtn"
-            android:layout_width="64dp"
+            android:layout_width="66dp"
             android:layout_height="38dp"
             android:background="@drawable/bg_partnerlist_greeting"
             android:clickable="true"
-            android:elevation="1dp"
+            android:elevation="0dp"
             android:ellipsize="end"
             android:focusable="true"
             android:gravity="center"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
+            android:paddingStart="9dp"
+            android:paddingEnd="3dp"
+            android:paddingBottom="1dp"
             android:text="@string/partnerlist_greet"
             android:textColor="@color/partnerlist_button_text"
             android:textSize="17sp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.15" />
+            app:layout_constraintVertical_bias="0.13" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>
