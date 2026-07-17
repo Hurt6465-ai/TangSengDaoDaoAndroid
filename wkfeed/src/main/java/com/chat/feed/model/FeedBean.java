@@ -54,6 +54,11 @@ public class FeedBean implements Serializable {
         return list.size() > 0 && list.get(0) != null && list.get(0).isVideo();
     }
 
+    public boolean isTikTok() {
+        FeedMedia first = firstMedia();
+        return first != null && first.isTikTok();
+    }
+
     public FeedMedia firstMedia() {
         List<FeedMedia> list = safeMedia();
         return list.isEmpty() ? null : list.get(0);
