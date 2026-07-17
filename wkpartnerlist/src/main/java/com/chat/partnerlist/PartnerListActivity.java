@@ -1,5 +1,8 @@
 package com.chat.partnerlist;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Build;
@@ -63,6 +66,12 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     private long serverTimeBase;
     private long elapsedTimeBase;
     private boolean lastErrorProfileRequired;
+    private boolean topBarCollapsed;
+    private boolean topBarAnimating;
+    private int topBarExpandedHeight;
+    private int topBarCollapsedHeight;
+    private int scrollDirectionDistance;
+    private ValueAnimator topBarAnimator;
 
     private final Runnable onlineRunnable = new Runnable() {
         @Override public void run() {
@@ -160,6 +169,7 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     @Override protected void initListener() {
         wkVBinding.backBtn.setOnClickListener(v -> finish());
         wkVBinding.partnerModeTab.setOnClickListener(v -> {
+            setTopBarCollapsed(false, true);
             if (adapter != null && adapter.getItemCount() > 0) wkVBinding.recyclerView.smoothScrollToPosition(0);
         });
         wkVBinding.datingModeTab.setOnClickListener(v -> openDatingHome());
@@ -176,6 +186,10 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             PartnerListHostBridge.openProfileEdit(this, REQ_PROFILE_EDIT);
         });
         wkVBinding.recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override public void onScrolled(@androidx.annotation.NonNull RecyclerView recyclerView, int dx, int dy) {
+                handleTopBarScroll(recyclerView, dy);
+            }
+
             @Override public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
                 if (newState == RecyclerView.SCROLL_STATE_IDLE) {
                     handler.removeCallbacks(onlineRunnable);
@@ -217,6 +231,12 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     @Override protected void onDestroy() {
         resumed = false;
         handler.removeCallbacksAndMessages(null);
+        if (topBarAnimator != null) {
+            topBarAnimator.removeAllListeners();
+            topBarAnimator.removeAllUpdateListeners();
+            topBarAnimator.cancel();
+            topBarAnimator = null;
+        }
         if (wkVBinding != null) wkVBinding.recyclerView.setAdapter(null);
         super.onDestroy();
     }
@@ -581,7 +601,10 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                     topBasePaddingTop + bars.top + topExtra,
                     topBasePaddingRight + bars.right,
                     topBasePaddingBottom);
-            setLayoutHeight(wkVBinding.topBar, topBaseHeight + bars.top + topExtra);
+            topBarExpandedHeight = topBaseHeight + bars.top + topExtra;
+            topBarCollapsedHeight = Math.max(1, bars.top);
+            setLayoutHeight(wkVBinding.topBar, topBarCollapsed ? topBarCollapsedHeight : topBarExpandedHeight);
+            setTopBarContentAlpha(topBarCollapsed ? 0f : 1f);
 
             wkVBinding.bottomNavigation.setPadding(
                     bottomBasePaddingLeft + bars.left,
@@ -594,6 +617,87 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             return insets;
         });
         ViewCompat.requestApplyInsets(wkVBinding.pageRoot);
+    }
+
+
+    /**
+     * 向下浏览时收起“语伴 / 交友”标签，只保留安全的状态栏高度；向上滚动或回到顶部时恢复。
+     * 使用累计方向距离，避免手指轻微抖动造成标题栏频繁闪烁。
+     */
+    private void handleTopBarScroll(RecyclerView recyclerView, int dy) {
+        if (recyclerView == null || dy == 0 || topBarExpandedHeight <= 0 || topBarAnimating) return;
+        if (!recyclerView.canScrollVertically(-1)) {
+            scrollDirectionDistance = 0;
+            setTopBarCollapsed(false, true);
+            return;
+        }
+
+        if ((dy > 0 && scrollDirectionDistance < 0) || (dy < 0 && scrollDirectionDistance > 0)) {
+            scrollDirectionDistance = 0;
+        }
+        scrollDirectionDistance += dy;
+
+        if (scrollDirectionDistance >= dp(20)) {
+            scrollDirectionDistance = 0;
+            setTopBarCollapsed(true, true);
+        } else if (scrollDirectionDistance <= -dp(12)) {
+            scrollDirectionDistance = 0;
+            setTopBarCollapsed(false, true);
+        }
+    }
+
+    private void setTopBarCollapsed(boolean collapsed, boolean animate) {
+        if (wkVBinding == null || wkVBinding.topBar == null || topBarExpandedHeight <= 0) return;
+        if (topBarCollapsed == collapsed && !topBarAnimating) return;
+        topBarCollapsed = collapsed;
+
+        int targetHeight = collapsed ? topBarCollapsedHeight : topBarExpandedHeight;
+        float targetAlpha = collapsed ? 0f : 1f;
+        if (topBarAnimator != null) {
+            topBarAnimator.removeAllListeners();
+            topBarAnimator.removeAllUpdateListeners();
+            topBarAnimator.cancel();
+            topBarAnimator = null;
+        }
+
+        if (!animate || wkVBinding.topBar.getHeight() <= 0) {
+            setLayoutHeight(wkVBinding.topBar, targetHeight);
+            setTopBarContentAlpha(targetAlpha);
+            topBarAnimating = false;
+            return;
+        }
+
+        int startHeight = wkVBinding.topBar.getHeight();
+        topBarAnimating = true;
+        topBarAnimator = ValueAnimator.ofInt(startHeight, targetHeight);
+        topBarAnimator.setDuration(collapsed ? 170L : 190L);
+        topBarAnimator.addUpdateListener(animation -> {
+            int height = (Integer) animation.getAnimatedValue();
+            setLayoutHeight(wkVBinding.topBar, height);
+            float fraction = animation.getAnimatedFraction();
+            float alpha = collapsed ? 1f - fraction : fraction;
+            setTopBarContentAlpha(alpha);
+        });
+        topBarAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override public void onAnimationEnd(Animator animation) {
+                topBarAnimating = false;
+                setLayoutHeight(wkVBinding.topBar, targetHeight);
+                setTopBarContentAlpha(targetAlpha);
+            }
+
+            @Override public void onAnimationCancel(Animator animation) {
+                topBarAnimating = false;
+            }
+        });
+        topBarAnimator.start();
+    }
+
+    private void setTopBarContentAlpha(float alpha) {
+        if (wkVBinding == null) return;
+        wkVBinding.modeTabs.setAlpha(alpha);
+        wkVBinding.backBtn.setAlpha(alpha);
+        wkVBinding.subtitleTv.setAlpha(alpha);
+        wkVBinding.quotaTv.setAlpha(alpha);
     }
 
     private int layoutHeight(View view) {
