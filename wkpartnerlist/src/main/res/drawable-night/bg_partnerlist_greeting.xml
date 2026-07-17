@@ -1,15 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="@color/partnerlist_button_ripple">
-    <item>
-        <shape android:shape="rectangle">
-            <gradient
-                android:angle="0"
-                android:startColor="#49374E"
-                android:centerColor="#393650"
-                android:endColor="#2D4056" />
-            <corners android:radius="19dp" />
-            <stroke android:width="0.9dp" android:color="#809A91E8" />
-        </shape>
-    </item>
+    <item android:drawable="@drawable/bg_partnerlist_greeting_bubble" />
 </ripple>

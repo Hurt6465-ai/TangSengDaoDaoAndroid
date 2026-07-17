@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient android:angle="0" android:startColor="#333A45" android:endColor="#2B323D" />
-    <corners android:radius="19dp" />
-    <stroke android:width="0.8dp" android:color="#46505D" />
-</shape>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/bg_partnerlist_greeting_bubble_disabled" />
+</selector>
