@@ -222,12 +222,28 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         fragments.add(PlaceholderTabFragment.newInstance("语伴", "语伴模块加载失败，请重新安装或检查 wkpartnerlist 模块"));
         fragments.add(new ChatFragment());
         fragments.add(PlaceholderTabFragment.newInstance("发现", "发现列表模块加载失败，请重新安装或检查 wkfeedlist 模块"));
-        fragments.add(WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_HOME_URL)));
+        fragments.add(createCommunityFragment());
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
         // 底部一级导航只允许点击切换。聊天、交友和发现内部都有自己的手势，避免横滑冲突。
         wkVBinding.vp.setUserInputEnabled(false);
         // 默认学习页仅预加载语伴占位和聊天；社区 WebView 到用户点击时再创建。
         wkVBinding.vp.setOffscreenPageLimit(2);
+    }
+
+    /**
+     * Load the optional forum module without making wkuikit depend on wkforum.
+     * The app module packages wkforum; this reflection keeps plugin boundaries clean.
+     */
+    private Fragment createCommunityFragment() {
+        try {
+            Class<?> clazz = Class.forName("com.chat.forum.ForumHomeFragment");
+            Object fragment = clazz.getDeclaredConstructor().newInstance();
+            if (fragment instanceof Fragment) {
+                return (Fragment) fragment;
+            }
+        } catch (Throwable ignored) {
+        }
+        return WebTabFragment.newInstance(WKApiConfig.getNodeBBSSOUrl(WKApiConfig.NODEBB_HOME_URL));
     }
 
     private void initBadgesAndCounters() {
