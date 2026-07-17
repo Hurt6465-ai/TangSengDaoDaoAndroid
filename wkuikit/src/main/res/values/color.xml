@@ -12,4 +12,7 @@
     <color name="tab_text_normal">#F3CDC2</color>
     <color name="tab_text_selected">#FF5A33</color>
     <color name="tab_bg">#f6f6f6</color>
+    <color name="chat_inline_translate_idle">#3C4048</color>
+    <color name="chat_inline_translate_active">#159E9A</color>
+    <color name="chat_inline_translate_ripple">#24159E9A</color>
 </resources>
