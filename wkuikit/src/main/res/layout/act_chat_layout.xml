@@ -174,7 +174,7 @@
                             android:maxLines="1"
                             android:paddingStart="4dp"
                             android:paddingEnd="6dp"
-                            android:text="馃嚥馃嚥 醼欋�坚�斸�横�欋��"
+                            android:text="@string/chat_ai_default_source_label"
                             android:textColor="@color/colorDark"
                             android:textSize="13sp" />
 
@@ -183,7 +183,7 @@
                             android:layout_width="28dp"
                             android:layout_height="match_parent"
                             android:gravity="center"
-                            android:text="鈬�"
+                            android:text="@string/chat_ai_swap_symbol"
                             android:textColor="@color/color999"
                             android:textSize="18sp" />
 
@@ -195,7 +195,7 @@
                             android:maxLines="1"
                             android:paddingStart="6dp"
                             android:paddingEnd="8dp"
-                            android:text="馃嚚馃嚦 涓枃"
+                            android:text="@string/chat_ai_default_target_label"
                             android:textColor="@color/colorDark"
                             android:textSize="13sp" />
 
@@ -209,7 +209,7 @@
                                 android:layout_width="14dp"
                                 android:layout_height="match_parent"
                                 android:gravity="center"
-                                android:text="鈥�"
+                                android:text="@string/chat_ai_status_dot"
                                 android:textColor="@color/color999"
                                 android:textSize="19sp" />
 
@@ -219,7 +219,7 @@
                                 android:layout_height="match_parent"
                                 android:layout_gravity="end"
                                 android:gravity="center"
-                                android:text="鏂嘇"
+                                android:text="@string/chat_ai_mark"
                                 android:textStyle="bold"
                                 android:textColor="@color/color999"
                                 android:textSize="13sp" />
