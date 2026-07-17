@@ -29,31 +29,19 @@
         android:paddingEnd="12dp"
         android:paddingBottom="13dp">
 
-        <!-- 只用一层低透明高光，卡片有质感但不会显得花哨。 -->
-        <View
-            android:id="@+id/cardGlow"
-            android:layout_width="154dp"
-            android:layout_height="154dp"
-            android:layout_marginTop="-70dp"
-            android:layout_marginEnd="-42dp"
-            android:background="@drawable/bg_partnerlist_card_glow"
-            android:importantForAccessibility="no"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
         <!-- 渐变外圈 -> 留白层 -> 头像，避免头像和光环粘在一起。 -->
         <View
             android:id="@+id/avatarRing"
-            android:layout_width="82dp"
-            android:layout_height="82dp"
-            android:background="@drawable/bg_partnerlist_avatar_ring"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:background="@drawable/bg_partnerlist_avatar_ring_mint_sky"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
         <View
             android:id="@+id/avatarGap"
-            android:layout_width="76dp"
-            android:layout_height="76dp"
+            android:layout_width="75dp"
+            android:layout_height="75dp"
             android:background="@drawable/bg_partnerlist_avatar_gap"
             app:layout_constraintBottom_toBottomOf="@id/avatarRing"
             app:layout_constraintEnd_toEndOf="@id/avatarRing"
@@ -62,8 +50,8 @@
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/avatarIv"
-            android:layout_width="70dp"
-            android:layout_height="70dp"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
             android:contentDescription="@string/partnerlist_avatar"
             android:scaleType="centerCrop"
             app:layout_constraintBottom_toBottomOf="@id/avatarRing"
@@ -73,10 +61,11 @@
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/flagIv"
-            android:layout_width="25dp"
-            android:layout_height="25dp"
+            android:layout_width="23dp"
+            android:layout_height="23dp"
+            android:layout_marginStart="1dp"
+            android:layout_marginBottom="1dp"
             android:background="@drawable/bg_partnerlist_flag"
-            android:elevation="3dp"
             android:padding="1.5dp"
             android:scaleType="centerCrop"
             android:visibility="gone"
@@ -87,8 +76,8 @@
             android:id="@+id/onlineDot"
             android:layout_width="14dp"
             android:layout_height="14dp"
-            android:layout_marginTop="5dp"
-            android:layout_marginEnd="5dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginEnd="6dp"
             android:background="@drawable/bg_partnerlist_online"
             android:elevation="3dp"
             android:visibility="gone"
