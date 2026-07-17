@@ -4,12 +4,12 @@
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:angle="135"
-                android:startColor="#FF29483F"
-                android:centerColor="#FF31434F"
-                android:endColor="#FF3B3F68" />
-            <corners android:radius="15dp" />
-            <stroke android:width="1dp" android:color="#806E80C7" />
+                android:angle="0"
+                android:startColor="#49374E"
+                android:centerColor="#393650"
+                android:endColor="#2D4056" />
+            <corners android:radius="19dp" />
+            <stroke android:width="0.9dp" android:color="#809A91E8" />
         </shape>
     </item>
 </ripple>
