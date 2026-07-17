@@ -1,5 +1,6 @@
 package com.chat.feed.profile;
 
+import android.content.Context;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -93,8 +94,7 @@ public class FeedWaterfallAdapter extends RecyclerView.Adapter<FeedWaterfallAdap
         }
 
         if (TextUtils.isEmpty(coverUrl)) {
-            Glide.with(holder.coverIv).clear(holder.coverIv);
-            holder.coverIv.setImageDrawable(null);
+            clearImageSafely(holder.coverIv);
         } else {
             Glide.with(holder.coverIv)
                     .load(coverUrl)
@@ -126,10 +126,35 @@ public class FeedWaterfallAdapter extends RecyclerView.Adapter<FeedWaterfallAdap
 
     @Override
     public void onViewRecycled(@NonNull VH holder) {
-        Glide.with(holder.coverIv).clear(holder.coverIv);
-        holder.coverIv.setImageDrawable(null);
+        // RecyclerView may recycle holders while the host Activity is already being destroyed.
+        // Never use Glide.with(view/activity) here because Glide will reject a destroyed Activity.
+        clearImageSafely(holder.coverIv);
+        holder.itemView.animate().cancel();
         holder.itemView.setOnClickListener(null);
         super.onViewRecycled(holder);
+    }
+
+    /**
+     * Clears a Glide request without binding the operation to the Activity lifecycle.
+     *
+     * <p>During Activity/Fragment teardown, RecyclerView#setAdapter(null) recycles every
+     * ViewHolder. The ImageView context can still be the destroyed Activity at that moment,
+     * so Glide.with(imageView) would throw "You cannot start a load for a destroyed activity".
+     * Using the application context avoids that lifecycle lookup while still cancelling the
+     * request associated with this ImageView.</p>
+     */
+    private void clearImageSafely(@NonNull ImageView imageView) {
+        imageView.animate().cancel();
+
+        Context context = imageView.getContext();
+        Context appContext = context == null ? null : context.getApplicationContext();
+        if (appContext != null) {
+            Glide.with(appContext).clear(imageView);
+        }
+
+        // Also remove the currently displayed drawable. If an unusual Context does not expose
+        // an application context, this still prevents a recycled card from showing stale media.
+        imageView.setImageDrawable(null);
     }
 
     @Override
