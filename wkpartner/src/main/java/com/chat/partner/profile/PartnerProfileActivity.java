@@ -878,18 +878,56 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (TextUtils.isEmpty(text)) return;
         TextView tv = new TextView(this);
         tv.setText(text);
-        tv.setTextSize(13);
-        tv.setTextColor(isPlaceholder ? 0xFF9999A8 : 0xFF5B3FE6);
+        tv.setTextSize(12);
         tv.setGravity(Gravity.CENTER);
         tv.setMaxLines(2);
         tv.setEllipsize(null);
         tv.setMaxWidth(dp(180));
-        tv.setBackgroundResource(isPlaceholder ? R.drawable.bg_partner_tag_unselected : R.drawable.bg_partner_tag_chip);
-        tv.setPadding(dp(14), dp(7), dp(14), dp(7));
-        tv.setIncludeFontPadding(false);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) tv.setForeground(getSelectableItemBackground());
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.rightMargin = dp(8);
+        tv.setIncludeFontPadding(true);
+
+        if (isPlaceholder) {
+            tv.setTextColor(0xFF9999A8);
+            tv.setBackgroundResource(R.drawable.bg_partner_tag_unselected);
+        } else {
+            // Stable color by tag text: scrolling/rebinding never changes the color, while
+            // adjacent tags are visually separated by several soft pill backgrounds.
+            int style = (text.hashCode() & Integer.MAX_VALUE) % 5;
+            int background;
+            int textColor;
+            switch (style) {
+                case 1:
+                    background = R.drawable.bg_partner_tag_chip_mint;
+                    textColor = 0xFF347D67;
+                    break;
+                case 2:
+                    background = R.drawable.bg_partner_tag_chip_blue;
+                    textColor = 0xFF3974A4;
+                    break;
+                case 3:
+                    background = R.drawable.bg_partner_tag_chip_peach;
+                    textColor = 0xFFAA653E;
+                    break;
+                case 4:
+                    background = R.drawable.bg_partner_tag_chip_pink;
+                    textColor = 0xFFA34E77;
+                    break;
+                default:
+                    background = R.drawable.bg_partner_profile_tag_chip_lavender;
+                    textColor = 0xFF6550B8;
+                    break;
+            }
+            tv.setTextColor(textColor);
+            tv.setBackgroundResource(background);
+        }
+
+        tv.setPadding(dp(12), dp(5), dp(12), dp(5));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            tv.setForeground(getSelectableItemBackground());
+        }
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.rightMargin = dp(7);
         wkVBinding.tagLayout.addView(tv, lp);
     }
 
