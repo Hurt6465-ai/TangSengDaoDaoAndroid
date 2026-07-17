@@ -155,13 +155,11 @@ public final class PartnerListCache {
                     user.online = item.optInt("online");
                     user.last_offline = item.optInt("last_offline");
                     user.last_active_at = item.optLong("last_active_at");
-                    user.created_at = item.optString("created_at");
-                    user.joined_at = item.optString("joined_at");
-                    user.registered_at = item.optString("registered_at");
-                    user.join_time = item.optString("join_time");
-                    user.created_at_ts = item.optLong("created_at_ts");
-                    user.joined_at_ts = item.optLong("joined_at_ts");
                     user.is_new = item.optInt("is_new");
+                    user.created_at = valueString(item, "created_at");
+                    user.joined_at = valueString(item, "joined_at");
+                    user.registered_at = valueString(item, "registered_at");
+                    user.join_time = valueString(item, "join_time");
                     user.profile_version = item.optLong("profile_version");
                     if (!TextUtils.isEmpty(user.stableId())) response.users.add(user);
                 }
@@ -213,13 +211,11 @@ public final class PartnerListCache {
             item.put("online", user.online);
             item.put("last_offline", user.last_offline);
             item.put("last_active_at", user.last_active_at);
+            item.put("is_new", user.is_new);
             item.put("created_at", user.created_at);
             item.put("joined_at", user.joined_at);
             item.put("registered_at", user.registered_at);
             item.put("join_time", user.join_time);
-            item.put("created_at_ts", user.created_at_ts);
-            item.put("joined_at_ts", user.joined_at_ts);
-            item.put("is_new", user.is_new);
             item.put("profile_version", user.profile_version);
             users.put(item);
         }
@@ -248,6 +244,13 @@ public final class PartnerListCache {
         out.users = new ArrayList<>();
         for (PartnerListUser user : src.usersSafe()) if (user != null) out.users.add(user.copy());
         return out;
+    }
+
+
+    private static String valueString(JSONObject object, String key) {
+        if (object == null || TextUtils.isEmpty(key) || !object.has(key) || object.isNull(key)) return "";
+        Object value = object.opt(key);
+        return value == null ? "" : String.valueOf(value);
     }
 
     private static JSONArray json(List<String> values) {

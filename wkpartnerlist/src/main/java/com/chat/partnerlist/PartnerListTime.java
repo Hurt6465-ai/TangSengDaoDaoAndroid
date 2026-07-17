@@ -2,9 +2,13 @@ package com.chat.partnerlist;
 
 import android.content.Context;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Locale;
 
 public final class PartnerListTime {
@@ -43,6 +47,41 @@ public final class PartnerListTime {
 
         long minutes = Math.max(1L, diff / MINUTE_MS);
         return context.getString(R.string.partnerlist_online_minutes_ago, minutes);
+    }
+
+
+    public static boolean isWithinDays(String rawTime, long serverTime, int days) {
+        long joinedAt = parseFlexibleTime(rawTime);
+        if (joinedAt <= 0 || days <= 0) return false;
+        long now = serverTime > 0 ? normalizeMillis(serverTime) : System.currentTimeMillis();
+        long diff = now - joinedAt;
+        return diff >= 0 && diff < days * 24L * 60L * 60L * 1000L;
+    }
+
+    /** Accepts unix seconds/millis and common ISO/server datetime strings. */
+    public static long parseFlexibleTime(String raw) {
+        if (raw == null) return 0L;
+        String value = raw.trim();
+        if (value.isEmpty() || "null".equalsIgnoreCase(value)) return 0L;
+        try {
+            return normalizeMillis(Long.parseLong(value));
+        } catch (Throwable ignored) {
+        }
+        try {
+            return Instant.parse(value).toEpochMilli();
+        } catch (DateTimeParseException ignored) {
+        }
+        try {
+            return OffsetDateTime.parse(value).toInstant().toEpochMilli();
+        } catch (DateTimeParseException ignored) {
+        }
+        String normalized = value.replace(' ', 'T');
+        try {
+            return LocalDateTime.parse(normalized, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    .atZone(BUSINESS_ZONE).toInstant().toEpochMilli();
+        } catch (DateTimeParseException ignored) {
+            return 0L;
+        }
     }
 
     public static long normalizeMillis(long value) {

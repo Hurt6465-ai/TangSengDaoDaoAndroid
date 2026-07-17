@@ -1,8 +1,5 @@
 package com.chat.partnerlist;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Build;
@@ -27,7 +24,6 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.recyclerview.widget.SimpleItemAnimator;
 
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.endpoint.EndpointManager;
@@ -66,12 +62,6 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     private long serverTimeBase;
     private long elapsedTimeBase;
     private boolean lastErrorProfileRequired;
-    private boolean topBarCollapsed;
-    private boolean topBarAnimating;
-    private int topBarExpandedHeight;
-    private int topBarCollapsedHeight;
-    private int scrollDirectionDistance;
-    private ValueAnimator topBarAnimator;
 
     private final Runnable onlineRunnable = new Runnable() {
         @Override public void run() {
@@ -145,14 +135,18 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     @Override protected void initView() {
         adapter = new PartnerListAdapter(this);
         layoutManager = new LinearLayoutManager(this);
+        layoutManager.setRecycleChildrenOnDetach(true);
+        layoutManager.setInitialPrefetchItemCount(4);
         wkVBinding.recyclerView.setLayoutManager(layoutManager);
         wkVBinding.recyclerView.setAdapter(adapter);
-        if (wkVBinding.recyclerView.getItemAnimator() instanceof SimpleItemAnimator) {
-            // 在线时间和额度使用 payload 局部刷新，关闭 change 动画可避免卡片每分钟轻微闪烁。
-            ((SimpleItemAnimator) wkVBinding.recyclerView.getItemAnimator()).setSupportsChangeAnimations(false);
-        }
+        // 卡片高度由简介和标签决定，不能 setHasFixedSize(true)。关闭全部 ItemAnimator，
+        // 避免 DiffUtil/payload 更新与 AppBar 滚动同时触发阴影和布局动画。
         wkVBinding.recyclerView.setHasFixedSize(false);
-        wkVBinding.recyclerView.setItemViewCacheSize(8);
+        wkVBinding.recyclerView.setItemAnimator(null);
+        wkVBinding.recyclerView.setItemViewCacheSize(10);
+        RecyclerView.RecycledViewPool pool = new RecyclerView.RecycledViewPool();
+        pool.setMaxRecycledViews(0, 14);
+        wkVBinding.recyclerView.setRecycledViewPool(pool);
         wkVBinding.recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         wkVBinding.recyclerView.setClipToPadding(false);
         GlobalBottomNavigationController.attach(this, wkVBinding.bottomNavigation, com.chat.uikit.R.id.i_partner);
@@ -169,8 +163,10 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     @Override protected void initListener() {
         wkVBinding.backBtn.setOnClickListener(v -> finish());
         wkVBinding.partnerModeTab.setOnClickListener(v -> {
-            setTopBarCollapsed(false, true);
-            if (adapter != null && adapter.getItemCount() > 0) wkVBinding.recyclerView.smoothScrollToPosition(0);
+            wkVBinding.appBar.setExpanded(true, true);
+            if (adapter != null && adapter.getItemCount() > 0) {
+                wkVBinding.recyclerView.smoothScrollToPosition(0);
+            }
         });
         wkVBinding.datingModeTab.setOnClickListener(v -> openDatingHome());
         wkVBinding.retryBtn.setOnClickListener(v -> {
@@ -186,14 +182,11 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             PartnerListHostBridge.openProfileEdit(this, REQ_PROFILE_EDIT);
         });
         wkVBinding.recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
-            @Override public void onScrolled(@androidx.annotation.NonNull RecyclerView recyclerView, int dx, int dy) {
-                handleTopBarScroll(recyclerView, dy);
-            }
-
             @Override public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
+                // 快速滑动时不启动在线批量请求，减少主线程回调与图片绑定争用。
+                handler.removeCallbacks(onlineRunnable);
                 if (newState == RecyclerView.SCROLL_STATE_IDLE) {
-                    handler.removeCallbacks(onlineRunnable);
-                    handler.postDelayed(onlineRunnable, 500L);
+                    handler.postDelayed(onlineRunnable, 700L);
                 }
             }
         });
@@ -231,12 +224,6 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     @Override protected void onDestroy() {
         resumed = false;
         handler.removeCallbacksAndMessages(null);
-        if (topBarAnimator != null) {
-            topBarAnimator.removeAllListeners();
-            topBarAnimator.removeAllUpdateListeners();
-            topBarAnimator.cancel();
-            topBarAnimator = null;
-        }
         if (wkVBinding != null) wkVBinding.recyclerView.setAdapter(null);
         super.onDestroy();
     }
@@ -601,10 +588,7 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                     topBasePaddingTop + bars.top + topExtra,
                     topBasePaddingRight + bars.right,
                     topBasePaddingBottom);
-            topBarExpandedHeight = topBaseHeight + bars.top + topExtra;
-            topBarCollapsedHeight = Math.max(1, bars.top);
-            setLayoutHeight(wkVBinding.topBar, topBarCollapsed ? topBarCollapsedHeight : topBarExpandedHeight);
-            setTopBarContentAlpha(topBarCollapsed ? 0f : 1f);
+            setLayoutHeight(wkVBinding.topBar, topBaseHeight + bars.top + topExtra);
 
             wkVBinding.bottomNavigation.setPadding(
                     bottomBasePaddingLeft + bars.left,
@@ -617,87 +601,6 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             return insets;
         });
         ViewCompat.requestApplyInsets(wkVBinding.pageRoot);
-    }
-
-
-    /**
-     * 向下浏览时收起“语伴 / 交友”标签，只保留安全的状态栏高度；向上滚动或回到顶部时恢复。
-     * 使用累计方向距离，避免手指轻微抖动造成标题栏频繁闪烁。
-     */
-    private void handleTopBarScroll(RecyclerView recyclerView, int dy) {
-        if (recyclerView == null || dy == 0 || topBarExpandedHeight <= 0 || topBarAnimating) return;
-        if (!recyclerView.canScrollVertically(-1)) {
-            scrollDirectionDistance = 0;
-            setTopBarCollapsed(false, true);
-            return;
-        }
-
-        if ((dy > 0 && scrollDirectionDistance < 0) || (dy < 0 && scrollDirectionDistance > 0)) {
-            scrollDirectionDistance = 0;
-        }
-        scrollDirectionDistance += dy;
-
-        if (scrollDirectionDistance >= dp(20)) {
-            scrollDirectionDistance = 0;
-            setTopBarCollapsed(true, true);
-        } else if (scrollDirectionDistance <= -dp(12)) {
-            scrollDirectionDistance = 0;
-            setTopBarCollapsed(false, true);
-        }
-    }
-
-    private void setTopBarCollapsed(boolean collapsed, boolean animate) {
-        if (wkVBinding == null || wkVBinding.topBar == null || topBarExpandedHeight <= 0) return;
-        if (topBarCollapsed == collapsed && !topBarAnimating) return;
-        topBarCollapsed = collapsed;
-
-        int targetHeight = collapsed ? topBarCollapsedHeight : topBarExpandedHeight;
-        float targetAlpha = collapsed ? 0f : 1f;
-        if (topBarAnimator != null) {
-            topBarAnimator.removeAllListeners();
-            topBarAnimator.removeAllUpdateListeners();
-            topBarAnimator.cancel();
-            topBarAnimator = null;
-        }
-
-        if (!animate || wkVBinding.topBar.getHeight() <= 0) {
-            setLayoutHeight(wkVBinding.topBar, targetHeight);
-            setTopBarContentAlpha(targetAlpha);
-            topBarAnimating = false;
-            return;
-        }
-
-        int startHeight = wkVBinding.topBar.getHeight();
-        topBarAnimating = true;
-        topBarAnimator = ValueAnimator.ofInt(startHeight, targetHeight);
-        topBarAnimator.setDuration(collapsed ? 170L : 190L);
-        topBarAnimator.addUpdateListener(animation -> {
-            int height = (Integer) animation.getAnimatedValue();
-            setLayoutHeight(wkVBinding.topBar, height);
-            float fraction = animation.getAnimatedFraction();
-            float alpha = collapsed ? 1f - fraction : fraction;
-            setTopBarContentAlpha(alpha);
-        });
-        topBarAnimator.addListener(new AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(Animator animation) {
-                topBarAnimating = false;
-                setLayoutHeight(wkVBinding.topBar, targetHeight);
-                setTopBarContentAlpha(targetAlpha);
-            }
-
-            @Override public void onAnimationCancel(Animator animation) {
-                topBarAnimating = false;
-            }
-        });
-        topBarAnimator.start();
-    }
-
-    private void setTopBarContentAlpha(float alpha) {
-        if (wkVBinding == null) return;
-        wkVBinding.modeTabs.setAlpha(alpha);
-        wkVBinding.backBtn.setAlpha(alpha);
-        wkVBinding.subtitleTv.setAlpha(alpha);
-        wkVBinding.quotaTv.setAlpha(alpha);
     }
 
     private int layoutHeight(View view) {

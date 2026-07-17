@@ -5,6 +5,7 @@ import android.content.res.Configuration;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.text.TextUtils;
+import android.util.LruCache;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -17,6 +18,7 @@ import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.chat.partner.profile.PartnerTagLocalizer;
 import com.chat.partnerlist.databinding.ItemPartnerListBinding;
 import com.chat.partnerlist.model.PartnerListUser;
 import com.chat.uikit.partner.PartnerPendingStore;
@@ -36,6 +38,7 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     private static final String PAYLOAD_QUOTA = "quota";
     private static final String PAYLOAD_FRESH = "fresh";
     private static final String PAYLOAD_GREETING = "greeting";
+    private static final Typeface MEDIUM = Typeface.create("sans-serif-medium", Typeface.NORMAL);
     private static final int NEW_USER_DAYS = 5;
 
     public interface Listener {
@@ -47,6 +50,7 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     private final Listener listener;
     private final Set<String> greetingPending = new HashSet<>();
     private final Set<String> greeted = new HashSet<>();
+    private final LruCache<String, List<String>> localizedTagCache = new LruCache<>(160);
     private Set<String> recentlyAdded = Collections.emptySet();
     private long serverTime;
     private int greetingRemaining = 10;
@@ -67,12 +71,16 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     }
 
     public void setGreetingRemaining(int remaining) {
-        greetingRemaining = Math.max(0, remaining);
+        int value = Math.max(0, remaining);
+        if (greetingRemaining == value) return;
+        greetingRemaining = value;
         if (getItemCount() > 0) notifyItemRangeChanged(0, getItemCount(), PAYLOAD_QUOTA);
     }
 
     public void setRecentlyAdded(List<String> ids) {
-        recentlyAdded = ids == null ? Collections.emptySet() : new HashSet<>(ids);
+        Set<String> next = ids == null ? Collections.emptySet() : new HashSet<>(ids);
+        if (recentlyAdded.equals(next)) return;
+        recentlyAdded = next;
         if (getItemCount() > 0) notifyItemRangeChanged(0, getItemCount(), PAYLOAD_FRESH);
     }
 
@@ -141,20 +149,29 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     private void bind(VH holder, PartnerListUser user) {
         if (user == null) return;
         ItemPartnerListBinding b = holder.binding;
+        Context context = b.getRoot().getContext();
         String uid = user.stableId();
         b.cardSurface.setBackgroundResource(cardBackground(uid));
 
-        // 与会话列表和全屏语伴共用 AvatarView；国旗镶嵌留缝由组件统一绘制。
-        b.avatarView.setSize(71f);
-        b.avatarView.setStrokeWidth(0f);
-        b.avatarView.showAvatar(uid, WKChannelType.PERSONAL, user.vercode);
-        b.avatarView.showFlag(!TextUtils.isEmpty(user.country_code) ? user.country_code : user.country);
+        String flag = !TextUtils.isEmpty(user.country_code) ? user.country_code : user.country;
+        if (!TextUtils.equals(holder.boundUid, uid)
+                || !TextUtils.equals(holder.boundVercode, user.vercode)
+                || !TextUtils.equals(holder.boundFlag, flag)) {
+            b.avatarView.setSize(72f);
+            b.avatarView.setStrokeWidth(0f);
+            b.avatarView.showAvatar(uid, WKChannelType.PERSONAL, user.vercode);
+            b.avatarView.showFlag(flag);
+            holder.boundUid = uid;
+            holder.boundVercode = user.vercode;
+            holder.boundFlag = flag;
+        }
+
         bindPresence(b, user);
         bindBadges(b, user);
-
         b.nameTv.setText(user.displayName());
-        String nativeLanguage = PartnerListLanguage.compact(b.getRoot().getContext(), user.nativeLanguages());
-        String learningLanguage = PartnerListLanguage.compact(b.getRoot().getContext(), user.learningLanguages());
+
+        String nativeLanguage = PartnerListLanguage.compact(context, user.nativeLanguages());
+        String learningLanguage = PartnerListLanguage.compact(context, user.learningLanguages());
         boolean hasNativeLanguage = !TextUtils.isEmpty(nativeLanguage);
         boolean hasLearningLanguage = !TextUtils.isEmpty(learningLanguage);
         b.nativeLanguageTv.setText(nativeLanguage);
@@ -164,13 +181,12 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         b.languageExchangeTv.setVisibility(hasNativeLanguage && hasLearningLanguage ? View.VISIBLE : View.GONE);
         b.languageRow.setVisibility(hasNativeLanguage || hasLearningLanguage ? View.VISIBLE : View.GONE);
 
-        // 简介保持在语言行下方。仅清理换行和重复空格，不按字符硬截断；布局最多显示两行。
         String intro = normalizeIntro(user.intro);
         if (TextUtils.isEmpty(intro)) intro = normalizeIntro(user.country);
-        if (TextUtils.isEmpty(intro)) intro = b.getRoot().getContext().getString(R.string.partnerlist_intro_fallback);
+        if (TextUtils.isEmpty(intro)) intro = context.getString(R.string.partnerlist_intro_fallback);
         b.introTv.setText(intro);
 
-        bindTags(b, user);
+        bindTags(holder, user);
         bindGreeting(holder, user);
         b.cardRoot.setOnClickListener(v -> {
             if (listener != null) listener.onOpenProfile(user);
@@ -183,7 +199,6 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         b.avatarRing.setVisibility(online ? View.VISIBLE : View.INVISIBLE);
         b.avatarGap.setVisibility(online ? View.VISIBLE : View.INVISIBLE);
         if (online) b.avatarRing.setBackgroundResource(avatarRingBackground(user.stableId()));
-
         String activeLabel = PartnerListTime.activeLabel(
                 b.getRoot().getContext(), user.online, user.last_active_at, serverTime);
         b.activeTv.setText(activeLabel);
@@ -193,131 +208,112 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     }
 
     private void bindBadges(ItemPartnerListBinding b, PartnerListUser user) {
-        boolean freshRecommendation = recentlyAdded.contains(user.stableId());
-        boolean joinedRecently = user.joinedWithinDays(serverTime, NEW_USER_DAYS);
-        b.freshBadge.setVisibility(freshRecommendation ? View.VISIBLE : View.GONE);
-        b.newBadge.setVisibility(joinedRecently ? View.VISIBLE : View.GONE);
+        boolean fresh = recentlyAdded.contains(user.stableId());
+        String registeredAt = user.registrationTimeRaw();
+        boolean joinedRecently = PartnerListTime.isWithinDays(registeredAt, serverTime, NEW_USER_DAYS);
+        if (TextUtils.isEmpty(registeredAt)) joinedRecently = user.is_new == 1;
+        // 推荐刷新标签优先，避免两个小标签同时挤压名字。
+        b.freshBadge.setVisibility(fresh ? View.VISIBLE : View.GONE);
+        b.newBadge.setVisibility(!fresh && joinedRecently ? View.VISIBLE : View.GONE);
     }
 
-    private void bindTags(ItemPartnerListBinding b, PartnerListUser user) {
-        TextView[] chips = new TextView[]{
-                b.tagOneTv, b.tagTwoTv, b.tagThreeTv, b.tagFourTv, b.tagFiveTv
-        };
-        for (TextView chip : chips) {
-            chip.setText("");
-            chip.setVisibility(View.GONE);
+    private void bindTags(VH holder, PartnerListUser user) {
+        ItemPartnerListBinding b = holder.binding;
+        Context context = b.getRoot().getContext();
+        List<String> labels = localizedTags(context, user.tags());
+        for (TextView chip : holder.tagViews) chip.setVisibility(View.GONE);
+        if (labels.isEmpty()) {
+            b.tagsRow.setVisibility(View.GONE);
+            return;
         }
 
-        List<String> tags = visibleTags(b.getRoot().getContext(), user.tags());
-        b.tagRow.setVisibility(tags.isEmpty() ? View.GONE : View.VISIBLE);
-        for (int i = 0; i < tags.size() && i < chips.length; i++) {
-            TextView chip = chips[i];
-            chip.setText(tags.get(i));
-            chip.setBackgroundResource(tagBackground(user.stableId(), i));
+        boolean myanmar = isMyanmarLocale(context) || containsMyanmar(labels);
+        int maxVisible = Math.min(labels.size(), myanmar ? 3 : 5);
+        int minVisible = Math.min(maxVisible, myanmar ? 2 : 3);
+        int available = b.tagsRow.getWidth();
+        if (available <= 0) {
+            int screen = context.getResources().getDisplayMetrics().widthPixels;
+            available = Math.max(dp(context, 150), screen - dp(context, 149));
+        }
+
+        int count = maxVisible;
+        while (count > minVisible && measuredTagWidth(holder.tagViews[0], labels, count, context) > available) {
+            count--;
+        }
+        int margins = dp(context, 5) * Math.max(0, count - 1);
+        int perChipMax = Math.max(dp(context, 44), (available - margins) / Math.max(1, count));
+        for (int i = 0; i < count; i++) {
+            TextView chip = holder.tagViews[i];
+            chip.setText(labels.get(i));
+            chip.setMaxWidth(perChipMax);
             chip.setVisibility(View.VISIBLE);
         }
+        b.tagsRow.setVisibility(View.VISIBLE);
     }
 
-    /**
-     * 标签保持用户原始顺序，不在 RecyclerView 复用时随机变化。
-     * 短标签显示 5 个，中等长度显示 4 个，长标签显示 3 个；缅文因字形更宽且上下留白更大，最多 3 个。
-     */
-    private List<String> visibleTags(Context context, List<String> source) {
-        if (source == null || source.isEmpty()) return Collections.emptyList();
+    private List<String> localizedTags(Context context, List<String> rawTags) {
+        if (rawTags == null || rawTags.isEmpty()) return Collections.emptyList();
+        String locale = currentLocale(context).toLanguageTag();
+        String cacheKey = locale + '|' + TextUtils.join("\u001f", rawTags);
+        List<String> cached = localizedTagCache.get(cacheKey);
+        if (cached != null) return cached;
 
         LinkedHashSet<String> unique = new LinkedHashSet<>();
-        boolean hasMyanmar = isMyanmarLocale(context);
-        for (String value : source) {
-            String tag = normalizeOneLine(value);
-            if (TextUtils.isEmpty(tag)) continue;
-            unique.add(tag);
-            hasMyanmar |= containsMyanmar(tag);
-            if (unique.size() >= 5) break;
+        for (String raw : rawTags) {
+            if (TextUtils.isEmpty(raw)) continue;
+            String key = PartnerTagLocalizer.toKey(raw);
+            String display = PartnerTagLocalizer.tagText(context, key);
+            if (TextUtils.isEmpty(display)) continue;
+            // 未识别的后端机器 key 不直接暴露给用户。
+            if (TextUtils.equals(display, raw.trim()) && isMachineKey(raw.trim())) continue;
+            unique.add(display.trim());
         }
-        if (unique.isEmpty()) return Collections.emptyList();
-
-        ArrayList<String> candidates = new ArrayList<>(unique);
-        int cap;
-        if (hasMyanmar) {
-            cap = 3;
-        } else if (candidates.size() >= 5 && estimatedUnits(candidates, 5) <= 38f) {
-            cap = 5;
-        } else if (candidates.size() >= 4 && estimatedUnits(candidates, 4) <= 34f) {
-            cap = 4;
-        } else {
-            cap = 3;
-        }
-        cap = Math.min(cap, candidates.size());
-        return new ArrayList<>(candidates.subList(0, cap));
+        List<String> result = Collections.unmodifiableList(new ArrayList<>(unique));
+        localizedTagCache.put(cacheKey, result);
+        return result;
     }
 
-    private float estimatedUnits(List<String> tags, int count) {
-        float total = 0f;
-        for (int i = 0; i < count && i < tags.size(); i++) {
-            total += 2.4f; // 胶囊左右内边距的近似成本。
-            String value = tags.get(i);
-            for (int offset = 0; offset < value.length();) {
-                int cp = value.codePointAt(offset);
-                offset += Character.charCount(cp);
-                if (isMyanmarCodePoint(cp)) total += 1.8f;
-                else if (isCjkCodePoint(cp)) total += 1.45f;
-                else if (Character.isWhitespace(cp)) total += 0.35f;
-                else if (Character.isUpperCase(cp)) total += 0.9f;
-                else if (Character.isLetterOrDigit(cp)) total += 0.7f;
-                else if (cp > 0xFFFF) total += 1.7f;
-                else total += 1f;
+    private boolean isMachineKey(String value) {
+        if (TextUtils.isEmpty(value) || value.indexOf('_') <= 0) return false;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (!(c == '_' || Character.isDigit(c) || (c >= 'a' && c <= 'z'))) return false;
+        }
+        return true;
+    }
+
+    private int measuredTagWidth(TextView sample, List<String> labels, int count, Context context) {
+        float width = 0f;
+        int horizontal = dp(context, 14);
+        int margin = dp(context, 5);
+        for (int i = 0; i < count; i++) {
+            width += sample.getPaint().measureText(labels.get(i)) + horizontal;
+            if (i > 0) width += margin;
+        }
+        return Math.round(width);
+    }
+
+    private boolean containsMyanmar(List<String> values) {
+        for (String value : values) {
+            if (value == null) continue;
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                if (c >= '\u1000' && c <= '\u109f') return true;
             }
-        }
-        return total;
-    }
-
-    private boolean isMyanmarLocale(Context context) {
-        if (context == null) return false;
-        Configuration configuration = context.getResources().getConfiguration();
-        Locale locale;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            locale = configuration.getLocales().isEmpty() ? Locale.getDefault() : configuration.getLocales().get(0);
-        } else {
-            locale = configuration.locale;
-        }
-        return locale != null && "my".equalsIgnoreCase(locale.getLanguage());
-    }
-
-    private boolean containsMyanmar(String value) {
-        if (TextUtils.isEmpty(value)) return false;
-        for (int offset = 0; offset < value.length();) {
-            int cp = value.codePointAt(offset);
-            offset += Character.charCount(cp);
-            if (isMyanmarCodePoint(cp)) return true;
         }
         return false;
     }
 
-    private boolean isMyanmarCodePoint(int cp) {
-        return (cp >= 0x1000 && cp <= 0x109F)
-                || (cp >= 0xAA60 && cp <= 0xAA7F)
-                || (cp >= 0xA9E0 && cp <= 0xA9FF);
+    private boolean isMyanmarLocale(Context context) {
+        return "my".equalsIgnoreCase(currentLocale(context).getLanguage());
     }
 
-    private boolean isCjkCodePoint(int cp) {
-        return (cp >= 0x3400 && cp <= 0x4DBF)
-                || (cp >= 0x4E00 && cp <= 0x9FFF)
-                || (cp >= 0xF900 && cp <= 0xFAFF)
-                || (cp >= 0x3040 && cp <= 0x30FF)
-                || (cp >= 0xAC00 && cp <= 0xD7AF);
-    }
-
-    private String normalizeIntro(String value) {
-        if (TextUtils.isEmpty(value)) return "";
-        return value.trim()
-                .replace('\r', ' ')
-                .replace('\n', ' ')
-                .replace('\t', ' ')
-                .replaceAll(" {2,}", " ");
-    }
-
-    private String normalizeOneLine(String value) {
-        return normalizeIntro(value);
+    private Locale currentLocale(Context context) {
+        Configuration configuration = context.getResources().getConfiguration();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !configuration.getLocales().isEmpty()) {
+            return configuration.getLocales().get(0);
+        }
+        return configuration.locale == null ? Locale.getDefault() : configuration.locale;
     }
 
     private void bindGreeting(VH holder, PartnerListUser user) {
@@ -363,37 +359,29 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
 
     private void setGreetingHi(TextView textView) {
         textView.setText("Hi");
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16.5f);
-        textView.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0.025f);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f);
+        textView.setTypeface(MEDIUM);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0.015f);
     }
 
     private void setCompactButtonText(TextView textView, int textRes) {
         textView.setText(textRes);
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f);
-        textView.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0.01f);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f);
+        textView.setTypeface(MEDIUM);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0f);
     }
 
     private int cardBackground(String uid) {
-        int bucket = Math.floorMod(uid == null ? 0 : uid.hashCode(), 8);
-        if (bucket == 1) return R.drawable.bg_partnerlist_card_lavender;
-        if (bucket == 2) return R.drawable.bg_partnerlist_card_peach;
-        if (bucket == 3) return R.drawable.bg_partnerlist_card_sky;
-        if (bucket == 4) return R.drawable.bg_partnerlist_card_rose;
-        if (bucket == 5) return R.drawable.bg_partnerlist_card_aqua;
-        if (bucket == 6) return R.drawable.bg_partnerlist_card_lemon;
-        if (bucket == 7) return R.drawable.bg_partnerlist_card_lilac;
-        return R.drawable.bg_partnerlist_card_mint;
-    }
-
-    private int tagBackground(String uid, int index) {
-        int bucket = Math.floorMod((uid == null ? 0 : uid.hashCode()) + index * 3, 5);
-        if (bucket == 1) return R.drawable.bg_partnerlist_tag_blue;
-        if (bucket == 2) return R.drawable.bg_partnerlist_tag_rose;
-        if (bucket == 3) return R.drawable.bg_partnerlist_tag_lavender;
-        if (bucket == 4) return R.drawable.bg_partnerlist_tag_peach;
-        return R.drawable.bg_partnerlist_tag_mint;
+        switch (Math.floorMod(uid == null ? 0 : uid.hashCode(), 8)) {
+            case 1: return R.drawable.bg_partnerlist_card_lavender;
+            case 2: return R.drawable.bg_partnerlist_card_peach;
+            case 3: return R.drawable.bg_partnerlist_card_sky;
+            case 4: return R.drawable.bg_partnerlist_card_rose;
+            case 5: return R.drawable.bg_partnerlist_card_aqua;
+            case 6: return R.drawable.bg_partnerlist_card_lemon;
+            case 7: return R.drawable.bg_partnerlist_card_coral;
+            default: return R.drawable.bg_partnerlist_card_mint;
+        }
     }
 
     private int avatarRingBackground(String uid) {
@@ -406,15 +394,31 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         return R.drawable.bg_partnerlist_avatar_ring_mint_sky;
     }
 
+    private String normalizeIntro(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        String clean = value.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ').trim();
+        while (clean.contains("  ")) clean = clean.replace("  ", " ");
+        return clean;
+    }
+
     private void animatePress(View view) {
-        view.animate().scaleX(0.96f).scaleY(0.96f).setDuration(80L).withEndAction(() ->
-                view.animate().scaleX(1f).scaleY(1f).setDuration(100L).start()).start();
+        view.animate().cancel();
+        view.animate().scaleX(0.95f).scaleY(0.95f).setDuration(70L).withEndAction(() ->
+                view.animate().scaleX(1f).scaleY(1f).setDuration(90L).start()).start();
+    }
+
+    private int dp(Context context, float value) {
+        return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
 
     @Override public void onViewRecycled(@NonNull VH holder) {
         holder.binding.cardRoot.setOnClickListener(null);
         holder.binding.greetingBtn.setOnClickListener(null);
+        holder.binding.greetingBtn.animate().cancel();
         holder.binding.avatarView.showDefaultAvatar("");
+        holder.boundUid = null;
+        holder.boundVercode = null;
+        holder.boundFlag = null;
         super.onViewRecycled(holder);
     }
 
@@ -430,9 +434,17 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
 
     static final class VH extends RecyclerView.ViewHolder {
         final ItemPartnerListBinding binding;
+        final TextView[] tagViews;
+        String boundUid;
+        String boundVercode;
+        String boundFlag;
+
         VH(ItemPartnerListBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
+            this.tagViews = new TextView[]{
+                    binding.tag1Tv, binding.tag2Tv, binding.tag3Tv, binding.tag4Tv, binding.tag5Tv
+            };
         }
     }
 
@@ -453,12 +465,8 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
                     && Objects.equals(a.tags(), b.tags())
                     && Objects.equals(a.profile_images, b.profile_images)
                     && TextUtils.equals(a.profile_cover, b.profile_cover)
-                    && TextUtils.equals(a.created_at, b.created_at)
-                    && TextUtils.equals(a.joined_at, b.joined_at)
-                    && TextUtils.equals(a.registered_at, b.registered_at)
-                    && TextUtils.equals(a.join_time, b.join_time)
-                    && a.created_at_ts == b.created_at_ts
-                    && a.joined_at_ts == b.joined_at_ts
+                    && TextUtils.equals(a.vercode, b.vercode)
+                    && TextUtils.equals(a.registrationTimeRaw(), b.registrationTimeRaw())
                     && a.online == b.online
                     && a.last_active_at == b.last_active_at
                     && a.is_new == b.is_new;
