@@ -30,4 +30,7 @@ android {
 dependencies {
     api project(':wkbase')
     implementation project(':wkuikit')
+    // Reuse the profile module's canonical tag-key localization instead of
+    // rendering backend keys such as goal_study_abroad in the list.
+    implementation project(':wkpartner')
 }
