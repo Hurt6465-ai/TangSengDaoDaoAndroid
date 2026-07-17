@@ -8,14 +8,16 @@
     <color name="partnerlist_mode_normal">#7A8290</color>
     <color name="partnerlist_hint_text">#5F6FAE</color>
     <color name="partnerlist_quota_text">#5C6CC8</color>
-    <color name="partnerlist_button_text">#E65798</color>
+    <color name="partnerlist_button_text">#E14F98</color>
     <color name="partnerlist_surface_text">#626A78</color>
     <color name="partnerlist_active_text">#818997</color>
     <color name="partnerlist_online_text">#2C9C76</color>
     <color name="partnerlist_native_language_text">#438B7C</color>
     <color name="partnerlist_learning_language_text">#4E8FBE</color>
     <color name="partnerlist_language_exchange">#9AA2B1</color>
+    <color name="partnerlist_tag_text">#596273</color>
     <color name="partnerlist_badge_text">#6B60C8</color>
+    <color name="partnerlist_joined_badge_text">#B64E7C</color>
     <color name="partnerlist_card_base">#FFF9FBFC</color>
     <color name="partnerlist_card_ripple">#165E6FC8</color>
     <color name="partnerlist_button_ripple">#24E65798</color>
