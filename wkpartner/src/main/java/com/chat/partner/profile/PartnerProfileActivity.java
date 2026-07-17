@@ -28,6 +28,7 @@ import androidx.core.widget.NestedScrollView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.alibaba.fastjson.JSONObject;
+import com.chat.base.act.WKWebViewActivity;
 import com.chat.base.base.WKBaseActivity;
 import com.chat.base.config.WKApiConfig;
 import com.chat.base.config.WKConfig;
@@ -556,7 +557,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         ensureFixedTopBarViews();
         if (toolbarTitleTv != null) toolbarTitleTv.setText(showName);
         bindToolbarMeta(data);
-        wkVBinding.avatarView.showAvatar(uid, WKChannelType.PERSONAL, data.avatar_cache_key);
+        bindProfileAvatar(data, showName);
         showCountryFlagIfSupported(firstNotEmpty(data.country_code, data.country));
         bindCover(data.profile_cover);
         bindSexAge(data);
@@ -566,7 +567,21 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         bindPhotos(data);
         bindFeedWorks();
         bindActionButton(data);
-        wkVBinding.onlineIndicator.setVisibility(!isSelf && data.status == 1 ? View.VISIBLE : View.GONE);
+        wkVBinding.onlineIndicator.setVisibility(!isSelf && data.online == 1 ? View.VISIBLE : View.GONE);
+    }
+
+    private void bindProfileAvatar(PartnerProfileEntity data, String showName) {
+        String targetUid = firstNotEmpty(data == null ? "" : data.uid, uid);
+        String avatarPath = data == null ? "" : data.avatar;
+        if (TextUtils.isEmpty(avatarPath) && !TextUtils.isEmpty(targetUid)) {
+            // 陌生人通常还没有本地 WKChannel，个人主页必须直接请求用户头像接口，
+            // 不能依赖 IM 频道资料同步后才显示。
+            avatarPath = "users/" + targetUid + "/avatar";
+        }
+        wkVBinding.avatarView.showAvatarUrl(avatarPath,
+                data == null ? "" : data.avatar_cache_key,
+                firstNotEmpty(showName, targetUid),
+                targetUid);
     }
 
     private void bindFeedWorks() {
@@ -690,7 +705,17 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private String formatLastOnline(PartnerProfileEntity data) {
         if (data == null) return "";
-        if (data.status == 1) return getString(R.string.partner_online);
+        if (data.online == 1) return getString(R.string.partner_online);
+
+        // /v1/users/{uid} 返回的是 last_offline（秒级时间戳）。旧代码误读 status，
+        // 导致所有正常账号（status=1）都显示在线，同时离线时间也永远取不到。
+        long lastOfflineMillis = normalizeEpochMillis(data.last_offline);
+        if (lastOfflineMillis > 0) {
+            CharSequence relative = DateUtils.getRelativeTimeSpanString(lastOfflineMillis, System.currentTimeMillis(),
+                    DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE);
+            return getString(R.string.partner_last_online_format, relative);
+        }
+
         String raw = firstNotEmpty(data.last_online, data.last_online_time, data.last_seen, data.last_seen_at,
                 data.last_active_at, data.last_active_time, data.last_login_at, data.last_login_time);
         if (TextUtils.isEmpty(raw)) return "";
@@ -701,6 +726,11 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             return getString(R.string.partner_last_online_format, relative);
         }
         return getString(R.string.partner_last_online_format, raw.trim());
+    }
+
+    private long normalizeEpochMillis(long value) {
+        if (value <= 0) return 0L;
+        return value < 100000000000L ? value * 1000L : value;
     }
 
     private long parseTimeMillis(String raw) {
@@ -966,7 +996,23 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         } else if (action == 3) {
             addBlackList();
         } else {
-            showToast(getString(R.string.partner_report_coming));
+            openReportPage();
+        }
+    }
+
+    private void openReportPage() {
+        if (TextUtils.isEmpty(uid)) {
+            showToast(getString(R.string.partner_report_open_failed));
+            return;
+        }
+        try {
+            Intent intent = new Intent(this, WKWebViewActivity.class);
+            intent.putExtra("channelType", WKChannelType.PERSONAL);
+            intent.putExtra("channelID", uid);
+            intent.putExtra("url", WKApiConfig.baseWebUrl + "report.html");
+            startActivity(intent);
+        } catch (Exception ignored) {
+            showToast(getString(R.string.partner_report_open_failed));
         }
     }
 

@@ -18,7 +18,14 @@ public class PartnerProfileEntity {
     public String category;
     public String role;
     public int follow;
+    // status 是当前用户与对方的关系状态：1 正常，2 已拉黑；不是在线状态。
     public int status;
+    public int online;
+    public long last_offline;
+    public int device_flag;
+    public int is_upload_avatar;
+    public int be_deleted;
+    public int be_blacklist;
     public String last_online;
     public String last_online_time;
     public String last_seen;
