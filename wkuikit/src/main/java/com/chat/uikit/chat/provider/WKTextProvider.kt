@@ -288,8 +288,8 @@ open class WKTextProvider : WKChatBaseProvider() {
         btn.scaleType = ImageView.ScaleType.CENTER_INSIDE
         btn.contentDescription = context.getString(com.chat.translate.R.string.wktranslate_translate)
         btn.isSelected = cached?.expanded == true
-        btn.minWidth = 0
-        btn.minHeight = 0
+        btn.setMinimumWidth(0)
+        btn.setMinimumHeight(0)
         btn.setPadding(dp(4), dp(4), dp(4), dp(4))
         btn.setBackgroundResource(R.drawable.bg_chat_translate_quick)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
