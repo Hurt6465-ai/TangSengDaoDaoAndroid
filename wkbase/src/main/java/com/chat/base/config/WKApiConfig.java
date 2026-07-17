@@ -20,6 +20,9 @@ public class WKApiConfig {
     public static final String NODEBB_VIDEO_URL = NODEBB_BASE_URL + "/video";
     public static final String NODEBB_SSO_API_BASE_URL = "https://api.886.best/v1/";
 
+    // Independent bbs-go service. Keep the trailing slash for Retrofit.
+    private static String forumBaseUrl = "https://bbs.886.best/";
+
     public static void initBaseURL(String apiURL) {
         baseUrl = apiURL + "/v1/";
         baseWebUrl = apiURL + "/web/";
@@ -28,6 +31,17 @@ public class WKApiConfig {
     public static void initBaseURLIncludeIP(String apiURL) {
         baseUrl = apiURL + "/v1/";
         baseWebUrl = apiURL + "/web/";
+    }
+
+    public static void initForumBaseURL(String url) {
+        if (TextUtils.isEmpty(url)) return;
+        String normalized = url.trim();
+        if (!normalized.endsWith("/")) normalized += "/";
+        forumBaseUrl = normalized;
+    }
+
+    public static String getForumBaseUrl() {
+        return forumBaseUrl;
     }
 
     public static String getNodeBBSSOUrl(String redirectUrl) {
