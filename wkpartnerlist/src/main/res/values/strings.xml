@@ -17,10 +17,10 @@
     <string name="partnerlist_complete_profile">完善我的资料</string>
     <string name="partnerlist_retry">重新加载</string>
     <string name="partnerlist_load_failed">语伴列表加载失败，请稍后重试</string>
-    <string name="partnerlist_greet">👋 Hi</string>
+    <string name="partnerlist_greet">Hi</string>
     <string name="partnerlist_greeted">已打招呼</string>
     <string name="partnerlist_sending">发送中</string>
-    <string name="partnerlist_limit_reached_short">已达上限</string>
+    <string name="partnerlist_limit_reached_short">已用完</string>
     <string name="partnerlist_daily_limit_message">今天已经向 10 位新朋友打过招呼，明天凌晨 4:00 恢复</string>
     <string name="partnerlist_default_greeting">你好，很高兴认识你 👋</string>
     <string name="partnerlist_greeting_success">已发送打招呼</string>
@@ -29,7 +29,8 @@
     <string name="partnerlist_intro_fallback">想认识认真学习语言的新朋友</string>
     <string name="partnerlist_name_age">%1$s  %2$d</string>
     <string name="partnerlist_learning_language">学习 %1$s</string>
-    <string name="partnerlist_online_now">当前在线</string>
+    <string name="partnerlist_online_now">在线</string>
+    <string name="partnerlist_online_minutes_ago">%1$d 分钟前在线</string>
     <string name="partnerlist_active_just_now">刚刚活跃</string>
     <string name="partnerlist_active_minutes">%1$d 分钟前活跃</string>
     <string name="partnerlist_active_hours">%1$d 小时前活跃</string>
