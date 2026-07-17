@@ -126,4 +126,5 @@ dependencies {
     implementation project(path: ':wkfeed')
     implementation project(path: ':wkfeedlist')
     implementation project(path: ':wkdating')
+    implementation project(path: ':wkforum')
 }
