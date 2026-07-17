@@ -1,12 +1,8 @@
 package com.chat.partnerlist;
 
 import android.graphics.Typeface;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
-import android.text.SpannableString;
-import android.text.Spanned;
 import android.text.TextUtils;
-import android.text.style.StyleSpan;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -19,13 +15,10 @@ import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.engine.DiskCacheStrategy;
-import com.bumptech.glide.request.RequestOptions;
-import com.chat.base.config.WKApiConfig;
 import com.chat.partnerlist.databinding.ItemPartnerListBinding;
 import com.chat.partnerlist.model.PartnerListUser;
 import com.chat.uikit.partner.PartnerPendingStore;
+import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -144,19 +137,12 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         String uid = user.stableId();
         b.cardSurface.setBackgroundResource(cardBackground(uid));
 
-        int avatarPx = Math.round(72f * b.getRoot().getResources().getDisplayMetrics().density);
-        int avatarPlaceholder = ContextCompat.getColor(b.getRoot().getContext(), R.color.partnerlist_avatar_placeholder);
-        Glide.with(b.avatarIv)
-                .load(showUrl(user.displayAvatar()))
-                .apply(RequestOptions.circleCropTransform())
-                .override(avatarPx, avatarPx)
-                .placeholder(new ColorDrawable(avatarPlaceholder))
-                .error(new ColorDrawable(avatarPlaceholder))
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                .dontAnimate()
-                .into(b.avatarIv);
-
-        PartnerListFlagResolver.bind(b.flagIv, user.country_code, user.country);
+        // 与会话列表和全屏语伴共用 AvatarView，国旗会自动在头像上挖出极细间隙，
+        // 不再通过白色圆圈伪造边框。
+        b.avatarView.setSize(72f);
+        b.avatarView.setStrokeWidth(0f);
+        b.avatarView.showAvatar(uid, WKChannelType.PERSONAL, user.vercode);
+        b.avatarView.showFlag(!TextUtils.isEmpty(user.country_code) ? user.country_code : user.country);
         bindPresence(b, user);
         bindBadges(b, user);
 
@@ -251,13 +237,10 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
 
 
     private void setGreetingHi(TextView textView) {
-        SpannableString label = new SpannableString("Hi");
-        label.setSpan(new StyleSpan(Typeface.BOLD_ITALIC), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        label.setSpan(new StyleSpan(Typeface.BOLD), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        textView.setText(label);
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f);
-        textView.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0.035f);
+        textView.setText("Hi");
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16.5f);
+        textView.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0.025f);
     }
 
     private void setCompactButtonText(TextView textView, int textRes) {
@@ -293,15 +276,8 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     @Override public void onViewRecycled(@NonNull VH holder) {
         holder.binding.cardRoot.setOnClickListener(null);
         holder.binding.greetingBtn.setOnClickListener(null);
-        try { Glide.with(holder.binding.avatarIv).clear(holder.binding.avatarIv); } catch (Throwable ignored) {}
+        holder.binding.avatarView.showDefaultAvatar("");
         super.onViewRecycled(holder);
-    }
-
-    private String showUrl(String url) {
-        if (TextUtils.isEmpty(url)) return "";
-        String value = url.trim();
-        if (value.startsWith("http://") || value.startsWith("https://")) return value;
-        return WKApiConfig.getShowUrl(value);
     }
 
     private static long fnv1a64(String value) {
