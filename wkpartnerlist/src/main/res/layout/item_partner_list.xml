@@ -29,20 +29,22 @@
         android:paddingEnd="12dp"
         android:paddingBottom="13dp">
 
-        <!-- 渐变外圈 -> 留白层 -> 头像，避免头像和光环粘在一起。 -->
+        <!-- 在线时才显示：2dp 渐变光环 + 1dp 极细留白。 -->
         <View
             android:id="@+id/avatarRing"
-            android:layout_width="80dp"
-            android:layout_height="80dp"
+            android:layout_width="78dp"
+            android:layout_height="78dp"
             android:background="@drawable/bg_partnerlist_avatar_ring_mint_sky"
+            android:visibility="invisible"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
         <View
             android:id="@+id/avatarGap"
-            android:layout_width="75dp"
-            android:layout_height="75dp"
+            android:layout_width="74dp"
+            android:layout_height="74dp"
             android:background="@drawable/bg_partnerlist_avatar_gap"
+            android:visibility="invisible"
             app:layout_constraintBottom_toBottomOf="@id/avatarRing"
             app:layout_constraintEnd_toEndOf="@id/avatarRing"
             app:layout_constraintStart_toStartOf="@id/avatarRing"
@@ -59,48 +61,42 @@
             app:layout_constraintStart_toStartOf="@id/avatarRing"
             app:layout_constraintTop_toTopOf="@id/avatarRing" />
 
+        <!-- 国旗 PNG 本身已经是透明圆形，不再叠白底或白色描边。 -->
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/flagIv"
-            android:layout_width="23dp"
-            android:layout_height="23dp"
-            android:layout_marginStart="1dp"
-            android:layout_marginBottom="1dp"
-            android:background="@drawable/bg_partnerlist_flag"
-            android:padding="1.5dp"
-            android:scaleType="centerCrop"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:scaleType="fitCenter"
             android:visibility="gone"
-            app:layout_constraintBottom_toBottomOf="@id/avatarRing"
-            app:layout_constraintStart_toStartOf="@id/avatarRing" />
+            app:layout_constraintBottom_toBottomOf="@id/avatarIv"
+            app:layout_constraintStart_toStartOf="@id/avatarIv" />
 
         <View
             android:id="@+id/onlineDot"
-            android:layout_width="14dp"
-            android:layout_height="14dp"
-            android:layout_marginTop="6dp"
-            android:layout_marginEnd="6dp"
+            android:layout_width="13dp"
+            android:layout_height="13dp"
+            android:layout_marginTop="5dp"
+            android:layout_marginEnd="5dp"
             android:background="@drawable/bg_partnerlist_online"
-            android:elevation="3dp"
+            android:elevation="2dp"
             android:visibility="gone"
             app:layout_constraintEnd_toEndOf="@id/avatarRing"
             app:layout_constraintTop_toTopOf="@id/avatarRing" />
 
+        <!-- 只显示“在线”或“几分钟前在线”，超过一小时直接隐藏。 -->
         <TextView
             android:id="@+id/activeTv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
-            android:background="@drawable/bg_partnerlist_active_pill"
+            android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:gravity="center"
             android:includeFontPadding="true"
             android:maxLines="1"
-            android:minHeight="20dp"
-            android:paddingStart="7dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="7dp"
-            android:paddingBottom="2dp"
+            android:maxWidth="88dp"
             android:textColor="@color/partnerlist_active_text"
-            android:textSize="11sp"
+            android:textSize="10sp"
+            android:visibility="gone"
             app:layout_constraintEnd_toEndOf="@id/avatarRing"
             app:layout_constraintStart_toStartOf="@id/avatarRing"
             app:layout_constraintTop_toBottomOf="@id/avatarRing" />
@@ -109,9 +105,9 @@
             android:id="@+id/nameRow"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
+            android:layout_marginStart="13dp"
             android:layout_marginTop="2dp"
-            android:layout_marginEnd="10dp"
+            android:layout_marginEnd="9dp"
             android:gravity="center_vertical"
             android:minHeight="25dp"
             android:orientation="horizontal"
@@ -166,62 +162,103 @@
                 android:visibility="gone" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/languageTv"
-            android:layout_width="wrap_content"
+        <!-- 母语与学习语言拆成两个独立浅色气囊，中间只保留轻量交换符号。 -->
+        <LinearLayout
+            android:id="@+id/languageRow"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="7dp"
-            android:background="@drawable/bg_partnerlist_language_chip"
-            android:ellipsize="end"
-            android:includeFontPadding="true"
-            android:maxLines="1"
-            android:paddingStart="9dp"
-            android:paddingTop="3dp"
-            android:paddingEnd="9dp"
-            android:paddingBottom="3dp"
-            android:textColor="@color/partnerlist_accent_text"
-            android:textSize="11sp"
-            android:textStyle="bold"
+            android:layout_marginTop="6dp"
+            android:baselineAligned="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
             app:layout_constraintEnd_toEndOf="@id/nameRow"
-            app:layout_constraintHorizontal_bias="0"
             app:layout_constraintStart_toStartOf="@id/nameRow"
-            app:layout_constraintTop_toBottomOf="@id/nameRow" />
+            app:layout_constraintTop_toBottomOf="@id/nameRow">
+
+            <TextView
+                android:id="@+id/nativeLanguageTv"
+                android:layout_width="wrap_content"
+                android:layout_height="25dp"
+                android:background="@drawable/bg_partnerlist_language_native"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:maxWidth="60dp"
+                android:minWidth="36dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:textColor="@color/partnerlist_native_language_text"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/languageExchangeTv"
+                android:layout_width="21dp"
+                android:layout_height="25dp"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="⇄"
+                android:textColor="@color/partnerlist_language_exchange"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/learningLanguageTv"
+                android:layout_width="wrap_content"
+                android:layout_height="25dp"
+                android:background="@drawable/bg_partnerlist_language_learning"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:maxWidth="60dp"
+                android:minWidth="36dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:textColor="@color/partnerlist_learning_language_text"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/introTv"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="7dp"
+            android:layout_marginEnd="4dp"
             android:ellipsize="end"
             android:includeFontPadding="true"
             android:lineSpacingExtra="2dp"
             android:maxLines="2"
             android:textColor="@color/partnerlist_text_secondary"
             android:textSize="13sp"
-            app:layout_constraintEnd_toEndOf="@id/nameRow"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="@id/nameRow"
-            app:layout_constraintTop_toBottomOf="@id/languageTv" />
+            app:layout_constraintTop_toBottomOf="@id/languageRow"
+            app:layout_goneMarginTop="5dp" />
 
+        <!-- 小型悬浮 Hi 按钮上移，H 由代码单独使用粗斜体。 -->
         <TextView
             android:id="@+id/greetingBtn"
-            android:layout_width="78dp"
-            android:layout_height="44dp"
+            android:layout_width="64dp"
+            android:layout_height="38dp"
             android:background="@drawable/bg_partnerlist_greeting"
             android:clickable="true"
-            android:elevation="2dp"
+            android:elevation="1dp"
+            android:ellipsize="end"
             android:focusable="true"
             android:gravity="center"
-            android:includeFontPadding="true"
+            android:includeFontPadding="false"
             android:maxLines="1"
-            android:paddingStart="5dp"
-            android:paddingEnd="5dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
             android:text="@string/partnerlist_greet"
             android:textColor="@color/partnerlist_button_text"
-            android:textSize="12sp"
-            android:textStyle="bold"
+            android:textSize="17sp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.15" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>
