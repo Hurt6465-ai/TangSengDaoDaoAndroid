@@ -6,6 +6,7 @@
     android:layout_margin="5dp"
     android:background="@drawable/bg_feed_waterfall_card"
     android:clipToOutline="true"
+    android:elevation="1dp"
     android:orientation="vertical">
 
     <FrameLayout
@@ -16,15 +17,20 @@
             android:id="@+id/coverIv"
             android:layout_width="match_parent"
             android:layout_height="220dp"
+            android:contentDescription="@null"
             android:scaleType="centerCrop" />
 
         <ImageView
             android:id="@+id/playIconIv"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
-            android:layout_gravity="bottom|start"
-            android:layout_marginStart="8dp"
-            android:layout_marginBottom="8dp"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_feed_waterfall_play_badge"
+            android:contentDescription="@null"
+            android:paddingStart="14dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="12dp"
             android:src="@drawable/ic_feed_play"
             android:visibility="gone" />
 
@@ -50,45 +56,31 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:ellipsize="end"
+        android:lineSpacingExtra="1dp"
         android:maxLines="2"
-        android:paddingStart="8dp"
+        android:minHeight="44dp"
+        android:paddingStart="9dp"
         android:paddingTop="8dp"
-        android:paddingEnd="8dp"
-        android:textColor="#111827"
+        android:paddingEnd="9dp"
+        android:textColor="#20232C"
         android:textSize="13sp" />
 
+    <!-- Personal profile already identifies the author, so only retain the lightweight like count. -->
     <LinearLayout
-        android:id="@+id/authorRow"
+        android:id="@+id/statsRow"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
+        android:layout_height="30dp"
+        android:gravity="end|center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingTop="6dp"
-        android:paddingEnd="8dp"
-        android:paddingBottom="9dp">
-
-        <com.chat.base.ui.components.AvatarView
-            android:id="@+id/authorAvatar"
-            android:layout_width="22dp"
-            android:layout_height="22dp" />
-
-        <TextView
-            android:id="@+id/authorNameTv"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="#6B7280"
-            android:textSize="12sp" />
+        android:paddingStart="9dp"
+        android:paddingEnd="9dp"
+        android:paddingBottom="7dp">
 
         <TextView
             android:id="@+id/waterfallLikeTv"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#6B7280"
+            android:textColor="#717784"
             android:textSize="12sp" />
     </LinearLayout>
 </LinearLayout>
