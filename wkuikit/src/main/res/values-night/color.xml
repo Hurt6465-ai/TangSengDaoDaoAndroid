@@ -9,4 +9,7 @@
     <color name="category_community_bg">#30283E</color>
     <color name="category_community_text">#8DEC59D8</color>
     <color name="tab_bg">#08090B</color>
+    <color name="chat_inline_translate_idle">#E7E9ED</color>
+    <color name="chat_inline_translate_active">#65D3CE</color>
+    <color name="chat_inline_translate_ripple">#3065D3CE</color>
 </resources>
