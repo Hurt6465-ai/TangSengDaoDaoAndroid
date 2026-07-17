@@ -11,11 +11,12 @@
     android:clickable="true"
     android:focusable="true"
     app:cardBackgroundColor="@color/partnerlist_card_base"
-    app:cardCornerRadius="17dp"
-    app:cardElevation="2dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="1dp"
     app:cardPreventCornerOverlap="false"
     app:cardUseCompatPadding="false"
     app:rippleColor="@color/partnerlist_card_ripple"
+    app:strokeColor="@color/partnerlist_card_stroke"
     app:strokeWidth="0dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -23,273 +24,252 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_partnerlist_card_mint"
-        android:minHeight="118dp"
-        android:paddingStart="12dp"
-        android:paddingTop="11dp"
-        android:paddingEnd="10dp"
+        android:minHeight="132dp"
+        android:paddingStart="13dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="11dp"
         android:paddingBottom="11dp">
 
-        <LinearLayout
-            android:id="@+id/avatarColumn"
-            android:layout_width="76dp"
-            android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
+        <View
+            android:id="@+id/avatarRing"
+            android:layout_width="78dp"
+            android:layout_height="78dp"
+            android:background="@drawable/bg_partnerlist_avatar_ring_mint_sky"
+            android:visibility="invisible"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent">
+            app:layout_constraintTop_toTopOf="parent" />
 
-            <FrameLayout
-                android:layout_width="76dp"
-                android:layout_height="76dp">
+        <View
+            android:id="@+id/avatarGap"
+            android:layout_width="74dp"
+            android:layout_height="74dp"
+            android:background="@drawable/bg_partnerlist_avatar_gap"
+            android:visibility="invisible"
+            app:layout_constraintBottom_toBottomOf="@id/avatarRing"
+            app:layout_constraintEnd_toEndOf="@id/avatarRing"
+            app:layout_constraintStart_toStartOf="@id/avatarRing"
+            app:layout_constraintTop_toTopOf="@id/avatarRing" />
 
-                <!-- 头像光环只表示当前在线。 -->
-                <View
-                    android:id="@+id/avatarRing"
-                    android:layout_width="76dp"
-                    android:layout_height="76dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_partnerlist_avatar_ring_mint_sky"
-                    android:visibility="invisible" />
+        <com.chat.base.ui.components.AvatarView
+            android:id="@+id/avatarView"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:contentDescription="@string/partnerlist_avatar"
+            app:layout_constraintBottom_toBottomOf="@id/avatarRing"
+            app:layout_constraintEnd_toEndOf="@id/avatarRing"
+            app:layout_constraintStart_toStartOf="@id/avatarRing"
+            app:layout_constraintTop_toTopOf="@id/avatarRing" />
 
-                <!-- 光环与头像之间只保留极细留白。 -->
-                <View
-                    android:id="@+id/avatarGap"
-                    android:layout_width="73dp"
-                    android:layout_height="73dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_partnerlist_avatar_gap"
-                    android:visibility="invisible" />
+        <View
+            android:id="@+id/onlineDot"
+            android:layout_width="13dp"
+            android:layout_height="13dp"
+            android:layout_marginTop="5dp"
+            android:layout_marginEnd="5dp"
+            android:background="@drawable/bg_partnerlist_online"
+            android:elevation="1dp"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="@id/avatarRing"
+            app:layout_constraintTop_toTopOf="@id/avatarRing" />
 
-                <!-- 与会话列表、全屏语伴共用 AvatarView，国旗镶嵌间隙由组件绘制。 -->
-                <com.chat.base.ui.components.AvatarView
-                    android:id="@+id/avatarView"
-                    android:layout_width="71dp"
-                    android:layout_height="71dp"
-                    android:layout_gravity="center"
-                    android:contentDescription="@string/partnerlist_avatar" />
+        <TextView
+            android:id="@+id/activeTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:includeFontPadding="true"
+            android:maxLines="1"
+            android:maxWidth="88dp"
+            android:textColor="@color/partnerlist_active_text"
+            android:textSize="10sp"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="@id/avatarRing"
+            app:layout_constraintStart_toStartOf="@id/avatarRing"
+            app:layout_constraintTop_toBottomOf="@id/avatarRing" />
 
-                <View
-                    android:id="@+id/onlineDot"
-                    android:layout_width="12dp"
-                    android:layout_height="12dp"
-                    android:layout_gravity="end|top"
-                    android:layout_marginTop="5dp"
-                    android:layout_marginEnd="5dp"
-                    android:background="@drawable/bg_partnerlist_online"
-                    android:elevation="2dp"
-                    android:visibility="gone" />
-            </FrameLayout>
+        <LinearLayout
+            android:id="@+id/nameRow"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="1dp"
+            android:layout_marginEnd="6dp"
+            android:gravity="center_vertical"
+            android:minHeight="26dp"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toStartOf="@id/greetingBtn"
+            app:layout_constraintStart_toEndOf="@id/avatarRing"
+            app:layout_constraintTop_toTopOf="@id/avatarRing">
 
-            <!-- 只显示在线或一小时内的分钟状态，不加边框。 -->
             <TextView
-                android:id="@+id/activeTv"
+                android:id="@+id/nameTv"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:includeFontPadding="true"
+                android:maxLines="1"
+                android:textColor="@color/partnerlist_text_primary"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/freshBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
+                android:layout_marginStart="5dp"
+                android:background="@drawable/bg_partnerlist_fresh_badge"
+                android:includeFontPadding="true"
+                android:paddingStart="6dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="1dp"
+                android:text="@string/partnerlist_new_recommendation"
+                android:textColor="@color/partnerlist_fresh_badge_text"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/newBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="5dp"
+                android:background="@drawable/bg_partnerlist_joined_badge"
+                android:includeFontPadding="true"
+                android:paddingStart="6dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="1dp"
+                android:text="@string/partnerlist_new"
+                android:textColor="@color/partnerlist_joined_badge_text"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/languageRow"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:baselineAligned="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="@id/nameRow"
+            app:layout_constraintStart_toStartOf="@id/nameRow"
+            app:layout_constraintTop_toBottomOf="@id/nameRow">
+
+            <TextView
+                android:id="@+id/nativeLanguageTv"
+                android:layout_width="wrap_content"
+                android:layout_height="22dp"
+                android:background="@drawable/bg_partnerlist_language_native"
                 android:ellipsize="end"
                 android:gravity="center"
                 android:includeFontPadding="false"
                 android:maxLines="1"
-                android:maxWidth="84dp"
-                android:textColor="@color/partnerlist_active_text"
-                android:textSize="10sp"
-                android:visibility="gone" />
-        </LinearLayout>
-
-        <!-- 右侧资料列：简介始终紧跟在母语/学习语言下方。 -->
-        <LinearLayout
-            android:id="@+id/contentColumn"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="11dp"
-            android:gravity="start"
-            android:orientation="vertical"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/avatarColumn"
-            app:layout_constraintTop_toTopOf="parent">
-
-            <!-- 本轮刚替换进来的语伴，固定显示在资料列最顶部。 -->
-            <TextView
-                android:id="@+id/freshBadge"
-                android:layout_width="wrap_content"
-                android:layout_height="17dp"
-                android:layout_marginEnd="54dp"
-                android:background="@drawable/bg_partnerlist_new_badge"
-                android:gravity="center"
-                android:includeFontPadding="false"
+                android:maxWidth="48dp"
+                android:minWidth="29dp"
                 android:paddingStart="6dp"
                 android:paddingEnd="6dp"
-                android:text="@string/partnerlist_new_recommendation"
-                android:textColor="@color/partnerlist_badge_text"
-                android:textSize="8.5sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                android:textColor="@color/partnerlist_native_language_text"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
 
-            <LinearLayout
-                android:id="@+id/nameRow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:minHeight="24dp"
-                android:orientation="horizontal"
-                android:paddingEnd="54dp">
-
-                <TextView
-                    android:id="@+id/nameTv"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:textColor="@color/partnerlist_text_primary"
-                    android:textSize="17sp"
-                    android:textStyle="bold" />
-
-                <!-- 仅账号注册时间在 5 天内时显示。 -->
-                <TextView
-                    android:id="@+id/newBadge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="17dp"
-                    android:layout_marginStart="5dp"
-                    android:background="@drawable/bg_partnerlist_joined_badge"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:paddingStart="6dp"
-                    android:paddingEnd="6dp"
-                    android:text="@string/partnerlist_new"
-                    android:textColor="@color/partnerlist_joined_badge_text"
-                    android:textSize="8.5sp"
-                    android:textStyle="bold"
-                    android:visibility="gone" />
-            </LinearLayout>
-
-            <!-- 母语与学习语言保持短小，学习语言使用浅蓝色气囊。 -->
-            <LinearLayout
-                android:id="@+id/languageRow"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:baselineAligned="false"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/nativeLanguageTv"
-                    android:layout_width="wrap_content"
-                    android:layout_height="20dp"
-                    android:background="@drawable/bg_partnerlist_language_native"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:maxWidth="46dp"
-                    android:minWidth="27dp"
-                    android:paddingStart="5dp"
-                    android:paddingEnd="5dp"
-                    android:textColor="@color/partnerlist_native_language_text"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/languageExchangeTv"
-                    android:layout_width="17dp"
-                    android:layout_height="20dp"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:text="⇋"
-                    android:textColor="@color/partnerlist_language_exchange"
-                    android:textSize="11sp" />
-
-                <TextView
-                    android:id="@+id/learningLanguageTv"
-                    android:layout_width="wrap_content"
-                    android:layout_height="20dp"
-                    android:background="@drawable/bg_partnerlist_language_learning"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:maxLines="1"
-                    android:maxWidth="46dp"
-                    android:minWidth="27dp"
-                    android:paddingStart="5dp"
-                    android:paddingEnd="5dp"
-                    android:textColor="@color/partnerlist_learning_language_text"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <!-- 不按字符硬截断：根据设备宽度显示最多两行。 -->
             <TextView
-                android:id="@+id/introTv"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:breakStrategy="simple"
+                android:id="@+id/languageExchangeTv"
+                android:layout_width="18dp"
+                android:layout_height="22dp"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="⇋"
+                android:textColor="@color/partnerlist_language_exchange"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/learningLanguageTv"
+                android:layout_width="wrap_content"
+                android:layout_height="22dp"
+                android:background="@drawable/bg_partnerlist_language_learning"
                 android:ellipsize="end"
-                android:hyphenationFrequency="none"
-                android:includeFontPadding="true"
-                android:lineSpacingExtra="1dp"
-                android:maxLines="2"
-                android:textColor="@color/partnerlist_text_secondary"
-                android:textSize="13sp" />
-
-            <!-- 标签数量由文字长度决定：短标签最多 5 个，普通 4 个，长/缅文最多 3 个。 -->
-            <androidx.constraintlayout.widget.ConstraintLayout
-                android:id="@+id/tagRow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:id="@+id/tagOneTv"
-                    style="@style/PartnerListTagChip"
-                    android:background="@drawable/bg_partnerlist_tag_mint" />
-
-                <TextView
-                    android:id="@+id/tagTwoTv"
-                    style="@style/PartnerListTagChip"
-                    android:background="@drawable/bg_partnerlist_tag_blue" />
-
-                <TextView
-                    android:id="@+id/tagThreeTv"
-                    style="@style/PartnerListTagChip"
-                    android:background="@drawable/bg_partnerlist_tag_rose" />
-
-                <TextView
-                    android:id="@+id/tagFourTv"
-                    style="@style/PartnerListTagChip"
-                    android:background="@drawable/bg_partnerlist_tag_lavender" />
-
-                <TextView
-                    android:id="@+id/tagFiveTv"
-                    style="@style/PartnerListTagChip"
-                    android:background="@drawable/bg_partnerlist_tag_peach" />
-
-                <androidx.constraintlayout.helper.widget.Flow
-                    android:id="@+id/tagFlow"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    app:constraint_referenced_ids="tagOneTv,tagTwoTv,tagThreeTv,tagFourTv,tagFiveTv"
-                    app:flow_horizontalAlign="start"
-                    app:flow_horizontalBias="0"
-                    app:flow_horizontalGap="5dp"
-                    app:flow_horizontalStyle="packed"
-                    app:flow_verticalGap="4dp"
-                    app:flow_wrapMode="chain"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent" />
-            </androidx.constraintlayout.widget.ConstraintLayout>
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:maxWidth="48dp"
+                android:minWidth="29dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:textColor="@color/partnerlist_learning_language_text"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- 偏圆形、左尾的 Hi 气泡。 -->
+        <TextView
+            android:id="@+id/introTv"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:includeFontPadding="true"
+            android:lineSpacingExtra="1dp"
+            android:maxLines="2"
+            android:textColor="@color/partnerlist_text_secondary"
+            android:textSize="13sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="@id/nameRow"
+            app:layout_constraintTop_toBottomOf="@id/languageRow"
+            app:layout_goneMarginTop="5dp" />
+
+        <!-- 固定复用 5 个标签 View，避免 RecyclerView 滑动时反复 inflate/addView。 -->
+        <LinearLayout
+            android:id="@+id/tagsRow"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:clipChildren="true"
+            android:gravity="start|center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="@id/nameRow"
+            app:layout_constraintTop_toBottomOf="@id/introTv"
+            app:layout_goneMarginTop="0dp">
+
+            <TextView
+                android:id="@+id/tag1Tv"
+                style="@style/PartnerListTagChip"
+                android:background="@drawable/bg_partnerlist_tag_mint" />
+
+            <TextView
+                android:id="@+id/tag2Tv"
+                style="@style/PartnerListTagChip"
+                android:background="@drawable/bg_partnerlist_tag_lavender" />
+
+            <TextView
+                android:id="@+id/tag3Tv"
+                style="@style/PartnerListTagChip"
+                android:background="@drawable/bg_partnerlist_tag_blue" />
+
+            <TextView
+                android:id="@+id/tag4Tv"
+                style="@style/PartnerListTagChip"
+                android:background="@drawable/bg_partnerlist_tag_peach" />
+
+            <TextView
+                android:id="@+id/tag5Tv"
+                style="@style/PartnerListTagChip"
+                android:background="@drawable/bg_partnerlist_tag_rose" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/greetingBtn"
-            android:layout_width="50dp"
-            android:layout_height="42dp"
-            android:layout_marginTop="7dp"
+            android:layout_width="56dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="0dp"
             android:background="@drawable/bg_partnerlist_greeting"
             android:clickable="true"
             android:elevation="0dp"
@@ -298,29 +278,14 @@
             android:gravity="center"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:paddingStart="5dp"
-            android:paddingEnd="1dp"
-            android:paddingBottom="2dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="2dp"
+            android:paddingBottom="1dp"
             android:text="@string/partnerlist_greet"
             android:textColor="@color/partnerlist_button_text"
             android:textSize="17sp"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <androidx.constraintlayout.widget.Barrier
-            android:id="@+id/cardBottomBarrier"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:barrierDirection="bottom"
-            app:constraint_referenced_ids="avatarColumn,contentColumn,greetingBtn" />
-
-        <View
-            android:id="@+id/cardBottomAnchor"
-            android:layout_width="1dp"
-            android:layout_height="1dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/cardBottomBarrier" />
+            app:layout_constraintTop_toTopOf="@id/nameRow" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>

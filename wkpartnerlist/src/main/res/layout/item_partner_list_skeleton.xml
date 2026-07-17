@@ -2,40 +2,41 @@
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="154dp"
+    android:layout_height="150dp"
     android:layout_marginStart="14dp"
     android:layout_marginTop="6dp"
     android:layout_marginEnd="14dp"
     android:layout_marginBottom="6dp"
     app:cardBackgroundColor="@color/partnerlist_card_base"
-    app:cardCornerRadius="17dp"
-    app:cardElevation="2dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="1dp"
     app:cardPreventCornerOverlap="false"
     app:cardUseCompatPadding="false"
+    app:strokeColor="@color/partnerlist_card_stroke"
     app:strokeWidth="0dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/bg_partnerlist_card"
-        android:paddingStart="12dp"
-        android:paddingTop="11dp"
-        android:paddingEnd="10dp"
+        android:background="@drawable/bg_partnerlist_card_mint"
+        android:paddingStart="13dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="11dp"
         android:paddingBottom="11dp">
 
         <View
             android:id="@+id/skeletonAvatar"
-            android:layout_width="76dp"
-            android:layout_height="76dp"
+            android:layout_width="78dp"
+            android:layout_height="78dp"
             android:background="@drawable/bg_partnerlist_skeleton_circle"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
         <View
             android:id="@+id/skeletonActive"
-            android:layout_width="48dp"
-            android:layout_height="8dp"
-            android:layout_marginTop="6dp"
+            android:layout_width="52dp"
+            android:layout_height="9dp"
+            android:layout_marginTop="7dp"
             android:background="@drawable/bg_partnerlist_skeleton_bar"
             app:layout_constraintEnd_toEndOf="@id/skeletonAvatar"
             app:layout_constraintStart_toStartOf="@id/skeletonAvatar"
@@ -43,18 +44,18 @@
 
         <View
             android:id="@+id/skeletonName"
-            android:layout_width="102dp"
+            android:layout_width="104dp"
             android:layout_height="16dp"
-            android:layout_marginStart="11dp"
-            android:layout_marginTop="4dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="5dp"
             android:background="@drawable/bg_partnerlist_skeleton_bar"
             app:layout_constraintStart_toEndOf="@id/skeletonAvatar"
             app:layout_constraintTop_toTopOf="@id/skeletonAvatar" />
 
         <View
             android:id="@+id/skeletonNativeLanguage"
-            android:layout_width="34dp"
-            android:layout_height="20dp"
+            android:layout_width="38dp"
+            android:layout_height="22dp"
             android:layout_marginTop="9dp"
             android:background="@drawable/bg_partnerlist_skeleton_bar"
             app:layout_constraintStart_toStartOf="@id/skeletonName"
@@ -62,28 +63,18 @@
 
         <View
             android:id="@+id/skeletonLearningLanguage"
-            android:layout_width="34dp"
-            android:layout_height="20dp"
-            android:layout_marginStart="17dp"
+            android:layout_width="38dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="18dp"
             android:background="@drawable/bg_partnerlist_skeleton_bar"
             app:layout_constraintStart_toEndOf="@id/skeletonNativeLanguage"
             app:layout_constraintTop_toTopOf="@id/skeletonNativeLanguage" />
 
         <View
-            android:id="@+id/skeletonButton"
-            android:layout_width="50dp"
-            android:layout_height="42dp"
-            android:layout_marginTop="7dp"
-            android:background="@drawable/bg_partnerlist_skeleton_bar"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <!-- 简介骨架与真实卡片一致，位于语言行下方而不是头像下方。 -->
-        <View
             android:id="@+id/skeletonIntro1"
             android:layout_width="0dp"
-            android:layout_height="10dp"
-            android:layout_marginTop="8dp"
+            android:layout_height="11dp"
+            android:layout_marginTop="9dp"
             android:background="@drawable/bg_partnerlist_skeleton_bar"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="@id/skeletonName"
@@ -91,39 +82,38 @@
 
         <View
             android:id="@+id/skeletonIntro2"
-            android:layout_width="150dp"
+            android:layout_width="112dp"
             android:layout_height="10dp"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="7dp"
             android:background="@drawable/bg_partnerlist_skeleton_bar"
-            app:layout_constraintStart_toStartOf="@id/skeletonIntro1"
+            app:layout_constraintStart_toStartOf="@id/skeletonName"
             app:layout_constraintTop_toBottomOf="@id/skeletonIntro1" />
 
         <View
             android:id="@+id/skeletonTag1"
-            android:layout_width="48dp"
-            android:layout_height="18dp"
+            android:layout_width="54dp"
+            android:layout_height="22dp"
             android:layout_marginTop="7dp"
             android:background="@drawable/bg_partnerlist_skeleton_bar"
-            app:layout_constraintStart_toStartOf="@id/skeletonIntro1"
+            app:layout_constraintStart_toStartOf="@id/skeletonName"
             app:layout_constraintTop_toBottomOf="@id/skeletonIntro2" />
 
         <View
             android:id="@+id/skeletonTag2"
-            android:layout_width="58dp"
-            android:layout_height="18dp"
+            android:layout_width="62dp"
+            android:layout_height="22dp"
             android:layout_marginStart="5dp"
             android:background="@drawable/bg_partnerlist_skeleton_bar"
             app:layout_constraintStart_toEndOf="@id/skeletonTag1"
             app:layout_constraintTop_toTopOf="@id/skeletonTag1" />
 
         <View
-            android:id="@+id/skeletonTag3"
-            android:layout_width="42dp"
-            android:layout_height="18dp"
-            android:layout_marginStart="5dp"
+            android:id="@+id/skeletonButton"
+            android:layout_width="56dp"
+            android:layout_height="44dp"
             android:background="@drawable/bg_partnerlist_skeleton_bar"
-            app:layout_constraintStart_toEndOf="@id/skeletonTag2"
-            app:layout_constraintTop_toTopOf="@id/skeletonTag1" />
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/skeletonName" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </com.google.android.material.card.MaterialCardView>
