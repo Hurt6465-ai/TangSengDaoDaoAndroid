@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFF"
+    android:background="#F1F3F7"
     android:clipChildren="false"
     android:clipToPadding="false"
     android:fitsSystemWindows="false">
@@ -218,29 +218,49 @@
                     <TextView
                         android:id="@+id/nativeLangTv"
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:letterSpacing="0.04"
-                        android:textColor="#777785"
-                        android:textSize="12sp" />
+                        android:layout_height="22dp"
+                        android:background="@drawable/bg_partner_profile_language_native"
+                        android:ellipsize="end"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="0.03"
+                        android:maxLines="1"
+                        android:maxWidth="142dp"
+                        android:minWidth="32dp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:textColor="#347D71"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold" />
 
-                    <ImageView
+                    <TextView
                         android:id="@+id/langToTv"
-                        android:layout_width="16dp"
-                        android:layout_height="10dp"
-                        android:layout_marginStart="5dp"
-                        android:layout_marginEnd="5dp"
-                        android:contentDescription="@string/partner_profile"
-                        android:src="@drawable/ic_partner_lang_exchange_simple"
-                        android:visibility="gone"
-                        app:tint="#B7A4FF" />
+                        android:layout_width="20dp"
+                        android:layout_height="22dp"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:text="⇋"
+                        android:textColor="#9AA2B1"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
 
                     <TextView
                         android:id="@+id/learningLangTv"
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:letterSpacing="0.04"
-                        android:textColor="#777785"
-                        android:textSize="12sp" />
+                        android:layout_height="22dp"
+                        android:background="@drawable/bg_partner_profile_language_learning"
+                        android:ellipsize="end"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:letterSpacing="0.03"
+                        android:maxLines="1"
+                        android:maxWidth="142dp"
+                        android:minWidth="32dp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:textColor="#3977A8"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold" />
                 </LinearLayout>
             </RelativeLayout>
 
@@ -344,7 +364,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
-                android:background="#F7F8FA"
+                android:background="#EEF1F5"
                 android:orientation="vertical"
                 android:paddingTop="14dp"
                 android:visibility="gone">
@@ -367,7 +387,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:background="#F7F8FA"
+                    android:background="#EEF1F5"
                     android:minHeight="520dp" />
             </LinearLayout>
 
