@@ -16,6 +16,11 @@ public final class PartnerListFlagResolver {
 
     public static void bind(ImageView imageView, String countryCode, String countryName) {
         if (imageView == null) return;
+        // 与会话列表 / 全屏语伴 AvatarView 一致：国旗资源本身就是透明圆形，
+        // 不再额外套白底、描边或 padding，避免出现双层白圈。
+        imageView.setBackground(null);
+        imageView.setPadding(0, 0, 0, 0);
+        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         Context context = imageView.getContext();
         String code = normalize(!TextUtils.isEmpty(countryCode) ? countryCode : countryName);
         if (TextUtils.isEmpty(code)) {

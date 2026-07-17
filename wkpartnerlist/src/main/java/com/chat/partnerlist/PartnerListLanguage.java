@@ -10,12 +10,24 @@ public final class PartnerListLanguage {
     private PartnerListLanguage() {}
 
     public static String relation(Context context, List<String> nativeLangs, List<String> learningLangs) {
-        String nativeName = nativeLangs == null || nativeLangs.isEmpty() ? "" : display(context, nativeLangs.get(0));
-        String learningName = learningLangs == null || learningLangs.isEmpty() ? "" : display(context, learningLangs.get(0));
+        String nativeName = compact(context, nativeLangs);
+        String learningName = compact(context, learningLangs);
         if (TextUtils.isEmpty(nativeName) && TextUtils.isEmpty(learningName)) return "";
         if (TextUtils.isEmpty(nativeName)) return learningName;
         if (TextUtils.isEmpty(learningName)) return nativeName;
         return nativeName + "  ⇋  " + learningName;
+    }
+
+    /**
+     * 卡片只展示首个有效语言代码，保持两个气囊轻巧、稳定，不让多语言把姓名区挤乱。
+     */
+    public static String compact(Context context, List<String> languages) {
+        if (languages == null || languages.isEmpty()) return "";
+        for (String language : languages) {
+            String value = display(context, language);
+            if (!TextUtils.isEmpty(value)) return value;
+        }
+        return "";
     }
 
     public static String display(Context context, String code) {

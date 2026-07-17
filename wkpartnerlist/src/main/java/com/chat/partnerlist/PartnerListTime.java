@@ -2,10 +2,6 @@ package com.chat.partnerlist;
 
 import android.content.Context;
 
-import com.chat.partnerlist.R;
-
-import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -14,6 +10,8 @@ import java.util.Locale;
 public final class PartnerListTime {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
     private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US);
+    private static final long MINUTE_MS = 60_000L;
+    private static final long STATUS_VISIBLE_WINDOW_MS = 60L * MINUTE_MS;
 
     private PartnerListTime() {}
 
@@ -23,26 +21,28 @@ public final class PartnerListTime {
 
     public static boolean isRecentlyActive(int online, long lastActiveAt, long serverTime) {
         if (online == 1) return true;
-        long now = serverTime > 0 ? serverTime : System.currentTimeMillis();
+        long now = serverTime > 0 ? normalizeMillis(serverTime) : System.currentTimeMillis();
         long ts = normalizeMillis(lastActiveAt);
-        return ts > 0 && Math.max(0L, now - ts) < 10L * 60L * 1000L;
+        return ts > 0 && Math.max(0L, now - ts) < STATUS_VISIBLE_WINDOW_MS;
     }
 
+    /**
+     * 列表只保留有用的短状态：当前在线，或一小时内“几分钟前在线”。
+     * 不再显示“最近活跃 / 今天活跃 / 几小时前活跃”等模糊、冗长状态。
+     */
     public static String activeLabel(Context context, int online, long lastActiveAt, long serverTime) {
         if (context == null) return "";
-        if (online == 1) return context.getString(R.string.partnerlist_active_10m);
-        long now = serverTime > 0 ? serverTime : System.currentTimeMillis();
+        if (online == 1) return context.getString(R.string.partnerlist_online_now);
+
+        long now = serverTime > 0 ? normalizeMillis(serverTime) : System.currentTimeMillis();
         long ts = normalizeMillis(lastActiveAt);
-        if (ts <= 0) return context.getString(R.string.partnerlist_active_recently);
+        if (ts <= 0) return "";
+
         long diff = Math.max(0L, now - ts);
-        long minute = 60_000L;
-        long hour = 60L * minute;
-        long day = 24L * hour;
-        if (diff < 10L * minute) return context.getString(R.string.partnerlist_active_10m);
-        if (diff < hour) return context.getString(R.string.partnerlist_active_minutes, Math.max(1, diff / minute));
-        if (diff < day) return context.getString(R.string.partnerlist_active_hours, Math.max(1, diff / hour));
-        if (diff < 3L * day) return context.getString(R.string.partnerlist_active_today);
-        return context.getString(R.string.partnerlist_active_recently);
+        if (diff >= STATUS_VISIBLE_WINDOW_MS) return "";
+
+        long minutes = Math.max(1L, diff / MINUTE_MS);
+        return context.getString(R.string.partnerlist_online_minutes_ago, minutes);
     }
 
     public static long normalizeMillis(long value) {
@@ -53,11 +53,11 @@ public final class PartnerListTime {
     public static long nextDueAt(long rotateAt, long retryAt) {
         return Math.max(normalizeMillis(rotateAt), normalizeMillis(retryAt));
     }
+
     public static long nextDayBoundaryMillis() {
         ZonedDateTime now = ZonedDateTime.now(BUSINESS_ZONE);
         ZonedDateTime boundary = now.toLocalDate().atTime(4, 0).atZone(BUSINESS_ZONE);
         if (!boundary.isAfter(now)) boundary = boundary.plusDays(1);
         return boundary.toInstant().toEpochMilli();
     }
-
 }

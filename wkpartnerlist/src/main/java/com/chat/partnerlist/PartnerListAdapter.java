@@ -1,11 +1,17 @@
 package com.chat.partnerlist;
 
+import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.StyleSpan;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -151,15 +157,21 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
                 .into(b.avatarIv);
 
         PartnerListFlagResolver.bind(b.flagIv, user.country_code, user.country);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) b.flagIv.setClipToOutline(true);
         bindPresence(b, user);
         bindBadges(b, user);
 
         // 列表语伴只突出名字和语言，不显示性别、年龄。
         b.nameTv.setText(user.displayName());
-        String relation = PartnerListLanguage.relation(b.getRoot().getContext(), user.nativeLanguages(), user.learningLanguages());
-        b.languageTv.setText(relation);
-        b.languageTv.setVisibility(TextUtils.isEmpty(relation) ? View.GONE : View.VISIBLE);
+        String nativeLanguage = PartnerListLanguage.compact(b.getRoot().getContext(), user.nativeLanguages());
+        String learningLanguage = PartnerListLanguage.compact(b.getRoot().getContext(), user.learningLanguages());
+        boolean hasNativeLanguage = !TextUtils.isEmpty(nativeLanguage);
+        boolean hasLearningLanguage = !TextUtils.isEmpty(learningLanguage);
+        b.nativeLanguageTv.setText(nativeLanguage);
+        b.learningLanguageTv.setText(learningLanguage);
+        b.nativeLanguageTv.setVisibility(hasNativeLanguage ? View.VISIBLE : View.GONE);
+        b.learningLanguageTv.setVisibility(hasLearningLanguage ? View.VISIBLE : View.GONE);
+        b.languageExchangeTv.setVisibility(hasNativeLanguage && hasLearningLanguage ? View.VISIBLE : View.GONE);
+        b.languageRow.setVisibility(hasNativeLanguage || hasLearningLanguage ? View.VISIBLE : View.GONE);
 
         String intro = user.intro;
         if (TextUtils.isEmpty(intro) && !user.tags().isEmpty()) intro = user.tags().get(0);
@@ -180,8 +192,12 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         b.avatarRing.setVisibility(online ? View.VISIBLE : View.INVISIBLE);
         b.avatarGap.setVisibility(online ? View.VISIBLE : View.INVISIBLE);
         if (online) b.avatarRing.setBackgroundResource(avatarRingBackground(user.stableId()));
-        b.activeTv.setText(PartnerListTime.activeLabel(
-                b.getRoot().getContext(), user.online, user.last_active_at, serverTime));
+        String activeLabel = PartnerListTime.activeLabel(
+                b.getRoot().getContext(), user.online, user.last_active_at, serverTime);
+        b.activeTv.setText(activeLabel);
+        b.activeTv.setVisibility(TextUtils.isEmpty(activeLabel) ? View.GONE : View.VISIBLE);
+        b.activeTv.setTextColor(ContextCompat.getColor(b.getRoot().getContext(),
+                online ? R.color.partnerlist_online_text : R.color.partnerlist_active_text));
     }
 
     private void bindBadges(ItemPartnerListBinding b, PartnerListUser user) {
@@ -202,22 +218,22 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         if (sending) {
             b.greetingBtn.setEnabled(false);
             b.greetingBtn.setAlpha(0.72f);
-            b.greetingBtn.setText(R.string.partnerlist_sending);
+            setCompactButtonText(b.greetingBtn, R.string.partnerlist_sending);
             b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_disabled);
         } else if (contacted) {
             b.greetingBtn.setEnabled(true);
             b.greetingBtn.setAlpha(1f);
-            b.greetingBtn.setText(R.string.partnerlist_go_chat);
+            setCompactButtonText(b.greetingBtn, R.string.partnerlist_go_chat);
             b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting);
         } else if (greetingRemaining <= 0) {
             b.greetingBtn.setEnabled(false);
             b.greetingBtn.setAlpha(0.72f);
-            b.greetingBtn.setText(R.string.partnerlist_limit_reached_short);
+            setCompactButtonText(b.greetingBtn, R.string.partnerlist_limit_reached_short);
             b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_disabled);
         } else {
             b.greetingBtn.setEnabled(true);
             b.greetingBtn.setAlpha(1f);
-            b.greetingBtn.setText(R.string.partnerlist_greet);
+            setGreetingHi(b.greetingBtn);
             b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting);
         }
 
@@ -231,6 +247,24 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
                 if (pos != RecyclerView.NO_POSITION) listener.onGreeting(user, pos);
             }
         });
+    }
+
+
+    private void setGreetingHi(TextView textView) {
+        SpannableString label = new SpannableString("Hi");
+        label.setSpan(new StyleSpan(Typeface.BOLD_ITALIC), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        label.setSpan(new StyleSpan(Typeface.BOLD), 1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        textView.setText(label);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f);
+        textView.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0.035f);
+    }
+
+    private void setCompactButtonText(TextView textView, int textRes) {
+        textView.setText(textRes);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f);
+        textView.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0.01f);
     }
 
     private int cardBackground(String uid) {
