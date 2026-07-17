@@ -69,7 +69,7 @@
     <string name="partner_blacklist_added">Blacklist ထဲထည့်ပြီးပါပြီ</string>
     <string name="partner_blacklist_removed">Blacklist မှ ဖယ်ပြီးပါပြီ</string>
     <string name="partner_report">တိုင်ကြားရန်</string>
-    <string name="partner_report_coming">တိုင်ကြားခြင်းလုပ်ဆောင်ချက်ကို နောက်ပိုင်းတွင် ထည့်သွင်းပါမည်。</string>
+    <string name="partner_report_open_failed">တိုင်ကြားရန်စာမျက်နှာကို ဖွင့်၍မရပါ</string>
     <string name="partner_save_media_failed">အခြေခံအချက်အလက် သိမ်းပြီးပါပြီ။ ပုံ သို့မဟုတ် tag သိမ်းမရပါ။ Backend တွင် profile_cover/profile_images/tags ကို ထောက်ပံ့ထားကြောင်း စစ်ပါ။</string>
     <string name="partner_profile_image_required">ဘာသာဖော် ဓာတ်ပုံ အနည်းဆုံး တစ်ပုံ တင်ပါ</string>
     <string name="partner_avatar_upload_success">ပရိုဖိုင်ပုံ တင်ပြီးပါပြီ</string>
