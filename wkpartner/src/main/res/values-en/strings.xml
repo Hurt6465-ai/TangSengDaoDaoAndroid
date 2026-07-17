@@ -72,4 +72,5 @@
     <string name="partner_add_photo">Batch add partner photos (up to 5)</string>
     <string name="partner_avatar_change_hint">Tap to change avatar</string>
     <string name="partner_profile_photo_batch_tip">Tap a placeholder to choose multiple photos at once, up to 5.</string>
+    <string name="partner_report_open_failed">Unable to open the report page</string>
 </resources>
