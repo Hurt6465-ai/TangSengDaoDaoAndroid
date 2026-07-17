@@ -1,25 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="partnerlist_text_primary">#20242C</color>
-    <color name="partnerlist_text_secondary">#626A78</color>
+    <color name="partnerlist_text_secondary">#5F6876</color>
     <color name="partnerlist_text_muted">#7A8290</color>
     <color name="partnerlist_accent_text">#5D70C5</color>
     <color name="partnerlist_mode_selected">#20242C</color>
     <color name="partnerlist_mode_normal">#7A8290</color>
     <color name="partnerlist_hint_text">#5F6FAE</color>
     <color name="partnerlist_quota_text">#5C6CC8</color>
-    <color name="partnerlist_button_text">#E14F98</color>
+    <color name="partnerlist_button_text">#D84F91</color>
     <color name="partnerlist_surface_text">#626A78</color>
     <color name="partnerlist_active_text">#818997</color>
     <color name="partnerlist_online_text">#2C9C76</color>
     <color name="partnerlist_native_language_text">#438B7C</color>
     <color name="partnerlist_learning_language_text">#4E8FBE</color>
     <color name="partnerlist_language_exchange">#9AA2B1</color>
-    <color name="partnerlist_tag_text">#596273</color>
     <color name="partnerlist_badge_text">#6B60C8</color>
-    <color name="partnerlist_joined_badge_text">#B64E7C</color>
+    <color name="partnerlist_fresh_badge_text">#7258C7</color>
+    <color name="partnerlist_joined_badge_text">#C35B81</color>
+    <color name="partnerlist_tag_text">#5E6470</color>
     <color name="partnerlist_card_base">#FFF9FBFC</color>
-    <color name="partnerlist_card_ripple">#165E6FC8</color>
-    <color name="partnerlist_button_ripple">#24E65798</color>
+    <color name="partnerlist_card_stroke">#1A6C7684</color>
+    <color name="partnerlist_card_ripple">#145E6FC8</color>
+    <color name="partnerlist_button_ripple">#24D84F91</color>
     <color name="partnerlist_avatar_placeholder">#E9ECF4</color>
 </resources>
