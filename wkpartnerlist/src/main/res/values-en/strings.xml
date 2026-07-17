@@ -17,10 +17,10 @@
     <string name="partnerlist_complete_profile">Complete my profile</string>
     <string name="partnerlist_retry">Try again</string>
     <string name="partnerlist_load_failed">Couldn’t load partners. Please try again later.</string>
-    <string name="partnerlist_greet">👋 Hi</string>
+    <string name="partnerlist_greet">Hi</string>
     <string name="partnerlist_greeted">Sent</string>
     <string name="partnerlist_sending">Sending</string>
-    <string name="partnerlist_limit_reached_short">Limit reached</string>
+    <string name="partnerlist_limit_reached_short">Limit</string>
     <string name="partnerlist_daily_limit_message">You’ve greeted 10 new people today. The limit resets at 4:00 AM.</string>
     <string name="partnerlist_default_greeting">Hi, nice to meet you 👋</string>
     <string name="partnerlist_greeting_success">Greeting sent</string>
@@ -29,7 +29,8 @@
     <string name="partnerlist_intro_fallback">Looking for serious language-learning friends</string>
     <string name="partnerlist_name_age">%1$s  %2$d</string>
     <string name="partnerlist_learning_language">Learning %1$s</string>
-    <string name="partnerlist_online_now">Online now</string>
+    <string name="partnerlist_online_now">Online</string>
+    <string name="partnerlist_online_minutes_ago">%1$dm ago</string>
     <string name="partnerlist_active_just_now">Active just now</string>
     <string name="partnerlist_active_minutes">Active %1$d min ago</string>
     <string name="partnerlist_active_hours">Active %1$d hr ago</string>
