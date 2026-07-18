@@ -21,7 +21,7 @@ public class WKApiConfig {
     public static final String NODEBB_SSO_API_BASE_URL = "https://api.886.best/v1/";
 
     // Independent bbs-go service. Keep the trailing slash for Retrofit.
-    private static String forumBaseUrl = "https://bbs.886.best/";
+    private static String forumBaseUrl = "http://107.172.79.50:3001/";
 
     public static void initBaseURL(String apiURL) {
         baseUrl = apiURL + "/v1/";
