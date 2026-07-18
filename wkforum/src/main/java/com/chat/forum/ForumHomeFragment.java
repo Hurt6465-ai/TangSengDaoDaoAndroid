@@ -57,6 +57,7 @@ public class ForumHomeFragment extends Fragment {
     private static final long CATEGORY_LATEST = 0L;
     private static final long CATEGORY_RECOMMEND = -1L;
     private static final long CATEGORY_FOLLOW = -2L;
+    private static final long CATEGORY_ARTICLE = -200L;
     private static final int FEATURED_CATEGORY_COUNT = 4;
 
     private DrawerLayout drawerLayout;
@@ -74,6 +75,7 @@ public class ForumHomeFragment extends Fragment {
     private TextView loginHintView;
     private TextView centerButton;
     private TopicAdapter adapter;
+    private ArticleAdapter articleAdapter;
     private long selectedCategory = CATEGORY_COMPREHENSIVE;
     private String cursor = "";
     private boolean hasMore;
@@ -87,6 +89,12 @@ public class ForumHomeFragment extends Fragment {
     private final ActivityResultLauncher<Intent> topicDetailLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (isAdded() && firstLoadDone) loadTopics(true);
+            });
+    private final ActivityResultLauncher<Intent> articleDetailLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (isAdded() && selectedCategory == CATEGORY_ARTICLE && articleAdapter != null) {
+                    articleAdapter.notifyDataSetChanged();
+                }
             });
     private final ActivityResultLauncher<Intent> createTopicLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -161,7 +169,7 @@ public class ForumHomeFragment extends Fragment {
         feedTabContainer.setBackground(roundRect(context,
                 dark ? 0xFF23252A : 0xFFF2F3F5, 15));
         AppBarLayout.LayoutParams feedTabsParams = new AppBarLayout.LayoutParams(
-                dp(context, 180), dp(context, 32));
+                dp(context, 226), dp(context, 32));
         feedTabsParams.gravity = Gravity.END;
         feedTabsParams.setMargins(0, dp(context, 5), dp(context, 14), dp(context, 5));
         appBarLayout.addView(feedTabContainer, feedTabsParams);
@@ -198,6 +206,8 @@ public class ForumHomeFragment extends Fragment {
         recyclerView.setItemViewCacheSize(8);
         adapter = new TopicAdapter(context, topic ->
                 topicDetailLauncher.launch(ForumTopicActivity.createIntent(context, topic.id)));
+        articleAdapter = new ArticleAdapter(context, article ->
+                articleDetailLauncher.launch(ForumArticleActivity.createIntent(context, article.id)));
         recyclerView.setAdapter(adapter);
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -206,7 +216,7 @@ public class ForumHomeFragment extends Fragment {
                 RecyclerView.LayoutManager manager = rv.getLayoutManager();
                 if (manager instanceof LinearLayoutManager) {
                     int last = ((LinearLayoutManager) manager).findLastVisibleItemPosition();
-                    if (last >= adapter.getItemCount() - 5) loadTopics(false);
+                    if (last >= currentItemCount() - 5) loadTopics(false);
                 }
             }
         });
@@ -447,6 +457,10 @@ public class ForumHomeFragment extends Fragment {
     }
 
     private void loadTopics(boolean reset) {
+        if (selectedCategory == CATEGORY_ARTICLE) {
+            loadArticles(reset);
+            return;
+        }
         if (loading && !reset) return;
         if (reset) {
             topicRequestGeneration++;
@@ -497,12 +511,70 @@ public class ForumHomeFragment extends Fragment {
                 });
     }
 
+    private void loadArticles(boolean reset) {
+        if (loading && !reset) return;
+        if (reset) {
+            topicRequestGeneration++;
+            loading = false;
+            cursor = "";
+            hasMore = false;
+            if (articleAdapter != null) articleAdapter.replaceAll(new ArrayList<>());
+            showState("正在加载文章…");
+        }
+        final int generation = topicRequestGeneration;
+        final String requestCursor = cursor;
+        loading = true;
+        ForumApiClient.getInstance().getArticles(requestCursor,
+                new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Article>>() {
+                    @Override
+                    public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Article> page) {
+                        if (!isAdded() || generation != topicRequestGeneration
+                                || selectedCategory != CATEGORY_ARTICLE) return;
+                        loading = false;
+                        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+                        List<ForumApiClient.Article> list = page == null || page.results == null
+                                ? new ArrayList<>() : page.results;
+                        if (reset) articleAdapter.replaceAll(list); else articleAdapter.append(list);
+                        cursor = page == null || TextUtils.isEmpty(page.cursor) ? cursor : page.cursor;
+                        hasMore = page != null && page.hasMore;
+                        if (articleAdapter.getItemCount() == 0) {
+                            showState("这里还没有文章\n文章可在网页版发布");
+                        } else {
+                            hideState();
+                        }
+                    }
+
+                    @Override
+                    public void onError(@NonNull String message) {
+                        if (!isAdded() || generation != topicRequestGeneration
+                                || selectedCategory != CATEGORY_ARTICLE) return;
+                        loading = false;
+                        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+                        if (articleAdapter.getItemCount() == 0) showState(message + "\n下拉刷新重试");
+                    }
+                });
+    }
+
+    private int currentItemCount() {
+        return selectedCategory == CATEGORY_ARTICLE
+                ? (articleAdapter == null ? 0 : articleAdapter.getItemCount())
+                : (adapter == null ? 0 : adapter.getItemCount());
+    }
+
+    private void applyListAdapter() {
+        if (recyclerView == null) return;
+        RecyclerView.Adapter<?> target = selectedCategory == CATEGORY_ARTICLE
+                ? articleAdapter : adapter;
+        if (target != null && recyclerView.getAdapter() != target) recyclerView.setAdapter(target);
+    }
+
     private void renderNavigation() {
         if (!isAdded() || feedTabContainer == null || featuredGrid == null) return;
         feedTabContainer.removeAllViews();
         addFeedTab("综合", CATEGORY_COMPREHENSIVE);
         addFeedTab("最新", CATEGORY_LATEST);
         addFeedTab("推荐", CATEGORY_RECOMMEND);
+        addFeedTab("文章", CATEGORY_ARTICLE);
 
         List<ForumApiClient.Category> flat = flattenCategories();
         allCategoriesButton.setText("更多  ›");
@@ -594,6 +666,10 @@ public class ForumHomeFragment extends Fragment {
 
     private void renderCurrentCategory() {
         if (currentCategoryView == null) return;
+        if (selectedCategory == CATEGORY_ARTICLE) {
+            currentCategoryView.setVisibility(View.GONE);
+            return;
+        }
         ForumApiClient.Category selected = findCategory(selectedCategory);
         if (selected == null) {
             currentCategoryView.setVisibility(View.GONE);
@@ -609,6 +685,7 @@ public class ForumHomeFragment extends Fragment {
             return;
         }
         selectedCategory = categoryId;
+        applyListAdapter();
         renderNavigation();
         renderDrawer();
         closeDrawer();
@@ -653,7 +730,7 @@ public class ForumHomeFragment extends Fragment {
         addDrawerItem("综合", "全部板块的活跃讨论", CATEGORY_COMPREHENSIVE, 0, false);
         addDrawerItem("最新", "按发布时间查看新帖", CATEGORY_LATEST, 0, false);
         addDrawerItem("推荐", "管理员推荐的优质内容", CATEGORY_RECOMMEND, 0, false);
-        addDrawerItem("关注", "关注用户发布的帖子", CATEGORY_FOLLOW, 0, false);
+        addDrawerItem("文章", "网页版发布的长文内容", CATEGORY_ARTICLE, 0, false);
 
         List<ForumApiClient.Category> flat = flattenCategories();
         List<ForumApiClient.Category> featured = featuredCategories(flat);
@@ -865,6 +942,7 @@ public class ForumHomeFragment extends Fragment {
             holder.title.setText(safe(topic.title));
             holder.sticky.setVisibility(topic.sticky ? View.VISIBLE : View.GONE);
             holder.recommend.setVisibility(topic.recommend ? View.VISIBLE : View.GONE);
+            holder.qa.setVisibility(topic.type == 2 ? View.VISIBLE : View.GONE);
             holder.replyCount.setText(String.valueOf(Math.max(0L, topic.commentCount)));
             holder.replyCount.setTextColor(newReply ? 0xFF1877F2
                     : (dark ? 0xFFB7BCC4 : 0xFF626A74));
@@ -883,6 +961,7 @@ public class ForumHomeFragment extends Fragment {
             holder.avatar.setAlpha(dimmed ? 0.56f : 1f);
             holder.sticky.setAlpha(dimmed ? 0.58f : 1f);
             holder.recommend.setAlpha(dimmed ? 0.58f : 1f);
+            holder.qa.setAlpha(dimmed ? 0.58f : 1f);
 
             bindAvatar(holder.avatar, topic.user, author);
             holder.itemView.setOnClickListener(v -> {
@@ -949,6 +1028,157 @@ public class ForumHomeFragment extends Fragment {
         }
     }
 
+    private static final class ArticleAdapter extends RecyclerView.Adapter<ArticleHolder> {
+        private static final String SEEN_PREF = "forum_article_seen";
+        private final Context context;
+        private final SharedPreferences seenPrefs;
+        private final List<ForumApiClient.Article> items = new ArrayList<>();
+        private final OnArticleClickListener listener;
+
+        ArticleAdapter(Context context, OnArticleClickListener listener) {
+            this.context = context;
+            this.listener = listener;
+            this.seenPrefs = context.getSharedPreferences(SEEN_PREF, Context.MODE_PRIVATE);
+            setHasStableIds(true);
+        }
+
+        @Override public long getItemId(int position) { return items.get(position).id; }
+
+        @NonNull @Override
+        public ArticleHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            return new ArticleHolder(createArticleItemView(context));
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ArticleHolder holder, int position) {
+            ForumApiClient.Article article = items.get(position);
+            String author = article.user == null || TextUtils.isEmpty(article.user.nickname)
+                    ? "用户" : article.user.nickname;
+            boolean read = seenPrefs.getLong("time_" + article.id, 0L) > 0;
+            boolean dark = isDark(context);
+            holder.author.setText(author);
+            holder.meta.setText("文章");
+            holder.time.setText(formatTime(article.createTime));
+            holder.title.setText(safe(article.title));
+            holder.replyCount.setText(String.valueOf(Math.max(0L, article.commentCount)));
+            int titleColor = read ? (dark ? 0xFF777C84 : 0xFF9A9FA6)
+                    : (dark ? Color.WHITE : 0xFF171A1F);
+            holder.title.setTextColor(titleColor);
+            holder.avatar.setAlpha(read ? 0.58f : 1f);
+            holder.author.setAlpha(read ? 0.58f : 1f);
+            holder.meta.setAlpha(read ? 0.52f : 1f);
+            bindArticleAvatar(holder.avatar, article.user, author);
+            holder.itemView.setOnClickListener(v -> listener.onClick(article));
+        }
+
+        void replaceAll(List<ForumApiClient.Article> data) {
+            items.clear(); if (data != null) items.addAll(data); notifyDataSetChanged();
+        }
+        void append(List<ForumApiClient.Article> data) {
+            if (data == null || data.isEmpty()) return;
+            int start = items.size(); items.addAll(data); notifyItemRangeInserted(start, data.size());
+        }
+        @Override public int getItemCount() { return items.size(); }
+
+        private void bindArticleAvatar(AvatarView avatar, ForumApiClient.User user, String fallback) {
+            try {
+                String uid = user == null ? "" : safe(user.uid);
+                String id = user == null ? "" : safe(user.id);
+                if (!TextUtils.isEmpty(uid)) avatar.showAvatar(uid, WKChannelType.PERSONAL);
+                else if (user != null && (!TextUtils.isEmpty(user.smallAvatar) || !TextUtils.isEmpty(user.avatar))) {
+                    String remote = TextUtils.isEmpty(user.smallAvatar) ? user.avatar : user.smallAvatar;
+                    avatar.showAvatarUrl(ForumApiClient.getInstance().resolveUrl(remote), id, fallback, id);
+                } else avatar.showDefaultAvatar(fallback, TextUtils.isEmpty(uid) ? id : uid);
+                if (user != null && (!TextUtils.isEmpty(user.countryCode) || !TextUtils.isEmpty(user.country))) {
+                    avatar.showFlag(TextUtils.isEmpty(user.countryCode) ? user.country : user.countryCode);
+                }
+            } catch (Throwable ignored) { avatar.showDefaultAvatar(fallback, fallback); }
+        }
+    }
+
+    private static final class ArticleHolder extends RecyclerView.ViewHolder {
+        final AvatarView avatar;
+        final TextView author;
+        final TextView meta;
+        final TextView time;
+        final TextView title;
+        final TextView replyCount;
+
+        ArticleHolder(@NonNull View itemView) {
+            super(itemView);
+            LinearLayout root = (LinearLayout) itemView;
+            LinearLayout authorRow = (LinearLayout) root.getChildAt(0);
+            avatar = (AvatarView) authorRow.getChildAt(0);
+            LinearLayout authorText = (LinearLayout) authorRow.getChildAt(1);
+            author = (TextView) authorText.getChildAt(0);
+            meta = (TextView) authorText.getChildAt(1);
+            time = (TextView) authorRow.getChildAt(2);
+            LinearLayout titleRow = (LinearLayout) root.getChildAt(1);
+            title = (TextView) titleRow.getChildAt(0);
+            replyCount = (TextView) titleRow.getChildAt(1);
+        }
+    }
+
+    private interface OnArticleClickListener { void onClick(ForumApiClient.Article article); }
+
+    private static View createArticleItemView(Context context) {
+        boolean dark = isDark(context);
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(context, 15), dp(context, 10), dp(context, 13), dp(context, 11));
+        root.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
+        root.setForeground(selectableBackground(context));
+
+        LinearLayout authorRow = new LinearLayout(context);
+        authorRow.setGravity(Gravity.CENTER_VERTICAL);
+        AvatarView avatar = new AvatarView(context);
+        avatar.setSize(31);
+        authorRow.addView(avatar, new LinearLayout.LayoutParams(dp(context, 35), dp(context, 35)));
+        LinearLayout copy = new LinearLayout(context);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        TextView author = text(context, "", 12.5f, dark ? 0xFFF1F2F4 : 0xFF272B31, true);
+        TextView meta = text(context, "文章", 10.5f, dark ? 0xFF8F949C : 0xFF7A818A, false);
+        copy.addView(author); copy.addView(meta);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        copyParams.leftMargin = dp(context, 8);
+        authorRow.addView(copy, copyParams);
+        TextView time = text(context, "", 10.5f, dark ? 0xFF747981 : 0xFFA1A6AD, false);
+        time.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        authorRow.addView(time, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 35)));
+        root.addView(authorRow);
+
+        LinearLayout titleRow = new LinearLayout(context);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text(context, "", 16.5f, dark ? Color.WHITE : 0xFF171A1F, true);
+        title.setMaxLines(2); title.setEllipsize(TextUtils.TruncateAt.END);
+        titleRow.addView(title, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView replies = text(context, "0", 11.5f, dark ? 0xFFB7BCC4 : 0xFF626A74, true);
+        replies.setGravity(Gravity.CENTER);
+        replies.setPadding(dp(context, 8), 0, dp(context, 8), 0);
+        replies.setCompoundDrawablePadding(dp(context, 3));
+        replies.setBackground(roundRect(context, dark ? 0xFF25272C : 0xFFF1F3F5, 13));
+        setCompoundIcon(replies, R.drawable.ic_forum_chat_bubble, 15,
+                dark ? 0xFF9EA4AD : 0xFF69717A);
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 27));
+        rp.leftMargin = dp(context, 9);
+        titleRow.addView(replies, rp);
+        LinearLayout.LayoutParams trp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        trp.topMargin = dp(context, 7);
+        root.addView(titleRow, trp);
+        View divider = new View(context);
+        divider.setBackgroundColor(dark ? 0xFF24262B : 0xFFEDEFF2);
+        LinearLayout.LayoutParams dpv = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 0.55f));
+        dpv.topMargin = dp(context, 10);
+        root.addView(divider, dpv);
+        return root;
+    }
+
     private static final class TopicHolder extends RecyclerView.ViewHolder {
         private final AvatarView avatar;
         private final TextView author;
@@ -956,6 +1186,7 @@ public class ForumHomeFragment extends Fragment {
         private final TextView time;
         private final TextView sticky;
         private final TextView recommend;
+        private final TextView qa;
         private final TextView title;
         private final TextView replyCount;
 
@@ -972,6 +1203,7 @@ public class ForumHomeFragment extends Fragment {
             LinearLayout badges = (LinearLayout) right.getChildAt(1);
             sticky = (TextView) badges.getChildAt(0);
             recommend = (TextView) badges.getChildAt(1);
+            qa = (TextView) badges.getChildAt(2);
             LinearLayout titleRow = (LinearLayout) root.getChildAt(1);
             title = (TextView) titleRow.getChildAt(0);
             replyCount = (TextView) titleRow.getChildAt(1);
@@ -1032,6 +1264,12 @@ public class ForumHomeFragment extends Fragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 19));
         recommendParams.leftMargin = dp(context, 4);
         badges.addView(recommend, recommendParams);
+        TextView qa = badge(context, "问答", 0xFF7B4BC4,
+                dark ? 0xFF352A47 : 0xFFF0E8FF);
+        LinearLayout.LayoutParams qaParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 19));
+        qaParams.leftMargin = dp(context, 4);
+        badges.addView(qa, qaParams);
         right.addView(badges, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 20)));
         authorRow.addView(right, new LinearLayout.LayoutParams(

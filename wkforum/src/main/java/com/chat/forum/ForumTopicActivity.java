@@ -7,7 +7,10 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -63,7 +66,6 @@ import com.bumptech.glide.Glide;
 import com.chat.base.config.WKApiConfig;
 import com.chat.base.net.ud.WKUploader;
 import com.chat.base.ui.components.AvatarView;
-import com.chat.uikit.view.WaveformView;
 import com.chat.uikit.view.voice.AudioRecordManager;
 import com.xinbida.wukongim.entity.WKChannelType;
 
@@ -247,11 +249,14 @@ public class ForumTopicActivity extends AppCompatActivity {
         body.addView(stateView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        fastScrollButton = text("↓", 18, dark ? 0xFFE7E9ED : 0xFF515860, true);
+        fastScrollButton = text("", 18, dark ? 0xFFE7E9ED : 0xFF515860, true);
         fastScrollButton.setIncludeFontPadding(false);
         fastScrollButton.setGravity(Gravity.CENTER);
         fastScrollButton.setContentDescription("快速到底部");
-        fastScrollButton.setBackground(roundRect(dark ? 0xFF2A2D32 : 0xFFF4F5F7, 18));
+        fastScrollButton.setPadding(0, 0, 0, 0);
+        fastScrollButton.setBackground(roundRect(dark ? 0xFF2A2D32 : 0xFFF4F5F7, 15));
+        setCompoundIcon(fastScrollButton, R.drawable.ic_forum_arrow_down, 17,
+                dark ? 0xFFD3D6DA : 0xFF5D646C);
         fastScrollButton.setElevation(dp(2));
         fastScrollButton.setVisibility(View.GONE);
         fastScrollButton.setOnClickListener(v -> {
@@ -272,7 +277,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             }
             recyclerView.post(this::updateFastScrollButton);
         });
-        FrameLayout.LayoutParams fastParams = new FrameLayout.LayoutParams(dp(36), dp(36),
+        FrameLayout.LayoutParams fastParams = new FrameLayout.LayoutParams(dp(32), dp(32),
                 Gravity.END | Gravity.BOTTOM);
         fastParams.setMargins(0, 0, dp(10), dp(10));
         body.addView(fastScrollButton, fastParams);
@@ -332,13 +337,18 @@ public class ForumTopicActivity extends AppCompatActivity {
         composerAction.setGravity(Gravity.CENTER);
         composerAction.setIncludeFontPadding(false);
         composerAction.setCompoundDrawablePadding(0);
+        composerAction.setPadding(0, 0, 0, 0);
+        composerAction.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+        composerAction.setMinWidth(0);
+        composerAction.setMinHeight(0);
+        composerAction.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         composerAction.setOnClickListener(v -> {
             if (sending) return;
             if (!TextUtils.isEmpty(commentInput.getText().toString().trim())) sendComment();
             else Toast.makeText(this, "按住录音，上滑取消", Toast.LENGTH_SHORT).show();
         });
         composerAction.setOnTouchListener(this::handleComposerTouch);
-        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(dp(52), dp(52));
+        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(dp(48), dp(48));
         actionParams.leftMargin = dp(8);
         row.addView(composerAction, actionParams);
         wrapper.addView(row, new LinearLayout.LayoutParams(
@@ -512,7 +522,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                 : (isDark() ? 0xFF2A2D33 : 0xFFF0F2F5), 24));
         composerAction.setContentDescription(hasText ? "发送评论" : "按住录音");
         setCompoundIcon(composerAction, hasText ? R.drawable.ic_forum_send
-                        : R.drawable.ic_forum_mic, hasText ? 22 : 30,
+                        : R.drawable.ic_forum_mic, hasText ? 21 : 27,
                 hasText ? Color.WHITE : (isDark() ? 0xFFE4E6EA : 0xFF4D555E));
     }
 
@@ -683,7 +693,10 @@ public class ForumTopicActivity extends AppCompatActivity {
             return;
         }
         fastScrollToTop = first > 3;
-        fastScrollButton.setText(fastScrollToTop ? "↑" : "↓");
+        fastScrollButton.setText("");
+        setCompoundIcon(fastScrollButton,
+                fastScrollToTop ? R.drawable.ic_forum_arrow_up : R.drawable.ic_forum_arrow_down,
+                17, isDark() ? 0xFFD3D6DA : 0xFF5D646C);
         fastScrollButton.setContentDescription(fastScrollToTop ? "快速回到顶部" : "快速回到底部");
         fastScrollButton.setVisibility(View.VISIBLE);
     }
@@ -778,10 +791,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                 actions.add(() -> confirmForbidUser(topic.user, -1));
             }
         }
-        new AlertDialog.Builder(this)
-                .setItems(labels.toArray(new String[0]), (dialog, which) -> actions.get(which).run())
-                .setNegativeButton("取消", null)
-                .show();
+        showCompactActionMenu(labels, actions);
     }
 
     private boolean canDeleteTopic(ForumApiClient.Topic topic) {
@@ -878,6 +888,8 @@ public class ForumTopicActivity extends AppCompatActivity {
         if (comment == null || topicActionBusy) return;
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
+        labels.add(comment.liked ? "取消点赞" : "点赞");
+        actions.add(() -> changeCommentLike(comment));
         if (!isOwnComment(comment)) {
             labels.add("回复");
             actions.add(() -> setReplyTarget(parentId, comment.id, author));
@@ -918,7 +930,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                 actions.get(index).run();
             });
             panel.addView(item, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(38)));
         }
         dialog.setContentView(panel);
         Window window = dialog.getWindow();
@@ -926,14 +938,14 @@ public class ForumTopicActivity extends AppCompatActivity {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             WindowManager.LayoutParams params = new WindowManager.LayoutParams();
             params.copyFrom(window.getAttributes());
-            params.width = dp(176);
+            params.width = dp(126);
             params.height = WindowManager.LayoutParams.WRAP_CONTENT;
             params.gravity = Gravity.CENTER;
             window.setAttributes(params);
         }
         dialog.show();
         if (window != null) {
-            window.setLayout(dp(176), WindowManager.LayoutParams.WRAP_CONTENT);
+            window.setLayout(dp(126), WindowManager.LayoutParams.WRAP_CONTENT);
         }
     }
 
@@ -1528,6 +1540,8 @@ public class ForumTopicActivity extends AppCompatActivity {
 
             TextView content = htmlText(TextUtils.isEmpty(topic.content) ? topic.summary : topic.content, 17);
             content.setOnClickListener(v -> clearReplyTarget());
+            content.setMaxLines(Integer.MAX_VALUE);
+            content.setEllipsize(null);
             root.addView(content, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             addRemoteImages(root, topic.imageList, dp(10));
@@ -1568,6 +1582,12 @@ public class ForumTopicActivity extends AppCompatActivity {
             TextView authorView = text(author, 14,
                     isDark() ? Color.WHITE : 0xFF272B31, true);
             nameRow.addView(authorView);
+            TextView ownerBadge = smallBadge("楼主", 0xFF1877F2,
+                    isDark() ? 0xFF243B59 : 0xFFEAF3FF);
+            LinearLayout.LayoutParams ownerBadgeParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(20));
+            ownerBadgeParams.leftMargin = dp(6);
+            nameRow.addView(ownerBadge, ownerBadgeParams);
             copy.addView(nameRow);
             TextView meta = text(formatDate(topic.createTime), 12,
                     isDark() ? 0xFF8F949C : 0xFF7A8088, false);
@@ -1650,14 +1670,13 @@ public class ForumTopicActivity extends AppCompatActivity {
             bindAvatar(holder.avatar, comment.user, author);
             String target = reply && comment.quote != null && comment.quote.user != null
                     ? userName(comment.quote.user) : "";
-            String displayName = reply && !TextUtils.isEmpty(target)
-                    ? author + " 回复 " + target : author;
-            setCommentNameAndTime(holder.name, displayName, formatDate(comment.createTime), reply);
+            setCommentNameAndTime(holder.name, author, target,
+                    formatDate(comment.createTime), reply, isTopicAuthor(comment.user));
 
             holder.like.setText(comment.likeCount > 0 ? String.valueOf(comment.likeCount) : "");
             int likeColor = comment.liked ? 0xFF1877F2
                     : (isDark() ? 0xFF858B93 : 0xFF9AA0A7);
-            setCompoundIcon(holder.like, R.drawable.ic_forum_thumb_up, 17, likeColor);
+            setCompoundIcon(holder.like, R.drawable.ic_forum_thumb_up_outline, 16, likeColor);
             holder.like.setTextColor(likeColor);
             holder.like.setOnClickListener(v -> changeCommentLike(comment));
 
@@ -1718,19 +1737,52 @@ public class ForumTopicActivity extends AppCompatActivity {
             holder.body.setOnClickListener(replyClick);
         }
 
-        private void setCommentNameAndTime(TextView view, String name, String time, boolean reply) {
-            String safeName = TextUtils.isEmpty(name) ? "用户" : name;
-            String suffix = " · " + safe(time);
-            SpannableString value = new SpannableString(safeName + suffix);
-            value.setSpan(new StyleSpan(Typeface.BOLD), 0, safeName.length(),
+        private void setCommentNameAndTime(TextView view, String author, String target,
+                                           String time, boolean reply, boolean owner) {
+            String safeAuthor = TextUtils.isEmpty(author) ? "用户" : author;
+            String safeTarget = TextUtils.isEmpty(target) ? "" : target;
+            String connector = reply && !TextUtils.isEmpty(safeTarget) ? " 回复 " : "";
+            String namePart = safeAuthor + connector + safeTarget;
+            String ownerPart = owner ? "  楼主" : "";
+            String timePart = " · " + safe(time);
+            SpannableString value = new SpannableString(namePart + ownerPart + timePart);
+            int normalName = isDark() ? 0xFFE4E6E9 : 0xFF30353B;
+            int replyName = isDark() ? 0xFFA3A9B1 : 0xFF7E858D;
+            int connectorColor = isDark() ? 0xFF767D86 : 0xFFA1A7AE;
+            value.setSpan(new ForegroundColorSpan(reply ? replyName : normalName),
+                    0, safeAuthor.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            value.setSpan(new StyleSpan(reply ? Typeface.NORMAL : Typeface.BOLD),
+                    0, safeAuthor.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            if (!TextUtils.isEmpty(connector)) {
+                int connectorStart = safeAuthor.length();
+                int targetStart = connectorStart + connector.length();
+                value.setSpan(new ForegroundColorSpan(connectorColor), connectorStart, targetStart,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                value.setSpan(new ForegroundColorSpan(replyName), targetStart, namePart.length(),
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            if (owner) {
+                int ownerStart = namePart.length();
+                int ownerEnd = ownerStart + ownerPart.length();
+                value.setSpan(new ForegroundColorSpan(0xFF1877F2), ownerStart, ownerEnd,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                value.setSpan(new RelativeSizeSpan(0.82f), ownerStart, ownerEnd,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            int timeStart = namePart.length() + ownerPart.length();
+            int timeColor = isDark() ? 0xFF666D75 : 0xFFB4B9BF;
+            value.setSpan(new ForegroundColorSpan(timeColor), timeStart, value.length(),
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            int muted = isDark() ? 0xFF777D85 : 0xFFA8ADB4;
-            value.setSpan(new ForegroundColorSpan(muted), safeName.length(), value.length(),
+            value.setSpan(new RelativeSizeSpan(0.80f), timeStart, value.length(),
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            value.setSpan(new RelativeSizeSpan(reply ? 0.82f : 0.80f),
-                    safeName.length(), value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             view.setText(value);
             view.setTextSize(TypedValue.COMPLEX_UNIT_SP, reply ? 12 : 13);
+        }
+
+        private boolean isTopicAuthor(@Nullable ForumApiClient.User user) {
+            return currentTopic != null && currentTopic.user != null && user != null
+                    && !TextUtils.isEmpty(currentTopic.user.id)
+                    && TextUtils.equals(currentTopic.user.id, user.id);
         }
 
         private void bindToggle(ToggleHolder holder, ForumApiClient.Comment parent) {
@@ -1810,14 +1862,14 @@ public class ForumTopicActivity extends AppCompatActivity {
         like.setGravity(Gravity.CENTER);
         like.setCompoundDrawablePadding(dp(1));
         like.setBackground(selectableBackground());
-        header.addView(like, new LinearLayout.LayoutParams(dp(46), dp(32)));
+        header.addView(like, new LinearLayout.LayoutParams(dp(34), dp(30)));
 
         TextView more = text("⋮", 20, dark ? 0xFF858B93 : 0xFF9AA0A7, false);
         more.setGravity(Gravity.CENTER);
         more.setIncludeFontPadding(false);
         more.setContentDescription("评论操作");
         more.setBackground(selectableBackground());
-        header.addView(more, new LinearLayout.LayoutParams(dp(32), dp(32)));
+        header.addView(more, new LinearLayout.LayoutParams(dp(25), dp(30)));
         root.addView(header, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -1867,40 +1919,33 @@ public class ForumTopicActivity extends AppCompatActivity {
     }
 
     private final class VoiceBubbleView extends LinearLayout {
-        private final WaveformView waveformView;
+        private final VoiceSignalView signalView;
         private final TextView durationView;
-        private String boundWaveform = "";
 
         VoiceBubbleView(Context context) {
             super(context);
             setOrientation(HORIZONTAL);
             setGravity(Gravity.CENTER_VERTICAL);
-            setPadding(dp(12), 0, dp(10), 0);
+            setPadding(dp(12), 0, dp(12), 0);
             setClickable(true);
 
-            waveformView = new WaveformView(context);
-            waveformView.setFresh(false);
-            LinearLayout.LayoutParams waveformParams = new LinearLayout.LayoutParams(
-                    0, dp(24), 1f);
-            addView(waveformView, waveformParams);
+            signalView = new VoiceSignalView(context);
+            addView(signalView, new LinearLayout.LayoutParams(dp(30), dp(30)));
 
             durationView = text("1″", 12.5f,
                     isDark() ? 0xFFDDE0E5 : 0xFF4B525B, true);
-            durationView.setGravity(Gravity.CENTER);
+            durationView.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
             durationView.setSingleLine(true);
             LinearLayout.LayoutParams durationParams = new LinearLayout.LayoutParams(
-                    dp(38), ViewGroup.LayoutParams.MATCH_PARENT);
-            durationParams.leftMargin = dp(6);
+                    0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+            durationParams.leftMargin = dp(8);
             addView(durationView, durationParams);
         }
 
         void bind(VoicePayload payload, int seconds, boolean active, float progress) {
             if (payload == null) return;
-            if (!TextUtils.equals(boundWaveform, payload.waveform)) {
-                boundWaveform = safe(payload.waveform);
-                waveformView.setWaveform(decodeWaveform(boundWaveform));
-            }
-            waveformView.setProgress(Math.max(0f, Math.min(1f, progress)));
+            signalView.setProgress(progress);
+            signalView.setActive(active);
             durationView.setText(Math.max(0, seconds) + "″");
             durationView.setTextColor(active ? 0xFF1877F2
                     : (isDark() ? 0xFFDDE0E5 : 0xFF4B525B));
@@ -1908,15 +1953,48 @@ public class ForumTopicActivity extends AppCompatActivity {
                     ? (isDark() ? 0xFF263B57 : 0xFFEAF3FF)
                     : (isDark() ? 0xFF25282E : 0xFFF0F3F7), 21));
         }
+    }
 
-        private byte[] decodeWaveform(String encoded) {
-            if (!TextUtils.isEmpty(encoded)) {
-                try {
-                    byte[] decoded = Base64.decode(encoded, Base64.DEFAULT);
-                    if (decoded != null && decoded.length > 0) return decoded;
-                } catch (Throwable ignored) { }
+    private final class VoiceSignalView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private float progress;
+        private boolean active;
+
+        VoiceSignalView(Context context) {
+            super(context);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeWidth(dp(2.2f));
+        }
+
+        void setProgress(float value) {
+            progress = Math.max(0f, Math.min(1f, value));
+            invalidate();
+        }
+
+        void setActive(boolean value) {
+            active = value;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            int base = active ? 0xFF1877F2 : (isDark() ? 0xFFD1D5DA : 0xFF59616A);
+            paint.setColor(base);
+            float cx = getWidth() * 0.22f;
+            float cy = getHeight() * 0.5f;
+            paint.setStyle(Paint.Style.FILL);
+            canvas.drawCircle(cx, cy, dp(2.0f), paint);
+            paint.setStyle(Paint.Style.STROKE);
+            for (int i = 0; i < 3; i++) {
+                float r = dp(4.8f + i * 4.0f);
+                int alpha = active && progress > (i / 3f) ? 255 : 205;
+                paint.setAlpha(alpha);
+                RectF oval = new RectF(cx - r, cy - r, cx + r, cy + r);
+                canvas.drawArc(oval, -48, 96, false, paint);
             }
-            return new byte[]{8, 22, 13, 27, 16, 30, 11, 25, 18, 28, 14, 24, 9, 20};
+            paint.setAlpha(255);
         }
     }
 

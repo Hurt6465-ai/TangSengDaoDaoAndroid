@@ -40,7 +40,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Native normal-topic composer. */
+/** Native topic and Q&A composer. */
 public class ForumCreateTopicActivity extends AppCompatActivity {
     private static final int MAX_IMAGES = 6;
 
@@ -52,6 +52,9 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private EditText tagsInput;
     private Spinner categorySpinner;
     private LinearLayout imageContainer;
+    private LinearLayout typePill;
+    private EditText bountyInput;
+    private int topicType;
     private TextView publishButton;
     private boolean publishing;
 
@@ -119,9 +122,31 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         form.setPadding(dp(16), dp(16), dp(16), dp(40));
         form.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
 
-        form.addView(label("板块"));
+        form.addView(label("类型"));
+        typePill = new LinearLayout(this);
+        typePill.setGravity(Gravity.CENTER_VERTICAL);
+        typePill.setPadding(dp(2), dp(2), dp(2), dp(2));
+        typePill.setBackground(roundRect(dark ? 0xFF25272C : 0xFFF1F3F5, 16));
+        LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(dp(170), dp(34));
+        typeParams.topMargin = dp(7);
+        form.addView(typePill, typeParams);
+        renderTypePill();
+
+        TextView categoryLabel = label("板块");
+        LinearLayout.LayoutParams categoryLabelParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        categoryLabelParams.topMargin = dp(14);
+        form.addView(categoryLabel, categoryLabelParams);
         categorySpinner = new Spinner(this);
         form.addView(categorySpinner, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+
+        bountyInput = input("悬赏积分，可选", false);
+        bountyInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        bountyInput.setVisibility(View.GONE);
+        LinearLayout.LayoutParams bountyParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bountyParams.topMargin = dp(8);
+        form.addView(bountyInput, bountyParams);
 
         titleInput = input("标题（最多128字）", false);
         titleInput.setMaxLines(2);
@@ -193,8 +218,42 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         });
     }
 
+    private void renderTypePill() {
+        if (typePill == null) return;
+        typePill.removeAllViews();
+        addTypeTab("讨论", 0);
+        addTypeTab("问答", 2);
+        if (bountyInput != null) bountyInput.setVisibility(topicType == 2 ? View.VISIBLE : View.GONE);
+    }
+
+    private void addTypeTab(String label, int value) {
+        boolean selected = topicType == value;
+        TextView tab = text(label, 12.5f, selected ? 0xFF1877F2
+                : (isDark() ? 0xFFAEB3BB : 0xFF66707A), selected);
+        tab.setGravity(Gravity.CENTER);
+        tab.setBackground(selected ? roundRect(isDark() ? 0xFF34465F : Color.WHITE, 14) : null);
+        tab.setOnClickListener(v -> {
+            if (publishing || topicType == value) return;
+            topicType = value;
+            renderTypePill();
+            loadCategories();
+            contentInput.setHint(topicType == 2
+                    ? "请清楚描述问题、已经尝试的方法和期望得到的帮助…"
+                    : "分享你的经验、观点或学习内容…");
+        });
+        typePill.addView(tab, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+    }
+
     private void loadCategories() {
-        ForumApiClient.getInstance().getCategories(new ForumApiClient.ResultCallback<List<ForumApiClient.Category>>() {
+        categories.clear();
+        List<String> waiting = new ArrayList<>();
+        waiting.add("加载中…");
+        ArrayAdapter<String> waitingAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, waiting);
+        categorySpinner.setAdapter(waitingAdapter);
+        ForumApiClient.getInstance().getCategoriesForType(topicType,
+                new ForumApiClient.ResultCallback<List<ForumApiClient.Category>>() {
             @Override
             public void onSuccess(@Nullable List<ForumApiClient.Category> data) {
                 if (isFinishing() || isDestroyed()) return;
@@ -204,7 +263,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                 }
                 List<String> names = new ArrayList<>();
                 for (ForumApiClient.Category category : categories) names.add(category.name);
-                if (names.isEmpty()) names.add("学习交流");
+                if (names.isEmpty()) names.add(topicType == 2 ? "请先在网页后台创建问答板块" : "暂无可发布板块");
                 ArrayAdapter<String> adapter = new ArrayAdapter<>(ForumCreateTopicActivity.this,
                         android.R.layout.simple_spinner_item, names);
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -253,13 +312,16 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             return;
         }
         final long selectedCategoryId = categoryId;
+        final int selectedType = topicType;
+        final int bountyScore = parseBountyScore();
         final List<String> tags = parseTags(tagsInput.getText().toString());
         setPublishing(true, selectedImages.isEmpty() ? "发布中…" : "处理图片…");
         ForumApiClient.getInstance().ensureSession(this, new ForumApiClient.ResultCallback<String>() {
             @Override
             public void onSuccess(@Nullable String data) {
                 uploadImagesSequentially(0, new ArrayList<>(), uploaded ->
-                        createTopic(selectedCategoryId, title, content, tags, uploaded));
+                        createTopic(selectedType, selectedCategoryId, title, content,
+                                tags, uploaded, bountyScore));
             }
 
             @Override
@@ -308,10 +370,12 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         });
     }
 
-    private void createTopic(long categoryId, String title, String content,
-                             List<String> tags, List<ForumApiClient.ImageInfo> images) {
+    private void createTopic(int type, long categoryId, String title, String content,
+                             List<String> tags, List<ForumApiClient.ImageInfo> images,
+                             int bountyScore) {
         publishButton.setText("发布中…");
-        ForumApiClient.getInstance().createTopic(categoryId, title, content, tags, images,
+        ForumApiClient.getInstance().createTopic(type, categoryId, title, content,
+                tags, images, bountyScore,
                 new ForumApiClient.ResultCallback<ForumApiClient.Topic>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Topic topic) {
@@ -373,6 +437,14 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         }
     }
 
+    private int parseBountyScore() {
+        if (topicType != 2 || bountyInput == null) return 0;
+        String raw = bountyInput.getText().toString().trim();
+        if (TextUtils.isEmpty(raw)) return 0;
+        try { return Math.max(0, Integer.parseInt(raw)); }
+        catch (Throwable ignored) { return 0; }
+    }
+
     private List<String> parseTags(String raw) {
         if (TextUtils.isEmpty(raw)) return Collections.emptyList();
         List<String> result = new ArrayList<>();
@@ -410,6 +482,13 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         view.setTextColor(color);
         if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         return view;
+    }
+
+    private android.graphics.drawable.GradientDrawable roundRect(int color, float radiusDp) {
+        android.graphics.drawable.GradientDrawable drawable = new android.graphics.drawable.GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radiusDp));
+        return drawable;
     }
 
     private boolean isDark() {

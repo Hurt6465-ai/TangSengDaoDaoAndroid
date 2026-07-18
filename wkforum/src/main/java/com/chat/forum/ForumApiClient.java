@@ -55,7 +55,7 @@ public final class ForumApiClient {
     private static final String PREF_ROLES = "forum_bbsgo_roles";
     private static final String PREF_PERMISSIONS = "forum_bbsgo_permissions";
     private static final String PREF_AUTH_META_VERSION = "forum_bbsgo_auth_meta_version";
-    private static final String AUTH_META_VERSION = "6";
+    private static final String AUTH_META_VERSION = "8";
     private static final long SESSION_SAFETY_WINDOW_MS = 60_000L;
 
     private static final ForumApiClient INSTANCE = new ForumApiClient();
@@ -201,7 +201,31 @@ public final class ForumApiClient {
     }
 
     public void getCategories(@NonNull ResultCallback<List<Category>> callback) {
-        forumService().categories(authHeader()).enqueue(new EnvelopeCallback<>(callback));
+        forumService().categoryNavs(authHeader()).enqueue(new EnvelopeCallback<>(callback));
+    }
+
+    public void getCategoriesForType(int topicType,
+                                     @NonNull ResultCallback<List<Category>> callback) {
+        forumService().categories(authHeader(), topicType)
+                .enqueue(new EnvelopeCallback<>(callback));
+    }
+
+    public void getArticles(@Nullable String cursor,
+                            @NonNull ResultCallback<Page<Article>> callback) {
+        forumService().articles(authHeader(), TextUtils.isEmpty(cursor) ? "" : cursor)
+                .enqueue(new EnvelopeCallback<>(callback));
+    }
+
+    public void getArticle(long articleId, @NonNull ResultCallback<Article> callback) {
+        forumService().article(authHeader(), articleId).enqueue(new EnvelopeCallback<>(callback));
+    }
+
+    public void getArticleComments(long articleId, @Nullable String cursor, @Nullable String sort,
+                                   @NonNull ResultCallback<Page<Comment>> callback) {
+        forumService().comments(authHeader(), "article", String.valueOf(articleId),
+                        TextUtils.isEmpty(cursor) ? "" : cursor,
+                        TextUtils.isEmpty(sort) ? "asc" : sort)
+                .enqueue(new EnvelopeCallback<>(callback));
     }
 
     public void getTopics(long categoryId, @Nullable String cursor,
@@ -323,14 +347,22 @@ public final class ForumApiClient {
                             @NonNull String content, @NonNull List<String> tags,
                             @NonNull List<ImageInfo> images,
                             @NonNull ResultCallback<Topic> callback) {
+        createTopic(0, categoryId, title, content, tags, images, 0, callback);
+    }
+
+    public void createTopic(int type, long categoryId, @NonNull String title,
+                            @NonNull String content, @NonNull List<String> tags,
+                            @NonNull List<ImageInfo> images, int bountyScore,
+                            @NonNull ResultCallback<Topic> callback) {
         CreateTopicRequest request = new CreateTopicRequest();
-        request.type = 0;
+        request.type = type;
         request.categoryId = categoryId;
         request.title = title;
         request.content = content;
         request.contentType = "markdown";
         request.tags = tags;
         request.imageList = images;
+        request.bountyScore = Math.max(0, bountyScore);
         forumService().createTopic(requireAuthHeader(), request)
                 .enqueue(new EnvelopeCallback<>(callback));
     }
@@ -742,7 +774,19 @@ public final class ForumApiClient {
         Call<ApiEnvelope<ExchangeData>> exchange(@Body ExchangeRequest request);
 
         @GET("api/topic/category_navs")
-        Call<ApiEnvelope<List<Category>>> categories(@Header("X-User-Token") String token);
+        Call<ApiEnvelope<List<Category>>> categoryNavs(@Header("X-User-Token") String token);
+
+        @GET("api/topic/categories")
+        Call<ApiEnvelope<List<Category>>> categories(@Header("X-User-Token") String token,
+                                                     @Query("type") int topicType);
+
+        @GET("api/article/articles")
+        Call<ApiEnvelope<Page<Article>>> articles(@Header("X-User-Token") String token,
+                                                  @Query("cursor") String cursor);
+
+        @GET("api/article/{id}")
+        Call<ApiEnvelope<Article>> article(@Header("X-User-Token") String token,
+                                           @Path("id") long articleId);
 
         @GET("api/topic/topics")
         Call<ApiEnvelope<Page<Topic>>> topics(@Header("X-User-Token") String token,
@@ -910,6 +954,7 @@ public final class ForumApiClient {
         public String contentType;
         public List<String> tags;
         public List<ImageInfo> imageList;
+        public int bountyScore;
     }
 
     private static final class ApiEnvelope<T> {
@@ -931,6 +976,7 @@ public final class ForumApiClient {
         public String name;
         public String description;
         public String logo;
+        public String type;
         public boolean adminOnlyPost;
         public boolean canPost;
         public List<Category> children;
@@ -951,9 +997,36 @@ public final class ForumApiClient {
         public boolean recommend;
         public boolean liked;
         public boolean favorited;
+        public String qaStatus;
+        public long acceptedCommentId;
+        public int bountyScore;
         public User user;
         public Category category;
         public List<ImageInfo> imageList;
+    }
+
+
+    public static final class Article {
+        public long id;
+        public String title;
+        public String summary;
+        public String content;
+        public String sourceUrl;
+        public long viewCount;
+        public long commentCount;
+        public long likeCount;
+        public long createTime;
+        public int status;
+        public boolean favorited;
+        public User user;
+        public ImageInfo cover;
+        public List<Tag> tags;
+    }
+
+    public static final class Tag {
+        public long id;
+        public String name;
+        public String description;
     }
 
     public static final class Favorite {
