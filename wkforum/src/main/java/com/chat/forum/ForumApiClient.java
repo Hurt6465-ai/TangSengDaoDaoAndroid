@@ -53,7 +53,7 @@ public final class ForumApiClient {
     private static final String PREF_ROLES = "forum_bbsgo_roles";
     private static final String PREF_PERMISSIONS = "forum_bbsgo_permissions";
     private static final String PREF_AUTH_META_VERSION = "forum_bbsgo_auth_meta_version";
-    private static final String AUTH_META_VERSION = "2";
+    private static final String AUTH_META_VERSION = "3";
     private static final long SESSION_SAFETY_WINDOW_MS = 60_000L;
 
     private static final ForumApiClient INSTANCE = new ForumApiClient();
@@ -162,6 +162,8 @@ public final class ForumApiClient {
                 || hasPermission("dashboard.topic.sticky")
                 || hasPermission("dashboard.topic.delete")
                 || hasPermission("dashboard.comment.delete")
+                || hasPermission("dashboard.user.forbidden")
+                || hasPermission("dashboard.user.forbiddenForever")
                 || hasPermission("dashboard.category.update");
     }
 
@@ -332,6 +334,15 @@ public final class ForumApiClient {
         call.enqueue(new EnvelopeCallback<>(callback));
     }
 
+    public void setCommentLiked(long commentId, boolean liked,
+                                @NonNull ResultCallback<Void> callback) {
+        EntityActionRequest request = new EntityActionRequest("comment", String.valueOf(commentId));
+        Call<ApiEnvelope<Void>> call = liked
+                ? forumService().like(requireAuthHeader(), request)
+                : forumService().unlike(requireAuthHeader(), request);
+        call.enqueue(new EnvelopeCallback<>(callback));
+    }
+
     public void setTopicFavorited(@NonNull String topicId, boolean favorited,
                                   @NonNull ResultCallback<Void> callback) {
         EntityActionRequest request = new EntityActionRequest("topic", topicId);
@@ -346,6 +357,16 @@ public final class ForumApiClient {
         ReportRequest request = new ReportRequest();
         request.dataId = topicId;
         request.dataType = "topic";
+        request.reason = reason;
+        forumService().report(requireAuthHeader(), request)
+                .enqueue(new EnvelopeCallback<>(callback));
+    }
+
+    public void reportComment(long commentId, @NonNull String reason,
+                              @NonNull ResultCallback<Void> callback) {
+        ReportRequest request = new ReportRequest();
+        request.dataId = String.valueOf(commentId);
+        request.dataType = "comment";
         request.reason = reason;
         forumService().report(requireAuthHeader(), request)
                 .enqueue(new EnvelopeCallback<>(callback));
@@ -370,6 +391,16 @@ public final class ForumApiClient {
 
     public void deleteComment(long commentId, @NonNull ResultCallback<Void> callback) {
         forumService().deleteComment(requireAuthHeader(), commentId)
+                .enqueue(new EnvelopeCallback<>(callback));
+    }
+
+    public void forbidUser(@NonNull String userId, int days, @NonNull String reason,
+                           @NonNull ResultCallback<Void> callback) {
+        UserForbiddenRequest request = new UserForbiddenRequest();
+        request.userId = userId;
+        request.days = days;
+        request.reason = reason;
+        forumService().forbidUser(requireAuthHeader(), request)
                 .enqueue(new EnvelopeCallback<>(callback));
     }
 
@@ -748,6 +779,10 @@ public final class ForumApiClient {
         Call<ApiEnvelope<Void>> deleteComment(@Header("X-User-Token") String token,
                                               @Path("id") long commentId);
 
+        @POST("api/user/forbidden")
+        Call<ApiEnvelope<Void>> forbidUser(@Header("X-User-Token") String token,
+                                           @Body UserForbiddenRequest request);
+
         @Multipart
         @POST("api/upload")
         Call<ApiEnvelope<UploadResult>> upload(@Header("X-User-Token") String token,
@@ -785,6 +820,12 @@ public final class ForumApiClient {
     private static final class ReportRequest {
         public String dataId;
         public String dataType;
+        public String reason;
+    }
+
+    private static final class UserForbiddenRequest {
+        public String userId;
+        public int days;
         public String reason;
     }
 
