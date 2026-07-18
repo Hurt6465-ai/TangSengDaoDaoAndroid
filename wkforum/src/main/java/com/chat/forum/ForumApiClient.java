@@ -11,6 +11,7 @@ import com.chat.base.config.WKApiConfig;
 import com.chat.base.config.WKConfig;
 import com.chat.base.config.WKSharedPreferencesUtil;
 import com.chat.base.net.FastJsonConverterFactory;
+import com.chat.base.net.entity.UploadFileUrl;
 import com.chat.base.net.RetrofitUtils;
 
 import java.io.File;
@@ -37,6 +38,7 @@ import retrofit2.http.POST;
 import retrofit2.http.Part;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
+import retrofit2.http.Url;
 
 /**
  * Native bbs-go client.
@@ -53,7 +55,7 @@ public final class ForumApiClient {
     private static final String PREF_ROLES = "forum_bbsgo_roles";
     private static final String PREF_PERMISSIONS = "forum_bbsgo_permissions";
     private static final String PREF_AUTH_META_VERSION = "forum_bbsgo_auth_meta_version";
-    private static final String AUTH_META_VERSION = "3";
+    private static final String AUTH_META_VERSION = "5";
     private static final long SESSION_SAFETY_WINDOW_MS = 60_000L;
 
     private static final ForumApiClient INSTANCE = new ForumApiClient();
@@ -157,7 +159,8 @@ public final class ForumApiClient {
     }
 
     public boolean isForumManager() {
-        return hasRole("owner")
+        return hasRole("owner") || hasRole("admin") || hasRole("administrator")
+                || hasRole("moderator") || hasRole("管理员") || hasRole("站长")
                 || hasPermission("dashboard.topic.recommend")
                 || hasPermission("dashboard.topic.sticky")
                 || hasPermission("dashboard.topic.delete")
@@ -410,6 +413,55 @@ public final class ForumApiClient {
         MultipartBody.Part part = MultipartBody.Part.createFormData("image", file.getName(), body);
         forumService().upload(requireAuthHeader(), part)
                 .enqueue(new EnvelopeCallback<>(callback));
+    }
+
+    public void getVoiceUploadTarget(@NonNull File file,
+                                     @NonNull ResultCallback<VoiceUploadTarget> callback) {
+        if (!file.exists() || file.length() <= 0) {
+            callback.onError("录音文件不存在");
+            return;
+        }
+        String uid = currentUid();
+        if (TextUtils.isEmpty(uid)) {
+            callback.onError("请先登录");
+            return;
+        }
+        String name = file.getName();
+        String ext = "amr";
+        int dot = name.lastIndexOf('.');
+        if (dot >= 0 && dot < name.length() - 1) ext = name.substring(dot + 1);
+        String path = "/forum/" + uid + "/voice_" + System.currentTimeMillis() + "." + ext;
+        String requestUrl = WKApiConfig.baseUrl + "file/upload?type=common&path="
+                + Uri.encode(path, "/");
+        TangSengUploadService service;
+        try {
+            service = RetrofitUtils.getInstance().createService(TangSengUploadService.class);
+        } catch (Throwable error) {
+            callback.onError(readableError(error, "上传服务尚未初始化"));
+            return;
+        }
+        service.getUploadFileUrl(requestUrl).enqueue(new Callback<UploadFileUrl>() {
+            @Override
+            public void onResponse(@NonNull Call<UploadFileUrl> call,
+                                   @NonNull Response<UploadFileUrl> response) {
+                UploadFileUrl data = response.body();
+                if (!response.isSuccessful() || data == null || TextUtils.isEmpty(data.url)) {
+                    callback.onError(extractHttpError(response, "无法获取语音上传地址"));
+                    return;
+                }
+                VoiceUploadTarget target = new VoiceUploadTarget();
+                target.uploadUrl = data.url;
+                target.path = path;
+                target.publicUrl = data.public_url;
+                callback.onSuccess(target);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<UploadFileUrl> call,
+                                  @NonNull Throwable throwable) {
+                callback.onError(readableError(throwable, "无法连接上传服务"));
+            }
+        });
     }
 
     private void requestTangSengToken(Context context, String uid) {
@@ -671,6 +723,11 @@ public final class ForumApiClient {
     private interface TangSengService {
         @POST("forum/token")
         Call<TangSengTokenResponse> issueForumToken();
+    }
+
+    private interface TangSengUploadService {
+        @GET
+        Call<UploadFileUrl> getUploadFileUrl(@Url String url);
     }
 
     private interface ForumService {
@@ -941,6 +998,8 @@ public final class ForumApiClient {
     }
 
     public static final class User {
+        /** Talkami uid; BBS-GO id remains in id for forum APIs. */
+        public String uid;
         public String id;
         public String nickname;
         public String avatar;
@@ -961,6 +1020,12 @@ public final class ForumApiClient {
         public ImageInfo(String url) {
             this.url = url;
         }
+    }
+
+    public static final class VoiceUploadTarget {
+        public String uploadUrl;
+        public String path;
+        public String publicUrl;
     }
 
     public static final class UploadResult {
