@@ -55,7 +55,7 @@ public final class ForumApiClient {
     private static final String PREF_ROLES = "forum_bbsgo_roles";
     private static final String PREF_PERMISSIONS = "forum_bbsgo_permissions";
     private static final String PREF_AUTH_META_VERSION = "forum_bbsgo_auth_meta_version";
-    private static final String AUTH_META_VERSION = "5";
+    private static final String AUTH_META_VERSION = "6";
     private static final long SESSION_SAFETY_WINDOW_MS = 60_000L;
 
     private static final ForumApiClient INSTANCE = new ForumApiClient();
@@ -286,8 +286,15 @@ public final class ForumApiClient {
 
     public void getComments(@NonNull String topicId, @Nullable String cursor,
                             @NonNull ResultCallback<Page<Comment>> callback) {
+        getComments(topicId, cursor, "desc", callback);
+    }
+
+    public void getComments(@NonNull String topicId, @Nullable String cursor,
+                            @Nullable String sort,
+                            @NonNull ResultCallback<Page<Comment>> callback) {
         forumService().comments(authHeader(), "topic", topicId,
-                        TextUtils.isEmpty(cursor) ? "" : cursor)
+                        TextUtils.isEmpty(cursor) ? "" : cursor,
+                        TextUtils.isEmpty(sort) ? "desc" : sort)
                 .enqueue(new EnvelopeCallback<>(callback));
     }
 
@@ -781,7 +788,8 @@ public final class ForumApiClient {
         Call<ApiEnvelope<Page<Comment>>> comments(@Header("X-User-Token") String token,
                                                   @Query("entityType") String entityType,
                                                   @Query("entityId") String entityId,
-                                                  @Query("cursor") String cursor);
+                                                  @Query("cursor") String cursor,
+                                                  @Query("sort") String sort);
 
         @GET("api/comment/replies")
         Call<ApiEnvelope<Page<Comment>>> replies(@Header("X-User-Token") String token,

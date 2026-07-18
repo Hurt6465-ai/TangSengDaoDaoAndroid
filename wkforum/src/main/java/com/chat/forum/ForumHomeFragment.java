@@ -156,10 +156,14 @@ public class ForumHomeFragment extends Fragment {
 
         feedTabContainer = new LinearLayout(context);
         feedTabContainer.setGravity(Gravity.CENTER_VERTICAL);
-        feedTabContainer.setPadding(dp(context, 8), dp(context, 5), dp(context, 8), dp(context, 5));
-        feedTabContainer.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
-        appBarLayout.addView(feedTabContainer, new AppBarLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        feedTabContainer.setPadding(dp(context, 3), dp(context, 3), dp(context, 3), dp(context, 3));
+        feedTabContainer.setBackground(roundRect(context,
+                dark ? 0xFF23252A : 0xFFF1F3F6, 19));
+        AppBarLayout.LayoutParams feedTabsParams = new AppBarLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 42));
+        feedTabsParams.setMargins(dp(context, 14), dp(context, 6),
+                dp(context, 14), dp(context, 6));
+        appBarLayout.addView(feedTabContainer, feedTabsParams);
 
         currentCategoryView = text(context, "", 12, dark ? 0xFFAAB0B8 : 0xFF66707B, false);
         currentCategoryView.setPadding(dp(context, 16), dp(context, 7), dp(context, 16), dp(context, 7));
@@ -288,26 +292,29 @@ public class ForumHomeFragment extends Fragment {
     private void buildFeaturedSectionHeader(Context context) {
         boolean dark = isDark(context);
         LinearLayout header = new LinearLayout(context);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = text(context, "常用板块", 15,
-                dark ? Color.WHITE : 0xFF202328, true);
-        header.addView(title, new LinearLayout.LayoutParams(0, dp(context, 29), 1f));
+        header.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
 
         allCategoriesButton = text(context, "更多  ›", 13, 0xFF1877F2, true);
-        allCategoriesButton.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        allCategoriesButton.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
         allCategoriesButton.setOnClickListener(v -> openDrawer());
         header.addView(allCategoriesButton, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 29)));
-        featuredSection.addView(header);
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 27)));
+        featuredSection.addView(header, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         featuredGrid = new GridLayout(context);
         featuredGrid.setColumnCount(2);
         featuredGrid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
         featuredGrid.setUseDefaultMargins(false);
-        LinearLayout.LayoutParams gridParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        gridParams.topMargin = dp(context, 3);
-        featuredSection.addView(featuredGrid, gridParams);
+        featuredSection.addView(featuredGrid, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        View sectionDivider = new View(context);
+        sectionDivider.setBackgroundColor(dark ? 0x332F3338 : 0x335F6872);
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 0.7f));
+        dividerParams.topMargin = dp(context, 9);
+        featuredSection.addView(sectionDivider, dividerParams);
     }
 
     @Override
@@ -498,7 +505,7 @@ public class ForumHomeFragment extends Fragment {
         addFeedTab("关注", CATEGORY_FOLLOW);
 
         List<ForumApiClient.Category> flat = flattenCategories();
-        allCategoriesButton.setText(flat.isEmpty() ? "更多  ›" : "更多 " + flat.size() + "  ›");
+        allCategoriesButton.setText("更多  ›");
         featuredGrid.removeAllViews();
 
         List<ForumApiClient.Category> featured = featuredCategories(flat);
@@ -519,18 +526,20 @@ public class ForumHomeFragment extends Fragment {
 
     private void addFeedTab(String label, long categoryId) {
         Context context = requireContext();
+        boolean dark = isDark(context);
         boolean selected = selectedCategory == categoryId;
-        TextView tab = text(context, label, 14,
-                selected ? 0xFF1877F2 : (isDark(context) ? 0xFFB8BBC2 : 0xFF565D66),
-                selected);
+        TextView tab = text(context, label, 13.5f,
+                selected ? (dark ? Color.WHITE : 0xFF1877F2)
+                        : (dark ? 0xFFADB2BA : 0xFF59616B), selected);
         tab.setGravity(Gravity.CENTER);
-        tab.setPadding(dp(context, 5), 0, dp(context, 5), 0);
+        tab.setSingleLine(true);
         tab.setBackground(selected
-                ? roundRect(context, isDark(context) ? 0xFF243B59 : 0xFFEAF3FF, 15)
-                : selectableBackground(context));
+                ? roundRect(context, dark ? 0xFF3B4656 : Color.WHITE, 16)
+                : null);
         tab.setOnClickListener(v -> selectCategory(categoryId));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(context, 33), 1f);
-        params.setMargins(dp(context, 2), 0, dp(context, 2), 0);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+        params.setMargins(dp(context, 1), 0, dp(context, 1), 0);
         feedTabContainer.addView(tab, params);
     }
 
@@ -845,22 +854,45 @@ public class ForumHomeFragment extends Fragment {
             String author = topic.user == null || TextUtils.isEmpty(topic.user.nickname)
                     ? "用户" : topic.user.nickname;
             String category = topic.category == null ? "" : safe(topic.category.name);
+            boolean newReply = hasNewReply(topic);
+            boolean read = wasSeen(topic);
+            boolean dimmed = read && !newReply;
+            boolean dark = isDark(context);
+
             holder.author.setText(author);
-            holder.meta.setText((TextUtils.isEmpty(category) ? "" : category + " · ")
-                    + formatTime(topic.createTime));
+            holder.meta.setText(category);
+            holder.time.setText(formatTime(topic.createTime));
             holder.title.setText(safe(topic.title));
             holder.sticky.setVisibility(topic.sticky ? View.VISIBLE : View.GONE);
             holder.recommend.setVisibility(topic.recommend ? View.VISIBLE : View.GONE);
             holder.replyCount.setText(String.valueOf(Math.max(0L, topic.commentCount)));
-            setCompoundIcon(holder.replyCount, com.chat.forum.R.drawable.ic_forum_reply_round,
-                    18, isDark(context) ? 0xFF9CA2AA : 0xFF69717A);
-            boolean newReply = hasNewReply(topic);
-            holder.newReply.setVisibility(newReply ? View.VISIBLE : View.GONE);
+            holder.replyCount.setTextColor(newReply ? 0xFF1877F2
+                    : (dark ? 0xFFB7BCC4 : 0xFF626A74));
+            holder.replyCount.setBackground(roundRect(context,
+                    newReply ? (dark ? 0xFF263B57 : 0xFFEAF3FF)
+                            : (dark ? 0xFF25272C : 0xFFF1F3F5), 13));
+            setCompoundIcon(holder.replyCount, com.chat.forum.R.drawable.ic_forum_chat_bubble,
+                    15, newReply ? 0xFF1877F2 : (dark ? 0xFF9EA4AD : 0xFF69717A));
+
+            int normalTitle = dark ? Color.WHITE : 0xFF171A1F;
+            int dimTitle = dark ? 0xFF777C84 : 0xFF9A9FA6;
+            holder.title.setTextColor(dimmed ? dimTitle : normalTitle);
+            holder.author.setAlpha(dimmed ? 0.58f : 1f);
+            holder.meta.setAlpha(dimmed ? 0.52f : 1f);
+            holder.time.setAlpha(dimmed ? 0.50f : 1f);
+            holder.avatar.setAlpha(dimmed ? 0.56f : 1f);
+            holder.sticky.setAlpha(dimmed ? 0.58f : 1f);
+            holder.recommend.setAlpha(dimmed ? 0.58f : 1f);
 
             bindAvatar(holder.avatar, topic.user, author);
             holder.itemView.setOnClickListener(v -> {
                 if (!TextUtils.isEmpty(topic.id)) listener.onClick(topic);
             });
+        }
+
+        private boolean wasSeen(ForumApiClient.Topic topic) {
+            return topic != null && !TextUtils.isEmpty(topic.id)
+                    && seenPrefs.contains("time_" + topic.id);
         }
 
         private boolean hasNewReply(ForumApiClient.Topic topic) {
@@ -921,10 +953,10 @@ public class ForumHomeFragment extends Fragment {
         private final AvatarView avatar;
         private final TextView author;
         private final TextView meta;
+        private final TextView time;
         private final TextView sticky;
         private final TextView recommend;
         private final TextView title;
-        private final TextView newReply;
         private final TextView replyCount;
 
         private TopicHolder(@NonNull View itemView) {
@@ -935,13 +967,14 @@ public class ForumHomeFragment extends Fragment {
             LinearLayout authorText = (LinearLayout) authorRow.getChildAt(1);
             author = (TextView) authorText.getChildAt(0);
             meta = (TextView) authorText.getChildAt(1);
-            LinearLayout badges = (LinearLayout) authorRow.getChildAt(2);
+            LinearLayout right = (LinearLayout) authorRow.getChildAt(2);
+            time = (TextView) right.getChildAt(0);
+            LinearLayout badges = (LinearLayout) right.getChildAt(1);
             sticky = (TextView) badges.getChildAt(0);
             recommend = (TextView) badges.getChildAt(1);
             LinearLayout titleRow = (LinearLayout) root.getChildAt(1);
             title = (TextView) titleRow.getChildAt(0);
-            newReply = (TextView) titleRow.getChildAt(1);
-            replyCount = (TextView) titleRow.getChildAt(2);
+            replyCount = (TextView) titleRow.getChildAt(1);
         }
     }
 
@@ -953,7 +986,7 @@ public class ForumHomeFragment extends Fragment {
         boolean dark = isDark(context);
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(context, 15), dp(context, 10), dp(context, 12), 0);
+        root.setPadding(dp(context, 15), dp(context, 10), dp(context, 13), dp(context, 11));
         root.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
         root.setForeground(selectableBackground(context));
         root.setLayoutParams(new RecyclerView.LayoutParams(
@@ -969,6 +1002,8 @@ public class ForumHomeFragment extends Fragment {
         authorText.setOrientation(LinearLayout.VERTICAL);
         TextView author = text(context, "", 12.5f, dark ? 0xFFF1F2F4 : 0xFF272B31, true);
         TextView meta = text(context, "", 10.5f, dark ? 0xFF8F949C : 0xFF7A818A, false);
+        meta.setSingleLine(true);
+        meta.setEllipsize(TextUtils.TruncateAt.END);
         authorText.addView(author);
         authorText.addView(meta);
         LinearLayout.LayoutParams authorTextParams = new LinearLayout.LayoutParams(0,
@@ -976,19 +1011,31 @@ public class ForumHomeFragment extends Fragment {
         authorTextParams.leftMargin = dp(context, 8);
         authorRow.addView(authorText, authorTextParams);
 
+        LinearLayout right = new LinearLayout(context);
+        right.setOrientation(LinearLayout.VERTICAL);
+        right.setGravity(Gravity.END);
+        TextView time = text(context, "", 10.5f,
+                dark ? 0xFF747981 : 0xFFA1A6AD, false);
+        time.setGravity(Gravity.END);
+        right.addView(time, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 18)));
+
         LinearLayout badges = new LinearLayout(context);
-        badges.setGravity(Gravity.CENTER_VERTICAL);
+        badges.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
         TextView sticky = badge(context, "置顶", 0xFFB96800,
                 dark ? 0xFF40311D : 0xFFFFF0D6);
         TextView recommend = badge(context, "推荐", 0xFF1877F2,
                 dark ? 0xFF243B59 : 0xFFEAF3FF);
         badges.addView(sticky, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 22)));
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 19)));
         LinearLayout.LayoutParams recommendParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 22));
-        recommendParams.leftMargin = dp(context, 5);
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 19));
+        recommendParams.leftMargin = dp(context, 4);
         badges.addView(recommend, recommendParams);
-        authorRow.addView(badges);
+        right.addView(badges, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 20)));
+        authorRow.addView(right, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(authorRow, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -1001,31 +1048,22 @@ public class ForumHomeFragment extends Fragment {
         titleRow.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView newReply = badge(context, "新回复", Color.WHITE, 0xFFE94B4B);
-        LinearLayout.LayoutParams newParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 21));
-        newParams.leftMargin = dp(context, 6);
-        titleRow.addView(newReply, newParams);
-
-        TextView replyCount = text(context, "0", 12,
-                dark ? 0xFF9CA2AA : 0xFF69717A, false);
-        replyCount.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+        TextView replyCount = text(context, "0", 11.5f,
+                dark ? 0xFFB7BCC4 : 0xFF626A74, true);
+        replyCount.setGravity(Gravity.CENTER);
         replyCount.setCompoundDrawablePadding(dp(context, 3));
+        replyCount.setPadding(dp(context, 8), 0, dp(context, 8), 0);
+        replyCount.setBackground(roundRect(context,
+                dark ? 0xFF25272C : 0xFFF1F3F5, 13));
         LinearLayout.LayoutParams replyParams = new LinearLayout.LayoutParams(
-                dp(context, 52), dp(context, 32));
-        replyParams.leftMargin = dp(context, 4);
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 27));
+        replyParams.leftMargin = dp(context, 9);
         titleRow.addView(replyCount, replyParams);
 
         LinearLayout.LayoutParams titleRowParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         titleRowParams.topMargin = dp(context, 7);
-        titleRowParams.bottomMargin = dp(context, 10);
         root.addView(titleRow, titleRowParams);
-
-        View divider = new View(context);
-        divider.setBackgroundColor(dark ? 0xFF292B30 : 0xFFE7E9ED);
-        root.addView(divider, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 0.7f)));
         return root;
     }
 

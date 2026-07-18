@@ -10,7 +10,10 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.media.AudioAttributes;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -55,6 +58,9 @@ import com.chat.uikit.view.voice.AudioRecordManager;
 import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -63,6 +69,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 /** Native topic detail with a single RecyclerView for smooth long discussions. */
 public class ForumTopicActivity extends AppCompatActivity {
@@ -70,10 +83,22 @@ public class ForumTopicActivity extends AppCompatActivity {
     private static final String SEEN_PREF = "forum_topic_seen";
     private static final long MIN_RECORD_MS = 700L;
     private static final long MAX_RECORD_MS = 60_000L;
+    private static final String COMMENT_SORT_HOT = "hot";
+    private static final String COMMENT_SORT_ASC = "asc";
+    private static final String COMMENT_SORT_DESC = "desc";
+    private static final OkHttpClient VOICE_HTTP = new OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(45, TimeUnit.SECONDS)
+            .callTimeout(60, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build();
 
     private String topicId = "";
     private RecyclerView recyclerView;
     private TextView stateView;
+    private TextView fastScrollButton;
+    private boolean fastScrollToTop;
     private EditText commentInput;
     private TextView composerAction;
     private TextView replyHint;
@@ -86,6 +111,8 @@ public class ForumTopicActivity extends AppCompatActivity {
     private boolean commentsHasMore;
     private boolean loadingComments;
     private boolean refreshCommentsPending;
+    private boolean commentsTailWindow;
+    private String commentSort = COMMENT_SORT_ASC;
     private boolean sending;
     private boolean topicActionBusy;
     private long replyParentId;
@@ -115,8 +142,19 @@ public class ForumTopicActivity extends AppCompatActivity {
     };
 
     private MediaPlayer voicePlayer;
+    private Call voiceDownloadCall;
     private String playingVoiceKey = "";
+    private VoicePayload playingVoicePayload;
     private TextView playingVoiceView;
+    private final Runnable voiceProgressTick = new Runnable() {
+        @Override
+        public void run() {
+            updatePlayingVoiceUi();
+            if (voicePlayer != null && isVoicePlaying()) {
+                mainHandler.postDelayed(this, 250L);
+            }
+        }
+    };
 
     private final ActivityResultLauncher<String> audioPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(), granted -> {
@@ -166,23 +204,28 @@ public class ForumTopicActivity extends AppCompatActivity {
         root.requestApplyInsets();
 
         FrameLayout body = new FrameLayout(this);
+        body.setClickable(true);
+        body.setOnClickListener(v -> {
+            if (replyParentId > 0 || replyQuoteId > 0) clearReplyTarget();
+        });
         recyclerView = new RecyclerView(this);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        recyclerView.setLayoutManager(layoutManager);
         recyclerView.setItemAnimator(null);
         recyclerView.setClipToPadding(false);
-        recyclerView.setPadding(0, 0, 0, dp(12));
-        recyclerView.setItemViewCacheSize(12);
+        recyclerView.setPadding(0, 0, 0, dp(14));
+        recyclerView.setItemViewCacheSize(14);
+        recyclerView.setHasFixedSize(false);
         adapter = new TopicDetailAdapter();
         recyclerView.setAdapter(adapter);
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
-                if (dy <= 0 || loadingComments || !commentsHasMore) return;
-                RecyclerView.LayoutManager manager = rv.getLayoutManager();
-                if (manager instanceof LinearLayoutManager) {
-                    int last = ((LinearLayoutManager) manager).findLastVisibleItemPosition();
+                if (dy > 0 && !loadingComments && commentsHasMore) {
+                    int last = layoutManager.findLastVisibleItemPosition();
                     if (last >= adapter.getItemCount() - 4) loadComments(false);
                 }
+                updateFastScrollButton();
             }
         });
         body.addView(recyclerView, new FrameLayout.LayoutParams(
@@ -190,13 +233,45 @@ public class ForumTopicActivity extends AppCompatActivity {
 
         stateView = text("正在加载…", 14, dark ? 0xFFB8BBC2 : 0xFF6E737B, false);
         stateView.setGravity(Gravity.CENTER);
+        stateView.setOnClickListener(v -> clearReplyTarget());
         body.addView(stateView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        fastScrollButton = text("↓", 24, dark ? Color.WHITE : 0xFF30363D, true);
+        fastScrollButton.setGravity(Gravity.CENTER);
+        fastScrollButton.setContentDescription("快速到底部");
+        fastScrollButton.setBackground(roundRect(dark ? 0xFF30333A : 0xFFF0F3F7, 24));
+        fastScrollButton.setElevation(dp(5));
+        fastScrollButton.setVisibility(View.GONE);
+        fastScrollButton.setOnClickListener(v -> {
+            if (adapter == null || adapter.getItemCount() == 0) return;
+            if (fastScrollToTop) {
+                if (commentsTailWindow && COMMENT_SORT_ASC.equals(commentSort)) {
+                    commentsTailWindow = false;
+                    loadComments(true);
+                } else {
+                    recyclerView.stopScroll();
+                    recyclerView.scrollToPosition(0);
+                }
+            } else if (COMMENT_SORT_ASC.equals(commentSort) && commentsHasMore) {
+                loadTailComments();
+            } else {
+                recyclerView.stopScroll();
+                recyclerView.scrollToPosition(Math.max(0, adapter.getItemCount() - 1));
+            }
+            recyclerView.post(this::updateFastScrollButton);
+        });
+        FrameLayout.LayoutParams fastParams = new FrameLayout.LayoutParams(dp(48), dp(48),
+                Gravity.END | Gravity.BOTTOM);
+        fastParams.setMargins(0, 0, dp(14), dp(14));
+        body.addView(fastScrollButton, fastParams);
+
         root.addView(body, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         root.addView(buildComposer(), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         setContentView(root);
+        cleanupVoiceCache();
     }
 
     private View buildComposer() {
@@ -218,8 +293,8 @@ public class ForumTopicActivity extends AppCompatActivity {
 
         recordHint = text("", 13, dark ? Color.WHITE : 0xFF33383E, true);
         recordHint.setGravity(Gravity.CENTER);
-        recordHint.setPadding(dp(12), dp(7), dp(12), dp(7));
-        recordHint.setBackground(roundRect(dark ? 0xFF292C31 : 0xFFF0F2F5, 12));
+        recordHint.setPadding(dp(12), dp(8), dp(12), dp(8));
+        recordHint.setBackground(roundRect(dark ? 0xFF292C31 : 0xFFF0F2F5, 14));
         recordHint.setVisibility(View.GONE);
         LinearLayout.LayoutParams recordParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -237,21 +312,20 @@ public class ForumTopicActivity extends AppCompatActivity {
         commentInput.setHintTextColor(dark ? 0xFF777B82 : 0xFF9A9FA6);
         commentInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         commentInput.setMaxLines(4);
-        commentInput.setPadding(dp(14), dp(8), dp(14), dp(8));
-        commentInput.setBackground(roundRect(dark ? 0xFF24262B : 0xFFF1F3F5, 19));
+        commentInput.setPadding(dp(14), dp(9), dp(14), dp(9));
+        commentInput.setBackground(roundRect(dark ? 0xFF24262B : 0xFFF1F3F5, 21));
         row.addView(commentInput, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        composerAction = text("", 14, dark ? 0xFFE2E4E8 : 0xFF4D555E, true);
+        composerAction = text("", 14, Color.WHITE, true);
         composerAction.setGravity(Gravity.CENTER);
-        composerAction.setBackground(roundRect(dark ? 0xFF25272C : 0xFFF1F3F5, 19));
         composerAction.setOnClickListener(v -> {
             if (sending) return;
             if (!TextUtils.isEmpty(commentInput.getText().toString().trim())) sendComment();
-            else Toast.makeText(this, "按住麦克风录音，上滑取消", Toast.LENGTH_SHORT).show();
+            else Toast.makeText(this, "按住录音，上滑取消", Toast.LENGTH_SHORT).show();
         });
         composerAction.setOnTouchListener(this::handleComposerTouch);
-        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(dp(58), dp(40));
+        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(dp(48), dp(48));
         actionParams.leftMargin = dp(8);
         row.addView(composerAction, actionParams);
         wrapper.addView(row, new LinearLayout.LayoutParams(
@@ -420,17 +494,13 @@ public class ForumTopicActivity extends AppCompatActivity {
     private void updateComposerAction() {
         if (composerAction == null || commentInput == null) return;
         boolean hasText = !TextUtils.isEmpty(commentInput.getText().toString().trim());
-        composerAction.setText(hasText ? "发送" : "");
-        composerAction.setTextColor(hasText ? Color.WHITE : (isDark() ? 0xFFE2E4E8 : 0xFF4D555E));
+        composerAction.setText("");
         composerAction.setBackground(roundRect(hasText ? 0xFF1877F2
-                : (isDark() ? 0xFF25272C : 0xFFF1F3F5), 19));
+                : (isDark() ? 0xFF2A2D33 : 0xFFF0F2F5), 24));
         composerAction.setContentDescription(hasText ? "发送评论" : "按住录音");
-        if (hasText) {
-            composerAction.setCompoundDrawables(null, null, null, null);
-        } else {
-            setCompoundIcon(composerAction, R.drawable.ic_forum_mic, 23,
-                    isDark() ? 0xFFE2E4E8 : 0xFF4D555E);
-        }
+        setCompoundIcon(composerAction, hasText ? R.drawable.ic_forum_send
+                        : R.drawable.ic_forum_mic, hasText ? 22 : 27,
+                hasText ? Color.WHITE : (isDark() ? 0xFFE4E6EA : 0xFF4D555E));
     }
 
     private void loadTopic() {
@@ -502,6 +572,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             return;
         }
         if (reset) {
+            commentsTailWindow = false;
             commentsCursor = "";
             commentsHasMore = false;
             comments.clear();
@@ -509,7 +580,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         }
         loadingComments = true;
         adapter.rebuild();
-        ForumApiClient.getInstance().getComments(topicId, commentsCursor,
+        ForumApiClient.getInstance().getComments(topicId, commentsCursor, commentSort,
                 new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Comment>>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Comment> page) {
@@ -519,6 +590,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                         if (page != null && !TextUtils.isEmpty(page.cursor)) commentsCursor = page.cursor;
                         commentsHasMore = page != null && page.hasMore;
                         adapter.rebuild();
+                        recyclerView.post(ForumTopicActivity.this::updateFastScrollButton);
                         if (refreshCommentsPending) {
                             refreshCommentsPending = false;
                             loadComments(true);
@@ -535,6 +607,72 @@ public class ForumTopicActivity extends AppCompatActivity {
                         }
                     }
                 });
+    }
+
+    private void setCommentSort(@NonNull String sort) {
+        if (loadingComments) return;
+        if (TextUtils.equals(commentSort, sort) && !commentsTailWindow) return;
+        commentSort = sort;
+        commentsTailWindow = false;
+        expandedReplies.clear();
+        stopVoicePlayback();
+        loadComments(true);
+        recyclerView.post(() -> recyclerView.scrollToPosition(0));
+    }
+
+    private void loadTailComments() {
+        if (loadingComments) return;
+        loadingComments = true;
+        ForumApiClient.getInstance().getComments(topicId, "", COMMENT_SORT_DESC,
+                new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Comment>>() {
+                    @Override
+                    public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Comment> page) {
+                        loadingComments = false;
+                        if (isDead()) return;
+                        List<ForumApiClient.Comment> latest = page == null || page.results == null
+                                ? new ArrayList<>() : new ArrayList<>(page.results);
+                        java.util.Collections.reverse(latest);
+                        comments.clear();
+                        comments.addAll(latest);
+                        commentsCursor = "";
+                        commentsHasMore = false;
+                        commentsTailWindow = true;
+                        expandedReplies.clear();
+                        adapter.rebuild();
+                        recyclerView.post(() -> {
+                            recyclerView.scrollToPosition(Math.max(0, adapter.getItemCount() - 1));
+                            updateFastScrollButton();
+                        });
+                    }
+
+                    @Override
+                    public void onError(@NonNull String message) {
+                        loadingComments = false;
+                        Toast.makeText(ForumTopicActivity.this, message, Toast.LENGTH_LONG).show();
+                    }
+                });
+    }
+
+    private void updateFastScrollButton() {
+        if (fastScrollButton == null || recyclerView == null || adapter == null
+                || adapter.getItemCount() <= 1) {
+            if (fastScrollButton != null) fastScrollButton.setVisibility(View.GONE);
+            return;
+        }
+        RecyclerView.LayoutManager manager = recyclerView.getLayoutManager();
+        if (!(manager instanceof LinearLayoutManager)) return;
+        LinearLayoutManager linear = (LinearLayoutManager) manager;
+        int first = linear.findFirstVisibleItemPosition();
+        boolean canUp = recyclerView.canScrollVertically(-1);
+        boolean canDown = recyclerView.canScrollVertically(1);
+        if (!canUp && !canDown) {
+            fastScrollButton.setVisibility(View.GONE);
+            return;
+        }
+        fastScrollToTop = first > 3;
+        fastScrollButton.setText(fastScrollToTop ? "↑" : "↓");
+        fastScrollButton.setContentDescription(fastScrollToTop ? "快速回到顶部" : "快速回到底部");
+        fastScrollButton.setVisibility(View.VISIBLE);
     }
 
     private void loadMoreReplies(ForumApiClient.Comment parent) {
@@ -866,7 +1004,7 @@ public class ForumTopicActivity extends AppCompatActivity {
     private void setReplyTarget(long parentId, long quoteId, String name) {
         replyParentId = parentId;
         replyQuoteId = quoteId;
-        replyHint.setText("回复 " + safe(name) + "（点击取消）");
+        replyHint.setText("正在回复 " + safe(name) + " · 点击空白处取消");
         replyHint.setVisibility(View.VISIBLE);
         commentInput.requestFocus();
         InputMethodManager keyboard = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
@@ -899,7 +1037,12 @@ public class ForumTopicActivity extends AppCompatActivity {
                         clearReplyTarget();
                         setSending(false);
                         setResult(RESULT_OK);
-                        requestTopic();
+                        if (currentTopic != null) currentTopic.commentCount = Math.max(0, currentTopic.commentCount + 1);
+                        if (COMMENT_SORT_ASC.equals(commentSort)) {
+                            loadTailComments();
+                        } else {
+                            requestTopic();
+                        }
                     }
 
                     @Override
@@ -943,8 +1086,9 @@ public class ForumTopicActivity extends AppCompatActivity {
         composerAction.setEnabled(!value);
         composerAction.setAlpha(value ? 0.55f : 1f);
         if (value) {
+            composerAction.setText("");
             composerAction.setCompoundDrawables(null, null, null, null);
-            composerAction.setText("发送中");
+            composerAction.setBackground(roundRect(0xFF9ABEF0, 24));
         } else {
             updateComposerAction();
         }
@@ -963,7 +1107,9 @@ public class ForumTopicActivity extends AppCompatActivity {
     }
 
     private void focusCommentInput() {
-        recyclerView.scrollToPosition(Math.max(0, adapter.getItemCount() - 1));
+        if (COMMENT_SORT_ASC.equals(commentSort)) {
+            recyclerView.scrollToPosition(Math.max(0, adapter.getItemCount() - 1));
+        }
         commentInput.requestFocus();
         InputMethodManager keyboard = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
         if (keyboard != null) keyboard.showSoftInput(commentInput, InputMethodManager.SHOW_IMPLICIT);
@@ -971,55 +1117,208 @@ public class ForumTopicActivity extends AppCompatActivity {
 
     private void playVoice(VoicePayload payload, String key, TextView view) {
         if (payload == null || TextUtils.isEmpty(payload.playPath())) return;
+        view.setTag(key);
         if (voicePlayer != null && TextUtils.equals(playingVoiceKey, key)) {
             try {
                 if (voicePlayer.isPlaying()) {
                     voicePlayer.pause();
-                    setCompoundIcon(view, R.drawable.ic_forum_play, 20,
-                            isDark() ? 0xFFDFE2E6 : 0xFF3E464F);
                 } else {
                     voicePlayer.start();
-                    setCompoundIcon(view, R.drawable.ic_forum_pause, 20, 0xFF1877F2);
+                    mainHandler.removeCallbacks(voiceProgressTick);
+                    mainHandler.post(voiceProgressTick);
                 }
-            } catch (Throwable ignored) { }
+                playingVoiceView = view;
+                updatePlayingVoiceUi();
+            } catch (Throwable ignored) {
+                stopVoicePlayback();
+            }
             return;
         }
         stopVoicePlayback();
         playingVoiceKey = key;
+        playingVoicePayload = payload;
         playingVoiceView = view;
-        voicePlayer = new MediaPlayer();
-        try {
-            voicePlayer.setDataSource(payload.playPath());
-            voicePlayer.setOnPreparedListener(player -> {
-                if (isDead()) return;
-                player.start();
-                setCompoundIcon(view, R.drawable.ic_forum_pause, 20, 0xFF1877F2);
-            });
-            voicePlayer.setOnCompletionListener(player -> stopVoicePlayback());
-            voicePlayer.setOnErrorListener((player, what, extra) -> {
-                stopVoicePlayback();
-                Toast.makeText(this, "语音播放失败", Toast.LENGTH_SHORT).show();
-                return true;
-            });
-            voicePlayer.prepareAsync();
-        } catch (Throwable error) {
-            stopVoicePlayback();
-            Toast.makeText(this, "语音播放失败", Toast.LENGTH_SHORT).show();
+        setVoiceBubbleUi(view, payload.durationSec, true);
+
+        String source = payload.playPath();
+        if (source.startsWith("file://")) {
+            prepareVoiceFile(new File(Uri.parse(source).getPath()));
+            return;
         }
+        if (source.startsWith("/")) {
+            prepareVoiceFile(new File(source));
+            return;
+        }
+        File cacheFile = voiceCacheFile(source);
+        if (cacheFile.exists() && cacheFile.length() > 0) {
+            prepareVoiceFile(cacheFile);
+            return;
+        }
+        downloadVoice(source, cacheFile);
     }
 
     private void stopVoicePlayback() {
+        mainHandler.removeCallbacks(voiceProgressTick);
+        if (voiceDownloadCall != null) {
+            voiceDownloadCall.cancel();
+            voiceDownloadCall = null;
+        }
         if (voicePlayer != null) {
             try { voicePlayer.stop(); } catch (Throwable ignored) { }
             try { voicePlayer.release(); } catch (Throwable ignored) { }
             voicePlayer = null;
         }
-        if (playingVoiceView != null) {
-            setCompoundIcon(playingVoiceView, R.drawable.ic_forum_play, 20,
-                    isDark() ? 0xFFDFE2E6 : 0xFF3E464F);
+        if (playingVoiceView != null && playingVoicePayload != null
+                && TextUtils.equals(String.valueOf(playingVoiceView.getTag()), playingVoiceKey)) {
+            setVoiceBubbleUi(playingVoiceView, playingVoicePayload.durationSec, false);
         }
         playingVoiceKey = "";
+        playingVoicePayload = null;
         playingVoiceView = null;
+    }
+
+
+    private void prepareVoiceFile(@Nullable File file) {
+        if (file == null || !file.exists() || file.length() <= 0 || TextUtils.isEmpty(playingVoiceKey)) {
+            voicePlaybackError();
+            return;
+        }
+        final String expectedKey = playingVoiceKey;
+        MediaPlayer player = new MediaPlayer();
+        voicePlayer = player;
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                player.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build());
+            } else {
+                player.setAudioStreamType(AudioManager.STREAM_MUSIC);
+            }
+            player.setDataSource(file.getAbsolutePath());
+            player.setOnPreparedListener(mp -> {
+                if (isDead() || !TextUtils.equals(expectedKey, playingVoiceKey)) {
+                    try { mp.release(); } catch (Throwable ignored) { }
+                    return;
+                }
+                mp.start();
+                mainHandler.removeCallbacks(voiceProgressTick);
+                mainHandler.post(voiceProgressTick);
+            });
+            player.setOnCompletionListener(mp -> stopVoicePlayback());
+            player.setOnErrorListener((mp, what, extra) -> {
+                voicePlaybackError();
+                return true;
+            });
+            player.prepareAsync();
+        } catch (Throwable error) {
+            voicePlaybackError();
+        }
+    }
+
+    private void downloadVoice(String url, File target) {
+        File parent = target.getParentFile();
+        if (parent != null && !parent.exists()) parent.mkdirs();
+        final String expectedKey = playingVoiceKey;
+        Request request;
+        try {
+            request = new Request.Builder().url(url).get().build();
+        } catch (Throwable error) {
+            voicePlaybackError();
+            return;
+        }
+        voiceDownloadCall = VOICE_HTTP.newCall(request);
+        voiceDownloadCall.enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException error) {
+                runOnUiThread(() -> {
+                    if (TextUtils.equals(expectedKey, playingVoiceKey)) voicePlaybackError();
+                });
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                File part = new File(target.getAbsolutePath() + ".part");
+                boolean ok = false;
+                try {
+                    if (!response.isSuccessful() || response.body() == null) throw new IOException("HTTP " + response.code());
+                    try (InputStream input = response.body().byteStream();
+                         FileOutputStream output = new FileOutputStream(part)) {
+                        byte[] buffer = new byte[16 * 1024];
+                        int read;
+                        while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
+                        output.flush();
+                    }
+                    if (part.length() <= 0) throw new IOException("empty voice");
+                    if (target.exists()) target.delete();
+                    ok = part.renameTo(target);
+                    if (!ok) {
+                        try (InputStream input = new java.io.FileInputStream(part);
+                             FileOutputStream output = new FileOutputStream(target)) {
+                            byte[] buffer = new byte[16 * 1024];
+                            int read;
+                            while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
+                        }
+                        ok = target.length() > 0;
+                    }
+                } finally {
+                    response.close();
+                    if (part.exists()) part.delete();
+                }
+                final boolean success = ok;
+                runOnUiThread(() -> {
+                    if (!TextUtils.equals(expectedKey, playingVoiceKey)) return;
+                    voiceDownloadCall = null;
+                    if (success) prepareVoiceFile(target); else voicePlaybackError();
+                });
+            }
+        });
+    }
+
+    private void updatePlayingVoiceUi() {
+        if (playingVoiceView == null || playingVoicePayload == null
+                || !TextUtils.equals(String.valueOf(playingVoiceView.getTag()), playingVoiceKey)) return;
+        int remain = playingVoicePayload.durationSec;
+        boolean active = false;
+        if (voicePlayer != null) {
+            try {
+                active = voicePlayer.isPlaying();
+                int duration = voicePlayer.getDuration();
+                int position = voicePlayer.getCurrentPosition();
+                if (duration > 0) remain = Math.max(0, (int) Math.ceil((duration - position) / 1000.0));
+            } catch (Throwable ignored) { }
+        }
+        setVoiceBubbleUi(playingVoiceView, remain, active);
+    }
+
+    private void setVoiceBubbleUi(TextView view, int seconds, boolean active) {
+        if (view == null) return;
+        view.setText(Math.max(0, seconds) + "″");
+        int color = active ? 0xFF1877F2 : (isDark() ? 0xFFE0E3E8 : 0xFF414850);
+        setCompoundIcon(view, R.drawable.ic_forum_waveform, 23, color);
+        view.setTextColor(color);
+        view.setBackground(roundRect(active
+                ? (isDark() ? 0xFF263B57 : 0xFFEAF3FF)
+                : (isDark() ? 0xFF25282E : 0xFFF0F3F7), 20));
+    }
+
+    private void voicePlaybackError() {
+        stopVoicePlayback();
+        if (!isDead()) Toast.makeText(this, "语音播放失败，请重试", Toast.LENGTH_SHORT).show();
+    }
+
+    private File voiceCacheFile(String url) {
+        File dir = new File(getCacheDir(), "forum_voice_play");
+        if (!dir.exists()) dir.mkdirs();
+        return new File(dir, Integer.toHexString(url.hashCode()) + ".amr");
+    }
+
+    private void cleanupVoiceCache() {
+        File dir = new File(getCacheDir(), "forum_voice_play");
+        File[] files = dir.listFiles();
+        if (files == null || files.length <= 40) return;
+        java.util.Arrays.sort(files, (a, b) -> Long.compare(a.lastModified(), b.lastModified()));
+        for (int i = 0; i < files.length - 30; i++) deleteQuietly(files[i].getAbsolutePath());
     }
 
     @Override
@@ -1120,6 +1419,9 @@ public class ForumTopicActivity extends AppCompatActivity {
             root.setOrientation(LinearLayout.VERTICAL);
             root.setPadding(dp(18), dp(12), dp(18), 0);
             root.setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
+            root.setOnClickListener(v -> {
+                if (replyParentId > 0 || replyQuoteId > 0) clearReplyTarget();
+            });
             ForumApiClient.Topic topic = currentTopic;
             if (topic == null) return;
 
@@ -1168,30 +1470,28 @@ public class ForumTopicActivity extends AppCompatActivity {
             root.addView(divider(), dividerParams);
 
             TextView content = htmlText(TextUtils.isEmpty(topic.content) ? topic.summary : topic.content, 17);
+            content.setOnClickListener(v -> clearReplyTarget());
             root.addView(content, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             addRemoteImages(root, topic.imageList, dp(10));
 
             LinearLayout actions = new LinearLayout(ForumTopicActivity.this);
             actions.setGravity(Gravity.CENTER_VERTICAL);
-            actions.setPadding(0, dp(15), 0, dp(13));
+            actions.setPadding(0, dp(12), 0, dp(10));
             addTopicStat(actions, R.drawable.ic_forum_eye, String.valueOf(Math.max(0, topic.viewCount)), false, null);
             addTopicStat(actions, topic.liked ? R.drawable.ic_forum_heart_filled : R.drawable.ic_forum_heart_round,
                     String.valueOf(Math.max(0, topic.likeCount)), topic.liked, v -> changeTopicLike());
             addTopicStat(actions, topic.favorited ? R.drawable.ic_forum_bookmark_filled : R.drawable.ic_forum_bookmark,
-                    topic.favorited ? "已收藏" : "收藏", topic.favorited, v -> changeFavorite());
-            addTopicStat(actions, R.drawable.ic_forum_reply_round,
+                    "", topic.favorited, v -> changeFavorite());
+            addTopicStat(actions, R.drawable.ic_forum_chat_bubble,
                     String.valueOf(Math.max(0, topic.commentCount)), false, v -> focusCommentInput());
             root.addView(actions, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
             root.addView(divider(), new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(0.8f)));
-            TextView commentsTitle = text(topic.commentCount > 0 ? "评论 " + topic.commentCount : "评论",
-                    18, isDark() ? Color.WHITE : 0xFF202328, true);
-            commentsTitle.setPadding(0, dp(15), 0, dp(9));
-            root.addView(commentsTitle, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            root.addView(buildCommentsHeader(topic), new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
         }
 
         private View buildAuthorRow(ForumApiClient.Topic topic) {
@@ -1240,38 +1540,83 @@ public class ForumTopicActivity extends AppCompatActivity {
 
         private void addTopicStat(LinearLayout row, int iconRes, String label,
                                   boolean active, @Nullable View.OnClickListener click) {
-            TextView action = text(label, 13,
+            TextView action = text(label, 12.5f,
                     active ? 0xFFE34A55 : (isDark() ? 0xFFB8BBC2 : 0xFF59616A), false);
             action.setGravity(Gravity.CENTER);
-            action.setCompoundDrawablePadding(dp(4));
-            setCompoundIcon(action, iconRes, iconRes == R.drawable.ic_forum_eye ? 23 : 20,
+            action.setCompoundDrawablePadding(dp(3));
+            action.setPadding(dp(8), 0, dp(8), 0);
+            setCompoundIcon(action, iconRes, iconRes == R.drawable.ic_forum_eye ? 22 : 19,
                     active ? 0xFFE34A55 : (isDark() ? 0xFFB8BBC2 : 0xFF59616A));
             if (click != null) {
                 action.setBackground(selectableBackground());
                 action.setOnClickListener(click);
             }
-            row.addView(action, new LinearLayout.LayoutParams(0, dp(42), 1f));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
+            params.rightMargin = dp(5);
+            row.addView(action, params);
+        }
+
+        private View buildCommentsHeader(ForumApiClient.Topic topic) {
+            LinearLayout row = new LinearLayout(ForumTopicActivity.this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            TextView title = text(topic.commentCount > 0 ? "评论 " + topic.commentCount : "评论",
+                    17, isDark() ? Color.WHITE : 0xFF202328, true);
+            row.addView(title, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+
+            LinearLayout pill = new LinearLayout(ForumTopicActivity.this);
+            pill.setGravity(Gravity.CENTER_VERTICAL);
+            pill.setPadding(dp(2), dp(2), dp(2), dp(2));
+            pill.setBackground(roundRect(isDark() ? 0xFF25272C : 0xFFF1F3F5, 15));
+            addSortTab(pill, "热门", COMMENT_SORT_HOT);
+            addSortTab(pill, "正序", COMMENT_SORT_ASC);
+            addSortTab(pill, "倒序", COMMENT_SORT_DESC);
+            row.addView(pill, new LinearLayout.LayoutParams(dp(150), dp(32)));
+            return row;
+        }
+
+        private void addSortTab(LinearLayout pill, String label, String value) {
+            boolean selected = TextUtils.equals(commentSort, value);
+            TextView tab = text(label, 11.5f, selected ? 0xFF1877F2
+                    : (isDark() ? 0xFFAEB3BB : 0xFF69717A), selected);
+            tab.setGravity(Gravity.CENTER);
+            tab.setBackground(selected ? roundRect(isDark() ? 0xFF34465F : Color.WHITE, 13) : null);
+            tab.setOnClickListener(v -> setCommentSort(value));
+            pill.addView(tab, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.MATCH_PARENT, 1f));
         }
 
         private void bindComment(CommentHolder holder, Row row) {
             ForumApiClient.Comment comment = row.comment;
             boolean reply = row.reply;
-            int left = reply ? 52 : 16;
+            int left = reply ? 48 : 16;
             holder.root.setPadding(dp(left), dp(reply ? 7 : 10), dp(14), 0);
             holder.avatar.setSize(reply ? 25 : 32);
             LinearLayout.LayoutParams avatarParams = (LinearLayout.LayoutParams) holder.avatar.getLayoutParams();
             avatarParams.width = dp((reply ? 25 : 32) + 4);
             avatarParams.height = dp((reply ? 25 : 32) + 4);
             holder.avatar.setLayoutParams(avatarParams);
+
             String author = userName(comment.user);
             bindAvatar(holder.avatar, comment.user, author);
             String target = reply && comment.quote != null && comment.quote.user != null
                     ? userName(comment.quote.user) : "";
-            String header = reply && !TextUtils.isEmpty(target)
-                    ? author + " 回复 " + target + " · " + formatDate(comment.createTime)
-                    : author + " · " + formatDate(comment.createTime);
-            holder.meta.setText(header);
-            holder.meta.setTextSize(TypedValue.COMPLEX_UNIT_SP, reply ? 12 : 13);
+            holder.name.setText(reply && !TextUtils.isEmpty(target)
+                    ? author + " 回复 " + target : author);
+            holder.name.setTextSize(TypedValue.COMPLEX_UNIT_SP, reply ? 12 : 13);
+            holder.time.setText(formatDate(comment.createTime));
+            holder.time.setTextColor(isDark() ? 0xFF747981 : 0xFFA2A7AE);
+
+            holder.like.setText(comment.likeCount > 0 ? String.valueOf(comment.likeCount) : "");
+            setCompoundIcon(holder.like, comment.liked ? R.drawable.ic_forum_heart_filled
+                            : R.drawable.ic_forum_heart_round, 18,
+                    comment.liked ? 0xFFE34A55 : (isDark() ? 0xFF9EA4AC : 0xFF6B737C));
+            holder.like.setOnClickListener(v -> changeCommentLike(comment));
+            holder.reply.setText("");
+            setCompoundIcon(holder.reply, R.drawable.ic_forum_chat_bubble, 19,
+                    isDark() ? 0xFF9EA4AC : 0xFF6B737C);
+            holder.reply.setOnClickListener(v -> setReplyTarget(row.parentId, comment.id, author));
 
             VoicePayload voice = VoicePayload.parse(comment.content);
             if (voice == null) {
@@ -1282,11 +1627,22 @@ public class ForumTopicActivity extends AppCompatActivity {
             } else {
                 holder.body.setVisibility(View.GONE);
                 holder.voice.setVisibility(View.VISIBLE);
-                holder.voice.setText(formatVoiceTime(voice.durationSec));
-                setCompoundIcon(holder.voice, R.drawable.ic_forum_play, 20,
-                        isDark() ? 0xFFDFE2E6 : 0xFF3E464F);
                 String key = String.valueOf(comment.id);
+                holder.voice.setTag(key);
+                int width = Math.min(220, 102 + Math.max(1, voice.durationSec) * 2);
+                LinearLayout.LayoutParams voiceParams = (LinearLayout.LayoutParams) holder.voice.getLayoutParams();
+                voiceParams.width = dp(width);
+                holder.voice.setLayoutParams(voiceParams);
+                boolean playing = TextUtils.equals(playingVoiceKey, key);
+                if (playing) playingVoiceView = holder.voice;
+                setVoiceBubbleUi(holder.voice, playing ? voiceRemainingSeconds(voice) : voice.durationSec,
+                        playing && voicePlayer != null && isVoicePlaying());
                 holder.voice.setOnClickListener(v -> playVoice(voice, key, holder.voice));
+                holder.voice.setOnLongClickListener(v -> {
+                    v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                    showCommentMenu(comment);
+                    return true;
+                });
             }
 
             holder.imageContainer.removeAllViews();
@@ -1294,16 +1650,18 @@ public class ForumTopicActivity extends AppCompatActivity {
             holder.imageContainer.setVisibility(holder.imageContainer.getChildCount() > 0
                     ? View.VISIBLE : View.GONE);
 
-            holder.like.setText(comment.likeCount > 0 ? String.valueOf(comment.likeCount) : "");
-            setCompoundIcon(holder.like, comment.liked ? R.drawable.ic_forum_heart_filled
-                            : R.drawable.ic_forum_heart_round,
-                    19, comment.liked ? 0xFFE34A55 : (isDark() ? 0xFFB8BBC2 : 0xFF59616A));
-            holder.like.setOnClickListener(v -> changeCommentLike(comment));
-            holder.reply.setOnClickListener(v -> setReplyTarget(row.parentId, comment.id, author));
-            holder.root.setOnLongClickListener(v -> {
+            View.OnLongClickListener longClick = v -> {
                 v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
                 showCommentMenu(comment);
                 return true;
+            };
+            holder.root.setOnLongClickListener(longClick);
+            holder.body.setOnLongClickListener(longClick);
+            holder.root.setOnClickListener(v -> {
+                if (replyParentId > 0 || replyQuoteId > 0) clearReplyTarget();
+            });
+            holder.body.setOnClickListener(v -> {
+                if (replyParentId > 0 || replyQuoteId > 0) clearReplyTarget();
             });
         }
 
@@ -1334,41 +1692,76 @@ public class ForumTopicActivity extends AppCompatActivity {
         }
     }
 
+    private int voiceRemainingSeconds(VoicePayload payload) {
+        if (payload == null || voicePlayer == null) return payload == null ? 0 : payload.durationSec;
+        try {
+            int duration = voicePlayer.getDuration();
+            int position = voicePlayer.getCurrentPosition();
+            if (duration > 0) return Math.max(0, (int) Math.ceil((duration - position) / 1000.0));
+        } catch (Throwable ignored) { }
+        return payload.durationSec;
+    }
+
+    private boolean isVoicePlaying() {
+        try { return voicePlayer != null && voicePlayer.isPlaying(); }
+        catch (Throwable ignored) { return false; }
+    }
+
     private View createCommentItem(Context context) {
         boolean dark = isDark();
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
+        root.setClickable(true);
 
         LinearLayout header = new LinearLayout(context);
         header.setGravity(Gravity.CENTER_VERTICAL);
         AvatarView avatar = new AvatarView(context);
         avatar.setSize(32);
         header.addView(avatar, new LinearLayout.LayoutParams(dp(36), dp(36)));
-        TextView meta = text("", 13, dark ? 0xFFE4E6E9 : 0xFF30353B, true);
-        meta.setSingleLine(true);
-        meta.setEllipsize(TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams metaParams = new LinearLayout.LayoutParams(
+
+        TextView name = text("", 13, dark ? 0xFFE4E6E9 : 0xFF30353B, true);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        metaParams.leftMargin = dp(8);
-        header.addView(meta, metaParams);
+        nameParams.leftMargin = dp(8);
+        header.addView(name, nameParams);
+
+        TextView time = text("", 10.5f, dark ? 0xFF747981 : 0xFFA2A7AE, false);
+        time.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+        time.setSingleLine(true);
+        header.addView(time, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(32)));
+
+        TextView like = text("", 11.5f, dark ? 0xFF9EA4AC : 0xFF6B737C, false);
+        like.setGravity(Gravity.CENTER);
+        like.setCompoundDrawablePadding(dp(2));
+        like.setBackground(selectableBackground());
+        header.addView(like, new LinearLayout.LayoutParams(dp(47), dp(34)));
+
+        TextView reply = text("", 12, dark ? 0xFF9EA4AC : 0xFF6B737C, false);
+        reply.setGravity(Gravity.CENTER);
+        reply.setContentDescription("回复");
+        reply.setBackground(selectableBackground());
+        header.addView(reply, new LinearLayout.LayoutParams(dp(40), dp(34)));
         root.addView(header, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView body = htmlText("", 15);
         LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bodyParams.topMargin = dp(6);
+        bodyParams.topMargin = dp(5);
         bodyParams.leftMargin = dp(40);
         root.addView(body, bodyParams);
 
-        TextView voice = text("00:01", 13, dark ? 0xFFDFE2E6 : 0xFF3E464F, true);
+        TextView voice = text("1″", 13, dark ? 0xFFE0E3E8 : 0xFF414850, true);
         voice.setGravity(Gravity.CENTER_VERTICAL);
-        voice.setCompoundDrawablePadding(dp(7));
-        voice.setPadding(dp(12), 0, dp(12), 0);
-        voice.setBackground(roundRect(dark ? 0xFF24272C : 0xFFF0F3F7, 17));
+        voice.setCompoundDrawablePadding(dp(8));
+        voice.setPadding(dp(14), 0, dp(14), 0);
+        voice.setBackground(roundRect(dark ? 0xFF25282E : 0xFFF0F3F7, 20));
         voice.setVisibility(View.GONE);
-        LinearLayout.LayoutParams voiceParams = new LinearLayout.LayoutParams(dp(150), dp(38));
+        LinearLayout.LayoutParams voiceParams = new LinearLayout.LayoutParams(dp(120), dp(42));
         voiceParams.topMargin = dp(6);
         voiceParams.leftMargin = dp(40);
         root.addView(voice, voiceParams);
@@ -1381,23 +1774,11 @@ public class ForumTopicActivity extends AppCompatActivity {
         imagesParams.leftMargin = dp(40);
         root.addView(images, imagesParams);
 
-        LinearLayout actions = new LinearLayout(context);
-        actions.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
-        actions.setPadding(dp(36), dp(2), 0, dp(4));
-        TextView like = text("", 13, dark ? 0xFFB8BBC2 : 0xFF59616A, false);
-        like.setGravity(Gravity.CENTER);
-        like.setCompoundDrawablePadding(dp(3));
-        like.setBackground(selectableBackground());
-        actions.addView(like, new LinearLayout.LayoutParams(dp(58), dp(34)));
-        TextView reply = text("»", 22, dark ? 0xFFB8BBC2 : 0xFF59616A, false);
-        reply.setGravity(Gravity.CENTER);
-        reply.setContentDescription("回复");
-        reply.setBackground(selectableBackground());
-        actions.addView(reply, new LinearLayout.LayoutParams(dp(48), dp(34)));
-        root.addView(actions, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        root.addView(divider(), new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(0.7f)));
+        View divider = divider();
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(0.7f));
+        dividerParams.topMargin = dp(9);
+        root.addView(divider, dividerParams);
         return root;
     }
 
@@ -1427,7 +1808,8 @@ public class ForumTopicActivity extends AppCompatActivity {
     private static final class CommentHolder extends RecyclerView.ViewHolder {
         final LinearLayout root;
         final AvatarView avatar;
-        final TextView meta;
+        final TextView name;
+        final TextView time;
         final TextView body;
         final TextView voice;
         final LinearLayout imageContainer;
@@ -1439,13 +1821,13 @@ public class ForumTopicActivity extends AppCompatActivity {
             root = (LinearLayout) itemView;
             LinearLayout header = (LinearLayout) root.getChildAt(0);
             avatar = (AvatarView) header.getChildAt(0);
-            meta = (TextView) header.getChildAt(1);
+            name = (TextView) header.getChildAt(1);
+            time = (TextView) header.getChildAt(2);
+            like = (TextView) header.getChildAt(3);
+            reply = (TextView) header.getChildAt(4);
             body = (TextView) root.getChildAt(1);
             voice = (TextView) root.getChildAt(2);
             imageContainer = (LinearLayout) root.getChildAt(3);
-            LinearLayout actions = (LinearLayout) root.getChildAt(4);
-            like = (TextView) actions.getChildAt(0);
-            reply = (TextView) actions.getChildAt(1);
         }
     }
 
