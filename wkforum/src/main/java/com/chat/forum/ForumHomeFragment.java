@@ -120,6 +120,7 @@ public class ForumHomeFragment extends Fragment {
         appBarLayout = new AppBarLayout(context);
         appBarLayout.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
         appBarLayout.setElevation(0f);
+        appBarLayout.setStateListAnimator(null);
         appBarLayout.addOnOffsetChangedListener((layout, verticalOffset) -> appBarOffset = verticalOffset);
         appBarLayout.setOnApplyWindowInsetsListener((view, insets) -> {
             view.setPadding(0, insets.getSystemWindowInsetTop(), 0, 0);
@@ -156,13 +157,13 @@ public class ForumHomeFragment extends Fragment {
 
         feedTabContainer = new LinearLayout(context);
         feedTabContainer.setGravity(Gravity.CENTER_VERTICAL);
-        feedTabContainer.setPadding(dp(context, 3), dp(context, 3), dp(context, 3), dp(context, 3));
+        feedTabContainer.setPadding(dp(context, 2), dp(context, 2), dp(context, 2), dp(context, 2));
         feedTabContainer.setBackground(roundRect(context,
-                dark ? 0xFF23252A : 0xFFF1F3F6, 19));
+                dark ? 0xFF23252A : 0xFFF2F3F5, 15));
         AppBarLayout.LayoutParams feedTabsParams = new AppBarLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 42));
-        feedTabsParams.setMargins(dp(context, 14), dp(context, 6),
-                dp(context, 14), dp(context, 6));
+                dp(context, 180), dp(context, 32));
+        feedTabsParams.gravity = Gravity.END;
+        feedTabsParams.setMargins(0, dp(context, 5), dp(context, 14), dp(context, 5));
         appBarLayout.addView(feedTabContainer, feedTabsParams);
 
         currentCategoryView = text(context, "", 12, dark ? 0xFFAAB0B8 : 0xFF66707B, false);
@@ -502,7 +503,6 @@ public class ForumHomeFragment extends Fragment {
         addFeedTab("综合", CATEGORY_COMPREHENSIVE);
         addFeedTab("最新", CATEGORY_LATEST);
         addFeedTab("推荐", CATEGORY_RECOMMEND);
-        addFeedTab("关注", CATEGORY_FOLLOW);
 
         List<ForumApiClient.Category> flat = flattenCategories();
         allCategoriesButton.setText("更多  ›");
@@ -528,13 +528,13 @@ public class ForumHomeFragment extends Fragment {
         Context context = requireContext();
         boolean dark = isDark(context);
         boolean selected = selectedCategory == categoryId;
-        TextView tab = text(context, label, 13.5f,
+        TextView tab = text(context, label, 11.5f,
                 selected ? (dark ? Color.WHITE : 0xFF1877F2)
-                        : (dark ? 0xFFADB2BA : 0xFF59616B), selected);
+                        : (dark ? 0xFFA9AFB7 : 0xFF626A73), selected);
         tab.setGravity(Gravity.CENTER);
         tab.setSingleLine(true);
         tab.setBackground(selected
-                ? roundRect(context, dark ? 0xFF3B4656 : Color.WHITE, 16)
+                ? roundRect(context, dark ? 0xFF3A4554 : Color.WHITE, 12)
                 : null);
         tab.setOnClickListener(v -> selectCategory(categoryId));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0,
@@ -1064,6 +1064,13 @@ public class ForumHomeFragment extends Fragment {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         titleRowParams.topMargin = dp(context, 7);
         root.addView(titleRow, titleRowParams);
+
+        View divider = new View(context);
+        divider.setBackgroundColor(dark ? 0xFF24262B : 0xFFEDEFF2);
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 0.55f));
+        dividerParams.topMargin = dp(context, 10);
+        root.addView(divider, dividerParams);
         return root;
     }
 
