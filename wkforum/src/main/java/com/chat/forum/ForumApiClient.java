@@ -50,6 +50,10 @@ public final class ForumApiClient {
     private static final String PREF_TOKEN = "forum_bbsgo_token";
     private static final String PREF_EXPIRES_AT = "forum_bbsgo_token_expires_at";
     private static final String PREF_USER_ID = "forum_bbsgo_user_id";
+    private static final String PREF_ROLES = "forum_bbsgo_roles";
+    private static final String PREF_PERMISSIONS = "forum_bbsgo_permissions";
+    private static final String PREF_AUTH_META_VERSION = "forum_bbsgo_auth_meta_version";
+    private static final String AUTH_META_VERSION = "2";
     private static final long SESSION_SAFETY_WINDOW_MS = 60_000L;
 
     private static final ForumApiClient INSTANCE = new ForumApiClient();
@@ -82,7 +86,10 @@ public final class ForumApiClient {
         String cachedToken = getSessionToken(uid);
         boolean cachedSessionValid = !TextUtils.isEmpty(cachedToken)
                 && getSessionExpiresAt(uid) - System.currentTimeMillis() > SESSION_SAFETY_WINDOW_MS;
-        if (cachedSessionValid && !TextUtils.isEmpty(getForumUserId(uid))) {
+        String authMetaVersion = WKSharedPreferencesUtil.getInstance()
+                .getSP(uidKey(uid, PREF_AUTH_META_VERSION));
+        if (cachedSessionValid && !TextUtils.isEmpty(getForumUserId(uid))
+                && AUTH_META_VERSION.equals(authMetaVersion)) {
             callback.onSuccess(cachedToken);
             return;
         }
@@ -124,6 +131,9 @@ public final class ForumApiClient {
         prefs.putSP(uidKey(uid, PREF_TOKEN), "");
         prefs.putLong(uidKey(uid, PREF_EXPIRES_AT), 0L);
         prefs.putSP(uidKey(uid, PREF_USER_ID), "");
+        prefs.putSP(uidKey(uid, PREF_ROLES), "");
+        prefs.putSP(uidKey(uid, PREF_PERMISSIONS), "");
+        prefs.putSP(uidKey(uid, PREF_AUTH_META_VERSION), "");
     }
 
     public boolean hasValidSession() {
@@ -135,6 +145,36 @@ public final class ForumApiClient {
     @NonNull
     public String getCurrentForumUserId() {
         return getForumUserId(currentUid());
+    }
+
+    public boolean hasRole(@NonNull String role) {
+        return containsStoredValue(PREF_ROLES, role);
+    }
+
+    public boolean hasPermission(@NonNull String permission) {
+        return containsStoredValue(PREF_PERMISSIONS, "*")
+                || containsStoredValue(PREF_PERMISSIONS, permission);
+    }
+
+    public boolean isForumManager() {
+        return hasRole("owner")
+                || hasPermission("dashboard.topic.recommend")
+                || hasPermission("dashboard.topic.sticky")
+                || hasPermission("dashboard.topic.delete")
+                || hasPermission("dashboard.comment.delete")
+                || hasPermission("dashboard.category.update");
+    }
+
+    private boolean containsStoredValue(@NonNull String key, @NonNull String expected) {
+        String uid = currentUid();
+        if (TextUtils.isEmpty(uid) || TextUtils.isEmpty(expected)) return false;
+        String raw = WKSharedPreferencesUtil.getInstance().getSP(uidKey(uid, key));
+        if (TextUtils.isEmpty(raw)) return false;
+        String[] values = raw.split(",", -1);
+        for (String value : values) {
+            if (expected.equals(value == null ? "" : value.trim())) return true;
+        }
+        return false;
     }
 
     @NonNull
@@ -161,8 +201,14 @@ public final class ForumApiClient {
 
     public void getTopics(long categoryId, @Nullable String cursor,
                           @NonNull ResultCallback<Page<Topic>> callback) {
+        getTopics(categoryId, cursor, "latestPublish", callback);
+    }
+
+    public void getTopics(long categoryId, @Nullable String cursor, @Nullable String sort,
+                          @NonNull ResultCallback<Page<Topic>> callback) {
         forumService().topics(authHeader(), categoryId,
-                        TextUtils.isEmpty(cursor) ? "" : cursor, "latestPublish")
+                        TextUtils.isEmpty(cursor) ? "" : cursor,
+                        TextUtils.isEmpty(sort) ? "" : sort)
                 .enqueue(new EnvelopeCallback<>(callback));
     }
 
@@ -310,6 +356,23 @@ public final class ForumApiClient {
                 .enqueue(new EnvelopeCallback<>(callback));
     }
 
+    public void setTopicRecommended(@NonNull String topicId, boolean recommended,
+                                    @NonNull ResultCallback<Void> callback) {
+        forumService().recommendTopic(requireAuthHeader(), topicId, recommended)
+                .enqueue(new EnvelopeCallback<>(callback));
+    }
+
+    public void setTopicSticky(@NonNull String topicId, boolean sticky,
+                               @NonNull ResultCallback<Void> callback) {
+        forumService().stickyTopic(requireAuthHeader(), topicId, sticky)
+                .enqueue(new EnvelopeCallback<>(callback));
+    }
+
+    public void deleteComment(long commentId, @NonNull ResultCallback<Void> callback) {
+        forumService().deleteComment(requireAuthHeader(), commentId)
+                .enqueue(new EnvelopeCallback<>(callback));
+    }
+
     public void uploadImage(@NonNull File file, @NonNull ResultCallback<UploadResult> callback) {
         MediaType mediaType = MediaType.Companion.parse("image/webp");
         RequestBody body = RequestBody.Companion.create(file, mediaType);
@@ -373,6 +436,11 @@ public final class ForumApiClient {
                         prefs.putSP(uidKey(uid, PREF_TOKEN), data.token);
                         prefs.putLong(uidKey(uid, PREF_EXPIRES_AT), expiresAtMs);
                         prefs.putSP(uidKey(uid, PREF_USER_ID), data.user == null ? "" : safe(data.user.id));
+                        prefs.putSP(uidKey(uid, PREF_ROLES), data.user == null
+                                ? "" : joinValues(data.user.roles));
+                        prefs.putSP(uidKey(uid, PREF_PERMISSIONS), data.user == null
+                                ? "" : joinValues(data.user.permissions));
+                        prefs.putSP(uidKey(uid, PREF_AUTH_META_VERSION), AUTH_META_VERSION);
                         finishAuth(uid, data.token, null);
                     }
 
@@ -444,6 +512,16 @@ public final class ForumApiClient {
     @NonNull
     private static String safe(@Nullable String value) {
         return value == null ? "" : value;
+    }
+
+    @NonNull
+    private static String joinValues(@Nullable List<String> values) {
+        if (values == null || values.isEmpty()) return "";
+        List<String> clean = new ArrayList<>();
+        for (String value : values) {
+            if (!TextUtils.isEmpty(value)) clean.add(value.trim());
+        }
+        return TextUtils.join(",", clean);
     }
 
     private ForumService forumService() {
@@ -654,6 +732,22 @@ public final class ForumApiClient {
         Call<ApiEnvelope<Void>> deleteTopic(@Header("X-User-Token") String token,
                                             @Path("id") String topicId);
 
+        @FormUrlEncoded
+        @POST("api/topic/recommend/{id}")
+        Call<ApiEnvelope<Void>> recommendTopic(@Header("X-User-Token") String token,
+                                               @Path("id") String topicId,
+                                               @Field("recommend") boolean recommend);
+
+        @FormUrlEncoded
+        @POST("api/topic/sticky/{id}")
+        Call<ApiEnvelope<Void>> stickyTopic(@Header("X-User-Token") String token,
+                                            @Path("id") String topicId,
+                                            @Field("sticky") boolean sticky);
+
+        @POST("api/comment/delete/{id}")
+        Call<ApiEnvelope<Void>> deleteComment(@Header("X-User-Token") String token,
+                                              @Path("id") long commentId);
+
         @Multipart
         @POST("api/upload")
         Call<ApiEnvelope<UploadResult>> upload(@Header("X-User-Token") String token,
@@ -810,6 +904,10 @@ public final class ForumApiClient {
         public String nickname;
         public String avatar;
         public String smallAvatar;
+        public String countryCode;
+        public String country;
+        public List<String> roles;
+        public List<String> permissions;
     }
 
     public static final class ImageInfo {
