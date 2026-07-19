@@ -23,6 +23,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -45,6 +46,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.bumptech.glide.Glide;
 import com.chat.base.config.WKApiConfig;
 import com.chat.base.ui.components.AvatarView;
 import com.google.android.material.appbar.AppBarLayout;
@@ -64,9 +66,11 @@ public class ForumHomeFragment extends Fragment {
     private static final String ARG_BOARD_ID = "forum_arg_board_id";
     private static final String ARG_BOARD_NAME = "forum_arg_board_name";
     private static final String ARG_BOARD_DESCRIPTION = "forum_arg_board_description";
+    private static final String ARG_BOARD_LOGO = "forum_arg_board_logo";
     private static final String STATE_BOARD_ID = "forum_state_board_id";
     private static final String STATE_BOARD_NAME = "forum_state_board_name";
     private static final String STATE_BOARD_DESCRIPTION = "forum_state_board_description";
+    private static final String STATE_BOARD_LOGO = "forum_state_board_logo";
     private static final String STATE_BOARD_SORT = "forum_state_board_sort";
     private static final long CATEGORY_COMPREHENSIVE = -100L;
     private static final long CATEGORY_LATEST = 0L;
@@ -83,13 +87,15 @@ public class ForumHomeFragment extends Fragment {
     private DrawerLayout drawerLayout;
     private LinearLayout drawerContent;
     private AppBarLayout appBarLayout;
-    private LinearLayout collapsibleHeader;
+    private ViewGroup collapsibleHeader;
     private LinearLayout feedTabContainer;
     private LinearLayout featuredSection;
     private GridLayout featuredGrid;
     private TextView allCategoriesButton;
     private LinearLayout boardHeaderSection;
     private TextView boardIconView;
+    private AppCompatImageView boardLogoImageView;
+    private AppCompatImageView boardCoverView;
     private TextView boardTitleView;
     private TextView boardDescriptionView;
     private TextView boardFollowButton;
@@ -109,6 +115,8 @@ public class ForumHomeFragment extends Fragment {
     private long boardCategoryId;
     private String boardCategoryName = "";
     private String boardCategoryDescription = "";
+    private String boardCategoryLogo = "";
+    private String boundBoardLogoUrl = "";
     private int boardSort = BOARD_SORT_LATEST;
     private long selectedCategory = CATEGORY_COMPREHENSIVE;
     private String cursor = "";
@@ -153,13 +161,14 @@ public class ForumHomeFragment extends Fragment {
             });
 
     static ForumHomeFragment newBoardInstance(long categoryId, @Nullable String name,
-                                              @Nullable String description) {
+                                              @Nullable String description, @Nullable String logo) {
         ForumHomeFragment fragment = new ForumHomeFragment();
         Bundle arguments = new Bundle();
         arguments.putBoolean(ARG_BOARD_MODE, true);
         arguments.putLong(ARG_BOARD_ID, categoryId);
         arguments.putString(ARG_BOARD_NAME, safe(name));
         arguments.putString(ARG_BOARD_DESCRIPTION, safe(description));
+        arguments.putString(ARG_BOARD_LOGO, safe(logo));
         fragment.setArguments(arguments);
         return fragment;
     }
@@ -173,11 +182,13 @@ public class ForumHomeFragment extends Fragment {
             boardCategoryId = arguments.getLong(ARG_BOARD_ID, 0L);
             boardCategoryName = safe(arguments.getString(ARG_BOARD_NAME));
             boardCategoryDescription = safe(arguments.getString(ARG_BOARD_DESCRIPTION));
+            boardCategoryLogo = safe(arguments.getString(ARG_BOARD_LOGO));
             if (savedInstanceState != null) {
                 boardCategoryId = savedInstanceState.getLong(STATE_BOARD_ID, boardCategoryId);
                 boardCategoryName = savedInstanceState.getString(STATE_BOARD_NAME, boardCategoryName);
                 boardCategoryDescription = savedInstanceState.getString(
                         STATE_BOARD_DESCRIPTION, boardCategoryDescription);
+                boardCategoryLogo = savedInstanceState.getString(STATE_BOARD_LOGO, boardCategoryLogo);
                 boardSort = savedInstanceState.getInt(STATE_BOARD_SORT, BOARD_SORT_LATEST);
             }
             selectedCategory = boardCategoryId;
@@ -191,6 +202,7 @@ public class ForumHomeFragment extends Fragment {
         outState.putLong(STATE_BOARD_ID, boardCategoryId);
         outState.putString(STATE_BOARD_NAME, boardCategoryName);
         outState.putString(STATE_BOARD_DESCRIPTION, boardCategoryDescription);
+        outState.putString(STATE_BOARD_LOGO, boardCategoryLogo);
         outState.putInt(STATE_BOARD_SORT, boardSort);
     }
 
@@ -213,70 +225,84 @@ public class ForumHomeFragment extends Fragment {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         appBarLayout = new AppBarLayout(context);
-        appBarLayout.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
+        appBarLayout.setBackgroundColor(boardMode
+                ? Color.TRANSPARENT : (dark ? 0xFF17181B : Color.WHITE));
         appBarLayout.setElevation(0f);
         appBarLayout.setStateListAnimator(null);
         appBarLayout.addOnOffsetChangedListener((layout, verticalOffset) -> appBarOffset = verticalOffset);
         appBarLayout.setOnApplyWindowInsetsListener((view, insets) -> {
-            view.setPadding(0, insets.getSystemWindowInsetTop(), 0, 0);
+            int top = insets.getSystemWindowInsetTop();
+            if (boardMode && collapsibleHeader != null) {
+                view.setPadding(0, 0, 0, 0);
+                collapsibleHeader.setPadding(0, top, 0, 0);
+            } else {
+                view.setPadding(0, top, 0, 0);
+            }
             return insets;
         });
-        appBarLayout.requestApplyInsets();
-
-        collapsibleHeader = new LinearLayout(context);
-        collapsibleHeader.setOrientation(LinearLayout.VERTICAL);
-        collapsibleHeader.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
-        collapsibleHeader.addView(buildToolbar(context), new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         loginHintView = text(context, "", 12, dark ? 0xFFFFC46B : 0xFF8B5B00, false);
         loginHintView.setPadding(dp(context, 16), dp(context, 6), dp(context, 16), dp(context, 6));
         loginHintView.setBackgroundColor(dark ? 0xFF302619 : 0xFFFFF5D8);
         loginHintView.setVisibility(View.GONE);
-        collapsibleHeader.addView(loginHintView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        feedTabContainer = new LinearLayout(context);
+        feedTabContainer.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout feedTabsRow = new LinearLayout(context);
 
         if (boardMode) {
-            boardHeaderSection = buildBoardHeader(context);
-            collapsibleHeader.addView(boardHeaderSection, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            collapsibleHeader = buildBoardHero(context);
+            feedTabContainer.setPadding(0, 0, 0, 0);
+            feedTabContainer.setBackgroundColor(Color.TRANSPARENT);
+            feedTabsRow.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+            feedTabsRow.setPadding(dp(context, 12), dp(context, 17), dp(context, 12), dp(context, 7));
+            feedTabsRow.setBackground(topRoundRect(context,
+                    dark ? 0xFF17181B : Color.WHITE, 25));
+            feedTabsRow.addView(feedTabContainer, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 43)));
         } else {
+            LinearLayout homeHeader = new LinearLayout(context);
+            homeHeader.setOrientation(LinearLayout.VERTICAL);
+            homeHeader.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
+            collapsibleHeader = homeHeader;
+            homeHeader.addView(buildToolbar(context), new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            homeHeader.addView(loginHintView, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
             featuredSection = new LinearLayout(context);
             featuredSection.setOrientation(LinearLayout.VERTICAL);
             featuredSection.setPadding(dp(context, 14), dp(context, 4), dp(context, 14), dp(context, 9));
             featuredSection.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
-            collapsibleHeader.addView(featuredSection, new LinearLayout.LayoutParams(
+            homeHeader.addView(featuredSection, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             buildFeaturedSectionHeader(context);
-        }
 
-        feedTabContainer = new LinearLayout(context);
-        feedTabContainer.setGravity(Gravity.CENTER_VERTICAL);
-        feedTabContainer.setPadding(dp(context, 2), dp(context, 2), dp(context, 2), dp(context, 2));
-        feedTabContainer.setBackground(roundRect(context,
-                dark ? 0xFF23252A : 0xFFF2F3F5, 15));
-        LinearLayout feedTabsRow = new LinearLayout(context);
-        feedTabsRow.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
-        feedTabsRow.setPadding(dp(context, 10), dp(context, 4), dp(context, 10), dp(context, 6));
-        feedTabsRow.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
-        feedTabsRow.addView(feedTabContainer, new LinearLayout.LayoutParams(
-                boardMode ? dp(context, 216) : dp(context, 158), dp(context, 29)));
-        if (!boardMode) {
-            // The home feed switch disappears with the discovery header.
-            collapsibleHeader.addView(feedTabsRow, new LinearLayout.LayoutParams(
+            feedTabContainer.setPadding(dp(context, 2), dp(context, 2), dp(context, 2), dp(context, 2));
+            feedTabContainer.setBackground(roundRect(context,
+                    dark ? 0xFF23252A : 0xFFF2F3F5, 15));
+            feedTabsRow.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+            feedTabsRow.setPadding(dp(context, 10), dp(context, 4), dp(context, 10), dp(context, 6));
+            feedTabsRow.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
+            feedTabsRow.addView(feedTabContainer, new LinearLayout.LayoutParams(
+                    dp(context, 158), dp(context, 29)));
+            homeHeader.addView(feedTabsRow, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
 
         AppBarLayout.LayoutParams collapsibleParams = new AppBarLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                boardMode ? dp(context, 300) : ViewGroup.LayoutParams.WRAP_CONTENT);
         collapsibleParams.setScrollFlags(AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL
                 | AppBarLayout.LayoutParams.SCROLL_FLAG_ENTER_ALWAYS);
         appBarLayout.addView(collapsibleHeader, collapsibleParams);
+        appBarLayout.requestApplyInsets();
 
         if (boardMode) {
-            // Tieba-style board sorting remains visible while the board profile collapses.
-            appBarLayout.addView(feedTabsRow, new AppBarLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            AppBarLayout.LayoutParams sortParams = new AppBarLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            sortParams.topMargin = -dp(context, 24);
+            appBarLayout.addView(feedTabsRow, sortParams);
         } else {
             currentCategoryView = text(context, "", 12,
                     dark ? 0xFFAAB0B8 : 0xFF66707B, false);
@@ -309,7 +335,9 @@ public class ForumHomeFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(context));
         recyclerView.setItemAnimator(null);
         recyclerView.setClipToPadding(false);
-        recyclerView.setBackgroundColor(dark ? 0xFF111214 : Color.WHITE);
+        recyclerView.setBackgroundColor(boardMode
+                ? (dark ? 0xFF111214 : 0xFFF3F4F6)
+                : (dark ? 0xFF111214 : Color.WHITE));
         recyclerView.setPadding(0, dp(context, 3), 0, dp(context, 86));
         recyclerView.setItemViewCacheSize(10);
         adapter = new TopicAdapter(context, topic ->
@@ -380,15 +408,55 @@ public class ForumHomeFragment extends Fragment {
         return drawerLayout;
     }
 
+    private ViewGroup buildBoardHero(Context context) {
+        FrameLayout hero = new FrameLayout(context);
+        hero.setBackground(boardHeroFallback(context));
+
+        boardCoverView = new AppCompatImageView(context);
+        boardCoverView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        boardCoverView.setAlpha(0.94f);
+        boardCoverView.setBackground(boardHeroFallback(context));
+        hero.addView(boardCoverView, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        View scrim = new View(context);
+        GradientDrawable scrimDrawable = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0x33000000, 0x55000000, 0xD9131B24});
+        scrim.setBackground(scrimDrawable);
+        hero.addView(scrim, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.addView(buildToolbar(context), new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 48)));
+        content.addView(loginHintView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        View spacer = new View(context);
+        content.addView(spacer, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        boardHeaderSection = buildBoardHeader(context);
+        content.addView(boardHeaderSection, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        hero.addView(content, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        renderBoardHeader();
+        return hero;
+    }
+
     private View buildToolbar(Context context) {
         boolean dark = isDark(context);
+        int primary = boardMode ? Color.WHITE : (dark ? Color.WHITE : 0xFF252A30);
+        int secondary = boardMode ? 0xE6FFFFFF : (dark ? 0xFFD9DCE1 : 0xFF4D535B);
         LinearLayout toolbar = new LinearLayout(context);
         toolbar.setGravity(Gravity.CENTER_VERTICAL);
         toolbar.setPadding(dp(context, 3), 0, dp(context, 6), 0);
-        toolbar.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
+        toolbar.setBackgroundColor(boardMode ? Color.TRANSPARENT
+                : (dark ? 0xFF17181B : Color.WHITE));
 
         TextView leading = text(context, boardMode ? "‹" : "☰",
-                boardMode ? 35 : 22, dark ? Color.WHITE : 0xFF252A30, false);
+                boardMode ? 35 : 22, primary, false);
         leading.setGravity(Gravity.CENTER);
         leading.setBackground(selectableBackground(context));
         leading.setContentDescription(boardMode ? "返回社区" : "打开板块侧栏");
@@ -406,20 +474,20 @@ public class ForumHomeFragment extends Fragment {
         titleBox.setOrientation(LinearLayout.VERTICAL);
         titleBox.setGravity(Gravity.CENTER_VERTICAL);
         toolbarTitleView = text(context, boardMode ? displayBoardName() : "社区", 19,
-                dark ? Color.WHITE : 0xFF17191C, true);
+                boardMode ? Color.WHITE : (dark ? Color.WHITE : 0xFF17191C), true);
         toolbarSubtitleView = text(context,
-                boardMode ? "点击切换板块  ›" : "综合讨论与经验分享", 11,
-                dark ? 0xFF8F949C : 0xFF7A8088, false);
+                boardMode ? "" : "综合讨论与经验分享", 11,
+                boardMode ? 0xCCFFFFFF : (dark ? 0xFF8F949C : 0xFF7A8088), false);
         titleBox.addView(toolbarTitleView);
         titleBox.addView(toolbarSubtitleView);
         titleBox.setOnClickListener(v -> {
             if (boardMode) openDrawer(); else refreshAll();
         });
+        if (boardMode) titleBox.setVisibility(View.INVISIBLE);
         toolbar.addView(titleBox, new LinearLayout.LayoutParams(0, dp(context, 44), 1f));
 
         if (boardMode) {
-            TextView boardMenu = text(context, "☰", 20,
-                    dark ? 0xFFD9DCE1 : 0xFF4D535B, false);
+            TextView boardMenu = text(context, "☰", 20, secondary, false);
             boardMenu.setGravity(Gravity.CENTER);
             boardMenu.setBackground(selectableBackground(context));
             boardMenu.setContentDescription("切换板块");
@@ -434,19 +502,17 @@ public class ForumHomeFragment extends Fragment {
             if (isAdded()) userCenterLauncher.launch(ForumUserCenterActivity.createIntent(requireContext()));
         });
         AppCompatImageView bell = new AppCompatImageView(context);
-        bell.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-        setImageIcon(bell, R.drawable.ic_forum_bell, 22,
-                dark ? 0xFFD9DCE1 : 0xFF4D535B);
+        bell.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        setImageIcon(bell, R.drawable.ic_forum_bell, 22, secondary);
         FrameLayout.LayoutParams bellParams = new FrameLayout.LayoutParams(
                 dp(context, 38), dp(context, 38), Gravity.CENTER);
         notificationButton.addView(bell, bellParams);
 
-        centerButton = text(context, "", 10, 0xFFE64646, true);
+        centerButton = text(context, "", 10, Color.WHITE, true);
         centerButton.setGravity(Gravity.CENTER);
         centerButton.setMinWidth(dp(context, 18));
         centerButton.setPadding(dp(context, 4), 0, dp(context, 4), 0);
-        centerButton.setBackground(roundRect(context,
-                dark ? 0xFF3A2428 : 0xFFFFEEEE, 9));
+        centerButton.setBackground(roundRect(context, 0xFFE64646, 9));
         centerButton.setVisibility(View.GONE);
         FrameLayout.LayoutParams countParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 18), Gravity.END | Gravity.TOP);
@@ -457,41 +523,54 @@ public class ForumHomeFragment extends Fragment {
     }
 
     private LinearLayout buildBoardHeader(Context context) {
-        boolean dark = isDark(context);
         LinearLayout section = new LinearLayout(context);
         section.setOrientation(LinearLayout.VERTICAL);
-        section.setPadding(dp(context, 15), dp(context, 10), dp(context, 15), dp(context, 13));
-        section.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
+        section.setPadding(dp(context, 18), dp(context, 8), dp(context, 18), dp(context, 28));
+        section.setBackgroundColor(Color.TRANSPARENT);
 
         LinearLayout row = new LinearLayout(context);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        boardIconView = text(context, categoryInitial(displayBoardName()), 21,
+
+        FrameLayout logoBox = new FrameLayout(context);
+        logoBox.setBackground(roundRect(context, 0xEFFFFFFF, 17));
+        logoBox.setPadding(dp(context, 2), dp(context, 2), dp(context, 2), dp(context, 2));
+        boardIconView = text(context, categoryInitial(displayBoardName()), 23,
                 categoryAccent(displayBoardName()), true);
         boardIconView.setGravity(Gravity.CENTER);
-        boardIconView.setBackground(roundRect(context,
-                dark ? 0xFF262A30 : 0xFFF1F5FA, 14));
-        row.addView(boardIconView, new LinearLayout.LayoutParams(dp(context, 54), dp(context, 54)));
+        boardIconView.setBackground(roundRect(context, 0xFFF1F5FA, 15));
+        logoBox.addView(boardIconView, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        boardLogoImageView = new AppCompatImageView(context);
+        boardLogoImageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        boardLogoImageView.setBackground(roundRect(context, 0xFFF1F5FA, 15));
+        boardLogoImageView.setClipToOutline(true);
+        logoBox.addView(boardLogoImageView, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        row.addView(logoBox, new LinearLayout.LayoutParams(dp(context, 72), dp(context, 72)));
 
         LinearLayout copy = new LinearLayout(context);
         copy.setOrientation(LinearLayout.VERTICAL);
         copy.setGravity(Gravity.CENTER_VERTICAL);
-        boardTitleView = text(context, displayBoardName(), 18,
-                dark ? Color.WHITE : 0xFF1D2126, true);
-        boardDescriptionView = text(context, displayBoardDescription(), 12,
-                dark ? 0xFFA1A6AE : 0xFF737A83, false);
+        boardTitleView = text(context, displayBoardName(), 22, Color.WHITE, true);
+        boardTitleView.setShadowLayer(dp(context, 2), 0, dp(context, 1), 0x99000000);
+        boardDescriptionView = text(context, displayBoardDescription(), 12.5f,
+                0xE6FFFFFF, false);
         boardDescriptionView.setMaxLines(2);
         boardDescriptionView.setEllipsize(TextUtils.TruncateAt.END);
+        boardDescriptionView.setLineSpacing(dp(context, 1), 1.05f);
         copy.addView(boardTitleView);
         LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        descriptionParams.topMargin = dp(context, 3);
+        descriptionParams.topMargin = dp(context, 5);
         copy.addView(boardDescriptionView, descriptionParams);
         LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        copyParams.leftMargin = dp(context, 11);
+        copyParams.leftMargin = dp(context, 12);
+        copyParams.rightMargin = dp(context, 10);
         row.addView(copy, copyParams);
 
-        boardFollowButton = text(context, "", 13, 0xFF1877F2, true);
+        boardFollowButton = text(context, "", 13, Color.WHITE, true);
         boardFollowButton.setGravity(Gravity.CENTER);
         boardFollowButton.setOnClickListener(v -> {
             if (!isAdded() || boardCategoryId <= 0) return;
@@ -499,17 +578,17 @@ public class ForumHomeFragment extends Fragment {
             renderBoardHeader();
             renderDrawer();
         });
-        row.addView(boardFollowButton, new LinearLayout.LayoutParams(dp(context, 72), dp(context, 34)));
+        row.addView(boardFollowButton, new LinearLayout.LayoutParams(dp(context, 76), dp(context, 36)));
         section.addView(row, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        TextView hint = text(context, "本板块独立讨论 · 左侧右滑可快速切换板块", 11,
-                dark ? 0xFF777D86 : 0xFF8B929A, false);
+        TextView hint = text(context, "点击标题或右上角可快速切换板块", 11,
+                0xBFFFFFFF, false);
         LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        hintParams.topMargin = dp(context, 9);
+        hintParams.leftMargin = dp(context, 84);
+        hintParams.topMargin = dp(context, 8);
         section.addView(hint, hintParams);
-        renderBoardHeader();
         return section;
     }
 
@@ -522,17 +601,37 @@ public class ForumHomeFragment extends Fragment {
         if (boardTitleView != null) boardTitleView.setText(displayBoardName());
         if (boardDescriptionView != null) boardDescriptionView.setText(displayBoardDescription());
         if (toolbarTitleView != null) toolbarTitleView.setText(displayBoardName());
-        if (toolbarSubtitleView != null) toolbarSubtitleView.setText("点击切换板块  ›");
+        if (toolbarSubtitleView != null) toolbarSubtitleView.setText("");
+
+        String logoUrl = TextUtils.isEmpty(boardCategoryLogo) ? ""
+                : ForumApiClient.getInstance().resolveUrl(boardCategoryLogo);
+        if (!TextUtils.equals(boundBoardLogoUrl, logoUrl)) {
+            boundBoardLogoUrl = logoUrl;
+            if (boardCoverView != null) {
+                Glide.with(boardCoverView).clear(boardCoverView);
+                boardCoverView.setImageDrawable(null);
+                boardCoverView.setBackground(boardHeroFallback(boardCoverView.getContext()));
+                if (!TextUtils.isEmpty(logoUrl)) {
+                    Glide.with(boardCoverView).load(logoUrl).centerCrop().into(boardCoverView);
+                }
+            }
+            if (boardLogoImageView != null) {
+                Glide.with(boardLogoImageView).clear(boardLogoImageView);
+                boardLogoImageView.setImageDrawable(null);
+                boardLogoImageView.setVisibility(TextUtils.isEmpty(logoUrl) ? View.GONE : View.VISIBLE);
+                if (!TextUtils.isEmpty(logoUrl)) {
+                    Glide.with(boardLogoImageView).load(logoUrl).centerCrop().into(boardLogoImageView);
+                }
+            }
+        }
+
         if (boardFollowButton == null || !isAdded()) return;
         boolean followed = ForumBoardStore.isFollowed(requireContext(), boardCategoryId);
         boardFollowButton.setText(followed ? "已关注" : "+ 关注");
-        boardFollowButton.setTextColor(followed
-                ? (isDark(requireContext()) ? 0xFFB6BBC3 : 0xFF68707A) : 0xFF1877F2);
-        GradientDrawable background = roundRect(requireContext(), followed
-                ? (isDark(requireContext()) ? 0xFF282B30 : 0xFFF1F3F5)
-                : (isDark(requireContext()) ? 0xFF233B59 : 0xFFEAF3FF), 17);
-        background.setStroke(dp(requireContext(), 0.7f), followed
-                ? (isDark(requireContext()) ? 0xFF3A3E45 : 0xFFD9DDE2) : 0xFFB9D8FF);
+        boardFollowButton.setTextColor(Color.WHITE);
+        GradientDrawable background = roundRect(requireContext(),
+                followed ? 0x55FFFFFF : 0x33000000, 18);
+        background.setStroke(dp(requireContext(), 0.8f), 0x99FFFFFF);
         boardFollowButton.setBackground(background);
     }
 
@@ -604,7 +703,12 @@ public class ForumHomeFragment extends Fragment {
         featuredGrid = null;
         allCategoriesButton = null;
         boardHeaderSection = null;
+        if (boardCoverView != null) Glide.with(boardCoverView).clear(boardCoverView);
+        if (boardLogoImageView != null) Glide.with(boardLogoImageView).clear(boardLogoImageView);
+        boardCoverView = null;
+        boardLogoImageView = null;
         boardIconView = null;
+        boundBoardLogoUrl = "";
         boardTitleView = null;
         boardDescriptionView = null;
         boardFollowButton = null;
@@ -713,6 +817,8 @@ public class ForumHomeFragment extends Fragment {
                             if (board != null) {
                                 boardCategoryName = safe(board.name);
                                 boardCategoryDescription = safe(board.description);
+                                boardCategoryLogo = safe(board.logo);
+                                boundBoardLogoUrl = "";
                             }
                             if (boardCategoryId > 0) {
                                 ForumBoardStore.addRecent(requireContext(), boardCategoryId);
@@ -1024,19 +1130,32 @@ public class ForumHomeFragment extends Fragment {
         Context context = requireContext();
         boolean dark = isDark(context);
         boolean selected = boardSort == sortMode;
-        TextView tab = text(context, label, 12,
-                selected ? (dark ? Color.WHITE : 0xFF1877F2)
-                        : (dark ? 0xFFA9AFB7 : 0xFF626A73), selected);
+
+        LinearLayout tabBox = new LinearLayout(context);
+        tabBox.setOrientation(LinearLayout.VERTICAL);
+        tabBox.setGravity(Gravity.CENTER);
+        tabBox.setBackground(selectableBackground(context));
+        tabBox.setOnClickListener(v -> selectBoardSort(sortMode));
+
+        TextView tab = text(context, label, selected ? 16 : 15,
+                selected ? (dark ? Color.WHITE : 0xFF20242A)
+                        : (dark ? 0xFFA9AFB7 : 0xFF616872), selected);
         tab.setGravity(Gravity.CENTER);
         tab.setSingleLine(true);
-        tab.setBackground(selected
-                ? roundRect(context, dark ? 0xFF3A4554 : Color.WHITE, 11)
-                : null);
-        tab.setOnClickListener(v -> selectBoardSort(sortMode));
+        tabBox.addView(tab, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        View indicator = new View(context);
+        indicator.setBackground(roundRect(context,
+                selected ? 0xFF1877F2 : Color.TRANSPARENT, 1.5f));
+        LinearLayout.LayoutParams indicatorParams = new LinearLayout.LayoutParams(
+                dp(context, 22), dp(context, 3));
+        indicatorParams.gravity = Gravity.CENTER_HORIZONTAL;
+        tabBox.addView(indicator, indicatorParams);
+
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-        params.setMargins(dp(context, 0.5f), 0, dp(context, 0.5f), 0);
-        feedTabContainer.addView(tab, params);
+        feedTabContainer.addView(tabBox, params);
     }
 
     private void addFeedTab(String label, long categoryId) {
@@ -1163,7 +1282,7 @@ public class ForumHomeFragment extends Fragment {
             switchBoard(category);
         } else {
             startActivity(ForumBoardActivity.createIntent(requireContext(), category.id,
-                    category.name, category.description));
+                    category.name, category.description, category.logo));
         }
     }
 
@@ -1182,6 +1301,8 @@ public class ForumHomeFragment extends Fragment {
         selectedCategory = category.id;
         boardCategoryName = safe(category.name);
         boardCategoryDescription = safe(category.description);
+        boardCategoryLogo = safe(category.logo);
+        boundBoardLogoUrl = "";
         boardSort = BOARD_SORT_LATEST;
         cursor = "";
         hasMore = false;
@@ -1313,6 +1434,7 @@ public class ForumHomeFragment extends Fragment {
         category.id = boardCategoryId;
         category.name = displayBoardName();
         category.description = boardCategoryDescription;
+        category.logo = boardCategoryLogo;
         return category;
     }
 
@@ -2216,6 +2338,22 @@ public class ForumHomeFragment extends Fragment {
         view.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp);
         if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         return view;
+    }
+
+    private GradientDrawable boardHeroFallback(Context context) {
+        int accent = categoryAccent(displayBoardName());
+        int middle = blend(accent, Color.BLACK, 0.45f);
+        int bottom = blend(accent, Color.BLACK, 0.72f);
+        return new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{accent, middle, bottom});
+    }
+
+    private static GradientDrawable topRoundRect(Context context, int color, float radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        float radius = dp(context, radiusDp);
+        drawable.setCornerRadii(new float[]{radius, radius, radius, radius, 0, 0, 0, 0});
+        return drawable;
     }
 
     private static GradientDrawable roundRect(Context context, int color, float radiusDp) {
