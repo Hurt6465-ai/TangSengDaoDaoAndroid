@@ -42,9 +42,12 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Native topic and Q&A composer. */
+/** Native post, Q&A, and article composer. */
 public class ForumCreateTopicActivity extends AppCompatActivity {
     private static final int MAX_IMAGES = 6;
+    private static final int TYPE_TOPIC = 0;
+    private static final int TYPE_QA = 2;
+    private static final int TYPE_ARTICLE = 3;
     private static final String STATE_TITLE = "forum_title";
     private static final String STATE_CONTENT = "forum_content";
     private static final String STATE_TAGS = "forum_tags";
@@ -63,11 +66,14 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private EditText contentInput;
     private EditText tagsInput;
     private Spinner categorySpinner;
+    private TextView categoryLabel;
+    private TextView imageLabel;
     private LinearLayout imageContainer;
     private LinearLayout typePill;
     private EditText bountyInput;
     private int topicType;
     private TextView publishButton;
+    private TextView headingView;
     private boolean publishing;
     private boolean authenticating;
     private boolean discardDraft;
@@ -80,15 +86,18 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private final ActivityResultLauncher<String> imagePicker = registerForActivityResult(
             new ActivityResultContracts.GetMultipleContents(), uris -> {
                 if (uris == null || uris.isEmpty() || publishing) return;
+                int maxImages = topicType == TYPE_ARTICLE ? 1 : MAX_IMAGES;
                 int added = 0;
                 for (Uri uri : uris) {
                     if (uri == null || selectedImages.contains(uri)) continue;
-                    if (selectedImages.size() >= MAX_IMAGES) break;
+                    if (selectedImages.size() >= maxImages) break;
                     selectedImages.add(uri);
                     added++;
                 }
                 if (added < uris.size()) {
-                    Toast.makeText(this, "每篇帖子最多选择6张图片", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, topicType == TYPE_ARTICLE
+                            ? "文章只使用第一张图片作为封面"
+                            : "每篇帖子最多选择6张图片", Toast.LENGTH_SHORT).show();
                 }
                 renderSelectedImages();
             });
@@ -163,8 +172,8 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             if (!publishing || authenticating) finish();
         });
         toolbar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(52)));
-        TextView heading = text("发布帖子", 18, dark ? Color.WHITE : 0xFF1C1E21, true);
-        toolbar.addView(heading, new LinearLayout.LayoutParams(0, dp(52), 1f));
+        headingView = text("发布帖子", 18, dark ? Color.WHITE : 0xFF1C1E21, true);
+        toolbar.addView(headingView, new LinearLayout.LayoutParams(0, dp(52), 1f));
         publishButton = text("发布", 15, 0xFF1877F2, true);
         publishButton.setGravity(Gravity.CENTER);
         publishButton.setOnClickListener(v -> publish());
@@ -182,12 +191,12 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         typePill.setGravity(Gravity.CENTER_VERTICAL);
         typePill.setPadding(dp(2), dp(2), dp(2), dp(2));
         typePill.setBackground(roundRect(dark ? 0xFF25272C : 0xFFF1F3F5, 16));
-        LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(dp(170), dp(34));
+        LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(dp(258), dp(34));
         typeParams.topMargin = dp(7);
         form.addView(typePill, typeParams);
         renderTypePill();
 
-        TextView categoryLabel = label("板块");
+        categoryLabel = label("板块");
         LinearLayout.LayoutParams categoryLabelParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         categoryLabelParams.topMargin = dp(14);
@@ -224,14 +233,16 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
 
         LinearLayout imageHeader = new LinearLayout(this);
         imageHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView imageLabel = label("图片（最多6张）");
+        imageLabel = label("图片（最多6张）");
         imageHeader.addView(imageLabel, new LinearLayout.LayoutParams(0, dp(48), 1f));
         TextView choose = text("选择图片", 14, 0xFF1877F2, true);
         choose.setGravity(Gravity.CENTER);
         choose.setOnClickListener(v -> {
             if (publishing) return;
-            if (selectedImages.size() >= MAX_IMAGES) {
-                Toast.makeText(this, "最多6张图片", Toast.LENGTH_SHORT).show();
+            int maxImages = topicType == TYPE_ARTICLE ? 1 : MAX_IMAGES;
+            if (selectedImages.size() >= maxImages) {
+                Toast.makeText(this, topicType == TYPE_ARTICLE
+                        ? "文章最多选择1张封面图" : "最多6张图片", Toast.LENGTH_SHORT).show();
                 return;
             }
             imagePicker.launch("image/*");
@@ -279,9 +290,10 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private void renderTypePill() {
         if (typePill == null) return;
         typePill.removeAllViews();
-        addTypeTab("讨论", 0);
-        addTypeTab("问答", 2);
-        if (bountyInput != null) bountyInput.setVisibility(topicType == 2 ? View.VISIBLE : View.GONE);
+        addTypeTab("帖子", TYPE_TOPIC);
+        addTypeTab("问答", TYPE_QA);
+        addTypeTab("文章", TYPE_ARTICLE);
+        updateTypeDependentViews();
     }
 
     private void addTypeTab(String label, int value) {
@@ -296,13 +308,18 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             pendingCategoryId = 0L;
             renderTypePill();
             updateContentHint();
-            loadCategories();
+            if (topicType != TYPE_ARTICLE) loadCategories();
         });
         typePill.addView(tab, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.MATCH_PARENT, 1f));
     }
 
     private void loadCategories() {
+        if (topicType == TYPE_ARTICLE) {
+            categoriesLoaded = true;
+            categories.clear();
+            return;
+        }
         final int generation = ++categoryGeneration;
         final int requestType = topicType;
         categoriesLoaded = false;
@@ -324,7 +341,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                 }
                 List<String> names = new ArrayList<>();
                 for (ForumApiClient.Category category : categories) names.add(category.name);
-                if (names.isEmpty()) names.add(topicType == 2 ? "请先在网页后台创建问答板块" : "暂无可发布板块");
+                if (names.isEmpty()) names.add("暂无可发布板块");
                 ArrayAdapter<String> adapter = new ArrayAdapter<>(ForumCreateTopicActivity.this,
                         android.R.layout.simple_spinner_item, names);
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -367,8 +384,8 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             contentInput.setError("请输入内容");
             return;
         }
-        long categoryId = selectedCategoryId();
-        if (categoryId <= 0) {
+        long categoryId = topicType == TYPE_ARTICLE ? 0L : selectedCategoryId();
+        if (topicType != TYPE_ARTICLE && categoryId <= 0) {
             Toast.makeText(this, "板块尚未加载，请稍后重试", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -384,9 +401,14 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             @Override
             public void onSuccess(@Nullable String data) {
                 if (!isPublishActive(generation)) return;
-                uploadImagesSequentially(generation, images, 0, new ArrayList<>(), uploaded ->
+                uploadImagesSequentially(generation, images, 0, new ArrayList<>(), uploaded -> {
+                    if (selectedType == TYPE_ARTICLE) {
+                        createArticle(generation, title, content, tags, uploaded);
+                    } else {
                         createTopic(generation, selectedType, selectedCategoryId, title, content,
-                                tags, uploaded, bountyScore));
+                                tags, uploaded, bountyScore);
+                    }
+                });
             }
 
             @Override
@@ -476,6 +498,34 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                         String id = topic == null ? "" : topic.id;
                         if (!TextUtils.isEmpty(id)) {
                             ForumTopicActivity.open(ForumCreateTopicActivity.this, id);
+                        }
+                        finish();
+                    }
+
+                    @Override
+                    public void onError(@NonNull String message) {
+                        if (isPublishActive(generation)) failPublish(message);
+                    }
+                });
+    }
+
+    private void createArticle(int generation, String title, String content,
+                               List<String> tags, List<ForumApiClient.ImageInfo> images) {
+        if (!isPublishActive(generation)) return;
+        publishButton.setText("发布中…");
+        ForumApiClient.ImageInfo cover = images == null || images.isEmpty() ? null : images.get(0);
+        ForumApiClient.getInstance().createArticle(title, buildArticleSummary(content), content,
+                tags, cover, publishScope, new ForumApiClient.ResultCallback<ForumApiClient.Article>() {
+                    @Override
+                    public void onSuccess(@Nullable ForumApiClient.Article article) {
+                        if (!isPublishActive(generation)) return;
+                        discardDraft = true;
+                        ForumDraftStore.clear(ForumCreateTopicActivity.this);
+                        setResult(Activity.RESULT_OK);
+                        long id = article == null ? 0L : article.id;
+                        if (id > 0L) {
+                            startActivity(ForumArticleActivity.createIntent(
+                                    ForumCreateTopicActivity.this, id));
                         }
                         finish();
                     }
@@ -586,9 +636,40 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
 
     private void updateContentHint() {
         if (contentInput == null) return;
-        contentInput.setHint(topicType == 2
-                ? "请清楚描述问题、已经尝试的方法和期望得到的帮助…"
-                : "分享你的经验、观点或学习内容…");
+        if (topicType == TYPE_QA) {
+            contentInput.setHint("请清楚描述问题、已经尝试的方法和期望得到的帮助…");
+        } else if (topicType == TYPE_ARTICLE) {
+            contentInput.setHint("撰写完整文章内容，建议分段表达…");
+        } else {
+            contentInput.setHint("分享你的经验、观点或学习内容…");
+        }
+    }
+
+    private void updateTypeDependentViews() {
+        boolean article = topicType == TYPE_ARTICLE;
+        if (headingView != null) {
+            headingView.setText(article ? "发布文章" : (topicType == TYPE_QA ? "发布问答" : "发布帖子"));
+        }
+        if (categoryLabel != null) categoryLabel.setVisibility(article ? View.GONE : View.VISIBLE);
+        if (categorySpinner != null) categorySpinner.setVisibility(article ? View.GONE : View.VISIBLE);
+        if (bountyInput != null) bountyInput.setVisibility(topicType == TYPE_QA ? View.VISIBLE : View.GONE);
+        if (imageLabel != null) {
+            imageLabel.setText(article ? "封面图（最多1张）" : "图片（最多6张）");
+        }
+        if (article && selectedImages.size() > 1) {
+            Uri cover = selectedImages.get(0);
+            selectedImages.clear();
+            selectedImages.add(cover);
+            renderSelectedImages();
+        }
+    }
+
+    private static String buildArticleSummary(String content) {
+        if (TextUtils.isEmpty(content)) return "";
+        String compact = content.replaceAll("\\s+", " ").trim();
+        int end = compact.offsetByCodePoints(0, Math.min(140,
+                compact.codePointCount(0, compact.length())));
+        return compact.substring(0, end);
     }
 
     private long selectedCategoryId() {
@@ -649,7 +730,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     }
 
     private int parseBountyScore() {
-        if (topicType != 2 || bountyInput == null) return 0;
+        if (topicType != TYPE_QA || bountyInput == null) return 0;
         String raw = bountyInput.getText().toString().trim();
         if (TextUtils.isEmpty(raw)) return 0;
         try { return Math.max(0, Integer.parseInt(raw)); }

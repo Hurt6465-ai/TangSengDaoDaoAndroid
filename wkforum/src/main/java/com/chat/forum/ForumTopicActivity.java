@@ -128,11 +128,18 @@ public class ForumTopicActivity extends AppCompatActivity {
     private boolean topicActionBusy;
     private long replyParentId;
     private long replyQuoteId;
-    private boolean authorFollowStateLoaded;
-    private boolean authorFollowed;
     private final ForumApiClient.RequestScope requestScope = new ForumApiClient.RequestScope();
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable hideFastScrollButton = () -> {
+        if (fastScrollButton == null) return;
+        fastScrollButton.animate().cancel();
+        fastScrollButton.animate().alpha(0f).setDuration(140L).withEndAction(() -> {
+            if (fastScrollButton != null && fastScrollButton.getAlpha() == 0f) {
+                fastScrollButton.setVisibility(View.GONE);
+            }
+        }).start();
+    };
     private boolean recording;
     private boolean recordCancel;
     private long recordStartTime;
@@ -800,7 +807,6 @@ public class ForumTopicActivity extends AppCompatActivity {
                         markTopicSeen(topic);
                         stateView.setVisibility(View.GONE);
                         adapter.rebuild();
-                        loadAuthorFollowState(topic);
                         loadComments(true);
                     }
 
@@ -817,29 +823,6 @@ public class ForumTopicActivity extends AppCompatActivity {
                 .putLong("time_" + topic.id, latest)
                 .putLong("count_" + topic.id, Math.max(0L, topic.commentCount))
                 .apply();
-    }
-
-    private void loadAuthorFollowState(ForumApiClient.Topic topic) {
-        if (topic == null || topic.user == null || TextUtils.isEmpty(topic.user.id)
-                || TextUtils.equals(ForumApiClient.getInstance().getCurrentForumUserId(), topic.user.id)) {
-            authorFollowStateLoaded = true;
-            authorFollowed = false;
-            adapter.rebuild();
-            return;
-        }
-        ForumApiClient.getInstance().getUserFollowed(topic.user.id, requestScope,
-                new ForumApiClient.ResultCallback<Boolean>() {
-                    @Override public void onSuccess(@Nullable Boolean followed) {
-                        if (isDead() || currentTopic != topic) return;
-                        authorFollowStateLoaded = true;
-                        authorFollowed = Boolean.TRUE.equals(followed);
-                        adapter.rebuild();
-                    }
-                    @Override public void onError(@NonNull String message) {
-                        authorFollowStateLoaded = true;
-                        adapter.rebuild();
-                    }
-                });
     }
 
     private void loadComments(boolean reset) {
@@ -948,7 +931,7 @@ public class ForumTopicActivity extends AppCompatActivity {
     private void updateFastScrollButton() {
         if (fastScrollButton == null || recyclerView == null || adapter == null
                 || adapter.getItemCount() <= 1) {
-            if (fastScrollButton != null) fastScrollButton.setVisibility(View.GONE);
+            hideFastScrollImmediately();
             return;
         }
         RecyclerView.LayoutManager manager = recyclerView.getLayoutManager();
@@ -958,7 +941,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         boolean canUp = recyclerView.canScrollVertically(-1);
         boolean canDown = recyclerView.canScrollVertically(1);
         if (!canUp && !canDown) {
-            fastScrollButton.setVisibility(View.GONE);
+            hideFastScrollImmediately();
             return;
         }
         fastScrollToTop = first > 3;
@@ -966,7 +949,19 @@ public class ForumTopicActivity extends AppCompatActivity {
                 fastScrollToTop ? R.drawable.ic_forum_arrow_up : R.drawable.ic_forum_arrow_down,
                 17, isDark() ? 0xFFD3D6DA : 0xFF5D646C);
         fastScrollButton.setContentDescription(fastScrollToTop ? "快速回到顶部" : "快速回到底部");
+        mainHandler.removeCallbacks(hideFastScrollButton);
+        fastScrollButton.animate().cancel();
+        fastScrollButton.setAlpha(1f);
         fastScrollButton.setVisibility(View.VISIBLE);
+        mainHandler.postDelayed(hideFastScrollButton, 1100L);
+    }
+
+    private void hideFastScrollImmediately() {
+        mainHandler.removeCallbacks(hideFastScrollButton);
+        if (fastScrollButton == null) return;
+        fastScrollButton.animate().cancel();
+        fastScrollButton.setAlpha(0f);
+        fastScrollButton.setVisibility(View.GONE);
     }
 
     private void loadMoreReplies(ForumApiClient.Comment parent) {
@@ -1122,21 +1117,6 @@ public class ForumTopicActivity extends AppCompatActivity {
                     @Override public void success() {
                         topic.favorited = next;
                         completeAction(next ? "已收藏" : "已取消收藏");
-                        adapter.rebuild();
-                    }
-                }));
-    }
-
-    private void changeAuthorFollow() {
-        ForumApiClient.Topic topic = currentTopic;
-        if (topic == null || topic.user == null || TextUtils.isEmpty(topic.user.id)) return;
-        boolean next = !authorFollowed;
-        runAuthenticatedAction(() -> ForumApiClient.getInstance().setUserFollowed(
-                topic.user.id, next, new VoidCallback() {
-                    @Override public void success() {
-                        authorFollowStateLoaded = true;
-                        authorFollowed = next;
-                        completeAction(next ? "已关注" : "已取消关注");
                         adapter.rebuild();
                     }
                 }));
@@ -1756,6 +1736,8 @@ public class ForumTopicActivity extends AppCompatActivity {
         activeVoiceLocalPath = "";
         if (recording) finishRecord(true);
         mainHandler.removeCallbacks(recordTick);
+        mainHandler.removeCallbacks(hideFastScrollButton);
+        if (fastScrollButton != null) fastScrollButton.animate().cancel();
         stopVoicePlayback();
         dismissVoiceConfirmDialog(true);
         dismissVoiceRetryDialog(true);
@@ -1829,8 +1811,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                     + topic.favorited + '|' + topic.sticky + '|' + topic.recommend + '|'
                     + topic.type + '|' + safe(topic.qaStatus) + '|' + topic.acceptedCommentId + '|'
                     + userKey(user) + '|' + safe(category == null ? null : category.name) + '|'
-                    + authorFollowStateLoaded + '|' + authorFollowed + '|' + commentSort
-                    + '|' + imageListKey(topic.imageList);
+                    + commentSort + '|' + imageListKey(topic.imageList);
         }
 
         private String commentContentKey(ForumApiClient.Comment comment, boolean reply) {
@@ -1933,8 +1914,13 @@ public class ForumTopicActivity extends AppCompatActivity {
         private void bindComment(CommentHolder holder, Row row) {
             ForumApiClient.Comment comment = row.comment;
             boolean reply = row.reply;
+            VoicePayload voice = VoicePayload.parse(comment.content);
             int left = reply ? 48 : 16;
-            holder.root.setPadding(dp(left), dp(reply ? 7 : 10), dp(14), 0);
+            int right = voice == null ? 14 : 2;
+            holder.root.setPadding(dp(left), dp(reply ? 7 : 10), dp(right), dp(reply ? 6 : 8));
+            holder.root.setBackgroundColor(reply
+                    ? (isDark() ? 0xFF22272E : 0xFFEEF3F8)
+                    : (isDark() ? 0xFF1A1D21 : 0xFFF7F8FA));
             holder.avatar.setSize(reply ? 25 : 32);
             LinearLayout.LayoutParams avatarParams = (LinearLayout.LayoutParams) holder.avatar.getLayoutParams();
             avatarParams.width = dp((reply ? 25 : 32) + 4);
@@ -1943,6 +1929,10 @@ public class ForumTopicActivity extends AppCompatActivity {
 
             String author = userName(comment.user);
             bindAvatar(holder.avatar, comment.user, author);
+            View.OnClickListener openProfile = v -> ForumProfileRouter.open(
+                    ForumTopicActivity.this, comment.user);
+            holder.avatar.setOnClickListener(openProfile);
+            holder.name.setOnClickListener(openProfile);
             String target = reply && comment.quote != null && comment.quote.user != null
                     ? userName(comment.quote.user) : "";
             setCommentName(holder.name, author, target, reply, isTopicAuthor(comment.user));
@@ -1953,14 +1943,19 @@ public class ForumTopicActivity extends AppCompatActivity {
                     : (isDark() ? 0xFF858B93 : 0xFF9AA0A7);
             setCompoundIcon(holder.like, R.drawable.ic_forum_thumb_up_outline, 16, likeColor);
             holder.like.setTextColor(likeColor);
+            holder.like.setBackground(voice == null ? selectableBackground() : null);
             holder.like.setOnClickListener(v -> changeCommentLike(comment));
 
             holder.more.setText("⋮");
             holder.more.setTextColor(isDark() ? 0xFF858B93 : 0xFF9AA0A7);
+            holder.more.setBackground(voice == null ? selectableBackground() : null);
+            holder.more.setTranslationX(voice == null ? 0f : dp(4));
             holder.more.setOnClickListener(v -> showCommentMenu(comment, row.parentId, author));
 
-            VoicePayload voice = VoicePayload.parse(comment.content);
             if (voice == null) {
+                if (playingVoiceView == holder.voice) playingVoiceView = null;
+                holder.voice.setOnClickListener(null);
+                holder.voice.setOnLongClickListener(null);
                 holder.body.setVisibility(View.VISIBLE);
                 holder.voice.setVisibility(View.GONE);
                 holder.body.setText(ForumHtmlCache.parse(comment.content));
@@ -2166,11 +2161,6 @@ public class ForumTopicActivity extends AppCompatActivity {
         timeParams.topMargin = dp(2);
         root.addView(time, timeParams);
 
-        View divider = divider();
-        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(0.55f));
-        dividerParams.topMargin = dp(9);
-        root.addView(divider, dividerParams);
         return root;
     }
 
@@ -2178,7 +2168,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         LinearLayout root = new LinearLayout(context);
         root.setGravity(Gravity.CENTER_VERTICAL);
         root.setPadding(dp(52), dp(3), dp(14), dp(6));
-        root.setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
+        root.setBackgroundColor(isDark() ? 0xFF22272E : 0xFFEEF3F8);
         TextView more = text("", 12, 0xFF1877F2, true);
         more.setGravity(Gravity.CENTER_VERTICAL);
         root.addView(more, new LinearLayout.LayoutParams(0, dp(34), 1f));
@@ -2198,7 +2188,6 @@ public class ForumTopicActivity extends AppCompatActivity {
         private final AvatarView avatar;
         private final TextView author;
         private final TextView authorMeta;
-        private final TextView follow;
         private final TextView more;
         private final TextView content;
         private final ForumRemoteImageListView images;
@@ -2276,22 +2265,13 @@ public class ForumTopicActivity extends AppCompatActivity {
             authorCopyParams.leftMargin = dp(10);
             authorRow.addView(authorCopy, authorCopyParams);
 
-            follow = text("", 12.5f, 0xFF1877F2, true);
-            follow.setGravity(Gravity.CENTER);
-            follow.setMinWidth(dp(62));
-            follow.setPadding(dp(10), 0, dp(10), 0);
-            follow.setOnClickListener(v -> changeAuthorFollow());
-            LinearLayout.LayoutParams followParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(32));
-            followParams.rightMargin = dp(3);
-            authorRow.addView(follow, followParams);
-
             more = text("⋮", 27, isDark() ? 0xFFD8DADE : 0xFF4D535B, false);
             more.setGravity(Gravity.CENTER);
             more.setContentDescription("帖子操作");
             more.setBackground(selectableBackground());
             more.setOnClickListener(v -> showTopicMenu());
-            authorRow.addView(more, new LinearLayout.LayoutParams(dp(44), dp(44)));
+            more.setTranslationX(dp(10));
+            authorRow.addView(more, new LinearLayout.LayoutParams(dp(38), dp(44)));
             addView(authorRow, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -2373,16 +2353,11 @@ public class ForumTopicActivity extends AppCompatActivity {
             authorMeta.setText(formatDate(topic.createTime));
             bindAvatar(avatar, topic.user, authorName);
 
-            String currentForumUser = ForumApiClient.getInstance().getCurrentForumUserId();
-            boolean ownTopic = topic.user != null
-                    && TextUtils.equals(currentForumUser, topic.user.id);
-            follow.setVisibility(!ownTopic && authorFollowStateLoaded ? VISIBLE : GONE);
-            follow.setText(authorFollowed ? "已关注" : "+ 关注");
-            follow.setTextColor(authorFollowed
-                    ? (isDark() ? 0xFFAAB0B8 : 0xFF737A83) : 0xFF1877F2);
-            follow.setBackground(roundRect(authorFollowed
-                    ? (isDark() ? 0xFF292C31 : 0xFFF0F2F5)
-                    : (isDark() ? 0xFF243B59 : 0xFFEAF3FF), 16));
+            View.OnClickListener openProfile = v -> ForumProfileRouter.open(
+                    ForumTopicActivity.this, topic.user);
+            avatar.setOnClickListener(openProfile);
+            author.setOnClickListener(openProfile);
+            authorMeta.setOnClickListener(openProfile);
 
             String body = TextUtils.isEmpty(topic.content) ? topic.summary : topic.content;
             content.setText(ForumHtmlCache.parse(body));
@@ -2500,9 +2475,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             signalView.setActive(active);
             durationView.setText(Math.max(0, seconds) + "″");
             durationView.setTextColor(accent);
-            playView.setBackground(roundRect(active
-                    ? (isDark() ? 0xFF315174 : 0xFFDCEBFF)
-                    : (isDark() ? 0xFF353941 : Color.WHITE), 17));
+            playView.setBackground(null);
             setImageIcon(playView, active ? R.drawable.ic_forum_pause : R.drawable.ic_forum_play,
                     15, active ? 0xFF1877F2 : (isDark() ? 0xFFE5E8EC : 0xFF4F5862));
             setBackground(roundRect(active

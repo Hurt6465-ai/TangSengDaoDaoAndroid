@@ -306,6 +306,19 @@ public final class ForumApiClient {
         enqueue(forumService().article(authHeader(), articleId), scope, callback);
     }
 
+    public void createArticle(@NonNull String title, @NonNull String summary,
+                              @NonNull String content, @NonNull List<String> tags,
+                              @Nullable ImageInfo cover, @Nullable RequestScope scope,
+                              @NonNull ResultCallback<Article> callback) {
+        CreateArticleRequest request = new CreateArticleRequest();
+        request.title = title;
+        request.summary = summary;
+        request.content = content;
+        request.tags = TextUtils.join(",", tags);
+        request.cover = cover == null ? "" : imageInfoJson(cover);
+        enqueue(forumService().createArticle(requireAuthHeader(), request), scope, callback);
+    }
+
     public void getArticleComments(long articleId, @Nullable String cursor, @Nullable String sort,
                                    @NonNull ResultCallback<Page<Comment>> callback) {
         getArticleComments(articleId, cursor, sort, null, callback);
@@ -888,6 +901,11 @@ public final class ForumApiClient {
         return builder.append(']').toString();
     }
 
+    private static String imageInfoJson(@Nullable ImageInfo image) {
+        if (image == null || TextUtils.isEmpty(image.url)) return "";
+        return "{\"url\":\"" + escapeJson(image.url) + "\"}";
+    }
+
     private static String escapeJson(String value) {
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
@@ -958,6 +976,10 @@ public final class ForumApiClient {
         @GET("api/article/{id}")
         Call<ApiEnvelope<Article>> article(@Header("X-User-Token") String token,
                                            @Path("id") long articleId);
+
+        @POST("api/article/create")
+        Call<ApiEnvelope<Article>> createArticle(@Header("X-User-Token") String token,
+                                                 @Body CreateArticleRequest request);
 
         @GET("api/topic/topics")
         Call<ApiEnvelope<Page<Topic>>> topics(@Header("X-User-Token") String token,
@@ -1128,6 +1150,14 @@ public final class ForumApiClient {
         public int bountyScore;
     }
 
+    private static final class CreateArticleRequest {
+        public String title;
+        public String summary;
+        public String content;
+        public String cover;
+        public String tags;
+    }
+
     private static final class ApiEnvelope<T> {
         public Boolean success;
         public T data;
@@ -1173,6 +1203,7 @@ public final class ForumApiClient {
         public int bountyScore;
         public User user;
         public Category category;
+        public List<Tag> tags;
         public List<ImageInfo> imageList;
     }
 

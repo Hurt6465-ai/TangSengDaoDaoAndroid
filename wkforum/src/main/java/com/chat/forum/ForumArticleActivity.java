@@ -56,7 +56,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-/** Native read-first article screen. Articles are still authored on the web. */
+/** Native article detail screen. */
 public class ForumArticleActivity extends AppCompatActivity {
     private static final String EXTRA_ARTICLE_ID = "article_id";
     private static final String SEEN_PREF = "forum_article_seen";
@@ -585,8 +585,8 @@ public class ForumArticleActivity extends AppCompatActivity {
     private View createCommentView(Context context) {
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(10), dp(14), 0);
-        root.setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
+        root.setPadding(dp(16), dp(10), dp(4), dp(9));
+        root.setBackgroundColor(isDark() ? 0xFF1A1D21 : 0xFFF7F8FA);
         LinearLayout header = new LinearLayout(context);
         header.setGravity(Gravity.CENTER_VERTICAL);
         AvatarView avatar = new AvatarView(context);
@@ -606,16 +606,16 @@ public class ForumArticleActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bp.leftMargin = dp(43); bp.topMargin = dp(5);
         root.addView(body, bp);
-        LinearLayout.LayoutParams dpv = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(0.55f));
-        dpv.topMargin = dp(10);
-        root.addView(divider(), dpv);
         return root;
     }
 
     private void bindComment(CommentHolder holder, ForumApiClient.Comment comment) {
         String author = userName(comment.user);
         bindAvatar(holder.avatar, comment.user, author);
+        View.OnClickListener openProfile = v -> ForumProfileRouter.open(
+                ForumArticleActivity.this, comment.user);
+        holder.avatar.setOnClickListener(openProfile);
+        holder.name.setOnClickListener(openProfile);
         boolean owner = article != null && article.user != null && comment.user != null
                 && TextUtils.equals(article.user.id, comment.user.id);
         holder.name.setText(commentName(author, formatTime(comment.createTime), owner));
@@ -670,7 +670,8 @@ public class ForumArticleActivity extends AppCompatActivity {
             more.setContentDescription("文章操作");
             more.setBackground(selectableBackground());
             more.setOnClickListener(v -> showArticleMenu());
-            titleRow.addView(more, new LinearLayout.LayoutParams(dp(38), dp(38)));
+            more.setTranslationX(dp(10));
+            titleRow.addView(more, new LinearLayout.LayoutParams(dp(34), dp(38)));
             addView(titleRow);
 
             LinearLayout authorRow = new LinearLayout(context);
@@ -725,6 +726,10 @@ public class ForumArticleActivity extends AppCompatActivity {
             String authorName = userName(value.user);
             bindAvatar(avatar, value.user, authorName);
             author.setText(authorName + "  作者 · " + formatTime(value.createTime));
+            View.OnClickListener openProfile = v -> ForumProfileRouter.open(
+                    ForumArticleActivity.this, value.user);
+            avatar.setOnClickListener(openProfile);
+            author.setOnClickListener(openProfile);
 
             String coverUrl = "";
             if (value.cover != null && !TextUtils.isEmpty(value.cover.url)) {

@@ -30,6 +30,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.content.res.AppCompatResources;
+import androidx.appcompat.widget.AppCompatImageView;
 import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.core.view.GravityCompat;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
@@ -183,11 +184,15 @@ public class ForumHomeFragment extends Fragment {
         feedTabContainer.setPadding(dp(context, 2), dp(context, 2), dp(context, 2), dp(context, 2));
         feedTabContainer.setBackground(roundRect(context,
                 dark ? 0xFF23252A : 0xFFF2F3F5, 15));
-        AppBarLayout.LayoutParams feedTabsParams = new AppBarLayout.LayoutParams(
-                dp(context, 184), dp(context, 31));
-        feedTabsParams.gravity = Gravity.CENTER_HORIZONTAL;
-        feedTabsParams.setMargins(0, dp(context, 5), 0, dp(context, 5));
-        appBarLayout.addView(feedTabContainer, feedTabsParams);
+        LinearLayout feedTabsRow = new LinearLayout(context);
+        feedTabsRow.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+        feedTabsRow.setPadding(dp(context, 14), dp(context, 5), dp(context, 14), dp(context, 7));
+        feedTabsRow.addView(feedTabContainer, new LinearLayout.LayoutParams(
+                dp(context, 184), dp(context, 31)));
+        // Keep the feed switch inside the collapsible area so it naturally
+        // disappears as the list scrolls, instead of staying pinned on top.
+        collapsibleHeader.addView(feedTabsRow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         currentCategoryView = text(context, "", 12, dark ? 0xFFAAB0B8 : 0xFF66707B, false);
         currentCategoryView.setPadding(dp(context, 16), dp(context, 7), dp(context, 16), dp(context, 7));
@@ -313,13 +318,32 @@ public class ForumHomeFragment extends Fragment {
         titleBox.setOnClickListener(v -> refreshAll());
         toolbar.addView(titleBox, new LinearLayout.LayoutParams(0, dp(context, 44), 1f));
 
-        centerButton = text(context, "我的", 14, dark ? 0xFFD9DCE1 : 0xFF333840, true);
-        centerButton.setGravity(Gravity.CENTER);
-        centerButton.setBackground(selectableBackground(context));
-        centerButton.setOnClickListener(v -> {
+        FrameLayout notificationButton = new FrameLayout(context);
+        notificationButton.setForeground(selectableBackground(context));
+        notificationButton.setContentDescription("社区通知");
+        notificationButton.setOnClickListener(v -> {
             if (isAdded()) userCenterLauncher.launch(ForumUserCenterActivity.createIntent(requireContext()));
         });
-        toolbar.addView(centerButton, new LinearLayout.LayoutParams(dp(context, 62), dp(context, 38)));
+        AppCompatImageView bell = new AppCompatImageView(context);
+        bell.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+        setImageIcon(bell, R.drawable.ic_forum_bell, 22,
+                dark ? 0xFFD9DCE1 : 0xFF4D535B);
+        FrameLayout.LayoutParams bellParams = new FrameLayout.LayoutParams(
+                dp(context, 38), dp(context, 38), Gravity.CENTER);
+        notificationButton.addView(bell, bellParams);
+
+        centerButton = text(context, "", 10, 0xFFE64646, true);
+        centerButton.setGravity(Gravity.CENTER);
+        centerButton.setMinWidth(dp(context, 18));
+        centerButton.setPadding(dp(context, 4), 0, dp(context, 4), 0);
+        centerButton.setBackground(roundRect(context,
+                dark ? 0xFF3A2428 : 0xFFFFEEEE, 9));
+        centerButton.setVisibility(View.GONE);
+        FrameLayout.LayoutParams countParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 18), Gravity.END | Gravity.TOP);
+        countParams.setMargins(0, dp(context, 1), dp(context, 1), 0);
+        notificationButton.addView(centerButton, countParams);
+        toolbar.addView(notificationButton, new LinearLayout.LayoutParams(dp(context, 50), dp(context, 42)));
         return toolbar;
     }
 
@@ -420,7 +444,7 @@ public class ForumHomeFragment extends Fragment {
 
     private void loadUnreadCount() {
         if (!isAdded() || centerButton == null || !ForumApiClient.getInstance().hasValidSession()) {
-            if (centerButton != null) centerButton.setText("我的");
+            if (centerButton != null) centerButton.setVisibility(View.GONE);
             return;
         }
         ForumApiClient.getInstance().getRecentMessages(requestScope,
@@ -429,12 +453,13 @@ public class ForumHomeFragment extends Fragment {
                     public void onSuccess(@Nullable ForumApiClient.RecentMessages data) {
                         if (!isAdded() || centerButton == null) return;
                         long count = data == null ? 0L : Math.max(0L, data.count);
-                        centerButton.setText(count <= 0 ? "我的" : "我的 " + (count > 99 ? "99+" : count));
+                        centerButton.setText(count > 99 ? "99+" : String.valueOf(count));
+                        centerButton.setVisibility(count > 0 ? View.VISIBLE : View.GONE);
                     }
 
                     @Override
                     public void onError(@NonNull String message) {
-                        if (centerButton != null) centerButton.setText("我的");
+                        if (centerButton != null) centerButton.setVisibility(View.GONE);
                     }
                 });
     }
@@ -1059,6 +1084,7 @@ public class ForumHomeFragment extends Fragment {
 
             holder.author.setText(author);
             holder.meta.setText(category);
+            bindTopicTags(holder.tagContainer, topic.tags, dark);
             holder.time.setText(formatTime(topic.createTime));
             holder.title.setText(safe(topic.title));
             holder.sticky.setVisibility(topic.sticky ? View.VISIBLE : View.GONE);
@@ -1076,6 +1102,7 @@ public class ForumHomeFragment extends Fragment {
             holder.title.setTextColor(dimmed ? dimTitle : normalTitle);
             holder.author.setAlpha(dimmed ? 0.58f : 1f);
             holder.meta.setAlpha(dimmed ? 0.52f : 1f);
+            holder.tagContainer.setAlpha(dimmed ? 0.52f : 1f);
             holder.time.setAlpha(dimmed ? 0.50f : 1f);
             holder.avatar.setAlpha(dimmed ? 0.56f : 1f);
             holder.sticky.setAlpha(dimmed ? 0.58f : 1f);
@@ -1083,6 +1110,7 @@ public class ForumHomeFragment extends Fragment {
             holder.qa.setAlpha(dimmed ? 0.58f : 1f);
 
             bindAvatar(holder.avatar, topic.user, author);
+            holder.avatar.setOnClickListener(v -> ForumProfileRouter.open(context, topic.user));
             holder.itemView.setOnClickListener(v -> {
                 if (!TextUtils.isEmpty(topic.id)) listener.onClick(topic);
             });
@@ -1334,6 +1362,7 @@ public class ForumHomeFragment extends Fragment {
             holder.author.setAlpha(read ? 0.58f : 1f);
             holder.meta.setAlpha(read ? 0.52f : 1f);
             bindArticleAvatar(holder.avatar, article.user, author);
+            holder.avatar.setOnClickListener(v -> ForumProfileRouter.open(context, article.user));
             holder.itemView.setOnClickListener(v -> listener.onClick(article));
         }
 
@@ -1486,6 +1515,7 @@ public class ForumHomeFragment extends Fragment {
         private final AvatarView avatar;
         private final TextView author;
         private final TextView meta;
+        private final LinearLayout tagContainer;
         private final TextView time;
         private final TextView sticky;
         private final TextView recommend;
@@ -1500,7 +1530,9 @@ public class ForumHomeFragment extends Fragment {
             avatar = (AvatarView) authorRow.getChildAt(0);
             LinearLayout authorText = (LinearLayout) authorRow.getChildAt(1);
             author = (TextView) authorText.getChildAt(0);
-            meta = (TextView) authorText.getChildAt(1);
+            LinearLayout metaRow = (LinearLayout) authorText.getChildAt(1);
+            meta = (TextView) metaRow.getChildAt(0);
+            tagContainer = (LinearLayout) metaRow.getChildAt(1);
             LinearLayout right = (LinearLayout) authorRow.getChildAt(2);
             time = (TextView) right.getChildAt(0);
             LinearLayout badges = (LinearLayout) right.getChildAt(1);
@@ -1536,11 +1568,22 @@ public class ForumHomeFragment extends Fragment {
         LinearLayout authorText = new LinearLayout(context);
         authorText.setOrientation(LinearLayout.VERTICAL);
         TextView author = text(context, "", 12.5f, dark ? 0xFFF1F2F4 : 0xFF272B31, true);
+        LinearLayout metaRow = new LinearLayout(context);
+        metaRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView meta = text(context, "", 10.5f, dark ? 0xFF8F949C : 0xFF7A818A, false);
         meta.setSingleLine(true);
+        meta.setMaxWidth(dp(context, 108));
         meta.setEllipsize(TextUtils.TruncateAt.END);
+        metaRow.addView(meta, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 20)));
+        LinearLayout tagContainer = new LinearLayout(context);
+        tagContainer.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams tagsParams = new LinearLayout.LayoutParams(
+                0, dp(context, 20), 1f);
+        tagsParams.leftMargin = dp(context, 4);
+        metaRow.addView(tagContainer, tagsParams);
         authorText.addView(author);
-        authorText.addView(meta);
+        authorText.addView(metaRow);
         LinearLayout.LayoutParams authorTextParams = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         authorTextParams.leftMargin = dp(context, 8);
@@ -1622,6 +1665,38 @@ public class ForumHomeFragment extends Fragment {
         return badge;
     }
 
+    private static void bindTopicTags(LinearLayout container, @Nullable List<ForumApiClient.Tag> tags,
+                                      boolean dark) {
+        container.removeAllViews();
+        if (tags == null || tags.isEmpty()) {
+            container.setVisibility(View.GONE);
+            return;
+        }
+        int[] lightBackgrounds = {0xFFEAF3FF, 0xFFF1ECFF, 0xFFEAF8F1, 0xFFFFF1E6};
+        int[] lightTexts = {0xFF3477BD, 0xFF7451A8, 0xFF2F8061, 0xFFA9682C};
+        int shown = 0;
+        for (ForumApiClient.Tag tag : tags) {
+            if (tag == null || TextUtils.isEmpty(tag.name)) continue;
+            int index = (tag.name.hashCode() & 0x7fffffff) % lightBackgrounds.length;
+            int background = dark ? blend(lightTexts[index], 0xFF17181B, 0.78f)
+                    : lightBackgrounds[index];
+            TextView chip = text(container.getContext(), tag.name, 9.5f,
+                    dark ? 0xFFD7DBE1 : lightTexts[index], true);
+            chip.setGravity(Gravity.CENTER);
+            chip.setSingleLine(true);
+            chip.setMaxWidth(dp(container.getContext(), 72));
+            chip.setEllipsize(TextUtils.TruncateAt.END);
+            chip.setPadding(dp(container.getContext(), 6), 0, dp(container.getContext(), 6), 0);
+            chip.setBackground(roundRect(container.getContext(), background, 9));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(container.getContext(), 18));
+            if (shown > 0) params.leftMargin = dp(container.getContext(), 4);
+            container.addView(chip, params);
+            if (++shown >= 2) break;
+        }
+        container.setVisibility(shown > 0 ? View.VISIBLE : View.GONE);
+    }
+
     private static void setCompoundIcon(TextView view, int resId, int sizeDp, int color) {
         Drawable drawable = AppCompatResources.getDrawable(view.getContext(), resId);
         if (drawable == null) return;
@@ -1630,6 +1705,16 @@ public class ForumHomeFragment extends Fragment {
         int size = dp(view.getContext(), sizeDp);
         drawable.setBounds(0, 0, size, size);
         view.setCompoundDrawables(drawable, null, null, null);
+    }
+
+    private static void setImageIcon(AppCompatImageView view, int resId, int sizeDp, int color) {
+        Drawable drawable = AppCompatResources.getDrawable(view.getContext(), resId);
+        if (drawable == null) return;
+        drawable = DrawableCompat.wrap(drawable.mutate());
+        DrawableCompat.setTint(drawable, color);
+        int size = dp(view.getContext(), sizeDp);
+        drawable.setBounds(0, 0, size, size);
+        view.setImageDrawable(drawable);
     }
 
     private static TextView text(Context context, String value, float sizeSp, int color, boolean bold) {
@@ -1690,7 +1775,18 @@ public class ForumHomeFragment extends Fragment {
                 + topic.likeCount + '|' + topic.sticky + '|' + topic.recommend + '|'
                 + safe(user == null ? null : user.nickname) + '|'
                 + safe(user == null ? null : user.smallAvatar) + '|'
-                + safe(category == null ? null : category.name);
+                + safe(category == null ? null : category.name) + '|'
+                + tagSignature(topic.tags);
+    }
+
+    private static String tagSignature(@Nullable List<ForumApiClient.Tag> tags) {
+        if (tags == null || tags.isEmpty()) return "";
+        StringBuilder result = new StringBuilder();
+        for (ForumApiClient.Tag tag : tags) {
+            if (tag == null || TextUtils.isEmpty(tag.name)) continue;
+            result.append(tag.id).append(':').append(tag.name).append(';');
+        }
+        return result.toString();
     }
 
     private static String articleSignature(ForumApiClient.Article article) {
