@@ -34,7 +34,6 @@ import android.util.Base64;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -63,7 +62,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.chat.base.config.WKApiConfig;
 import com.chat.base.net.ud.WKUploader;
 import com.chat.base.ui.components.AvatarView;
-import com.chat.uikit.view.voice.AudioRecordManager;
 import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.io.File;
@@ -139,11 +137,12 @@ public class ForumTopicActivity extends AppCompatActivity {
             }
         }).start();
     };
+    private final ForumAudioRecorder forumAudioRecorder = new ForumAudioRecorder();
     private boolean recording;
-    private boolean recordCancel;
+    private boolean recordingPaused;
     private long recordStartTime;
-    private float recordStartX;
-    private float recordStartY;
+    private long recordPausedAt;
+    private long recordPausedDuration;
     private long recordReplyParentId;
     private long recordReplyQuoteId;
     private String recordPath = "";
@@ -151,7 +150,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         @Override
         public void run() {
             if (!recording) return;
-            long elapsed = Math.max(0L, System.currentTimeMillis() - recordStartTime);
+            long elapsed = currentRecordDuration();
             int seconds = (int) Math.ceil(elapsed / 1000.0);
             updateRecordHint(seconds);
             if (elapsed >= MAX_RECORD_MS) {
@@ -224,7 +223,7 @@ public class ForumTopicActivity extends AppCompatActivity {
     private final ActivityResultLauncher<String> audioPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(), granted -> {
                 if (granted) {
-                    Toast.makeText(this, "按住录音，上滑取消，松开后确认发送", Toast.LENGTH_SHORT).show();
+                    startRecord();
                 } else {
                     Toast.makeText(this, "需要麦克风权限才能发送语音评论", Toast.LENGTH_LONG).show();
                 }
@@ -393,9 +392,8 @@ public class ForumTopicActivity extends AppCompatActivity {
         composerAction.setOnClickListener(v -> {
             if (sending) return;
             if (!TextUtils.isEmpty(commentInput.getText().toString().trim())) sendComment();
-            else Toast.makeText(this, "按住录音，上滑取消，松开后确认发送", Toast.LENGTH_SHORT).show();
+            else toggleRecordByClick();
         });
-        composerAction.setOnTouchListener(this::handleComposerTouch);
         LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(dp(48), dp(48));
         actionParams.leftMargin = dp(8);
         row.addView(composerAction, actionParams);
@@ -413,44 +411,17 @@ public class ForumTopicActivity extends AppCompatActivity {
         return wrapper;
     }
 
-    private boolean handleComposerTouch(View view, MotionEvent event) {
-        if (sending || commentInput == null
-                || !TextUtils.isEmpty(commentInput.getText().toString().trim())) return false;
-        switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                        != PackageManager.PERMISSION_GRANTED) {
-                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
-                    return true;
-                }
-                recordStartX = event.getRawX();
-                recordStartY = event.getRawY();
-                startRecord();
-                return true;
-            case MotionEvent.ACTION_MOVE:
-                if (recording) {
-                    if (recordStartY - event.getRawY() >= dp(58)
-                            || Math.abs(event.getRawX() - recordStartX) >= dp(96)) {
-                        recordCancel = true;
-                    }
-                    long elapsed = Math.max(0L, System.currentTimeMillis() - recordStartTime);
-                    updateRecordHint((int) Math.ceil(elapsed / 1000.0));
-                }
-                return true;
-            case MotionEvent.ACTION_UP:
-                if (recording) {
-                    boolean cancel = recordCancel
-                            || recordStartY - event.getRawY() >= dp(58)
-                            || Math.abs(event.getRawX() - recordStartX) >= dp(96);
-                    finishRecord(cancel);
-                }
-                return true;
-            case MotionEvent.ACTION_CANCEL:
-                if (recording) finishRecord(true);
-                return true;
-            default:
-                return false;
+    private void toggleRecordByClick() {
+        if (recording) {
+            showRecordControls();
+            return;
         }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
+            return;
+        }
+        startRecord();
     }
 
     private void startRecord() {
@@ -462,24 +433,30 @@ public class ForumTopicActivity extends AppCompatActivity {
             File file = new File(dir, "voice_" + System.currentTimeMillis() + ".amr");
             recordPath = file.getAbsolutePath();
             recordStartTime = System.currentTimeMillis();
-            recordCancel = false;
+            recordPausedAt = 0L;
+            recordPausedDuration = 0L;
+            recordingPaused = false;
             recordReplyParentId = replyParentId;
             recordReplyQuoteId = replyQuoteId;
-            AudioRecordManager.getInstance().init(recordPath);
-            AudioRecordManager.getInstance().startRecord();
+            forumAudioRecorder.start(new File(recordPath));
             recording = true;
             composerAction.setSelected(true);
-            composerAction.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            composerAction.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            commentInput.setEnabled(false);
             recordHint.setVisibility(View.VISIBLE);
             updateRecordHint(0);
+            updateComposerAction();
             mainHandler.post(recordTick);
         } catch (Throwable error) {
-            try { AudioRecordManager.getInstance().cancelRecord(); } catch (Throwable ignored) { }
+            try { forumAudioRecorder.cancel(); } catch (Throwable ignored) { }
             deleteQuietly(recordPath);
             recordPath = "";
             recording = false;
+            recordingPaused = false;
             composerAction.setSelected(false);
+            commentInput.setEnabled(true);
             recordHint.setVisibility(View.GONE);
+            updateComposerAction();
             Toast.makeText(this, "录音启动失败", Toast.LENGTH_SHORT).show();
         }
     }
@@ -487,22 +464,81 @@ public class ForumTopicActivity extends AppCompatActivity {
     private void updateRecordHint(int seconds) {
         if (!recording || recordHint == null) return;
         String time = String.format(Locale.getDefault(), "%02d:%02d", seconds / 60, seconds % 60);
-        recordHint.setText((recordCancel ? "松开取消" : "松开完成，上滑取消") + "  " + time);
-        recordHint.setTextColor(recordCancel ? 0xFFEF4444 : (isDark() ? Color.WHITE : 0xFF33383E));
+        recordHint.setText((recordingPaused ? "录音已暂停" : "录音中") + "  " + time
+                + (recordingPaused ? " · 点击麦克风继续或结束" : " · 再点麦克风暂停或结束"));
+        recordHint.setTextColor(isDark() ? Color.WHITE : 0xFF33383E);
+    }
+
+    private long currentRecordDuration() {
+        if (!recording) return 0L;
+        long now = System.currentTimeMillis();
+        long paused = recordPausedDuration;
+        if (recordingPaused && recordPausedAt > 0L) paused += now - recordPausedAt;
+        return Math.max(0L, now - recordStartTime - paused);
+    }
+
+    private void showRecordControls() {
+        if (!recording) return;
+        String pauseLabel = recordingPaused ? "继续录音" : "暂停录音";
+        new AlertDialog.Builder(this)
+                .setItems(new String[]{pauseLabel, "结束并发送", "取消录音"}, (dialog, which) -> {
+                    if (which == 0) {
+                        if (recordingPaused) resumeRecord();
+                        else pauseRecord();
+                    } else if (which == 1) {
+                        finishRecord(false);
+                    } else {
+                        finishRecord(true);
+                    }
+                })
+                .show();
+    }
+
+    private void pauseRecord() {
+        if (!recording || recordingPaused) return;
+        try {
+            forumAudioRecorder.pause();
+            recordingPaused = true;
+            recordPausedAt = System.currentTimeMillis();
+            updateRecordHint((int) Math.ceil(currentRecordDuration() / 1000.0));
+            updateComposerAction();
+        } catch (Throwable error) {
+            Toast.makeText(this, "暂停录音失败", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void resumeRecord() {
+        if (!recording || !recordingPaused) return;
+        try {
+            forumAudioRecorder.resume();
+            long now = System.currentTimeMillis();
+            if (recordPausedAt > 0L) recordPausedDuration += now - recordPausedAt;
+            recordPausedAt = 0L;
+            recordingPaused = false;
+            updateRecordHint((int) Math.ceil(currentRecordDuration() / 1000.0));
+            updateComposerAction();
+        } catch (Throwable error) {
+            Toast.makeText(this, "继续录音失败", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void finishRecord(boolean cancel) {
         if (!recording) return;
+        long duration = currentRecordDuration();
         recording = false;
         mainHandler.removeCallbacks(recordTick);
-        long duration = Math.max(0L, System.currentTimeMillis() - recordStartTime);
         String localPath = recordPath;
-        byte[] waveform = AudioRecordManager.getInstance().getDbs();
-        if (cancel) AudioRecordManager.getInstance().cancelRecord();
-        else AudioRecordManager.getInstance().stopRecord();
+        byte[] waveform = forumAudioRecorder.getLevels();
+        if (cancel) forumAudioRecorder.cancel();
+        else forumAudioRecorder.stop();
         composerAction.setSelected(false);
+        commentInput.setEnabled(true);
         recordHint.setVisibility(View.GONE);
         recordPath = "";
+        recordingPaused = false;
+        recordPausedAt = 0L;
+        recordPausedDuration = 0L;
+        updateComposerAction();
         if (cancel) {
             deleteQuietly(localPath);
             return;
@@ -515,7 +551,9 @@ public class ForumTopicActivity extends AppCompatActivity {
         int seconds = Math.max(1, (int) Math.ceil(duration / 1000.0));
         String waveformText = Base64.encodeToString(waveform == null ? new byte[0] : waveform,
                 Base64.NO_WRAP);
-        showVoiceSendConfirmation(localPath, seconds, waveformText,
+        // The second tap explicitly says "结束并发送". Do not ask for a third
+        // confirmation; upload immediately and keep the retry dialog on error.
+        uploadAndSendVoice(localPath, seconds, waveformText,
                 recordReplyParentId, recordReplyQuoteId);
     }
 
@@ -776,12 +814,21 @@ public class ForumTopicActivity extends AppCompatActivity {
     private void updateComposerAction() {
         if (composerAction == null || commentInput == null) return;
         boolean hasText = !TextUtils.isEmpty(commentInput.getText().toString().trim());
-        composerAction.setBackground(roundRect(hasText ? 0xFF1877F2
-                : (isDark() ? 0xFF2A2D33 : 0xFFF0F2F5), 24));
-        composerAction.setContentDescription(hasText ? "发送评论" : "按住录音，松开后确认发送");
-        setImageIcon(composerAction, hasText ? R.drawable.ic_forum_send
-                        : R.drawable.ic_forum_mic, hasText ? 20 : 25,
-                hasText ? Color.WHITE : (isDark() ? 0xFFE4E6EA : 0xFF4D555E));
+        if (hasText && !recording) {
+            composerAction.setBackground(roundRect(0xFF1877F2, 24));
+            composerAction.setContentDescription("发送评论");
+            setImageIcon(composerAction, R.drawable.ic_forum_send, 20, Color.WHITE);
+            return;
+        }
+        // Voice input is a lightweight icon button; no gray circular frame.
+        composerAction.setBackground(null);
+        composerAction.setContentDescription(recording
+                ? (recordingPaused ? "继续或结束录音" : "暂停或结束录音")
+                : "点击开始录音");
+        setImageIcon(composerAction,
+                recordingPaused ? R.drawable.ic_forum_play : R.drawable.ic_forum_mic,
+                recordingPaused ? 21 : 25,
+                recording ? 0xFF1877F2 : (isDark() ? 0xFFE4E6EA : 0xFF4D555E));
     }
 
     private void loadTopic() {
@@ -1801,6 +1848,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         private static final int TYPE_TOGGLE = 3;
         private static final int TYPE_EMPTY = 4;
         private static final int TYPE_LOAD_MORE = 5;
+        private static final int TYPE_DIVIDER = 6;
         private final List<Row> rows = new ArrayList<>();
 
         private TopicDetailAdapter() {
@@ -1813,7 +1861,8 @@ public class ForumTopicActivity extends AppCompatActivity {
             if (currentTopic != null && comments.isEmpty() && !loadingComments) {
                 next.add(Row.empty());
             }
-            for (ForumApiClient.Comment parent : comments) {
+            for (int commentIndex = 0; commentIndex < comments.size(); commentIndex++) {
+                ForumApiClient.Comment parent = comments.get(commentIndex);
                 if (parent == null) continue;
                 next.add(Row.comment(parent, parent.id, false, commentContentKey(parent, false)));
                 boolean expanded = expandedReplies.contains(parent.id);
@@ -1828,6 +1877,9 @@ public class ForumTopicActivity extends AppCompatActivity {
                 if (parent.commentCount > 0 || (parent.replies != null
                         && parent.replies.results != null && !parent.replies.results.isEmpty())) {
                     next.add(Row.toggle(parent, toggleContentKey(parent, expanded)));
+                }
+                if (commentIndex < comments.size() - 1) {
+                    next.add(Row.divider(parent.id));
                 }
             }
             if (commentsHasMore || loadingComments) {
@@ -1861,6 +1913,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                     + topic.commentCount + '|' + topic.likeCount + '|' + topic.liked + '|'
                     + topic.favorited + '|' + topic.sticky + '|' + topic.recommend + '|'
                     + topic.type + '|' + safe(topic.qaStatus) + '|' + topic.acceptedCommentId + '|'
+                    + topic.bountyScore + '|'
                     + userKey(user) + '|' + safe(category == null ? null : category.name) + '|'
                     + commentSort + '|' + imageListKey(topic.imageList);
         }
@@ -1913,6 +1966,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             if (viewType == TYPE_ARTICLE) return new ArticleHolder(new ArticleView(parent.getContext()));
             if (viewType == TYPE_COMMENT) return new CommentHolder(createCommentItem(parent.getContext()));
             if (viewType == TYPE_TOGGLE) return new ToggleHolder(createToggleItem(parent.getContext()));
+            if (viewType == TYPE_DIVIDER) return new SimpleHolder(createCommentGroupDivider(parent.getContext()));
             TextView text = ForumTopicActivity.this.text("", 14,
                     isDark() ? 0xFF8F949C : 0xFF7A818A, false);
             text.setGravity(Gravity.CENTER);
@@ -1926,6 +1980,11 @@ public class ForumTopicActivity extends AppCompatActivity {
             if (holder instanceof ArticleHolder) bindArticle((ArticleHolder) holder);
             else if (holder instanceof CommentHolder) bindComment((CommentHolder) holder, row);
             else if (holder instanceof ToggleHolder) bindToggle((ToggleHolder) holder, row.parent);
+            else if (row.type == TYPE_DIVIDER) {
+                // A divider is a plain View. It has no bindable text and must
+                // not enter the SimpleHolder TextView branch during recycling.
+                holder.itemView.setOnClickListener(null);
+            }
             else if (holder instanceof SimpleHolder) {
                 TextView text = (TextView) holder.itemView;
                 if (row.type == TYPE_EMPTY) {
@@ -2085,7 +2144,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             SpannableString value = new SpannableString(namePart + ownerPart);
             int normalName = isDark() ? 0xFFE4E6E9 : 0xFF30353B;
             int replyName = isDark() ? 0xFFA3A9B1 : 0xFF7E858D;
-            int connectorColor = isDark() ? 0xFF767D86 : 0xFFA1A7AE;
+            int connectorColor = isDark() ? 0xFFD2D6DB : 0xFF4B535C;
             value.setSpan(new ForegroundColorSpan(reply ? replyName : normalName),
                     0, safeAuthor.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             value.setSpan(new StyleSpan(reply ? Typeface.NORMAL : Typeface.BOLD),
@@ -2094,6 +2153,8 @@ public class ForumTopicActivity extends AppCompatActivity {
                 int connectorStart = safeAuthor.length();
                 int targetStart = connectorStart + connector.length();
                 value.setSpan(new ForegroundColorSpan(connectorColor), connectorStart, targetStart,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                value.setSpan(new StyleSpan(Typeface.BOLD), connectorStart, targetStart,
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 value.setSpan(new ForegroundColorSpan(replyName), targetStart, namePart.length(),
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -2264,6 +2325,19 @@ public class ForumTopicActivity extends AppCompatActivity {
         return root;
     }
 
+    private View createCommentGroupDivider(Context context) {
+        View line = new View(context);
+        line.setBackgroundColor(isDark() ? 0xFF292B30 : 0xFFE7E9ED);
+        RecyclerView.LayoutParams params = new RecyclerView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(1));
+        params.leftMargin = dp(16);
+        params.rightMargin = dp(14);
+        params.topMargin = dp(8);
+        params.bottomMargin = dp(8);
+        line.setLayoutParams(params);
+        return line;
+    }
+
     private final class ArticleView extends LinearLayout {
         private final LinearLayout topMeta;
         private final TextView category;
@@ -2271,6 +2345,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         private final TextView recommend;
         private final TextView qaMark;
         private final TextView qaStatus;
+        private final TextView bounty;
         private final TextView title;
         private final AvatarView avatar;
         private final TextView author;
@@ -2320,13 +2395,14 @@ public class ForumTopicActivity extends AppCompatActivity {
 
             LinearLayout titleRow = new LinearLayout(context);
             titleRow.setGravity(Gravity.CENTER_VERTICAL);
-            qaMark = text("问", 12, isDark() ? 0xFF3D2C00 : 0xFF6E4B00, true);
+            qaMark = text("?", 12, isDark() ? 0xFF3D2C00 : 0xFF6E4B00, true);
             qaMark.setGravity(Gravity.CENTER);
             qaMark.setIncludeFontPadding(false);
-            qaMark.setBackground(roundRect(isDark() ? 0xFFD6A52A : 0xFFFFD65A, 12));
+            qaMark.setBackground(roundRect(isDark() ? 0xFFD6A52A : 0xFFFFD65A, 10));
             qaMark.setVisibility(GONE);
-            LinearLayout.LayoutParams qaMarkParams = new LinearLayout.LayoutParams(dp(24), dp(24));
-            qaMarkParams.rightMargin = dp(8);
+            LinearLayout.LayoutParams qaMarkParams = new LinearLayout.LayoutParams(dp(20), dp(20));
+            qaMarkParams.topMargin = dp(3);
+            qaMarkParams.rightMargin = dp(7);
             titleRow.addView(qaMark, qaMarkParams);
 
             title = text("", 24, isDark() ? Color.WHITE : 0xFF17191C, true);
@@ -2334,20 +2410,18 @@ public class ForumTopicActivity extends AppCompatActivity {
             titleRow.addView(title, new LinearLayout.LayoutParams(
                     0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-            qaStatus = text("", 11, 0xFFB76E00, true);
-            qaStatus.setGravity(Gravity.CENTER);
-            qaStatus.setSingleLine(true);
-            qaStatus.setPadding(dp(8), 0, dp(8), 0);
-            qaStatus.setVisibility(GONE);
-            LinearLayout.LayoutParams qaStatusParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(24));
-            qaStatusParams.leftMargin = dp(8);
-            titleRow.addView(qaStatus, qaStatusParams);
-
             LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             titleParams.topMargin = dp(10);
             addView(titleRow, titleParams);
+
+            bounty = text("", 12, isDark() ? 0xFFFFCB68 : 0xFFB96A00, true);
+            bounty.setVisibility(GONE);
+            LinearLayout.LayoutParams bountyParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            bountyParams.topMargin = dp(6);
+            bountyParams.leftMargin = dp(27);
+            addView(bounty, bountyParams);
 
             LinearLayout authorRow = new LinearLayout(context);
             authorRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -2361,6 +2435,9 @@ public class ForumTopicActivity extends AppCompatActivity {
             LinearLayout nameRow = new LinearLayout(context);
             nameRow.setGravity(Gravity.CENTER_VERTICAL);
             author = text("", 14, isDark() ? Color.WHITE : 0xFF272B31, true);
+            author.setSingleLine(true);
+            author.setEllipsize(TextUtils.TruncateAt.END);
+            author.setMaxWidth(dp(190));
             nameRow.addView(author);
             TextView ownerBadge = smallBadge("楼主", 0xFF1877F2,
                     isDark() ? 0xFF243B59 : 0xFFEAF3FF);
@@ -2371,6 +2448,15 @@ public class ForumTopicActivity extends AppCompatActivity {
             authorCopy.addView(nameRow);
             authorMeta = text("", 12, isDark() ? 0xFF8F949C : 0xFF7A8088, false);
             authorCopy.addView(authorMeta);
+            qaStatus = text("", 10.5f, 0xFFB76E00, true);
+            qaStatus.setGravity(Gravity.CENTER);
+            qaStatus.setSingleLine(true);
+            qaStatus.setPadding(dp(7), 0, dp(7), 0);
+            qaStatus.setVisibility(GONE);
+            LinearLayout.LayoutParams qaStatusParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(20));
+            qaStatusParams.topMargin = dp(2);
+            authorCopy.addView(qaStatus, qaStatusParams);
             LinearLayout.LayoutParams authorCopyParams = new LinearLayout.LayoutParams(
                     0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
             authorCopyParams.leftMargin = dp(10);
@@ -2452,11 +2538,13 @@ public class ForumTopicActivity extends AppCompatActivity {
             setVisibility(VISIBLE);
             boolean hasCategory = topic.category != null
                     && !TextUtils.isEmpty(topic.category.name);
-            category.setVisibility(hasCategory ? VISIBLE : GONE);
-            category.setText(hasCategory ? topic.category.name : "");
+            // The category now follows the username in a lighter tone instead
+            // of occupying a separate pill above the title.
+            category.setVisibility(GONE);
+            category.setText("");
             sticky.setVisibility(topic.sticky ? VISIBLE : GONE);
             recommend.setVisibility(topic.recommend ? VISIBLE : GONE);
-            topMeta.setVisibility(hasCategory || topic.sticky || topic.recommend ? VISIBLE : GONE);
+            topMeta.setVisibility(topic.sticky || topic.recommend ? VISIBLE : GONE);
 
             boolean question = topic.type == 2;
             boolean solved = question && (topic.acceptedCommentId > 0
@@ -2472,9 +2560,13 @@ public class ForumTopicActivity extends AppCompatActivity {
             } else {
                 qaStatus.setBackground(null);
             }
+            bounty.setVisibility(question && topic.bountyScore > 0 ? VISIBLE : GONE);
+            bounty.setText(question && topic.bountyScore > 0
+                    ? "悬赏 " + topic.bountyScore + " 积分" : "");
             title.setText(safe(topic.title));
             String authorName = userName(topic.user);
-            author.setText(authorName);
+            bindAuthorCategory(author, authorName,
+                    hasCategory ? topic.category.name : "");
             authorMeta.setText(formatDate(topic.createTime));
             bindAvatar(avatar, topic.user, authorName);
 
@@ -2509,6 +2601,23 @@ public class ForumTopicActivity extends AppCompatActivity {
             bindSortTab(hotSort, COMMENT_SORT_HOT);
             bindSortTab(ascSort, COMMENT_SORT_ASC);
             bindSortTab(descSort, COMMENT_SORT_DESC);
+        }
+
+        private void bindAuthorCategory(TextView view, String authorName, String categoryName) {
+            String safeAuthor = TextUtils.isEmpty(authorName) ? "用户" : authorName;
+            if (TextUtils.isEmpty(categoryName)) {
+                view.setText(safeAuthor);
+                return;
+            }
+            String suffix = " · " + categoryName;
+            SpannableString value = new SpannableString(safeAuthor + suffix);
+            value.setSpan(new StyleSpan(Typeface.BOLD), 0, safeAuthor.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            value.setSpan(new ForegroundColorSpan(isDark() ? 0xFF8F949C : 0xFF8A9098),
+                    safeAuthor.length(), value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            value.setSpan(new StyleSpan(Typeface.NORMAL), safeAuthor.length(), value.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            view.setText(value);
         }
 
         void recycle() {
@@ -2733,11 +2842,15 @@ public class ForumTopicActivity extends AppCompatActivity {
         }
         static Row empty() { return new Row(4, null, null, 0, false, "empty"); }
         static Row loadMore(String key) { return new Row(5, null, null, 0, false, key); }
+        static Row divider(long parentId) {
+            return new Row(6, null, null, parentId, false, "divider:" + parentId);
+        }
 
         long stableId() {
             if (type == 1) return Long.MIN_VALUE + 1;
             if (type == 4) return Long.MIN_VALUE + 4;
             if (type == 5) return Long.MIN_VALUE + 5;
+            if (type == 6) return -(parentId * 10L + 6L);
             if (type == 3) return -(parentId * 10L + 3L);
             long id = comment == null ? 0 : comment.id;
             return id * 10L + (reply ? 2L : 1L);

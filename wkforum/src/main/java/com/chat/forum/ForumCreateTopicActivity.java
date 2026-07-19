@@ -46,7 +46,7 @@ import java.util.concurrent.Executors;
 
 /** Native post, Q&A, and article composer. */
 public class ForumCreateTopicActivity extends AppCompatActivity {
-    private static final int MAX_IMAGES = 6;
+    private static final int MAX_IMAGES = 2;
     private static final int TYPE_TOPIC = 0;
     private static final int TYPE_QA = 2;
     private static final int TYPE_ARTICLE = 3;
@@ -93,7 +93,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private final ActivityResultLauncher<String> imagePicker = registerForActivityResult(
             new ActivityResultContracts.GetMultipleContents(), uris -> {
                 if (uris == null || uris.isEmpty() || publishing) return;
-                int maxImages = topicType == TYPE_ARTICLE ? 1 : MAX_IMAGES;
+                int maxImages = MAX_IMAGES;
                 int added = 0;
                 for (Uri uri : uris) {
                     if (uri == null || selectedImages.contains(uri)) continue;
@@ -102,9 +102,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                     added++;
                 }
                 if (added < uris.size()) {
-                    Toast.makeText(this, topicType == TYPE_ARTICLE
-                            ? "文章只使用第一张图片作为封面"
-                            : "每篇帖子最多选择6张图片", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "每次最多选择2张图片", Toast.LENGTH_SHORT).show();
                 }
                 renderSelectedImages();
             });
@@ -268,16 +266,15 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
 
         LinearLayout imageHeader = new LinearLayout(this);
         imageHeader.setGravity(Gravity.CENTER_VERTICAL);
-        imageLabel = label("图片（最多6张）");
+        imageLabel = label("图片（最多2张，WebP约100KB）");
         imageHeader.addView(imageLabel, new LinearLayout.LayoutParams(0, dp(48), 1f));
         TextView choose = text("选择图片", 14, 0xFF1877F2, true);
         choose.setGravity(Gravity.CENTER);
         choose.setOnClickListener(v -> {
             if (publishing) return;
-            int maxImages = topicType == TYPE_ARTICLE ? 1 : MAX_IMAGES;
+            int maxImages = MAX_IMAGES;
             if (selectedImages.size() >= maxImages) {
-                Toast.makeText(this, topicType == TYPE_ARTICLE
-                        ? "文章最多选择1张封面图" : "最多6张图片", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "最多2张图片", Toast.LENGTH_SHORT).show();
                 return;
             }
             imagePicker.launch("image/*");
@@ -549,9 +546,9 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                                List<String> tags, List<ForumApiClient.ImageInfo> images) {
         if (!isPublishActive(generation)) return;
         publishButton.setText("发布中…");
-        ForumApiClient.ImageInfo cover = images == null || images.isEmpty() ? null : images.get(0);
-        ForumApiClient.getInstance().createArticle(title, buildArticleSummary(content), content,
-                tags, cover, publishScope, new ForumApiClient.ResultCallback<ForumApiClient.Article>() {
+        String articleContent = appendArticleBodyImages(content, images);
+        ForumApiClient.getInstance().createArticle(title, buildArticleSummary(content), articleContent,
+                tags, null, publishScope, new ForumApiClient.ResultCallback<ForumApiClient.Article>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Article article) {
                         if (!isPublishActive(generation)) return;
@@ -767,14 +764,22 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         if (bountyInput != null) bountyInput.setVisibility(topicType == TYPE_QA ? View.VISIBLE : View.GONE);
         if (relationButton != null) relationButton.setVisibility(article ? View.VISIBLE : View.GONE);
         if (imageLabel != null) {
-            imageLabel.setText(article ? "封面图（最多1张）" : "图片（最多6张）");
+            imageLabel.setText(article
+                    ? "正文图片（最多2张，WebP约100KB）"
+                    : "图片（最多2张，WebP约100KB）");
         }
-        if (article && selectedImages.size() > 1) {
-            Uri cover = selectedImages.get(0);
-            selectedImages.clear();
-            selectedImages.add(cover);
-            renderSelectedImages();
+    }
+
+    private static String appendArticleBodyImages(String content,
+                                                  List<ForumApiClient.ImageInfo> images) {
+        StringBuilder result = new StringBuilder(content == null ? "" : content.trim());
+        if (images == null || images.isEmpty()) return result.toString();
+        for (ForumApiClient.ImageInfo image : images) {
+            if (image == null || TextUtils.isEmpty(image.url)) continue;
+            if (result.length() > 0) result.append("\n\n");
+            result.append("![文章图片](").append(image.url.trim()).append(')');
         }
+        return result.toString();
     }
 
     private static String buildArticleSummary(String content) {

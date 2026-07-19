@@ -11,7 +11,11 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.util.LongSparseArray;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -186,9 +190,9 @@ public class ForumHomeFragment extends Fragment {
                 dark ? 0xFF23252A : 0xFFF2F3F5, 15));
         LinearLayout feedTabsRow = new LinearLayout(context);
         feedTabsRow.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
-        feedTabsRow.setPadding(dp(context, 14), dp(context, 5), dp(context, 14), dp(context, 7));
+        feedTabsRow.setPadding(dp(context, 10), dp(context, 4), dp(context, 10), dp(context, 6));
         feedTabsRow.addView(feedTabContainer, new LinearLayout.LayoutParams(
-                dp(context, 184), dp(context, 31)));
+                dp(context, 158), dp(context, 29)));
         // Keep the feed switch inside the collapsible area so it naturally
         // disappears as the list scrolls, instead of staying pinned on top.
         collapsibleHeader.addView(feedTabsRow, new LinearLayout.LayoutParams(
@@ -723,13 +727,13 @@ public class ForumHomeFragment extends Fragment {
         Context context = requireContext();
         boolean dark = isDark(context);
         boolean selected = selectedCategory == categoryId;
-        TextView tab = text(context, label, 11.2f,
+        TextView tab = text(context, label, 10.8f,
                 selected ? (dark ? Color.WHITE : 0xFF1877F2)
                         : (dark ? 0xFFA9AFB7 : 0xFF626A73), selected);
         tab.setGravity(Gravity.CENTER);
         tab.setSingleLine(true);
         tab.setBackground(selected
-                ? roundRect(context, dark ? 0xFF3A4554 : Color.WHITE, 12)
+                ? roundRect(context, dark ? 0xFF3A4554 : Color.WHITE, 11)
                 : null);
         tab.setOnClickListener(v -> selectCategory(categoryId));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0,
@@ -1082,8 +1086,8 @@ public class ForumHomeFragment extends Fragment {
             boolean dimmed = read && !newReply;
             boolean dark = isDark(context);
 
-            holder.author.setText(author);
-            holder.meta.setText(category);
+            bindAuthorCategory(holder.author, author, category, dark);
+            holder.meta.setVisibility(View.GONE);
             bindTopicTags(holder.tagContainer, topic.tags, dark);
             holder.time.setText(formatTime(topic.createTime));
             holder.title.setText(safe(topic.title));
@@ -1099,7 +1103,7 @@ public class ForumHomeFragment extends Fragment {
                 holder.qaStatus.setTextColor(solved ? 0xFF21875B : 0xFFB76E00);
                 holder.qaStatus.setBackground(roundRect(context,
                         solved ? (dark ? 0xFF203D32 : 0xFFE9F7F0)
-                                : (dark ? 0xFF40311D : 0xFFFFF3D8), 11));
+                                : (dark ? 0xFF40311D : 0xFFFFF3D8), 9));
             } else {
                 holder.qaStatus.setBackground(null);
             }
@@ -1114,7 +1118,6 @@ public class ForumHomeFragment extends Fragment {
             int dimTitle = dark ? 0xFF777C84 : 0xFF9A9FA6;
             holder.title.setTextColor(dimmed ? dimTitle : normalTitle);
             holder.author.setAlpha(dimmed ? 0.58f : 1f);
-            holder.meta.setAlpha(dimmed ? 0.52f : 1f);
             holder.tagContainer.setAlpha(dimmed ? 0.52f : 1f);
             holder.time.setAlpha(dimmed ? 0.50f : 1f);
             holder.avatar.setAlpha(dimmed ? 0.56f : 1f);
@@ -1364,8 +1367,8 @@ public class ForumHomeFragment extends Fragment {
                     ? "用户" : article.user.nickname;
             boolean read = seenPrefs.getLong("time_" + article.id, 0L) > 0;
             boolean dark = isDark(context);
-            holder.author.setText(author);
-            holder.meta.setText("文章");
+            bindAuthorCategory(holder.author, author, "文章", dark);
+            holder.meta.setVisibility(View.GONE);
             holder.time.setText(formatTime(article.createTime));
             holder.title.setText(safe(article.title));
             holder.replyCount.setText(String.valueOf(Math.max(0L, article.commentCount)));
@@ -1374,7 +1377,7 @@ public class ForumHomeFragment extends Fragment {
             holder.title.setTextColor(titleColor);
             holder.avatar.setAlpha(read ? 0.58f : 1f);
             holder.author.setAlpha(read ? 0.58f : 1f);
-            holder.meta.setAlpha(read ? 0.52f : 1f);
+            holder.articleMark.setAlpha(read ? 0.58f : 1f);
             bindArticleAvatar(holder.avatar, article.user, author);
             holder.avatar.setOnClickListener(v -> ForumProfileRouter.open(context, article.user));
             holder.itemView.setOnClickListener(v -> listener.onClick(article));
@@ -1448,6 +1451,7 @@ public class ForumHomeFragment extends Fragment {
         final TextView author;
         final TextView meta;
         final TextView time;
+        final TextView articleMark;
         final TextView title;
         final TextView replyCount;
 
@@ -1461,8 +1465,9 @@ public class ForumHomeFragment extends Fragment {
             meta = (TextView) authorText.getChildAt(1);
             time = (TextView) authorRow.getChildAt(2);
             LinearLayout titleRow = (LinearLayout) root.getChildAt(1);
-            title = (TextView) titleRow.getChildAt(0);
-            replyCount = (TextView) titleRow.getChildAt(1);
+            articleMark = (TextView) titleRow.getChildAt(0);
+            title = (TextView) titleRow.getChildAt(1);
+            replyCount = (TextView) titleRow.getChildAt(2);
         }
     }
 
@@ -1484,6 +1489,8 @@ public class ForumHomeFragment extends Fragment {
         LinearLayout copy = new LinearLayout(context);
         copy.setOrientation(LinearLayout.VERTICAL);
         TextView author = text(context, "", 12.5f, dark ? 0xFFF1F2F4 : 0xFF272B31, true);
+        author.setSingleLine(true);
+        author.setEllipsize(TextUtils.TruncateAt.END);
         TextView meta = text(context, "文章", 10.5f, dark ? 0xFF8F949C : 0xFF7A818A, false);
         copy.addView(author); copy.addView(meta);
         LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0,
@@ -1498,6 +1505,16 @@ public class ForumHomeFragment extends Fragment {
 
         LinearLayout titleRow = new LinearLayout(context);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView articleMark = text(context, "#", 11.5f,
+                dark ? 0xFFF0E7FF : Color.WHITE, true);
+        articleMark.setGravity(Gravity.CENTER);
+        articleMark.setIncludeFontPadding(false);
+        articleMark.setBackground(roundRect(context,
+                dark ? 0xFF7651AA : 0xFF8B63D7, 9));
+        LinearLayout.LayoutParams articleMarkParams = new LinearLayout.LayoutParams(
+                dp(context, 18), dp(context, 18));
+        articleMarkParams.rightMargin = dp(context, 6);
+        titleRow.addView(articleMark, articleMarkParams);
         TextView title = text(context, "", 16.5f, dark ? Color.WHITE : 0xFF171A1F, true);
         title.setMaxLines(2); title.setEllipsize(TextUtils.TruncateAt.END);
         titleRow.addView(title, new LinearLayout.LayoutParams(0,
@@ -1553,11 +1570,11 @@ public class ForumHomeFragment extends Fragment {
             LinearLayout badges = (LinearLayout) right.getChildAt(1);
             sticky = (TextView) badges.getChildAt(0);
             recommend = (TextView) badges.getChildAt(1);
+            qaStatus = (TextView) badges.getChildAt(2);
             LinearLayout titleRow = (LinearLayout) root.getChildAt(1);
             qaMark = (TextView) titleRow.getChildAt(0);
             title = (TextView) titleRow.getChildAt(1);
-            qaStatus = (TextView) titleRow.getChildAt(2);
-            replyCount = (TextView) titleRow.getChildAt(3);
+            replyCount = (TextView) titleRow.getChildAt(2);
         }
     }
 
@@ -1584,6 +1601,8 @@ public class ForumHomeFragment extends Fragment {
         LinearLayout authorText = new LinearLayout(context);
         authorText.setOrientation(LinearLayout.VERTICAL);
         TextView author = text(context, "", 12.5f, dark ? 0xFFF1F2F4 : 0xFF272B31, true);
+        author.setSingleLine(true);
+        author.setEllipsize(TextUtils.TruncateAt.END);
         LinearLayout metaRow = new LinearLayout(context);
         metaRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView meta = text(context, "", 10.5f, dark ? 0xFF8F949C : 0xFF7A818A, false);
@@ -1620,12 +1639,18 @@ public class ForumHomeFragment extends Fragment {
                 dark ? 0xFF40311D : 0xFFFFF0D6);
         TextView recommend = badge(context, "推荐", 0xFF1877F2,
                 dark ? 0xFF243B59 : 0xFFEAF3FF);
+        TextView qaStatus = badge(context, "", 0xFFB76E00,
+                dark ? 0xFF40311D : 0xFFFFF3D8);
         badges.addView(sticky, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 19)));
         LinearLayout.LayoutParams recommendParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 19));
         recommendParams.leftMargin = dp(context, 4);
         badges.addView(recommend, recommendParams);
+        LinearLayout.LayoutParams qaStatusParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 18));
+        qaStatusParams.leftMargin = dp(context, 4);
+        badges.addView(qaStatus, qaStatusParams);
         right.addView(badges, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 20)));
         authorRow.addView(right, new LinearLayout.LayoutParams(
@@ -1635,14 +1660,14 @@ public class ForumHomeFragment extends Fragment {
 
         LinearLayout titleRow = new LinearLayout(context);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView qaMark = text(context, "问", 11.5f, dark ? 0xFF3D2C00 : 0xFF6E4B00, true);
+        TextView qaMark = text(context, "?", 11.5f, dark ? 0xFF3D2C00 : 0xFF6E4B00, true);
         qaMark.setGravity(Gravity.CENTER);
         qaMark.setIncludeFontPadding(false);
-        qaMark.setBackground(roundRect(context, dark ? 0xFFD6A52A : 0xFFFFD65A, 11));
+        qaMark.setBackground(roundRect(context, dark ? 0xFFD6A52A : 0xFFFFD65A, 9));
         qaMark.setVisibility(View.GONE);
         LinearLayout.LayoutParams qaMarkParams = new LinearLayout.LayoutParams(
-                dp(context, 22), dp(context, 22));
-        qaMarkParams.rightMargin = dp(context, 7);
+                dp(context, 18), dp(context, 18));
+        qaMarkParams.rightMargin = dp(context, 6);
         titleRow.addView(qaMark, qaMarkParams);
 
         TextView title = text(context, "", 16.5f, dark ? Color.WHITE : 0xFF171A1F, true);
@@ -1651,16 +1676,6 @@ public class ForumHomeFragment extends Fragment {
         title.setEllipsize(TextUtils.TruncateAt.END);
         titleRow.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        TextView qaStatus = text(context, "", 10.5f, 0xFFB76E00, true);
-        qaStatus.setGravity(Gravity.CENTER);
-        qaStatus.setSingleLine(true);
-        qaStatus.setPadding(dp(context, 7), 0, dp(context, 7), 0);
-        qaStatus.setVisibility(View.GONE);
-        LinearLayout.LayoutParams qaStatusParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 22));
-        qaStatusParams.leftMargin = dp(context, 7);
-        titleRow.addView(qaStatus, qaStatusParams);
 
         TextView replyCount = text(context, "0", 11.5f,
                 dark ? 0xFFB7BCC4 : 0xFF626A74, true);
@@ -1695,6 +1710,24 @@ public class ForumHomeFragment extends Fragment {
         return badge;
     }
 
+    private static void bindAuthorCategory(TextView view, String author, String category,
+                                           boolean dark) {
+        String safeAuthor = TextUtils.isEmpty(author) ? "用户" : author;
+        if (TextUtils.isEmpty(category)) {
+            view.setText(safeAuthor);
+            return;
+        }
+        String suffix = " · " + category;
+        SpannableStringBuilder value = new SpannableStringBuilder(safeAuthor).append(suffix);
+        value.setSpan(new StyleSpan(Typeface.BOLD), 0, safeAuthor.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        value.setSpan(new ForegroundColorSpan(dark ? 0xFF8F949C : 0xFF8A9098),
+                safeAuthor.length(), value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        value.setSpan(new StyleSpan(Typeface.NORMAL), safeAuthor.length(), value.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        view.setText(value);
+    }
+
     private static void bindTopicTags(LinearLayout container, @Nullable List<ForumApiClient.Tag> tags,
                                       boolean dark) {
         container.removeAllViews();
@@ -1702,8 +1735,8 @@ public class ForumHomeFragment extends Fragment {
             container.setVisibility(View.GONE);
             return;
         }
-        int[] lightBackgrounds = {0xFFEAF3FF, 0xFFF1ECFF, 0xFFEAF8F1, 0xFFFFF1E6};
-        int[] lightTexts = {0xFF3477BD, 0xFF7451A8, 0xFF2F8061, 0xFFA9682C};
+        int[] lightBackgrounds = {0xFFEAF3FF, 0xFFF1ECFF, 0xFFFFF1E6, 0xFFFFEAF1};
+        int[] lightTexts = {0xFF3477BD, 0xFF7451A8, 0xFFA9682C, 0xFFB65A7A};
         int shown = 0;
         for (ForumApiClient.Tag tag : tags) {
             if (tag == null || TextUtils.isEmpty(tag.name)) continue;

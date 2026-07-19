@@ -20,10 +20,11 @@ import java.util.UUID;
 
 /** Compresses a selected image for forum upload without retaining EXIF metadata. */
 public final class ForumImageCompressor {
-    private static final int MAX_LONG_EDGE = 1440;
+    private static final int MAX_LONG_EDGE = 1280;
     private static final int DECODE_LONG_EDGE = 2048;
-    private static final int TARGET_BYTES = 420 * 1024;
-    private static final int MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
+    private static final int TARGET_BYTES = 100 * 1024;
+    private static final int MAX_OUTPUT_BYTES = 110 * 1024;
+    private static final int MIN_LONG_EDGE = 480;
     private static final int MAX_DECODE_ATTEMPTS = 3;
     private static final long STALE_FILE_AGE_MS = 24L * 60L * 60L * 1000L;
 
@@ -147,15 +148,31 @@ public final class ForumImageCompressor {
             throws IOException {
         Bitmap.CompressFormat format = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
                 ? Bitmap.CompressFormat.WEBP_LOSSY : Bitmap.CompressFormat.WEBP;
+        Bitmap current = bitmap;
+        boolean ownsCurrent = false;
         boolean encoded = false;
-        for (int quality = 82; quality >= 56; quality -= 6) {
-            writeBitmap(bitmap, format, quality, output);
-            encoded = output.length() > 0;
-            if (encoded && output.length() <= TARGET_BYTES) return;
+        try {
+            for (int pass = 0; pass < 8; pass++) {
+                for (int quality = 82; quality >= 18; quality -= 4) {
+                    writeBitmap(current, format, quality, output);
+                    encoded = output.length() > 0;
+                    if (encoded && output.length() <= TARGET_BYTES) return;
+                }
+                int longEdge = Math.max(current.getWidth(), current.getHeight());
+                if (longEdge <= MIN_LONG_EDGE) break;
+                int nextLongEdge = Math.max(MIN_LONG_EDGE, Math.round(longEdge * 0.80f));
+                Bitmap smaller = scaleDown(current, nextLongEdge);
+                if (smaller == current) break;
+                if (ownsCurrent && !current.isRecycled()) current.recycle();
+                current = smaller;
+                ownsCurrent = true;
+            }
+        } finally {
+            if (ownsCurrent && current != bitmap && !current.isRecycled()) current.recycle();
         }
         if (!encoded) throw new IOException("图片压缩失败");
         if (output.length() > MAX_OUTPUT_BYTES) {
-            throw new IOException("图片压缩后仍然过大");
+            throw new IOException("图片压缩后仍超过110KB，请选择尺寸较小的图片");
         }
     }
 

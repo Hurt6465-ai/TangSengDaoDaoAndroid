@@ -10,7 +10,6 @@ import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
@@ -18,7 +17,6 @@ import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.TextWatcher;
-import android.text.method.LinkMovementMethod;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.StyleSpan;
@@ -55,6 +53,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Native article detail screen. */
 public class ForumArticleActivity extends AppCompatActivity {
@@ -384,16 +384,24 @@ public class ForumArticleActivity extends AppCompatActivity {
         if (article == null) return;
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
+        String articleUrl = ForumLinkRouter.articleWebUrl(article.id);
         labels.add("分享");
-        actions.add(() -> share(article.title + "\n" + article.summary));
+        actions.add(() -> share(article.title + "\n" + article.summary + "\n" + articleUrl));
+        labels.add("复制文章链接");
+        actions.add(() -> copyArticleText("文章链接", articleUrl));
+        labels.add("复制引用格式");
+        actions.add(() -> copyArticleText("文章引用",
+                ForumLinkRouter.markdownReference(article.title, articleUrl)));
         if (!TextUtils.isEmpty(article.sourceUrl)) {
             labels.add("查看来源");
-            actions.add(() -> {
-                try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(article.sourceUrl))); }
-                catch (Throwable ignored) { }
-            });
+            actions.add(() -> ForumLinkRouter.open(this, article.sourceUrl));
         }
         showCompactMenu(labels, actions);
+    }
+
+    private void copyArticleText(String label, String value) {
+        boolean copied = ForumLinkRouter.copyToClipboard(this, label, value);
+        Toast.makeText(this, copied ? "已复制" : "复制失败", Toast.LENGTH_SHORT).show();
     }
 
     private void showCompactMenu(List<String> labels, List<Runnable> actions) {
@@ -619,7 +627,7 @@ public class ForumArticleActivity extends AppCompatActivity {
         boolean owner = article != null && article.user != null && comment.user != null
                 && TextUtils.equals(article.user.id, comment.user.id);
         holder.name.setText(commentName(author, formatTime(comment.createTime), owner));
-        holder.body.setText(ForumHtmlCache.parse(comment.content));
+        ForumLinkRouter.setLinkedText(holder.body, ForumHtmlCache.parse(comment.content));
         holder.more.setOnClickListener(v -> showCommentMenu(comment));
         holder.root.setOnClickListener(v -> setReply(comment));
         holder.root.setOnLongClickListener(v -> {
@@ -643,11 +651,13 @@ public class ForumArticleActivity extends AppCompatActivity {
     }
 
     private final class ArticleHeaderView extends LinearLayout {
+        private final TextView articleMark;
         private final TextView title;
         private final AvatarView avatar;
         private final TextView author;
         private final ImageView cover;
         private final TextView content;
+        private final ForumRemoteImageListView bodyImages;
         private final TextView stats;
         private String boundCoverUrl = "";
 
@@ -659,6 +669,14 @@ public class ForumArticleActivity extends AppCompatActivity {
 
             LinearLayout titleRow = new LinearLayout(context);
             titleRow.setGravity(Gravity.TOP);
+            articleMark = text("#", 12, Color.WHITE, true);
+            articleMark.setGravity(Gravity.CENTER);
+            articleMark.setIncludeFontPadding(false);
+            articleMark.setBackground(roundRect(isDark() ? 0xFF7651AA : 0xFF8B63D7, 10));
+            LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(dp(20), dp(20));
+            markParams.topMargin = dp(4);
+            markParams.rightMargin = dp(7);
+            titleRow.addView(articleMark, markParams);
             title = text("", 24, isDark() ? Color.WHITE : 0xFF17191C, true);
             title.setLineSpacing(0, 1.10f);
             title.setMaxLines(Integer.MAX_VALUE);
@@ -702,6 +720,12 @@ public class ForumArticleActivity extends AppCompatActivity {
             content.setEllipsize(null);
             addView(content, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            bodyImages = new ForumRemoteImageListView(context);
+            LinearLayout.LayoutParams bodyImageParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            bodyImageParams.topMargin = dp(10);
+            addView(bodyImages, bodyImageParams);
 
             stats = text("", 12, isDark() ? 0xFF8F949C : 0xFF90969E, false);
             stats.setPadding(0, dp(12), 0, dp(12));
@@ -747,7 +771,9 @@ public class ForumArticleActivity extends AppCompatActivity {
             }
 
             String body = TextUtils.isEmpty(value.content) ? value.summary : value.content;
-            content.setText(ForumHtmlCache.parse(body));
+            ForumLinkRouter.setLinkedText(content, ForumHtmlCache.parse(body));
+            bodyImages.bind(extractArticleImages(body), dp(220), dp(10),
+                    isDark() ? 0xFF24262B : 0xFFF0F1F3);
             stats.setText("◉ " + Math.max(0, value.viewCount) + "   评论 "
                     + Math.max(0, value.commentCount));
         }
@@ -756,7 +782,34 @@ public class ForumArticleActivity extends AppCompatActivity {
             Glide.with(cover).clear(cover);
             cover.setImageDrawable(null);
             boundCoverUrl = "";
+            bodyImages.recycle();
         }
+    }
+
+    private List<ForumApiClient.ImageInfo> extractArticleImages(String content) {
+        List<ForumApiClient.ImageInfo> result = new ArrayList<>();
+        if (TextUtils.isEmpty(content)) return result;
+        Pattern[] patterns = new Pattern[]{
+                Pattern.compile("<img[^>]+src=[\\\"']([^\\\"']+)[\\\"']", Pattern.CASE_INSENSITIVE),
+                Pattern.compile("!\\[[^]]*]\\(([^)\\s]+)")
+        };
+        for (Pattern pattern : patterns) {
+            Matcher matcher = pattern.matcher(content);
+            while (matcher.find() && result.size() < 2) {
+                String url = matcher.group(1);
+                if (TextUtils.isEmpty(url)) continue;
+                boolean duplicate = false;
+                for (ForumApiClient.ImageInfo old : result) {
+                    if (old != null && TextUtils.equals(old.url, url)) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate) result.add(new ForumApiClient.ImageInfo(url));
+            }
+            if (!result.isEmpty()) break;
+        }
+        return result;
     }
 
     private final class ArticleHeaderHolder extends RecyclerView.ViewHolder {
@@ -801,8 +854,7 @@ public class ForumArticleActivity extends AppCompatActivity {
     private TextView htmlText(String html, float size) {
         TextView view = text("", size, isDark() ? 0xFFE8E9EB : 0xFF272A2F, false);
         view.setLineSpacing(dp(3), 1.08f);
-        view.setMovementMethod(LinkMovementMethod.getInstance());
-        view.setText(ForumHtmlCache.parse(html));
+        ForumLinkRouter.setLinkedText(view, ForumHtmlCache.parse(html));
         return view;
     }
 
