@@ -71,7 +71,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private static final String ICON_CHAT = "faw-comments";
     private static final String ICON_PARTNER = "faw-user-friends";
     private static final String ICON_DISCOVER = "faw-compass";
-    private static final String ICON_COMMUNITY = "faw-heart";
+    private static final String ICON_COMMUNITY = "faw-users";
     private static final String ICON_STUDY = "faw-graduation-cap";
 
     // 参考 Messenger 的底部导航颜色：选中蓝色，未选中淡黑灰色。
