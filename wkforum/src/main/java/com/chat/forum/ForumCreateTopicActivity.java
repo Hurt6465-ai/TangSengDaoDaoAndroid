@@ -28,6 +28,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -59,12 +61,15 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private final ExecutorService imageExecutor = Executors.newSingleThreadExecutor();
     private final List<Uri> selectedImages = new ArrayList<>();
     private final List<ForumApiClient.Category> categories = new ArrayList<>();
+    private final List<ForumApiClient.Tag> recommendedTags = new ArrayList<>();
+    private final LinkedHashSet<String> selectedTags = new LinkedHashSet<>();
     private final Set<File> pendingUploadFiles = Collections.synchronizedSet(new HashSet<>());
     private final ForumApiClient.RequestScope readScope = new ForumApiClient.RequestScope();
     private final ForumApiClient.RequestScope publishScope = new ForumApiClient.RequestScope();
     private EditText titleInput;
     private EditText contentInput;
-    private EditText tagsInput;
+    private LinearLayout tagContainer;
+    private TextView tagHint;
     private Spinner categorySpinner;
     private TextView categoryLabel;
     private TextView imageLabel;
@@ -74,6 +79,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private int topicType;
     private TextView publishButton;
     private TextView headingView;
+    private TextView relationButton;
     private boolean publishing;
     private boolean authenticating;
     private boolean discardDraft;
@@ -81,6 +87,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private int categoryGeneration;
     private int publishGeneration;
     private boolean categoriesLoaded;
+    private boolean tagsLoaded;
     private long pendingCategoryId;
 
     private final ActivityResultLauncher<String> imagePicker = registerForActivityResult(
@@ -125,7 +132,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         super.onSaveInstanceState(outState);
         outState.putString(STATE_TITLE, valueOf(titleInput));
         outState.putString(STATE_CONTENT, valueOf(contentInput));
-        outState.putString(STATE_TAGS, valueOf(tagsInput));
+        outState.putString(STATE_TAGS, TextUtils.join(",", selectedTags));
         outState.putString(STATE_BOUNTY, valueOf(bountyInput));
         outState.putInt(STATE_TYPE, topicType);
         outState.putLong(STATE_CATEGORY, categoryIdForState());
@@ -226,10 +233,38 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         contentParams.topMargin = dp(12);
         form.addView(contentInput, contentParams);
 
-        tagsInput = input("标签，可选；多个标签用逗号分隔", false);
-        LinearLayout.LayoutParams tagsParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        tagsParams.topMargin = dp(12);
-        form.addView(tagsInput, tagsParams);
+        relationButton = text("＋ 插入文章/帖子关联", 13, 0xFF1877F2, true);
+        relationButton.setGravity(Gravity.CENTER_VERTICAL);
+        relationButton.setPadding(dp(4), 0, dp(4), 0);
+        relationButton.setOnClickListener(v -> showInsertReferenceDialog());
+        relationButton.setVisibility(View.GONE);
+        LinearLayout.LayoutParams relationParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
+        relationParams.topMargin = dp(4);
+        form.addView(relationButton, relationParams);
+
+        TextView tagsLabel = label("推荐标签（最多选择5个）");
+        LinearLayout.LayoutParams tagsLabelParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        tagsLabelParams.topMargin = dp(14);
+        form.addView(tagsLabel, tagsLabelParams);
+
+        tagHint = text("加载推荐标签…", 12, dark ? 0xFF8E9299 : 0xFF8A8F96, false);
+        LinearLayout.LayoutParams tagHintParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(28));
+        tagHintParams.topMargin = dp(4);
+        form.addView(tagHint, tagHintParams);
+
+        HorizontalScrollView tagScroll = new HorizontalScrollView(this);
+        tagScroll.setHorizontalScrollBarEnabled(false);
+        tagScroll.setFillViewport(false);
+        tagContainer = new LinearLayout(this);
+        tagContainer.setOrientation(LinearLayout.HORIZONTAL);
+        tagContainer.setGravity(Gravity.CENTER_VERTICAL);
+        tagScroll.addView(tagContainer, new HorizontalScrollView.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(42)));
+        form.addView(tagScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(46)));
 
         LinearLayout imageHeader = new LinearLayout(this);
         imageHeader.setGravity(Gravity.CENTER_VERTICAL);
@@ -275,6 +310,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                 authenticating = false;
                 setPublishing(false, "发布");
                 loadCategories();
+                loadRecommendedTags();
             }
 
             @Override
@@ -392,7 +428,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         final long selectedCategoryId = categoryId;
         final int selectedType = topicType;
         final int bountyScore = parseBountyScore();
-        final List<String> tags = parseTags(tagsInput.getText().toString());
+        final List<String> tags = new ArrayList<>(selectedTags);
         final List<Uri> images = new ArrayList<>(selectedImages);
         final int generation = ++publishGeneration;
         saveDraft();
@@ -552,10 +588,86 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         }
         if (titleInput != null) titleInput.setEnabled(!value);
         if (contentInput != null) contentInput.setEnabled(!value);
-        if (tagsInput != null) tagsInput.setEnabled(!value);
+        setTagSelectionEnabled(!value);
         if (bountyInput != null) bountyInput.setEnabled(!value);
         if (categorySpinner != null) categorySpinner.setEnabled(!value);
         if (typePill != null) typePill.setEnabled(!value);
+        if (relationButton != null) relationButton.setEnabled(!value);
+    }
+
+    private void showInsertReferenceDialog() {
+        if (publishing || contentInput == null) return;
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(18), dp(8), dp(18), 0);
+
+        Spinner typeSpinner = new Spinner(this);
+        ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                Arrays.asList("文章", "帖子"));
+        typeSpinner.setAdapter(typeAdapter);
+        panel.addView(typeSpinner, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+
+        EditText labelInput = input("显示文字，例如：缅语声调基础", false);
+        int selectionStart = Math.max(0, contentInput.getSelectionStart());
+        int selectionEnd = Math.max(selectionStart, contentInput.getSelectionEnd());
+        if (selectionEnd > selectionStart) {
+            labelInput.setText(contentInput.getText().subSequence(selectionStart, selectionEnd));
+            labelInput.setSelection(labelInput.length());
+        }
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        labelParams.topMargin = dp(6);
+        panel.addView(labelInput, labelParams);
+
+        EditText targetInput = input("文章/帖子 ID 或复制的链接", false);
+        LinearLayout.LayoutParams targetParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        targetParams.topMargin = dp(8);
+        panel.addView(targetInput, targetParams);
+
+        TextView hint = text("可在目标文章或帖子右上角菜单复制链接；插入后点击会在 App 内打开。",
+                12, isDark() ? 0xFF92979F : 0xFF7B818A, false);
+        hint.setPadding(0, dp(8), 0, 0);
+        panel.addView(hint);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("插入关联内容")
+                .setView(panel)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("插入", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    String label = labelInput.getText().toString().trim();
+                    String target = targetInput.getText().toString().trim();
+                    boolean articleTarget = typeSpinner.getSelectedItemPosition() == 0;
+                    String url = ForumLinkRouter.normalizeReference(target, articleTarget);
+                    if (TextUtils.isEmpty(label)) {
+                        labelInput.setError("请输入显示文字");
+                        return;
+                    }
+                    if (TextUtils.isEmpty(url)) {
+                        targetInput.setError("请输入有效的文章/帖子 ID 或论坛链接");
+                        return;
+                    }
+                    insertReferenceAtSelection(label, url);
+                    dialog.dismiss();
+                }));
+        dialog.show();
+    }
+
+    private void insertReferenceAtSelection(String label, String url) {
+        if (contentInput == null) return;
+        int start = Math.max(0, contentInput.getSelectionStart());
+        int end = Math.max(start, contentInput.getSelectionEnd());
+        String markdown = ForumLinkRouter.markdownReference(label, url);
+        contentInput.getText().replace(start, end, markdown);
+        int cursor = Math.min(contentInput.length(), start + markdown.length());
+        contentInput.setSelection(cursor);
+        contentInput.requestFocus();
     }
 
     private void renderSelectedImages() {
@@ -592,7 +704,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         if (state != null) {
             titleInput.setText(state.getString(STATE_TITLE, ""));
             contentInput.setText(state.getString(STATE_CONTENT, ""));
-            tagsInput.setText(state.getString(STATE_TAGS, ""));
+            restoreSelectedTags(state.getString(STATE_TAGS, ""));
             bountyInput.setText(state.getString(STATE_BOUNTY, ""));
             topicType = state.getInt(STATE_TYPE, 0);
             pendingCategoryId = state.getLong(STATE_CATEGORY, 0L);
@@ -613,7 +725,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         if (draft == null) return;
         titleInput.setText(draft.title);
         contentInput.setText(draft.content);
-        tagsInput.setText(draft.tags);
+        restoreSelectedTags(draft.tags);
         bountyInput.setText(draft.bounty);
         topicType = draft.topicType;
         pendingCategoryId = draft.categoryId;
@@ -623,11 +735,11 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     }
 
     private void saveDraft() {
-        if (titleInput == null || contentInput == null || tagsInput == null) return;
+        if (titleInput == null || contentInput == null) return;
         ForumDraftStore.Draft draft = new ForumDraftStore.Draft();
         draft.title = valueOf(titleInput);
         draft.content = valueOf(contentInput);
-        draft.tags = valueOf(tagsInput);
+        draft.tags = TextUtils.join(",", selectedTags);
         draft.bounty = valueOf(bountyInput);
         draft.topicType = topicType;
         draft.categoryId = categoryIdForState();
@@ -653,6 +765,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         if (categoryLabel != null) categoryLabel.setVisibility(article ? View.GONE : View.VISIBLE);
         if (categorySpinner != null) categorySpinner.setVisibility(article ? View.GONE : View.VISIBLE);
         if (bountyInput != null) bountyInput.setVisibility(topicType == TYPE_QA ? View.VISIBLE : View.GONE);
+        if (relationButton != null) relationButton.setVisibility(article ? View.VISIBLE : View.GONE);
         if (imageLabel != null) {
             imageLabel.setText(article ? "封面图（最多1张）" : "图片（最多6张）");
         }
@@ -737,15 +850,119 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         catch (Throwable ignored) { return 0; }
     }
 
-    private List<String> parseTags(String raw) {
-        if (TextUtils.isEmpty(raw)) return Collections.emptyList();
-        List<String> result = new ArrayList<>();
-        for (String item : Arrays.asList(raw.split("[,，]"))) {
-            String value = item.trim();
-            if (!value.isEmpty() && !result.contains(value)) result.add(value);
-            if (result.size() >= 5) break;
+    private void loadRecommendedTags() {
+        tagsLoaded = false;
+        renderRecommendedTags();
+        ForumApiClient.getInstance().getRecommendedTags(readScope,
+                new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Tag>>() {
+            @Override
+            public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Tag> data) {
+                if (destroyed || isFinishing()) return;
+                recommendedTags.clear();
+                if (data != null && data.results != null) {
+                    for (ForumApiClient.Tag tag : data.results) {
+                        if (tag == null || TextUtils.isEmpty(tag.name)) continue;
+                        recommendedTags.add(tag);
+                        if (recommendedTags.size() >= 20) break;
+                    }
+                }
+                tagsLoaded = true;
+                renderRecommendedTags();
+            }
+
+            @Override
+            public void onError(@NonNull String message) {
+                if (destroyed || isFinishing()) return;
+                tagsLoaded = true;
+                renderRecommendedTags();
+                Toast.makeText(ForumCreateTopicActivity.this,
+                        "推荐标签加载失败，可稍后重试", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void restoreSelectedTags(@Nullable String raw) {
+        selectedTags.clear();
+        if (!TextUtils.isEmpty(raw)) {
+            for (String item : raw.split("[,，]")) {
+                String value = item == null ? "" : item.trim();
+                if (!value.isEmpty()) selectedTags.add(value);
+                if (selectedTags.size() >= 5) break;
+            }
         }
-        return result;
+        renderRecommendedTags();
+    }
+
+    private void renderRecommendedTags() {
+        if (tagContainer == null || tagHint == null) return;
+        tagContainer.removeAllViews();
+        if (!tagsLoaded && recommendedTags.isEmpty()) {
+            tagHint.setText("加载推荐标签…");
+            tagHint.setVisibility(View.VISIBLE);
+            return;
+        }
+
+        List<String> names = new ArrayList<>();
+        names.addAll(selectedTags);
+        for (ForumApiClient.Tag tag : recommendedTags) {
+            String name = tag == null ? "" : safeTag(tag.name);
+            if (!name.isEmpty() && !names.contains(name)) names.add(name);
+        }
+        if (names.isEmpty()) {
+            tagHint.setText("暂无推荐标签，可以不选择");
+            tagHint.setVisibility(View.VISIBLE);
+            return;
+        }
+
+        tagHint.setText(selectedTags.isEmpty()
+                ? "选择与你内容最相关的标签"
+                : "已选择 " + selectedTags.size() + "/5");
+        tagHint.setVisibility(View.VISIBLE);
+        for (String name : names) {
+            boolean selected = selectedTags.contains(name);
+            TextView chip = text(name, 12.5f, selected ? 0xFFFFFFFF
+                    : (isDark() ? 0xFFD2D6DC : 0xFF56606B), selected);
+            chip.setGravity(Gravity.CENTER);
+            chip.setSingleLine(true);
+            chip.setPadding(dp(12), 0, dp(12), 0);
+            chip.setBackground(roundRect(selected ? 0xFF1877F2
+                    : (isDark() ? 0xFF292C31 : 0xFFF0F2F5), 16));
+            chip.setEnabled(!publishing);
+            chip.setAlpha(publishing ? 0.58f : 1f);
+            chip.setOnClickListener(v -> toggleTag(name));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
+            params.rightMargin = dp(8);
+            tagContainer.addView(chip, params);
+        }
+    }
+
+    private void toggleTag(@NonNull String name) {
+        if (publishing) return;
+        if (selectedTags.contains(name)) {
+            selectedTags.remove(name);
+        } else {
+            if (selectedTags.size() >= 5) {
+                Toast.makeText(this, "最多选择5个标签", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            selectedTags.add(name);
+        }
+        renderRecommendedTags();
+    }
+
+    private void setTagSelectionEnabled(boolean enabled) {
+        if (tagContainer == null) return;
+        for (int i = 0; i < tagContainer.getChildCount(); i++) {
+            View child = tagContainer.getChildAt(i);
+            child.setEnabled(enabled);
+            child.setAlpha(enabled ? 1f : 0.58f);
+        }
+    }
+
+    @NonNull
+    private static String safeTag(@Nullable String value) {
+        return value == null ? "" : value.trim();
     }
 
     private TextView label(String value) {

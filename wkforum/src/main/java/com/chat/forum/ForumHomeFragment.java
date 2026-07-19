@@ -1089,7 +1089,20 @@ public class ForumHomeFragment extends Fragment {
             holder.title.setText(safe(topic.title));
             holder.sticky.setVisibility(topic.sticky ? View.VISIBLE : View.GONE);
             holder.recommend.setVisibility(topic.recommend ? View.VISIBLE : View.GONE);
-            holder.qa.setVisibility(topic.type == 2 ? View.VISIBLE : View.GONE);
+            boolean question = topic.type == 2;
+            boolean solved = question && (topic.acceptedCommentId > 0
+                    || "solved".equalsIgnoreCase(safe(topic.qaStatus)));
+            holder.qaMark.setVisibility(question ? View.VISIBLE : View.GONE);
+            holder.qaStatus.setVisibility(question ? View.VISIBLE : View.GONE);
+            if (question) {
+                holder.qaStatus.setText(solved ? "已解决" : "未解决");
+                holder.qaStatus.setTextColor(solved ? 0xFF21875B : 0xFFB76E00);
+                holder.qaStatus.setBackground(roundRect(context,
+                        solved ? (dark ? 0xFF203D32 : 0xFFE9F7F0)
+                                : (dark ? 0xFF40311D : 0xFFFFF3D8), 11));
+            } else {
+                holder.qaStatus.setBackground(null);
+            }
             holder.replyCount.setText(String.valueOf(Math.max(0L, topic.commentCount)));
             holder.replyCount.setTextColor(newReply ? 0xFF1877F2
                     : (dark ? 0xFFB7BCC4 : 0xFF626A74));
@@ -1107,7 +1120,8 @@ public class ForumHomeFragment extends Fragment {
             holder.avatar.setAlpha(dimmed ? 0.56f : 1f);
             holder.sticky.setAlpha(dimmed ? 0.58f : 1f);
             holder.recommend.setAlpha(dimmed ? 0.58f : 1f);
-            holder.qa.setAlpha(dimmed ? 0.58f : 1f);
+            holder.qaMark.setAlpha(dimmed ? 0.58f : 1f);
+            holder.qaStatus.setAlpha(dimmed ? 0.58f : 1f);
 
             bindAvatar(holder.avatar, topic.user, author);
             holder.avatar.setOnClickListener(v -> ForumProfileRouter.open(context, topic.user));
@@ -1519,8 +1533,9 @@ public class ForumHomeFragment extends Fragment {
         private final TextView time;
         private final TextView sticky;
         private final TextView recommend;
-        private final TextView qa;
+        private final TextView qaMark;
         private final TextView title;
+        private final TextView qaStatus;
         private final TextView replyCount;
 
         private TopicHolder(@NonNull View itemView) {
@@ -1538,10 +1553,11 @@ public class ForumHomeFragment extends Fragment {
             LinearLayout badges = (LinearLayout) right.getChildAt(1);
             sticky = (TextView) badges.getChildAt(0);
             recommend = (TextView) badges.getChildAt(1);
-            qa = (TextView) badges.getChildAt(2);
             LinearLayout titleRow = (LinearLayout) root.getChildAt(1);
-            title = (TextView) titleRow.getChildAt(0);
-            replyCount = (TextView) titleRow.getChildAt(1);
+            qaMark = (TextView) titleRow.getChildAt(0);
+            title = (TextView) titleRow.getChildAt(1);
+            qaStatus = (TextView) titleRow.getChildAt(2);
+            replyCount = (TextView) titleRow.getChildAt(3);
         }
     }
 
@@ -1610,12 +1626,6 @@ public class ForumHomeFragment extends Fragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 19));
         recommendParams.leftMargin = dp(context, 4);
         badges.addView(recommend, recommendParams);
-        TextView qa = badge(context, "问答", 0xFF7B4BC4,
-                dark ? 0xFF352A47 : 0xFFF0E8FF);
-        LinearLayout.LayoutParams qaParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 19));
-        qaParams.leftMargin = dp(context, 4);
-        badges.addView(qa, qaParams);
         right.addView(badges, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 20)));
         authorRow.addView(right, new LinearLayout.LayoutParams(
@@ -1625,12 +1635,32 @@ public class ForumHomeFragment extends Fragment {
 
         LinearLayout titleRow = new LinearLayout(context);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView qaMark = text(context, "问", 11.5f, dark ? 0xFF3D2C00 : 0xFF6E4B00, true);
+        qaMark.setGravity(Gravity.CENTER);
+        qaMark.setIncludeFontPadding(false);
+        qaMark.setBackground(roundRect(context, dark ? 0xFFD6A52A : 0xFFFFD65A, 11));
+        qaMark.setVisibility(View.GONE);
+        LinearLayout.LayoutParams qaMarkParams = new LinearLayout.LayoutParams(
+                dp(context, 22), dp(context, 22));
+        qaMarkParams.rightMargin = dp(context, 7);
+        titleRow.addView(qaMark, qaMarkParams);
+
         TextView title = text(context, "", 16.5f, dark ? Color.WHITE : 0xFF171A1F, true);
         title.setMaxLines(2);
         title.setLineSpacing(dp(context, 2), 1.08f);
         title.setEllipsize(TextUtils.TruncateAt.END);
         titleRow.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView qaStatus = text(context, "", 10.5f, 0xFFB76E00, true);
+        qaStatus.setGravity(Gravity.CENTER);
+        qaStatus.setSingleLine(true);
+        qaStatus.setPadding(dp(context, 7), 0, dp(context, 7), 0);
+        qaStatus.setVisibility(View.GONE);
+        LinearLayout.LayoutParams qaStatusParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 22));
+        qaStatusParams.leftMargin = dp(context, 7);
+        titleRow.addView(qaStatus, qaStatusParams);
 
         TextView replyCount = text(context, "0", 11.5f,
                 dark ? 0xFFB7BCC4 : 0xFF626A74, true);

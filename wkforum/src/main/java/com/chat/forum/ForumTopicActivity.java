@@ -30,7 +30,6 @@ import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.StyleSpan;
-import android.text.method.LinkMovementMethod;
 import android.util.Base64;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -1031,8 +1030,15 @@ public class ForumTopicActivity extends AppCompatActivity {
         boolean manager = client.isForumManager();
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
+        String topicUrl = ForumLinkRouter.topicWebUrl(topic.id);
         labels.add("分享");
-        actions.add(() -> shareText(topic.title, safe(topic.title) + "\n" + safe(topic.content)));
+        actions.add(() -> shareText(topic.title,
+                safe(topic.title) + "\n" + safe(topic.content) + "\n" + topicUrl));
+        labels.add("复制帖子链接");
+        actions.add(() -> copyTopicText("帖子链接", topicUrl));
+        labels.add("复制引用格式");
+        actions.add(() -> copyTopicText("帖子引用",
+                ForumLinkRouter.markdownReference(topic.title, topicUrl)));
         labels.add("举报");
         actions.add(this::showReportDialog);
         if (manager || client.hasPermission("dashboard.topic.recommend")) {
@@ -1059,6 +1065,11 @@ public class ForumTopicActivity extends AppCompatActivity {
             }
         }
         showCompactActionMenu(labels, actions);
+    }
+
+    private void copyTopicText(String label, String value) {
+        boolean copied = ForumLinkRouter.copyToClipboard(this, label, value);
+        Toast.makeText(this, copied ? "已复制" : "复制失败", Toast.LENGTH_SHORT).show();
     }
 
     private boolean canDeleteTopic(ForumApiClient.Topic topic) {
@@ -1146,6 +1157,10 @@ public class ForumTopicActivity extends AppCompatActivity {
             labels.add("回复");
             actions.add(() -> setReplyTarget(parentId, comment.id, author));
         }
+        if (canAcceptAnswer(comment, parentId)) {
+            labels.add("采纳为答案");
+            actions.add(() -> confirmAcceptAnswer(comment));
+        }
         labels.add("举报");
         actions.add(() -> showCommentReportDialog(comment));
         labels.add("分享");
@@ -1160,6 +1175,42 @@ public class ForumTopicActivity extends AppCompatActivity {
     private boolean isOwnComment(@Nullable ForumApiClient.Comment comment) {
         return comment != null && comment.user != null
                 && TextUtils.equals(ForumApiClient.getInstance().getCurrentForumUserId(), comment.user.id);
+    }
+
+    private boolean canAcceptAnswer(@Nullable ForumApiClient.Comment comment, long parentId) {
+        ForumApiClient.Topic topic = currentTopic;
+        if (topic == null || comment == null || topic.type != 2 || comment.id <= 0) return false;
+        if (parentId != comment.id) return false;
+        if (!TextUtils.isEmpty(comment.entityType)
+                && !"topic".equalsIgnoreCase(safe(comment.entityType))) return false;
+        if (topic.acceptedCommentId > 0 || "solved".equalsIgnoreCase(safe(topic.qaStatus))) return false;
+        ForumApiClient client = ForumApiClient.getInstance();
+        boolean owner = topic.user != null && TextUtils.equals(
+                client.getCurrentForumUserId(), topic.user.id);
+        return owner || client.isForumManager();
+    }
+
+    private void confirmAcceptAnswer(@NonNull ForumApiClient.Comment comment) {
+        new AlertDialog.Builder(this)
+                .setTitle("采纳答案")
+                .setMessage("采纳后该问答会标记为已解决。确定选择这条回答吗？")
+                .setPositiveButton("采纳", (dialog, which) -> acceptAnswer(comment))
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void acceptAnswer(@NonNull ForumApiClient.Comment comment) {
+        ForumApiClient.Topic topic = currentTopic;
+        if (topic == null || topicActionBusy) return;
+        runAuthenticatedAction(() -> ForumApiClient.getInstance().acceptAnswer(topic.id, comment.id,
+                new VoidCallback() {
+                    @Override public void success() {
+                        topic.acceptedCommentId = comment.id;
+                        topic.qaStatus = "solved";
+                        completeAction("已采纳答案");
+                        adapter.rebuild();
+                    }
+                }));
     }
 
     private void showCompactActionMenu(List<String> labels, List<Runnable> actions) {
@@ -1821,7 +1872,8 @@ public class ForumTopicActivity extends AppCompatActivity {
                     + comment.likeCount + '|' + comment.liked + '|' + comment.commentCount + '|'
                     + comment.status + '|' + comment.createTime + '|' + userKey(comment.user) + '|'
                     + userKey(quoteUser) + '|' + textKey(comment.quote == null
-                    ? null : comment.quote.content) + '|' + imageListKey(comment.imageList);
+                    ? null : comment.quote.content) + '|' + imageListKey(comment.imageList) + '|'
+                    + (currentTopic == null ? 0L : currentTopic.acceptedCommentId);
         }
 
         private String userKey(@Nullable ForumApiClient.User user) {
@@ -1918,9 +1970,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             int left = reply ? 48 : 16;
             int right = voice == null ? 14 : 2;
             holder.root.setPadding(dp(left), dp(reply ? 7 : 10), dp(right), dp(reply ? 6 : 8));
-            holder.root.setBackgroundColor(reply
-                    ? (isDark() ? 0xFF22272E : 0xFFEEF3F8)
-                    : (isDark() ? 0xFF1A1D21 : 0xFFF7F8FA));
+            holder.root.setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
             holder.avatar.setSize(reply ? 25 : 32);
             LinearLayout.LayoutParams avatarParams = (LinearLayout.LayoutParams) holder.avatar.getLayoutParams();
             avatarParams.width = dp((reply ? 25 : 32) + 4);
@@ -1937,6 +1987,27 @@ public class ForumTopicActivity extends AppCompatActivity {
                     ? userName(comment.quote.user) : "";
             setCommentName(holder.name, author, target, reply, isTopicAuthor(comment.user));
             holder.time.setText(formatDate(comment.createTime));
+
+            boolean accepted = currentTopic != null && currentTopic.type == 2
+                    && currentTopic.acceptedCommentId == comment.id;
+            boolean canAccept = !reply && canAcceptAnswer(comment, row.parentId);
+            holder.answer.setVisibility(accepted || canAccept ? View.VISIBLE : View.GONE);
+            if (accepted) {
+                holder.answer.setText("已采纳");
+                holder.answer.setTextColor(isDark() ? 0xFF79D4A8 : 0xFF21875B);
+                holder.answer.setBackground(roundRect(isDark() ? 0xFF203D32 : 0xFFE9F7F0, 11));
+                holder.answer.setOnClickListener(null);
+                holder.answer.setClickable(false);
+            } else if (canAccept) {
+                holder.answer.setText("采纳");
+                holder.answer.setTextColor(0xFF1877F2);
+                holder.answer.setBackground(roundRect(isDark() ? 0xFF243B59 : 0xFFEAF3FF, 11));
+                holder.answer.setClickable(true);
+                holder.answer.setOnClickListener(v -> confirmAcceptAnswer(comment));
+            } else {
+                holder.answer.setOnClickListener(null);
+                holder.answer.setBackground(null);
+            }
 
             holder.like.setText(comment.likeCount > 0 ? String.valueOf(comment.likeCount) : "");
             int likeColor = comment.liked ? 0xFF1877F2
@@ -1958,7 +2029,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                 holder.voice.setOnLongClickListener(null);
                 holder.body.setVisibility(View.VISIBLE);
                 holder.voice.setVisibility(View.GONE);
-                holder.body.setText(ForumHtmlCache.parse(comment.content));
+                ForumLinkRouter.setLinkedText(holder.body, ForumHtmlCache.parse(comment.content));
             } else {
                 holder.body.setVisibility(View.GONE);
                 holder.voice.setVisibility(View.VISIBLE);
@@ -2102,6 +2173,8 @@ public class ForumTopicActivity extends AppCompatActivity {
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
+        root.setLayoutParams(new RecyclerView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.setClickable(true);
 
         LinearLayout header = new LinearLayout(context);
@@ -2117,6 +2190,16 @@ public class ForumTopicActivity extends AppCompatActivity {
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         nameParams.leftMargin = dp(8);
         header.addView(name, nameParams);
+
+        TextView answer = text("", 10.5f, 0xFF1877F2, true);
+        answer.setGravity(Gravity.CENTER);
+        answer.setSingleLine(true);
+        answer.setPadding(dp(8), 0, dp(8), 0);
+        answer.setVisibility(View.GONE);
+        LinearLayout.LayoutParams answerParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(26));
+        answerParams.rightMargin = dp(2);
+        header.addView(answer, answerParams);
 
         TextView like = text("", 11, dark ? 0xFF858B93 : 0xFF9AA0A7, false);
         like.setGravity(Gravity.CENTER);
@@ -2168,7 +2251,9 @@ public class ForumTopicActivity extends AppCompatActivity {
         LinearLayout root = new LinearLayout(context);
         root.setGravity(Gravity.CENTER_VERTICAL);
         root.setPadding(dp(52), dp(3), dp(14), dp(6));
-        root.setBackgroundColor(isDark() ? 0xFF22272E : 0xFFEEF3F8);
+        root.setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
+        root.setLayoutParams(new RecyclerView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         TextView more = text("", 12, 0xFF1877F2, true);
         more.setGravity(Gravity.CENTER_VERTICAL);
         root.addView(more, new LinearLayout.LayoutParams(0, dp(34), 1f));
@@ -2184,6 +2269,8 @@ public class ForumTopicActivity extends AppCompatActivity {
         private final TextView category;
         private final TextView sticky;
         private final TextView recommend;
+        private final TextView qaMark;
+        private final TextView qaStatus;
         private final TextView title;
         private final AvatarView avatar;
         private final TextView author;
@@ -2231,12 +2318,36 @@ public class ForumTopicActivity extends AppCompatActivity {
             topMeta.addView(recommend, recommendParams);
             addView(topMeta);
 
+            LinearLayout titleRow = new LinearLayout(context);
+            titleRow.setGravity(Gravity.CENTER_VERTICAL);
+            qaMark = text("问", 12, isDark() ? 0xFF3D2C00 : 0xFF6E4B00, true);
+            qaMark.setGravity(Gravity.CENTER);
+            qaMark.setIncludeFontPadding(false);
+            qaMark.setBackground(roundRect(isDark() ? 0xFFD6A52A : 0xFFFFD65A, 12));
+            qaMark.setVisibility(GONE);
+            LinearLayout.LayoutParams qaMarkParams = new LinearLayout.LayoutParams(dp(24), dp(24));
+            qaMarkParams.rightMargin = dp(8);
+            titleRow.addView(qaMark, qaMarkParams);
+
             title = text("", 24, isDark() ? Color.WHITE : 0xFF17191C, true);
             title.setLineSpacing(0, 1.10f);
+            titleRow.addView(title, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            qaStatus = text("", 11, 0xFFB76E00, true);
+            qaStatus.setGravity(Gravity.CENTER);
+            qaStatus.setSingleLine(true);
+            qaStatus.setPadding(dp(8), 0, dp(8), 0);
+            qaStatus.setVisibility(GONE);
+            LinearLayout.LayoutParams qaStatusParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(24));
+            qaStatusParams.leftMargin = dp(8);
+            titleRow.addView(qaStatus, qaStatusParams);
+
             LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             titleParams.topMargin = dp(10);
-            addView(title, titleParams);
+            addView(titleRow, titleParams);
 
             LinearLayout authorRow = new LinearLayout(context);
             authorRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -2347,6 +2458,20 @@ public class ForumTopicActivity extends AppCompatActivity {
             recommend.setVisibility(topic.recommend ? VISIBLE : GONE);
             topMeta.setVisibility(hasCategory || topic.sticky || topic.recommend ? VISIBLE : GONE);
 
+            boolean question = topic.type == 2;
+            boolean solved = question && (topic.acceptedCommentId > 0
+                    || "solved".equalsIgnoreCase(safe(topic.qaStatus)));
+            qaMark.setVisibility(question ? VISIBLE : GONE);
+            qaStatus.setVisibility(question ? VISIBLE : GONE);
+            if (question) {
+                qaStatus.setText(solved ? "已解决" : "未解决");
+                qaStatus.setTextColor(solved ? 0xFF21875B : 0xFFB76E00);
+                qaStatus.setBackground(roundRect(
+                        solved ? (isDark() ? 0xFF203D32 : 0xFFE9F7F0)
+                                : (isDark() ? 0xFF40311D : 0xFFFFF3D8), 12));
+            } else {
+                qaStatus.setBackground(null);
+            }
             title.setText(safe(topic.title));
             String authorName = userName(topic.user);
             author.setText(authorName);
@@ -2360,7 +2485,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             authorMeta.setOnClickListener(openProfile);
 
             String body = TextUtils.isEmpty(topic.content) ? topic.summary : topic.content;
-            content.setText(ForumHtmlCache.parse(body));
+            ForumLinkRouter.setLinkedText(content, ForumHtmlCache.parse(body));
             images.bind(topic.imageList, dp(220), dp(10),
                     isDark() ? 0xFF24262B : 0xFFF0F1F3);
 
@@ -2548,6 +2673,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         final VoiceBubbleView voice;
         final ForumRemoteImageListView imageContainer;
         final TextView time;
+        final TextView answer;
         final TextView like;
         final TextView more;
 
@@ -2557,8 +2683,9 @@ public class ForumTopicActivity extends AppCompatActivity {
             LinearLayout header = (LinearLayout) root.getChildAt(0);
             avatar = (AvatarView) header.getChildAt(0);
             name = (TextView) header.getChildAt(1);
-            like = (TextView) header.getChildAt(2);
-            more = (TextView) header.getChildAt(3);
+            answer = (TextView) header.getChildAt(2);
+            like = (TextView) header.getChildAt(3);
+            more = (TextView) header.getChildAt(4);
             body = (TextView) root.getChildAt(1);
             voice = (VoiceBubbleView) root.getChildAt(2);
             imageContainer = (ForumRemoteImageListView) root.getChildAt(3);
@@ -2671,8 +2798,7 @@ public class ForumTopicActivity extends AppCompatActivity {
     private TextView htmlText(String html, float sizeSp) {
         TextView view = text("", sizeSp, isDark() ? 0xFFE8E9EB : 0xFF272A2F, false);
         view.setLineSpacing(dp(3), 1.08f);
-        view.setMovementMethod(LinkMovementMethod.getInstance());
-        view.setText(ForumHtmlCache.parse(html));
+        ForumLinkRouter.setLinkedText(view, ForumHtmlCache.parse(html));
         return view;
     }
 

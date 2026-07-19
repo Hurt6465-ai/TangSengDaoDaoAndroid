@@ -286,6 +286,15 @@ public final class ForumApiClient {
         enqueue(forumService().categories(authHeader(), topicType), scope, callback);
     }
 
+    public void getRecommendedTags(@NonNull ResultCallback<Page<Tag>> callback) {
+        getRecommendedTags(null, callback);
+    }
+
+    public void getRecommendedTags(@Nullable RequestScope scope,
+                                   @NonNull ResultCallback<Page<Tag>> callback) {
+        enqueue(forumService().tags(authHeader(), 1), scope, callback);
+    }
+
     public void getArticles(@Nullable String cursor,
                             @NonNull ResultCallback<Page<Article>> callback) {
         getArticles(cursor, null, callback);
@@ -524,6 +533,12 @@ public final class ForumApiClient {
         request.imageList = images;
         request.bountyScore = Math.max(0, bountyScore);
         enqueue(forumService().createTopic(requireAuthHeader(), request), scope, callback);
+    }
+
+    public void acceptAnswer(@NonNull String topicId, long commentId,
+                             @NonNull ResultCallback<Void> callback) {
+        forumService().acceptAnswer(requireAuthHeader(), topicId, commentId)
+                .enqueue(new EnvelopeCallback<>(callback));
     }
 
     public void setTopicLiked(@NonNull String topicId, boolean liked,
@@ -969,6 +984,10 @@ public final class ForumApiClient {
         Call<ApiEnvelope<List<Category>>> categories(@Header("X-User-Token") String token,
                                                      @Query("type") int topicType);
 
+        @GET("api/tag/tags")
+        Call<ApiEnvelope<Page<Tag>>> tags(@Header("X-User-Token") String token,
+                                          @Query("page") int page);
+
         @GET("api/article/articles")
         Call<ApiEnvelope<Page<Article>>> articles(@Header("X-User-Token") String token,
                                                   @Query("cursor") String cursor);
@@ -1040,6 +1059,12 @@ public final class ForumApiClient {
         @POST("api/topic/create")
         Call<ApiEnvelope<Topic>> createTopic(@Header("X-User-Token") String token,
                                              @Body CreateTopicRequest request);
+
+        @FormUrlEncoded
+        @POST("api/topic/accept_answer/{id}")
+        Call<ApiEnvelope<Void>> acceptAnswer(@Header("X-User-Token") String token,
+                                             @Path("id") String topicId,
+                                             @Field("commentId") long commentId);
 
         @POST("api/like/like")
         Call<ApiEnvelope<Void>> like(@Header("X-User-Token") String token,
