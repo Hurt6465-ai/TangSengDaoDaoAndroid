@@ -32,6 +32,7 @@ public class FeedWaterfallFragment extends Fragment {
     private String cursor = "";
     private boolean loading;
     private boolean hasMore = true;
+    private int skippedPageCount;
     private int viewGeneration;
     private FeedWaterfallAdapter adapter;
     private RecyclerView recyclerView;
@@ -60,6 +61,7 @@ public class FeedWaterfallFragment extends Fragment {
         loading = false;
         cursor = "";
         hasMore = true;
+        skippedPageCount = 0;
         uid = getArguments() == null ? "" : getArguments().getString(ARG_UID, "");
         recyclerView = view.findViewById(R.id.feedWaterfallRecyclerView);
         loadingView = view.findViewById(R.id.feedWaterfallLoading);
@@ -93,11 +95,12 @@ public class FeedWaterfallFragment extends Fragment {
         if (loading || TextUtils.isEmpty(uid) || (!hasMore && !first) || adapter == null) return;
         loading = true;
         final int requestGeneration = viewGeneration;
+        final String requestCursor = first ? "" : cursor;
         if (first && loadingView != null && stateTv != null) {
             loadingView.setVisibility(View.VISIBLE);
             stateTv.setVisibility(View.GONE);
         }
-        FeedModel.getInstance().userFeeds(uid, first ? "" : cursor,
+        FeedModel.getInstance().userFeeds(uid, requestCursor,
                 new IRequestResultListener<FeedListResponse>() {
                     @Override
                     public void onSuccess(FeedListResponse result) {
@@ -109,12 +112,39 @@ public class FeedWaterfallFragment extends Fragment {
                             requestWaterfallRelayout();
                             return;
                         }
-                        cursor = result.cursor == null ? "" : result.cursor;
-                        hasMore = result.has_more == 1 && !TextUtils.isEmpty(cursor);
-                        if (first) adapter.submitList(result.safeList());
-                        else adapter.append(result.safeList());
+
+                        java.util.List<FeedBean> page = result.safeList();
+                        String nextCursor = result.cursor == null ? "" : result.cursor;
+                        boolean cursorAdvanced = !TextUtils.isEmpty(nextCursor)
+                                && !TextUtils.equals(nextCursor, requestCursor);
+
+                        int before = adapter.getItemCount();
+                        if (first) {
+                            adapter.submitList(page);
+                            skippedPageCount = 0;
+                        } else {
+                            adapter.append(page);
+                        }
+                        int inserted = Math.max(0, adapter.getItemCount() - (first ? 0 : before));
+
+                        cursor = nextCursor;
+                        hasMore = result.has_more == 1 && cursorAdvanced;
+                        if (inserted == 0 && result.has_more == 1) {
+                            skippedPageCount++;
+                            if (skippedPageCount >= 2) hasMore = false;
+                        } else if (inserted > 0) {
+                            skippedPageCount = 0;
+                        }
+
                         updateState(false);
                         requestWaterfallRelayout();
+
+                        // A filtered or duplicate page may contain no new cards while still
+                        // advancing the cursor. Skip at most one such page automatically so the
+                        // personal profile does not appear to stop early.
+                        if (hasMore && inserted == 0 && recyclerView != null) {
+                            recyclerView.post(() -> loadMore(false));
+                        }
                     }
 
                     @Override
