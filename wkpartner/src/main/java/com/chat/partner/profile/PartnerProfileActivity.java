@@ -59,6 +59,7 @@ import java.util.Locale;
 
 public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBinding> {
     private static final int REQ_CHANGE_COVER = 7201;
+    private static final String TAG_FEED_WORKS = "partner_profile_feed_works";
     private String uid;
     private boolean isSelf;
     private boolean isSayHiLoading;
@@ -75,7 +76,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private boolean fixedTopBarSolid;
     private PartnerProfileEntity profile;
     private String sourceVercode;
-    private boolean feedWorksAttached;
     private Fragment feedWorksFragment;
 
     // These views were moved out of the old Toolbar/AppBar collapsing area. Use findViewById
@@ -270,13 +270,17 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void maybeLoadMoreWorks() {
         ensureFixedTopBarViews();
-        if (feedWorksFragment == null || feedWorksSection == null || feedWorksSection.getVisibility() != View.VISIBLE) return;
+        if (feedWorksSection == null || feedWorksSection.getVisibility() != View.VISIBLE) return;
         View child = wkVBinding.nestedScrollView.getChildAt(0);
         if (child == null) return;
-        int distanceToBottom = child.getBottom() - (wkVBinding.nestedScrollView.getScrollY() + wkVBinding.nestedScrollView.getHeight());
+        int distanceToBottom = child.getBottom()
+                - (wkVBinding.nestedScrollView.getScrollY() + wkVBinding.nestedScrollView.getHeight());
         if (distanceToBottom > dp(900)) return;
+
+        Fragment current = resolveFeedWorksFragment();
+        if (current == null) return;
         try {
-            feedWorksFragment.getClass().getMethod("loadMoreIfNeeded").invoke(feedWorksFragment);
+            current.getClass().getMethod("loadMoreIfNeeded").invoke(current);
         } catch (Throwable ignored) {
         }
     }
@@ -590,35 +594,55 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             hideFeedWorks();
             return;
         }
+
         try {
-            Class<?> routeClass = Class.forName("com.chat.feed.FeedRoute");
-            Object fragmentObj = routeClass.getMethod("newUserWaterfallFragment", String.class).invoke(null, uid);
-            if (!(fragmentObj instanceof Fragment)) {
-                hideFeedWorks();
-                return;
-            }
-            feedWorksSection.setVisibility(View.VISIBLE);
-            updateWorksHeaderPin();
-            feedWorksFragment = (Fragment) fragmentObj;
-            if (!feedWorksAttached) {
-                feedWorksAttached = true;
+            Fragment current = resolveFeedWorksFragment();
+            if (current == null || !fragmentMatchesProfileUid(current, uid)) {
+                Class<?> routeClass = Class.forName("com.chat.feed.FeedRoute");
+                Object fragmentObj = routeClass
+                        .getMethod("newUserWaterfallFragment", String.class)
+                        .invoke(null, uid);
+                if (!(fragmentObj instanceof Fragment)) {
+                    hideFeedWorks();
+                    return;
+                }
+                current = (Fragment) fragmentObj;
                 getSupportFragmentManager()
                         .beginTransaction()
-                        .replace(R.id.feedWorksContainer, feedWorksFragment)
+                        .replace(R.id.feedWorksContainer, current, TAG_FEED_WORKS)
                         .commitAllowingStateLoss();
-                // 内嵌作品瀑布流自带 RecyclerView。关闭它的嵌套滚动，
-                // 由外层 NestedScrollView 统一滚动，避免父子互抢。
-                feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 160);
-                feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 480);
-                feedWorksContainer.postDelayed(this::maybeLoadMoreWorks, 650);
-            } else {
-                feedWorksContainer.post(this::disableNestedFeedScrolling);
-                feedWorksContainer.post(this::maybeLoadMoreWorks);
             }
+
+            // Reuse the Fragment that is actually attached to the container. Previously every
+            // profile refresh created a new, unattached Fragment and assigned it here, so the
+            // outer scroll bridge sent load-more calls to an invisible Fragment after onResume.
+            feedWorksFragment = current;
+            feedWorksSection.setVisibility(View.VISIBLE);
+            updateWorksHeaderPin();
+            feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 160);
+            feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 480);
+            feedWorksContainer.postDelayed(this::maybeLoadMoreWorks, 650);
         } catch (Throwable ignored) {
-            // wkfeed 是可选模块。没有安装时不要影响个人主页。
+            // wkfeed is optional. Its absence must not break the profile page.
             hideFeedWorks();
         }
+    }
+
+    private Fragment resolveFeedWorksFragment() {
+        Fragment current = getSupportFragmentManager().findFragmentByTag(TAG_FEED_WORKS);
+        if (current == null) {
+            current = getSupportFragmentManager().findFragmentById(R.id.feedWorksContainer);
+        }
+        if (current != null) feedWorksFragment = current;
+        return current != null ? current : feedWorksFragment;
+    }
+
+    private boolean fragmentMatchesProfileUid(Fragment fragment, String expectedUid) {
+        if (fragment == null || TextUtils.isEmpty(expectedUid) || fragment.getArguments() == null) {
+            return false;
+        }
+        String fragmentUid = fragment.getArguments().getString("uid", "");
+        return TextUtils.equals(fragmentUid, expectedUid);
     }
 
     private void hideFeedWorks() {
