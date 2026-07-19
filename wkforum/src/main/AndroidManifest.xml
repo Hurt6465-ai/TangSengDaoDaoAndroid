@@ -5,6 +5,10 @@
 
     <application>
         <activity
+            android:name=".ForumBoardActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".ForumTopicActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
