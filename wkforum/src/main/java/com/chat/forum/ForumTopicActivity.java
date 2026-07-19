@@ -109,7 +109,13 @@ public class ForumTopicActivity extends AppCompatActivity {
     private EditText commentInput;
     private AppCompatImageView composerAction;
     private TextView replyHint;
-    private TextView recordHint;
+    private LinearLayout composerRow;
+    private LinearLayout recordPanel;
+    private TextView recordDurationView;
+    private ForumWaveformView recordWaveform;
+    private AppCompatImageView recordDeleteButton;
+    private AppCompatImageView recordToggleButton;
+    private AppCompatImageView recordFinishButton;
     private TopicDetailAdapter adapter;
     private ForumApiClient.Topic currentTopic;
     private final List<ForumApiClient.Comment> comments = new ArrayList<>();
@@ -140,24 +146,43 @@ public class ForumTopicActivity extends AppCompatActivity {
     private final ForumAudioRecorder forumAudioRecorder = new ForumAudioRecorder();
     private boolean recording;
     private boolean recordingPaused;
+    private boolean recordReady;
     private long recordStartTime;
     private long recordPausedAt;
     private long recordPausedDuration;
     private long recordReplyParentId;
     private long recordReplyQuoteId;
     private String recordPath = "";
+    private int recordReadySeconds;
+    private String recordReadyWaveform = "";
+    private MediaPlayer recordPreviewPlayer;
     private final Runnable recordTick = new Runnable() {
         @Override
         public void run() {
             if (!recording) return;
             long elapsed = currentRecordDuration();
-            int seconds = (int) Math.ceil(elapsed / 1000.0);
-            updateRecordHint(seconds);
+            updateRecordPanelState();
             if (elapsed >= MAX_RECORD_MS) {
-                finishRecord(false);
+                stopRecordForPreview();
                 return;
             }
             mainHandler.postDelayed(this, 100L);
+        }
+    };
+    private final Runnable recordPreviewTick = new Runnable() {
+        @Override
+        public void run() {
+            MediaPlayer player = recordPreviewPlayer;
+            if (player == null || recordWaveform == null) return;
+            try {
+                int duration = player.getDuration();
+                int position = player.getCurrentPosition();
+                recordWaveform.setProgress(duration <= 0 ? 0f : position / (float) duration);
+                if (player.isPlaying()) {
+                    mainHandler.postDelayed(this, 80L);
+                }
+            } catch (Throwable ignored) {
+            }
         }
     };
 
@@ -358,19 +383,14 @@ public class ForumTopicActivity extends AppCompatActivity {
         wrapper.addView(replyHint, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        recordHint = text("", 13, dark ? Color.WHITE : 0xFF33383E, true);
-        recordHint.setGravity(Gravity.CENTER);
-        recordHint.setPadding(dp(12), dp(8), dp(12), dp(8));
-        recordHint.setBackground(roundRect(dark ? 0xFF292C31 : 0xFFF0F2F5, 14));
-        recordHint.setVisibility(View.GONE);
-        LinearLayout.LayoutParams recordParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        recordParams.setMargins(0, dp(5), 0, 0);
-        wrapper.addView(recordHint, recordParams);
+        recordPanel = buildRecordPanel(dark);
+        recordPanel.setVisibility(View.GONE);
+        wrapper.addView(recordPanel, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(60)));
 
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, dp(6), 0, 0);
+        composerRow = new LinearLayout(this);
+        composerRow.setGravity(Gravity.CENTER_VERTICAL);
+        composerRow.setPadding(0, dp(6), 0, 0);
 
         commentInput = new EditText(this);
         commentInput.setHint("友善交流，说点什么…");
@@ -381,7 +401,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         commentInput.setMaxLines(4);
         commentInput.setPadding(dp(14), dp(9), dp(14), dp(9));
         commentInput.setBackground(roundRect(dark ? 0xFF24262B : 0xFFF1F3F5, 21));
-        row.addView(commentInput, new LinearLayout.LayoutParams(
+        composerRow.addView(commentInput, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         composerAction = new AppCompatImageView(this);
@@ -396,8 +416,8 @@ public class ForumTopicActivity extends AppCompatActivity {
         });
         LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(dp(48), dp(48));
         actionParams.leftMargin = dp(8);
-        row.addView(composerAction, actionParams);
-        wrapper.addView(row, new LinearLayout.LayoutParams(
+        composerRow.addView(composerAction, actionParams);
+        wrapper.addView(composerRow, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         commentInput.addTextChangedListener(new TextWatcher() {
@@ -411,11 +431,60 @@ public class ForumTopicActivity extends AppCompatActivity {
         return wrapper;
     }
 
+    private LinearLayout buildRecordPanel(boolean dark) {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setGravity(Gravity.CENTER_VERTICAL);
+        panel.setPadding(0, dp(6), 0, 0);
+
+        recordDeleteButton = recordControl(R.drawable.ic_forum_delete, 21,
+                dark ? 0xFFD4D7DC : 0xFF626970, "删除录音");
+        recordDeleteButton.setOnClickListener(v -> discardCurrentRecording());
+        panel.addView(recordDeleteButton, new LinearLayout.LayoutParams(dp(42), dp(48)));
+
+        recordDurationView = text("00:00", 13,
+                dark ? 0xFFE4E6EA : 0xFF33383E, true);
+        recordDurationView.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        recordDurationView.setGravity(Gravity.CENTER);
+        panel.addView(recordDurationView, new LinearLayout.LayoutParams(dp(62), dp(48)));
+
+        recordWaveform = new ForumWaveformView(this);
+        recordWaveform.setColors(dark ? 0xFF555A62 : 0xFFD4D8DE, 0xFF1877F2);
+        recordWaveform.setPadding(dp(2), dp(8), dp(2), dp(8));
+        recordWaveform.setOnSeekListener(this::seekRecordPreview);
+        LinearLayout.LayoutParams waveParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        waveParams.leftMargin = dp(2);
+        waveParams.rightMargin = dp(4);
+        panel.addView(recordWaveform, waveParams);
+
+        recordToggleButton = recordControl(R.drawable.ic_forum_pause, 21,
+                dark ? 0xFFE4E6EA : 0xFF3E454D, "暂停录音");
+        recordToggleButton.setOnClickListener(v -> toggleRecordPanelAction());
+        panel.addView(recordToggleButton, new LinearLayout.LayoutParams(dp(42), dp(48)));
+
+        recordFinishButton = recordControl(R.drawable.ic_forum_stop, 22,
+                0xFFE53935, "结束录音");
+        recordFinishButton.setOnClickListener(v -> {
+            if (recording) stopRecordForPreview();
+            else if (recordReady) sendPreparedRecord();
+        });
+        panel.addView(recordFinishButton, new LinearLayout.LayoutParams(dp(44), dp(48)));
+        return panel;
+    }
+
+    private AppCompatImageView recordControl(int icon, int iconDp, int tint, String description) {
+        AppCompatImageView view = new AppCompatImageView(this);
+        view.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+        view.setPadding(dp(10), dp(10), dp(10), dp(10));
+        view.setMinimumWidth(0);
+        view.setMinimumHeight(0);
+        view.setBackground(selectableBackground());
+        view.setContentDescription(description);
+        setImageIcon(view, icon, iconDp, tint);
+        return view;
+    }
+
     private void toggleRecordByClick() {
-        if (recording) {
-            showRecordControls();
-            return;
-        }
+        if (recording || recordReady) return;
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
@@ -425,12 +494,13 @@ public class ForumTopicActivity extends AppCompatActivity {
     }
 
     private void startRecord() {
-        if (recording) return;
+        if (recording || recordReady) return;
         stopVoicePlayback();
+        stopRecordPreview();
         try {
             File dir = new File(getCacheDir(), "forum_voice");
             if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("无法创建录音目录");
-            File file = new File(dir, "voice_" + System.currentTimeMillis() + ".amr");
+            File file = new File(dir, "voice_" + System.currentTimeMillis() + ".m4a");
             recordPath = file.getAbsolutePath();
             recordStartTime = System.currentTimeMillis();
             recordPausedAt = 0L;
@@ -438,35 +508,33 @@ public class ForumTopicActivity extends AppCompatActivity {
             recordingPaused = false;
             recordReplyParentId = replyParentId;
             recordReplyQuoteId = replyQuoteId;
+            recordReadySeconds = 0;
+            recordReadyWaveform = "";
+            if (recordWaveform != null) recordWaveform.clear();
+            forumAudioRecorder.setLevelListener(amplitude -> {
+                if (recording && !recordingPaused && recordWaveform != null) {
+                    recordWaveform.appendAmplitude(amplitude);
+                }
+            });
             forumAudioRecorder.start(new File(recordPath));
             recording = true;
-            composerAction.setSelected(true);
+            recordReady = false;
             composerAction.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            commentInput.setEnabled(false);
-            recordHint.setVisibility(View.VISIBLE);
-            updateRecordHint(0);
-            updateComposerAction();
+            showRecordPanel(true);
+            updateRecordPanelState();
             mainHandler.post(recordTick);
         } catch (Throwable error) {
             try { forumAudioRecorder.cancel(); } catch (Throwable ignored) { }
+            forumAudioRecorder.setLevelListener(null);
             deleteQuietly(recordPath);
             recordPath = "";
             recording = false;
             recordingPaused = false;
-            composerAction.setSelected(false);
-            commentInput.setEnabled(true);
-            recordHint.setVisibility(View.GONE);
+            recordReady = false;
+            showRecordPanel(false);
             updateComposerAction();
             Toast.makeText(this, "录音启动失败", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    private void updateRecordHint(int seconds) {
-        if (!recording || recordHint == null) return;
-        String time = String.format(Locale.getDefault(), "%02d:%02d", seconds / 60, seconds % 60);
-        recordHint.setText((recordingPaused ? "录音已暂停" : "录音中") + "  " + time
-                + (recordingPaused ? " · 点击麦克风继续或结束" : " · 再点麦克风暂停或结束"));
-        recordHint.setTextColor(isDark() ? Color.WHITE : 0xFF33383E);
     }
 
     private long currentRecordDuration() {
@@ -477,21 +545,13 @@ public class ForumTopicActivity extends AppCompatActivity {
         return Math.max(0L, now - recordStartTime - paused);
     }
 
-    private void showRecordControls() {
-        if (!recording) return;
-        String pauseLabel = recordingPaused ? "继续录音" : "暂停录音";
-        new AlertDialog.Builder(this)
-                .setItems(new String[]{pauseLabel, "结束并发送", "取消录音"}, (dialog, which) -> {
-                    if (which == 0) {
-                        if (recordingPaused) resumeRecord();
-                        else pauseRecord();
-                    } else if (which == 1) {
-                        finishRecord(false);
-                    } else {
-                        finishRecord(true);
-                    }
-                })
-                .show();
+    private void toggleRecordPanelAction() {
+        if (recording) {
+            if (recordingPaused) resumeRecord();
+            else pauseRecord();
+        } else if (recordReady) {
+            toggleRecordPreview();
+        }
     }
 
     private void pauseRecord() {
@@ -500,8 +560,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             forumAudioRecorder.pause();
             recordingPaused = true;
             recordPausedAt = System.currentTimeMillis();
-            updateRecordHint((int) Math.ceil(currentRecordDuration() / 1000.0));
-            updateComposerAction();
+            updateRecordPanelState();
         } catch (Throwable error) {
             Toast.makeText(this, "暂停录音失败", Toast.LENGTH_SHORT).show();
         }
@@ -515,46 +574,206 @@ public class ForumTopicActivity extends AppCompatActivity {
             if (recordPausedAt > 0L) recordPausedDuration += now - recordPausedAt;
             recordPausedAt = 0L;
             recordingPaused = false;
-            updateRecordHint((int) Math.ceil(currentRecordDuration() / 1000.0));
-            updateComposerAction();
+            updateRecordPanelState();
         } catch (Throwable error) {
             Toast.makeText(this, "继续录音失败", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void finishRecord(boolean cancel) {
+    private void stopRecordForPreview() {
         if (!recording) return;
         long duration = currentRecordDuration();
+        byte[] waveform = forumAudioRecorder.getLevels();
         recording = false;
         mainHandler.removeCallbacks(recordTick);
-        String localPath = recordPath;
-        byte[] waveform = forumAudioRecorder.getLevels();
-        if (cancel) forumAudioRecorder.cancel();
-        else forumAudioRecorder.stop();
-        composerAction.setSelected(false);
-        commentInput.setEnabled(true);
-        recordHint.setVisibility(View.GONE);
-        recordPath = "";
+        try { forumAudioRecorder.stop(); } catch (Throwable ignored) { }
         recordingPaused = false;
         recordPausedAt = 0L;
         recordPausedDuration = 0L;
-        updateComposerAction();
-        if (cancel) {
-            deleteQuietly(localPath);
-            return;
-        }
-        if (duration < MIN_RECORD_MS) {
-            deleteQuietly(localPath);
+        if (duration < MIN_RECORD_MS || TextUtils.isEmpty(recordPath)
+                || !new File(recordPath).exists() || new File(recordPath).length() <= 0) {
+            deleteQuietly(recordPath);
+            recordPath = "";
+            recordReady = false;
+            showRecordPanel(false);
             Toast.makeText(this, "录音时间太短", Toast.LENGTH_SHORT).show();
             return;
         }
-        int seconds = Math.max(1, (int) Math.ceil(duration / 1000.0));
-        String waveformText = Base64.encodeToString(waveform == null ? new byte[0] : waveform,
-                Base64.NO_WRAP);
-        // The second tap explicitly says "结束并发送". Do not ask for a third
-        // confirmation; upload immediately and keep the retry dialog on error.
-        uploadAndSendVoice(localPath, seconds, waveformText,
-                recordReplyParentId, recordReplyQuoteId);
+        recordReady = true;
+        recordReadySeconds = Math.max(1, (int) Math.ceil(duration / 1000.0));
+        recordReadyWaveform = Base64.encodeToString(
+                waveform == null ? new byte[0] : waveform, Base64.NO_WRAP);
+        if (recordWaveform != null) {
+            recordWaveform.setSamples(waveform);
+            recordWaveform.setProgress(0f);
+            recordWaveform.setSeekEnabled(true);
+        }
+        updateRecordPanelState();
+    }
+
+    private void sendPreparedRecord() {
+        if (!recordReady || sending) return;
+        String localPath = recordPath;
+        int seconds = recordReadySeconds;
+        String waveform = recordReadyWaveform;
+        long targetParentId = recordReplyParentId;
+        long targetQuoteId = recordReplyQuoteId;
+        stopRecordPreview();
+        resetRecordUi(false);
+        uploadAndSendVoice(localPath, seconds, waveform, targetParentId, targetQuoteId);
+    }
+
+    private void discardCurrentRecording() {
+        if (recording) {
+            try { forumAudioRecorder.cancel(); } catch (Throwable ignored) { }
+        }
+        resetRecordUi(true);
+    }
+
+    private void resetRecordUi(boolean deleteFile) {
+        mainHandler.removeCallbacks(recordTick);
+        stopRecordPreview();
+        String path = recordPath;
+        recording = false;
+        recordingPaused = false;
+        recordReady = false;
+        recordStartTime = 0L;
+        recordPausedAt = 0L;
+        recordPausedDuration = 0L;
+        recordReadySeconds = 0;
+        recordReadyWaveform = "";
+        recordPath = "";
+        forumAudioRecorder.setLevelListener(null);
+        if (deleteFile) deleteQuietly(path);
+        if (recordWaveform != null) {
+            recordWaveform.clear();
+            recordWaveform.setSeekEnabled(false);
+        }
+        showRecordPanel(false);
+        updateComposerAction();
+    }
+
+    private void showRecordPanel(boolean show) {
+        if (recordPanel != null) recordPanel.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (composerRow != null) composerRow.setVisibility(show ? View.GONE : View.VISIBLE);
+        if (commentInput != null) commentInput.setEnabled(!show);
+        if (replyHint != null) replyHint.setEnabled(!show);
+        if (show) {
+            InputMethodManager keyboard = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (keyboard != null && commentInput != null) {
+                keyboard.hideSoftInputFromWindow(commentInput.getWindowToken(), 0);
+            }
+        }
+    }
+
+    private void updateRecordPanelState() {
+        if (recordDurationView == null || recordToggleButton == null || recordFinishButton == null) return;
+        boolean dark = isDark();
+        if (recording) {
+            long elapsed = currentRecordDuration();
+            int seconds = (int) Math.ceil(elapsed / 1000.0);
+            String time = String.format(Locale.getDefault(), "%02d:%02d", seconds / 60, seconds % 60);
+            String prefix = recordingPaused ? "Ⅱ " : "● ";
+            SpannableString value = new SpannableString(prefix + time);
+            value.setSpan(new ForegroundColorSpan(recordingPaused ? 0xFFFFA726 : 0xFFE53935),
+                    0, prefix.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            recordDurationView.setText(value);
+            setImageIcon(recordToggleButton,
+                    recordingPaused ? R.drawable.ic_forum_play : R.drawable.ic_forum_pause,
+                    21, dark ? 0xFFE4E6EA : 0xFF3E454D);
+            recordToggleButton.setContentDescription(recordingPaused ? "继续录音" : "暂停录音");
+            setImageIcon(recordFinishButton, R.drawable.ic_forum_stop, 22, 0xFFE53935);
+            recordFinishButton.setContentDescription("结束录音并试听");
+            if (recordWaveform != null) {
+                recordWaveform.setColors(0xFF1877F2, 0xFF1877F2);
+                recordWaveform.setSeekEnabled(false);
+                recordWaveform.setProgress(-1f);
+            }
+            return;
+        }
+        if (recordReady) {
+            String time = String.format(Locale.getDefault(), "%02d:%02d",
+                    recordReadySeconds / 60, recordReadySeconds % 60);
+            recordDurationView.setText(time);
+            boolean playing = false;
+            try { playing = recordPreviewPlayer != null && recordPreviewPlayer.isPlaying(); }
+            catch (Throwable ignored) { }
+            setImageIcon(recordToggleButton,
+                    playing ? R.drawable.ic_forum_pause : R.drawable.ic_forum_play,
+                    21, dark ? 0xFFE4E6EA : 0xFF3E454D);
+            recordToggleButton.setContentDescription(playing ? "暂停试听" : "试听录音");
+            setImageIcon(recordFinishButton, R.drawable.ic_forum_send, 21, 0xFF1877F2);
+            recordFinishButton.setContentDescription("发送语音评论");
+            if (recordWaveform != null) {
+                recordWaveform.setColors(dark ? 0xFF555A62 : 0xFFD4D8DE, 0xFF1877F2);
+                recordWaveform.setSeekEnabled(true);
+            }
+        }
+    }
+
+    private void toggleRecordPreview() {
+        if (!recordReady || TextUtils.isEmpty(recordPath)) return;
+        try {
+            if (!ensureRecordPreviewPlayer()) return;
+            if (recordPreviewPlayer.isPlaying()) {
+                recordPreviewPlayer.pause();
+                mainHandler.removeCallbacks(recordPreviewTick);
+            } else {
+                recordPreviewPlayer.start();
+                mainHandler.removeCallbacks(recordPreviewTick);
+                mainHandler.post(recordPreviewTick);
+            }
+            updateRecordPanelState();
+        } catch (Throwable error) {
+            stopRecordPreview();
+            Toast.makeText(this, "无法试听录音", Toast.LENGTH_SHORT).show();
+            updateRecordPanelState();
+        }
+    }
+
+    private boolean ensureRecordPreviewPlayer() {
+        if (recordPreviewPlayer != null) return true;
+        File file = new File(recordPath);
+        if (!file.exists() || file.length() <= 0) return false;
+        MediaPlayer player = new MediaPlayer();
+        player.setAudioAttributes(new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build());
+        try {
+            player.setDataSource(file.getAbsolutePath());
+            player.setOnCompletionListener(mp -> {
+                mainHandler.removeCallbacks(recordPreviewTick);
+                try { mp.seekTo(0); } catch (Throwable ignored) { }
+                if (recordWaveform != null) recordWaveform.setProgress(0f);
+                updateRecordPanelState();
+            });
+            player.prepare();
+            recordPreviewPlayer = player;
+            return true;
+        } catch (Throwable error) {
+            try { player.release(); } catch (Throwable ignored) { }
+            return false;
+        }
+    }
+
+    private void seekRecordPreview(float fraction) {
+        if (!recordReady) return;
+        try {
+            if (!ensureRecordPreviewPlayer()) return;
+            int duration = recordPreviewPlayer.getDuration();
+            recordPreviewPlayer.seekTo((int) (Math.max(0f, Math.min(1f, fraction)) * duration));
+        } catch (Throwable ignored) { }
+    }
+
+    private void stopRecordPreview() {
+        mainHandler.removeCallbacks(recordPreviewTick);
+        MediaPlayer player = recordPreviewPlayer;
+        recordPreviewPlayer = null;
+        if (player != null) {
+            try { player.stop(); } catch (Throwable ignored) { }
+            try { player.release(); } catch (Throwable ignored) { }
+        }
     }
 
     private void showVoiceSendConfirmation(String localPath, int seconds, String waveform,
@@ -1821,7 +2040,7 @@ public class ForumTopicActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
-        if (recording) finishRecord(true);
+        if (recording || recordReady) discardCurrentRecording();
         stopVoicePlayback();
         super.onStop();
     }
@@ -1832,8 +2051,9 @@ public class ForumTopicActivity extends AppCompatActivity {
         voiceUploadGeneration++;
         deleteQuietly(activeVoiceLocalPath);
         activeVoiceLocalPath = "";
-        if (recording) finishRecord(true);
+        if (recording || recordReady) discardCurrentRecording();
         mainHandler.removeCallbacks(recordTick);
+        mainHandler.removeCallbacks(recordPreviewTick);
         mainHandler.removeCallbacks(hideFastScrollButton);
         if (fastScrollButton != null) fastScrollButton.animate().cancel();
         stopVoicePlayback();

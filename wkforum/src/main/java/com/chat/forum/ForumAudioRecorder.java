@@ -17,6 +17,10 @@ import java.util.List;
  * Kept inside wkforum so pause/resume behavior cannot change IM chat recording.
  */
 final class ForumAudioRecorder {
+    interface LevelListener {
+        void onLevel(int amplitude);
+    }
+
     private enum State { IDLE, RECORDING, PAUSED }
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -29,16 +33,23 @@ final class ForumAudioRecorder {
                 double amplitude = recorder.getMaxAmplitude();
                 double db = amplitude > 1d ? 20d * Math.log10(amplitude) : 0d;
                 levels.add((int) db);
+                LevelListener listener = levelListener;
+                if (listener != null) listener.onLevel((int) amplitude);
             } catch (RuntimeException ignored) {
                 // The recorder may be stopping while the sampler is running.
             }
-            handler.postDelayed(this, 100L);
+            handler.postDelayed(this, 80L);
         }
     };
 
     private MediaRecorder recorder;
     private File outputFile;
     private State state = State.IDLE;
+    private LevelListener levelListener;
+
+    void setLevelListener(LevelListener listener) {
+        levelListener = listener;
+    }
 
     void start(@NonNull File file) throws IOException {
         release(false);
@@ -48,8 +59,10 @@ final class ForumAudioRecorder {
         MediaRecorder next = new MediaRecorder();
         try {
             next.setAudioSource(MediaRecorder.AudioSource.MIC);
-            next.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
-            next.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+            next.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            next.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            next.setAudioEncodingBitRate(24_000);
+            next.setAudioSamplingRate(16_000);
             next.setOutputFile(file.getAbsolutePath());
             next.prepare();
             next.start();
