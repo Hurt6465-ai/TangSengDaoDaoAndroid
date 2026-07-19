@@ -57,6 +57,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private static final String STATE_TYPE = "forum_type";
     private static final String STATE_CATEGORY = "forum_category";
     private static final String STATE_IMAGES = "forum_images";
+    private static final String EXTRA_INITIAL_CATEGORY_ID = "forum_initial_category_id";
 
     private final ExecutorService imageExecutor = Executors.newSingleThreadExecutor();
     private final List<Uri> selectedImages = new ArrayList<>();
@@ -89,6 +90,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private boolean categoriesLoaded;
     private boolean tagsLoaded;
     private long pendingCategoryId;
+    private long initialCategoryId;
 
     private final ActivityResultLauncher<String> imagePicker = registerForActivityResult(
             new ActivityResultContracts.GetMultipleContents(), uris -> {
@@ -111,11 +113,17 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         return new Intent(context, ForumCreateTopicActivity.class);
     }
 
+    public static Intent createIntent(Context context, long initialCategoryId) {
+        return createIntent(context).putExtra(EXTRA_INITIAL_CATEGORY_ID, initialCategoryId);
+    }
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        initialCategoryId = getIntent().getLongExtra(EXTRA_INITIAL_CATEGORY_ID, 0L);
         buildView();
         restoreComposerState(savedInstanceState);
+        if (pendingCategoryId <= 0L) pendingCategoryId = initialCategoryId;
         authenticateAndLoadCategories();
     }
 
@@ -338,7 +346,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         tab.setOnClickListener(v -> {
             if (publishing || topicType == value) return;
             topicType = value;
-            pendingCategoryId = 0L;
+            pendingCategoryId = value == TYPE_ARTICLE ? 0L : initialCategoryId;
             renderTypePill();
             updateContentHint();
             if (topicType != TYPE_ARTICLE) loadCategories();

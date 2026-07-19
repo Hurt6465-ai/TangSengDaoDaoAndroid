@@ -60,11 +60,24 @@ import java.util.Set;
 
 /** Native forum home shown inside the Community bottom tab. */
 public class ForumHomeFragment extends Fragment {
+    private static final String ARG_BOARD_MODE = "forum_arg_board_mode";
+    private static final String ARG_BOARD_ID = "forum_arg_board_id";
+    private static final String ARG_BOARD_NAME = "forum_arg_board_name";
+    private static final String ARG_BOARD_DESCRIPTION = "forum_arg_board_description";
+    private static final String STATE_BOARD_ID = "forum_state_board_id";
+    private static final String STATE_BOARD_NAME = "forum_state_board_name";
+    private static final String STATE_BOARD_DESCRIPTION = "forum_state_board_description";
+    private static final String STATE_BOARD_SORT = "forum_state_board_sort";
     private static final long CATEGORY_COMPREHENSIVE = -100L;
     private static final long CATEGORY_LATEST = 0L;
     private static final long CATEGORY_RECOMMEND = -1L;
     private static final long CATEGORY_FOLLOW = -2L;
+    private static final int BOARD_SORT_LATEST = 0;
+    private static final int BOARD_SORT_HOT = 1;
+    private static final int BOARD_SORT_FEATURED = 2;
     private static final int FEATURED_CATEGORY_COUNT = 4;
+    private static final int BOARD_FEATURED_SCAN_PAGES = 5;
+    private static final int BOARD_FEATURED_TARGET_COUNT = 20;
     private static final long FEED_CACHE_TTL_MS = 3 * 60_000L;
 
     private DrawerLayout drawerLayout;
@@ -75,6 +88,13 @@ public class ForumHomeFragment extends Fragment {
     private LinearLayout featuredSection;
     private GridLayout featuredGrid;
     private TextView allCategoriesButton;
+    private LinearLayout boardHeaderSection;
+    private TextView boardIconView;
+    private TextView boardTitleView;
+    private TextView boardDescriptionView;
+    private TextView boardFollowButton;
+    private TextView toolbarTitleView;
+    private TextView toolbarSubtitleView;
     private TextView currentCategoryView;
     private RecyclerView recyclerView;
     private SwipeRefreshLayout swipeRefreshLayout;
@@ -85,6 +105,11 @@ public class ForumHomeFragment extends Fragment {
     private TopicAdapter adapter;
     private ArticleAdapter articleAdapter;
     private MixedFeedAdapter mixedFeedAdapter;
+    private boolean boardMode;
+    private long boardCategoryId;
+    private String boardCategoryName = "";
+    private String boardCategoryDescription = "";
+    private int boardSort = BOARD_SORT_LATEST;
     private long selectedCategory = CATEGORY_COMPREHENSIVE;
     private String cursor = "";
     private boolean hasMore;
@@ -126,6 +151,48 @@ public class ForumHomeFragment extends Fragment {
             new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (isAdded()) loadUnreadCount();
             });
+
+    static ForumHomeFragment newBoardInstance(long categoryId, @Nullable String name,
+                                              @Nullable String description) {
+        ForumHomeFragment fragment = new ForumHomeFragment();
+        Bundle arguments = new Bundle();
+        arguments.putBoolean(ARG_BOARD_MODE, true);
+        arguments.putLong(ARG_BOARD_ID, categoryId);
+        arguments.putString(ARG_BOARD_NAME, safe(name));
+        arguments.putString(ARG_BOARD_DESCRIPTION, safe(description));
+        fragment.setArguments(arguments);
+        return fragment;
+    }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Bundle arguments = getArguments();
+        boardMode = arguments != null && arguments.getBoolean(ARG_BOARD_MODE, false);
+        if (boardMode) {
+            boardCategoryId = arguments.getLong(ARG_BOARD_ID, 0L);
+            boardCategoryName = safe(arguments.getString(ARG_BOARD_NAME));
+            boardCategoryDescription = safe(arguments.getString(ARG_BOARD_DESCRIPTION));
+            if (savedInstanceState != null) {
+                boardCategoryId = savedInstanceState.getLong(STATE_BOARD_ID, boardCategoryId);
+                boardCategoryName = savedInstanceState.getString(STATE_BOARD_NAME, boardCategoryName);
+                boardCategoryDescription = savedInstanceState.getString(
+                        STATE_BOARD_DESCRIPTION, boardCategoryDescription);
+                boardSort = savedInstanceState.getInt(STATE_BOARD_SORT, BOARD_SORT_LATEST);
+            }
+            selectedCategory = boardCategoryId;
+        }
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (!boardMode) return;
+        outState.putLong(STATE_BOARD_ID, boardCategoryId);
+        outState.putString(STATE_BOARD_NAME, boardCategoryName);
+        outState.putString(STATE_BOARD_DESCRIPTION, boardCategoryDescription);
+        outState.putInt(STATE_BOARD_SORT, boardSort);
+    }
 
     @Nullable
     @Override
@@ -169,19 +236,19 @@ public class ForumHomeFragment extends Fragment {
         collapsibleHeader.addView(loginHintView, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        featuredSection = new LinearLayout(context);
-        featuredSection.setOrientation(LinearLayout.VERTICAL);
-        featuredSection.setPadding(dp(context, 14), dp(context, 4), dp(context, 14), dp(context, 9));
-        featuredSection.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
-        collapsibleHeader.addView(featuredSection, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        buildFeaturedSectionHeader(context);
-
-        AppBarLayout.LayoutParams collapsibleParams = new AppBarLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        collapsibleParams.setScrollFlags(AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL
-                | AppBarLayout.LayoutParams.SCROLL_FLAG_ENTER_ALWAYS);
-        appBarLayout.addView(collapsibleHeader, collapsibleParams);
+        if (boardMode) {
+            boardHeaderSection = buildBoardHeader(context);
+            collapsibleHeader.addView(boardHeaderSection, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        } else {
+            featuredSection = new LinearLayout(context);
+            featuredSection.setOrientation(LinearLayout.VERTICAL);
+            featuredSection.setPadding(dp(context, 14), dp(context, 4), dp(context, 14), dp(context, 9));
+            featuredSection.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
+            collapsibleHeader.addView(featuredSection, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            buildFeaturedSectionHeader(context);
+        }
 
         feedTabContainer = new LinearLayout(context);
         feedTabContainer.setGravity(Gravity.CENTER_VERTICAL);
@@ -191,20 +258,36 @@ public class ForumHomeFragment extends Fragment {
         LinearLayout feedTabsRow = new LinearLayout(context);
         feedTabsRow.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
         feedTabsRow.setPadding(dp(context, 10), dp(context, 4), dp(context, 10), dp(context, 6));
+        feedTabsRow.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
         feedTabsRow.addView(feedTabContainer, new LinearLayout.LayoutParams(
-                dp(context, 158), dp(context, 29)));
-        // Keep the feed switch inside the collapsible area so it naturally
-        // disappears as the list scrolls, instead of staying pinned on top.
-        collapsibleHeader.addView(feedTabsRow, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                boardMode ? dp(context, 216) : dp(context, 158), dp(context, 29)));
+        if (!boardMode) {
+            // The home feed switch disappears with the discovery header.
+            collapsibleHeader.addView(feedTabsRow, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
 
-        currentCategoryView = text(context, "", 12, dark ? 0xFFAAB0B8 : 0xFF66707B, false);
-        currentCategoryView.setPadding(dp(context, 16), dp(context, 7), dp(context, 16), dp(context, 7));
-        currentCategoryView.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
-        currentCategoryView.setVisibility(View.GONE);
-        currentCategoryView.setOnClickListener(v -> selectCategory(CATEGORY_COMPREHENSIVE));
-        appBarLayout.addView(currentCategoryView, new AppBarLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        AppBarLayout.LayoutParams collapsibleParams = new AppBarLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        collapsibleParams.setScrollFlags(AppBarLayout.LayoutParams.SCROLL_FLAG_SCROLL
+                | AppBarLayout.LayoutParams.SCROLL_FLAG_ENTER_ALWAYS);
+        appBarLayout.addView(collapsibleHeader, collapsibleParams);
+
+        if (boardMode) {
+            // Tieba-style board sorting remains visible while the board profile collapses.
+            appBarLayout.addView(feedTabsRow, new AppBarLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        } else {
+            currentCategoryView = text(context, "", 12,
+                    dark ? 0xFFAAB0B8 : 0xFF66707B, false);
+            currentCategoryView.setPadding(dp(context, 16), dp(context, 7),
+                    dp(context, 16), dp(context, 7));
+            currentCategoryView.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
+            currentCategoryView.setVisibility(View.GONE);
+            currentCategoryView.setOnClickListener(v -> selectCategory(CATEGORY_COMPREHENSIVE));
+            appBarLayout.addView(currentCategoryView, new AppBarLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
 
         CoordinatorLayout.LayoutParams appBarParams = new CoordinatorLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -304,23 +387,45 @@ public class ForumHomeFragment extends Fragment {
         toolbar.setPadding(dp(context, 3), 0, dp(context, 6), 0);
         toolbar.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
 
-        TextView menu = text(context, "☰", 22, dark ? Color.WHITE : 0xFF252A30, false);
-        menu.setGravity(Gravity.CENTER);
-        menu.setBackground(selectableBackground(context));
-        menu.setContentDescription("打开板块侧栏");
-        menu.setOnClickListener(v -> openDrawer());
-        toolbar.addView(menu, new LinearLayout.LayoutParams(dp(context, 44), dp(context, 44)));
+        TextView leading = text(context, boardMode ? "‹" : "☰",
+                boardMode ? 35 : 22, dark ? Color.WHITE : 0xFF252A30, false);
+        leading.setGravity(Gravity.CENTER);
+        leading.setBackground(selectableBackground(context));
+        leading.setContentDescription(boardMode ? "返回社区" : "打开板块侧栏");
+        leading.setOnClickListener(v -> {
+            if (boardMode) {
+                Activity activity = getActivity();
+                if (activity != null) activity.finish();
+            } else {
+                openDrawer();
+            }
+        });
+        toolbar.addView(leading, new LinearLayout.LayoutParams(dp(context, 44), dp(context, 44)));
 
         LinearLayout titleBox = new LinearLayout(context);
         titleBox.setOrientation(LinearLayout.VERTICAL);
         titleBox.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = text(context, "社区", 19, dark ? Color.WHITE : 0xFF17191C, true);
-        TextView subtitle = text(context, "综合讨论与经验分享", 11,
+        toolbarTitleView = text(context, boardMode ? displayBoardName() : "社区", 19,
+                dark ? Color.WHITE : 0xFF17191C, true);
+        toolbarSubtitleView = text(context,
+                boardMode ? "点击切换板块  ›" : "综合讨论与经验分享", 11,
                 dark ? 0xFF8F949C : 0xFF7A8088, false);
-        titleBox.addView(title);
-        titleBox.addView(subtitle);
-        titleBox.setOnClickListener(v -> refreshAll());
+        titleBox.addView(toolbarTitleView);
+        titleBox.addView(toolbarSubtitleView);
+        titleBox.setOnClickListener(v -> {
+            if (boardMode) openDrawer(); else refreshAll();
+        });
         toolbar.addView(titleBox, new LinearLayout.LayoutParams(0, dp(context, 44), 1f));
+
+        if (boardMode) {
+            TextView boardMenu = text(context, "☰", 20,
+                    dark ? 0xFFD9DCE1 : 0xFF4D535B, false);
+            boardMenu.setGravity(Gravity.CENTER);
+            boardMenu.setBackground(selectableBackground(context));
+            boardMenu.setContentDescription("切换板块");
+            boardMenu.setOnClickListener(v -> openDrawer());
+            toolbar.addView(boardMenu, new LinearLayout.LayoutParams(dp(context, 42), dp(context, 42)));
+        }
 
         FrameLayout notificationButton = new FrameLayout(context);
         notificationButton.setForeground(selectableBackground(context));
@@ -349,6 +454,95 @@ public class ForumHomeFragment extends Fragment {
         notificationButton.addView(centerButton, countParams);
         toolbar.addView(notificationButton, new LinearLayout.LayoutParams(dp(context, 50), dp(context, 42)));
         return toolbar;
+    }
+
+    private LinearLayout buildBoardHeader(Context context) {
+        boolean dark = isDark(context);
+        LinearLayout section = new LinearLayout(context);
+        section.setOrientation(LinearLayout.VERTICAL);
+        section.setPadding(dp(context, 15), dp(context, 10), dp(context, 15), dp(context, 13));
+        section.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
+
+        LinearLayout row = new LinearLayout(context);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        boardIconView = text(context, categoryInitial(displayBoardName()), 21,
+                categoryAccent(displayBoardName()), true);
+        boardIconView.setGravity(Gravity.CENTER);
+        boardIconView.setBackground(roundRect(context,
+                dark ? 0xFF262A30 : 0xFFF1F5FA, 14));
+        row.addView(boardIconView, new LinearLayout.LayoutParams(dp(context, 54), dp(context, 54)));
+
+        LinearLayout copy = new LinearLayout(context);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.setGravity(Gravity.CENTER_VERTICAL);
+        boardTitleView = text(context, displayBoardName(), 18,
+                dark ? Color.WHITE : 0xFF1D2126, true);
+        boardDescriptionView = text(context, displayBoardDescription(), 12,
+                dark ? 0xFFA1A6AE : 0xFF737A83, false);
+        boardDescriptionView.setMaxLines(2);
+        boardDescriptionView.setEllipsize(TextUtils.TruncateAt.END);
+        copy.addView(boardTitleView);
+        LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        descriptionParams.topMargin = dp(context, 3);
+        copy.addView(boardDescriptionView, descriptionParams);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        copyParams.leftMargin = dp(context, 11);
+        row.addView(copy, copyParams);
+
+        boardFollowButton = text(context, "", 13, 0xFF1877F2, true);
+        boardFollowButton.setGravity(Gravity.CENTER);
+        boardFollowButton.setOnClickListener(v -> {
+            if (!isAdded() || boardCategoryId <= 0) return;
+            ForumBoardStore.toggleFollowed(requireContext(), boardCategoryId);
+            renderBoardHeader();
+            renderDrawer();
+        });
+        row.addView(boardFollowButton, new LinearLayout.LayoutParams(dp(context, 72), dp(context, 34)));
+        section.addView(row, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView hint = text(context, "本板块独立讨论 · 左侧右滑可快速切换板块", 11,
+                dark ? 0xFF777D86 : 0xFF8B929A, false);
+        LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        hintParams.topMargin = dp(context, 9);
+        section.addView(hint, hintParams);
+        renderBoardHeader();
+        return section;
+    }
+
+    private void renderBoardHeader() {
+        if (!boardMode) return;
+        if (boardIconView != null) {
+            boardIconView.setText(categoryInitial(displayBoardName()));
+            boardIconView.setTextColor(categoryAccent(displayBoardName()));
+        }
+        if (boardTitleView != null) boardTitleView.setText(displayBoardName());
+        if (boardDescriptionView != null) boardDescriptionView.setText(displayBoardDescription());
+        if (toolbarTitleView != null) toolbarTitleView.setText(displayBoardName());
+        if (toolbarSubtitleView != null) toolbarSubtitleView.setText("点击切换板块  ›");
+        if (boardFollowButton == null || !isAdded()) return;
+        boolean followed = ForumBoardStore.isFollowed(requireContext(), boardCategoryId);
+        boardFollowButton.setText(followed ? "已关注" : "+ 关注");
+        boardFollowButton.setTextColor(followed
+                ? (isDark(requireContext()) ? 0xFFB6BBC3 : 0xFF68707A) : 0xFF1877F2);
+        GradientDrawable background = roundRect(requireContext(), followed
+                ? (isDark(requireContext()) ? 0xFF282B30 : 0xFFF1F3F5)
+                : (isDark(requireContext()) ? 0xFF233B59 : 0xFFEAF3FF), 17);
+        background.setStroke(dp(requireContext(), 0.7f), followed
+                ? (isDark(requireContext()) ? 0xFF3A3E45 : 0xFFD9DDE2) : 0xFFB9D8FF);
+        boardFollowButton.setBackground(background);
+    }
+
+    private String displayBoardName() {
+        return TextUtils.isEmpty(boardCategoryName) ? "社区板块" : boardCategoryName;
+    }
+
+    private String displayBoardDescription() {
+        return TextUtils.isEmpty(boardCategoryDescription)
+                ? "分享经验、提问和参与本板块讨论" : boardCategoryDescription;
     }
 
     private void buildFeaturedSectionHeader(Context context) {
@@ -382,6 +576,9 @@ public class ForumHomeFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        if (boardMode && isAdded() && boardCategoryId > 0) {
+            ForumBoardStore.addRecent(requireContext(), boardCategoryId);
+        }
         if (!firstLoadDone && getView() != null) {
             firstLoadDone = true;
             authenticateAndLoad();
@@ -406,6 +603,13 @@ public class ForumHomeFragment extends Fragment {
         featuredSection = null;
         featuredGrid = null;
         allCategoriesButton = null;
+        boardHeaderSection = null;
+        boardIconView = null;
+        boardTitleView = null;
+        boardDescriptionView = null;
+        boardFollowButton = null;
+        toolbarTitleView = null;
+        toolbarSubtitleView = null;
         currentCategoryView = null;
         recyclerView = null;
         swipeRefreshLayout = null;
@@ -474,8 +678,9 @@ public class ForumHomeFragment extends Fragment {
                 new ForumApiClient.ResultCallback<String>() {
             @Override
             public void onSuccess(@Nullable String data) {
-                if (isAdded()) createTopicLauncher.launch(
-                        ForumCreateTopicActivity.createIntent(requireContext()));
+                if (isAdded()) createTopicLauncher.launch(boardMode
+                        ? ForumCreateTopicActivity.createIntent(requireContext(), boardCategoryId)
+                        : ForumCreateTopicActivity.createIntent(requireContext()));
             }
 
             @Override
@@ -503,7 +708,18 @@ public class ForumHomeFragment extends Fragment {
                         if (!isAdded()) return;
                         categories.clear();
                         if (data != null) categories.addAll(data);
+                        if (boardMode) {
+                            ForumApiClient.Category board = findCategory(boardCategoryId);
+                            if (board != null) {
+                                boardCategoryName = safe(board.name);
+                                boardCategoryDescription = safe(board.description);
+                            }
+                            if (boardCategoryId > 0) {
+                                ForumBoardStore.addRecent(requireContext(), boardCategoryId);
+                            }
+                        }
                         renderNavigation();
+                        renderBoardHeader();
                         renderDrawer();
                     }
 
@@ -528,61 +744,128 @@ public class ForumHomeFragment extends Fragment {
             cursor = "";
             hasMore = false;
             if (clearBeforeLoad && adapter != null) adapter.replaceAll(new ArrayList<>());
-            if (articleAdapter != null && selectedCategory != CATEGORY_COMPREHENSIVE) {
-                articleAdapter.replaceAll(new ArrayList<>());
-            } else if (clearBeforeLoad && articleAdapter != null) {
-                articleAdapter.replaceAll(new ArrayList<>());
-            }
+            if (clearBeforeLoad && articleAdapter != null) articleAdapter.replaceAll(new ArrayList<>());
             if (mixedFeedAdapter != null) mixedFeedAdapter.rebuild();
             if (clearBeforeLoad || adapter == null || adapter.getItemCount() == 0) {
-                showState("正在加载帖子…");
+                showState(boardMode ? "正在进入板块…" : "正在加载帖子…");
             }
         }
         final int generation = topicRequestGeneration;
         final long requestSelection = selectedCategory;
-        final long apiCategory = requestSelection == CATEGORY_COMPREHENSIVE
-                ? CATEGORY_LATEST : requestSelection;
-        final String sort = requestSelection == CATEGORY_LATEST
-                || requestSelection == CATEGORY_RECOMMEND ? "latestPublish" : "";
+        final int requestBoardSort = boardSort;
+        final long apiCategory = boardMode ? boardCategoryId
+                : (requestSelection == CATEGORY_COMPREHENSIVE ? CATEGORY_LATEST : requestSelection);
+        final String sort = boardMode
+                ? (requestBoardSort == BOARD_SORT_HOT ? "" : "latestPublish")
+                : (requestSelection == CATEGORY_LATEST || requestSelection == CATEGORY_RECOMMEND
+                ? "latestPublish" : "");
         final String requestCursor = cursor;
         loading = true;
+        if (boardMode && requestBoardSort == BOARD_SORT_FEATURED) {
+            loadBoardFeaturedPage(reset, generation, requestSelection, requestBoardSort,
+                    apiCategory, requestCursor, 0, new ArrayList<>());
+            return;
+        }
         ForumApiClient.getInstance().getTopics(apiCategory, requestCursor, sort, requestScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Topic>>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Topic> page) {
-                        if (!isAdded() || generation != topicRequestGeneration
-                                || requestSelection != selectedCategory) return;
-                        loading = false;
-                        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+                        if (!isTopicRequestCurrent(generation, requestSelection, requestBoardSort)) return;
                         List<ForumApiClient.Topic> list = page == null || page.results == null
                                 ? new ArrayList<>() : page.results;
-                        if (reset) adapter.replaceAll(list); else adapter.append(list);
-                        if (mixedFeedAdapter != null) mixedFeedAdapter.rebuild();
-                        if (reset && requestSelection == CATEGORY_COMPREHENSIVE) {
-                            loadInlineArticles(generation, requestSelection);
-                        }
-                        String nextCursor = page == null ? "" : safe(page.cursor);
-                        if (!TextUtils.isEmpty(nextCursor)) cursor = nextCursor;
-                        hasMore = page != null && page.hasMore && !TextUtils.isEmpty(nextCursor);
-                        updateCurrentFeedState();
-                        if (currentItemCount() == 0) {
-                            showState("这里还没有内容\n来发布第一篇内容吧");
-                        } else {
-                            hideState();
-                        }
+                        finishTopicPage(reset, generation, requestSelection, requestBoardSort,
+                                list, page == null ? "" : safe(page.cursor),
+                                page != null && page.hasMore);
                     }
 
                     @Override
                     public void onError(@NonNull String message) {
-                        if (!isAdded() || generation != topicRequestGeneration
-                                || requestSelection != selectedCategory) return;
-                        loading = false;
-                        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
-                        if (currentItemCount() == 0) {
-                            showState(message + "\n下拉刷新重试");
-                        }
+                        handleTopicError(generation, requestSelection, requestBoardSort, message);
                     }
                 });
+    }
+
+    private void loadBoardFeaturedPage(boolean reset, int generation, long requestSelection,
+                                       int requestBoardSort, long categoryId,
+                                       String pageCursor, int scannedPages,
+                                       List<ForumApiClient.Topic> collected) {
+        ForumApiClient.getInstance().getTopics(categoryId, pageCursor, "latestPublish", requestScope,
+                new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Topic>>() {
+                    @Override
+                    public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Topic> page) {
+                        if (!isTopicRequestCurrent(generation, requestSelection, requestBoardSort)) return;
+                        List<ForumApiClient.Topic> source = page == null || page.results == null
+                                ? new ArrayList<>() : page.results;
+                        for (ForumApiClient.Topic topic : source) {
+                            if (topic != null && topic.recommend) collected.add(topic);
+                            if (collected.size() >= BOARD_FEATURED_TARGET_COUNT) break;
+                        }
+                        String nextCursor = page == null ? "" : safe(page.cursor);
+                        boolean more = page != null && page.hasMore && !TextUtils.isEmpty(nextCursor);
+                        boolean shouldContinue = collected.size() < BOARD_FEATURED_TARGET_COUNT
+                                && more && scannedPages + 1 < BOARD_FEATURED_SCAN_PAGES;
+                        if (shouldContinue) {
+                            loadBoardFeaturedPage(reset, generation, requestSelection,
+                                    requestBoardSort, categoryId, nextCursor,
+                                    scannedPages + 1, collected);
+                            return;
+                        }
+                        // If no featured post exists in the scanned window, stop instead of
+                        // exposing an endless empty pagination state.
+                        if (collected.isEmpty() && scannedPages + 1 >= BOARD_FEATURED_SCAN_PAGES) {
+                            more = false;
+                        }
+                        finishTopicPage(reset, generation, requestSelection, requestBoardSort,
+                                collected, nextCursor, more);
+                    }
+
+                    @Override
+                    public void onError(@NonNull String message) {
+                        handleTopicError(generation, requestSelection, requestBoardSort, message);
+                    }
+                });
+    }
+
+    private boolean isTopicRequestCurrent(int generation, long requestSelection,
+                                          int requestBoardSort) {
+        return isAdded() && generation == topicRequestGeneration
+                && requestSelection == selectedCategory
+                && (!boardMode || requestBoardSort == boardSort);
+    }
+
+    private void finishTopicPage(boolean reset, int generation, long requestSelection,
+                                 int requestBoardSort, List<ForumApiClient.Topic> list,
+                                 String nextCursor, boolean serverHasMore) {
+        if (!isTopicRequestCurrent(generation, requestSelection, requestBoardSort)) return;
+        loading = false;
+        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+        if (reset) adapter.replaceAll(list); else adapter.append(list);
+        if (mixedFeedAdapter != null) mixedFeedAdapter.rebuild();
+        if (!boardMode && reset && requestSelection == CATEGORY_COMPREHENSIVE) {
+            loadInlineArticles(generation, requestSelection);
+        }
+        if (!TextUtils.isEmpty(nextCursor)) cursor = nextCursor;
+        hasMore = serverHasMore && !TextUtils.isEmpty(nextCursor);
+        updateCurrentFeedState();
+        if (currentItemCount() == 0) {
+            if (boardMode && boardSort == BOARD_SORT_FEATURED) {
+                showState("本板块暂时没有精华内容");
+            } else if (boardMode) {
+                showState("这个板块还没有帖子\n来发布第一篇内容吧");
+            } else {
+                showState("这里还没有内容\n来发布第一篇内容吧");
+            }
+        } else {
+            hideState();
+        }
+    }
+
+    private void handleTopicError(int generation, long requestSelection,
+                                  int requestBoardSort, @NonNull String message) {
+        if (!isTopicRequestCurrent(generation, requestSelection, requestBoardSort)) return;
+        loading = false;
+        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+        if (currentItemCount() == 0) showState(message + "\n下拉刷新重试");
     }
 
     private void loadInlineArticles(int generation, long requestSelection) {
@@ -618,27 +901,28 @@ public class ForumHomeFragment extends Fragment {
 
     private void updateCurrentFeedState() {
         saveCurrentFeedState();
-        TopicFeedState state = topicState(selectedCategory, true);
+        TopicFeedState state = topicState(currentFeedStateKey(), true);
         state.updatedAt = System.currentTimeMillis();
     }
 
     private void saveCurrentFeedState() {
-        TopicFeedState state = topicState(selectedCategory, true);
+        TopicFeedState state = topicState(currentFeedStateKey(), true);
         if (adapter != null) state.items = adapter.snapshot();
         state.cursor = cursor;
         state.hasMore = hasMore;
         captureScroll(state);
-        if (selectedCategory == CATEGORY_COMPREHENSIVE && articleAdapter != null) {
+        if (!boardMode && selectedCategory == CATEGORY_COMPREHENSIVE && articleAdapter != null) {
             articleFeedState.items = articleAdapter.snapshot();
         }
     }
 
     private boolean restoreCurrentFeedState() {
         applyListAdapter();
-        TopicFeedState state = topicState(selectedCategory, false);
+        TopicFeedState state = topicState(currentFeedStateKey(), false);
         if (state == null || !state.isFresh() || state.items.isEmpty()) return false;
         adapter.replaceAll(state.items);
-        if (selectedCategory == CATEGORY_COMPREHENSIVE && articleFeedState.isFresh()) {
+        if (!boardMode && selectedCategory == CATEGORY_COMPREHENSIVE
+                && articleFeedState.isFresh()) {
             articleAdapter.replaceAll(articleFeedState.items);
         } else {
             articleAdapter.replaceAll(new ArrayList<>());
@@ -675,6 +959,11 @@ public class ForumHomeFragment extends Fragment {
         });
     }
 
+    private long currentFeedStateKey() {
+        if (!boardMode) return selectedCategory;
+        return boardCategoryId * 4L + Math.max(0, Math.min(BOARD_SORT_FEATURED, boardSort));
+    }
+
     @Nullable
     private TopicFeedState topicState(long categoryId, boolean create) {
         TopicFeedState state = topicFeedStates.get(categoryId);
@@ -697,8 +986,16 @@ public class ForumHomeFragment extends Fragment {
     }
 
     private void renderNavigation() {
-        if (!isAdded() || feedTabContainer == null || featuredGrid == null) return;
+        if (!isAdded() || feedTabContainer == null) return;
         feedTabContainer.removeAllViews();
+        if (boardMode) {
+            addBoardSortTab("最新", BOARD_SORT_LATEST);
+            addBoardSortTab("热门", BOARD_SORT_HOT);
+            addBoardSortTab("精华", BOARD_SORT_FEATURED);
+            renderBoardHeader();
+            return;
+        }
+        if (featuredGrid == null || allCategoriesButton == null) return;
         addFeedTab("综合", CATEGORY_COMPREHENSIVE);
         addFeedTab("最新", CATEGORY_LATEST);
         addFeedTab("推荐", CATEGORY_RECOMMEND);
@@ -721,6 +1018,25 @@ public class ForumHomeFragment extends Fragment {
             for (int i = 0; i < featured.size(); i++) addFeaturedCategory(featured.get(i), i);
         }
         renderCurrentCategory();
+    }
+
+    private void addBoardSortTab(String label, int sortMode) {
+        Context context = requireContext();
+        boolean dark = isDark(context);
+        boolean selected = boardSort == sortMode;
+        TextView tab = text(context, label, 12,
+                selected ? (dark ? Color.WHITE : 0xFF1877F2)
+                        : (dark ? 0xFFA9AFB7 : 0xFF626A73), selected);
+        tab.setGravity(Gravity.CENTER);
+        tab.setSingleLine(true);
+        tab.setBackground(selected
+                ? roundRect(context, dark ? 0xFF3A4554 : Color.WHITE, 11)
+                : null);
+        tab.setOnClickListener(v -> selectBoardSort(sortMode));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+        params.setMargins(dp(context, 0.5f), 0, dp(context, 0.5f), 0);
+        feedTabContainer.addView(tab, params);
     }
 
     private void addFeedTab(String label, long categoryId) {
@@ -757,7 +1073,7 @@ public class ForumHomeFragment extends Fragment {
         GradientDrawable cardBg = roundRect(context, backgroundColor, 13);
         cardBg.setStroke(dp(context, 0.7f), dark ? 0xFF34373C : 0xFFE1E4E8);
         card.setBackground(cardBg);
-        card.setOnClickListener(v -> selectCategory(category.id));
+        card.setOnClickListener(v -> openBoard(category));
 
         TextView icon = text(context, categoryInitial(category.name), 14,
                 selected ? 0xFF1877F2 : accent, true);
@@ -823,6 +1139,63 @@ public class ForumHomeFragment extends Fragment {
         if (!restoreCurrentFeedState()) loadTopics(true);
     }
 
+    private void selectBoardSort(int sortMode) {
+        if (!boardMode || boardSort == sortMode) {
+            if (recyclerView != null) recyclerView.smoothScrollToPosition(0);
+            return;
+        }
+        saveCurrentFeedState();
+        topicRequestGeneration++;
+        loading = false;
+        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+        boardSort = sortMode;
+        cursor = "";
+        hasMore = false;
+        if (articleAdapter != null) articleAdapter.replaceAll(new ArrayList<>());
+        if (mixedFeedAdapter != null) mixedFeedAdapter.rebuild();
+        renderNavigation();
+        if (!restoreCurrentFeedState()) loadTopics(true);
+    }
+
+    private void openBoard(@NonNull ForumApiClient.Category category) {
+        if (!isAdded() || category.id <= 0) return;
+        if (boardMode) {
+            switchBoard(category);
+        } else {
+            startActivity(ForumBoardActivity.createIntent(requireContext(), category.id,
+                    category.name, category.description));
+        }
+    }
+
+    private void switchBoard(@NonNull ForumApiClient.Category category) {
+        if (!boardMode || category.id <= 0) return;
+        if (boardCategoryId == category.id) {
+            closeDrawer();
+            if (recyclerView != null) recyclerView.smoothScrollToPosition(0);
+            return;
+        }
+        saveCurrentFeedState();
+        topicRequestGeneration++;
+        loading = false;
+        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
+        boardCategoryId = category.id;
+        selectedCategory = category.id;
+        boardCategoryName = safe(category.name);
+        boardCategoryDescription = safe(category.description);
+        boardSort = BOARD_SORT_LATEST;
+        cursor = "";
+        hasMore = false;
+        ForumBoardStore.addRecent(requireContext(), boardCategoryId);
+        if (adapter != null) adapter.replaceAll(new ArrayList<>());
+        if (articleAdapter != null) articleAdapter.replaceAll(new ArrayList<>());
+        if (mixedFeedAdapter != null) mixedFeedAdapter.rebuild();
+        renderBoardHeader();
+        renderNavigation();
+        renderDrawer();
+        closeDrawer();
+        if (!restoreCurrentFeedState()) loadTopics(true);
+    }
+
     private void openDrawer() {
         if (drawerLayout != null) drawerLayout.openDrawer(GravityCompat.START);
     }
@@ -831,6 +1204,12 @@ public class ForumHomeFragment extends Fragment {
         if (drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START)) {
             drawerLayout.closeDrawer(GravityCompat.START);
         }
+    }
+
+    boolean closeDrawerIfOpen() {
+        if (drawerLayout == null || !drawerLayout.isDrawerOpen(GravityCompat.START)) return false;
+        drawerLayout.closeDrawer(GravityCompat.START);
+        return true;
     }
 
     private void renderDrawer() {
@@ -843,7 +1222,8 @@ public class ForumHomeFragment extends Fragment {
         header.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout titleBox = new LinearLayout(context);
         titleBox.setOrientation(LinearLayout.VERTICAL);
-        TextView title = text(context, "社区板块", 20, dark ? Color.WHITE : 0xFF1C2025, true);
+        TextView title = text(context, boardMode ? "切换板块" : "社区板块", 20,
+                dark ? Color.WHITE : 0xFF1C2025, true);
         TextView subtitle = text(context, "从屏幕左侧右滑可随时打开", 11,
                 dark ? 0xFF8F949C : 0xFF7A818A, false);
         titleBox.addView(title);
@@ -857,30 +1237,43 @@ public class ForumHomeFragment extends Fragment {
         drawerContent.addView(header, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        addDrawerSection("内容流");
-        addDrawerItem("综合", "全部板块的活跃讨论", CATEGORY_COMPREHENSIVE, 0, false);
-        addDrawerItem("最新", "按发布时间查看新帖", CATEGORY_LATEST, 0, false);
-        addDrawerItem("推荐", "管理员推荐的优质内容", CATEGORY_RECOMMEND, 0, false);
+        if (!boardMode) {
+            addDrawerSection("内容流");
+            addDrawerItem("综合", "全部板块的活跃讨论", CATEGORY_COMPREHENSIVE, 0, false);
+            addDrawerItem("最新", "按发布时间查看新帖", CATEGORY_LATEST, 0, false);
+            addDrawerItem("推荐", "管理员推荐的优质内容", CATEGORY_RECOMMEND, 0, false);
+        }
 
-        List<ForumApiClient.Category> flat = flattenCategories();
-        List<ForumApiClient.Category> featured = featuredCategories(flat);
-        if (!featured.isEmpty()) {
-            addDrawerSection("常用板块");
-            for (ForumApiClient.Category category : featured) addDrawerCategory(category, 0);
+        List<ForumApiClient.Category> followed = resolveBoardIds(
+                ForumBoardStore.followedIds(context));
+        if (!followed.isEmpty()) {
+            addDrawerSection("我的板块");
+            for (ForumApiClient.Category category : followed) addDrawerCategory(category, 0);
+        }
+
+        List<ForumApiClient.Category> recent = resolveBoardIds(
+                ForumBoardStore.recentIds(context));
+        if (boardMode && recent.isEmpty()) {
+            ForumApiClient.Category current = currentBoardCategory();
+            if (current != null) recent.add(current);
+        }
+        if (!recent.isEmpty()) {
+            addDrawerSection("最近访问");
+            int count = 0;
+            for (ForumApiClient.Category category : recent) {
+                addDrawerCategory(category, 0);
+                if (++count >= 6) break;
+            }
         }
 
         if (!categories.isEmpty()) {
             addDrawerSection("全部板块");
-            for (ForumApiClient.Category root : categories) {
-                if (root == null || root.id <= 0 || TextUtils.isEmpty(root.name)) continue;
-                addDrawerCategory(root, 0);
-                if (root.children != null) {
-                    for (ForumApiClient.Category child : root.children) {
-                        if (child == null || child.id <= 0 || TextUtils.isEmpty(child.name)) continue;
-                        addDrawerCategory(child, 1);
-                    }
-                }
-            }
+            for (ForumApiClient.Category root : categories) addDrawerCategoryTree(root, 0);
+        } else {
+            addDrawerSection("全部板块");
+            TextView loading = drawerRow(context, "正在加载板块", "请稍候或下拉刷新", false, 0);
+            drawerContent.addView(loading, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 58)));
         }
 
         if (ForumApiClient.getInstance().isForumManager()) {
@@ -893,6 +1286,42 @@ public class ForumHomeFragment extends Fragment {
             });
             drawerContent.addView(admin, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 58)));
+        }
+    }
+
+    private List<ForumApiClient.Category> resolveBoardIds(List<Long> ids) {
+        List<ForumApiClient.Category> result = new ArrayList<>();
+        Set<Long> seen = new HashSet<>();
+        if (ids == null) return result;
+        for (Long id : ids) {
+            if (id == null || id <= 0 || !seen.add(id)) continue;
+            ForumApiClient.Category category = findCategory(id);
+            if (category == null && boardMode && id == boardCategoryId) {
+                category = currentBoardCategory();
+            }
+            if (category != null) result.add(category);
+        }
+        return result;
+    }
+
+    @Nullable
+    private ForumApiClient.Category currentBoardCategory() {
+        if (!boardMode || boardCategoryId <= 0) return null;
+        ForumApiClient.Category category = findCategory(boardCategoryId);
+        if (category != null) return category;
+        category = new ForumApiClient.Category();
+        category.id = boardCategoryId;
+        category.name = displayBoardName();
+        category.description = boardCategoryDescription;
+        return category;
+    }
+
+    private void addDrawerCategoryTree(@Nullable ForumApiClient.Category category, int level) {
+        if (category == null || category.id <= 0 || TextUtils.isEmpty(category.name)) return;
+        addDrawerCategory(category, Math.min(level, 3));
+        if (category.children == null) return;
+        for (ForumApiClient.Category child : category.children) {
+            addDrawerCategoryTree(child, level + 1);
         }
     }
 
@@ -909,7 +1338,7 @@ public class ForumHomeFragment extends Fragment {
         TextView row = drawerRow(requireContext(), safe(category.name),
                 TextUtils.isEmpty(category.description) ? categoryHint(category.name) : category.description,
                 selectedCategory == category.id, level);
-        row.setOnClickListener(v -> selectCategory(category.id));
+        row.setOnClickListener(v -> openBoard(category));
         drawerContent.addView(row, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(requireContext(), 58)));
     }
