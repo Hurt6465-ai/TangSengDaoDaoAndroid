@@ -179,6 +179,16 @@ public class ForumTopicActivity extends AppCompatActivity {
     private String pendingVoiceCommentContent = "";
     private long pendingVoiceReplyParentId;
     private long pendingVoiceReplyQuoteId;
+    private final Runnable voiceProgressTick = new Runnable() {
+        @Override
+        public void run() {
+            updatePlayingVoiceUi();
+            if (voicePlayer != null && isVoicePlaying()) {
+                mainHandler.postDelayed(this, 250L);
+            }
+        }
+    };
+
     private final AudioManager.OnAudioFocusChangeListener voiceFocusListener = focusChange -> {
         MediaPlayer player = voicePlayer;
         if (player == null) return;
@@ -203,15 +213,6 @@ public class ForumTopicActivity extends AppCompatActivity {
                 updatePlayingVoiceUi();
             }
         } catch (Throwable ignored) { }
-    };
-    private final Runnable voiceProgressTick = new Runnable() {
-        @Override
-        public void run() {
-            updatePlayingVoiceUi();
-            if (voicePlayer != null && isVoicePlaying()) {
-                mainHandler.postDelayed(this, 250L);
-            }
-        }
     };
 
     private final ActivityResultLauncher<String> audioPermissionLauncher = registerForActivityResult(
