@@ -47,7 +47,7 @@ public final class GlobalBottomNavigationController {
         addItem(activity, navigation, R.id.i_partner, "faw-user-friends", R.string.tab_text_partner, selectedMenuId == R.id.i_partner);
         addItem(activity, navigation, R.id.i_chat, "faw-comments", R.string.tab_text_chat, selectedMenuId == R.id.i_chat);
         addItem(activity, navigation, R.id.i_discover, "faw-compass", R.string.tab_text_discover, selectedMenuId == R.id.i_discover);
-        addItem(activity, navigation, R.id.i_community, "faw-heart", R.string.tab_text_community, selectedMenuId == R.id.i_community);
+        addItem(activity, navigation, R.id.i_community, "faw-users", R.string.tab_text_community, selectedMenuId == R.id.i_community);
 
         AtomicBoolean navigating = new AtomicBoolean(false);
         navigation.setSelectedItemId(selectedMenuId);
