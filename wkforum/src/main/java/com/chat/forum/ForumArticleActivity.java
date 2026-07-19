@@ -13,7 +13,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
-import android.text.Html;
 import android.text.InputType;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -43,6 +42,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.graphics.drawable.DrawableCompat;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -73,9 +73,11 @@ public class ForumArticleActivity extends AppCompatActivity {
     private String cursor = "";
     private boolean hasMore;
     private boolean loading;
+    private boolean refreshCommentsPending;
     private boolean sending;
     private long replyParentId;
     private long replyQuoteId;
+    private final ForumApiClient.RequestScope requestScope = new ForumApiClient.RequestScope();
 
     public static Intent createIntent(Context context, long articleId) {
         return new Intent(context, ForumArticleActivity.class)
@@ -193,14 +195,15 @@ public class ForumArticleActivity extends AppCompatActivity {
     }
 
     private void load() {
-        ForumApiClient.getInstance().ensureSession(this, new ForumApiClient.ResultCallback<String>() {
+        ForumApiClient.getInstance().ensureSession(this, requestScope,
+                new ForumApiClient.ResultCallback<String>() {
             @Override public void onSuccess(@Nullable String data) { requestArticle(); }
             @Override public void onError(@NonNull String message) { requestArticle(); }
         });
     }
 
     private void requestArticle() {
-        ForumApiClient.getInstance().getArticle(articleId,
+        ForumApiClient.getInstance().getArticle(articleId, requestScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Article>() {
                     @Override public void onSuccess(@Nullable ForumApiClient.Article data) {
                         if (isFinishing() || isDestroyed()) return;
@@ -220,30 +223,43 @@ public class ForumArticleActivity extends AppCompatActivity {
     }
 
     private void loadComments(boolean reset) {
-        if (loading) return;
+        if (loading) {
+            if (reset) refreshCommentsPending = true;
+            return;
+        }
         if (reset) {
+            refreshCommentsPending = false;
             cursor = "";
             hasMore = false;
             comments.clear();
             adapter.rebuild();
         }
         loading = true;
-        ForumApiClient.getInstance().getArticleComments(articleId, cursor, "asc",
+        ForumApiClient.getInstance().getArticleComments(articleId, cursor, "asc", requestScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Comment>>() {
                     @Override public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Comment> page) {
                         loading = false;
                         if (isFinishing() || isDestroyed()) return;
                         if (page != null && page.results != null) appendUnique(page.results);
-                        cursor = page == null || TextUtils.isEmpty(page.cursor) ? cursor : page.cursor;
-                        hasMore = page != null && page.hasMore;
+                        String nextCursor = page == null ? "" : safe(page.cursor);
+                        if (!TextUtils.isEmpty(nextCursor)) cursor = nextCursor;
+                        hasMore = page != null && page.hasMore && !TextUtils.isEmpty(nextCursor);
                         adapter.rebuild();
+                        drainPendingCommentRefresh();
                     }
                     @Override public void onError(@NonNull String message) {
                         loading = false;
                         if (comments.isEmpty()) Toast.makeText(ForumArticleActivity.this,
                                 message, Toast.LENGTH_LONG).show();
+                        drainPendingCommentRefresh();
                     }
                 });
+    }
+
+    private void drainPendingCommentRefresh() {
+        if (isDead() || loading || !refreshCommentsPending) return;
+        refreshCommentsPending = false;
+        loadComments(true);
     }
 
     private void appendUnique(List<ForumApiClient.Comment> incoming) {
@@ -262,19 +278,25 @@ public class ForumArticleActivity extends AppCompatActivity {
         if (sending || TextUtils.isEmpty(content)) return;
         sending = true;
         send.setAlpha(0.45f);
-        String entityType = replyParentId > 0 ? "comment" : "article";
-        String entityId = replyParentId > 0 ? String.valueOf(replyParentId) : String.valueOf(articleId);
-        ForumApiClient.getInstance().createComment(entityType, entityId, content, replyQuoteId,
+        final long targetParentId = replyParentId;
+        final long targetQuoteId = replyQuoteId;
+        String entityType = targetParentId > 0 ? "comment" : "article";
+        String entityId = targetParentId > 0 ? String.valueOf(targetParentId)
+                : String.valueOf(articleId);
+        ForumApiClient.getInstance().createComment(entityType, entityId, content, targetQuoteId,
                 new ArrayList<>(), new ForumApiClient.ResultCallback<ForumApiClient.Comment>() {
                     @Override public void onSuccess(@Nullable ForumApiClient.Comment data) {
+                        if (isDead()) return;
                         sending = false;
                         input.setText("");
-                        clearReply();
-                        comments.clear(); cursor = ""; hasMore = false;
+                        if (replyParentId == targetParentId && replyQuoteId == targetQuoteId) {
+                            clearReply();
+                        }
                         if (article != null) article.commentCount++;
                         loadComments(true);
                     }
                     @Override public void onError(@NonNull String message) {
+                        if (isDead()) return;
                         sending = false;
                         send.setAlpha(1f);
                         Toast.makeText(ForumArticleActivity.this, message, Toast.LENGTH_LONG).show();
@@ -321,11 +343,13 @@ public class ForumArticleActivity extends AppCompatActivity {
         ForumApiClient.getInstance().setCommentLiked(comment.id, next,
                 new ForumApiClient.ResultCallback<Void>() {
                     @Override public void onSuccess(@Nullable Void data) {
+                        if (isDead()) return;
                         comment.liked = next;
                         comment.likeCount = Math.max(0, comment.likeCount + (next ? 1 : -1));
                         adapter.rebuild();
                     }
                     @Override public void onError(@NonNull String message) {
+                        if (isDead()) return;
                         Toast.makeText(ForumArticleActivity.this, message, Toast.LENGTH_LONG).show();
                     }
                 });
@@ -342,10 +366,15 @@ public class ForumArticleActivity extends AppCompatActivity {
         ForumApiClient.getInstance().deleteComment(comment.id,
                 new ForumApiClient.ResultCallback<Void>() {
                     @Override public void onSuccess(@Nullable Void data) {
+                        if (isDead()) return;
                         comments.remove(comment);
+                        if (article != null) {
+                            article.commentCount = Math.max(0, article.commentCount - 1);
+                        }
                         adapter.rebuild();
                     }
                     @Override public void onError(@NonNull String message) {
+                        if (isDead()) return;
                         Toast.makeText(ForumArticleActivity.this, message, Toast.LENGTH_LONG).show();
                     }
                 });
@@ -402,110 +431,155 @@ public class ForumArticleActivity extends AppCompatActivity {
         startActivity(Intent.createChooser(intent, "分享"));
     }
 
+    private boolean isDead() {
+        return isFinishing() || isDestroyed();
+    }
+
+    @Override
+    protected void onDestroy() {
+        requestScope.cancelAll();
+        super.onDestroy();
+    }
+
     private final class ArticleAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
-        private final List<Integer> rows = new ArrayList<>();
-        ArticleAdapter() { setHasStableIds(true); }
+        private final List<Row> rows = new ArrayList<>();
+
+        ArticleAdapter() {
+            setHasStableIds(true);
+        }
+
         void rebuild() {
+            List<Row> next = new ArrayList<>();
+            if (article != null) next.add(Row.article(articleContentKey()));
+            for (ForumApiClient.Comment comment : comments) {
+                if (comment != null) next.add(Row.comment(comment, commentContentKey(comment)));
+            }
+            if (article != null && comments.isEmpty() && !loading) next.add(Row.empty());
+            if (hasMore || loading) next.add(Row.loadMore(loading ? "loading" : "more:" + cursor));
+
+            List<Row> old = new ArrayList<>(rows);
+            DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+                @Override public int getOldListSize() { return old.size(); }
+                @Override public int getNewListSize() { return next.size(); }
+                @Override public boolean areItemsTheSame(int oldPosition, int newPosition) {
+                    return old.get(oldPosition).stableId() == next.get(newPosition).stableId();
+                }
+                @Override public boolean areContentsTheSame(int oldPosition, int newPosition) {
+                    return TextUtils.equals(old.get(oldPosition).contentKey,
+                            next.get(newPosition).contentKey);
+                }
+            }, false);
             rows.clear();
-            if (article != null) rows.add(-1);
-            for (int i = 0; i < comments.size(); i++) rows.add(i);
-            if (article != null && comments.isEmpty() && !loading) rows.add(-2);
-            if (hasMore || loading) rows.add(-3);
-            notifyDataSetChanged();
+            rows.addAll(next);
+            diff.dispatchUpdatesTo(this);
         }
+
         @Override public long getItemId(int position) {
-            int value = rows.get(position);
-            return value >= 0 ? comments.get(value).id : Long.MIN_VALUE - value;
+            return rows.get(position).stableId();
         }
+
         @Override public int getItemViewType(int position) {
-            int value = rows.get(position);
-            return value == -1 ? 1 : value >= 0 ? 2 : 3;
+            return rows.get(position).type;
         }
+
         @NonNull @Override
         public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
-            if (type == 1) return new SimpleHolder(new LinearLayout(parent.getContext()));
-            if (type == 2) return new CommentHolder(createCommentView(parent.getContext()));
+            if (type == Row.TYPE_ARTICLE) return new ArticleHeaderHolder(new ArticleHeaderView(parent.getContext()));
+            if (type == Row.TYPE_COMMENT) return new CommentHolder(createCommentView(parent.getContext()));
             TextView view = text("", 14, isDark() ? 0xFF8F949C : 0xFF7A818A, false);
             view.setGravity(Gravity.CENTER);
             view.setPadding(dp(18), dp(22), dp(18), dp(26));
             return new SimpleHolder(view);
         }
+
         @Override public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
-            int value = rows.get(position);
-            if (value == -1) bindArticle((LinearLayout) holder.itemView);
-            else if (value >= 0) bindComment((CommentHolder) holder, comments.get(value));
-            else {
+            Row row = rows.get(position);
+            if (row.type == Row.TYPE_ARTICLE) {
+                ((ArticleHeaderHolder) holder).view.bind(article);
+            } else if (row.type == Row.TYPE_COMMENT) {
+                bindComment((CommentHolder) holder, row.comment);
+            } else {
                 TextView text = (TextView) holder.itemView;
-                text.setText(value == -2 ? "还没有评论" : loading ? "加载中…" : "加载更多");
-                text.setOnClickListener(v -> { if (value == -3 && !loading) loadComments(false); });
+                text.setText(row.type == Row.TYPE_EMPTY ? "还没有评论"
+                        : loading ? "加载中…" : "加载更多");
+                text.setOnClickListener(v -> {
+                    if (row.type == Row.TYPE_LOAD_MORE && !loading) loadComments(false);
+                });
             }
         }
-        @Override public int getItemCount() { return rows.size(); }
+
+        @Override
+        public void onViewRecycled(@NonNull RecyclerView.ViewHolder holder) {
+            if (holder instanceof ArticleHeaderHolder) {
+                ((ArticleHeaderHolder) holder).view.recycle();
+            }
+            super.onViewRecycled(holder);
+        }
+
+        @Override public int getItemCount() {
+            return rows.size();
+        }
+
+        private String articleContentKey() {
+            if (article == null) return "";
+            ForumApiClient.ImageInfo cover = article.cover;
+            return article.id + "|" + textKey(article.title) + '|' + textKey(article.summary) + '|'
+                    + textKey(article.content) + '|' + textKey(article.sourceUrl) + '|'
+                    + article.createTime + '|' + article.viewCount + '|' + article.commentCount + '|'
+                    + article.likeCount + '|' + article.favorited + '|' + article.status + '|'
+                    + userKey(article.user) + '|' + textKey(cover == null ? null : cover.url) + '|'
+                    + textKey(cover == null ? null : cover.preview);
+        }
+
+        private String commentContentKey(ForumApiClient.Comment comment) {
+            if (comment == null) return "";
+            return comment.id + "|" + textKey(comment.content) + '|' + comment.likeCount + '|'
+                    + comment.liked + '|' + comment.status + '|' + comment.createTime + '|'
+                    + userKey(comment.user);
+        }
+
+        private String userKey(@Nullable ForumApiClient.User user) {
+            if (user == null) return "";
+            return safe(user.id) + ':' + safe(user.uid) + ':' + textKey(user.nickname) + ':'
+                    + textKey(user.smallAvatar) + ':' + textKey(user.avatar) + ':'
+                    + safe(user.countryCode) + ':' + safe(user.country);
+        }
+
+        private String textKey(@Nullable String value) {
+            if (value == null) return "0:0";
+            return value.length() + ":" + value.hashCode();
+        }
     }
 
-    private void bindArticle(LinearLayout root) {
-        root.removeAllViews();
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(12), dp(18), dp(14));
-        root.setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
-        if (article == null) return;
+    private static final class Row {
+        static final int TYPE_ARTICLE = 1;
+        static final int TYPE_COMMENT = 2;
+        static final int TYPE_EMPTY = 3;
+        static final int TYPE_LOAD_MORE = 4;
 
-        LinearLayout titleRow = new LinearLayout(this);
-        titleRow.setGravity(Gravity.TOP);
-        TextView title = text(article.title, 24, isDark() ? Color.WHITE : 0xFF17191C, true);
-        title.setLineSpacing(0, 1.10f);
-        title.setMaxLines(Integer.MAX_VALUE);
-        titleRow.addView(title, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        TextView more = text("⋮", 26, isDark() ? 0xFFD8DADE : 0xFF4D535B, false);
-        more.setGravity(Gravity.CENTER);
-        more.setIncludeFontPadding(false);
-        more.setBackground(selectableBackground());
-        more.setOnClickListener(v -> showArticleMenu());
-        titleRow.addView(more, new LinearLayout.LayoutParams(dp(38), dp(38)));
-        root.addView(titleRow);
+        final int type;
+        final ForumApiClient.Comment comment;
+        final String contentKey;
 
-        LinearLayout authorRow = new LinearLayout(this);
-        authorRow.setGravity(Gravity.CENTER_VERTICAL);
-        authorRow.setPadding(0, dp(12), 0, dp(12));
-        AvatarView avatar = new AvatarView(this);
-        avatar.setSize(38);
-        bindAvatar(avatar, article.user, userName(article.user));
-        authorRow.addView(avatar, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        TextView name = text(userName(article.user) + "  作者 · " + formatTime(article.createTime),
-                13, isDark() ? 0xFFE4E6E9 : 0xFF30353B, true);
-        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        nameParams.leftMargin = dp(9);
-        authorRow.addView(name, nameParams);
-        root.addView(authorRow);
-
-        if (article.cover != null && !TextUtils.isEmpty(article.cover.url)) {
-            ImageView cover = new ImageView(this);
-            cover.setAdjustViewBounds(true);
-            cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            Glide.with(this).load(ForumApiClient.getInstance().resolveUrl(article.cover.url)).into(cover);
-            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(190));
-            cp.bottomMargin = dp(12);
-            root.addView(cover, cp);
+        private Row(int type, @Nullable ForumApiClient.Comment comment, @NonNull String contentKey) {
+            this.type = type;
+            this.comment = comment;
+            this.contentKey = contentKey;
         }
-        TextView content = htmlText(TextUtils.isEmpty(article.content) ? article.summary : article.content, 17);
-        content.setMaxLines(Integer.MAX_VALUE);
-        content.setEllipsize(null);
-        root.addView(content, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        TextView stats = text("◉ " + Math.max(0, article.viewCount) + "   评论 "
-                + Math.max(0, article.commentCount), 12,
-                isDark() ? 0xFF8F949C : 0xFF90969E, false);
-        stats.setPadding(0, dp(12), 0, dp(12));
-        root.addView(stats);
-        root.addView(divider(), new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(0.7f)));
-        TextView commentsTitle = text("评论", 17, isDark() ? Color.WHITE : 0xFF202328, true);
-        commentsTitle.setGravity(Gravity.CENTER_VERTICAL);
-        root.addView(commentsTitle, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+
+        static Row article(String key) { return new Row(TYPE_ARTICLE, null, key); }
+        static Row comment(ForumApiClient.Comment comment, String key) {
+            return new Row(TYPE_COMMENT, comment, key);
+        }
+        static Row empty() { return new Row(TYPE_EMPTY, null, "empty"); }
+        static Row loadMore(String key) { return new Row(TYPE_LOAD_MORE, null, key); }
+
+        long stableId() {
+            if (type == TYPE_ARTICLE) return Long.MIN_VALUE + 1;
+            if (type == TYPE_EMPTY) return Long.MIN_VALUE + 3;
+            if (type == TYPE_LOAD_MORE) return Long.MIN_VALUE + 4;
+            return comment == null ? RecyclerView.NO_ID : comment.id;
+        }
     }
 
     private View createCommentView(Context context) {
@@ -545,8 +619,7 @@ public class ForumArticleActivity extends AppCompatActivity {
         boolean owner = article != null && article.user != null && comment.user != null
                 && TextUtils.equals(article.user.id, comment.user.id);
         holder.name.setText(commentName(author, formatTime(comment.createTime), owner));
-        holder.body.setText(Html.fromHtml(TextUtils.isEmpty(comment.content) ? "" : comment.content,
-                Html.FROM_HTML_MODE_LEGACY));
+        holder.body.setText(ForumHtmlCache.parse(comment.content));
         holder.more.setOnClickListener(v -> showCommentMenu(comment));
         holder.root.setOnClickListener(v -> setReply(comment));
         holder.root.setOnLongClickListener(v -> {
@@ -567,6 +640,126 @@ public class ForumArticleActivity extends AppCompatActivity {
         value.setSpan(new RelativeSizeSpan(0.82f), timeStart, value.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return value;
+    }
+
+    private final class ArticleHeaderView extends LinearLayout {
+        private final TextView title;
+        private final AvatarView avatar;
+        private final TextView author;
+        private final ImageView cover;
+        private final TextView content;
+        private final TextView stats;
+        private String boundCoverUrl = "";
+
+        ArticleHeaderView(Context context) {
+            super(context);
+            setOrientation(VERTICAL);
+            setPadding(dp(18), dp(12), dp(18), dp(14));
+            setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
+
+            LinearLayout titleRow = new LinearLayout(context);
+            titleRow.setGravity(Gravity.TOP);
+            title = text("", 24, isDark() ? Color.WHITE : 0xFF17191C, true);
+            title.setLineSpacing(0, 1.10f);
+            title.setMaxLines(Integer.MAX_VALUE);
+            titleRow.addView(title, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            TextView more = text("⋮", 26, isDark() ? 0xFFD8DADE : 0xFF4D535B, false);
+            more.setGravity(Gravity.CENTER);
+            more.setIncludeFontPadding(false);
+            more.setContentDescription("文章操作");
+            more.setBackground(selectableBackground());
+            more.setOnClickListener(v -> showArticleMenu());
+            titleRow.addView(more, new LinearLayout.LayoutParams(dp(38), dp(38)));
+            addView(titleRow);
+
+            LinearLayout authorRow = new LinearLayout(context);
+            authorRow.setGravity(Gravity.CENTER_VERTICAL);
+            authorRow.setPadding(0, dp(12), 0, dp(12));
+            avatar = new AvatarView(context);
+            avatar.setSize(38);
+            authorRow.addView(avatar, new LinearLayout.LayoutParams(dp(42), dp(42)));
+            author = text("", 13, isDark() ? 0xFFE4E6E9 : 0xFF30353B, true);
+            LinearLayout.LayoutParams authorParams = new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            authorParams.leftMargin = dp(9);
+            authorRow.addView(author, authorParams);
+            addView(authorRow);
+
+            cover = new ImageView(context);
+            cover.setAdjustViewBounds(true);
+            cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            cover.setBackgroundColor(isDark() ? 0xFF24262B : 0xFFF0F1F3);
+            cover.setVisibility(GONE);
+            LinearLayout.LayoutParams coverParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(190));
+            coverParams.bottomMargin = dp(12);
+            addView(cover, coverParams);
+
+            content = htmlText("", 17);
+            content.setMaxLines(Integer.MAX_VALUE);
+            content.setEllipsize(null);
+            addView(content, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            stats = text("", 12, isDark() ? 0xFF8F949C : 0xFF90969E, false);
+            stats.setPadding(0, dp(12), 0, dp(12));
+            addView(stats);
+            addView(divider(), new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(0.7f)));
+            TextView commentsTitle = text("评论", 17,
+                    isDark() ? Color.WHITE : 0xFF202328, true);
+            commentsTitle.setGravity(Gravity.CENTER_VERTICAL);
+            addView(commentsTitle, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+        }
+
+        void bind(@Nullable ForumApiClient.Article value) {
+            if (value == null) {
+                setVisibility(GONE);
+                recycle();
+                return;
+            }
+            setVisibility(VISIBLE);
+            title.setText(safe(value.title));
+            String authorName = userName(value.user);
+            bindAvatar(avatar, value.user, authorName);
+            author.setText(authorName + "  作者 · " + formatTime(value.createTime));
+
+            String coverUrl = "";
+            if (value.cover != null && !TextUtils.isEmpty(value.cover.url)) {
+                String remote = TextUtils.isEmpty(value.cover.preview)
+                        ? value.cover.url : value.cover.preview;
+                coverUrl = ForumApiClient.getInstance().resolveUrl(remote);
+            }
+            cover.setVisibility(TextUtils.isEmpty(coverUrl) ? GONE : VISIBLE);
+            if (TextUtils.isEmpty(coverUrl)) {
+                recycle();
+            } else if (!TextUtils.equals(boundCoverUrl, coverUrl)) {
+                Glide.with(cover).clear(cover);
+                Glide.with(cover).load(coverUrl).centerCrop().into(cover);
+                boundCoverUrl = coverUrl;
+            }
+
+            String body = TextUtils.isEmpty(value.content) ? value.summary : value.content;
+            content.setText(ForumHtmlCache.parse(body));
+            stats.setText("◉ " + Math.max(0, value.viewCount) + "   评论 "
+                    + Math.max(0, value.commentCount));
+        }
+
+        void recycle() {
+            Glide.with(cover).clear(cover);
+            cover.setImageDrawable(null);
+            boundCoverUrl = "";
+        }
+    }
+
+    private final class ArticleHeaderHolder extends RecyclerView.ViewHolder {
+        final ArticleHeaderView view;
+        ArticleHeaderHolder(@NonNull ArticleHeaderView itemView) {
+            super(itemView);
+            view = itemView;
+        }
     }
 
     private static final class SimpleHolder extends RecyclerView.ViewHolder {
@@ -604,7 +797,7 @@ public class ForumArticleActivity extends AppCompatActivity {
         TextView view = text("", size, isDark() ? 0xFFE8E9EB : 0xFF272A2F, false);
         view.setLineSpacing(dp(3), 1.08f);
         view.setMovementMethod(LinkMovementMethod.getInstance());
-        view.setText(Html.fromHtml(safe(html).replace("\n", "<br>"), Html.FROM_HTML_MODE_LEGACY));
+        view.setText(ForumHtmlCache.parse(html));
         return view;
     }
 

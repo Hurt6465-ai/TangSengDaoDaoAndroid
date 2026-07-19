@@ -10,7 +10,6 @@ import android.content.res.Configuration;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -23,7 +22,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
-import android.text.Html;
 import android.text.InputType;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -45,7 +43,6 @@ import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -57,12 +54,13 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.content.res.AppCompatResources;
+import androidx.appcompat.widget.AppCompatImageView;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.bumptech.glide.Glide;
 import com.chat.base.config.WKApiConfig;
 import com.chat.base.net.ud.WKUploader;
 import com.chat.base.ui.components.AvatarView;
@@ -109,10 +107,10 @@ public class ForumTopicActivity extends AppCompatActivity {
     private String topicId = "";
     private RecyclerView recyclerView;
     private TextView stateView;
-    private TextView fastScrollButton;
+    private AppCompatImageView fastScrollButton;
     private boolean fastScrollToTop;
     private EditText commentInput;
-    private TextView composerAction;
+    private AppCompatImageView composerAction;
     private TextView replyHint;
     private TextView recordHint;
     private TopicDetailAdapter adapter;
@@ -123,6 +121,7 @@ public class ForumTopicActivity extends AppCompatActivity {
     private boolean commentsHasMore;
     private boolean loadingComments;
     private boolean refreshCommentsPending;
+    private boolean tailCommentsPending;
     private boolean commentsTailWindow;
     private String commentSort = COMMENT_SORT_ASC;
     private boolean sending;
@@ -131,12 +130,16 @@ public class ForumTopicActivity extends AppCompatActivity {
     private long replyQuoteId;
     private boolean authorFollowStateLoaded;
     private boolean authorFollowed;
+    private final ForumApiClient.RequestScope requestScope = new ForumApiClient.RequestScope();
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean recording;
     private boolean recordCancel;
     private long recordStartTime;
+    private float recordStartX;
     private float recordStartY;
+    private long recordReplyParentId;
+    private long recordReplyQuoteId;
     private String recordPath = "";
     private final Runnable recordTick = new Runnable() {
         @Override
@@ -158,6 +161,49 @@ public class ForumTopicActivity extends AppCompatActivity {
     private String playingVoiceKey = "";
     private VoicePayload playingVoicePayload;
     private VoiceBubbleView playingVoiceView;
+    private AudioManager audioManager;
+    private boolean voiceAudioFocusHeld;
+    private boolean resumeVoiceAfterFocusGain;
+    private long voiceUploadGeneration;
+    private AlertDialog voiceRetryDialog;
+    private AlertDialog voiceConfirmDialog;
+    private String confirmVoicePath = "";
+    private int confirmVoiceSeconds;
+    private String confirmVoiceWaveform = "";
+    private long confirmVoiceReplyParentId;
+    private long confirmVoiceReplyQuoteId;
+    private String activeVoiceLocalPath = "";
+    private String pendingVoicePath = "";
+    private int pendingVoiceSeconds;
+    private String pendingVoiceWaveform = "";
+    private String pendingVoiceCommentContent = "";
+    private long pendingVoiceReplyParentId;
+    private long pendingVoiceReplyQuoteId;
+    private final AudioManager.OnAudioFocusChangeListener voiceFocusListener = focusChange -> {
+        MediaPlayer player = voicePlayer;
+        if (player == null) return;
+        try {
+            if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+                resumeVoiceAfterFocusGain = false;
+                stopVoicePlayback();
+            } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
+                resumeVoiceAfterFocusGain = player.isPlaying();
+                if (player.isPlaying()) player.pause();
+                updatePlayingVoiceUi();
+            } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
+                player.setVolume(0.25f, 0.25f);
+            } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
+                player.setVolume(1f, 1f);
+                if (resumeVoiceAfterFocusGain && !player.isPlaying()) {
+                    resumeVoiceAfterFocusGain = false;
+                    player.start();
+                    mainHandler.removeCallbacks(voiceProgressTick);
+                    mainHandler.post(voiceProgressTick);
+                }
+                updatePlayingVoiceUi();
+            }
+        } catch (Throwable ignored) { }
+    };
     private final Runnable voiceProgressTick = new Runnable() {
         @Override
         public void run() {
@@ -171,7 +217,7 @@ public class ForumTopicActivity extends AppCompatActivity {
     private final ActivityResultLauncher<String> audioPermissionLauncher = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(), granted -> {
                 if (granted) {
-                    Toast.makeText(this, "按住麦克风录音，上滑取消", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "按住录音，上滑取消，松开后确认发送", Toast.LENGTH_SHORT).show();
                 } else {
                     Toast.makeText(this, "需要麦克风权限才能发送语音评论", Toast.LENGTH_LONG).show();
                 }
@@ -249,13 +295,12 @@ public class ForumTopicActivity extends AppCompatActivity {
         body.addView(stateView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        fastScrollButton = text("", 18, dark ? 0xFFE7E9ED : 0xFF515860, true);
-        fastScrollButton.setIncludeFontPadding(false);
-        fastScrollButton.setGravity(Gravity.CENTER);
+        fastScrollButton = new AppCompatImageView(this);
+        fastScrollButton.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
         fastScrollButton.setContentDescription("快速到底部");
-        fastScrollButton.setPadding(0, 0, 0, 0);
-        fastScrollButton.setBackground(roundRect(dark ? 0xFF2A2D32 : 0xFFF4F5F7, 15));
-        setCompoundIcon(fastScrollButton, R.drawable.ic_forum_arrow_down, 17,
+        fastScrollButton.setPadding(dp(8), dp(8), dp(8), dp(8));
+        fastScrollButton.setBackground(roundRect(dark ? 0xFF2A2D32 : 0xFFF4F5F7, 16));
+        setImageIcon(fastScrollButton, R.drawable.ic_forum_arrow_down, 17,
                 dark ? 0xFFD3D6DA : 0xFF5D646C);
         fastScrollButton.setElevation(dp(2));
         fastScrollButton.setVisibility(View.GONE);
@@ -277,7 +322,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             }
             recyclerView.post(this::updateFastScrollButton);
         });
-        FrameLayout.LayoutParams fastParams = new FrameLayout.LayoutParams(dp(32), dp(32),
+        FrameLayout.LayoutParams fastParams = new FrameLayout.LayoutParams(dp(34), dp(34),
                 Gravity.END | Gravity.BOTTOM);
         fastParams.setMargins(0, 0, dp(10), dp(10));
         body.addView(fastScrollButton, fastParams);
@@ -333,19 +378,15 @@ public class ForumTopicActivity extends AppCompatActivity {
         row.addView(commentInput, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        composerAction = text("", 14, Color.WHITE, true);
-        composerAction.setGravity(Gravity.CENTER);
-        composerAction.setIncludeFontPadding(false);
-        composerAction.setCompoundDrawablePadding(0);
-        composerAction.setPadding(0, 0, 0, 0);
-        composerAction.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
-        composerAction.setMinWidth(0);
-        composerAction.setMinHeight(0);
-        composerAction.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+        composerAction = new AppCompatImageView(this);
+        composerAction.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+        composerAction.setPadding(dp(11), dp(11), dp(11), dp(11));
+        composerAction.setMinimumWidth(0);
+        composerAction.setMinimumHeight(0);
         composerAction.setOnClickListener(v -> {
             if (sending) return;
             if (!TextUtils.isEmpty(commentInput.getText().toString().trim())) sendComment();
-            else Toast.makeText(this, "按住录音，上滑取消", Toast.LENGTH_SHORT).show();
+            else Toast.makeText(this, "按住录音，上滑取消，松开后确认发送", Toast.LENGTH_SHORT).show();
         });
         composerAction.setOnTouchListener(this::handleComposerTouch);
         LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(dp(48), dp(48));
@@ -375,18 +416,27 @@ public class ForumTopicActivity extends AppCompatActivity {
                     audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
                     return true;
                 }
+                recordStartX = event.getRawX();
                 recordStartY = event.getRawY();
                 startRecord();
                 return true;
             case MotionEvent.ACTION_MOVE:
                 if (recording) {
-                    recordCancel = recordStartY - event.getRawY() >= dp(76);
+                    if (recordStartY - event.getRawY() >= dp(58)
+                            || Math.abs(event.getRawX() - recordStartX) >= dp(96)) {
+                        recordCancel = true;
+                    }
                     long elapsed = Math.max(0L, System.currentTimeMillis() - recordStartTime);
                     updateRecordHint((int) Math.ceil(elapsed / 1000.0));
                 }
                 return true;
             case MotionEvent.ACTION_UP:
-                if (recording) finishRecord(recordCancel);
+                if (recording) {
+                    boolean cancel = recordCancel
+                            || recordStartY - event.getRawY() >= dp(58)
+                            || Math.abs(event.getRawX() - recordStartX) >= dp(96);
+                    finishRecord(cancel);
+                }
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 if (recording) finishRecord(true);
@@ -406,6 +456,8 @@ public class ForumTopicActivity extends AppCompatActivity {
             recordPath = file.getAbsolutePath();
             recordStartTime = System.currentTimeMillis();
             recordCancel = false;
+            recordReplyParentId = replyParentId;
+            recordReplyQuoteId = replyQuoteId;
             AudioRecordManager.getInstance().init(recordPath);
             AudioRecordManager.getInstance().startRecord();
             recording = true;
@@ -415,7 +467,11 @@ public class ForumTopicActivity extends AppCompatActivity {
             updateRecordHint(0);
             mainHandler.post(recordTick);
         } catch (Throwable error) {
+            try { AudioRecordManager.getInstance().cancelRecord(); } catch (Throwable ignored) { }
+            deleteQuietly(recordPath);
+            recordPath = "";
             recording = false;
+            composerAction.setSelected(false);
             recordHint.setVisibility(View.GONE);
             Toast.makeText(this, "录音启动失败", Toast.LENGTH_SHORT).show();
         }
@@ -424,7 +480,7 @@ public class ForumTopicActivity extends AppCompatActivity {
     private void updateRecordHint(int seconds) {
         if (!recording || recordHint == null) return;
         String time = String.format(Locale.getDefault(), "%02d:%02d", seconds / 60, seconds % 60);
-        recordHint.setText((recordCancel ? "松开取消" : "松开发送，上滑取消") + "  " + time);
+        recordHint.setText((recordCancel ? "松开取消" : "松开完成，上滑取消") + "  " + time);
         recordHint.setTextColor(recordCancel ? 0xFFEF4444 : (isDark() ? Color.WHITE : 0xFF33383E));
     }
 
@@ -452,18 +508,95 @@ public class ForumTopicActivity extends AppCompatActivity {
         int seconds = Math.max(1, (int) Math.ceil(duration / 1000.0));
         String waveformText = Base64.encodeToString(waveform == null ? new byte[0] : waveform,
                 Base64.NO_WRAP);
-        uploadAndSendVoice(localPath, seconds, waveformText);
+        showVoiceSendConfirmation(localPath, seconds, waveformText,
+                recordReplyParentId, recordReplyQuoteId);
     }
 
-    private void uploadAndSendVoice(String localPath, int seconds, String waveform) {
+    private void showVoiceSendConfirmation(String localPath, int seconds, String waveform,
+                                               long targetParentId, long targetQuoteId) {
+        if (TextUtils.isEmpty(localPath) || !new File(localPath).exists()) {
+            deleteQuietly(localPath);
+            Toast.makeText(this, "录音文件不存在", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        dismissVoiceConfirmDialog(true);
+        confirmVoicePath = localPath;
+        confirmVoiceSeconds = seconds;
+        confirmVoiceWaveform = waveform == null ? "" : waveform;
+        confirmVoiceReplyParentId = targetParentId;
+        confirmVoiceReplyQuoteId = targetQuoteId;
+        voiceConfirmDialog = new AlertDialog.Builder(this)
+                .setTitle("发送语音评论？")
+                .setMessage(seconds + " 秒录音。确认后才会发送，取消将直接删除。")
+                .setNegativeButton("取消", (dialog, which) -> discardVoiceConfirmation())
+                .setPositiveButton("发送", (dialog, which) -> sendConfirmedVoice())
+                .setOnCancelListener(dialog -> discardVoiceConfirmation())
+                .create();
+        voiceConfirmDialog.setOnDismissListener(dialog -> {
+            if (voiceConfirmDialog == dialog) voiceConfirmDialog = null;
+        });
+        voiceConfirmDialog.show();
+    }
+
+    private void sendConfirmedVoice() {
+        String path = confirmVoicePath;
+        int seconds = confirmVoiceSeconds;
+        String waveform = confirmVoiceWaveform;
+        long targetParentId = confirmVoiceReplyParentId;
+        long targetQuoteId = confirmVoiceReplyQuoteId;
+        clearVoiceConfirmation(false);
+        if (TextUtils.isEmpty(path) || !new File(path).exists()) {
+            Toast.makeText(this, "录音文件已失效，请重新录制", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        uploadAndSendVoice(path, seconds, waveform, targetParentId, targetQuoteId);
+    }
+
+    private void discardVoiceConfirmation() {
+        clearVoiceConfirmation(true);
+    }
+
+    private void clearVoiceConfirmation(boolean deleteFile) {
+        String path = confirmVoicePath;
+        confirmVoicePath = "";
+        confirmVoiceSeconds = 0;
+        confirmVoiceWaveform = "";
+        confirmVoiceReplyParentId = 0L;
+        confirmVoiceReplyQuoteId = 0L;
+        if (deleteFile) deleteQuietly(path);
+    }
+
+    private void dismissVoiceConfirmDialog(boolean discard) {
+        AlertDialog dialog = voiceConfirmDialog;
+        voiceConfirmDialog = null;
+        if (dialog != null) {
+            dialog.setOnCancelListener(null);
+            dialog.setOnDismissListener(null);
+            if (dialog.isShowing()) dialog.dismiss();
+        }
+        if (discard) discardVoiceConfirmation();
+    }
+
+    private void uploadAndSendVoice(String localPath, int seconds, String waveform,
+                                    long targetParentId, long targetQuoteId) {
         File file = new File(localPath);
+        if (!file.exists() || file.length() <= 0) {
+            failVoiceUpload(localPath, seconds, waveform, targetParentId, targetQuoteId,
+                    "录音文件不存在");
+            return;
+        }
+        dismissVoiceRetryDialog(false);
+        activeVoiceLocalPath = localPath;
+        final long generation = ++voiceUploadGeneration;
         setSending(true);
-        ForumApiClient.getInstance().getVoiceUploadTarget(file,
+        ForumApiClient.getInstance().getVoiceUploadTarget(file, requestScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.VoiceUploadTarget>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.VoiceUploadTarget target) {
+                        if (!isVoiceUploadActive(generation, localPath)) return;
                         if (target == null || TextUtils.isEmpty(target.uploadUrl)) {
-                            failVoice(localPath, "无法获取语音上传地址");
+                            failVoiceUpload(localPath, seconds, waveform, targetParentId,
+                                    targetQuoteId, "无法获取语音上传地址");
                             return;
                         }
                         String tag = "forum_voice_" + UUID.randomUUID();
@@ -472,35 +605,154 @@ public class ForumTopicActivity extends AppCompatActivity {
                                     @Override
                                     public void onSuccess(String uploadedPath) {
                                         runOnUiThread(() -> {
+                                            if (!isVoiceUploadActive(generation, localPath)) {
+                                                deleteQuietly(localPath);
+                                                clearActiveVoicePath(localPath);
+                                                return;
+                                            }
                                             String remote = !TextUtils.isEmpty(target.publicUrl)
                                                     ? target.publicUrl
                                                     : (!TextUtils.isEmpty(uploadedPath)
                                                     ? uploadedPath : target.path);
                                             String content = "voice:" + normalizeVoicePath(remote)
                                                     + "|" + seconds + "|" + waveform;
-                                            sendCommentContent(content, localPath);
+                                            sendCommentContent(content, localPath, targetParentId,
+                                                    targetQuoteId);
                                         });
                                     }
 
                                     @Override
                                     public void onError() {
-                                        runOnUiThread(() -> failVoice(localPath, "语音上传失败"));
+                                        runOnUiThread(() -> {
+                                            if (isVoiceUploadActive(generation, localPath)) {
+                                                failVoiceUpload(localPath, seconds, waveform,
+                                                        targetParentId, targetQuoteId, "语音上传失败");
+                                            } else {
+                                                deleteQuietly(localPath);
+                                                clearActiveVoicePath(localPath);
+                                            }
+                                        });
                                     }
                                 });
                     }
 
                     @Override
                     public void onError(@NonNull String message) {
-                        failVoice(localPath, message);
+                        if (isVoiceUploadActive(generation, localPath)) {
+                            failVoiceUpload(localPath, seconds, waveform, targetParentId,
+                                    targetQuoteId, message);
+                        }
                     }
                 });
     }
 
-    private void failVoice(String localPath, String message) {
-        if (isDead()) return;
-        deleteQuietly(localPath);
+    private void clearActiveVoicePath(@Nullable String path) {
+        if (!TextUtils.isEmpty(path) && TextUtils.equals(activeVoiceLocalPath, path)) {
+            activeVoiceLocalPath = "";
+        }
+    }
+
+    private boolean isVoiceUploadActive(long generation, String localPath) {
+        return !isDead() && generation == voiceUploadGeneration
+                && !TextUtils.isEmpty(localPath) && new File(localPath).exists();
+    }
+
+    private void failVoiceUpload(String localPath, int seconds, String waveform,
+                                 long targetParentId, long targetQuoteId, String message) {
+        if (isDead()) {
+            deleteQuietly(localPath);
+            return;
+        }
         setSending(false);
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        clearActiveVoicePath(localPath);
+        dismissVoiceRetryDialog(true);
+        pendingVoicePath = localPath == null ? "" : localPath;
+        pendingVoiceSeconds = seconds;
+        pendingVoiceWaveform = waveform == null ? "" : waveform;
+        pendingVoiceCommentContent = "";
+        pendingVoiceReplyParentId = targetParentId;
+        pendingVoiceReplyQuoteId = targetQuoteId;
+        voiceRetryDialog = new AlertDialog.Builder(this)
+                .setTitle("语音发送失败")
+                .setMessage(TextUtils.isEmpty(message) ? "请检查网络后重试" : message)
+                .setNegativeButton("删除", (dialog, which) -> discardPendingVoice())
+                .setPositiveButton("重试", (dialog, which) -> retryPendingVoice())
+                .setOnCancelListener(dialog -> discardPendingVoice())
+                .create();
+        voiceRetryDialog.setOnDismissListener(dialog -> voiceRetryDialog = null);
+        voiceRetryDialog.show();
+    }
+
+    private void retryPendingVoice() {
+        String path = pendingVoicePath;
+        int seconds = pendingVoiceSeconds;
+        String waveform = pendingVoiceWaveform;
+        long targetParentId = pendingVoiceReplyParentId;
+        long targetQuoteId = pendingVoiceReplyQuoteId;
+        pendingVoicePath = "";
+        pendingVoiceSeconds = 0;
+        pendingVoiceWaveform = "";
+        pendingVoiceCommentContent = "";
+        pendingVoiceReplyParentId = 0L;
+        pendingVoiceReplyQuoteId = 0L;
+        if (TextUtils.isEmpty(path) || !new File(path).exists()) {
+            Toast.makeText(this, "录音文件已失效，请重新录制", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        uploadAndSendVoice(path, seconds, waveform, targetParentId, targetQuoteId);
+    }
+
+    private void discardPendingVoice() {
+        String path = pendingVoicePath;
+        pendingVoicePath = "";
+        pendingVoiceSeconds = 0;
+        pendingVoiceWaveform = "";
+        pendingVoiceCommentContent = "";
+        pendingVoiceReplyParentId = 0L;
+        pendingVoiceReplyQuoteId = 0L;
+        deleteQuietly(path);
+    }
+
+    private void dismissVoiceRetryDialog(boolean discard) {
+        AlertDialog dialog = voiceRetryDialog;
+        voiceRetryDialog = null;
+        if (dialog != null) {
+            dialog.setOnCancelListener(null);
+            dialog.setOnDismissListener(null);
+            if (dialog.isShowing()) dialog.dismiss();
+        }
+        if (discard) discardPendingVoice();
+    }
+
+    private void showVoiceCommentRetry(String content, long targetParentId, long targetQuoteId,
+                                       String message) {
+        if (isDead()) return;
+        setSending(false);
+        dismissVoiceRetryDialog(true);
+        pendingVoiceCommentContent = content == null ? "" : content;
+        pendingVoiceReplyParentId = targetParentId;
+        pendingVoiceReplyQuoteId = targetQuoteId;
+        voiceRetryDialog = new AlertDialog.Builder(this)
+                .setTitle("语音评论发送失败")
+                .setMessage(TextUtils.isEmpty(message) ? "请检查网络后重试" : message)
+                .setNegativeButton("取消", (dialog, which) -> discardPendingVoice())
+                .setPositiveButton("重试", (dialog, which) -> retryPendingVoiceComment())
+                .setOnCancelListener(dialog -> discardPendingVoice())
+                .create();
+        voiceRetryDialog.setOnDismissListener(dialog -> voiceRetryDialog = null);
+        voiceRetryDialog.show();
+    }
+
+    private void retryPendingVoiceComment() {
+        String content = pendingVoiceCommentContent;
+        long targetParentId = pendingVoiceReplyParentId;
+        long targetQuoteId = pendingVoiceReplyQuoteId;
+        pendingVoiceCommentContent = "";
+        pendingVoiceReplyParentId = 0L;
+        pendingVoiceReplyQuoteId = 0L;
+        if (TextUtils.isEmpty(content)) return;
+        setSending(true);
+        sendCommentContent(content, null, targetParentId, targetQuoteId);
     }
 
     private String normalizeVoicePath(String value) {
@@ -517,24 +769,24 @@ public class ForumTopicActivity extends AppCompatActivity {
     private void updateComposerAction() {
         if (composerAction == null || commentInput == null) return;
         boolean hasText = !TextUtils.isEmpty(commentInput.getText().toString().trim());
-        composerAction.setText("");
         composerAction.setBackground(roundRect(hasText ? 0xFF1877F2
                 : (isDark() ? 0xFF2A2D33 : 0xFFF0F2F5), 24));
-        composerAction.setContentDescription(hasText ? "发送评论" : "按住录音");
-        setCompoundIcon(composerAction, hasText ? R.drawable.ic_forum_send
-                        : R.drawable.ic_forum_mic, hasText ? 21 : 27,
+        composerAction.setContentDescription(hasText ? "发送评论" : "按住录音，松开后确认发送");
+        setImageIcon(composerAction, hasText ? R.drawable.ic_forum_send
+                        : R.drawable.ic_forum_mic, hasText ? 20 : 25,
                 hasText ? Color.WHITE : (isDark() ? 0xFFE4E6EA : 0xFF4D555E));
     }
 
     private void loadTopic() {
-        ForumApiClient.getInstance().ensureSession(this, new ForumApiClient.ResultCallback<String>() {
+        ForumApiClient.getInstance().ensureSession(this, requestScope,
+                new ForumApiClient.ResultCallback<String>() {
             @Override public void onSuccess(@Nullable String data) { requestTopic(); }
             @Override public void onError(@NonNull String message) { requestTopic(); }
         });
     }
 
     private void requestTopic() {
-        ForumApiClient.getInstance().getTopic(topicId,
+        ForumApiClient.getInstance().getTopic(topicId, requestScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Topic>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Topic topic) {
@@ -574,7 +826,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             adapter.rebuild();
             return;
         }
-        ForumApiClient.getInstance().getUserFollowed(topic.user.id,
+        ForumApiClient.getInstance().getUserFollowed(topic.user.id, requestScope,
                 new ForumApiClient.ResultCallback<Boolean>() {
                     @Override public void onSuccess(@Nullable Boolean followed) {
                         if (isDead() || currentTopic != topic) return;
@@ -595,6 +847,8 @@ public class ForumTopicActivity extends AppCompatActivity {
             return;
         }
         if (reset) {
+            refreshCommentsPending = false;
+            tailCommentsPending = false;
             commentsTailWindow = false;
             commentsCursor = "";
             commentsHasMore = false;
@@ -603,31 +857,27 @@ public class ForumTopicActivity extends AppCompatActivity {
         }
         loadingComments = true;
         adapter.rebuild();
-        ForumApiClient.getInstance().getComments(topicId, commentsCursor, commentSort,
+        ForumApiClient.getInstance().getComments(topicId, commentsCursor, commentSort, requestScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Comment>>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Comment> page) {
                         loadingComments = false;
                         if (isDead()) return;
                         if (page != null && page.results != null) appendUnique(comments, page.results);
-                        if (page != null && !TextUtils.isEmpty(page.cursor)) commentsCursor = page.cursor;
-                        commentsHasMore = page != null && page.hasMore;
+                        String nextCursor = page == null ? "" : safe(page.cursor);
+                        if (!TextUtils.isEmpty(nextCursor)) commentsCursor = nextCursor;
+                        commentsHasMore = page != null && page.hasMore
+                                && !TextUtils.isEmpty(nextCursor);
                         adapter.rebuild();
                         recyclerView.post(ForumTopicActivity.this::updateFastScrollButton);
-                        if (refreshCommentsPending) {
-                            refreshCommentsPending = false;
-                            loadComments(true);
-                        }
+                        drainPendingCommentLoad();
                     }
 
                     @Override public void onError(@NonNull String message) {
                         loadingComments = false;
                         adapter.rebuild();
                         Toast.makeText(ForumTopicActivity.this, message, Toast.LENGTH_LONG).show();
-                        if (refreshCommentsPending) {
-                            refreshCommentsPending = false;
-                            loadComments(true);
-                        }
+                        drainPendingCommentLoad();
                     }
                 });
     }
@@ -644,9 +894,13 @@ public class ForumTopicActivity extends AppCompatActivity {
     }
 
     private void loadTailComments() {
-        if (loadingComments) return;
+        if (loadingComments) {
+            tailCommentsPending = true;
+            return;
+        }
+        tailCommentsPending = false;
         loadingComments = true;
-        ForumApiClient.getInstance().getComments(topicId, "", COMMENT_SORT_DESC,
+        ForumApiClient.getInstance().getComments(topicId, "", COMMENT_SORT_DESC, requestScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Comment>>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Comment> page) {
@@ -666,14 +920,28 @@ public class ForumTopicActivity extends AppCompatActivity {
                             recyclerView.scrollToPosition(Math.max(0, adapter.getItemCount() - 1));
                             updateFastScrollButton();
                         });
+                        drainPendingCommentLoad();
                     }
 
                     @Override
                     public void onError(@NonNull String message) {
                         loadingComments = false;
                         Toast.makeText(ForumTopicActivity.this, message, Toast.LENGTH_LONG).show();
+                        drainPendingCommentLoad();
                     }
                 });
+    }
+
+    private void drainPendingCommentLoad() {
+        if (isDead() || loadingComments) return;
+        if (tailCommentsPending) {
+            tailCommentsPending = false;
+            refreshCommentsPending = false;
+            loadTailComments();
+        } else if (refreshCommentsPending) {
+            refreshCommentsPending = false;
+            loadComments(true);
+        }
     }
 
     private void updateFastScrollButton() {
@@ -693,8 +961,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             return;
         }
         fastScrollToTop = first > 3;
-        fastScrollButton.setText("");
-        setCompoundIcon(fastScrollButton,
+        setImageIcon(fastScrollButton,
                 fastScrollToTop ? R.drawable.ic_forum_arrow_up : R.drawable.ic_forum_arrow_down,
                 17, isDark() ? 0xFFD3D6DA : 0xFF5D646C);
         fastScrollButton.setContentDescription(fastScrollToTop ? "快速回到顶部" : "快速回到底部");
@@ -706,7 +973,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         loadingComments = true;
         adapter.rebuild();
         String replyCursor = parent.replies == null ? "" : safe(parent.replies.cursor);
-        ForumApiClient.getInstance().getReplies(parent.id, replyCursor,
+        ForumApiClient.getInstance().getReplies(parent.id, replyCursor, requestScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Comment>>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Comment> page) {
@@ -717,10 +984,13 @@ public class ForumTopicActivity extends AppCompatActivity {
                         if (page != null && page.results != null) {
                             appendUnique(parent.replies.results, page.results);
                         }
-                        parent.replies.cursor = page == null ? parent.replies.cursor : page.cursor;
-                        parent.replies.hasMore = page != null && page.hasMore;
+                        String nextCursor = page == null ? "" : safe(page.cursor);
+                        if (!TextUtils.isEmpty(nextCursor)) parent.replies.cursor = nextCursor;
+                        parent.replies.hasMore = page != null && page.hasMore
+                                && !TextUtils.isEmpty(nextCursor);
                         expandedReplies.add(parent.id);
                         adapter.rebuild();
+                        drainPendingCommentLoad();
                     }
 
                     @Override
@@ -728,6 +998,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                         loadingComments = false;
                         adapter.rebuild();
                         Toast.makeText(ForumTopicActivity.this, message, Toast.LENGTH_LONG).show();
+                        drainPendingCommentLoad();
                     }
                 });
     }
@@ -1025,6 +1296,9 @@ public class ForumTopicActivity extends AppCompatActivity {
                 new VoidCallback() {
                     @Override public void success() {
                         removeComment(commentId);
+                        if (currentTopic != null) {
+                            currentTopic.commentCount = Math.max(0, currentTopic.commentCount - 1);
+                        }
                         completeAction("评论已删除");
                         adapter.rebuild();
                     }
@@ -1091,20 +1365,24 @@ public class ForumTopicActivity extends AppCompatActivity {
         String content = commentInput.getText().toString().trim();
         if (TextUtils.isEmpty(content) || sending) return;
         setSending(true);
-        sendCommentContent(content, null);
+        sendCommentContent(content, null, replyParentId, replyQuoteId);
     }
 
-    private void sendCommentContent(String content, @Nullable String localVoicePath) {
-        String entityType = replyParentId > 0 ? "comment" : "topic";
-        String entityId = replyParentId > 0 ? String.valueOf(replyParentId) : topicId;
-        ForumApiClient.getInstance().createComment(entityType, entityId, content, replyQuoteId,
+    private void sendCommentContent(String content, @Nullable String localVoicePath,
+                                    long targetParentId, long targetQuoteId) {
+        String entityType = targetParentId > 0 ? "comment" : "topic";
+        String entityId = targetParentId > 0 ? String.valueOf(targetParentId) : topicId;
+        ForumApiClient.getInstance().createComment(entityType, entityId, content, targetQuoteId,
                 new ArrayList<>(), new ForumApiClient.ResultCallback<ForumApiClient.Comment>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Comment data) {
-                        if (isDead()) return;
                         deleteQuietly(localVoicePath);
+                        clearActiveVoicePath(localVoicePath);
+                        if (isDead()) return;
                         commentInput.setText("");
-                        clearReplyTarget();
+                        if (replyParentId == targetParentId && replyQuoteId == targetQuoteId) {
+                            clearReplyTarget();
+                        }
                         setSending(false);
                         setResult(RESULT_OK);
                         if (currentTopic != null) currentTopic.commentCount = Math.max(0, currentTopic.commentCount + 1);
@@ -1118,7 +1396,12 @@ public class ForumTopicActivity extends AppCompatActivity {
                     @Override
                     public void onError(@NonNull String message) {
                         deleteQuietly(localVoicePath);
-                        failSend(message);
+                        clearActiveVoicePath(localVoicePath);
+                        if (content.startsWith("voice:")) {
+                            showVoiceCommentRetry(content, targetParentId, targetQuoteId, message);
+                        } else {
+                            failSend(message);
+                        }
                     }
                 });
     }
@@ -1126,7 +1409,7 @@ public class ForumTopicActivity extends AppCompatActivity {
     private void runAuthenticatedAction(Runnable action) {
         if (topicActionBusy) return;
         topicActionBusy = true;
-        ForumApiClient.getInstance().ensureSession(this,
+        ForumApiClient.getInstance().ensureSession(this, requestScope,
                 new ForumApiClient.ResultCallback<String>() {
                     @Override public void onSuccess(@Nullable String data) { action.run(); }
                     @Override public void onError(@NonNull String message) { finishTopicAction(message); }
@@ -1156,8 +1439,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         composerAction.setEnabled(!value);
         composerAction.setAlpha(value ? 0.55f : 1f);
         if (value) {
-            composerAction.setText("");
-            composerAction.setCompoundDrawables(null, null, null, null);
+            composerAction.setImageDrawable(null);
             composerAction.setBackground(roundRect(0xFF9ABEF0, 24));
         } else {
             updateComposerAction();
@@ -1192,7 +1474,10 @@ public class ForumTopicActivity extends AppCompatActivity {
             try {
                 if (voicePlayer.isPlaying()) {
                     voicePlayer.pause();
-                } else {
+                    resumeVoiceAfterFocusGain = false;
+                    abandonVoiceAudioFocus();
+                } else if (requestVoiceAudioFocus()) {
+                    voicePlayer.setVolume(1f, 1f);
                     voicePlayer.start();
                     mainHandler.removeCallbacks(voiceProgressTick);
                     mainHandler.post(voiceProgressTick);
@@ -1238,6 +1523,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             try { voicePlayer.release(); } catch (Throwable ignored) { }
             voicePlayer = null;
         }
+        abandonVoiceAudioFocus();
         if (playingVoiceView != null && playingVoicePayload != null
                 && TextUtils.equals(String.valueOf(playingVoiceView.getTag()), playingVoiceKey)) {
             setVoiceBubbleUi(playingVoiceView, playingVoicePayload, playingVoicePayload.durationSec, false, 0f);
@@ -1271,6 +1557,11 @@ public class ForumTopicActivity extends AppCompatActivity {
                     try { mp.release(); } catch (Throwable ignored) { }
                     return;
                 }
+                if (!requestVoiceAudioFocus()) {
+                    voicePlaybackError("其他应用正在占用音频");
+                    return;
+                }
+                mp.setVolume(1f, 1f);
                 mp.start();
                 mainHandler.removeCallbacks(voiceProgressTick);
                 mainHandler.post(voiceProgressTick);
@@ -1297,21 +1588,27 @@ public class ForumTopicActivity extends AppCompatActivity {
             voicePlaybackError();
             return;
         }
-        voiceDownloadCall = VOICE_HTTP.newCall(request);
-        voiceDownloadCall.enqueue(new Callback() {
+        Call call = VOICE_HTTP.newCall(request);
+        voiceDownloadCall = call;
+        call.enqueue(new Callback() {
             @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException error) {
+            public void onFailure(@NonNull Call failedCall, @NonNull IOException error) {
                 runOnUiThread(() -> {
-                    if (TextUtils.equals(expectedKey, playingVoiceKey)) voicePlaybackError();
+                    if (voiceDownloadCall == failedCall) voiceDownloadCall = null;
+                    if (!failedCall.isCanceled() && TextUtils.equals(expectedKey, playingVoiceKey)) {
+                        voicePlaybackError();
+                    }
                 });
             }
 
             @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+            public void onResponse(@NonNull Call responseCall, @NonNull Response response) {
                 File part = new File(target.getAbsolutePath() + ".part");
                 boolean ok = false;
                 try {
-                    if (!response.isSuccessful() || response.body() == null) throw new IOException("HTTP " + response.code());
+                    if (!response.isSuccessful() || response.body() == null) {
+                        throw new IOException("HTTP " + response.code());
+                    }
                     try (InputStream input = response.body().byteStream();
                          FileOutputStream output = new FileOutputStream(part)) {
                         byte[] buffer = new byte[16 * 1024];
@@ -1320,7 +1617,9 @@ public class ForumTopicActivity extends AppCompatActivity {
                         output.flush();
                     }
                     if (part.length() <= 0) throw new IOException("empty voice");
-                    if (target.exists()) target.delete();
+                    if (target.exists() && !target.delete()) {
+                        throw new IOException("cannot replace voice cache");
+                    }
                     ok = part.renameTo(target);
                     if (!ok) {
                         try (InputStream input = new java.io.FileInputStream(part);
@@ -1328,18 +1627,23 @@ public class ForumTopicActivity extends AppCompatActivity {
                             byte[] buffer = new byte[16 * 1024];
                             int read;
                             while ((read = input.read(buffer)) != -1) output.write(buffer, 0, read);
+                            output.flush();
                         }
                         ok = target.length() > 0;
                     }
+                } catch (Throwable ignored) {
+                    ok = false;
+                    if (target.exists() && target.length() <= 0) target.delete();
                 } finally {
                     response.close();
                     if (part.exists()) part.delete();
                 }
                 final boolean success = ok;
                 runOnUiThread(() -> {
+                    if (voiceDownloadCall == responseCall) voiceDownloadCall = null;
                     if (!TextUtils.equals(expectedKey, playingVoiceKey)) return;
-                    voiceDownloadCall = null;
-                    if (success) prepareVoiceFile(target); else voicePlaybackError();
+                    if (success) prepareVoiceFile(target);
+                    else voicePlaybackError();
                 });
             }
         });
@@ -1371,30 +1675,89 @@ public class ForumTopicActivity extends AppCompatActivity {
         view.bind(payload, Math.max(0, seconds), active, progress);
     }
 
+    private boolean requestVoiceAudioFocus() {
+        if (voiceAudioFocusHeld) return true;
+        if (audioManager == null) {
+            audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        }
+        if (audioManager == null) return true;
+        int result;
+        try {
+            result = audioManager.requestAudioFocus(voiceFocusListener,
+                    AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+        } catch (Throwable ignored) {
+            return true;
+        }
+        voiceAudioFocusHeld = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+        return voiceAudioFocusHeld;
+    }
+
+    private void abandonVoiceAudioFocus() {
+        resumeVoiceAfterFocusGain = false;
+        if (!voiceAudioFocusHeld || audioManager == null) return;
+        try { audioManager.abandonAudioFocus(voiceFocusListener); } catch (Throwable ignored) { }
+        voiceAudioFocusHeld = false;
+    }
+
     private void voicePlaybackError() {
+        voicePlaybackError("语音播放失败，请重试");
+    }
+
+    private void voicePlaybackError(String message) {
         stopVoicePlayback();
-        if (!isDead()) Toast.makeText(this, "语音播放失败，请重试", Toast.LENGTH_SHORT).show();
+        if (!isDead()) Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     private File voiceCacheFile(String url) {
         File dir = new File(getCacheDir(), "forum_voice_play");
         if (!dir.exists()) dir.mkdirs();
-        return new File(dir, Integer.toHexString(url.hashCode()) + ".amr");
+        return new File(dir, Integer.toHexString(url.hashCode()) + "_" + url.length() + ".amr");
     }
 
     private void cleanupVoiceCache() {
         File dir = new File(getCacheDir(), "forum_voice_play");
         File[] files = dir.listFiles();
-        if (files == null || files.length <= 40) return;
-        java.util.Arrays.sort(files, (a, b) -> Long.compare(a.lastModified(), b.lastModified()));
-        for (int i = 0; i < files.length - 30; i++) deleteQuietly(files[i].getAbsolutePath());
+        if (files == null || files.length == 0) return;
+        long now = System.currentTimeMillis();
+        long maxAge = TimeUnit.DAYS.toMillis(7);
+        for (File file : files) {
+            if (file == null) continue;
+            if (file.getName().endsWith(".part") || now - file.lastModified() > maxAge) {
+                deleteQuietly(file.getAbsolutePath());
+            }
+        }
+        files = dir.listFiles(file -> file != null && file.isFile()
+                && !file.getName().endsWith(".part"));
+        if (files == null || files.length == 0) return;
+        java.util.Arrays.sort(files, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+        long keptBytes = 0L;
+        for (int i = 0; i < files.length; i++) {
+            File file = files[i];
+            keptBytes += Math.max(0L, file.length());
+            if (i >= 30 || keptBytes > 40L * 1024L * 1024L) {
+                deleteQuietly(file.getAbsolutePath());
+            }
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        if (recording) finishRecord(true);
+        stopVoicePlayback();
+        super.onStop();
     }
 
     @Override
     protected void onDestroy() {
+        requestScope.cancelAll();
+        voiceUploadGeneration++;
+        deleteQuietly(activeVoiceLocalPath);
+        activeVoiceLocalPath = "";
         if (recording) finishRecord(true);
         mainHandler.removeCallbacks(recordTick);
         stopVoicePlayback();
+        dismissVoiceConfirmDialog(true);
+        dismissVoiceRetryDialog(true);
         super.onDestroy();
     }
 
@@ -1411,27 +1774,93 @@ public class ForumTopicActivity extends AppCompatActivity {
         }
 
         void rebuild() {
-            rows.clear();
-            if (currentTopic != null) rows.add(Row.article());
+            List<Row> next = new ArrayList<>();
+            if (currentTopic != null) next.add(Row.article(articleContentKey()));
             if (currentTopic != null && comments.isEmpty() && !loadingComments) {
-                rows.add(Row.empty());
+                next.add(Row.empty());
             }
             for (ForumApiClient.Comment parent : comments) {
                 if (parent == null) continue;
-                rows.add(Row.comment(parent, parent.id, false));
+                next.add(Row.comment(parent, parent.id, false, commentContentKey(parent, false)));
                 boolean expanded = expandedReplies.contains(parent.id);
                 if (expanded && parent.replies != null && parent.replies.results != null) {
                     for (ForumApiClient.Comment reply : parent.replies.results) {
-                        if (reply != null) rows.add(Row.comment(reply, parent.id, true));
+                        if (reply != null) {
+                            next.add(Row.comment(reply, parent.id, true,
+                                    commentContentKey(reply, true)));
+                        }
                     }
                 }
                 if (parent.commentCount > 0 || (parent.replies != null
                         && parent.replies.results != null && !parent.replies.results.isEmpty())) {
-                    rows.add(Row.toggle(parent));
+                    next.add(Row.toggle(parent, toggleContentKey(parent, expanded)));
                 }
             }
-            if (commentsHasMore || loadingComments) rows.add(Row.loadMore());
-            notifyDataSetChanged();
+            if (commentsHasMore || loadingComments) {
+                next.add(Row.loadMore((loadingComments ? "loading" : "more") + commentsCursor));
+            }
+
+            List<Row> old = new ArrayList<>(rows);
+            DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+                @Override public int getOldListSize() { return old.size(); }
+                @Override public int getNewListSize() { return next.size(); }
+                @Override public boolean areItemsTheSame(int oldPosition, int newPosition) {
+                    return old.get(oldPosition).stableId() == next.get(newPosition).stableId();
+                }
+                @Override public boolean areContentsTheSame(int oldPosition, int newPosition) {
+                    return TextUtils.equals(old.get(oldPosition).contentKey,
+                            next.get(newPosition).contentKey);
+                }
+            }, false);
+            rows.clear();
+            rows.addAll(next);
+            diff.dispatchUpdatesTo(this);
+        }
+
+        private String articleContentKey() {
+            ForumApiClient.Topic topic = currentTopic;
+            if (topic == null) return "";
+            ForumApiClient.User user = topic.user;
+            ForumApiClient.Category category = topic.category;
+            return safe(topic.id) + '|' + textKey(topic.title) + '|' + textKey(topic.content) + '|'
+                    + textKey(topic.summary) + '|' + topic.createTime + '|' + topic.viewCount + '|'
+                    + topic.commentCount + '|' + topic.likeCount + '|' + topic.liked + '|'
+                    + topic.favorited + '|' + topic.sticky + '|' + topic.recommend + '|'
+                    + topic.type + '|' + safe(topic.qaStatus) + '|' + topic.acceptedCommentId + '|'
+                    + userKey(user) + '|' + safe(category == null ? null : category.name) + '|'
+                    + authorFollowStateLoaded + '|' + authorFollowed + '|' + commentSort
+                    + '|' + imageListKey(topic.imageList);
+        }
+
+        private String commentContentKey(ForumApiClient.Comment comment, boolean reply) {
+            if (comment == null) return "";
+            ForumApiClient.User quoteUser = comment.quote == null ? null : comment.quote.user;
+            return comment.id + "|" + reply + '|' + textKey(comment.content) + '|'
+                    + comment.likeCount + '|' + comment.liked + '|' + comment.commentCount + '|'
+                    + comment.status + '|' + comment.createTime + '|' + userKey(comment.user) + '|'
+                    + userKey(quoteUser) + '|' + textKey(comment.quote == null
+                    ? null : comment.quote.content) + '|' + imageListKey(comment.imageList);
+        }
+
+        private String userKey(@Nullable ForumApiClient.User user) {
+            if (user == null) return "";
+            return safe(user.id) + ':' + safe(user.uid) + ':' + textKey(user.nickname) + ':'
+                    + textKey(user.smallAvatar) + ':' + textKey(user.avatar) + ':'
+                    + safe(user.countryCode) + ':' + safe(user.country);
+        }
+
+        private String textKey(@Nullable String value) {
+            if (value == null) return "0:0";
+            return value.length() + ":" + value.hashCode();
+        }
+
+        private String toggleContentKey(ForumApiClient.Comment parent, boolean expanded) {
+            int loaded = parent.replies == null || parent.replies.results == null
+                    ? 0 : parent.replies.results.size();
+            boolean more = parent.replies != null && parent.replies.hasMore;
+            String replyCursor = parent.replies == null ? "" : safe(parent.replies.cursor);
+            return parent.id + "|" + parent.commentCount + '|' + loaded + '|' + more + '|'
+                    + expanded + '|' + loadingComments + '|' + replyCursor;
         }
 
         @Override
@@ -1447,7 +1876,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         @NonNull
         @Override
         public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            if (viewType == TYPE_ARTICLE) return new ArticleHolder(new LinearLayout(parent.getContext()));
+            if (viewType == TYPE_ARTICLE) return new ArticleHolder(new ArticleView(parent.getContext()));
             if (viewType == TYPE_COMMENT) return new CommentHolder(createCommentItem(parent.getContext()));
             if (viewType == TYPE_TOGGLE) return new ToggleHolder(createToggleItem(parent.getContext()));
             TextView text = ForumTopicActivity.this.text("", 14,
@@ -1478,181 +1907,26 @@ public class ForumTopicActivity extends AppCompatActivity {
         }
 
         @Override
+        public void onViewRecycled(@NonNull RecyclerView.ViewHolder holder) {
+            if (holder instanceof ArticleHolder) {
+                ((ArticleHolder) holder).view.recycle();
+            } else if (holder instanceof CommentHolder) {
+                CommentHolder commentHolder = (CommentHolder) holder;
+                commentHolder.imageContainer.recycle();
+                if (playingVoiceView == commentHolder.voice) playingVoiceView = null;
+                commentHolder.voice.setOnClickListener(null);
+                commentHolder.voice.setOnLongClickListener(null);
+            }
+            super.onViewRecycled(holder);
+        }
+
+        @Override
         public int getItemCount() {
             return rows.size();
         }
 
         private void bindArticle(ArticleHolder holder) {
-            LinearLayout root = (LinearLayout) holder.itemView;
-            root.removeAllViews();
-            root.setOrientation(LinearLayout.VERTICAL);
-            root.setPadding(dp(18), dp(12), dp(18), 0);
-            root.setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
-            root.setOnClickListener(v -> {
-                if (replyParentId > 0 || replyQuoteId > 0) clearReplyTarget();
-            });
-            ForumApiClient.Topic topic = currentTopic;
-            if (topic == null) return;
-
-            LinearLayout topMeta = new LinearLayout(ForumTopicActivity.this);
-            topMeta.setGravity(Gravity.CENTER_VERTICAL);
-            if (topic.category != null && !TextUtils.isEmpty(topic.category.name)) {
-                TextView category = text(topic.category.name, 12, 0xFF1877F2, true);
-                category.setGravity(Gravity.CENTER);
-                category.setPadding(dp(10), 0, dp(10), 0);
-                category.setBackground(roundRect(isDark() ? 0xFF243B59 : 0xFFEAF3FF, 12));
-                topMeta.addView(category, new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(26)));
-            }
-            if (topic.sticky) {
-                TextView sticky = smallBadge("置顶", 0xFFB96800,
-                        isDark() ? 0xFF40311D : 0xFFFFF0D6);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(23));
-                lp.leftMargin = dp(6);
-                topMeta.addView(sticky, lp);
-            }
-            if (topic.recommend) {
-                TextView recommend = smallBadge("推荐", 0xFF1877F2,
-                        isDark() ? 0xFF243B59 : 0xFFEAF3FF);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT, dp(23));
-                lp.leftMargin = dp(6);
-                topMeta.addView(recommend, lp);
-            }
-            root.addView(topMeta);
-
-            TextView title = text(safe(topic.title), 24,
-                    isDark() ? Color.WHITE : 0xFF17191C, true);
-            title.setLineSpacing(0, 1.10f);
-            LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            titleParams.topMargin = dp(10);
-            root.addView(title, titleParams);
-            root.addView(buildAuthorRow(topic), new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(0.7f));
-            dividerParams.topMargin = dp(13);
-            dividerParams.bottomMargin = dp(15);
-            root.addView(divider(), dividerParams);
-
-            TextView content = htmlText(TextUtils.isEmpty(topic.content) ? topic.summary : topic.content, 17);
-            content.setOnClickListener(v -> clearReplyTarget());
-            content.setMaxLines(Integer.MAX_VALUE);
-            content.setEllipsize(null);
-            root.addView(content, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            addRemoteImages(root, topic.imageList, dp(10));
-
-            LinearLayout actions = new LinearLayout(ForumTopicActivity.this);
-            actions.setGravity(Gravity.CENTER_VERTICAL);
-            actions.setPadding(0, dp(12), 0, dp(10));
-            addTopicStat(actions, R.drawable.ic_forum_eye, String.valueOf(Math.max(0, topic.viewCount)), false, null);
-            addTopicStat(actions, topic.liked ? R.drawable.ic_forum_heart_filled : R.drawable.ic_forum_heart_round,
-                    String.valueOf(Math.max(0, topic.likeCount)), topic.liked, v -> changeTopicLike());
-            addTopicStat(actions, topic.favorited ? R.drawable.ic_forum_bookmark_filled : R.drawable.ic_forum_bookmark,
-                    "", topic.favorited, v -> changeFavorite());
-            addTopicStat(actions, R.drawable.ic_forum_chat_bubble,
-                    String.valueOf(Math.max(0, topic.commentCount)), false, v -> focusCommentInput());
-            root.addView(actions, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-            root.addView(divider(), new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(0.8f)));
-            root.addView(buildCommentsHeader(topic), new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
-        }
-
-        private View buildAuthorRow(ForumApiClient.Topic topic) {
-            LinearLayout row = new LinearLayout(ForumTopicActivity.this);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(0, dp(13), 0, 0);
-            AvatarView avatar = new AvatarView(ForumTopicActivity.this);
-            avatar.setSize(39);
-            String author = userName(topic.user);
-            bindAvatar(avatar, topic.user, author);
-            row.addView(avatar, new LinearLayout.LayoutParams(dp(43), dp(43)));
-
-            LinearLayout copy = new LinearLayout(ForumTopicActivity.this);
-            copy.setOrientation(LinearLayout.VERTICAL);
-            LinearLayout nameRow = new LinearLayout(ForumTopicActivity.this);
-            nameRow.setGravity(Gravity.CENTER_VERTICAL);
-            TextView authorView = text(author, 14,
-                    isDark() ? Color.WHITE : 0xFF272B31, true);
-            nameRow.addView(authorView);
-            TextView ownerBadge = smallBadge("楼主", 0xFF1877F2,
-                    isDark() ? 0xFF243B59 : 0xFFEAF3FF);
-            LinearLayout.LayoutParams ownerBadgeParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(20));
-            ownerBadgeParams.leftMargin = dp(6);
-            nameRow.addView(ownerBadge, ownerBadgeParams);
-            copy.addView(nameRow);
-            TextView meta = text(formatDate(topic.createTime), 12,
-                    isDark() ? 0xFF8F949C : 0xFF7A8088, false);
-            copy.addView(meta);
-            LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(
-                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-            copyParams.leftMargin = dp(10);
-            row.addView(copy, copyParams);
-
-            TextView more = text("⋮", 27, isDark() ? 0xFFD8DADE : 0xFF4D535B, false);
-            more.setGravity(Gravity.CENTER);
-            more.setContentDescription("帖子操作");
-            more.setBackground(selectableBackground());
-            more.setOnClickListener(v -> showTopicMenu());
-            row.addView(more, new LinearLayout.LayoutParams(dp(44), dp(44)));
-            return row;
-        }
-
-        private void addTopicStat(LinearLayout row, int iconRes, String label,
-                                  boolean active, @Nullable View.OnClickListener click) {
-            TextView action = text(label, 12.5f,
-                    active ? 0xFFE34A55 : (isDark() ? 0xFFB8BBC2 : 0xFF59616A), false);
-            action.setGravity(Gravity.CENTER);
-            action.setCompoundDrawablePadding(dp(3));
-            action.setPadding(dp(8), 0, dp(8), 0);
-            setCompoundIcon(action, iconRes, iconRes == R.drawable.ic_forum_eye ? 22 : 19,
-                    active ? 0xFFE34A55 : (isDark() ? 0xFFB8BBC2 : 0xFF59616A));
-            if (click != null) {
-                action.setBackground(selectableBackground());
-                action.setOnClickListener(click);
-            }
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
-            params.rightMargin = dp(5);
-            row.addView(action, params);
-        }
-
-        private View buildCommentsHeader(ForumApiClient.Topic topic) {
-            LinearLayout row = new LinearLayout(ForumTopicActivity.this);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            TextView title = text(topic.commentCount > 0 ? "评论 " + topic.commentCount : "评论",
-                    17, isDark() ? Color.WHITE : 0xFF202328, true);
-            row.addView(title, new LinearLayout.LayoutParams(0,
-                    ViewGroup.LayoutParams.MATCH_PARENT, 1f));
-
-            LinearLayout pill = new LinearLayout(ForumTopicActivity.this);
-            pill.setGravity(Gravity.CENTER_VERTICAL);
-            pill.setPadding(dp(2), dp(2), dp(2), dp(2));
-            pill.setBackground(roundRect(isDark() ? 0xFF25272C : 0xFFF1F3F5, 15));
-            addSortTab(pill, "热门", COMMENT_SORT_HOT);
-            addSortTab(pill, "正序", COMMENT_SORT_ASC);
-            addSortTab(pill, "倒序", COMMENT_SORT_DESC);
-            row.addView(pill, new LinearLayout.LayoutParams(dp(150), dp(32)));
-            return row;
-        }
-
-        private void addSortTab(LinearLayout pill, String label, String value) {
-            boolean selected = TextUtils.equals(commentSort, value);
-            TextView tab = text(label, 11.5f, selected ? 0xFF1877F2
-                    : (isDark() ? 0xFFAEB3BB : 0xFF69717A), selected);
-            tab.setGravity(Gravity.CENTER);
-            tab.setBackground(selected ? roundRect(isDark() ? 0xFF34465F : Color.WHITE, 13) : null);
-            tab.setOnClickListener(v -> setCommentSort(value));
-            pill.addView(tab, new LinearLayout.LayoutParams(0,
-                    ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+            holder.view.bind(currentTopic);
         }
 
         private void bindComment(CommentHolder holder, Row row) {
@@ -1670,8 +1944,8 @@ public class ForumTopicActivity extends AppCompatActivity {
             bindAvatar(holder.avatar, comment.user, author);
             String target = reply && comment.quote != null && comment.quote.user != null
                     ? userName(comment.quote.user) : "";
-            setCommentNameAndTime(holder.name, author, target,
-                    formatDate(comment.createTime), reply, isTopicAuthor(comment.user));
+            setCommentName(holder.name, author, target, reply, isTopicAuthor(comment.user));
+            holder.time.setText(formatDate(comment.createTime));
 
             holder.like.setText(comment.likeCount > 0 ? String.valueOf(comment.likeCount) : "");
             int likeColor = comment.liked ? 0xFF1877F2
@@ -1688,14 +1962,13 @@ public class ForumTopicActivity extends AppCompatActivity {
             if (voice == null) {
                 holder.body.setVisibility(View.VISIBLE);
                 holder.voice.setVisibility(View.GONE);
-                holder.body.setText(Html.fromHtml(safe(comment.content).replace("\n", "<br>"),
-                        Html.FROM_HTML_MODE_LEGACY));
+                holder.body.setText(ForumHtmlCache.parse(comment.content));
             } else {
                 holder.body.setVisibility(View.GONE);
                 holder.voice.setVisibility(View.VISIBLE);
                 String key = String.valueOf(comment.id);
                 holder.voice.setTag(key);
-                int width = Math.min(224, 126 + Math.max(1, voice.durationSec) * 2);
+                int width = Math.min(250, 176 + Math.max(1, voice.durationSec) * 2);
                 LinearLayout.LayoutParams voiceParams = (LinearLayout.LayoutParams) holder.voice.getLayoutParams();
                 voiceParams.width = dp(width);
                 holder.voice.setLayoutParams(voiceParams);
@@ -1713,10 +1986,8 @@ public class ForumTopicActivity extends AppCompatActivity {
                 });
             }
 
-            holder.imageContainer.removeAllViews();
-            addRemoteImages(holder.imageContainer, comment.imageList, dp(6));
-            holder.imageContainer.setVisibility(holder.imageContainer.getChildCount() > 0
-                    ? View.VISIBLE : View.GONE);
+            holder.imageContainer.bind(comment.imageList, dp(220), dp(6),
+                    isDark() ? 0xFF24262B : 0xFFF0F1F3);
 
             View.OnLongClickListener longClick = v -> {
                 v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
@@ -1737,15 +2008,14 @@ public class ForumTopicActivity extends AppCompatActivity {
             holder.body.setOnClickListener(replyClick);
         }
 
-        private void setCommentNameAndTime(TextView view, String author, String target,
-                                           String time, boolean reply, boolean owner) {
+        private void setCommentName(TextView view, String author, String target,
+                                    boolean reply, boolean owner) {
             String safeAuthor = TextUtils.isEmpty(author) ? "用户" : author;
             String safeTarget = TextUtils.isEmpty(target) ? "" : target;
             String connector = reply && !TextUtils.isEmpty(safeTarget) ? " 回复 " : "";
             String namePart = safeAuthor + connector + safeTarget;
             String ownerPart = owner ? "  楼主" : "";
-            String timePart = " · " + safe(time);
-            SpannableString value = new SpannableString(namePart + ownerPart + timePart);
+            SpannableString value = new SpannableString(namePart + ownerPart);
             int normalName = isDark() ? 0xFFE4E6E9 : 0xFF30353B;
             int replyName = isDark() ? 0xFFA3A9B1 : 0xFF7E858D;
             int connectorColor = isDark() ? 0xFF767D86 : 0xFFA1A7AE;
@@ -1769,12 +2039,6 @@ public class ForumTopicActivity extends AppCompatActivity {
                 value.setSpan(new RelativeSizeSpan(0.82f), ownerStart, ownerEnd,
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
-            int timeStart = namePart.length() + ownerPart.length();
-            int timeColor = isDark() ? 0xFF666D75 : 0xFFB4B9BF;
-            value.setSpan(new ForegroundColorSpan(timeColor), timeStart, value.length(),
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            value.setSpan(new RelativeSizeSpan(0.80f), timeStart, value.length(),
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             view.setText(value);
             view.setTextSize(TypedValue.COMPLEX_UNIT_SP, reply ? 12 : 13);
         }
@@ -1862,14 +2126,14 @@ public class ForumTopicActivity extends AppCompatActivity {
         like.setGravity(Gravity.CENTER);
         like.setCompoundDrawablePadding(dp(1));
         like.setBackground(selectableBackground());
-        header.addView(like, new LinearLayout.LayoutParams(dp(34), dp(30)));
+        header.addView(like, new LinearLayout.LayoutParams(dp(40), dp(32)));
 
         TextView more = text("⋮", 20, dark ? 0xFF858B93 : 0xFF9AA0A7, false);
         more.setGravity(Gravity.CENTER);
         more.setIncludeFontPadding(false);
         more.setContentDescription("评论操作");
         more.setBackground(selectableBackground());
-        header.addView(more, new LinearLayout.LayoutParams(dp(25), dp(30)));
+        header.addView(more, new LinearLayout.LayoutParams(dp(30), dp(32)));
         root.addView(header, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -1882,18 +2146,24 @@ public class ForumTopicActivity extends AppCompatActivity {
 
         VoiceBubbleView voice = new VoiceBubbleView(context);
         voice.setVisibility(View.GONE);
-        LinearLayout.LayoutParams voiceParams = new LinearLayout.LayoutParams(dp(132), dp(42));
+        LinearLayout.LayoutParams voiceParams = new LinearLayout.LayoutParams(dp(176), dp(48));
         voiceParams.topMargin = dp(6);
         voiceParams.leftMargin = dp(40);
         root.addView(voice, voiceParams);
 
-        LinearLayout images = new LinearLayout(context);
-        images.setOrientation(LinearLayout.VERTICAL);
-        images.setVisibility(View.GONE);
+        ForumRemoteImageListView images = new ForumRemoteImageListView(context);
         LinearLayout.LayoutParams imagesParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         imagesParams.leftMargin = dp(40);
         root.addView(images, imagesParams);
+
+        TextView time = text("", 10.5f, dark ? 0xFF6F757D : 0xFFA7ADB4, false);
+        time.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams timeParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(24));
+        timeParams.leftMargin = dp(40);
+        timeParams.topMargin = dp(2);
+        root.addView(time, timeParams);
 
         View divider = divider();
         LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
@@ -1918,7 +2188,280 @@ public class ForumTopicActivity extends AppCompatActivity {
         return root;
     }
 
+    private final class ArticleView extends LinearLayout {
+        private final LinearLayout topMeta;
+        private final TextView category;
+        private final TextView sticky;
+        private final TextView recommend;
+        private final TextView title;
+        private final AvatarView avatar;
+        private final TextView author;
+        private final TextView authorMeta;
+        private final TextView follow;
+        private final TextView more;
+        private final TextView content;
+        private final ForumRemoteImageListView images;
+        private final TextView eyeAction;
+        private final TextView likeAction;
+        private final TextView favoriteAction;
+        private final TextView commentAction;
+        private final TextView commentTitle;
+        private final TextView hotSort;
+        private final TextView ascSort;
+        private final TextView descSort;
+
+        ArticleView(Context context) {
+            super(context);
+            setOrientation(VERTICAL);
+            setPadding(dp(18), dp(12), dp(18), 0);
+            setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
+            setOnClickListener(v -> {
+                if (replyParentId > 0 || replyQuoteId > 0) clearReplyTarget();
+            });
+
+            topMeta = new LinearLayout(context);
+            topMeta.setGravity(Gravity.CENTER_VERTICAL);
+            category = text("", 12, 0xFF1877F2, true);
+            category.setGravity(Gravity.CENTER);
+            category.setPadding(dp(10), 0, dp(10), 0);
+            category.setBackground(roundRect(isDark() ? 0xFF243B59 : 0xFFEAF3FF, 12));
+            topMeta.addView(category, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(26)));
+            sticky = smallBadge("置顶", 0xFFB96800,
+                    isDark() ? 0xFF40311D : 0xFFFFF0D6);
+            LinearLayout.LayoutParams stickyParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(23));
+            stickyParams.leftMargin = dp(6);
+            topMeta.addView(sticky, stickyParams);
+            recommend = smallBadge("推荐", 0xFF1877F2,
+                    isDark() ? 0xFF243B59 : 0xFFEAF3FF);
+            LinearLayout.LayoutParams recommendParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(23));
+            recommendParams.leftMargin = dp(6);
+            topMeta.addView(recommend, recommendParams);
+            addView(topMeta);
+
+            title = text("", 24, isDark() ? Color.WHITE : 0xFF17191C, true);
+            title.setLineSpacing(0, 1.10f);
+            LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            titleParams.topMargin = dp(10);
+            addView(title, titleParams);
+
+            LinearLayout authorRow = new LinearLayout(context);
+            authorRow.setGravity(Gravity.CENTER_VERTICAL);
+            authorRow.setPadding(0, dp(13), 0, 0);
+            avatar = new AvatarView(context);
+            avatar.setSize(39);
+            authorRow.addView(avatar, new LinearLayout.LayoutParams(dp(43), dp(43)));
+
+            LinearLayout authorCopy = new LinearLayout(context);
+            authorCopy.setOrientation(VERTICAL);
+            LinearLayout nameRow = new LinearLayout(context);
+            nameRow.setGravity(Gravity.CENTER_VERTICAL);
+            author = text("", 14, isDark() ? Color.WHITE : 0xFF272B31, true);
+            nameRow.addView(author);
+            TextView ownerBadge = smallBadge("楼主", 0xFF1877F2,
+                    isDark() ? 0xFF243B59 : 0xFFEAF3FF);
+            LinearLayout.LayoutParams ownerBadgeParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(20));
+            ownerBadgeParams.leftMargin = dp(6);
+            nameRow.addView(ownerBadge, ownerBadgeParams);
+            authorCopy.addView(nameRow);
+            authorMeta = text("", 12, isDark() ? 0xFF8F949C : 0xFF7A8088, false);
+            authorCopy.addView(authorMeta);
+            LinearLayout.LayoutParams authorCopyParams = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            authorCopyParams.leftMargin = dp(10);
+            authorRow.addView(authorCopy, authorCopyParams);
+
+            follow = text("", 12.5f, 0xFF1877F2, true);
+            follow.setGravity(Gravity.CENTER);
+            follow.setMinWidth(dp(62));
+            follow.setPadding(dp(10), 0, dp(10), 0);
+            follow.setOnClickListener(v -> changeAuthorFollow());
+            LinearLayout.LayoutParams followParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(32));
+            followParams.rightMargin = dp(3);
+            authorRow.addView(follow, followParams);
+
+            more = text("⋮", 27, isDark() ? 0xFFD8DADE : 0xFF4D535B, false);
+            more.setGravity(Gravity.CENTER);
+            more.setContentDescription("帖子操作");
+            more.setBackground(selectableBackground());
+            more.setOnClickListener(v -> showTopicMenu());
+            authorRow.addView(more, new LinearLayout.LayoutParams(dp(44), dp(44)));
+            addView(authorRow, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(0.7f));
+            dividerParams.topMargin = dp(13);
+            dividerParams.bottomMargin = dp(15);
+            addView(divider(), dividerParams);
+
+            content = htmlText("", 17);
+            content.setMaxLines(Integer.MAX_VALUE);
+            content.setEllipsize(null);
+            content.setOnClickListener(v -> clearReplyTarget());
+            addView(content, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            images = new ForumRemoteImageListView(context);
+            addView(images, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            LinearLayout actions = new LinearLayout(context);
+            actions.setGravity(Gravity.CENTER_VERTICAL);
+            actions.setPadding(0, dp(12), 0, dp(10));
+            eyeAction = createTopicAction();
+            likeAction = createTopicAction();
+            favoriteAction = createTopicAction();
+            commentAction = createTopicAction();
+            actions.addView(eyeAction, actionParams());
+            actions.addView(likeAction, actionParams());
+            actions.addView(favoriteAction, actionParams());
+            actions.addView(commentAction, actionParams());
+            addView(actions, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            addView(divider(), new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(0.8f)));
+
+            LinearLayout commentsHeader = new LinearLayout(context);
+            commentsHeader.setGravity(Gravity.CENTER_VERTICAL);
+            commentTitle = text("评论", 17, isDark() ? Color.WHITE : 0xFF202328, true);
+            commentsHeader.addView(commentTitle, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+            LinearLayout pill = new LinearLayout(context);
+            pill.setGravity(Gravity.CENTER_VERTICAL);
+            pill.setPadding(dp(2), dp(2), dp(2), dp(2));
+            pill.setBackground(roundRect(isDark() ? 0xFF25272C : 0xFFF1F3F5, 15));
+            hotSort = createSortTab("热门", COMMENT_SORT_HOT);
+            ascSort = createSortTab("正序", COMMENT_SORT_ASC);
+            descSort = createSortTab("倒序", COMMENT_SORT_DESC);
+            pill.addView(hotSort, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+            pill.addView(ascSort, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+            pill.addView(descSort, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+            commentsHeader.addView(pill, new LinearLayout.LayoutParams(dp(150), dp(32)));
+            addView(commentsHeader, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
+        }
+
+        void bind(@Nullable ForumApiClient.Topic topic) {
+            if (topic == null) {
+                setVisibility(GONE);
+                images.recycle();
+                return;
+            }
+            setVisibility(VISIBLE);
+            boolean hasCategory = topic.category != null
+                    && !TextUtils.isEmpty(topic.category.name);
+            category.setVisibility(hasCategory ? VISIBLE : GONE);
+            category.setText(hasCategory ? topic.category.name : "");
+            sticky.setVisibility(topic.sticky ? VISIBLE : GONE);
+            recommend.setVisibility(topic.recommend ? VISIBLE : GONE);
+            topMeta.setVisibility(hasCategory || topic.sticky || topic.recommend ? VISIBLE : GONE);
+
+            title.setText(safe(topic.title));
+            String authorName = userName(topic.user);
+            author.setText(authorName);
+            authorMeta.setText(formatDate(topic.createTime));
+            bindAvatar(avatar, topic.user, authorName);
+
+            String currentForumUser = ForumApiClient.getInstance().getCurrentForumUserId();
+            boolean ownTopic = topic.user != null
+                    && TextUtils.equals(currentForumUser, topic.user.id);
+            follow.setVisibility(!ownTopic && authorFollowStateLoaded ? VISIBLE : GONE);
+            follow.setText(authorFollowed ? "已关注" : "+ 关注");
+            follow.setTextColor(authorFollowed
+                    ? (isDark() ? 0xFFAAB0B8 : 0xFF737A83) : 0xFF1877F2);
+            follow.setBackground(roundRect(authorFollowed
+                    ? (isDark() ? 0xFF292C31 : 0xFFF0F2F5)
+                    : (isDark() ? 0xFF243B59 : 0xFFEAF3FF), 16));
+
+            String body = TextUtils.isEmpty(topic.content) ? topic.summary : topic.content;
+            content.setText(ForumHtmlCache.parse(body));
+            images.bind(topic.imageList, dp(220), dp(10),
+                    isDark() ? 0xFF24262B : 0xFFF0F1F3);
+
+            bindTopicAction(eyeAction, R.drawable.ic_forum_eye,
+                    String.valueOf(Math.max(0, topic.viewCount)), false, null, 22);
+            bindTopicAction(likeAction,
+                    topic.liked ? R.drawable.ic_forum_heart_filled
+                            : R.drawable.ic_forum_heart_round,
+                    String.valueOf(Math.max(0, topic.likeCount)), topic.liked,
+                    v -> changeTopicLike(), 19);
+            bindTopicAction(favoriteAction,
+                    topic.favorited ? R.drawable.ic_forum_bookmark_filled
+                            : R.drawable.ic_forum_bookmark,
+                    "", topic.favorited, v -> changeFavorite(), 19);
+            bindTopicAction(commentAction, R.drawable.ic_forum_chat_bubble,
+                    String.valueOf(Math.max(0, topic.commentCount)), false,
+                    v -> focusCommentInput(), 19);
+
+            commentTitle.setText(topic.commentCount > 0
+                    ? "评论 " + topic.commentCount : "评论");
+            bindSortTab(hotSort, COMMENT_SORT_HOT);
+            bindSortTab(ascSort, COMMENT_SORT_ASC);
+            bindSortTab(descSort, COMMENT_SORT_DESC);
+        }
+
+        void recycle() {
+            images.recycle();
+        }
+
+        private TextView createTopicAction() {
+            TextView action = text("", 12.5f,
+                    isDark() ? 0xFFB8BBC2 : 0xFF59616A, false);
+            action.setGravity(Gravity.CENTER);
+            action.setCompoundDrawablePadding(dp(3));
+            action.setPadding(dp(8), 0, dp(8), 0);
+            return action;
+        }
+
+        private LinearLayout.LayoutParams actionParams() {
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
+            params.rightMargin = dp(5);
+            return params;
+        }
+
+        private void bindTopicAction(TextView action, int iconRes, String label,
+                                     boolean active, @Nullable View.OnClickListener listener,
+                                     int iconSize) {
+            int color = active ? 0xFFE34A55 : (isDark() ? 0xFFB8BBC2 : 0xFF59616A);
+            action.setText(label);
+            action.setTextColor(color);
+            setCompoundIcon(action, iconRes, iconSize, color);
+            action.setOnClickListener(listener);
+            action.setClickable(listener != null);
+            action.setBackground(listener == null ? null : selectableBackground());
+        }
+
+        private TextView createSortTab(String label, String value) {
+            TextView tab = text(label, 11.5f,
+                    isDark() ? 0xFFAEB3BB : 0xFF69717A, false);
+            tab.setGravity(Gravity.CENTER);
+            tab.setOnClickListener(v -> setCommentSort(value));
+            return tab;
+        }
+
+        private void bindSortTab(TextView tab, String value) {
+            boolean selected = TextUtils.equals(commentSort, value);
+            tab.setTextColor(selected ? 0xFF1877F2
+                    : (isDark() ? 0xFFAEB3BB : 0xFF69717A));
+            tab.setTypeface(Typeface.DEFAULT, selected ? Typeface.BOLD : Typeface.NORMAL);
+            tab.setBackground(selected
+                    ? roundRect(isDark() ? 0xFF34465F : Color.WHITE, 13) : null);
+        }
+    }
+
     private final class VoiceBubbleView extends LinearLayout {
+        private final AppCompatImageView playView;
         private final VoiceSignalView signalView;
         private final TextView durationView;
 
@@ -1926,37 +2469,51 @@ public class ForumTopicActivity extends AppCompatActivity {
             super(context);
             setOrientation(HORIZONTAL);
             setGravity(Gravity.CENTER_VERTICAL);
-            setPadding(dp(12), 0, dp(12), 0);
+            setPadding(dp(7), 0, dp(10), 0);
             setClickable(true);
 
-            signalView = new VoiceSignalView(context);
-            addView(signalView, new LinearLayout.LayoutParams(dp(30), dp(30)));
+            playView = new AppCompatImageView(context);
+            playView.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
+            playView.setPadding(dp(9), dp(9), dp(9), dp(9));
+            addView(playView, new LinearLayout.LayoutParams(dp(34), dp(34)));
 
-            durationView = text("1″", 12.5f,
+            signalView = new VoiceSignalView(context);
+            LinearLayout.LayoutParams signalParams = new LinearLayout.LayoutParams(
+                    0, dp(28), 1f);
+            signalParams.leftMargin = dp(8);
+            signalParams.rightMargin = dp(7);
+            addView(signalView, signalParams);
+
+            durationView = text("1″", 12,
                     isDark() ? 0xFFDDE0E5 : 0xFF4B525B, true);
-            durationView.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+            durationView.setGravity(Gravity.CENTER);
             durationView.setSingleLine(true);
-            LinearLayout.LayoutParams durationParams = new LinearLayout.LayoutParams(
-                    0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-            durationParams.leftMargin = dp(8);
-            addView(durationView, durationParams);
+            addView(durationView, new LinearLayout.LayoutParams(dp(36),
+                    ViewGroup.LayoutParams.MATCH_PARENT));
         }
 
         void bind(VoicePayload payload, int seconds, boolean active, float progress) {
             if (payload == null) return;
+            int accent = active ? 0xFF1877F2 : (isDark() ? 0xFFDDE0E5 : 0xFF4F5862);
             signalView.setProgress(progress);
             signalView.setActive(active);
             durationView.setText(Math.max(0, seconds) + "″");
-            durationView.setTextColor(active ? 0xFF1877F2
-                    : (isDark() ? 0xFFDDE0E5 : 0xFF4B525B));
+            durationView.setTextColor(accent);
+            playView.setBackground(roundRect(active
+                    ? (isDark() ? 0xFF315174 : 0xFFDCEBFF)
+                    : (isDark() ? 0xFF353941 : Color.WHITE), 17));
+            setImageIcon(playView, active ? R.drawable.ic_forum_pause : R.drawable.ic_forum_play,
+                    15, active ? 0xFF1877F2 : (isDark() ? 0xFFE5E8EC : 0xFF4F5862));
             setBackground(roundRect(active
                     ? (isDark() ? 0xFF263B57 : 0xFFEAF3FF)
-                    : (isDark() ? 0xFF25282E : 0xFFF0F3F7), 21));
+                    : (isDark() ? 0xFF25282E : 0xFFF0F3F7), 24));
         }
     }
 
     private final class VoiceSignalView extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final float[] bars = {0.34f, 0.58f, 0.82f, 0.46f, 0.72f, 0.92f, 0.56f,
+                0.38f, 0.68f, 0.88f, 0.52f, 0.76f, 0.44f, 0.64f, 0.36f};
         private float progress;
         private boolean active;
 
@@ -1964,7 +2521,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             super(context);
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeCap(Paint.Cap.ROUND);
-            paint.setStrokeWidth(dp(2.2f));
+            paint.setStrokeWidth(dp(2.0f));
         }
 
         void setProgress(float value) {
@@ -1980,26 +2537,29 @@ public class ForumTopicActivity extends AppCompatActivity {
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            int base = active ? 0xFF1877F2 : (isDark() ? 0xFFD1D5DA : 0xFF59616A);
-            paint.setColor(base);
-            float cx = getWidth() * 0.22f;
-            float cy = getHeight() * 0.5f;
-            paint.setStyle(Paint.Style.FILL);
-            canvas.drawCircle(cx, cy, dp(2.0f), paint);
-            paint.setStyle(Paint.Style.STROKE);
-            for (int i = 0; i < 3; i++) {
-                float r = dp(4.8f + i * 4.0f);
-                int alpha = active && progress > (i / 3f) ? 255 : 205;
-                paint.setAlpha(alpha);
-                RectF oval = new RectF(cx - r, cy - r, cx + r, cy + r);
-                canvas.drawArc(oval, -48, 96, false, paint);
+            if (getWidth() <= 0 || getHeight() <= 0) return;
+            float gap = getWidth() / (float) bars.length;
+            float centerY = getHeight() / 2f;
+            int progressed = Math.round(progress * bars.length);
+            for (int i = 0; i < bars.length; i++) {
+                boolean played = i < progressed;
+                paint.setColor(played ? 0xFF1877F2
+                        : (isDark() ? 0xFF8D949D : 0xFF9AA2AB));
+                paint.setAlpha(played ? 255 : 205);
+                float x = gap * i + gap / 2f;
+                float half = Math.max(dp(2), getHeight() * bars[i] * 0.42f);
+                canvas.drawLine(x, centerY - half, x, centerY + half, paint);
             }
             paint.setAlpha(255);
         }
     }
 
-    private static final class ArticleHolder extends RecyclerView.ViewHolder {
-        ArticleHolder(@NonNull View itemView) { super(itemView); }
+    private final class ArticleHolder extends RecyclerView.ViewHolder {
+        final ArticleView view;
+        ArticleHolder(@NonNull ArticleView itemView) {
+            super(itemView);
+            view = itemView;
+        }
     }
 
     private static final class SimpleHolder extends RecyclerView.ViewHolder {
@@ -2012,7 +2572,8 @@ public class ForumTopicActivity extends AppCompatActivity {
         final TextView name;
         final TextView body;
         final VoiceBubbleView voice;
-        final LinearLayout imageContainer;
+        final ForumRemoteImageListView imageContainer;
+        final TextView time;
         final TextView like;
         final TextView more;
 
@@ -2026,7 +2587,8 @@ public class ForumTopicActivity extends AppCompatActivity {
             more = (TextView) header.getChildAt(3);
             body = (TextView) root.getChildAt(1);
             voice = (VoiceBubbleView) root.getChildAt(2);
-            imageContainer = (LinearLayout) root.getChildAt(3);
+            imageContainer = (ForumRemoteImageListView) root.getChildAt(3);
+            time = (TextView) root.getChildAt(4);
         }
     }
 
@@ -2048,25 +2610,28 @@ public class ForumTopicActivity extends AppCompatActivity {
         final ForumApiClient.Comment parent;
         final long parentId;
         final boolean reply;
+        final String contentKey;
 
         private Row(int type, ForumApiClient.Comment comment,
-                    ForumApiClient.Comment parent, long parentId, boolean reply) {
+                    ForumApiClient.Comment parent, long parentId, boolean reply,
+                    @NonNull String contentKey) {
             this.type = type;
             this.comment = comment;
             this.parent = parent;
             this.parentId = parentId;
             this.reply = reply;
+            this.contentKey = contentKey;
         }
 
-        static Row article() { return new Row(1, null, null, 0, false); }
-        static Row comment(ForumApiClient.Comment comment, long parentId, boolean reply) {
-            return new Row(2, comment, null, parentId, reply);
+        static Row article(String key) { return new Row(1, null, null, 0, false, key); }
+        static Row comment(ForumApiClient.Comment comment, long parentId, boolean reply, String key) {
+            return new Row(2, comment, null, parentId, reply, key);
         }
-        static Row toggle(ForumApiClient.Comment parent) {
-            return new Row(3, null, parent, parent.id, false);
+        static Row toggle(ForumApiClient.Comment parent, String key) {
+            return new Row(3, null, parent, parent.id, false, key);
         }
-        static Row empty() { return new Row(4, null, null, 0, false); }
-        static Row loadMore() { return new Row(5, null, null, 0, false); }
+        static Row empty() { return new Row(4, null, null, 0, false, "empty"); }
+        static Row loadMore(String key) { return new Row(5, null, null, 0, false, key); }
 
         long stableId() {
             if (type == 1) return Long.MIN_VALUE + 1;
@@ -2076,6 +2641,16 @@ public class ForumTopicActivity extends AppCompatActivity {
             long id = comment == null ? 0 : comment.id;
             return id * 10L + (reply ? 2L : 1L);
         }
+    }
+
+    private static String imageListKey(@Nullable List<ForumApiClient.ImageInfo> images) {
+        if (images == null || images.isEmpty()) return "";
+        StringBuilder key = new StringBuilder();
+        for (ForumApiClient.ImageInfo image : images) {
+            if (image == null) continue;
+            key.append(safe(image.url)).append(':').append(safe(image.preview)).append(';');
+        }
+        return key.toString();
     }
 
     private static final class VoicePayload {
@@ -2123,26 +2698,8 @@ public class ForumTopicActivity extends AppCompatActivity {
         TextView view = text("", sizeSp, isDark() ? 0xFFE8E9EB : 0xFF272A2F, false);
         view.setLineSpacing(dp(3), 1.08f);
         view.setMovementMethod(LinkMovementMethod.getInstance());
-        view.setText(Html.fromHtml(safe(html).replace("\n", "<br>"), Html.FROM_HTML_MODE_LEGACY));
+        view.setText(ForumHtmlCache.parse(html));
         return view;
-    }
-
-    private void addRemoteImages(LinearLayout container, List<ForumApiClient.ImageInfo> images,
-                                 int topMargin) {
-        if (images == null || images.isEmpty()) return;
-        for (ForumApiClient.ImageInfo info : images) {
-            if (info == null || TextUtils.isEmpty(info.url)) continue;
-            ImageView image = new ImageView(this);
-            image.setAdjustViewBounds(true);
-            image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            image.setBackgroundColor(isDark() ? 0xFF24262B : 0xFFF0F1F3);
-            String remote = TextUtils.isEmpty(info.preview) ? info.url : info.preview;
-            Glide.with(this).load(ForumApiClient.getInstance().resolveUrl(remote)).into(image);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(220));
-            params.topMargin = topMargin;
-            container.addView(image, params);
-        }
     }
 
     private void bindAvatar(AvatarView avatar, ForumApiClient.User user, String fallbackName) {
@@ -2208,6 +2765,19 @@ public class ForumTopicActivity extends AppCompatActivity {
         return AppCompatResources.getDrawable(this, out.resourceId);
     }
 
+    private void setImageIcon(AppCompatImageView view, int resId, int sizeDp, int color) {
+        Drawable drawable = AppCompatResources.getDrawable(this, resId);
+        if (drawable == null) {
+            view.setImageDrawable(null);
+            return;
+        }
+        drawable = DrawableCompat.wrap(drawable.mutate());
+        DrawableCompat.setTint(drawable, color);
+        int size = dp(sizeDp);
+        drawable.setBounds(0, 0, size, size);
+        view.setImageDrawable(drawable);
+    }
+
     private void setCompoundIcon(TextView view, int resId, int sizeDp, int color) {
         Drawable drawable = AppCompatResources.getDrawable(this, resId);
         if (drawable == null) return;
@@ -2263,7 +2833,11 @@ public class ForumTopicActivity extends AppCompatActivity {
 
     private abstract class VoidCallback implements ForumApiClient.ResultCallback<Void> {
         abstract void success();
-        @Override public final void onSuccess(@Nullable Void data) { success(); }
-        @Override public final void onError(@NonNull String message) { finishTopicAction(message); }
+        @Override public final void onSuccess(@Nullable Void data) {
+            if (!isDead()) success();
+        }
+        @Override public final void onError(@NonNull String message) {
+            if (!isDead()) finishTopicAction(message);
+        }
     }
 }

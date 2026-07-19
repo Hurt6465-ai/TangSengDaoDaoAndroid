@@ -17,7 +17,10 @@ import com.chat.base.net.RetrofitUtils;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.MediaType;
@@ -77,6 +80,70 @@ public final class ForumApiClient {
         void onSuccess(@Nullable T data);
 
         void onError(@NonNull String message);
+    }
+
+    /**
+     * Lifecycle-bound collection of Retrofit calls. A Fragment/Activity creates one scope,
+     * passes it to read requests, and cancels it when its view is destroyed.
+     */
+    public static final class RequestScope {
+        private final Set<Call<?>> calls = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        private volatile boolean cancelled;
+
+        private <T> Call<T> track(@NonNull Call<T> call) {
+            if (cancelled) {
+                call.cancel();
+                return call;
+            }
+            calls.add(call);
+            if (cancelled && calls.remove(call)) call.cancel();
+            return call;
+        }
+
+        private void complete(@NonNull Call<?> call) {
+            calls.remove(call);
+        }
+
+        public void cancelAll() {
+            cancelled = true;
+            for (Call<?> call : calls) {
+                if (call != null) call.cancel();
+            }
+            calls.clear();
+        }
+
+        public boolean isCancelled() {
+            return cancelled;
+        }
+    }
+
+    private static <T> ResultCallback<T> scopedCallback(@Nullable RequestScope scope,
+                                                        @NonNull ResultCallback<T> callback) {
+        if (scope == null) return callback;
+        return new ResultCallback<T>() {
+            @Override
+            public void onSuccess(@Nullable T data) {
+                if (!scope.isCancelled()) callback.onSuccess(data);
+            }
+
+            @Override
+            public void onError(@NonNull String message) {
+                if (!scope.isCancelled()) callback.onError(message);
+            }
+        };
+    }
+
+    private <T> Call<ApiEnvelope<T>> enqueue(@NonNull Call<ApiEnvelope<T>> call,
+                                             @Nullable RequestScope scope,
+                                             @NonNull ResultCallback<T> callback) {
+        if (scope != null) scope.track(call);
+        call.enqueue(new EnvelopeCallback<>(callback, scope));
+        return call;
+    }
+
+    public void ensureSession(@NonNull Context context, @Nullable RequestScope scope,
+                              @NonNull ResultCallback<String> callback) {
+        ensureSession(context, scopedCallback(scope, callback));
     }
 
     public void ensureSession(@NonNull Context context, @NonNull ResultCallback<String> callback) {
@@ -201,69 +268,119 @@ public final class ForumApiClient {
     }
 
     public void getCategories(@NonNull ResultCallback<List<Category>> callback) {
-        forumService().categoryNavs(authHeader()).enqueue(new EnvelopeCallback<>(callback));
+        getCategories(null, callback);
+    }
+
+    public void getCategories(@Nullable RequestScope scope,
+                              @NonNull ResultCallback<List<Category>> callback) {
+        enqueue(forumService().categoryNavs(authHeader()), scope, callback);
     }
 
     public void getCategoriesForType(int topicType,
                                      @NonNull ResultCallback<List<Category>> callback) {
-        forumService().categories(authHeader(), topicType)
-                .enqueue(new EnvelopeCallback<>(callback));
+        getCategoriesForType(topicType, null, callback);
+    }
+
+    public void getCategoriesForType(int topicType, @Nullable RequestScope scope,
+                                     @NonNull ResultCallback<List<Category>> callback) {
+        enqueue(forumService().categories(authHeader(), topicType), scope, callback);
     }
 
     public void getArticles(@Nullable String cursor,
                             @NonNull ResultCallback<Page<Article>> callback) {
-        forumService().articles(authHeader(), TextUtils.isEmpty(cursor) ? "" : cursor)
-                .enqueue(new EnvelopeCallback<>(callback));
+        getArticles(cursor, null, callback);
+    }
+
+    public void getArticles(@Nullable String cursor, @Nullable RequestScope scope,
+                            @NonNull ResultCallback<Page<Article>> callback) {
+        enqueue(forumService().articles(authHeader(), TextUtils.isEmpty(cursor) ? "" : cursor),
+                scope, callback);
     }
 
     public void getArticle(long articleId, @NonNull ResultCallback<Article> callback) {
-        forumService().article(authHeader(), articleId).enqueue(new EnvelopeCallback<>(callback));
+        getArticle(articleId, null, callback);
+    }
+
+    public void getArticle(long articleId, @Nullable RequestScope scope,
+                           @NonNull ResultCallback<Article> callback) {
+        enqueue(forumService().article(authHeader(), articleId), scope, callback);
     }
 
     public void getArticleComments(long articleId, @Nullable String cursor, @Nullable String sort,
                                    @NonNull ResultCallback<Page<Comment>> callback) {
-        forumService().comments(authHeader(), "article", String.valueOf(articleId),
+        getArticleComments(articleId, cursor, sort, null, callback);
+    }
+
+    public void getArticleComments(long articleId, @Nullable String cursor, @Nullable String sort,
+                                   @Nullable RequestScope scope,
+                                   @NonNull ResultCallback<Page<Comment>> callback) {
+        enqueue(forumService().comments(authHeader(), "article", String.valueOf(articleId),
                         TextUtils.isEmpty(cursor) ? "" : cursor,
-                        TextUtils.isEmpty(sort) ? "asc" : sort)
-                .enqueue(new EnvelopeCallback<>(callback));
+                        TextUtils.isEmpty(sort) ? "asc" : sort),
+                scope, callback);
     }
 
     public void getTopics(long categoryId, @Nullable String cursor,
                           @NonNull ResultCallback<Page<Topic>> callback) {
-        getTopics(categoryId, cursor, "latestPublish", callback);
+        getTopics(categoryId, cursor, "latestPublish", null, callback);
     }
 
     public void getTopics(long categoryId, @Nullable String cursor, @Nullable String sort,
                           @NonNull ResultCallback<Page<Topic>> callback) {
-        forumService().topics(authHeader(), categoryId,
+        getTopics(categoryId, cursor, sort, null, callback);
+    }
+
+    public void getTopics(long categoryId, @Nullable String cursor, @Nullable String sort,
+                          @Nullable RequestScope scope,
+                          @NonNull ResultCallback<Page<Topic>> callback) {
+        enqueue(forumService().topics(authHeader(), categoryId,
                         TextUtils.isEmpty(cursor) ? "" : cursor,
-                        TextUtils.isEmpty(sort) ? "" : sort)
-                .enqueue(new EnvelopeCallback<>(callback));
+                        TextUtils.isEmpty(sort) ? "" : sort),
+                scope, callback);
     }
 
     public void getUserTopics(@NonNull String userId, @Nullable String cursor,
                               @NonNull ResultCallback<Page<Topic>> callback) {
-        forumService().userTopics(requireAuthHeader(), userId,
-                        TextUtils.isEmpty(cursor) ? "" : cursor)
-                .enqueue(new EnvelopeCallback<>(callback));
+        getUserTopics(userId, cursor, null, callback);
+    }
+
+    public void getUserTopics(@NonNull String userId, @Nullable String cursor,
+                              @Nullable RequestScope scope,
+                              @NonNull ResultCallback<Page<Topic>> callback) {
+        enqueue(forumService().userTopics(requireAuthHeader(), userId,
+                        TextUtils.isEmpty(cursor) ? "" : cursor),
+                scope, callback);
     }
 
     public void getFavorites(@Nullable String cursor,
                              @NonNull ResultCallback<Page<Favorite>> callback) {
-        forumService().favorites(requireAuthHeader(),
-                        TextUtils.isEmpty(cursor) ? "" : cursor)
-                .enqueue(new EnvelopeCallback<>(callback));
+        getFavorites(cursor, null, callback);
+    }
+
+    public void getFavorites(@Nullable String cursor, @Nullable RequestScope scope,
+                             @NonNull ResultCallback<Page<Favorite>> callback) {
+        enqueue(forumService().favorites(requireAuthHeader(),
+                        TextUtils.isEmpty(cursor) ? "" : cursor),
+                scope, callback);
     }
 
     public void getRecentMessages(@NonNull ResultCallback<RecentMessages> callback) {
-        forumService().recentMessages(requireAuthHeader())
-                .enqueue(new EnvelopeCallback<>(callback));
+        getRecentMessages(null, callback);
+    }
+
+    public void getRecentMessages(@Nullable RequestScope scope,
+                                  @NonNull ResultCallback<RecentMessages> callback) {
+        enqueue(forumService().recentMessages(requireAuthHeader()), scope, callback);
     }
 
     public void getUserFollowed(@NonNull String userId,
                                 @NonNull ResultCallback<Boolean> callback) {
-        forumService().isFollowed(requireAuthHeader(), userId)
-                .enqueue(new EnvelopeCallback<>(callback));
+        getUserFollowed(userId, null, callback);
+    }
+
+    public void getUserFollowed(@NonNull String userId, @Nullable RequestScope scope,
+                                @NonNull ResultCallback<Boolean> callback) {
+        enqueue(forumService().isFollowed(requireAuthHeader(), userId), scope, callback);
     }
 
     public void setUserFollowed(@NonNull String userId, boolean followed,
@@ -271,14 +388,19 @@ public final class ForumApiClient {
         Call<ApiEnvelope<Void>> call = followed
                 ? forumService().follow(requireAuthHeader(), userId)
                 : forumService().unfollow(requireAuthHeader(), userId);
-        call.enqueue(new EnvelopeCallback<>(callback));
+        enqueue(call, null, callback);
     }
 
     public void getMessages(@Nullable String cursor,
                             @NonNull ResultCallback<Page<Message>> callback) {
-        forumService().messages(requireAuthHeader(),
-                        TextUtils.isEmpty(cursor) ? "" : cursor)
-                .enqueue(new EnvelopeCallback<>(callback));
+        getMessages(cursor, null, callback);
+    }
+
+    public void getMessages(@Nullable String cursor, @Nullable RequestScope scope,
+                            @NonNull ResultCallback<Page<Message>> callback) {
+        enqueue(forumService().messages(requireAuthHeader(),
+                        TextUtils.isEmpty(cursor) ? "" : cursor),
+                scope, callback);
     }
 
     @NonNull
@@ -305,28 +427,45 @@ public final class ForumApiClient {
     }
 
     public void getTopic(@NonNull String topicId, @NonNull ResultCallback<Topic> callback) {
-        forumService().topic(authHeader(), topicId).enqueue(new EnvelopeCallback<>(callback));
+        getTopic(topicId, null, callback);
+    }
+
+    public void getTopic(@NonNull String topicId, @Nullable RequestScope scope,
+                         @NonNull ResultCallback<Topic> callback) {
+        enqueue(forumService().topic(authHeader(), topicId), scope, callback);
     }
 
     public void getComments(@NonNull String topicId, @Nullable String cursor,
                             @NonNull ResultCallback<Page<Comment>> callback) {
-        getComments(topicId, cursor, "desc", callback);
+        getComments(topicId, cursor, "desc", null, callback);
     }
 
     public void getComments(@NonNull String topicId, @Nullable String cursor,
                             @Nullable String sort,
                             @NonNull ResultCallback<Page<Comment>> callback) {
-        forumService().comments(authHeader(), "topic", topicId,
+        getComments(topicId, cursor, sort, null, callback);
+    }
+
+    public void getComments(@NonNull String topicId, @Nullable String cursor,
+                            @Nullable String sort, @Nullable RequestScope scope,
+                            @NonNull ResultCallback<Page<Comment>> callback) {
+        enqueue(forumService().comments(authHeader(), "topic", topicId,
                         TextUtils.isEmpty(cursor) ? "" : cursor,
-                        TextUtils.isEmpty(sort) ? "desc" : sort)
-                .enqueue(new EnvelopeCallback<>(callback));
+                        TextUtils.isEmpty(sort) ? "desc" : sort),
+                scope, callback);
     }
 
     public void getReplies(long commentId, @Nullable String cursor,
                            @NonNull ResultCallback<Page<Comment>> callback) {
-        forumService().replies(authHeader(), commentId,
-                        TextUtils.isEmpty(cursor) ? "" : cursor)
-                .enqueue(new EnvelopeCallback<>(callback));
+        getReplies(commentId, cursor, null, callback);
+    }
+
+    public void getReplies(long commentId, @Nullable String cursor,
+                           @Nullable RequestScope scope,
+                           @NonNull ResultCallback<Page<Comment>> callback) {
+        enqueue(forumService().replies(authHeader(), commentId,
+                        TextUtils.isEmpty(cursor) ? "" : cursor),
+                scope, callback);
     }
 
     public void createComment(@NonNull String entityType, @NonNull String entityId,
@@ -347,12 +486,20 @@ public final class ForumApiClient {
                             @NonNull String content, @NonNull List<String> tags,
                             @NonNull List<ImageInfo> images,
                             @NonNull ResultCallback<Topic> callback) {
-        createTopic(0, categoryId, title, content, tags, images, 0, callback);
+        createTopic(0, categoryId, title, content, tags, images, 0, null, callback);
     }
 
     public void createTopic(int type, long categoryId, @NonNull String title,
                             @NonNull String content, @NonNull List<String> tags,
                             @NonNull List<ImageInfo> images, int bountyScore,
+                            @NonNull ResultCallback<Topic> callback) {
+        createTopic(type, categoryId, title, content, tags, images, bountyScore, null, callback);
+    }
+
+    public void createTopic(int type, long categoryId, @NonNull String title,
+                            @NonNull String content, @NonNull List<String> tags,
+                            @NonNull List<ImageInfo> images, int bountyScore,
+                            @Nullable RequestScope scope,
                             @NonNull ResultCallback<Topic> callback) {
         CreateTopicRequest request = new CreateTopicRequest();
         request.type = type;
@@ -363,8 +510,7 @@ public final class ForumApiClient {
         request.tags = tags;
         request.imageList = images;
         request.bountyScore = Math.max(0, bountyScore);
-        forumService().createTopic(requireAuthHeader(), request)
-                .enqueue(new EnvelopeCallback<>(callback));
+        enqueue(forumService().createTopic(requireAuthHeader(), request), scope, callback);
     }
 
     public void setTopicLiked(@NonNull String topicId, boolean liked,
@@ -447,22 +593,32 @@ public final class ForumApiClient {
     }
 
     public void uploadImage(@NonNull File file, @NonNull ResultCallback<UploadResult> callback) {
+        uploadImage(file, null, callback);
+    }
+
+    public void uploadImage(@NonNull File file, @Nullable RequestScope scope,
+                            @NonNull ResultCallback<UploadResult> callback) {
         MediaType mediaType = MediaType.Companion.parse("image/webp");
         RequestBody body = RequestBody.Companion.create(file, mediaType);
         MultipartBody.Part part = MultipartBody.Part.createFormData("image", file.getName(), body);
-        forumService().upload(requireAuthHeader(), part)
-                .enqueue(new EnvelopeCallback<>(callback));
+        enqueue(forumService().upload(requireAuthHeader(), part), scope, callback);
     }
 
     public void getVoiceUploadTarget(@NonNull File file,
                                      @NonNull ResultCallback<VoiceUploadTarget> callback) {
+        getVoiceUploadTarget(file, null, callback);
+    }
+
+    public void getVoiceUploadTarget(@NonNull File file, @Nullable RequestScope scope,
+                                     @NonNull ResultCallback<VoiceUploadTarget> callback) {
+        ResultCallback<VoiceUploadTarget> safeCallback = scopedCallback(scope, callback);
         if (!file.exists() || file.length() <= 0) {
-            callback.onError("录音文件不存在");
+            safeCallback.onError("录音文件不存在");
             return;
         }
         String uid = currentUid();
         if (TextUtils.isEmpty(uid)) {
-            callback.onError("请先登录");
+            safeCallback.onError("请先登录");
             return;
         }
         String name = file.getName();
@@ -476,29 +632,34 @@ public final class ForumApiClient {
         try {
             service = RetrofitUtils.getInstance().createService(TangSengUploadService.class);
         } catch (Throwable error) {
-            callback.onError(readableError(error, "上传服务尚未初始化"));
+            safeCallback.onError(readableError(error, "上传服务尚未初始化"));
             return;
         }
-        service.getUploadFileUrl(requestUrl).enqueue(new Callback<UploadFileUrl>() {
+        Call<UploadFileUrl> requestCall = service.getUploadFileUrl(requestUrl);
+        if (scope != null) scope.track(requestCall);
+        requestCall.enqueue(new Callback<UploadFileUrl>() {
             @Override
             public void onResponse(@NonNull Call<UploadFileUrl> call,
                                    @NonNull Response<UploadFileUrl> response) {
+                if (scope != null) scope.complete(call);
                 UploadFileUrl data = response.body();
                 if (!response.isSuccessful() || data == null || TextUtils.isEmpty(data.url)) {
-                    callback.onError(extractHttpError(response, "无法获取语音上传地址"));
+                    safeCallback.onError(extractHttpError(response, "无法获取语音上传地址"));
                     return;
                 }
                 VoiceUploadTarget target = new VoiceUploadTarget();
                 target.uploadUrl = data.url;
                 target.path = path;
                 target.publicUrl = data.public_url;
-                callback.onSuccess(target);
+                safeCallback.onSuccess(target);
             }
 
             @Override
             public void onFailure(@NonNull Call<UploadFileUrl> call,
                                   @NonNull Throwable throwable) {
-                callback.onError(readableError(throwable, "无法连接上传服务"));
+                if (scope != null) scope.complete(call);
+                if (call.isCanceled()) return;
+                safeCallback.onError(readableError(throwable, "无法连接上传服务"));
             }
         });
     }
@@ -734,15 +895,23 @@ public final class ForumApiClient {
     private static final class EnvelopeCallback<T> implements Callback<ApiEnvelope<T>> {
         private final ResultCallback<T> callback;
         private final String requestToken;
+        private final RequestScope scope;
 
         private EnvelopeCallback(ResultCallback<T> callback) {
+            this(callback, null);
+        }
+
+        private EnvelopeCallback(ResultCallback<T> callback, @Nullable RequestScope scope) {
             this.callback = callback;
+            this.scope = scope;
             this.requestToken = INSTANCE.getSessionToken();
         }
 
         @Override
         public void onResponse(@NonNull Call<ApiEnvelope<T>> call,
                                @NonNull Response<ApiEnvelope<T>> response) {
+            if (scope != null) scope.complete(call);
+            if (call.isCanceled() || (scope != null && scope.isCancelled())) return;
             ApiEnvelope<T> envelope = response.body();
             String error = envelopeError(response, envelope, "论坛返回数据异常", requestToken);
             if (error != null) {
@@ -755,6 +924,8 @@ public final class ForumApiClient {
         @Override
         public void onFailure(@NonNull Call<ApiEnvelope<T>> call,
                               @NonNull Throwable throwable) {
+            if (scope != null) scope.complete(call);
+            if (call.isCanceled() || (scope != null && scope.isCancelled())) return;
             callback.onError(readableError(throwable, "论坛网络请求失败"));
         }
     }

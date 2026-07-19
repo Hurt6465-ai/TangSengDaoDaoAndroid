@@ -9,6 +9,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.SparseArray;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -22,21 +23,27 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /** Native forum notifications, favorites and current user's topics. */
 public class ForumUserCenterActivity extends AppCompatActivity {
     private static final int TAB_MESSAGES = 0;
     private static final int TAB_FAVORITES = 1;
     private static final int TAB_MY_TOPICS = 2;
+    private static final long CACHE_TTL_MS = 3L * 60L * 1000L;
 
+    private final ForumApiClient.RequestScope requestScope = new ForumApiClient.RequestScope();
+    private final SparseArray<TabState> tabStates = new SparseArray<>();
     private LinearLayout tabContainer;
     private RecyclerView recyclerView;
     private TextView stateView;
@@ -45,6 +52,7 @@ public class ForumUserCenterActivity extends AppCompatActivity {
     private String cursor = "";
     private boolean hasMore;
     private boolean loading;
+    private boolean destroyed;
     private int requestGeneration;
 
     public static Intent createIntent(Context context) {
@@ -59,8 +67,16 @@ public class ForumUserCenterActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        saveCurrentTabState();
+        super.onPause();
+    }
+
+    @Override
     protected void onDestroy() {
+        destroyed = true;
         requestGeneration++;
+        requestScope.cancelAll();
         super.onDestroy();
     }
 
@@ -131,6 +147,9 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         stateView = text("正在加载…", 14, dark ? 0xFFB8BBC2 : 0xFF6E737B, false);
         stateView.setGravity(Gravity.CENTER);
         stateView.setPadding(dp(24), dp(24), dp(24), dp(24));
+        stateView.setOnClickListener(v -> {
+            if (!loading) load(true);
+        });
         content.addView(stateView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(content, new LinearLayout.LayoutParams(
@@ -163,9 +182,12 @@ public class ForumUserCenterActivity extends AppCompatActivity {
                 load(true);
                 return;
             }
+            saveCurrentTabState();
             selectedTab = tab;
+            requestGeneration++;
+            loading = false;
             renderTabs();
-            load(true);
+            if (!restoreTabState(tab)) load(true);
         });
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -174,44 +196,39 @@ public class ForumUserCenterActivity extends AppCompatActivity {
     }
 
     private void load(boolean reset) {
-        if (loading && !reset) return;
-        if (reset) {
-            requestGeneration++;
-            loading = false;
-            cursor = "";
-            hasMore = false;
-            adapter.replaceAll(new ArrayList<>());
-            showState("正在加载…");
-        }
+        if (destroyed || (loading && !reset)) return;
+        if (reset) requestGeneration++;
         final int generation = requestGeneration;
         final int requestTab = selectedTab;
-        final String requestCursor = cursor;
+        final String requestCursor = reset ? "" : cursor;
         loading = true;
-        ForumApiClient.getInstance().ensureSession(this, new ForumApiClient.ResultCallback<String>() {
-            @Override
-            public void onSuccess(@Nullable String data) {
-                if (!isCurrent(generation, requestTab)) return;
-                requestPage(generation, requestTab, requestCursor, reset);
-            }
+        if (adapter.getItemCount() == 0) showState("正在加载…");
+        ForumApiClient.getInstance().ensureSession(this, requestScope,
+                new ForumApiClient.ResultCallback<String>() {
+                    @Override
+                    public void onSuccess(@Nullable String data) {
+                        if (!isCurrent(generation, requestTab)) return;
+                        requestPage(generation, requestTab, requestCursor, reset);
+                    }
 
-            @Override
-            public void onError(@NonNull String message) {
-                if (!isCurrent(generation, requestTab)) return;
-                loading = false;
-                if (adapter.getItemCount() == 0) showState(message + "\n点击刷新重试");
-            }
-        });
+                    @Override
+                    public void onError(@NonNull String message) {
+                        finishError(generation, requestTab, message);
+                    }
+                });
     }
 
     private void requestPage(int generation, int requestTab, String requestCursor, boolean reset) {
         if (requestTab == TAB_MESSAGES) {
-            ForumApiClient.getInstance().getMessages(requestCursor,
+            ForumApiClient.getInstance().getMessages(requestCursor, requestScope,
                     new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Message>>() {
                         @Override
                         public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Message> page) {
                             List<Row> rows = new ArrayList<>();
                             if (page != null && page.results != null) {
-                                for (ForumApiClient.Message message : page.results) rows.add(messageRow(message));
+                                for (ForumApiClient.Message message : page.results) {
+                                    rows.add(messageRow(message));
+                                }
                             }
                             finishPage(generation, requestTab, reset, page, rows);
                             if (isCurrent(generation, requestTab)) setResult(Activity.RESULT_OK);
@@ -223,13 +240,15 @@ public class ForumUserCenterActivity extends AppCompatActivity {
                         }
                     });
         } else if (requestTab == TAB_FAVORITES) {
-            ForumApiClient.getInstance().getFavorites(requestCursor,
+            ForumApiClient.getInstance().getFavorites(requestCursor, requestScope,
                     new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Favorite>>() {
                         @Override
                         public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Favorite> page) {
                             List<Row> rows = new ArrayList<>();
                             if (page != null && page.results != null) {
-                                for (ForumApiClient.Favorite favorite : page.results) rows.add(favoriteRow(favorite));
+                                for (ForumApiClient.Favorite favorite : page.results) {
+                                    rows.add(favoriteRow(favorite));
+                                }
                             }
                             finishPage(generation, requestTab, reset, page, rows);
                         }
@@ -245,7 +264,7 @@ public class ForumUserCenterActivity extends AppCompatActivity {
                 finishError(generation, requestTab, "论坛账号尚未建立，请刷新重试");
                 return;
             }
-            ForumApiClient.getInstance().getUserTopics(forumUserId, requestCursor,
+            ForumApiClient.getInstance().getUserTopics(forumUserId, requestCursor, requestScope,
                     new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Topic>>() {
                         @Override
                         public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Topic> page) {
@@ -269,23 +288,66 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         if (!isCurrent(generation, requestTab)) return;
         loading = false;
         if (reset) adapter.replaceAll(rows); else adapter.append(rows);
-        if (page != null && !TextUtils.isEmpty(page.cursor)) cursor = page.cursor;
-        hasMore = page != null && page.hasMore;
-        if (adapter.getItemCount() == 0) {
-            showState(emptyText(requestTab));
-        } else {
-            hideState();
-        }
+        cursor = page == null || TextUtils.isEmpty(page.cursor) ? "" : page.cursor;
+        hasMore = page != null && page.hasMore && !TextUtils.isEmpty(cursor);
+        saveCurrentTabState();
+        TabState state = tabStates.get(requestTab);
+        if (state != null) state.loadedAt = System.currentTimeMillis();
+        if (adapter.getItemCount() == 0) showState(emptyText(requestTab));
+        else hideState();
     }
 
     private void finishError(int generation, int requestTab, String message) {
         if (!isCurrent(generation, requestTab)) return;
         loading = false;
         if (adapter.getItemCount() == 0) showState(message + "\n点击刷新重试");
+        else Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
     private boolean isCurrent(int generation, int tab) {
-        return !isFinishing() && generation == requestGeneration && tab == selectedTab;
+        return !destroyed && !isFinishing() && generation == requestGeneration
+                && tab == selectedTab;
+    }
+
+    private void saveCurrentTabState() {
+        if (adapter == null || recyclerView == null) return;
+        TabState state = tabStates.get(selectedTab);
+        if (state == null) state = new TabState();
+        state.items = adapter.snapshot();
+        state.cursor = cursor;
+        state.hasMore = hasMore;
+        RecyclerView.LayoutManager manager = recyclerView.getLayoutManager();
+        if (manager instanceof LinearLayoutManager) {
+            LinearLayoutManager linear = (LinearLayoutManager) manager;
+            state.firstVisible = Math.max(0, linear.findFirstVisibleItemPosition());
+            View first = linear.findViewByPosition(state.firstVisible);
+            state.topOffset = first == null ? 0 : first.getTop() - recyclerView.getPaddingTop();
+        }
+        tabStates.put(selectedTab, state);
+    }
+
+    private boolean restoreTabState(int tab) {
+        TabState state = tabStates.get(tab);
+        if (state == null || state.items == null) {
+            adapter.replaceAll(new ArrayList<>());
+            cursor = "";
+            hasMore = false;
+            showState("正在加载…");
+            return false;
+        }
+        adapter.replaceAll(state.items);
+        cursor = state.cursor;
+        hasMore = state.hasMore;
+        if (adapter.getItemCount() == 0) showState(emptyText(tab)); else hideState();
+        int position = Math.min(Math.max(0, state.firstVisible),
+                Math.max(0, adapter.getItemCount() - 1));
+        RecyclerView.LayoutManager manager = recyclerView.getLayoutManager();
+        if (manager instanceof LinearLayoutManager && adapter.getItemCount() > 0) {
+            recyclerView.post(() -> ((LinearLayoutManager) manager)
+                    .scrollToPositionWithOffset(position, state.topOffset));
+        }
+        if (System.currentTimeMillis() - state.loadedAt > CACHE_TTL_MS) load(true);
+        return true;
     }
 
     private String emptyText(int tab) {
@@ -298,6 +360,9 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         Row row = new Row();
         if (message == null) return row;
         row.title = firstNonEmpty(message.title, "社区通知");
+        long sourceId = message.id > 0L ? message.id
+                : fnv64(row.title + "|" + message.detailUrl + "|" + message.createTime);
+        row.stableId = prefixedId(TAB_MESSAGES, sourceId);
         row.summary = firstNonEmpty(message.content, message.quoteContent);
         String from = message.from == null ? "系统" : firstNonEmpty(message.from.nickname, "系统");
         row.meta = from + " · " + formatTime(message.createTime);
@@ -310,9 +375,13 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         Row row = new Row();
         if (favorite == null) return row;
         row.title = favorite.deleted ? "内容已删除" : firstNonEmpty(favorite.title, "收藏内容");
+        long sourceId = favorite.id > 0L ? favorite.id
+                : fnv64(row.title + "|" + favorite.url + "|" + favorite.createTime);
+        row.stableId = prefixedId(TAB_FAVORITES, sourceId);
         row.summary = favorite.deleted ? "该内容已经不存在" : favorite.content;
         String author = favorite.user == null ? "" : firstNonEmpty(favorite.user.nickname, "");
-        row.meta = (TextUtils.isEmpty(author) ? "收藏" : author) + " · " + formatTime(favorite.createTime);
+        row.meta = (TextUtils.isEmpty(author) ? "收藏" : author) + " · "
+                + formatTime(favorite.createTime);
         row.topicId = "topic".equals(favorite.entityType)
                 ? ForumApiClient.getInstance().topicIdFromUrl(favorite.url) : "";
         row.disabled = favorite.deleted || TextUtils.isEmpty(row.topicId);
@@ -322,6 +391,7 @@ public class ForumUserCenterActivity extends AppCompatActivity {
     private Row topicRow(@Nullable ForumApiClient.Topic topic) {
         Row row = new Row();
         if (topic == null) return row;
+        row.stableId = prefixedId(TAB_MY_TOPICS, fnv64(topic.id));
         row.title = firstNonEmpty(topic.title, "未命名帖子");
         row.summary = topic.summary;
         String category = topic.category == null ? "" : firstNonEmpty(topic.category.name, "");
@@ -335,7 +405,7 @@ public class ForumUserCenterActivity extends AppCompatActivity {
 
     private void openRow(Row row) {
         if (row == null || row.disabled || TextUtils.isEmpty(row.topicId)) {
-            Toast.makeText(this, "该通知没有可打开的帖子", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "该内容没有可打开的帖子", Toast.LENGTH_SHORT).show();
             return;
         }
         startActivity(ForumTopicActivity.createIntent(this, row.topicId));
@@ -350,7 +420,17 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         stateView.setVisibility(View.GONE);
     }
 
+    private static final class TabState {
+        List<Row> items = new ArrayList<>();
+        String cursor = "";
+        boolean hasMore;
+        int firstVisible;
+        int topOffset;
+        long loadedAt;
+    }
+
     private static final class Row {
+        long stableId;
         String title = "";
         String summary = "";
         String meta = "";
@@ -370,6 +450,12 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         private CenterAdapter(Context context, RowClickListener listener) {
             this.context = context;
             this.listener = listener;
+            setHasStableIds(true);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return items.get(position).stableId;
         }
 
         @NonNull
@@ -391,6 +477,8 @@ public class ForumUserCenterActivity extends AppCompatActivity {
                 holder.summary.setAlpha(row.disabled ? 0.55f : 1f);
             }
             holder.meta.setText(row.meta);
+            holder.itemView.setEnabled(!row.disabled);
+            holder.itemView.setAlpha(row.disabled ? 0.72f : 1f);
             holder.itemView.setOnClickListener(v -> listener.onClick(row));
         }
 
@@ -399,17 +487,72 @@ public class ForumUserCenterActivity extends AppCompatActivity {
             return items.size();
         }
 
-        private void replaceAll(List<Row> rows) {
+        private void replaceAll(@Nullable List<Row> rows) {
+            List<Row> next = uniqueRows(rows);
+            List<Row> old = new ArrayList<>(items);
+            DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+                @Override
+                public int getOldListSize() {
+                    return old.size();
+                }
+
+                @Override
+                public int getNewListSize() {
+                    return next.size();
+                }
+
+                @Override
+                public boolean areItemsTheSame(int oldPosition, int newPosition) {
+                    return old.get(oldPosition).stableId == next.get(newPosition).stableId;
+                }
+
+                @Override
+                public boolean areContentsTheSame(int oldPosition, int newPosition) {
+                    return TextUtils.equals(signature(old.get(oldPosition)),
+                            signature(next.get(newPosition)));
+                }
+            }, false);
             items.clear();
-            if (rows != null) items.addAll(rows);
-            notifyDataSetChanged();
+            items.addAll(next);
+            diff.dispatchUpdatesTo(this);
         }
 
-        private void append(List<Row> rows) {
+        private void append(@Nullable List<Row> rows) {
             if (rows == null || rows.isEmpty()) return;
+            Set<Long> existing = new HashSet<>();
+            for (Row row : items) existing.add(row.stableId);
+            List<Row> added = new ArrayList<>();
+            for (Row row : rows) {
+                if (row == null || !existing.add(row.stableId)) continue;
+                added.add(row);
+            }
+            if (added.isEmpty()) return;
             int start = items.size();
-            items.addAll(rows);
-            notifyItemRangeInserted(start, rows.size());
+            items.addAll(added);
+            notifyItemRangeInserted(start, added.size());
+        }
+
+        @NonNull
+        private List<Row> snapshot() {
+            return new ArrayList<>(items);
+        }
+
+        @NonNull
+        private static List<Row> uniqueRows(@Nullable List<Row> rows) {
+            List<Row> result = new ArrayList<>();
+            if (rows == null) return result;
+            Set<Long> ids = new HashSet<>();
+            for (Row row : rows) {
+                if (row == null || !ids.add(row.stableId)) continue;
+                result.add(row);
+            }
+            return result;
+        }
+
+        @NonNull
+        private static String signature(@NonNull Row row) {
+            return row.title + "|" + row.summary + "|" + row.meta + "|"
+                    + row.topicId + "|" + row.disabled;
         }
     }
 
@@ -468,7 +611,8 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         return text(this, value, sizeSp, color, bold);
     }
 
-    private static TextView text(Context context, String value, float sizeSp, int color, boolean bold) {
+    private static TextView text(Context context, String value, float sizeSp,
+                                 int color, boolean bold) {
         TextView view = new TextView(context);
         view.setText(value);
         view.setTextColor(color);
@@ -484,8 +628,8 @@ public class ForumUserCenterActivity extends AppCompatActivity {
     }
 
     private static boolean isDark(Context context) {
-        return (context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
-                == Configuration.UI_MODE_NIGHT_YES;
+        return (context.getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
     }
 
     private int dp(float value) {
@@ -511,5 +655,19 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         if (diff < 86_400_000L) return (diff / 3_600_000L) + "小时前";
         if (diff < 7 * 86_400_000L) return (diff / 86_400_000L) + "天前";
         return new SimpleDateFormat("MM-dd", Locale.getDefault()).format(new Date(millis));
+    }
+
+    private static long prefixedId(int tab, long value) {
+        return (((long) tab + 1L) << 60) ^ (value & 0x0FFFFFFFFFFFFFFFL);
+    }
+
+    private static long fnv64(@Nullable String value) {
+        long hash = 0xcbf29ce484222325L;
+        String input = value == null ? "" : value;
+        for (int i = 0; i < input.length(); i++) {
+            hash ^= input.charAt(i);
+            hash *= 0x100000001b3L;
+        }
+        return hash;
     }
 }

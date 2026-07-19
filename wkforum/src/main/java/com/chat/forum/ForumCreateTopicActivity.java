@@ -36,17 +36,29 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** Native topic and Q&A composer. */
 public class ForumCreateTopicActivity extends AppCompatActivity {
     private static final int MAX_IMAGES = 6;
+    private static final String STATE_TITLE = "forum_title";
+    private static final String STATE_CONTENT = "forum_content";
+    private static final String STATE_TAGS = "forum_tags";
+    private static final String STATE_BOUNTY = "forum_bounty";
+    private static final String STATE_TYPE = "forum_type";
+    private static final String STATE_CATEGORY = "forum_category";
+    private static final String STATE_IMAGES = "forum_images";
 
     private final ExecutorService imageExecutor = Executors.newSingleThreadExecutor();
     private final List<Uri> selectedImages = new ArrayList<>();
     private final List<ForumApiClient.Category> categories = new ArrayList<>();
+    private final Set<File> pendingUploadFiles = Collections.synchronizedSet(new HashSet<>());
+    private final ForumApiClient.RequestScope readScope = new ForumApiClient.RequestScope();
+    private final ForumApiClient.RequestScope publishScope = new ForumApiClient.RequestScope();
     private EditText titleInput;
     private EditText contentInput;
     private EditText tagsInput;
@@ -57,16 +69,25 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private int topicType;
     private TextView publishButton;
     private boolean publishing;
+    private boolean authenticating;
+    private boolean discardDraft;
+    private volatile boolean destroyed;
+    private int categoryGeneration;
+    private int publishGeneration;
+    private boolean categoriesLoaded;
+    private long pendingCategoryId;
 
     private final ActivityResultLauncher<String> imagePicker = registerForActivityResult(
             new ActivityResultContracts.GetMultipleContents(), uris -> {
-                if (uris == null || uris.isEmpty()) return;
+                if (uris == null || uris.isEmpty() || publishing) return;
+                int added = 0;
                 for (Uri uri : uris) {
                     if (uri == null || selectedImages.contains(uri)) continue;
                     if (selectedImages.size() >= MAX_IMAGES) break;
                     selectedImages.add(uri);
+                    added++;
                 }
-                if (uris.size() + selectedImages.size() > MAX_IMAGES) {
+                if (added < uris.size()) {
                     Toast.makeText(this, "每篇帖子最多选择6张图片", Toast.LENGTH_SHORT).show();
                 }
                 renderSelectedImages();
@@ -80,12 +101,46 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         buildView();
+        restoreComposerState(savedInstanceState);
         authenticateAndLoadCategories();
     }
 
     @Override
+    protected void onStop() {
+        if ((!publishing || authenticating) && !discardDraft) saveDraft();
+        super.onStop();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString(STATE_TITLE, valueOf(titleInput));
+        outState.putString(STATE_CONTENT, valueOf(contentInput));
+        outState.putString(STATE_TAGS, valueOf(tagsInput));
+        outState.putString(STATE_BOUNTY, valueOf(bountyInput));
+        outState.putInt(STATE_TYPE, topicType);
+        outState.putLong(STATE_CATEGORY, categoryIdForState());
+        ArrayList<String> images = new ArrayList<>();
+        for (Uri uri : selectedImages) if (uri != null) images.add(uri.toString());
+        outState.putStringArrayList(STATE_IMAGES, images);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (publishing && !authenticating) {
+            Toast.makeText(this, "正在发布，请稍候", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    @Override
     protected void onDestroy() {
+        destroyed = true;
+        readScope.cancelAll();
+        publishScope.cancelAll();
         imageExecutor.shutdownNow();
+        cleanupPendingFiles();
         super.onDestroy();
     }
 
@@ -105,7 +160,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         TextView back = text("‹", 35, dark ? Color.WHITE : 0xFF1C1E21, false);
         back.setGravity(Gravity.CENTER);
         back.setOnClickListener(v -> {
-            if (!publishing) finish();
+            if (!publishing || authenticating) finish();
         });
         toolbar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(52)));
         TextView heading = text("发布帖子", 18, dark ? Color.WHITE : 0xFF1C1E21, true);
@@ -200,11 +255,13 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     }
 
     private void authenticateAndLoadCategories() {
+        authenticating = true;
         setPublishing(true, "连接中…");
-        ForumApiClient.getInstance().ensureSession(this, new ForumApiClient.ResultCallback<String>() {
+        ForumApiClient.getInstance().ensureSession(this, readScope, new ForumApiClient.ResultCallback<String>() {
             @Override
             public void onSuccess(@Nullable String data) {
                 if (isFinishing() || isDestroyed()) return;
+                authenticating = false;
                 setPublishing(false, "发布");
                 loadCategories();
             }
@@ -212,6 +269,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             @Override
             public void onError(@NonNull String message) {
                 if (isFinishing() || isDestroyed()) return;
+                authenticating = false;
                 setPublishing(false, "发布");
                 Toast.makeText(ForumCreateTopicActivity.this, message, Toast.LENGTH_LONG).show();
             }
@@ -235,29 +293,32 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         tab.setOnClickListener(v -> {
             if (publishing || topicType == value) return;
             topicType = value;
+            pendingCategoryId = 0L;
             renderTypePill();
+            updateContentHint();
             loadCategories();
-            contentInput.setHint(topicType == 2
-                    ? "请清楚描述问题、已经尝试的方法和期望得到的帮助…"
-                    : "分享你的经验、观点或学习内容…");
         });
         typePill.addView(tab, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.MATCH_PARENT, 1f));
     }
 
     private void loadCategories() {
+        final int generation = ++categoryGeneration;
+        final int requestType = topicType;
+        categoriesLoaded = false;
         categories.clear();
         List<String> waiting = new ArrayList<>();
         waiting.add("加载中…");
         ArrayAdapter<String> waitingAdapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item, waiting);
         categorySpinner.setAdapter(waitingAdapter);
-        ForumApiClient.getInstance().getCategoriesForType(topicType,
+        ForumApiClient.getInstance().getCategoriesForType(requestType, readScope,
                 new ForumApiClient.ResultCallback<List<ForumApiClient.Category>>() {
             @Override
             public void onSuccess(@Nullable List<ForumApiClient.Category> data) {
-                if (isFinishing() || isDestroyed()) return;
+                if (!isCategoryRequestCurrent(generation, requestType)) return;
                 categories.clear();
+                categoriesLoaded = true;
                 if (data != null) {
                     for (ForumApiClient.Category category : data) appendCategory(category);
                 }
@@ -268,11 +329,13 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                         android.R.layout.simple_spinner_item, names);
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 categorySpinner.setAdapter(adapter);
+                restoreCategorySelection();
             }
 
             @Override
             public void onError(@NonNull String message) {
-                if (!isFinishing()) Toast.makeText(ForumCreateTopicActivity.this, message, Toast.LENGTH_LONG).show();
+                if (!isCategoryRequestCurrent(generation, requestType)) return;
+                Toast.makeText(ForumCreateTopicActivity.this, message, Toast.LENGTH_LONG).show();
             }
         });
     }
@@ -304,9 +367,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             contentInput.setError("请输入内容");
             return;
         }
-        long categoryId = 0;
-        int position = categorySpinner.getSelectedItemPosition();
-        if (position >= 0 && position < categories.size()) categoryId = categories.get(position).id;
+        long categoryId = selectedCategoryId();
         if (categoryId <= 0) {
             Toast.makeText(this, "板块尚未加载，请稍后重试", Toast.LENGTH_SHORT).show();
             return;
@@ -315,80 +376,113 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         final int selectedType = topicType;
         final int bountyScore = parseBountyScore();
         final List<String> tags = parseTags(tagsInput.getText().toString());
-        setPublishing(true, selectedImages.isEmpty() ? "发布中…" : "处理图片…");
-        ForumApiClient.getInstance().ensureSession(this, new ForumApiClient.ResultCallback<String>() {
+        final List<Uri> images = new ArrayList<>(selectedImages);
+        final int generation = ++publishGeneration;
+        saveDraft();
+        setPublishing(true, images.isEmpty() ? "发布中…" : "处理图片…");
+        ForumApiClient.getInstance().ensureSession(this, publishScope, new ForumApiClient.ResultCallback<String>() {
             @Override
             public void onSuccess(@Nullable String data) {
-                uploadImagesSequentially(0, new ArrayList<>(), uploaded ->
-                        createTopic(selectedType, selectedCategoryId, title, content,
+                if (!isPublishActive(generation)) return;
+                uploadImagesSequentially(generation, images, 0, new ArrayList<>(), uploaded ->
+                        createTopic(generation, selectedType, selectedCategoryId, title, content,
                                 tags, uploaded, bountyScore));
             }
 
             @Override
             public void onError(@NonNull String message) {
-                setPublishing(false, "发布");
-                Toast.makeText(ForumCreateTopicActivity.this, message, Toast.LENGTH_LONG).show();
+                if (!isPublishActive(generation)) return;
+                failPublish(message);
             }
         });
     }
 
-    private void uploadImagesSequentially(int index, List<ForumApiClient.ImageInfo> uploaded,
+    private void uploadImagesSequentially(int generation, List<Uri> images, int index,
+                                          List<ForumApiClient.ImageInfo> uploaded,
                                           UploadsCallback callback) {
-        if (index >= selectedImages.size()) {
+        if (!isPublishActive(generation)) return;
+        if (index >= images.size()) {
             callback.onDone(uploaded);
             return;
         }
-        publishButton.setText("图片 " + (index + 1) + "/" + selectedImages.size());
-        Uri uri = selectedImages.get(index);
-        imageExecutor.execute(() -> {
-            File file;
-            try {
-                file = ForumImageCompressor.compress(getApplicationContext(), uri);
-            } catch (Throwable error) {
-                runOnUiThread(() -> failPublish("图片处理失败：" + safeMessage(error)));
-                return;
-            }
-            runOnUiThread(() -> ForumApiClient.getInstance().uploadImage(file,
-                    new ForumApiClient.ResultCallback<ForumApiClient.UploadResult>() {
-                        @Override
-                        public void onSuccess(@Nullable ForumApiClient.UploadResult result) {
-                            file.delete();
-                            if (result == null || TextUtils.isEmpty(result.url)) {
-                                failPublish("图片上传返回数据不完整");
-                                return;
-                            }
-                            uploaded.add(new ForumApiClient.ImageInfo(result.url));
-                            uploadImagesSequentially(index + 1, uploaded, callback);
+        publishButton.setText("图片 " + (index + 1) + "/" + images.size());
+        Uri uri = images.get(index);
+        try {
+            imageExecutor.execute(() -> {
+                File file = null;
+                try {
+                    file = ForumImageCompressor.compress(getApplicationContext(), uri);
+                    if (!isPublishActive(generation)) {
+                        deleteFile(file);
+                        return;
+                    }
+                    pendingUploadFiles.add(file);
+                    File uploadFile = file;
+                    runOnUiThread(() -> {
+                        if (!isPublishActive(generation)) {
+                            cleanupUploadFile(uploadFile);
+                            return;
                         }
+                        ForumApiClient.getInstance().uploadImage(uploadFile, publishScope,
+                                new ForumApiClient.ResultCallback<ForumApiClient.UploadResult>() {
+                                    @Override
+                                    public void onSuccess(@Nullable ForumApiClient.UploadResult result) {
+                                        cleanupUploadFile(uploadFile);
+                                        if (!isPublishActive(generation)) return;
+                                        if (result == null || TextUtils.isEmpty(result.url)) {
+                                            failPublish("图片上传返回数据不完整");
+                                            return;
+                                        }
+                                        uploaded.add(new ForumApiClient.ImageInfo(result.url));
+                                        uploadImagesSequentially(generation, images, index + 1,
+                                                uploaded, callback);
+                                    }
 
-                        @Override
-                        public void onError(@NonNull String message) {
-                            file.delete();
-                            failPublish(message);
+                                    @Override
+                                    public void onError(@NonNull String message) {
+                                        cleanupUploadFile(uploadFile);
+                                        if (isPublishActive(generation)) failPublish(message);
+                                    }
+                                });
+                    });
+                } catch (Throwable error) {
+                    deleteFile(file);
+                    runOnUiThread(() -> {
+                        if (isPublishActive(generation)) {
+                            failPublish("图片处理失败：" + safeMessage(error));
                         }
-                    }));
-        });
+                    });
+                }
+            });
+        } catch (RuntimeException error) {
+            if (isPublishActive(generation)) failPublish("图片处理任务无法启动");
+        }
     }
 
-    private void createTopic(int type, long categoryId, String title, String content,
-                             List<String> tags, List<ForumApiClient.ImageInfo> images,
-                             int bountyScore) {
+    private void createTopic(int generation, int type, long categoryId, String title,
+                             String content, List<String> tags,
+                             List<ForumApiClient.ImageInfo> images, int bountyScore) {
+        if (!isPublishActive(generation)) return;
         publishButton.setText("发布中…");
         ForumApiClient.getInstance().createTopic(type, categoryId, title, content,
-                tags, images, bountyScore,
+                tags, images, bountyScore, publishScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Topic>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Topic topic) {
-                        if (isFinishing() || isDestroyed()) return;
+                        if (!isPublishActive(generation)) return;
+                        discardDraft = true;
+                        ForumDraftStore.clear(ForumCreateTopicActivity.this);
                         setResult(Activity.RESULT_OK);
                         String id = topic == null ? "" : topic.id;
-                        if (!TextUtils.isEmpty(id)) ForumTopicActivity.open(ForumCreateTopicActivity.this, id);
+                        if (!TextUtils.isEmpty(id)) {
+                            ForumTopicActivity.open(ForumCreateTopicActivity.this, id);
+                        }
                         finish();
                     }
 
                     @Override
                     public void onError(@NonNull String message) {
-                        failPublish(message);
+                        if (isPublishActive(generation)) failPublish(message);
                     }
                 });
     }
@@ -404,7 +498,14 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         if (publishButton != null) {
             publishButton.setText(label);
             publishButton.setAlpha(value ? 0.55f : 1f);
+            publishButton.setEnabled(!value);
         }
+        if (titleInput != null) titleInput.setEnabled(!value);
+        if (contentInput != null) contentInput.setEnabled(!value);
+        if (tagsInput != null) tagsInput.setEnabled(!value);
+        if (bountyInput != null) bountyInput.setEnabled(!value);
+        if (categorySpinner != null) categorySpinner.setEnabled(!value);
+        if (typePill != null) typePill.setEnabled(!value);
     }
 
     private void renderSelectedImages() {
@@ -435,6 +536,116 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             params.rightMargin = dp(8);
             imageContainer.addView(box, params);
         }
+    }
+
+    private void restoreComposerState(@Nullable Bundle state) {
+        if (state != null) {
+            titleInput.setText(state.getString(STATE_TITLE, ""));
+            contentInput.setText(state.getString(STATE_CONTENT, ""));
+            tagsInput.setText(state.getString(STATE_TAGS, ""));
+            bountyInput.setText(state.getString(STATE_BOUNTY, ""));
+            topicType = state.getInt(STATE_TYPE, 0);
+            pendingCategoryId = state.getLong(STATE_CATEGORY, 0L);
+            ArrayList<String> images = state.getStringArrayList(STATE_IMAGES);
+            if (images != null) {
+                for (String value : images) {
+                    if (!TextUtils.isEmpty(value) && selectedImages.size() < MAX_IMAGES) {
+                        selectedImages.add(Uri.parse(value));
+                    }
+                }
+            }
+            renderTypePill();
+            updateContentHint();
+            renderSelectedImages();
+            return;
+        }
+        ForumDraftStore.Draft draft = ForumDraftStore.load(this);
+        if (draft == null) return;
+        titleInput.setText(draft.title);
+        contentInput.setText(draft.content);
+        tagsInput.setText(draft.tags);
+        bountyInput.setText(draft.bounty);
+        topicType = draft.topicType;
+        pendingCategoryId = draft.categoryId;
+        renderTypePill();
+        updateContentHint();
+        Toast.makeText(this, "已恢复上次未发布的草稿", Toast.LENGTH_SHORT).show();
+    }
+
+    private void saveDraft() {
+        if (titleInput == null || contentInput == null || tagsInput == null) return;
+        ForumDraftStore.Draft draft = new ForumDraftStore.Draft();
+        draft.title = valueOf(titleInput);
+        draft.content = valueOf(contentInput);
+        draft.tags = valueOf(tagsInput);
+        draft.bounty = valueOf(bountyInput);
+        draft.topicType = topicType;
+        draft.categoryId = categoryIdForState();
+        ForumDraftStore.save(this, draft);
+    }
+
+    private void updateContentHint() {
+        if (contentInput == null) return;
+        contentInput.setHint(topicType == 2
+                ? "请清楚描述问题、已经尝试的方法和期望得到的帮助…"
+                : "分享你的经验、观点或学习内容…");
+    }
+
+    private long selectedCategoryId() {
+        if (!categoriesLoaded || categorySpinner == null) return 0L;
+        int position = categorySpinner.getSelectedItemPosition();
+        if (position >= 0 && position < categories.size()) return categories.get(position).id;
+        return 0L;
+    }
+
+    private long categoryIdForState() {
+        long selected = selectedCategoryId();
+        return selected > 0L ? selected : pendingCategoryId;
+    }
+
+    private void restoreCategorySelection() {
+        if (pendingCategoryId <= 0L || categorySpinner == null) return;
+        for (int i = 0; i < categories.size(); i++) {
+            if (categories.get(i).id == pendingCategoryId) {
+                categorySpinner.setSelection(i);
+                return;
+            }
+        }
+    }
+
+    private boolean isCategoryRequestCurrent(int generation, int requestType) {
+        return !destroyed && !isFinishing() && generation == categoryGeneration
+                && requestType == topicType;
+    }
+
+    private boolean isPublishActive(int generation) {
+        return !destroyed && !isFinishing() && publishing && generation == publishGeneration;
+    }
+
+    private void cleanupUploadFile(@Nullable File file) {
+        if (file != null) pendingUploadFiles.remove(file);
+        deleteFile(file);
+    }
+
+    private void cleanupPendingFiles() {
+        List<File> files;
+        synchronized (pendingUploadFiles) {
+            files = new ArrayList<>(pendingUploadFiles);
+            pendingUploadFiles.clear();
+        }
+        for (File file : files) deleteFile(file);
+    }
+
+    private static void deleteFile(@Nullable File file) {
+        if (file != null && file.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            file.delete();
+        }
+    }
+
+    @NonNull
+    private static String valueOf(@Nullable EditText input) {
+        return input == null ? "" : input.getText().toString();
     }
 
     private int parseBountyScore() {

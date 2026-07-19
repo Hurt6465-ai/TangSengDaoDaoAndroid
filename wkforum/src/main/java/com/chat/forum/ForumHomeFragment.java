@@ -12,6 +12,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.LongSparseArray;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -34,6 +35,7 @@ import androidx.core.view.GravityCompat;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
@@ -57,8 +59,8 @@ public class ForumHomeFragment extends Fragment {
     private static final long CATEGORY_LATEST = 0L;
     private static final long CATEGORY_RECOMMEND = -1L;
     private static final long CATEGORY_FOLLOW = -2L;
-    private static final long CATEGORY_ARTICLE = -200L;
     private static final int FEATURED_CATEGORY_COUNT = 4;
+    private static final long FEED_CACHE_TTL_MS = 3 * 60_000L;
 
     private DrawerLayout drawerLayout;
     private LinearLayout drawerContent;
@@ -74,8 +76,10 @@ public class ForumHomeFragment extends Fragment {
     private TextView stateView;
     private TextView loginHintView;
     private TextView centerButton;
+    private TextView composeFab;
     private TopicAdapter adapter;
     private ArticleAdapter articleAdapter;
+    private MixedFeedAdapter mixedFeedAdapter;
     private long selectedCategory = CATEGORY_COMPREHENSIVE;
     private String cursor = "";
     private boolean hasMore;
@@ -84,23 +88,33 @@ public class ForumHomeFragment extends Fragment {
     private int authGeneration;
     private int topicRequestGeneration;
     private int appBarOffset;
+    private ForumApiClient.RequestScope requestScope;
     private final List<ForumApiClient.Category> categories = new ArrayList<>();
+    private final LongSparseArray<TopicFeedState> topicFeedStates = new LongSparseArray<>();
+    private final ArticleFeedState articleFeedState = new ArticleFeedState();
 
     private final ActivityResultLauncher<Intent> topicDetailLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (isAdded() && firstLoadDone) loadTopics(true);
+                if (!isAdded() || !firstLoadDone) return;
+                if (adapter != null) adapter.refreshSeenState();
+                if (mixedFeedAdapter != null && mixedFeedAdapter.getItemCount() > 0) {
+                    mixedFeedAdapter.notifyItemRangeChanged(0, mixedFeedAdapter.getItemCount(), "seen");
+                }
+                loadTopics(true, false);
             });
     private final ActivityResultLauncher<Intent> articleDetailLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (isAdded() && selectedCategory == CATEGORY_ARTICLE && articleAdapter != null) {
-                    articleAdapter.notifyDataSetChanged();
+                if (!isAdded() || articleAdapter == null) return;
+                articleAdapter.refreshSeenState();
+                if (mixedFeedAdapter != null && mixedFeedAdapter.getItemCount() > 0) {
+                    mixedFeedAdapter.notifyItemRangeChanged(0, mixedFeedAdapter.getItemCount(), "seen");
                 }
             });
     private final ActivityResultLauncher<Intent> createTopicLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == Activity.RESULT_OK && isAdded()) {
                     loadCategories();
-                    loadTopics(true);
+                    loadTopics(true, false);
                 }
             });
     private final ActivityResultLauncher<Intent> userCenterLauncher = registerForActivityResult(
@@ -113,6 +127,7 @@ public class ForumHomeFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         Context context = requireContext();
+        requestScope = new ForumApiClient.RequestScope();
         boolean dark = isDark(context);
 
         drawerLayout = new DrawerLayout(context);
@@ -169,9 +184,9 @@ public class ForumHomeFragment extends Fragment {
         feedTabContainer.setBackground(roundRect(context,
                 dark ? 0xFF23252A : 0xFFF2F3F5, 15));
         AppBarLayout.LayoutParams feedTabsParams = new AppBarLayout.LayoutParams(
-                dp(context, 226), dp(context, 32));
-        feedTabsParams.gravity = Gravity.END;
-        feedTabsParams.setMargins(0, dp(context, 5), dp(context, 14), dp(context, 5));
+                dp(context, 184), dp(context, 31));
+        feedTabsParams.gravity = Gravity.CENTER_HORIZONTAL;
+        feedTabsParams.setMargins(0, dp(context, 5), 0, dp(context, 5));
         appBarLayout.addView(feedTabContainer, feedTabsParams);
 
         currentCategoryView = text(context, "", 12, dark ? 0xFFAAB0B8 : 0xFF66707B, false);
@@ -192,7 +207,7 @@ public class ForumHomeFragment extends Fragment {
         swipeRefreshLayout.setProgressBackgroundColorSchemeColor(dark ? 0xFF24262B : Color.WHITE);
         swipeRefreshLayout.setOnRefreshListener(() -> {
             loadCategories();
-            loadTopics(true);
+            loadTopics(true, false);
         });
         swipeRefreshLayout.setOnChildScrollUpCallback((parent, child) ->
                 appBarOffset != 0 || (recyclerView != null && recyclerView.canScrollVertically(-1)));
@@ -202,13 +217,15 @@ public class ForumHomeFragment extends Fragment {
         recyclerView.setLayoutManager(new LinearLayoutManager(context));
         recyclerView.setItemAnimator(null);
         recyclerView.setClipToPadding(false);
-        recyclerView.setPadding(0, dp(context, 3), 0, dp(context, 22));
-        recyclerView.setItemViewCacheSize(8);
+        recyclerView.setBackgroundColor(dark ? 0xFF111214 : Color.WHITE);
+        recyclerView.setPadding(0, dp(context, 3), 0, dp(context, 86));
+        recyclerView.setItemViewCacheSize(10);
         adapter = new TopicAdapter(context, topic ->
                 topicDetailLauncher.launch(ForumTopicActivity.createIntent(context, topic.id)));
         articleAdapter = new ArticleAdapter(context, article ->
                 articleDetailLauncher.launch(ForumArticleActivity.createIntent(context, article.id)));
-        recyclerView.setAdapter(adapter);
+        mixedFeedAdapter = new MixedFeedAdapter(adapter, articleAdapter);
+        recyclerView.setAdapter(mixedFeedAdapter);
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
@@ -237,6 +254,19 @@ public class ForumHomeFragment extends Fragment {
         contentParams.setBehavior(new AppBarLayout.ScrollingViewBehavior());
         coordinator.addView(swipeRefreshLayout, contentParams);
 
+        composeFab = text(context, "+", 29, Color.WHITE, false);
+        composeFab.setIncludeFontPadding(false);
+        composeFab.setGravity(Gravity.CENTER);
+        composeFab.setContentDescription("发布内容");
+        composeFab.setBackground(roundRect(context, 0xFF1877F2, 27));
+        composeFab.setElevation(dp(context, 7));
+        composeFab.setOnClickListener(v -> openComposer());
+        CoordinatorLayout.LayoutParams fabParams = new CoordinatorLayout.LayoutParams(
+                dp(context, 54), dp(context, 54));
+        fabParams.gravity = Gravity.END | Gravity.BOTTOM;
+        fabParams.setMargins(0, 0, dp(context, 17), dp(context, 18));
+        coordinator.addView(composeFab, fabParams);
+
         ScrollView drawerScroll = new ScrollView(context);
         drawerScroll.setFillViewport(true);
         drawerScroll.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
@@ -254,6 +284,7 @@ public class ForumHomeFragment extends Fragment {
 
         renderNavigation();
         renderDrawer();
+        if (restoreCurrentFeedState()) firstLoadDone = true;
         return drawerLayout;
     }
 
@@ -281,14 +312,6 @@ public class ForumHomeFragment extends Fragment {
         titleBox.addView(subtitle);
         titleBox.setOnClickListener(v -> refreshAll());
         toolbar.addView(titleBox, new LinearLayout.LayoutParams(0, dp(context, 44), 1f));
-
-        TextView publish = text(context, "发布", 14, Color.WHITE, true);
-        publish.setGravity(Gravity.CENTER);
-        publish.setBackground(roundRect(context, 0xFF1877F2, 17));
-        publish.setOnClickListener(v -> openComposer());
-        LinearLayout.LayoutParams publishParams = new LinearLayout.LayoutParams(dp(context, 58), dp(context, 34));
-        publishParams.setMargins(0, 0, dp(context, 2), 0);
-        toolbar.addView(publish, publishParams);
 
         centerButton = text(context, "我的", 14, dark ? 0xFFD9DCE1 : 0xFF333840, true);
         centerButton.setGravity(Gravity.CENTER);
@@ -340,6 +363,9 @@ public class ForumHomeFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
+        saveCurrentFeedState();
+        if (requestScope != null) requestScope.cancelAll();
+        requestScope = null;
         authGeneration++;
         topicRequestGeneration++;
         loading = false;
@@ -358,14 +384,18 @@ public class ForumHomeFragment extends Fragment {
         stateView = null;
         loginHintView = null;
         centerButton = null;
+        composeFab = null;
         adapter = null;
+        articleAdapter = null;
+        mixedFeedAdapter = null;
         super.onDestroyView();
     }
 
     private void authenticateAndLoad() {
         final int generation = ++authGeneration;
         showState("正在登录论坛…");
-        ForumApiClient.getInstance().ensureSession(requireContext(), new ForumApiClient.ResultCallback<String>() {
+        ForumApiClient.getInstance().ensureSession(requireContext(), requestScope,
+                new ForumApiClient.ResultCallback<String>() {
             @Override
             public void onSuccess(@Nullable String data) {
                 if (!isAdded() || generation != authGeneration) return;
@@ -393,7 +423,7 @@ public class ForumHomeFragment extends Fragment {
             if (centerButton != null) centerButton.setText("我的");
             return;
         }
-        ForumApiClient.getInstance().getRecentMessages(
+        ForumApiClient.getInstance().getRecentMessages(requestScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.RecentMessages>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.RecentMessages data) {
@@ -411,7 +441,8 @@ public class ForumHomeFragment extends Fragment {
 
     private void openComposer() {
         if (!isAdded()) return;
-        ForumApiClient.getInstance().ensureSession(requireContext(), new ForumApiClient.ResultCallback<String>() {
+        ForumApiClient.getInstance().ensureSession(requireContext(), requestScope,
+                new ForumApiClient.ResultCallback<String>() {
             @Override
             public void onSuccess(@Nullable String data) {
                 if (isAdded()) createTopicLauncher.launch(
@@ -436,7 +467,7 @@ public class ForumHomeFragment extends Fragment {
     }
 
     private void loadCategories() {
-        ForumApiClient.getInstance().getCategories(
+        ForumApiClient.getInstance().getCategories(requestScope,
                 new ForumApiClient.ResultCallback<List<ForumApiClient.Category>>() {
                     @Override
                     public void onSuccess(@Nullable List<ForumApiClient.Category> data) {
@@ -457,18 +488,26 @@ public class ForumHomeFragment extends Fragment {
     }
 
     private void loadTopics(boolean reset) {
-        if (selectedCategory == CATEGORY_ARTICLE) {
-            loadArticles(reset);
-            return;
-        }
+        loadTopics(reset, true);
+    }
+
+    private void loadTopics(boolean reset, boolean clearBeforeLoad) {
         if (loading && !reset) return;
         if (reset) {
             topicRequestGeneration++;
             loading = false;
             cursor = "";
             hasMore = false;
-            if (adapter != null) adapter.replaceAll(new ArrayList<>());
-            showState("正在加载帖子…");
+            if (clearBeforeLoad && adapter != null) adapter.replaceAll(new ArrayList<>());
+            if (articleAdapter != null && selectedCategory != CATEGORY_COMPREHENSIVE) {
+                articleAdapter.replaceAll(new ArrayList<>());
+            } else if (clearBeforeLoad && articleAdapter != null) {
+                articleAdapter.replaceAll(new ArrayList<>());
+            }
+            if (mixedFeedAdapter != null) mixedFeedAdapter.rebuild();
+            if (clearBeforeLoad || adapter == null || adapter.getItemCount() == 0) {
+                showState("正在加载帖子…");
+            }
         }
         final int generation = topicRequestGeneration;
         final long requestSelection = selectedCategory;
@@ -478,7 +517,7 @@ public class ForumHomeFragment extends Fragment {
                 || requestSelection == CATEGORY_RECOMMEND ? "latestPublish" : "";
         final String requestCursor = cursor;
         loading = true;
-        ForumApiClient.getInstance().getTopics(apiCategory, requestCursor, sort,
+        ForumApiClient.getInstance().getTopics(apiCategory, requestCursor, sort, requestScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Topic>>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Topic> page) {
@@ -489,10 +528,16 @@ public class ForumHomeFragment extends Fragment {
                         List<ForumApiClient.Topic> list = page == null || page.results == null
                                 ? new ArrayList<>() : page.results;
                         if (reset) adapter.replaceAll(list); else adapter.append(list);
-                        cursor = page == null || TextUtils.isEmpty(page.cursor) ? cursor : page.cursor;
-                        hasMore = page != null && page.hasMore;
-                        if (adapter.getItemCount() == 0) {
-                            showState("这里还没有帖子\n来发布第一篇内容吧");
+                        if (mixedFeedAdapter != null) mixedFeedAdapter.rebuild();
+                        if (reset && requestSelection == CATEGORY_COMPREHENSIVE) {
+                            loadInlineArticles(generation, requestSelection);
+                        }
+                        String nextCursor = page == null ? "" : safe(page.cursor);
+                        if (!TextUtils.isEmpty(nextCursor)) cursor = nextCursor;
+                        hasMore = page != null && page.hasMore && !TextUtils.isEmpty(nextCursor);
+                        updateCurrentFeedState();
+                        if (currentItemCount() == 0) {
+                            showState("这里还没有内容\n来发布第一篇内容吧");
                         } else {
                             hideState();
                         }
@@ -504,68 +549,122 @@ public class ForumHomeFragment extends Fragment {
                                 || requestSelection != selectedCategory) return;
                         loading = false;
                         if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
-                        if (adapter.getItemCount() == 0) {
+                        if (currentItemCount() == 0) {
                             showState(message + "\n下拉刷新重试");
                         }
                     }
                 });
     }
 
-    private void loadArticles(boolean reset) {
-        if (loading && !reset) return;
-        if (reset) {
-            topicRequestGeneration++;
-            loading = false;
-            cursor = "";
-            hasMore = false;
-            if (articleAdapter != null) articleAdapter.replaceAll(new ArrayList<>());
-            showState("正在加载文章…");
-        }
-        final int generation = topicRequestGeneration;
-        final String requestCursor = cursor;
-        loading = true;
-        ForumApiClient.getInstance().getArticles(requestCursor,
+    private void loadInlineArticles(int generation, long requestSelection) {
+        if (requestSelection != CATEGORY_COMPREHENSIVE || articleAdapter == null) return;
+        ForumApiClient.getInstance().getArticles("", requestScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Page<ForumApiClient.Article>>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Page<ForumApiClient.Article> page) {
                         if (!isAdded() || generation != topicRequestGeneration
-                                || selectedCategory != CATEGORY_ARTICLE) return;
-                        loading = false;
-                        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
-                        List<ForumApiClient.Article> list = page == null || page.results == null
+                                || selectedCategory != CATEGORY_COMPREHENSIVE) return;
+                        List<ForumApiClient.Article> source = page == null || page.results == null
                                 ? new ArrayList<>() : page.results;
-                        if (reset) articleAdapter.replaceAll(list); else articleAdapter.append(list);
-                        cursor = page == null || TextUtils.isEmpty(page.cursor) ? cursor : page.cursor;
-                        hasMore = page != null && page.hasMore;
-                        if (articleAdapter.getItemCount() == 0) {
-                            showState("这里还没有文章\n文章可在网页版发布");
-                        } else {
-                            hideState();
+                        List<ForumApiClient.Article> inline = new ArrayList<>();
+                        for (ForumApiClient.Article article : source) {
+                            if (article == null || article.id <= 0) continue;
+                            inline.add(article);
+                            if (inline.size() >= 6) break;
                         }
+                        articleAdapter.replaceAll(inline);
+                        articleFeedState.items = articleAdapter.snapshot();
+                        articleFeedState.updatedAt = System.currentTimeMillis();
+                        if (mixedFeedAdapter != null) mixedFeedAdapter.rebuild();
+                        saveCurrentFeedState();
+                        if (currentItemCount() > 0) hideState();
                     }
 
                     @Override
                     public void onError(@NonNull String message) {
-                        if (!isAdded() || generation != topicRequestGeneration
-                                || selectedCategory != CATEGORY_ARTICLE) return;
-                        loading = false;
-                        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
-                        if (articleAdapter.getItemCount() == 0) showState(message + "\n下拉刷新重试");
+                        // Keep the last cached article cards when the article endpoint is temporarily unavailable.
                     }
                 });
     }
 
+    private void updateCurrentFeedState() {
+        saveCurrentFeedState();
+        TopicFeedState state = topicState(selectedCategory, true);
+        state.updatedAt = System.currentTimeMillis();
+    }
+
+    private void saveCurrentFeedState() {
+        TopicFeedState state = topicState(selectedCategory, true);
+        if (adapter != null) state.items = adapter.snapshot();
+        state.cursor = cursor;
+        state.hasMore = hasMore;
+        captureScroll(state);
+        if (selectedCategory == CATEGORY_COMPREHENSIVE && articleAdapter != null) {
+            articleFeedState.items = articleAdapter.snapshot();
+        }
+    }
+
+    private boolean restoreCurrentFeedState() {
+        applyListAdapter();
+        TopicFeedState state = topicState(selectedCategory, false);
+        if (state == null || !state.isFresh() || state.items.isEmpty()) return false;
+        adapter.replaceAll(state.items);
+        if (selectedCategory == CATEGORY_COMPREHENSIVE && articleFeedState.isFresh()) {
+            articleAdapter.replaceAll(articleFeedState.items);
+        } else {
+            articleAdapter.replaceAll(new ArrayList<>());
+        }
+        if (mixedFeedAdapter != null) mixedFeedAdapter.rebuild();
+        cursor = state.cursor;
+        hasMore = state.hasMore;
+        restoreScroll(state);
+        hideState();
+        return true;
+    }
+
+    private void captureScroll(FeedState state) {
+        if (recyclerView == null) return;
+        RecyclerView.LayoutManager layoutManager = recyclerView.getLayoutManager();
+        if (!(layoutManager instanceof LinearLayoutManager)) return;
+        LinearLayoutManager linear = (LinearLayoutManager) layoutManager;
+        int position = linear.findFirstVisibleItemPosition();
+        if (position < 0) return;
+        View child = linear.findViewByPosition(position);
+        state.position = position;
+        state.offset = child == null ? 0 : child.getTop() - recyclerView.getPaddingTop();
+    }
+
+    private void restoreScroll(FeedState state) {
+        if (recyclerView == null) return;
+        recyclerView.post(() -> {
+            if (recyclerView == null) return;
+            RecyclerView.LayoutManager layoutManager = recyclerView.getLayoutManager();
+            if (layoutManager instanceof LinearLayoutManager) {
+                ((LinearLayoutManager) layoutManager).scrollToPositionWithOffset(
+                        Math.max(0, state.position), state.offset);
+            }
+        });
+    }
+
+    @Nullable
+    private TopicFeedState topicState(long categoryId, boolean create) {
+        TopicFeedState state = topicFeedStates.get(categoryId);
+        if (state == null && create) {
+            state = new TopicFeedState();
+            topicFeedStates.put(categoryId, state);
+        }
+        return state;
+    }
+
     private int currentItemCount() {
-        return selectedCategory == CATEGORY_ARTICLE
-                ? (articleAdapter == null ? 0 : articleAdapter.getItemCount())
-                : (adapter == null ? 0 : adapter.getItemCount());
+        return mixedFeedAdapter == null ? 0 : mixedFeedAdapter.getItemCount();
     }
 
     private void applyListAdapter() {
-        if (recyclerView == null) return;
-        RecyclerView.Adapter<?> target = selectedCategory == CATEGORY_ARTICLE
-                ? articleAdapter : adapter;
-        if (target != null && recyclerView.getAdapter() != target) recyclerView.setAdapter(target);
+        if (recyclerView != null && mixedFeedAdapter != null
+                && recyclerView.getAdapter() != mixedFeedAdapter) {
+            recyclerView.setAdapter(mixedFeedAdapter);
+        }
     }
 
     private void renderNavigation() {
@@ -574,7 +673,6 @@ public class ForumHomeFragment extends Fragment {
         addFeedTab("综合", CATEGORY_COMPREHENSIVE);
         addFeedTab("最新", CATEGORY_LATEST);
         addFeedTab("推荐", CATEGORY_RECOMMEND);
-        addFeedTab("文章", CATEGORY_ARTICLE);
 
         List<ForumApiClient.Category> flat = flattenCategories();
         allCategoriesButton.setText("更多  ›");
@@ -600,7 +698,7 @@ public class ForumHomeFragment extends Fragment {
         Context context = requireContext();
         boolean dark = isDark(context);
         boolean selected = selectedCategory == categoryId;
-        TextView tab = text(context, label, 11.5f,
+        TextView tab = text(context, label, 11.2f,
                 selected ? (dark ? Color.WHITE : 0xFF1877F2)
                         : (dark ? 0xFFA9AFB7 : 0xFF626A73), selected);
         tab.setGravity(Gravity.CENTER);
@@ -611,7 +709,7 @@ public class ForumHomeFragment extends Fragment {
         tab.setOnClickListener(v -> selectCategory(categoryId));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-        params.setMargins(dp(context, 1), 0, dp(context, 1), 0);
+        params.setMargins(dp(context, 0.5f), 0, dp(context, 0.5f), 0);
         feedTabContainer.addView(tab, params);
     }
 
@@ -666,10 +764,6 @@ public class ForumHomeFragment extends Fragment {
 
     private void renderCurrentCategory() {
         if (currentCategoryView == null) return;
-        if (selectedCategory == CATEGORY_ARTICLE) {
-            currentCategoryView.setVisibility(View.GONE);
-            return;
-        }
         ForumApiClient.Category selected = findCategory(selectedCategory);
         if (selected == null) {
             currentCategoryView.setVisibility(View.GONE);
@@ -684,12 +778,20 @@ public class ForumHomeFragment extends Fragment {
             if (recyclerView != null) recyclerView.smoothScrollToPosition(0);
             return;
         }
+        saveCurrentFeedState();
+        topicRequestGeneration++;
+        loading = false;
+        if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
         selectedCategory = categoryId;
+        if (selectedCategory != CATEGORY_COMPREHENSIVE && articleAdapter != null) {
+            articleAdapter.replaceAll(new ArrayList<>());
+        }
+        if (mixedFeedAdapter != null) mixedFeedAdapter.rebuild();
         applyListAdapter();
         renderNavigation();
         renderDrawer();
         closeDrawer();
-        loadTopics(true);
+        if (!restoreCurrentFeedState()) loadTopics(true);
     }
 
     private void openDrawer() {
@@ -730,7 +832,6 @@ public class ForumHomeFragment extends Fragment {
         addDrawerItem("综合", "全部板块的活跃讨论", CATEGORY_COMPREHENSIVE, 0, false);
         addDrawerItem("最新", "按发布时间查看新帖", CATEGORY_LATEST, 0, false);
         addDrawerItem("推荐", "管理员推荐的优质内容", CATEGORY_RECOMMEND, 0, false);
-        addDrawerItem("文章", "网页版发布的长文内容", CATEGORY_ARTICLE, 0, false);
 
         List<ForumApiClient.Category> flat = flattenCategories();
         List<ForumApiClient.Category> featured = featuredCategories(flat);
@@ -899,6 +1000,26 @@ public class ForumHomeFragment extends Fragment {
         if (stateView != null) stateView.setVisibility(View.GONE);
     }
 
+    private static class FeedState {
+        String cursor = "";
+        boolean hasMore;
+        int position;
+        int offset;
+        long updatedAt;
+
+        boolean isFresh() {
+            return updatedAt > 0 && System.currentTimeMillis() - updatedAt <= FEED_CACHE_TTL_MS;
+        }
+    }
+
+    private static final class TopicFeedState extends FeedState {
+        List<ForumApiClient.Topic> items = new ArrayList<>();
+    }
+
+    private static final class ArticleFeedState extends FeedState {
+        List<ForumApiClient.Article> items = new ArrayList<>();
+    }
+
     private static final class TopicAdapter extends RecyclerView.Adapter<TopicHolder> {
         private static final String SEEN_PREF = "forum_topic_seen";
         private final Context context;
@@ -916,7 +1037,7 @@ public class ForumHomeFragment extends Fragment {
         @Override
         public long getItemId(int position) {
             String id = items.get(position).id;
-            return TextUtils.isEmpty(id) ? RecyclerView.NO_ID : id.hashCode();
+            return TextUtils.isEmpty(id) ? RecyclerView.NO_ID : stableStringId(id);
         }
 
         @NonNull
@@ -946,11 +1067,9 @@ public class ForumHomeFragment extends Fragment {
             holder.replyCount.setText(String.valueOf(Math.max(0L, topic.commentCount)));
             holder.replyCount.setTextColor(newReply ? 0xFF1877F2
                     : (dark ? 0xFFB7BCC4 : 0xFF626A74));
-            holder.replyCount.setBackground(roundRect(context,
-                    newReply ? (dark ? 0xFF263B57 : 0xFFEAF3FF)
-                            : (dark ? 0xFF25272C : 0xFFF1F3F5), 13));
+            holder.replyCount.setBackground(null);
             setCompoundIcon(holder.replyCount, com.chat.forum.R.drawable.ic_forum_chat_bubble,
-                    15, newReply ? 0xFF1877F2 : (dark ? 0xFF9EA4AD : 0xFF69717A));
+                    14, newReply ? 0xFF1877F2 : (dark ? 0xFF9EA4AD : 0xFF69717A));
 
             int normalTitle = dark ? Color.WHITE : 0xFF171A1F;
             int dimTitle = dark ? 0xFF777C84 : 0xFF9A9FA6;
@@ -984,16 +1103,58 @@ public class ForumHomeFragment extends Fragment {
         }
 
         private void replaceAll(List<ForumApiClient.Topic> data) {
+            List<ForumApiClient.Topic> next = uniqueTopics(data);
+            List<ForumApiClient.Topic> old = new ArrayList<>(items);
+            DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+                @Override public int getOldListSize() { return old.size(); }
+                @Override public int getNewListSize() { return next.size(); }
+                @Override public boolean areItemsTheSame(int oldPosition, int newPosition) {
+                    return TextUtils.equals(old.get(oldPosition).id, next.get(newPosition).id);
+                }
+                @Override public boolean areContentsTheSame(int oldPosition, int newPosition) {
+                    return TextUtils.equals(topicSignature(old.get(oldPosition)),
+                            topicSignature(next.get(newPosition)));
+                }
+            }, false);
             items.clear();
-            if (data != null) items.addAll(data);
-            notifyDataSetChanged();
+            items.addAll(next);
+            diff.dispatchUpdatesTo(this);
         }
 
         private void append(List<ForumApiClient.Topic> data) {
             if (data == null || data.isEmpty()) return;
+            Set<String> existing = new HashSet<>();
+            for (ForumApiClient.Topic item : items) {
+                if (item != null && !TextUtils.isEmpty(item.id)) existing.add(item.id);
+            }
+            List<ForumApiClient.Topic> added = new ArrayList<>();
+            for (ForumApiClient.Topic item : data) {
+                if (item == null || TextUtils.isEmpty(item.id) || !existing.add(item.id)) continue;
+                added.add(item);
+            }
+            if (added.isEmpty()) return;
             int start = items.size();
-            items.addAll(data);
-            notifyItemRangeInserted(start, data.size());
+            items.addAll(added);
+            notifyItemRangeInserted(start, added.size());
+        }
+
+        private List<ForumApiClient.Topic> snapshot() {
+            return new ArrayList<>(items);
+        }
+
+        private void refreshSeenState() {
+            if (!items.isEmpty()) notifyItemRangeChanged(0, items.size(), "seen");
+        }
+
+        private static List<ForumApiClient.Topic> uniqueTopics(List<ForumApiClient.Topic> data) {
+            List<ForumApiClient.Topic> result = new ArrayList<>();
+            if (data == null) return result;
+            Set<String> ids = new HashSet<>();
+            for (ForumApiClient.Topic item : data) {
+                if (item == null || TextUtils.isEmpty(item.id) || !ids.add(item.id)) continue;
+                result.add(item);
+            }
+            return result;
         }
 
         @Override
@@ -1024,6 +1185,111 @@ public class ForumHomeFragment extends Fragment {
                 String seed = user == null ? fallbackName
                         : (!TextUtils.isEmpty(user.uid) ? user.uid : safe(user.id));
                 avatar.showDefaultAvatar(fallbackName, seed);
+            }
+        }
+    }
+
+    private static final class MixedFeedAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+        private static final int TYPE_TOPIC = 1;
+        private static final int TYPE_ARTICLE = 2;
+        private final TopicAdapter topics;
+        private final ArticleAdapter articles;
+        private final List<FeedEntry> entries = new ArrayList<>();
+
+        MixedFeedAdapter(TopicAdapter topics, ArticleAdapter articles) {
+            this.topics = topics;
+            this.articles = articles;
+            setHasStableIds(true);
+            rebuild();
+        }
+
+        void rebuild() {
+            List<FeedEntry> next = new ArrayList<>();
+            int ti = 0;
+            int ai = 0;
+            while (ti < topics.items.size() || ai < articles.items.size()) {
+                ForumApiClient.Topic topic = ti < topics.items.size() ? topics.items.get(ti) : null;
+                ForumApiClient.Article article = ai < articles.items.size() ? articles.items.get(ai) : null;
+                long topicTime = topic == null ? Long.MIN_VALUE
+                        : Math.max(normalizeTime(topic.lastCommentTime), normalizeTime(topic.createTime));
+                long articleTime = article == null ? Long.MIN_VALUE : normalizeTime(article.createTime);
+                if (article != null && (topic == null || (!topic.sticky && articleTime > topicTime))) {
+                    next.add(FeedEntry.article(ai++, article));
+                } else if (topic != null) {
+                    next.add(FeedEntry.topic(ti++, topic));
+                }
+            }
+            List<FeedEntry> old = new ArrayList<>(entries);
+            DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+                @Override public int getOldListSize() { return old.size(); }
+                @Override public int getNewListSize() { return next.size(); }
+                @Override public boolean areItemsTheSame(int oldPosition, int newPosition) {
+                    return TextUtils.equals(old.get(oldPosition).key, next.get(newPosition).key);
+                }
+                @Override public boolean areContentsTheSame(int oldPosition, int newPosition) {
+                    return TextUtils.equals(old.get(oldPosition).signature,
+                            next.get(newPosition).signature);
+                }
+            }, false);
+            entries.clear();
+            entries.addAll(next);
+            diff.dispatchUpdatesTo(this);
+        }
+
+        @Override public long getItemId(int position) {
+            FeedEntry entry = entries.get(position);
+            if (entry.type == TYPE_ARTICLE) return Long.MIN_VALUE + entry.article.id;
+            return TextUtils.isEmpty(entry.topic.id) ? RecyclerView.NO_ID
+                    : stableStringId("topic:" + entry.topic.id);
+        }
+
+        @Override public int getItemViewType(int position) { return entries.get(position).type; }
+
+        @NonNull @Override
+        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            return viewType == TYPE_ARTICLE
+                    ? articles.onCreateViewHolder(parent, 0)
+                    : topics.onCreateViewHolder(parent, 0);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+            FeedEntry entry = entries.get(position);
+            if (entry.type == TYPE_ARTICLE) {
+                articles.onBindViewHolder((ArticleHolder) holder, entry.sourceIndex);
+            } else {
+                topics.onBindViewHolder((TopicHolder) holder, entry.sourceIndex);
+            }
+        }
+
+        @Override public int getItemCount() { return entries.size(); }
+
+        private static final class FeedEntry {
+            final int type;
+            final int sourceIndex;
+            final ForumApiClient.Topic topic;
+            final ForumApiClient.Article article;
+            final String key;
+            final String signature;
+
+            private FeedEntry(int type, int sourceIndex, ForumApiClient.Topic topic,
+                              ForumApiClient.Article article, String key, String signature) {
+                this.type = type;
+                this.sourceIndex = sourceIndex;
+                this.topic = topic;
+                this.article = article;
+                this.key = key;
+                this.signature = signature;
+            }
+
+            static FeedEntry topic(int index, ForumApiClient.Topic topic) {
+                return new FeedEntry(TYPE_TOPIC, index, topic, null,
+                        "t:" + safe(topic.id), topicSignature(topic));
+            }
+
+            static FeedEntry article(int index, ForumApiClient.Article article) {
+                return new FeedEntry(TYPE_ARTICLE, index, null, article,
+                        "a:" + article.id, articleSignature(article));
             }
         }
     }
@@ -1072,11 +1338,49 @@ public class ForumHomeFragment extends Fragment {
         }
 
         void replaceAll(List<ForumApiClient.Article> data) {
-            items.clear(); if (data != null) items.addAll(data); notifyDataSetChanged();
+            List<ForumApiClient.Article> next = uniqueArticles(data);
+            List<ForumApiClient.Article> old = new ArrayList<>(items);
+            DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+                @Override public int getOldListSize() { return old.size(); }
+                @Override public int getNewListSize() { return next.size(); }
+                @Override public boolean areItemsTheSame(int oldPosition, int newPosition) {
+                    return old.get(oldPosition).id == next.get(newPosition).id;
+                }
+                @Override public boolean areContentsTheSame(int oldPosition, int newPosition) {
+                    return TextUtils.equals(articleSignature(old.get(oldPosition)),
+                            articleSignature(next.get(newPosition)));
+                }
+            }, false);
+            items.clear();
+            items.addAll(next);
+            diff.dispatchUpdatesTo(this);
         }
         void append(List<ForumApiClient.Article> data) {
             if (data == null || data.isEmpty()) return;
-            int start = items.size(); items.addAll(data); notifyItemRangeInserted(start, data.size());
+            Set<Long> existing = new HashSet<>();
+            for (ForumApiClient.Article item : items) if (item != null) existing.add(item.id);
+            List<ForumApiClient.Article> added = new ArrayList<>();
+            for (ForumApiClient.Article item : data) {
+                if (item == null || !existing.add(item.id)) continue;
+                added.add(item);
+            }
+            if (added.isEmpty()) return;
+            int start = items.size(); items.addAll(added); notifyItemRangeInserted(start, added.size());
+        }
+        List<ForumApiClient.Article> snapshot() { return new ArrayList<>(items); }
+        void refreshSeenState() {
+            if (!items.isEmpty()) notifyItemRangeChanged(0, items.size(), "seen");
+        }
+
+        private static List<ForumApiClient.Article> uniqueArticles(List<ForumApiClient.Article> data) {
+            List<ForumApiClient.Article> result = new ArrayList<>();
+            if (data == null) return result;
+            Set<Long> ids = new HashSet<>();
+            for (ForumApiClient.Article item : data) {
+                if (item == null || !ids.add(item.id)) continue;
+                result.add(item);
+            }
+            return result;
         }
         @Override public int getItemCount() { return items.size(); }
 
@@ -1157,10 +1461,9 @@ public class ForumHomeFragment extends Fragment {
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView replies = text(context, "0", 11.5f, dark ? 0xFFB7BCC4 : 0xFF626A74, true);
         replies.setGravity(Gravity.CENTER);
-        replies.setPadding(dp(context, 8), 0, dp(context, 8), 0);
-        replies.setCompoundDrawablePadding(dp(context, 3));
-        replies.setBackground(roundRect(context, dark ? 0xFF25272C : 0xFFF1F3F5, 13));
-        setCompoundIcon(replies, R.drawable.ic_forum_chat_bubble, 15,
+        replies.setPadding(dp(context, 4), 0, dp(context, 2), 0);
+        replies.setCompoundDrawablePadding(dp(context, 2));
+        setCompoundIcon(replies, R.drawable.ic_forum_chat_bubble, 14,
                 dark ? 0xFF9EA4AD : 0xFF69717A);
         LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 27));
@@ -1290,9 +1593,7 @@ public class ForumHomeFragment extends Fragment {
                 dark ? 0xFFB7BCC4 : 0xFF626A74, true);
         replyCount.setGravity(Gravity.CENTER);
         replyCount.setCompoundDrawablePadding(dp(context, 3));
-        replyCount.setPadding(dp(context, 8), 0, dp(context, 8), 0);
-        replyCount.setBackground(roundRect(context,
-                dark ? 0xFF25272C : 0xFFF1F3F5, 13));
+        replyCount.setPadding(dp(context, 4), 0, dp(context, 2), 0);
         LinearLayout.LayoutParams replyParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 27));
         replyParams.leftMargin = dp(context, 9);
@@ -1369,6 +1670,36 @@ public class ForumHomeFragment extends Fragment {
 
     private static long normalizeTime(long value) {
         return value > 0 && value < 10_000_000_000L ? value * 1000L : value;
+    }
+
+    private static long stableStringId(String value) {
+        long hash = 0xcbf29ce484222325L;
+        for (int i = 0; i < value.length(); i++) {
+            hash ^= value.charAt(i);
+            hash *= 0x100000001b3L;
+        }
+        return hash;
+    }
+
+    private static String topicSignature(ForumApiClient.Topic topic) {
+        if (topic == null) return "";
+        ForumApiClient.User user = topic.user;
+        ForumApiClient.Category category = topic.category;
+        return safe(topic.id) + '|' + safe(topic.title) + '|' + topic.type + '|'
+                + topic.createTime + '|' + topic.lastCommentTime + '|' + topic.commentCount + '|'
+                + topic.likeCount + '|' + topic.sticky + '|' + topic.recommend + '|'
+                + safe(user == null ? null : user.nickname) + '|'
+                + safe(user == null ? null : user.smallAvatar) + '|'
+                + safe(category == null ? null : category.name);
+    }
+
+    private static String articleSignature(ForumApiClient.Article article) {
+        if (article == null) return "";
+        ForumApiClient.User user = article.user;
+        return article.id + "|" + safe(article.title) + '|' + article.createTime + '|'
+                + article.commentCount + '|' + article.likeCount + '|'
+                + safe(user == null ? null : user.nickname) + '|'
+                + safe(user == null ? null : user.smallAvatar);
     }
 
     private static String categoryInitial(String name) {
