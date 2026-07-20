@@ -5,6 +5,11 @@
 
     <application>
         <activity
+            android:name=".ForumImageViewerActivity"
+            android:exported="false"
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+        <activity
             android:name=".ForumBoardActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
