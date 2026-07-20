@@ -149,7 +149,7 @@ public final class ForumApiClient {
     public void ensureSession(@NonNull Context context, @NonNull ResultCallback<String> callback) {
         final String uid = currentUid();
         if (TextUtils.isEmpty(uid)) {
-            callback.onError("请先登录");
+            callback.onError(ForumText.get(R.string.forum_login_required));
             return;
         }
         String cachedToken = getSessionToken(uid);
@@ -184,7 +184,7 @@ public final class ForumApiClient {
         }
         if (staleCallbacks != null) {
             for (ResultCallback<String> stale : staleCallbacks) {
-                stale.onError("账号已切换，请重试");
+                stale.onError(ForumText.get(R.string.forum_account_changed_retry));
             }
         }
         if (startAuth) requestTangSengToken(context.getApplicationContext(), uid);
@@ -641,12 +641,12 @@ public final class ForumApiClient {
                                      @NonNull ResultCallback<VoiceUploadTarget> callback) {
         ResultCallback<VoiceUploadTarget> safeCallback = scopedCallback(scope, callback);
         if (!file.exists() || file.length() <= 0) {
-            safeCallback.onError("录音文件不存在");
+            safeCallback.onError(ForumText.get(R.string.forum_record_file_missing));
             return;
         }
         String uid = currentUid();
         if (TextUtils.isEmpty(uid)) {
-            safeCallback.onError("请先登录");
+            safeCallback.onError(ForumText.get(R.string.forum_login_required));
             return;
         }
         String name = file.getName();
@@ -660,7 +660,7 @@ public final class ForumApiClient {
         try {
             service = RetrofitUtils.getInstance().createService(TangSengUploadService.class);
         } catch (Throwable error) {
-            safeCallback.onError(readableError(error, "上传服务尚未初始化"));
+            safeCallback.onError(readableError(error, ForumText.get(R.string.forum_upload_service_unavailable)));
             return;
         }
         Call<UploadFileUrl> requestCall = service.getUploadFileUrl(requestUrl);
@@ -672,7 +672,7 @@ public final class ForumApiClient {
                 if (scope != null) scope.complete(call);
                 UploadFileUrl data = response.body();
                 if (!response.isSuccessful() || data == null || TextUtils.isEmpty(data.url)) {
-                    safeCallback.onError(extractHttpError(response, "无法获取语音上传地址"));
+                    safeCallback.onError(extractHttpError(response, ForumText.get(R.string.forum_record_upload_url_failed)));
                     return;
                 }
                 VoiceUploadTarget target = new VoiceUploadTarget();
@@ -687,7 +687,7 @@ public final class ForumApiClient {
                                   @NonNull Throwable throwable) {
                 if (scope != null) scope.complete(call);
                 if (call.isCanceled()) return;
-                safeCallback.onError(readableError(throwable, "无法连接上传服务"));
+                safeCallback.onError(readableError(throwable, ForumText.get(R.string.forum_upload_service_connect_failed)));
             }
         });
     }
@@ -697,7 +697,7 @@ public final class ForumApiClient {
         try {
             service = RetrofitUtils.getInstance().createService(TangSengService.class);
         } catch (Throwable error) {
-            finishAuth(uid, null, readableError(error, "唐僧接口尚未初始化"));
+            finishAuth(uid, null, readableError(error, ForumText.get(R.string.forum_ts_api_unavailable)));
             return;
         }
         service.issueForumToken().enqueue(new Callback<TangSengTokenResponse>() {
@@ -706,7 +706,7 @@ public final class ForumApiClient {
                                    @NonNull Response<TangSengTokenResponse> response) {
                 TangSengTokenResponse body = response.body();
                 if (!response.isSuccessful() || body == null || TextUtils.isEmpty(body.token)) {
-                    finishAuth(uid, null, extractHttpError(response, "无法获取论坛登录凭证"));
+                    finishAuth(uid, null, extractHttpError(response, ForumText.get(R.string.forum_auth_credential_failed)));
                     return;
                 }
                 exchangeToken(uid, body.token);
@@ -715,7 +715,7 @@ public final class ForumApiClient {
             @Override
             public void onFailure(@NonNull Call<TangSengTokenResponse> call,
                                   @NonNull Throwable throwable) {
-                finishAuth(uid, null, readableError(throwable, "无法连接唐僧服务器"));
+                finishAuth(uid, null, readableError(throwable, ForumText.get(R.string.forum_ts_server_connect_failed)));
             }
         });
     }
@@ -727,20 +727,20 @@ public final class ForumApiClient {
                     public void onResponse(@NonNull Call<ApiEnvelope<ExchangeData>> call,
                                            @NonNull Response<ApiEnvelope<ExchangeData>> response) {
                         ApiEnvelope<ExchangeData> envelope = response.body();
-                        String error = envelopeError(response, envelope, "论坛登录失败", null);
+                        String error = envelopeError(response, envelope, ForumText.get(R.string.forum_login_failed), null);
                         if (error != null) {
                             finishAuth(uid, null, error);
                             return;
                         }
                         ExchangeData data = envelope == null ? null : envelope.data;
                         if (data == null || TextUtils.isEmpty(data.token) || data.expiresAt <= 0) {
-                            finishAuth(uid, null, "论坛登录返回数据不完整");
+                            finishAuth(uid, null, ForumText.get(R.string.forum_login_incomplete));
                             return;
                         }
                         long expiresAtMs = data.expiresAt > 10_000_000_000L
                                 ? data.expiresAt : data.expiresAt * 1000L;
                         if (!TextUtils.equals(uid, currentUid())) {
-                            finishAuth(uid, null, "账号已切换，请重试");
+                            finishAuth(uid, null, ForumText.get(R.string.forum_account_changed_retry));
                             return;
                         }
                         WKSharedPreferencesUtil prefs = WKSharedPreferencesUtil.getInstance();
@@ -758,7 +758,7 @@ public final class ForumApiClient {
                     @Override
                     public void onFailure(@NonNull Call<ApiEnvelope<ExchangeData>> call,
                                           @NonNull Throwable throwable) {
-                        finishAuth(uid, null, readableError(throwable, "无法连接论坛服务器"));
+                        finishAuth(uid, null, readableError(throwable, ForumText.get(R.string.forum_server_connect_failed)));
                     }
                 });
     }
@@ -778,7 +778,7 @@ public final class ForumApiClient {
                 callback.onSuccess(token);
             } else {
                 callback.onError(TextUtils.isEmpty(errorMessage)
-                        ? "论坛登录失败" : errorMessage);
+                        ? ForumText.get(R.string.forum_login_failed) : errorMessage);
             }
         }
     }
@@ -843,6 +843,15 @@ public final class ForumApiClient {
                 current = forumRetrofit;
                 if (current == null || !TextUtils.equals(baseUrl, forumRetrofitBaseUrl)) {
                     OkHttpClient client = new OkHttpClient.Builder()
+                            .addInterceptor(chain -> {
+                                String language = ForumText.languageTag();
+                                okhttp3.Request request = chain.request().newBuilder()
+                                        .header("X-App-Language", language)
+                                        .header("X-Language", language)
+                                        .header("Accept-Language", language)
+                                        .build();
+                                return chain.proceed(request);
+                            })
                             .connectTimeout(15, TimeUnit.SECONDS)
                             .readTimeout(35, TimeUnit.SECONDS)
                             .writeTimeout(35, TimeUnit.SECONDS)
@@ -868,7 +877,7 @@ public final class ForumApiClient {
                                             @Nullable String requestToken) {
         if (!response.isSuccessful()) {
             if (response.code() == 401) INSTANCE.invalidateSessionIfMatches(requestToken);
-            return "论坛服务器返回 " + response.code();
+            return ForumText.get(R.string.forum_server_http_error, response.code());
         }
         if (envelope == null) return fallback;
         boolean failed = Boolean.FALSE.equals(envelope.success)
@@ -946,7 +955,7 @@ public final class ForumApiClient {
             if (scope != null) scope.complete(call);
             if (call.isCanceled() || (scope != null && scope.isCancelled())) return;
             ApiEnvelope<T> envelope = response.body();
-            String error = envelopeError(response, envelope, "论坛返回数据异常", requestToken);
+            String error = envelopeError(response, envelope, ForumText.get(R.string.forum_response_invalid), requestToken);
             if (error != null) {
                 callback.onError(error);
                 return;
@@ -959,7 +968,7 @@ public final class ForumApiClient {
                               @NonNull Throwable throwable) {
             if (scope != null) scope.complete(call);
             if (call.isCanceled() || (scope != null && scope.isCancelled())) return;
-            callback.onError(readableError(throwable, "论坛网络请求失败"));
+            callback.onError(readableError(throwable, ForumText.get(R.string.forum_network_failed)));
         }
     }
 

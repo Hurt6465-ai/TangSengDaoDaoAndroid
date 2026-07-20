@@ -332,7 +332,7 @@ public class ForumHomeFragment extends Fragment {
         content.addView(recyclerView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        stateView = text(context, "正在连接论坛…", 14,
+        stateView = text(context, ForumText.get(R.string.forum_connecting_forum), 14,
                 dark ? 0xFFB8BBC2 : 0xFF6E737B, false);
         stateView.setGravity(Gravity.CENTER);
         stateView.setPadding(dp(context, 24), dp(context, 24), dp(context, 24), dp(context, 24));
@@ -349,7 +349,7 @@ public class ForumHomeFragment extends Fragment {
         composeFab = text(context, "+", 29, Color.WHITE, false);
         composeFab.setIncludeFontPadding(false);
         composeFab.setGravity(Gravity.CENTER);
-        composeFab.setContentDescription("发布内容");
+        composeFab.setContentDescription(ForumText.get(R.string.forum_publish_content));
         composeFab.setBackground(roundRect(context, 0xFF1877F2, 27));
         composeFab.setElevation(dp(context, 7));
         composeFab.setOnClickListener(v -> openComposer());
@@ -391,7 +391,8 @@ public class ForumHomeFragment extends Fragment {
                 boardMode ? 35 : 22, dark ? Color.WHITE : 0xFF252A30, false);
         leading.setGravity(Gravity.CENTER);
         leading.setBackground(selectableBackground(context));
-        leading.setContentDescription(boardMode ? "返回社区" : "打开板块侧栏");
+        leading.setContentDescription(ForumText.get(boardMode
+                ? R.string.forum_back_to_community : R.string.forum_open_board_drawer));
         leading.setOnClickListener(v -> {
             if (boardMode) {
                 Activity activity = getActivity();
@@ -405,10 +406,12 @@ public class ForumHomeFragment extends Fragment {
         LinearLayout titleBox = new LinearLayout(context);
         titleBox.setOrientation(LinearLayout.VERTICAL);
         titleBox.setGravity(Gravity.CENTER_VERTICAL);
-        toolbarTitleView = text(context, boardMode ? displayBoardName() : "社区", 19,
+        toolbarTitleView = text(context, boardMode ? displayBoardName()
+                : ForumText.get(R.string.forum_community), 19,
                 dark ? Color.WHITE : 0xFF17191C, true);
         toolbarSubtitleView = text(context,
-                boardMode ? "点击切换板块  ›" : "综合讨论与经验分享", 11,
+                boardMode ? ForumText.get(R.string.forum_tap_switch_board)
+                        : ForumText.get(R.string.forum_community_subtitle), 11,
                 dark ? 0xFF8F949C : 0xFF7A8088, false);
         titleBox.addView(toolbarTitleView);
         titleBox.addView(toolbarSubtitleView);
@@ -422,14 +425,14 @@ public class ForumHomeFragment extends Fragment {
                     dark ? 0xFFD9DCE1 : 0xFF4D535B, false);
             boardMenu.setGravity(Gravity.CENTER);
             boardMenu.setBackground(selectableBackground(context));
-            boardMenu.setContentDescription("切换板块");
+            boardMenu.setContentDescription(ForumText.get(R.string.forum_switch_board));
             boardMenu.setOnClickListener(v -> openDrawer());
             toolbar.addView(boardMenu, new LinearLayout.LayoutParams(dp(context, 42), dp(context, 42)));
         }
 
         FrameLayout notificationButton = new FrameLayout(context);
         notificationButton.setForeground(selectableBackground(context));
-        notificationButton.setContentDescription("社区通知");
+        notificationButton.setContentDescription(ForumText.get(R.string.forum_community_notifications));
         notificationButton.setOnClickListener(v -> {
             if (isAdded()) userCenterLauncher.launch(ForumUserCenterActivity.createIntent(requireContext()));
         });
@@ -503,7 +506,7 @@ public class ForumHomeFragment extends Fragment {
         section.addView(row, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        TextView hint = text(context, "本板块独立讨论 · 左侧右滑可快速切换板块", 11,
+        TextView hint = text(context, ForumText.get(R.string.forum_board_header_hint), 11,
                 dark ? 0xFF777D86 : 0xFF8B929A, false);
         LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -522,10 +525,10 @@ public class ForumHomeFragment extends Fragment {
         if (boardTitleView != null) boardTitleView.setText(displayBoardName());
         if (boardDescriptionView != null) boardDescriptionView.setText(displayBoardDescription());
         if (toolbarTitleView != null) toolbarTitleView.setText(displayBoardName());
-        if (toolbarSubtitleView != null) toolbarSubtitleView.setText("点击切换板块  ›");
+        if (toolbarSubtitleView != null) toolbarSubtitleView.setText(R.string.forum_tap_switch_board);
         if (boardFollowButton == null || !isAdded()) return;
         boolean followed = ForumBoardStore.isFollowed(requireContext(), boardCategoryId);
-        boardFollowButton.setText(followed ? "已关注" : "+ 关注");
+        boardFollowButton.setText(followed ? R.string.forum_followed : R.string.forum_follow);
         boardFollowButton.setTextColor(followed
                 ? (isDark(requireContext()) ? 0xFFB6BBC3 : 0xFF68707A) : 0xFF1877F2);
         GradientDrawable background = roundRect(requireContext(), followed
@@ -537,12 +540,13 @@ public class ForumHomeFragment extends Fragment {
     }
 
     private String displayBoardName() {
-        return TextUtils.isEmpty(boardCategoryName) ? "社区板块" : boardCategoryName;
+        return TextUtils.isEmpty(boardCategoryName)
+                ? ForumText.get(R.string.forum_default_board_name) : boardCategoryName;
     }
 
     private String displayBoardDescription() {
         return TextUtils.isEmpty(boardCategoryDescription)
-                ? "分享经验、提问和参与本板块讨论" : boardCategoryDescription;
+                ? ForumText.get(R.string.forum_default_board_description) : boardCategoryDescription;
     }
 
     private void buildFeaturedSectionHeader(Context context) {
@@ -550,7 +554,7 @@ public class ForumHomeFragment extends Fragment {
         LinearLayout header = new LinearLayout(context);
         header.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
 
-        allCategoriesButton = text(context, "更多  ›", 13, 0xFF1877F2, true);
+        allCategoriesButton = text(context, ForumText.get(R.string.forum_more), 13, 0xFF1877F2, true);
         allCategoriesButton.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
         allCategoriesButton.setOnClickListener(v -> openDrawer());
         header.addView(allCategoriesButton, new LinearLayout.LayoutParams(
@@ -625,7 +629,7 @@ public class ForumHomeFragment extends Fragment {
 
     private void authenticateAndLoad() {
         final int generation = ++authGeneration;
-        showState("正在登录论坛…");
+        showState(ForumText.get(R.string.forum_logging_in));
         ForumApiClient.getInstance().ensureSession(requireContext(), requestScope,
                 new ForumApiClient.ResultCallback<String>() {
             @Override
@@ -641,7 +645,7 @@ public class ForumHomeFragment extends Fragment {
             @Override
             public void onError(@NonNull String message) {
                 if (!isAdded() || generation != authGeneration) return;
-                loginHintView.setText("统一登录失败，当前可浏览公开内容：" + message);
+                loginHintView.setText(ForumText.get(R.string.forum_login_failed_public, message));
                 loginHintView.setVisibility(View.VISIBLE);
                 loadCategories();
                 renderDrawer();
@@ -686,7 +690,7 @@ public class ForumHomeFragment extends Fragment {
             @Override
             public void onError(@NonNull String message) {
                 if (isAdded()) {
-                    loginHintView.setText("无法发布：" + message);
+                    loginHintView.setText(ForumText.get(R.string.forum_cannot_publish, message));
                     loginHintView.setVisibility(View.VISIBLE);
                 }
             }
@@ -747,7 +751,8 @@ public class ForumHomeFragment extends Fragment {
             if (clearBeforeLoad && articleAdapter != null) articleAdapter.replaceAll(new ArrayList<>());
             if (mixedFeedAdapter != null) mixedFeedAdapter.rebuild();
             if (clearBeforeLoad || adapter == null || adapter.getItemCount() == 0) {
-                showState(boardMode ? "正在进入板块…" : "正在加载帖子…");
+                showState(boardMode ? ForumText.get(R.string.forum_entering_board)
+                : ForumText.get(R.string.forum_loading_topics));
             }
         }
         final int generation = topicRequestGeneration;
@@ -849,11 +854,11 @@ public class ForumHomeFragment extends Fragment {
         updateCurrentFeedState();
         if (currentItemCount() == 0) {
             if (boardMode && boardSort == BOARD_SORT_FEATURED) {
-                showState("本板块暂时没有精华内容");
+                showState(ForumText.get(R.string.forum_no_featured_board));
             } else if (boardMode) {
-                showState("这个板块还没有帖子\n来发布第一篇内容吧");
+                showState(ForumText.get(R.string.forum_empty_board));
             } else {
-                showState("这里还没有内容\n来发布第一篇内容吧");
+                showState(ForumText.get(R.string.forum_empty_feed));
             }
         } else {
             hideState();
@@ -865,7 +870,7 @@ public class ForumHomeFragment extends Fragment {
         if (!isTopicRequestCurrent(generation, requestSelection, requestBoardSort)) return;
         loading = false;
         if (swipeRefreshLayout != null) swipeRefreshLayout.setRefreshing(false);
-        if (currentItemCount() == 0) showState(message + "\n下拉刷新重试");
+        if (currentItemCount() == 0) showState(ForumText.get(R.string.forum_loading_retry_pull, message));
     }
 
     private void loadInlineArticles(int generation, long requestSelection) {
@@ -989,24 +994,24 @@ public class ForumHomeFragment extends Fragment {
         if (!isAdded() || feedTabContainer == null) return;
         feedTabContainer.removeAllViews();
         if (boardMode) {
-            addBoardSortTab("最新", BOARD_SORT_LATEST);
-            addBoardSortTab("热门", BOARD_SORT_HOT);
-            addBoardSortTab("精华", BOARD_SORT_FEATURED);
+            addBoardSortTab(ForumText.get(R.string.forum_sort_latest), BOARD_SORT_LATEST);
+            addBoardSortTab(ForumText.get(R.string.forum_sort_hot), BOARD_SORT_HOT);
+            addBoardSortTab(ForumText.get(R.string.forum_sort_featured), BOARD_SORT_FEATURED);
             renderBoardHeader();
             return;
         }
         if (featuredGrid == null || allCategoriesButton == null) return;
-        addFeedTab("综合", CATEGORY_COMPREHENSIVE);
-        addFeedTab("最新", CATEGORY_LATEST);
-        addFeedTab("推荐", CATEGORY_RECOMMEND);
+        addFeedTab(ForumText.get(R.string.forum_feed_all), CATEGORY_COMPREHENSIVE);
+        addFeedTab(ForumText.get(R.string.forum_sort_latest), CATEGORY_LATEST);
+        addFeedTab(ForumText.get(R.string.forum_feed_recommended), CATEGORY_RECOMMEND);
 
         List<ForumApiClient.Category> flat = flattenCategories();
-        allCategoriesButton.setText("更多  ›");
+        allCategoriesButton.setText(R.string.forum_more);
         featuredGrid.removeAllViews();
 
         List<ForumApiClient.Category> featured = featuredCategories(flat);
         if (featured.isEmpty()) {
-            TextView loadingView = text(requireContext(), "板块加载中…", 13,
+            TextView loadingView = text(requireContext(), ForumText.get(R.string.forum_boards_loading), 13,
                     isDark(requireContext()) ? 0xFF8F949C : 0xFF7B818A, false);
             GridLayout.LayoutParams params = new GridLayout.LayoutParams();
             params.width = 0;
@@ -1113,7 +1118,7 @@ public class ForumHomeFragment extends Fragment {
         if (selected == null) {
             currentCategoryView.setVisibility(View.GONE);
         } else {
-            currentCategoryView.setText("当前板块：" + safe(selected.name) + "  ·  点击返回综合");
+            currentCategoryView.setText(ForumText.get(R.string.forum_current_board, safe(selected.name)));
             currentCategoryView.setVisibility(View.VISIBLE);
         }
     }
@@ -1222,9 +1227,10 @@ public class ForumHomeFragment extends Fragment {
         header.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout titleBox = new LinearLayout(context);
         titleBox.setOrientation(LinearLayout.VERTICAL);
-        TextView title = text(context, boardMode ? "切换板块" : "社区板块", 20,
+        TextView title = text(context, boardMode ? ForumText.get(R.string.forum_switch_board)
+                : ForumText.get(R.string.forum_default_board_name), 20,
                 dark ? Color.WHITE : 0xFF1C2025, true);
-        TextView subtitle = text(context, "从屏幕左侧右滑可随时打开", 11,
+        TextView subtitle = text(context, ForumText.get(R.string.forum_drawer_swipe_hint), 11,
                 dark ? 0xFF8F949C : 0xFF7A818A, false);
         titleBox.addView(title);
         titleBox.addView(subtitle);
@@ -1238,16 +1244,19 @@ public class ForumHomeFragment extends Fragment {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         if (!boardMode) {
-            addDrawerSection("内容流");
-            addDrawerItem("综合", "全部板块的活跃讨论", CATEGORY_COMPREHENSIVE, 0, false);
-            addDrawerItem("最新", "按发布时间查看新帖", CATEGORY_LATEST, 0, false);
-            addDrawerItem("推荐", "管理员推荐的优质内容", CATEGORY_RECOMMEND, 0, false);
+            addDrawerSection(ForumText.get(R.string.forum_content_feed));
+            addDrawerItem(ForumText.get(R.string.forum_feed_all),
+                ForumText.get(R.string.forum_all_boards_active), CATEGORY_COMPREHENSIVE, 0, false);
+            addDrawerItem(ForumText.get(R.string.forum_sort_latest),
+                ForumText.get(R.string.forum_latest_description), CATEGORY_LATEST, 0, false);
+            addDrawerItem(ForumText.get(R.string.forum_feed_recommended),
+                ForumText.get(R.string.forum_recommended_description), CATEGORY_RECOMMEND, 0, false);
         }
 
         List<ForumApiClient.Category> followed = resolveBoardIds(
                 ForumBoardStore.followedIds(context));
         if (!followed.isEmpty()) {
-            addDrawerSection("我的板块");
+            addDrawerSection(ForumText.get(R.string.forum_my_boards));
             for (ForumApiClient.Category category : followed) addDrawerCategory(category, 0);
         }
 
@@ -1258,7 +1267,7 @@ public class ForumHomeFragment extends Fragment {
             if (current != null) recent.add(current);
         }
         if (!recent.isEmpty()) {
-            addDrawerSection("最近访问");
+            addDrawerSection(ForumText.get(R.string.forum_recently_visited));
             int count = 0;
             for (ForumApiClient.Category category : recent) {
                 addDrawerCategory(category, 0);
@@ -1267,18 +1276,20 @@ public class ForumHomeFragment extends Fragment {
         }
 
         if (!categories.isEmpty()) {
-            addDrawerSection("全部板块");
+            addDrawerSection(ForumText.get(R.string.forum_all_boards));
             for (ForumApiClient.Category root : categories) addDrawerCategoryTree(root, 0);
         } else {
-            addDrawerSection("全部板块");
-            TextView loading = drawerRow(context, "正在加载板块", "请稍候或下拉刷新", false, 0);
+            addDrawerSection(ForumText.get(R.string.forum_all_boards));
+            TextView loading = drawerRow(context, ForumText.get(R.string.forum_loading_boards),
+                    ForumText.get(R.string.forum_wait_or_refresh), false, 0);
             drawerContent.addView(loading, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 58)));
         }
 
         if (ForumApiClient.getInstance().isForumManager()) {
-            addDrawerSection("管理员");
-            TextView admin = drawerRow(context, "管理员工具", "推荐、置顶、删除、禁言与后台管理",
+            addDrawerSection(ForumText.get(R.string.forum_admin));
+            TextView admin = drawerRow(context, ForumText.get(R.string.forum_admin_tools),
+                    ForumText.get(R.string.forum_admin_tools_subtitle),
                     false, 0);
             admin.setOnClickListener(v -> {
                 closeDrawer();
@@ -1370,21 +1381,16 @@ public class ForumHomeFragment extends Fragment {
 
     private void showAdminToolsDialog() {
         if (!isAdded()) return;
-        String message = "帖子右上角菜单会按权限动态显示：\n"
-                + "• 推荐/取消推荐\n"
-                + "• 置顶/取消置顶\n"
-                + "• 删除帖子和评论\n"
-                + "• 禁言 7 天或永久禁言\n\n"
-                + "批量管理继续使用网页后台。";
+        String message = ForumText.get(R.string.forum_admin_help_message);
         new AlertDialog.Builder(requireContext())
-                .setTitle("管理员工具")
+                .setTitle(R.string.forum_admin_tools)
                 .setMessage(message)
-                .setPositiveButton("打开网页后台", (dialog, which) -> openAdminWeb())
-                .setNeutralButton("刷新权限", (dialog, which) -> {
+                .setPositiveButton(R.string.forum_open_web_admin, (dialog, which) -> openAdminWeb())
+                .setNeutralButton(R.string.forum_refresh_permissions, (dialog, which) -> {
                     ForumApiClient.getInstance().invalidateSession();
                     authenticateAndLoad();
                 })
-                .setNegativeButton("关闭", null)
+                .setNegativeButton(R.string.forum_close, null)
                 .show();
     }
 
@@ -1396,7 +1402,7 @@ public class ForumHomeFragment extends Fragment {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (Throwable ignored) {
-            loginHintView.setText("无法打开论坛后台");
+            loginHintView.setText(R.string.forum_admin_open_failed);
             loginHintView.setVisibility(View.VISIBLE);
         }
     }
@@ -1508,7 +1514,7 @@ public class ForumHomeFragment extends Fragment {
         public void onBindViewHolder(@NonNull TopicHolder holder, int position) {
             ForumApiClient.Topic topic = items.get(position);
             String author = topic.user == null || TextUtils.isEmpty(topic.user.nickname)
-                    ? "用户" : topic.user.nickname;
+                    ? ForumText.get(R.string.forum_user) : topic.user.nickname;
             String category = topic.category == null ? "" : safe(topic.category.name);
             boolean newReply = hasNewReply(topic);
             boolean read = wasSeen(topic);
@@ -1528,7 +1534,7 @@ public class ForumHomeFragment extends Fragment {
             holder.qaMark.setVisibility(question ? View.VISIBLE : View.GONE);
             holder.qaStatus.setVisibility(question ? View.VISIBLE : View.GONE);
             if (question) {
-                holder.qaStatus.setText(solved ? "已解决" : "未解决");
+                holder.qaStatus.setText(solved ? R.string.forum_qa_solved : R.string.forum_qa_unsolved);
                 holder.qaStatus.setTextColor(solved ? 0xFF21875B : 0xFFB76E00);
                 holder.qaStatus.setBackground(roundRect(context,
                         solved ? (dark ? 0xFF203D32 : 0xFFE9F7F0)
@@ -1793,10 +1799,10 @@ public class ForumHomeFragment extends Fragment {
         public void onBindViewHolder(@NonNull ArticleHolder holder, int position) {
             ForumApiClient.Article article = items.get(position);
             String author = article.user == null || TextUtils.isEmpty(article.user.nickname)
-                    ? "用户" : article.user.nickname;
+                    ? ForumText.get(R.string.forum_user) : article.user.nickname;
             boolean read = seenPrefs.getLong("time_" + article.id, 0L) > 0;
             boolean dark = isDark(context);
-            bindAuthorCategory(holder.author, author, "文章", dark);
+            bindAuthorCategory(holder.author, author, ForumText.get(R.string.forum_article), dark);
             holder.meta.setVisibility(View.GONE);
             holder.time.setText(formatTime(article.createTime));
             holder.title.setText(safe(article.title));
@@ -1920,7 +1926,7 @@ public class ForumHomeFragment extends Fragment {
         TextView author = text(context, "", 12.5f, dark ? 0xFFF1F2F4 : 0xFF272B31, true);
         author.setSingleLine(true);
         author.setEllipsize(TextUtils.TruncateAt.END);
-        TextView meta = text(context, "文章", 10.5f, dark ? 0xFF8F949C : 0xFF7A818A, false);
+        TextView meta = text(context, ForumText.get(R.string.forum_article), 10.5f, dark ? 0xFF8F949C : 0xFF7A818A, false);
         copy.addView(author); copy.addView(meta);
         LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -2064,9 +2070,9 @@ public class ForumHomeFragment extends Fragment {
 
         LinearLayout badges = new LinearLayout(context);
         badges.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
-        TextView sticky = badge(context, "置顶", 0xFFB96800,
+        TextView sticky = badge(context, ForumText.get(R.string.forum_pinned), 0xFFB96800,
                 dark ? 0xFF40311D : 0xFFFFF0D6);
-        TextView recommend = badge(context, "推荐", 0xFF1877F2,
+        TextView recommend = badge(context, ForumText.get(R.string.forum_featured), 0xFF1877F2,
                 dark ? 0xFF243B59 : 0xFFEAF3FF);
         TextView qaStatus = badge(context, "", 0xFFB76E00,
                 dark ? 0xFF40311D : 0xFFFFF3D8);
@@ -2141,7 +2147,8 @@ public class ForumHomeFragment extends Fragment {
 
     private static void bindAuthorCategory(TextView view, String author, String category,
                                            boolean dark) {
-        String safeAuthor = TextUtils.isEmpty(author) ? "用户" : author;
+        String safeAuthor = TextUtils.isEmpty(author)
+                ? ForumText.get(R.string.forum_user) : author;
         if (TextUtils.isEmpty(category)) {
             view.setText(safeAuthor);
             return;
@@ -2291,21 +2298,22 @@ public class ForumHomeFragment extends Fragment {
     }
 
     private static String categoryInitial(String name) {
-        if (TextUtils.isEmpty(name)) return "板";
+        if (TextUtils.isEmpty(name)) return ForumText.get(R.string.forum_board_initial);
         return name.substring(0, name.offsetByCodePoints(0, 1));
     }
 
     private static String categoryHint(String name) {
-        if (TextUtils.isEmpty(name)) return "进入交流";
-        if (name.contains("口语")) return "发音、口语与纠音";
-        if (name.contains("贸易")) return "市场、物流与合作";
-        if (name.contains("影视")) return "电影、剧集与字幕";
-        if (name.contains("游戏")) return "组队、攻略与玩家交流";
-        if (name.contains("工作") || name.contains("求职")) return "招聘、求职与经验";
-        if (name.contains("学习交流")) return "方法、语法与答疑";
-        if (name.contains("学习")) return "方法、资料与答疑";
-        if (name.contains("闲聊")) return "日常分享与轻松讨论";
-        return "进入板块交流";
+        if (TextUtils.isEmpty(name)) return ForumText.get(R.string.forum_enter_discussion);
+        if (name.contains("口语")) return ForumText.get(R.string.forum_desc_speaking);
+        if (name.contains("贸易")) return ForumText.get(R.string.forum_desc_trade);
+        if (name.contains("影视")) return ForumText.get(R.string.forum_desc_media);
+        if (name.contains("游戏")) return ForumText.get(R.string.forum_desc_games);
+        if (name.contains("工作") || name.contains("求职"))
+            return ForumText.get(R.string.forum_desc_jobs);
+        if (name.contains("学习交流")) return ForumText.get(R.string.forum_desc_learning_exchange);
+        if (name.contains("学习")) return ForumText.get(R.string.forum_desc_learning);
+        if (name.contains("闲聊")) return ForumText.get(R.string.forum_desc_chat);
+        return ForumText.get(R.string.forum_enter_board_discussion);
     }
 
     private static int categoryAccent(String name) {
@@ -2324,13 +2332,8 @@ public class ForumHomeFragment extends Fragment {
     }
 
     private static String formatTime(long value) {
-        if (value <= 0) return "刚刚";
-        long millis = normalizeTime(value);
-        long diff = Math.max(0L, System.currentTimeMillis() - millis);
-        if (diff < 60_000L) return "刚刚";
-        if (diff < 3_600_000L) return (diff / 60_000L) + "分钟前";
-        if (diff < 86_400_000L) return (diff / 3_600_000L) + "小时前";
-        if (diff < 7 * 86_400_000L) return (diff / 86_400_000L) + "天前";
-        return new SimpleDateFormat("MM-dd", Locale.getDefault()).format(new Date(millis));
+        return ForumText.relativeTime(value);
     }
+
+
 }

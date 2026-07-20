@@ -75,7 +75,7 @@ public class ForumImageViewerActivity extends AppCompatActivity {
         close.setTextSize(38);
         close.setGravity(Gravity.CENTER);
         close.setBackgroundColor(0x33000000);
-        close.setContentDescription("关闭图片预览");
+        close.setContentDescription(ForumText.get(R.string.forum_close_image_preview));
         close.setOnClickListener(v -> finish());
         FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(dp(52), dp(52));
         closeParams.gravity = Gravity.START | Gravity.TOP;

@@ -60,7 +60,7 @@ public final class ForumImageCompressor {
 
             File directory = new File(context.getCacheDir(), "forum_uploads");
             if (!directory.exists() && !directory.mkdirs()) {
-                throw new IOException("无法创建图片缓存目录");
+                throw new IOException(ForumText.get(R.string.forum_image_cache_dir_failed));
             }
             pruneStaleFiles(directory);
             output = new File(directory, "forum_" + UUID.randomUUID() + ".webp");
@@ -68,7 +68,7 @@ public final class ForumImageCompressor {
             success = true;
             return output;
         } catch (OutOfMemoryError error) {
-            throw new IOException("图片尺寸过大，请选择较小图片", error);
+            throw new IOException(ForumText.get(R.string.forum_image_too_large), error);
         } finally {
             if (!working.isRecycled()) working.recycle();
             if (!success && output != null && output.exists()) {
@@ -84,11 +84,11 @@ public final class ForumImageCompressor {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
         try (InputStream input = resolver.openInputStream(uri)) {
-            if (input == null) throw new IOException("无法读取图片");
+            if (input == null) throw new IOException(ForumText.get(R.string.forum_image_read_failed));
             BitmapFactory.decodeStream(input, null, bounds);
         }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-            throw new IOException("图片格式无效");
+            throw new IOException(ForumText.get(R.string.forum_image_invalid));
         }
         return bounds;
     }
@@ -104,7 +104,7 @@ public final class ForumImageCompressor {
             options.inPreferredConfig = Bitmap.Config.ARGB_8888;
             options.inDither = false;
             try (InputStream input = resolver.openInputStream(uri)) {
-                if (input == null) throw new IOException("无法读取图片");
+                if (input == null) throw new IOException(ForumText.get(R.string.forum_image_read_failed));
                 Bitmap bitmap = BitmapFactory.decodeStream(input, null, options);
                 if (bitmap != null) return bitmap;
             } catch (OutOfMemoryError error) {
@@ -112,8 +112,8 @@ public final class ForumImageCompressor {
             }
             sample = safeDouble(sample);
         }
-        if (lastOom != null) throw new IOException("图片尺寸过大，无法解码", lastOom);
-        throw new IOException("图片解码失败");
+        if (lastOom != null) throw new IOException(ForumText.get(R.string.forum_image_decode_oom), lastOom);
+        throw new IOException(ForumText.get(R.string.forum_image_decode_failed));
     }
 
     private static int calculateSampleSize(int width, int height) {
@@ -170,9 +170,9 @@ public final class ForumImageCompressor {
         } finally {
             if (ownsCurrent && current != bitmap && !current.isRecycled()) current.recycle();
         }
-        if (!encoded) throw new IOException("图片压缩失败");
+        if (!encoded) throw new IOException(ForumText.get(R.string.forum_image_compress_failed));
         if (output.length() > MAX_OUTPUT_BYTES) {
-            throw new IOException("图片压缩后仍超过110KB，请选择尺寸较小的图片");
+            throw new IOException(ForumText.get(R.string.forum_image_still_too_large));
         }
     }
 
@@ -181,7 +181,7 @@ public final class ForumImageCompressor {
                                     int quality, @NonNull File output) throws IOException {
         try (BufferedOutputStream stream = new BufferedOutputStream(new FileOutputStream(output))) {
             if (!bitmap.compress(format, quality, stream)) {
-                throw new IOException("图片压缩失败");
+                throw new IOException(ForumText.get(R.string.forum_image_compress_failed));
             }
             stream.flush();
         }

@@ -89,7 +89,8 @@ final class ForumLinkRouter {
 
     @NonNull
     static String markdownReference(@Nullable String label, @Nullable String url) {
-        String safeLabel = TextUtils.isEmpty(label) ? "查看相关内容" : label.trim();
+        String safeLabel = TextUtils.isEmpty(label)
+                ? ForumText.get(R.string.forum_view_related_content) : label.trim();
         safeLabel = safeLabel.replace("\\", "\\\\")
                 .replace("[", "\\[")
                 .replace("]", "\\]");

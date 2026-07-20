@@ -63,7 +63,7 @@ final class ForumRemoteImageListView extends LinearLayout {
             String thumbUrl = thumbs.get(i);
             applyLayout(image, i);
             image.setBackgroundColor(placeholderColor);
-            image.setContentDescription("查看图片 " + (i + 1) + "/" + thumbs.size());
+            image.setContentDescription(ForumText.get(R.string.forum_view_image, i + 1, thumbs.size()));
             final int openIndex = i;
             image.setOnClickListener(v -> ForumImageViewerActivity.open(
                     getContext(), new ArrayList<>(viewerUrls), openIndex));

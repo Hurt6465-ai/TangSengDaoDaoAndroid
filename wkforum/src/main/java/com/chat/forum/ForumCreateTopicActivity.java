@@ -104,7 +104,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                     added++;
                 }
                 if (added < uris.size()) {
-                    Toast.makeText(this, "每次最多选择2张图片", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, R.string.forum_image_limit_each, Toast.LENGTH_SHORT).show();
                 }
                 renderSelectedImages();
             });
@@ -150,7 +150,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     @Override
     public void onBackPressed() {
         if (publishing && !authenticating) {
-            Toast.makeText(this, "正在发布，请稍候", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.forum_publishing_wait, Toast.LENGTH_SHORT).show();
             return;
         }
         super.onBackPressed();
@@ -185,9 +185,9 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             if (!publishing || authenticating) finish();
         });
         toolbar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(52)));
-        headingView = text("发布帖子", 18, dark ? Color.WHITE : 0xFF1C1E21, true);
+        headingView = text(ForumText.get(R.string.forum_publish_post), 18, dark ? Color.WHITE : 0xFF1C1E21, true);
         toolbar.addView(headingView, new LinearLayout.LayoutParams(0, dp(52), 1f));
-        publishButton = text("发布", 15, 0xFF1877F2, true);
+        publishButton = text(ForumText.get(R.string.forum_publish), 15, 0xFF1877F2, true);
         publishButton.setGravity(Gravity.CENTER);
         publishButton.setOnClickListener(v -> publish());
         toolbar.addView(publishButton, new LinearLayout.LayoutParams(dp(64), dp(48)));
@@ -199,7 +199,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         form.setPadding(dp(16), dp(16), dp(16), dp(40));
         form.setBackgroundColor(dark ? 0xFF17181B : Color.WHITE);
 
-        form.addView(label("类型"));
+        form.addView(label(ForumText.get(R.string.forum_type)));
         typePill = new LinearLayout(this);
         typePill.setGravity(Gravity.CENTER_VERTICAL);
         typePill.setPadding(dp(2), dp(2), dp(2), dp(2));
@@ -209,7 +209,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         form.addView(typePill, typeParams);
         renderTypePill();
 
-        categoryLabel = label("板块");
+        categoryLabel = label(ForumText.get(R.string.forum_board));
         LinearLayout.LayoutParams categoryLabelParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         categoryLabelParams.topMargin = dp(14);
@@ -217,7 +217,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         categorySpinner = new Spinner(this);
         form.addView(categorySpinner, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
 
-        bountyInput = input("悬赏积分，可选", false);
+        bountyInput = input(ForumText.get(R.string.forum_bounty_optional), false);
         bountyInput.setInputType(InputType.TYPE_CLASS_NUMBER);
         bountyInput.setVisibility(View.GONE);
         LinearLayout.LayoutParams bountyParams = new LinearLayout.LayoutParams(
@@ -225,7 +225,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         bountyParams.topMargin = dp(8);
         form.addView(bountyInput, bountyParams);
 
-        titleInput = input("标题（最多128字）", false);
+        titleInput = input(ForumText.get(R.string.forum_title_limit_hint), false);
         titleInput.setMaxLines(2);
         titleInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -239,7 +239,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         contentParams.topMargin = dp(12);
         form.addView(contentInput, contentParams);
 
-        relationButton = text("＋ 插入文章/帖子关联", 13, 0xFF1877F2, true);
+        relationButton = text(ForumText.get(R.string.forum_insert_relation), 13, 0xFF1877F2, true);
         relationButton.setGravity(Gravity.CENTER_VERTICAL);
         relationButton.setPadding(dp(4), 0, dp(4), 0);
         relationButton.setOnClickListener(v -> showInsertReferenceDialog());
@@ -249,13 +249,13 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         relationParams.topMargin = dp(4);
         form.addView(relationButton, relationParams);
 
-        TextView tagsLabel = label("推荐标签（最多选择5个）");
+        TextView tagsLabel = label(ForumText.get(R.string.forum_recommended_tags_limit));
         LinearLayout.LayoutParams tagsLabelParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         tagsLabelParams.topMargin = dp(14);
         form.addView(tagsLabel, tagsLabelParams);
 
-        tagHint = text("加载推荐标签…", 12, dark ? 0xFF8E9299 : 0xFF8A8F96, false);
+        tagHint = text(ForumText.get(R.string.forum_loading_recommended_tags), 12, dark ? 0xFF8E9299 : 0xFF8A8F96, false);
         LinearLayout.LayoutParams tagHintParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(28));
         tagHintParams.topMargin = dp(4);
@@ -274,15 +274,15 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
 
         LinearLayout imageHeader = new LinearLayout(this);
         imageHeader.setGravity(Gravity.CENTER_VERTICAL);
-        imageLabel = label("图片（最多2张，WebP约100KB）");
+        imageLabel = label(ForumText.get(R.string.forum_images_limit_label));
         imageHeader.addView(imageLabel, new LinearLayout.LayoutParams(0, dp(48), 1f));
-        TextView choose = text("选择图片", 14, 0xFF1877F2, true);
+        TextView choose = text(ForumText.get(R.string.forum_choose_images), 14, 0xFF1877F2, true);
         choose.setGravity(Gravity.CENTER);
         choose.setOnClickListener(v -> {
             if (publishing) return;
             int maxImages = MAX_IMAGES;
             if (selectedImages.size() >= maxImages) {
-                Toast.makeText(this, "最多2张图片", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.forum_image_limit, Toast.LENGTH_SHORT).show();
                 return;
             }
             imagePicker.launch("image/*");
@@ -307,13 +307,13 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
 
     private void authenticateAndLoadCategories() {
         authenticating = true;
-        setPublishing(true, "连接中…");
+        setPublishing(true, ForumText.get(R.string.forum_connecting));
         ForumApiClient.getInstance().ensureSession(this, readScope, new ForumApiClient.ResultCallback<String>() {
             @Override
             public void onSuccess(@Nullable String data) {
                 if (isFinishing() || isDestroyed()) return;
                 authenticating = false;
-                setPublishing(false, "发布");
+                setPublishing(false, ForumText.get(R.string.forum_publish));
                 loadCategories();
                 loadRecommendedTags();
             }
@@ -322,7 +322,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             public void onError(@NonNull String message) {
                 if (isFinishing() || isDestroyed()) return;
                 authenticating = false;
-                setPublishing(false, "发布");
+                setPublishing(false, ForumText.get(R.string.forum_publish));
                 Toast.makeText(ForumCreateTopicActivity.this, message, Toast.LENGTH_LONG).show();
             }
         });
@@ -331,8 +331,8 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private void renderTypePill() {
         if (typePill == null) return;
         typePill.removeAllViews();
-        addTypeTab("帖子", TYPE_TOPIC);
-        addTypeTab("问答", TYPE_QA);
+        addTypeTab(ForumText.get(R.string.forum_post), TYPE_TOPIC);
+        addTypeTab(ForumText.get(R.string.forum_question), TYPE_QA);
         updateTypeDependentViews();
     }
 
@@ -365,7 +365,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         categoriesLoaded = false;
         categories.clear();
         List<String> waiting = new ArrayList<>();
-        waiting.add("加载中…");
+        waiting.add(ForumText.get(R.string.forum_loading));
         ArrayAdapter<String> waitingAdapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_item, waiting);
         categorySpinner.setAdapter(waitingAdapter);
@@ -381,7 +381,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                 }
                 List<String> names = new ArrayList<>();
                 for (ForumApiClient.Category category : categories) names.add(category.name);
-                if (names.isEmpty()) names.add("暂无可发布板块");
+                if (names.isEmpty()) names.add(ForumText.get(R.string.forum_no_publishable_boards));
                 ArrayAdapter<String> adapter = new ArrayAdapter<>(ForumCreateTopicActivity.this,
                         android.R.layout.simple_spinner_item, names);
                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -413,20 +413,20 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         String title = titleInput.getText().toString().trim();
         String content = contentInput.getText().toString().trim();
         if (title.isEmpty()) {
-            titleInput.setError("请输入标题");
+            titleInput.setError(ForumText.get(R.string.forum_enter_title));
             return;
         }
         if (title.codePointCount(0, title.length()) > 128) {
-            titleInput.setError("标题不能超过128字");
+            titleInput.setError(ForumText.get(R.string.forum_title_too_long));
             return;
         }
         if (content.isEmpty()) {
-            contentInput.setError("请输入内容");
+            contentInput.setError(ForumText.get(R.string.forum_enter_content));
             return;
         }
         long categoryId = topicType == TYPE_ARTICLE ? 0L : selectedCategoryId();
         if (topicType != TYPE_ARTICLE && categoryId <= 0) {
-            Toast.makeText(this, "板块尚未加载，请稍后重试", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.forum_boards_not_ready, Toast.LENGTH_SHORT).show();
             return;
         }
         final long selectedCategoryId = categoryId;
@@ -436,7 +436,9 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         final List<Uri> images = new ArrayList<>(selectedImages);
         final int generation = ++publishGeneration;
         saveDraft();
-        setPublishing(true, images.isEmpty() ? "发布中…" : "处理图片…");
+        setPublishing(true, images.isEmpty()
+                ? ForumText.get(R.string.forum_publishing)
+                : ForumText.get(R.string.forum_processing_images));
         ForumApiClient.getInstance().ensureSession(this, publishScope, new ForumApiClient.ResultCallback<String>() {
             @Override
             public void onSuccess(@Nullable String data) {
@@ -467,7 +469,8 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             callback.onDone(uploaded);
             return;
         }
-        publishButton.setText("图片 " + (index + 1) + "/" + images.size());
+        publishButton.setText(ForumText.get(R.string.forum_uploading_image_progress,
+                index + 1, images.size()));
         Uri uri = images.get(index);
         try {
             imageExecutor.execute(() -> {
@@ -492,7 +495,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                                         cleanupUploadFile(uploadFile);
                                         if (!isPublishActive(generation)) return;
                                         if (result == null || TextUtils.isEmpty(result.url)) {
-                                            failPublish("图片上传返回数据不完整");
+                                            failPublish(ForumText.get(R.string.forum_image_upload_incomplete));
                                             return;
                                         }
                                         uploaded.add(new ForumApiClient.ImageInfo(result.url));
@@ -511,13 +514,13 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                     deleteFile(file);
                     runOnUiThread(() -> {
                         if (isPublishActive(generation)) {
-                            failPublish("图片处理失败：" + safeMessage(error));
+                            failPublish(ForumText.get(R.string.forum_image_processing_failed, safeMessage(error)));
                         }
                     });
                 }
             });
         } catch (RuntimeException error) {
-            if (isPublishActive(generation)) failPublish("图片处理任务无法启动");
+            if (isPublishActive(generation)) failPublish(ForumText.get(R.string.forum_image_task_failed));
         }
     }
 
@@ -525,7 +528,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                              String content, List<String> tags,
                              List<ForumApiClient.ImageInfo> images, int bountyScore) {
         if (!isPublishActive(generation)) return;
-        publishButton.setText("发布中…");
+        publishButton.setText(R.string.forum_publishing);
         ForumApiClient.getInstance().createTopic(type, categoryId, title, content,
                 tags, images, bountyScore, publishScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Topic>() {
@@ -552,7 +555,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private void createArticle(int generation, String title, String content,
                                List<String> tags, List<ForumApiClient.ImageInfo> images) {
         if (!isPublishActive(generation)) return;
-        publishButton.setText("发布中…");
+        publishButton.setText(R.string.forum_publishing);
         String articleContent = appendArticleBodyImages(content, images);
         ForumApiClient.getInstance().createArticle(title, buildArticleSummary(content), articleContent,
                 tags, null, publishScope, new ForumApiClient.ResultCallback<ForumApiClient.Article>() {
@@ -579,7 +582,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
 
     private void failPublish(String message) {
         if (isFinishing() || isDestroyed()) return;
-        setPublishing(false, "发布");
+        setPublishing(false, ForumText.get(R.string.forum_publish));
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
@@ -609,12 +612,13 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         Spinner typeSpinner = new Spinner(this);
         ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item,
-                Arrays.asList("文章", "帖子"));
+                Arrays.asList(ForumText.get(R.string.forum_article),
+                        ForumText.get(R.string.forum_post)));
         typeSpinner.setAdapter(typeAdapter);
         panel.addView(typeSpinner, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
 
-        EditText labelInput = input("显示文字，例如：缅语声调基础", false);
+        EditText labelInput = input(ForumText.get(R.string.forum_relation_display_hint), false);
         int selectionStart = Math.max(0, contentInput.getSelectionStart());
         int selectionEnd = Math.max(selectionStart, contentInput.getSelectionEnd());
         if (selectionEnd > selectionStart) {
@@ -638,10 +642,10 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         panel.addView(hint);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("插入关联内容")
+                .setTitle(R.string.forum_insert_related_content)
                 .setView(panel)
-                .setNegativeButton("取消", null)
-                .setPositiveButton("插入", null)
+                .setNegativeButton(R.string.forum_cancel, null)
+                .setPositiveButton(R.string.forum_insert, null)
                 .create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
                 .setOnClickListener(v -> {
@@ -650,11 +654,11 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                     boolean articleTarget = typeSpinner.getSelectedItemPosition() == 0;
                     String url = ForumLinkRouter.normalizeReference(target, articleTarget);
                     if (TextUtils.isEmpty(label)) {
-                        labelInput.setError("请输入显示文字");
+                        labelInput.setError(ForumText.get(R.string.forum_enter_display_text));
                         return;
                     }
                     if (TextUtils.isEmpty(url)) {
-                        targetInput.setError("请输入有效的文章/帖子 ID 或论坛链接");
+                        targetInput.setError(ForumText.get(R.string.forum_invalid_relation));
                         return;
                     }
                     insertReferenceAtSelection(label, url);
@@ -678,7 +682,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         if (imageContainer == null) return;
         imageContainer.removeAllViews();
         if (selectedImages.isEmpty()) {
-            TextView empty = text("未选择图片", 13, isDark() ? 0xFF8E9299 : 0xFF8A8F96, false);
+            TextView empty = text(ForumText.get(R.string.forum_no_images_selected), 13, isDark() ? 0xFF8E9299 : 0xFF8A8F96, false);
             empty.setGravity(Gravity.CENTER_VERTICAL);
             imageContainer.addView(empty, new LinearLayout.LayoutParams(dp(120), dp(88)));
             return;
@@ -690,7 +694,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             image.setScaleType(ImageView.ScaleType.CENTER_CROP);
             Glide.with(this).load(uri).into(image);
             box.addView(image, new LinearLayout.LayoutParams(dp(78), dp(70)));
-            TextView remove = text("移除", 12, 0xFFE14A4A, false);
+            TextView remove = text(ForumText.get(R.string.forum_remove), 12, 0xFFE14A4A, false);
             remove.setGravity(Gravity.CENTER);
             remove.setOnClickListener(v -> {
                 if (publishing) return;
@@ -735,7 +739,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         pendingCategoryId = draft.categoryId;
         renderTypePill();
         updateContentHint();
-        Toast.makeText(this, "已恢复上次未发布的草稿", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, R.string.forum_draft_restored, Toast.LENGTH_SHORT).show();
     }
 
     private int normalizeComposerType(int value) {
@@ -757,27 +761,28 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private void updateContentHint() {
         if (contentInput == null) return;
         if (topicType == TYPE_QA) {
-            contentInput.setHint("请清楚描述问题、已经尝试的方法和期望得到的帮助…");
+            contentInput.setHint(R.string.forum_question_content_hint);
         } else if (topicType == TYPE_ARTICLE) {
-            contentInput.setHint("撰写完整文章内容，建议分段表达…");
+            contentInput.setHint(R.string.forum_article_content_hint);
         } else {
-            contentInput.setHint("分享你的经验、观点或学习内容…");
+            contentInput.setHint(R.string.forum_post_content_hint);
         }
     }
 
     private void updateTypeDependentViews() {
         boolean article = topicType == TYPE_ARTICLE;
         if (headingView != null) {
-            headingView.setText(article ? "发布文章" : (topicType == TYPE_QA ? "发布问答" : "发布帖子"));
+            headingView.setText(article ? R.string.forum_publish_article
+                    : (topicType == TYPE_QA ? R.string.forum_publish_question
+                    : R.string.forum_publish_post));
         }
         if (categoryLabel != null) categoryLabel.setVisibility(article ? View.GONE : View.VISIBLE);
         if (categorySpinner != null) categorySpinner.setVisibility(article ? View.GONE : View.VISIBLE);
         if (bountyInput != null) bountyInput.setVisibility(topicType == TYPE_QA ? View.VISIBLE : View.GONE);
         if (relationButton != null) relationButton.setVisibility(article ? View.VISIBLE : View.GONE);
         if (imageLabel != null) {
-            imageLabel.setText(article
-                    ? "正文图片（最多2张，WebP约100KB）"
-                    : "图片（最多2张，WebP约100KB）");
+            imageLabel.setText(article ? R.string.forum_article_images_limit_label
+                    : R.string.forum_images_limit_label);
         }
     }
 
@@ -788,7 +793,8 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         for (ForumApiClient.ImageInfo image : images) {
             if (image == null || TextUtils.isEmpty(image.url)) continue;
             if (result.length() > 0) result.append("\n\n");
-            result.append("![文章图片](").append(image.url.trim()).append(')');
+            result.append("![").append(ForumText.get(R.string.forum_article_image_alt))
+                    .append("](").append(image.url.trim()).append(')');
         }
         return result.toString();
     }
@@ -892,7 +898,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                 tagsLoaded = true;
                 renderRecommendedTags();
                 Toast.makeText(ForumCreateTopicActivity.this,
-                        "推荐标签加载失败，可稍后重试", Toast.LENGTH_SHORT).show();
+                        R.string.forum_tags_load_failed, Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -913,7 +919,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         if (tagContainer == null || tagHint == null) return;
         tagContainer.removeAllViews();
         if (!tagsLoaded && recommendedTags.isEmpty()) {
-            tagHint.setText("加载推荐标签…");
+            tagHint.setText(R.string.forum_loading_recommended_tags);
             tagHint.setVisibility(View.VISIBLE);
             return;
         }
@@ -925,14 +931,14 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             if (!name.isEmpty() && !names.contains(name)) names.add(name);
         }
         if (names.isEmpty()) {
-            tagHint.setText("暂无推荐标签，可以不选择");
+            tagHint.setText(R.string.forum_no_suggested_tags);
             tagHint.setVisibility(View.VISIBLE);
             return;
         }
 
         tagHint.setText(selectedTags.isEmpty()
-                ? "选择与你内容最相关的标签"
-                : "已选择 " + selectedTags.size() + "/5");
+                ? ForumText.get(R.string.forum_choose_relevant_tags)
+                : ForumText.get(R.string.forum_selected_tags, selectedTags.size()));
         tagHint.setVisibility(View.VISIBLE);
         for (String name : names) {
             boolean selected = selectedTags.contains(name);
@@ -959,7 +965,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             selectedTags.remove(name);
         } else {
             if (selectedTags.size() >= 5) {
-                Toast.makeText(this, "最多选择5个标签", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.forum_tag_limit, Toast.LENGTH_SHORT).show();
                 return;
             }
             selectedTags.add(name);
@@ -1028,7 +1034,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
 
     private static String safeMessage(Throwable error) {
         String message = error == null ? "" : error.getMessage();
-        return TextUtils.isEmpty(message) ? "未知错误" : message;
+        return TextUtils.isEmpty(message) ? ForumText.get(R.string.forum_unknown_error) : message;
     }
 
     private interface UploadsCallback {

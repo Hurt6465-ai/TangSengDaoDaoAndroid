@@ -78,7 +78,7 @@ final class ForumAudioRecorder {
             outputFile = null;
             state = State.IDLE;
             if (error instanceof IOException) throw (IOException) error;
-            throw new IOException("无法开始录音", error);
+            throw new IOException(ForumText.get(R.string.forum_record_start_failed), error);
         }
     }
 

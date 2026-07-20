@@ -564,7 +564,8 @@ final class ForumVideoEmbedListView extends LinearLayout {
 
     @NonNull
     private static String buildHtml(@NonNull Embed embed, boolean autoplay) {
-        String title = embed.platform == Platform.YOUTUBE ? "YouTube video" : "TikTok video";
+        String title = ForumText.get(embed.platform == Platform.YOUTUBE
+                ? R.string.forum_youtube_video : R.string.forum_tiktok_video);
         String playerUrl;
         if (embed.platform == Platform.YOUTUBE) {
             playerUrl = embed.playerBaseUrl + "?autoplay=" + (autoplay ? "1" : "0")

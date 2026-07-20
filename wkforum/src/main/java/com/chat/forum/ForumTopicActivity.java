@@ -320,7 +320,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         body.addView(recyclerView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        stateView = text("正在加载…", 14, dark ? 0xFFB8BBC2 : 0xFF6E737B, false);
+        stateView = text(ForumText.get(R.string.forum_loading), 14, dark ? 0xFFB8BBC2 : 0xFF6E737B, false);
         stateView.setGravity(Gravity.CENTER);
         stateView.setOnClickListener(v -> clearReplyTarget());
         body.addView(stateView, new FrameLayout.LayoutParams(
@@ -328,7 +328,7 @@ public class ForumTopicActivity extends AppCompatActivity {
 
         fastScrollButton = new AppCompatImageView(this);
         fastScrollButton.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-        fastScrollButton.setContentDescription("快速到底部");
+        fastScrollButton.setContentDescription(ForumText.get(R.string.forum_fast_to_bottom));
         fastScrollButton.setPadding(dp(8), dp(8), dp(8), dp(8));
         fastScrollButton.setBackground(roundRect(dark ? 0xFF2A2D32 : 0xFFF4F5F7, 16));
         setImageIcon(fastScrollButton, R.drawable.ic_forum_arrow_down, 17,
@@ -1069,7 +1069,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                     public void onSuccess(@Nullable ForumApiClient.Topic topic) {
                         if (isDead()) return;
                         if (topic == null) {
-                            showError("帖子不存在或已被删除");
+                            showError(ForumText.get(R.string.forum_topic_not_found));
                             return;
                         }
                         currentTopic = topic;
@@ -1217,7 +1217,8 @@ public class ForumTopicActivity extends AppCompatActivity {
         setImageIcon(fastScrollButton,
                 fastScrollToTop ? R.drawable.ic_forum_arrow_up : R.drawable.ic_forum_arrow_down,
                 17, isDark() ? 0xFFD3D6DA : 0xFF5D646C);
-        fastScrollButton.setContentDescription(fastScrollToTop ? "快速回到顶部" : "快速回到底部");
+        fastScrollButton.setContentDescription(ForumText.get(fastScrollToTop
+                ? R.string.forum_fast_to_top : R.string.forum_fast_to_bottom));
         mainHandler.removeCallbacks(hideFastScrollButton);
         fastScrollButton.animate().cancel();
         fastScrollButton.setAlpha(1f);
@@ -1314,25 +1315,27 @@ public class ForumTopicActivity extends AppCompatActivity {
         labels.add(getString(R.string.forum_report));
         actions.add(this::showReportDialog);
         if (manager || client.hasPermission("dashboard.topic.recommend")) {
-            labels.add(topic.recommend ? "取消推荐" : "推荐");
+            labels.add(ForumText.get(topic.recommend
+                    ? R.string.forum_unfeature : R.string.forum_featured));
             actions.add(() -> changeTopicRecommended(topic));
         }
         if (manager || client.hasPermission("dashboard.topic.sticky")) {
-            labels.add(topic.sticky ? "取消置顶" : "置顶");
+            labels.add(ForumText.get(topic.sticky
+                    ? R.string.forum_unpin : R.string.forum_pinned));
             actions.add(() -> changeTopicSticky(topic));
         }
         if (canDeleteTopic(topic)) {
-            labels.add("删除帖子");
+            labels.add(ForumText.get(R.string.forum_delete_topic));
             actions.add(this::confirmDeleteTopic);
         }
         if (topic.user != null && !TextUtils.isEmpty(topic.user.id)
                 && !TextUtils.equals(client.getCurrentForumUserId(), topic.user.id)) {
             if (manager || client.hasPermission("dashboard.user.forbidden")) {
-                labels.add("禁言 7 天");
+                labels.add(ForumText.get(R.string.forum_mute_7_days));
                 actions.add(() -> confirmForbidUser(topic.user, 7));
             }
             if (manager || client.hasPermission("dashboard.user.forbiddenForever")) {
-                labels.add("永久禁言");
+                labels.add(ForumText.get(R.string.forum_mute_forever));
                 actions.add(() -> confirmForbidUser(topic.user, -1));
             }
         }
@@ -1358,7 +1361,8 @@ public class ForumTopicActivity extends AppCompatActivity {
                 new VoidCallback() {
                     @Override public void success() {
                         topic.sticky = next;
-                        completeAction(next ? "已置顶" : "已取消置顶");
+                        completeAction(ForumText.get(next
+                                ? R.string.forum_pinned_done : R.string.forum_unpinned_done));
                         adapter.rebuild();
                     }
                 }));
@@ -1370,7 +1374,8 @@ public class ForumTopicActivity extends AppCompatActivity {
                 new VoidCallback() {
                     @Override public void success() {
                         topic.recommend = next;
-                        completeAction(next ? "已推荐" : "已取消推荐");
+                        completeAction(ForumText.get(next
+                                ? R.string.forum_featured_done : R.string.forum_unfeatured_done));
                         adapter.rebuild();
                     }
                 }));
@@ -1399,7 +1404,8 @@ public class ForumTopicActivity extends AppCompatActivity {
                 new VoidCallback() {
                     @Override public void success() {
                         topic.favorited = next;
-                        completeAction(next ? "已收藏" : "已取消收藏");
+                        completeAction(ForumText.get(next
+                                ? R.string.forum_favorited_done : R.string.forum_unfavorited_done));
                         adapter.rebuild();
                     }
                 }));
@@ -1423,22 +1429,23 @@ public class ForumTopicActivity extends AppCompatActivity {
         if (comment == null || topicActionBusy) return;
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
-        labels.add(comment.liked ? "取消点赞" : "点赞");
+        labels.add(ForumText.get(comment.liked ? R.string.forum_unlike : R.string.forum_like));
         actions.add(() -> changeCommentLike(comment));
         if (!isOwnComment(comment)) {
-            labels.add("回复");
+            labels.add(ForumText.get(R.string.forum_reply));
             actions.add(() -> setReplyTarget(parentId, comment.id, author));
         }
         if (canAcceptAnswer(comment, parentId)) {
-            labels.add("采纳为答案");
+            labels.add(ForumText.get(R.string.forum_accept_as_answer));
             actions.add(() -> confirmAcceptAnswer(comment));
         }
-        labels.add("举报");
+        labels.add(ForumText.get(R.string.forum_report));
         actions.add(() -> showCommentReportDialog(comment));
         labels.add(getString(R.string.forum_share));
-        actions.add(() -> shareText("评论", userName(comment.user) + "：" + safe(comment.content)));
+        actions.add(() -> shareText(ForumText.get(R.string.forum_comments),
+                userName(comment.user) + ": " + safe(comment.content)));
         if (canDeleteComment(comment)) {
-            labels.add("删除");
+            labels.add(ForumText.get(R.string.forum_delete));
             actions.add(() -> confirmDeleteComment(comment));
         }
         showCompactActionMenu(labels, actions);
@@ -1464,10 +1471,10 @@ public class ForumTopicActivity extends AppCompatActivity {
 
     private void confirmAcceptAnswer(@NonNull ForumApiClient.Comment comment) {
         new AlertDialog.Builder(this)
-                .setTitle("采纳答案")
-                .setMessage("采纳后该问答会标记为已解决。确定选择这条回答吗？")
-                .setPositiveButton("采纳", (dialog, which) -> acceptAnswer(comment))
-                .setNegativeButton("取消", null)
+                .setTitle(R.string.forum_accept_answer)
+                .setMessage(R.string.forum_accept_answer_message)
+                .setPositiveButton(R.string.forum_accept, (dialog, which) -> acceptAnswer(comment))
+                .setNegativeButton(R.string.forum_cancel, null)
                 .show();
     }
 
@@ -1479,7 +1486,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                     @Override public void success() {
                         topic.acceptedCommentId = comment.id;
                         topic.qaStatus = "solved";
-                        completeAction("已采纳答案");
+                        completeAction(ForumText.get(R.string.forum_answer_accepted));
                         adapter.rebuild();
                     }
                 }));
@@ -1533,43 +1540,43 @@ public class ForumTopicActivity extends AppCompatActivity {
     }
 
     private void showReportDialog() {
-        String[] reasons = {"广告或诈骗", "色情低俗", "辱骂骚扰", "违法违规", "其他"};
+        String[] reasons = ForumText.array(R.array.forum_report_reasons);
         new AlertDialog.Builder(this)
-                .setTitle("举报帖子")
+                .setTitle(R.string.forum_report_post)
                 .setItems(reasons, (dialog, which) -> reportTopic(reasons[which]))
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.forum_cancel, null)
                 .show();
     }
 
     private void showCommentReportDialog(ForumApiClient.Comment comment) {
-        String[] reasons = {"广告或诈骗", "色情低俗", "辱骂骚扰", "违法违规", "其他"};
+        String[] reasons = ForumText.array(R.array.forum_report_reasons);
         new AlertDialog.Builder(this)
-                .setTitle("举报评论")
+                .setTitle(R.string.forum_report_comment)
                 .setItems(reasons, (dialog, which) -> reportComment(comment, reasons[which]))
-                .setNegativeButton("取消", null)
+                .setNegativeButton(R.string.forum_cancel, null)
                 .show();
     }
 
     private void reportTopic(String reason) {
         runAuthenticatedAction(() -> ForumApiClient.getInstance().reportTopic(topicId, reason,
                 new VoidCallback() {
-                    @Override public void success() { completeAction("举报已提交"); }
+                    @Override public void success() { completeAction(ForumText.get(R.string.forum_report_submitted)); }
                 }));
     }
 
     private void reportComment(ForumApiClient.Comment comment, String reason) {
         runAuthenticatedAction(() -> ForumApiClient.getInstance().reportComment(comment.id, reason,
                 new VoidCallback() {
-                    @Override public void success() { completeAction("举报已提交"); }
+                    @Override public void success() { completeAction(ForumText.get(R.string.forum_report_submitted)); }
                 }));
     }
 
     private void confirmDeleteTopic() {
         new AlertDialog.Builder(this)
-                .setTitle("删除帖子")
-                .setMessage("删除后无法恢复，确定继续吗？")
-                .setPositiveButton("删除", (dialog, which) -> deleteTopic())
-                .setNegativeButton("取消", null)
+                .setTitle(R.string.forum_delete_topic)
+                .setMessage(R.string.forum_delete_irreversible)
+                .setPositiveButton(R.string.forum_delete, (dialog, which) -> deleteTopic())
+                .setNegativeButton(R.string.forum_cancel, null)
                 .show();
     }
 
@@ -1579,7 +1586,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                     @Override public void onSuccess(@Nullable Void data) {
                         topicActionBusy = false;
                         setResult(RESULT_OK);
-                        Toast.makeText(ForumTopicActivity.this, "帖子已删除", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(ForumTopicActivity.this, R.string.forum_topic_deleted, Toast.LENGTH_SHORT).show();
                         finish();
                     }
                     @Override public void onError(@NonNull String message) { finishTopicAction(message); }
@@ -1588,10 +1595,10 @@ public class ForumTopicActivity extends AppCompatActivity {
 
     private void confirmDeleteComment(ForumApiClient.Comment comment) {
         new AlertDialog.Builder(this)
-                .setTitle("删除评论")
-                .setMessage("删除后无法恢复，确定继续吗？")
-                .setPositiveButton("删除", (dialog, which) -> deleteComment(comment.id))
-                .setNegativeButton("取消", null)
+                .setTitle(R.string.forum_delete_comment)
+                .setMessage(R.string.forum_delete_irreversible)
+                .setPositiveButton(R.string.forum_delete, (dialog, which) -> deleteComment(comment.id))
+                .setNegativeButton(R.string.forum_cancel, null)
                 .show();
     }
 
@@ -1603,7 +1610,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                         if (currentTopic != null) {
                             currentTopic.commentCount = Math.max(0, currentTopic.commentCount - 1);
                         }
-                        completeAction("评论已删除");
+                        completeAction(ForumText.get(R.string.forum_comment_deleted));
                         adapter.rebuild();
                     }
                 }));
@@ -1631,20 +1638,22 @@ public class ForumTopicActivity extends AppCompatActivity {
 
     private void confirmForbidUser(ForumApiClient.User user, int days) {
         if (user == null || TextUtils.isEmpty(user.id)) return;
-        String duration = days == -1 ? "永久" : days + " 天";
+        String duration = days == -1 ? ForumText.get(R.string.forum_permanent)
+                : ForumText.get(R.string.forum_days, days);
         new AlertDialog.Builder(this)
-                .setTitle(duration + "禁言")
-                .setMessage("确定将“" + userName(user) + "”禁言" + duration + "吗？")
-                .setPositiveButton("确定", (dialog, which) -> forbidUser(user, days))
-                .setNegativeButton("取消", null)
+                .setTitle(ForumText.get(R.string.forum_mute_title, duration))
+                .setMessage(ForumText.get(R.string.forum_mute_confirm, userName(user), duration))
+                .setPositiveButton(R.string.forum_confirm, (dialog, which) -> forbidUser(user, days))
+                .setNegativeButton(R.string.forum_cancel, null)
                 .show();
     }
 
     private void forbidUser(ForumApiClient.User user, int days) {
         runAuthenticatedAction(() -> ForumApiClient.getInstance().forbidUser(user.id, days,
-                "论坛内容管理", new VoidCallback() {
+                ForumText.get(R.string.forum_content_moderation), new VoidCallback() {
                     @Override public void success() {
-                        completeAction(days == -1 ? "已永久禁言" : "已禁言 7 天");
+                        completeAction(ForumText.get(days == -1
+                                ? R.string.forum_muted_permanently : R.string.forum_muted_7_days));
                     }
                 }));
     }
@@ -1652,7 +1661,7 @@ public class ForumTopicActivity extends AppCompatActivity {
     private void setReplyTarget(long parentId, long quoteId, String name) {
         replyParentId = parentId;
         replyQuoteId = quoteId;
-        replyHint.setText("正在回复 " + safe(name) + " · 点击空白处取消");
+        replyHint.setText(ForumText.get(R.string.forum_replying_to_blank_cancel, safe(name)));
         replyHint.setVisibility(View.VISIBLE);
         commentInput.requestFocus();
         InputMethodManager keyboard = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
@@ -2214,10 +2223,10 @@ public class ForumTopicActivity extends AppCompatActivity {
             else if (holder instanceof SimpleHolder) {
                 TextView text = (TextView) holder.itemView;
                 if (row.type == TYPE_EMPTY) {
-                    text.setText("还没有评论，来发表第一条吧");
+                    text.setText(R.string.forum_no_comments_first);
                     text.setOnClickListener(v -> focusCommentInput());
                 } else {
-                    text.setText(loadingComments ? "加载中…" : "加载更多评论");
+                    text.setText(loadingComments ? R.string.forum_loading : R.string.forum_load_more_comments);
                     text.setOnClickListener(v -> {
                         if (!loadingComments) loadComments(false);
                     });
@@ -2279,13 +2288,13 @@ public class ForumTopicActivity extends AppCompatActivity {
             boolean canAccept = !reply && canAcceptAnswer(comment, row.parentId);
             holder.answer.setVisibility(accepted || canAccept ? View.VISIBLE : View.GONE);
             if (accepted) {
-                holder.answer.setText("已采纳");
+                holder.answer.setText(R.string.forum_accepted);
                 holder.answer.setTextColor(isDark() ? 0xFF79D4A8 : 0xFF21875B);
                 holder.answer.setBackground(roundRect(isDark() ? 0xFF203D32 : 0xFFE9F7F0, 11));
                 holder.answer.setOnClickListener(null);
                 holder.answer.setClickable(false);
             } else if (canAccept) {
-                holder.answer.setText("采纳");
+                holder.answer.setText(R.string.forum_accept);
                 holder.answer.setTextColor(0xFF1877F2);
                 holder.answer.setBackground(roundRect(isDark() ? 0xFF243B59 : 0xFFEAF3FF, 11));
                 holder.answer.setClickable(true);
@@ -2366,28 +2375,34 @@ public class ForumTopicActivity extends AppCompatActivity {
 
         private void setCommentName(TextView view, String author, String target,
                                     boolean reply, boolean owner) {
-            String safeAuthor = TextUtils.isEmpty(author) ? "用户" : author;
+            String safeAuthor = TextUtils.isEmpty(author)
+                    ? ForumText.get(R.string.forum_user) : author;
             String safeTarget = TextUtils.isEmpty(target) ? "" : target;
-            String connector = reply && !TextUtils.isEmpty(safeTarget) ? " 回复 " : "";
-            String namePart = safeAuthor + connector + safeTarget;
-            String ownerPart = owner ? "  楼主" : "";
+            String namePart = reply && !TextUtils.isEmpty(safeTarget)
+                    ? ForumText.get(R.string.forum_replied_to, safeAuthor, safeTarget)
+                    : safeAuthor;
+            String ownerPart = owner ? "  " + ForumText.get(R.string.forum_owner) : "";
             SpannableString value = new SpannableString(namePart + ownerPart);
             int normalName = isDark() ? 0xFFE4E6E9 : 0xFF30353B;
             int replyName = isDark() ? 0xFFA3A9B1 : 0xFF7E858D;
             int connectorColor = isDark() ? 0xFFD2D6DB : 0xFF4B535C;
+            int authorStart = Math.max(0, namePart.indexOf(safeAuthor));
+            int authorEnd = Math.min(namePart.length(), authorStart + safeAuthor.length());
             value.setSpan(new ForegroundColorSpan(reply ? replyName : normalName),
-                    0, safeAuthor.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    authorStart, authorEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             value.setSpan(new StyleSpan(reply ? Typeface.NORMAL : Typeface.BOLD),
-                    0, safeAuthor.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            if (!TextUtils.isEmpty(connector)) {
-                int connectorStart = safeAuthor.length();
-                int targetStart = connectorStart + connector.length();
-                value.setSpan(new ForegroundColorSpan(connectorColor), connectorStart, targetStart,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                value.setSpan(new StyleSpan(Typeface.BOLD), connectorStart, targetStart,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                value.setSpan(new ForegroundColorSpan(replyName), targetStart, namePart.length(),
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    authorStart, authorEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            if (reply && !TextUtils.isEmpty(safeTarget)) {
+                int targetStart = namePart.indexOf(safeTarget, authorEnd);
+                if (targetStart >= 0) {
+                    value.setSpan(new ForegroundColorSpan(connectorColor), authorEnd, targetStart,
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    value.setSpan(new StyleSpan(Typeface.BOLD), authorEnd, targetStart,
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    value.setSpan(new ForegroundColorSpan(replyName), targetStart,
+                            Math.min(namePart.length(), targetStart + safeTarget.length()),
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                }
             }
             if (owner) {
                 int ownerStart = namePart.length();
@@ -2416,19 +2431,21 @@ public class ForumTopicActivity extends AppCompatActivity {
             holder.collapse.setVisibility(View.GONE);
             if (!expanded) {
                 holder.more.setVisibility(View.VISIBLE);
-                holder.more.setText("查看 " + Math.max(parent.commentCount,
-                        hasLoaded ? parent.replies.results.size() : 0) + " 条回复");
+                holder.more.setText(ForumText.get(R.string.forum_view_replies,
+                        Math.max(parent.commentCount,
+                                hasLoaded ? parent.replies.results.size() : 0)));
                 holder.more.setOnClickListener(v -> toggleReplies(parent));
             } else {
                 if (hasMore) {
                     holder.more.setVisibility(View.VISIBLE);
-                    holder.more.setText(loadingComments ? "加载中…" : "继续加载更多");
+                    holder.more.setText(loadingComments ? R.string.forum_loading
+                            : R.string.forum_continue_load_more);
                     holder.more.setOnClickListener(v -> {
                         if (!loadingComments) loadMoreReplies(parent);
                     });
                 }
                 holder.collapse.setVisibility(View.VISIBLE);
-                holder.collapse.setText("收起回复");
+                holder.collapse.setText(R.string.forum_collapse_replies);
                 holder.collapse.setOnClickListener(v -> toggleReplies(parent));
             }
         }
@@ -2501,7 +2518,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         TextView more = text("⋮", 20, dark ? 0xFF858B93 : 0xFF9AA0A7, false);
         more.setGravity(Gravity.CENTER);
         more.setIncludeFontPadding(false);
-        more.setContentDescription("评论操作");
+        more.setContentDescription(ForumText.get(R.string.forum_comment_actions));
         more.setBackground(selectableBackground());
         header.addView(more, new LinearLayout.LayoutParams(dp(30), dp(32)));
         root.addView(header, new LinearLayout.LayoutParams(
@@ -2617,13 +2634,13 @@ public class ForumTopicActivity extends AppCompatActivity {
             category.setBackground(roundRect(isDark() ? 0xFF243B59 : 0xFFEAF3FF, 12));
             topMeta.addView(category, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, dp(26)));
-            sticky = smallBadge("置顶", 0xFFB96800,
+            sticky = smallBadge(ForumText.get(R.string.forum_pinned), 0xFFB96800,
                     isDark() ? 0xFF40311D : 0xFFFFF0D6);
             LinearLayout.LayoutParams stickyParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, dp(23));
             stickyParams.leftMargin = dp(6);
             topMeta.addView(sticky, stickyParams);
-            recommend = smallBadge("推荐", 0xFF1877F2,
+            recommend = smallBadge(ForumText.get(R.string.forum_featured), 0xFF1877F2,
                     isDark() ? 0xFF243B59 : 0xFFEAF3FF);
             LinearLayout.LayoutParams recommendParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, dp(23));
@@ -2677,7 +2694,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             author.setEllipsize(TextUtils.TruncateAt.END);
             author.setMaxWidth(dp(190));
             nameRow.addView(author);
-            TextView ownerBadge = smallBadge("楼主", 0xFF1877F2,
+            TextView ownerBadge = smallBadge(ForumText.get(R.string.forum_owner), 0xFF1877F2,
                     isDark() ? 0xFF243B59 : 0xFFEAF3FF);
             LinearLayout.LayoutParams ownerBadgeParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, dp(20));
@@ -2702,7 +2719,7 @@ public class ForumTopicActivity extends AppCompatActivity {
 
             more = text("⋮", 27, isDark() ? 0xFFD8DADE : 0xFF4D535B, false);
             more.setGravity(Gravity.CENTER);
-            more.setContentDescription("帖子操作");
+            more.setContentDescription(ForumText.get(R.string.forum_topic_actions));
             more.setBackground(selectableBackground());
             more.setOnClickListener(v -> showTopicMenu());
             more.setTranslationX(dp(10));
@@ -2750,16 +2767,16 @@ public class ForumTopicActivity extends AppCompatActivity {
 
             LinearLayout commentsHeader = new LinearLayout(context);
             commentsHeader.setGravity(Gravity.CENTER_VERTICAL);
-            commentTitle = text("评论", 17, isDark() ? Color.WHITE : 0xFF202328, true);
+            commentTitle = text(ForumText.get(R.string.forum_comments), 17, isDark() ? Color.WHITE : 0xFF202328, true);
             commentsHeader.addView(commentTitle, new LinearLayout.LayoutParams(
                     0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
             LinearLayout pill = new LinearLayout(context);
             pill.setGravity(Gravity.CENTER_VERTICAL);
             pill.setPadding(dp(2), dp(2), dp(2), dp(2));
             pill.setBackground(roundRect(isDark() ? 0xFF25272C : 0xFFF1F3F5, 15));
-            hotSort = createSortTab("热门", COMMENT_SORT_HOT);
-            ascSort = createSortTab("正序", COMMENT_SORT_ASC);
-            descSort = createSortTab("倒序", COMMENT_SORT_DESC);
+            hotSort = createSortTab(ForumText.get(R.string.forum_sort_hot), COMMENT_SORT_HOT);
+            ascSort = createSortTab(ForumText.get(R.string.forum_sort_ascending), COMMENT_SORT_ASC);
+            descSort = createSortTab(ForumText.get(R.string.forum_sort_descending), COMMENT_SORT_DESC);
             pill.addView(hotSort, new LinearLayout.LayoutParams(0,
                     ViewGroup.LayoutParams.MATCH_PARENT, 1f));
             pill.addView(ascSort, new LinearLayout.LayoutParams(0,
@@ -2795,7 +2812,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             qaMark.setVisibility(question ? VISIBLE : GONE);
             qaStatus.setVisibility(question ? VISIBLE : GONE);
             if (question) {
-                qaStatus.setText(solved ? "已解决" : "未解决");
+                qaStatus.setText(solved ? R.string.forum_qa_solved : R.string.forum_qa_unsolved);
                 qaStatus.setTextColor(solved ? 0xFF21875B : 0xFFB76E00);
                 qaStatus.setBackground(roundRect(
                         solved ? (isDark() ? 0xFF203D32 : 0xFFE9F7F0)
@@ -2805,7 +2822,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             }
             bounty.setVisibility(question && topic.bountyScore > 0 ? VISIBLE : GONE);
             bounty.setText(question && topic.bountyScore > 0
-                    ? "悬赏 " + topic.bountyScore + " 积分" : "");
+                    ? ForumText.get(R.string.forum_bounty_points, topic.bountyScore) : "");
             title.setText(safe(topic.title));
             String authorName = userName(topic.user);
             bindAuthorCategory(author, authorName,
@@ -2842,14 +2859,16 @@ public class ForumTopicActivity extends AppCompatActivity {
                     v -> focusCommentInput(), 19);
 
             commentTitle.setText(topic.commentCount > 0
-                    ? "评论 " + topic.commentCount : "评论");
+                    ? ForumText.get(R.string.forum_comment_count, topic.commentCount)
+                    : ForumText.get(R.string.forum_comments));
             bindSortTab(hotSort, COMMENT_SORT_HOT);
             bindSortTab(ascSort, COMMENT_SORT_ASC);
             bindSortTab(descSort, COMMENT_SORT_DESC);
         }
 
         private void bindAuthorCategory(TextView view, String authorName, String categoryName) {
-            String safeAuthor = TextUtils.isEmpty(authorName) ? "用户" : authorName;
+            String safeAuthor = TextUtils.isEmpty(authorName)
+                    ? ForumText.get(R.string.forum_user) : authorName;
             if (TextUtils.isEmpty(categoryName)) {
                 view.setText(safeAuthor);
                 return;
@@ -3192,7 +3211,8 @@ public class ForumTopicActivity extends AppCompatActivity {
     }
 
     private static String userName(ForumApiClient.User user) {
-        return user == null || TextUtils.isEmpty(user.nickname) ? "用户" : user.nickname;
+        return user == null || TextUtils.isEmpty(user.nickname)
+                ? ForumText.get(R.string.forum_user) : user.nickname;
     }
 
     private View divider() {
@@ -3274,14 +3294,7 @@ public class ForumTopicActivity extends AppCompatActivity {
     }
 
     private static String formatDate(long value) {
-        if (value <= 0) return "刚刚";
-        long millis = normalizeTime(value);
-        long diff = Math.max(0L, System.currentTimeMillis() - millis);
-        if (diff < 60_000L) return "刚刚";
-        if (diff < 3_600_000L) return diff / 60_000L + "分钟前";
-        if (diff < 86_400_000L) return diff / 3_600_000L + "小时前";
-        if (diff < 7 * 86_400_000L) return diff / 86_400_000L + "天前";
-        return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date(millis));
+        return ForumText.relativeTime(value);
     }
 
     private static String formatVoiceTime(int sec) {

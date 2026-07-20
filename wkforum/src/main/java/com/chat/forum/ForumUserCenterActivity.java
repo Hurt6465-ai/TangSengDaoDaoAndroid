@@ -100,10 +100,10 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         back.setOnClickListener(v -> finish());
         toolbar.addView(back, new LinearLayout.LayoutParams(dp(48), dp(52)));
 
-        TextView title = text("我的社区", 18, dark ? Color.WHITE : 0xFF1C1E21, true);
+        TextView title = text(ForumText.get(R.string.forum_my_community), 18, dark ? Color.WHITE : 0xFF1C1E21, true);
         toolbar.addView(title, new LinearLayout.LayoutParams(0, dp(52), 1f));
 
-        TextView refresh = text("刷新", 14, 0xFF1877F2, true);
+        TextView refresh = text(ForumText.get(R.string.forum_refresh), 14, 0xFF1877F2, true);
         refresh.setGravity(Gravity.CENTER);
         refresh.setBackground(selectableBackground(this));
         refresh.setOnClickListener(v -> load(true));
@@ -144,7 +144,7 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         content.addView(recyclerView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        stateView = text("正在加载…", 14, dark ? 0xFFB8BBC2 : 0xFF6E737B, false);
+        stateView = text(ForumText.get(R.string.forum_loading), 14, dark ? 0xFFB8BBC2 : 0xFF6E737B, false);
         stateView.setGravity(Gravity.CENTER);
         stateView.setPadding(dp(24), dp(24), dp(24), dp(24));
         stateView.setOnClickListener(v -> {
@@ -161,9 +161,9 @@ public class ForumUserCenterActivity extends AppCompatActivity {
 
     private void renderTabs() {
         tabContainer.removeAllViews();
-        addTab("通知", TAB_MESSAGES);
-        addTab("收藏", TAB_FAVORITES);
-        addTab("我的帖子", TAB_MY_TOPICS);
+        addTab(ForumText.get(R.string.forum_notifications), TAB_MESSAGES);
+        addTab(ForumText.get(R.string.forum_favorites), TAB_FAVORITES);
+        addTab(ForumText.get(R.string.forum_my_posts), TAB_MY_TOPICS);
     }
 
     private void addTab(String title, int tab) {
@@ -202,7 +202,7 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         final int requestTab = selectedTab;
         final String requestCursor = reset ? "" : cursor;
         loading = true;
-        if (adapter.getItemCount() == 0) showState("正在加载…");
+        if (adapter.getItemCount() == 0) showState(ForumText.get(R.string.forum_loading));
         ForumApiClient.getInstance().ensureSession(this, requestScope,
                 new ForumApiClient.ResultCallback<String>() {
                     @Override
@@ -261,7 +261,7 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         } else {
             String forumUserId = ForumApiClient.getInstance().getCurrentForumUserId();
             if (TextUtils.isEmpty(forumUserId)) {
-                finishError(generation, requestTab, "论坛账号尚未建立，请刷新重试");
+                finishError(generation, requestTab, ForumText.get(R.string.forum_account_not_ready));
                 return;
             }
             ForumApiClient.getInstance().getUserTopics(forumUserId, requestCursor, requestScope,
@@ -300,7 +300,7 @@ public class ForumUserCenterActivity extends AppCompatActivity {
     private void finishError(int generation, int requestTab, String message) {
         if (!isCurrent(generation, requestTab)) return;
         loading = false;
-        if (adapter.getItemCount() == 0) showState(message + "\n点击刷新重试");
+        if (adapter.getItemCount() == 0) showState(ForumText.get(R.string.forum_loading_retry_tap, message));
         else Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
@@ -332,7 +332,7 @@ public class ForumUserCenterActivity extends AppCompatActivity {
             adapter.replaceAll(new ArrayList<>());
             cursor = "";
             hasMore = false;
-            showState("正在加载…");
+            showState(ForumText.get(R.string.forum_loading));
             return false;
         }
         adapter.replaceAll(state.items);
@@ -351,20 +351,21 @@ public class ForumUserCenterActivity extends AppCompatActivity {
     }
 
     private String emptyText(int tab) {
-        if (tab == TAB_MESSAGES) return "暂时没有社区通知";
-        if (tab == TAB_FAVORITES) return "还没有收藏帖子";
-        return "你还没有发布帖子";
+        if (tab == TAB_MESSAGES) return ForumText.get(R.string.forum_no_notifications);
+        if (tab == TAB_FAVORITES) return ForumText.get(R.string.forum_no_favorites);
+        return ForumText.get(R.string.forum_no_my_posts);
     }
 
     private Row messageRow(@Nullable ForumApiClient.Message message) {
         Row row = new Row();
         if (message == null) return row;
-        row.title = firstNonEmpty(message.title, "社区通知");
+        row.title = firstNonEmpty(message.title, ForumText.get(R.string.forum_community_notifications));
         long sourceId = message.id > 0L ? message.id
                 : fnv64(row.title + "|" + message.detailUrl + "|" + message.createTime);
         row.stableId = prefixedId(TAB_MESSAGES, sourceId);
         row.summary = firstNonEmpty(message.content, message.quoteContent);
-        String from = message.from == null ? "系统" : firstNonEmpty(message.from.nickname, "系统");
+        String from = message.from == null ? ForumText.get(R.string.forum_system)
+                : firstNonEmpty(message.from.nickname, ForumText.get(R.string.forum_system));
         row.meta = from + " · " + formatTime(message.createTime);
         row.topicId = ForumApiClient.getInstance().topicIdFromUrl(message.detailUrl);
         row.disabled = TextUtils.isEmpty(row.topicId);
@@ -374,13 +375,15 @@ public class ForumUserCenterActivity extends AppCompatActivity {
     private Row favoriteRow(@Nullable ForumApiClient.Favorite favorite) {
         Row row = new Row();
         if (favorite == null) return row;
-        row.title = favorite.deleted ? "内容已删除" : firstNonEmpty(favorite.title, "收藏内容");
+        row.title = favorite.deleted ? ForumText.get(R.string.forum_content_deleted)
+                : firstNonEmpty(favorite.title, ForumText.get(R.string.forum_saved_content));
         long sourceId = favorite.id > 0L ? favorite.id
                 : fnv64(row.title + "|" + favorite.url + "|" + favorite.createTime);
         row.stableId = prefixedId(TAB_FAVORITES, sourceId);
-        row.summary = favorite.deleted ? "该内容已经不存在" : favorite.content;
+        row.summary = favorite.deleted ? ForumText.get(R.string.forum_content_no_longer_exists)
+                : favorite.content;
         String author = favorite.user == null ? "" : firstNonEmpty(favorite.user.nickname, "");
-        row.meta = (TextUtils.isEmpty(author) ? "收藏" : author) + " · "
+        row.meta = (TextUtils.isEmpty(author) ? ForumText.get(R.string.forum_favorites) : author) + " · "
                 + formatTime(favorite.createTime);
         row.topicId = "topic".equals(favorite.entityType)
                 ? ForumApiClient.getInstance().topicIdFromUrl(favorite.url) : "";
@@ -392,12 +395,13 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         Row row = new Row();
         if (topic == null) return row;
         row.stableId = prefixedId(TAB_MY_TOPICS, fnv64(topic.id));
-        row.title = firstNonEmpty(topic.title, "未命名帖子");
+        row.title = firstNonEmpty(topic.title, ForumText.get(R.string.forum_untitled_post));
         row.summary = topic.summary;
         String category = topic.category == null ? "" : firstNonEmpty(topic.category.name, "");
-        String prefix = TextUtils.isEmpty(category) ? "我的帖子" : category;
-        row.meta = prefix + " · " + formatTime(topic.createTime)
-                + " · 评论 " + topic.commentCount + " · 赞 " + topic.likeCount;
+        String prefix = TextUtils.isEmpty(category) ? ForumText.get(R.string.forum_my_posts) : category;
+        row.meta = ForumText.get(R.string.forum_post_stats,
+                prefix + " · " + formatTime(topic.createTime),
+                Math.max(0, topic.commentCount), Math.max(0, topic.likeCount));
         row.topicId = topic.id;
         row.disabled = TextUtils.isEmpty(row.topicId);
         return row;
@@ -405,7 +409,7 @@ public class ForumUserCenterActivity extends AppCompatActivity {
 
     private void openRow(Row row) {
         if (row == null || row.disabled || TextUtils.isEmpty(row.topicId)) {
-            Toast.makeText(this, "该内容没有可打开的帖子", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.forum_no_openable_topic, Toast.LENGTH_SHORT).show();
             return;
         }
         startActivity(ForumTopicActivity.createIntent(this, row.topicId));
@@ -647,14 +651,7 @@ public class ForumUserCenterActivity extends AppCompatActivity {
     }
 
     private static String formatTime(long value) {
-        if (value <= 0) return "刚刚";
-        long millis = value < 10_000_000_000L ? value * 1000L : value;
-        long diff = Math.max(0L, System.currentTimeMillis() - millis);
-        if (diff < 60_000L) return "刚刚";
-        if (diff < 3_600_000L) return (diff / 60_000L) + "分钟前";
-        if (diff < 86_400_000L) return (diff / 3_600_000L) + "小时前";
-        if (diff < 7 * 86_400_000L) return (diff / 86_400_000L) + "天前";
-        return new SimpleDateFormat("MM-dd", Locale.getDefault()).format(new Date(millis));
+        return ForumText.relativeTime(value);
     }
 
     private static long prefixedId(int tab, long value) {

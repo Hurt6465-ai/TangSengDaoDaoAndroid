@@ -131,7 +131,7 @@ public class ForumArticleActivity extends AppCompatActivity {
         body.addView(recyclerView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        stateView = text("正在加载文章…", 14, dark ? 0xFFB8BBC2 : 0xFF6E737B, false);
+        stateView = text(ForumText.get(R.string.forum_loading_article), 14, dark ? 0xFFB8BBC2 : 0xFF6E737B, false);
         stateView.setGravity(Gravity.CENTER);
         body.addView(stateView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -175,7 +175,8 @@ public class ForumArticleActivity extends AppCompatActivity {
         send.setGravity(Gravity.CENTER);
         send.setIncludeFontPadding(false);
         send.setPadding(0, 0, 0, 0);
-        send.setBackground(roundRect(0xFF1877F2, 23));
+        send.setBackground(null);
+        send.setTextColor(0xFF1877F2);
         send.setOnClickListener(v -> sendComment());
         LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(dp(46), dp(46));
         sendParams.leftMargin = dp(8);
@@ -208,7 +209,7 @@ public class ForumArticleActivity extends AppCompatActivity {
                     @Override public void onSuccess(@Nullable ForumApiClient.Article data) {
                         if (isFinishing() || isDestroyed()) return;
                         if (data == null) {
-                            showError("文章不存在或已被删除");
+                            showError(ForumText.get(R.string.forum_article_not_found));
                             return;
                         }
                         article = data;
@@ -309,7 +310,7 @@ public class ForumArticleActivity extends AppCompatActivity {
         replyParentId = comment.entityType != null && comment.entityType.equals("comment")
                 ? comment.entityId : comment.id;
         replyQuoteId = comment.id;
-        replyHint.setText("正在回复 " + userName(comment.user) + " · 点击取消");
+        replyHint.setText(ForumText.get(R.string.forum_replying_to, userName(comment.user)));
         replyHint.setVisibility(View.VISIBLE);
         input.requestFocus();
         InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
@@ -325,14 +326,14 @@ public class ForumArticleActivity extends AppCompatActivity {
     private void showCommentMenu(ForumApiClient.Comment comment) {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
-        labels.add(comment.liked ? "取消点赞" : "点赞");
+        labels.add(ForumText.get(comment.liked ? R.string.forum_unlike : R.string.forum_like));
         actions.add(() -> changeLike(comment));
-        labels.add("回复");
+        labels.add(ForumText.get(R.string.forum_reply));
         actions.add(() -> setReply(comment));
-        labels.add("分享");
+        labels.add(ForumText.get(R.string.forum_share));
         actions.add(() -> share(userName(comment.user) + "：" + comment.content));
         if (canDelete(comment)) {
-            labels.add("删除");
+            labels.add(ForumText.get(R.string.forum_delete));
             actions.add(() -> deleteComment(comment));
         }
         showCompactMenu(labels, actions);
@@ -511,8 +512,10 @@ public class ForumArticleActivity extends AppCompatActivity {
                 bindComment((CommentHolder) holder, row.comment);
             } else {
                 TextView text = (TextView) holder.itemView;
-                text.setText(row.type == Row.TYPE_EMPTY ? "还没有评论"
-                        : loading ? "加载中…" : "加载更多");
+                text.setText(row.type == Row.TYPE_EMPTY
+                        ? ForumText.get(R.string.forum_no_comments)
+                        : loading ? ForumText.get(R.string.forum_loading)
+                        : ForumText.get(R.string.forum_load_more));
                 text.setOnClickListener(v -> {
                     if (row.type == Row.TYPE_LOAD_MORE && !loading) loadComments(false);
                 });
@@ -650,7 +653,7 @@ public class ForumArticleActivity extends AppCompatActivity {
     }
 
     private CharSequence commentName(String name, String time, boolean owner) {
-        String ownerText = owner ? "  作者" : "";
+        String ownerText = owner ? "  " + ForumText.get(R.string.forum_article_author) : "";
         SpannableString value = new SpannableString(name + ownerText + " · " + time);
         value.setSpan(new StyleSpan(Typeface.BOLD), 0, name.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         if (owner) value.setSpan(new ForegroundColorSpan(0xFF1877F2), name.length(),
@@ -699,7 +702,7 @@ public class ForumArticleActivity extends AppCompatActivity {
             TextView more = text("⋮", 26, isDark() ? 0xFFD8DADE : 0xFF4D535B, false);
             more.setGravity(Gravity.CENTER);
             more.setIncludeFontPadding(false);
-            more.setContentDescription("文章操作");
+            more.setContentDescription(ForumText.get(R.string.forum_article_actions));
             more.setBackground(selectableBackground());
             more.setOnClickListener(v -> showArticleMenu());
             more.setTranslationX(dp(10));
@@ -750,7 +753,7 @@ public class ForumArticleActivity extends AppCompatActivity {
             addView(stats);
             addView(divider(), new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(0.7f)));
-            TextView commentsTitle = text("评论", 17,
+            TextView commentsTitle = text(ForumText.get(R.string.forum_comments), 17,
                     isDark() ? Color.WHITE : 0xFF202328, true);
             commentsTitle.setGravity(Gravity.CENTER_VERTICAL);
             addView(commentsTitle, new LinearLayout.LayoutParams(
@@ -767,7 +770,8 @@ public class ForumArticleActivity extends AppCompatActivity {
             title.setText(safe(value.title));
             String authorName = userName(value.user);
             bindAvatar(avatar, value.user, authorName);
-            author.setText(authorName + "  作者 · " + formatTime(value.createTime));
+            author.setText(ForumText.get(R.string.forum_article_author_time,
+                    authorName, formatTime(value.createTime)));
             View.OnClickListener openProfile = v -> ForumProfileRouter.open(
                     ForumArticleActivity.this, value.user);
             avatar.setOnClickListener(openProfile);
@@ -809,8 +813,8 @@ public class ForumArticleActivity extends AppCompatActivity {
             videoEmbeds.bind(body);
             bodyImages.bind(extractArticleImages(body), dp(180), dp(10),
                     isDark() ? 0xFF24262B : 0xFFF0F1F3);
-            stats.setText("◉ " + Math.max(0, value.viewCount) + "   评论 "
-                    + Math.max(0, value.commentCount));
+            stats.setText(ForumText.get(R.string.forum_article_stats,
+                    Math.max(0, value.viewCount), Math.max(0, value.commentCount)));
         }
 
         void recycle() {
@@ -926,20 +930,17 @@ public class ForumArticleActivity extends AppCompatActivity {
                 value, getResources().getDisplayMetrics()));
     }
     private String userName(ForumApiClient.User user) {
-        return user == null || TextUtils.isEmpty(user.nickname) ? "用户" : user.nickname;
+        return user == null || TextUtils.isEmpty(user.nickname)
+                ? ForumText.get(R.string.forum_user) : user.nickname;
     }
     private static String safe(String value) { return value == null ? "" : value; }
     private static long normalizeTime(long value) { return value > 0 && value < 10_000_000_000L ? value * 1000L : value; }
     private static String formatTime(long value) {
-        long time = normalizeTime(value), diff = Math.max(0, System.currentTimeMillis() - time);
-        if (diff < 60_000L) return "刚刚";
-        if (diff < 3_600_000L) return (diff / 60_000L) + "分钟前";
-        if (diff < 86_400_000L) return (diff / 3_600_000L) + "小时前";
-        if (diff < 7L * 86_400_000L) return (diff / 86_400_000L) + "天前";
-        return new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date(time));
+        return ForumText.relativeTime(value);
     }
     private void showError(String message) {
-        stateView.setText(TextUtils.isEmpty(message) ? "文章加载失败" : message);
+        stateView.setText(TextUtils.isEmpty(message)
+                ? ForumText.get(R.string.forum_article_load_failed) : message);
         stateView.setVisibility(View.VISIBLE);
     }
 }
