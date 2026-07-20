@@ -36,8 +36,8 @@ final class ForumWaveformView extends View {
     ForumWaveformView(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
         float density = getResources().getDisplayMetrics().density;
-        barWidth = 2.6f * density;
-        gap = 2.2f * density;
+        barWidth = 2.8f * density;
+        gap = 2.8f * density;
         futurePaint.setStyle(Paint.Style.STROKE);
         futurePaint.setStrokeWidth(barWidth);
         futurePaint.setStrokeCap(Paint.Cap.ROUND);
@@ -117,16 +117,28 @@ final class ForumWaveformView extends View {
         float centerY = height * 0.5f;
         int sourceCount = samples.size();
         for (int i = 0; i < barCount; i++) {
-            float level = 0.10f;
+            float level;
             if (sourceCount > 0) {
                 int start = i * sourceCount / barCount;
                 int end = Math.max(start + 1, (i + 1) * sourceCount / barCount);
                 end = Math.min(end, sourceCount);
                 float max = 0f;
-                for (int j = start; j < end; j++) max = Math.max(max, samples.get(j));
-                level = Math.max(0.10f, max);
+                float sum = 0f;
+                for (int j = start; j < end; j++) {
+                    float sample = samples.get(j);
+                    max = Math.max(max, sample);
+                    sum += sample;
+                }
+                float average = sum / Math.max(1, end - start);
+                level = average * 0.72f + max * 0.28f;
+            } else {
+                // A quiet preview still looks like a natural waveform rather than equal sticks.
+                float[] idle = {0.24f, 0.46f, 0.31f, 0.68f, 0.38f, 0.57f, 0.29f, 0.73f};
+                level = idle[i % idle.length];
             }
-            float half = Math.max(barWidth, level * height * 0.42f);
+            float variation = 0.82f + ((i * 37) % 9) * 0.025f;
+            level = Math.max(0.16f, Math.min(1f, level * variation));
+            float half = Math.max(barWidth * 1.2f, level * height * 0.40f);
             float x = gap + i * (barWidth + gap) + barWidth * 0.5f;
             Paint paint = progress >= 0f && i <= progress * (barCount - 1) ? pastPaint : futurePaint;
             canvas.drawLine(x, centerY - half, x, centerY + half, paint);

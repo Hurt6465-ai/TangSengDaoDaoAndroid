@@ -250,7 +250,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                 if (granted) {
                     startRecord();
                 } else {
-                    Toast.makeText(this, "需要麦克风权限才能发送语音评论", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, getString(R.string.forum_record_permission_required), Toast.LENGTH_LONG).show();
                 }
             });
 
@@ -386,14 +386,14 @@ public class ForumTopicActivity extends AppCompatActivity {
         recordPanel = buildRecordPanel(dark);
         recordPanel.setVisibility(View.GONE);
         wrapper.addView(recordPanel, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(60)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(66)));
 
         composerRow = new LinearLayout(this);
         composerRow.setGravity(Gravity.CENTER_VERTICAL);
         composerRow.setPadding(0, dp(6), 0, 0);
 
         commentInput = new EditText(this);
-        commentInput.setHint("友善交流，说点什么…");
+        commentInput.setHint(R.string.forum_comment_hint);
         commentInput.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         commentInput.setTextColor(dark ? Color.WHITE : 0xFF202328);
         commentInput.setHintTextColor(dark ? 0xFF777B82 : 0xFF9A9FA6);
@@ -436,45 +436,49 @@ public class ForumTopicActivity extends AppCompatActivity {
         panel.setGravity(Gravity.CENTER_VERTICAL);
         panel.setPadding(0, dp(6), 0, 0);
 
-        recordDeleteButton = recordControl(R.drawable.ic_forum_delete, 21,
-                dark ? 0xFFD4D7DC : 0xFF626970, "删除录音");
+        recordDeleteButton = recordControl(R.drawable.ic_forum_delete, 24,
+                dark ? 0xFFD4D7DC : 0xFF626970, getString(R.string.forum_record_delete));
         recordDeleteButton.setOnClickListener(v -> discardCurrentRecording());
-        panel.addView(recordDeleteButton, new LinearLayout.LayoutParams(dp(42), dp(48)));
+        panel.addView(recordDeleteButton, new LinearLayout.LayoutParams(dp(50), dp(54)));
 
         recordDurationView = text("00:00", 13,
                 dark ? 0xFFE4E6EA : 0xFF33383E, true);
         recordDurationView.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         recordDurationView.setGravity(Gravity.CENTER);
-        panel.addView(recordDurationView, new LinearLayout.LayoutParams(dp(62), dp(48)));
+        panel.addView(recordDurationView, new LinearLayout.LayoutParams(dp(58), dp(54)));
 
         recordWaveform = new ForumWaveformView(this);
         recordWaveform.setColors(dark ? 0xFF555A62 : 0xFFD4D8DE, 0xFF1877F2);
         recordWaveform.setPadding(dp(2), dp(8), dp(2), dp(8));
         recordWaveform.setOnSeekListener(this::seekRecordPreview);
-        LinearLayout.LayoutParams waveParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
-        waveParams.leftMargin = dp(2);
-        waveParams.rightMargin = dp(4);
+        int availableWidth = getResources().getDisplayMetrics().widthPixels - dp(20);
+        int fixedControlsWidth = dp(50 + 58 + 50 + 52 + 4);
+        int waveformWidth = Math.max(dp(76), Math.min(dp(112),
+                availableWidth - fixedControlsWidth));
+        LinearLayout.LayoutParams waveParams = new LinearLayout.LayoutParams(waveformWidth, dp(50));
+        waveParams.leftMargin = dp(1);
+        waveParams.rightMargin = dp(3);
         panel.addView(recordWaveform, waveParams);
 
-        recordToggleButton = recordControl(R.drawable.ic_forum_pause, 21,
-                dark ? 0xFFE4E6EA : 0xFF3E454D, "暂停录音");
+        recordToggleButton = recordControl(R.drawable.ic_forum_pause, 24,
+                dark ? 0xFFE4E6EA : 0xFF3E454D, getString(R.string.forum_record_pause));
         recordToggleButton.setOnClickListener(v -> toggleRecordPanelAction());
-        panel.addView(recordToggleButton, new LinearLayout.LayoutParams(dp(42), dp(48)));
+        panel.addView(recordToggleButton, new LinearLayout.LayoutParams(dp(50), dp(54)));
 
-        recordFinishButton = recordControl(R.drawable.ic_forum_stop, 22,
-                0xFFE53935, "结束录音");
+        recordFinishButton = recordControl(R.drawable.ic_forum_stop, 25,
+                0xFFE53935, getString(R.string.forum_record_finish));
         recordFinishButton.setOnClickListener(v -> {
             if (recording) stopRecordForPreview();
             else if (recordReady) sendPreparedRecord();
         });
-        panel.addView(recordFinishButton, new LinearLayout.LayoutParams(dp(44), dp(48)));
+        panel.addView(recordFinishButton, new LinearLayout.LayoutParams(dp(52), dp(54)));
         return panel;
     }
 
     private AppCompatImageView recordControl(int icon, int iconDp, int tint, String description) {
         AppCompatImageView view = new AppCompatImageView(this);
         view.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
-        view.setPadding(dp(10), dp(10), dp(10), dp(10));
+        view.setPadding(dp(11), dp(11), dp(11), dp(11));
         view.setMinimumWidth(0);
         view.setMinimumHeight(0);
         view.setBackground(selectableBackground());
@@ -499,7 +503,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         stopRecordPreview();
         try {
             File dir = new File(getCacheDir(), "forum_voice");
-            if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("无法创建录音目录");
+            if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException(getString(R.string.forum_record_directory_failed));
             File file = new File(dir, "voice_" + System.currentTimeMillis() + ".m4a");
             recordPath = file.getAbsolutePath();
             recordStartTime = System.currentTimeMillis();
@@ -533,7 +537,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             recordReady = false;
             showRecordPanel(false);
             updateComposerAction();
-            Toast.makeText(this, "录音启动失败", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.forum_record_start_failed), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -562,7 +566,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             recordPausedAt = System.currentTimeMillis();
             updateRecordPanelState();
         } catch (Throwable error) {
-            Toast.makeText(this, "暂停录音失败", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.forum_record_pause_failed), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -576,7 +580,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             recordingPaused = false;
             updateRecordPanelState();
         } catch (Throwable error) {
-            Toast.makeText(this, "继续录音失败", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.forum_record_resume_failed), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -596,7 +600,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             recordPath = "";
             recordReady = false;
             showRecordPanel(false);
-            Toast.makeText(this, "录音时间太短", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.forum_record_too_short), Toast.LENGTH_SHORT).show();
             return;
         }
         recordReady = true;
@@ -680,10 +684,10 @@ public class ForumTopicActivity extends AppCompatActivity {
             recordDurationView.setText(value);
             setImageIcon(recordToggleButton,
                     recordingPaused ? R.drawable.ic_forum_play : R.drawable.ic_forum_pause,
-                    21, dark ? 0xFFE4E6EA : 0xFF3E454D);
-            recordToggleButton.setContentDescription(recordingPaused ? "继续录音" : "暂停录音");
-            setImageIcon(recordFinishButton, R.drawable.ic_forum_stop, 22, 0xFFE53935);
-            recordFinishButton.setContentDescription("结束录音并试听");
+                    24, dark ? 0xFFE4E6EA : 0xFF3E454D);
+            recordToggleButton.setContentDescription(recordingPaused ? getString(R.string.forum_record_resume) : getString(R.string.forum_record_pause));
+            setImageIcon(recordFinishButton, R.drawable.ic_forum_stop, 25, 0xFFE53935);
+            recordFinishButton.setContentDescription(getString(R.string.forum_record_stop_preview));
             if (recordWaveform != null) {
                 recordWaveform.setColors(0xFF1877F2, 0xFF1877F2);
                 recordWaveform.setSeekEnabled(false);
@@ -700,10 +704,10 @@ public class ForumTopicActivity extends AppCompatActivity {
             catch (Throwable ignored) { }
             setImageIcon(recordToggleButton,
                     playing ? R.drawable.ic_forum_pause : R.drawable.ic_forum_play,
-                    21, dark ? 0xFFE4E6EA : 0xFF3E454D);
-            recordToggleButton.setContentDescription(playing ? "暂停试听" : "试听录音");
-            setImageIcon(recordFinishButton, R.drawable.ic_forum_send, 21, 0xFF1877F2);
-            recordFinishButton.setContentDescription("发送语音评论");
+                    24, dark ? 0xFFE4E6EA : 0xFF3E454D);
+            recordToggleButton.setContentDescription(playing ? getString(R.string.forum_record_preview_pause) : getString(R.string.forum_record_preview_play));
+            setImageIcon(recordFinishButton, R.drawable.ic_forum_send, 24, 0xFF1877F2);
+            recordFinishButton.setContentDescription(getString(R.string.forum_record_send_voice));
             if (recordWaveform != null) {
                 recordWaveform.setColors(dark ? 0xFF555A62 : 0xFFD4D8DE, 0xFF1877F2);
                 recordWaveform.setSeekEnabled(true);
@@ -726,7 +730,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             updateRecordPanelState();
         } catch (Throwable error) {
             stopRecordPreview();
-            Toast.makeText(this, "无法试听录音", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.forum_record_preview_failed), Toast.LENGTH_SHORT).show();
             updateRecordPanelState();
         }
     }
@@ -780,7 +784,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                                                long targetParentId, long targetQuoteId) {
         if (TextUtils.isEmpty(localPath) || !new File(localPath).exists()) {
             deleteQuietly(localPath);
-            Toast.makeText(this, "录音文件不存在", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.forum_record_file_missing), Toast.LENGTH_SHORT).show();
             return;
         }
         dismissVoiceConfirmDialog(true);
@@ -790,10 +794,10 @@ public class ForumTopicActivity extends AppCompatActivity {
         confirmVoiceReplyParentId = targetParentId;
         confirmVoiceReplyQuoteId = targetQuoteId;
         voiceConfirmDialog = new AlertDialog.Builder(this)
-                .setTitle("发送语音评论？")
-                .setMessage(seconds + " 秒录音。确认后才会发送，取消将直接删除。")
-                .setNegativeButton("取消", (dialog, which) -> discardVoiceConfirmation())
-                .setPositiveButton("发送", (dialog, which) -> sendConfirmedVoice())
+                .setTitle(getString(R.string.forum_record_send_confirm_title))
+                .setMessage(getString(R.string.forum_record_send_confirm_message, seconds))
+                .setNegativeButton(R.string.forum_cancel, (dialog, which) -> discardVoiceConfirmation())
+                .setPositiveButton(getString(R.string.forum_send), (dialog, which) -> sendConfirmedVoice())
                 .setOnCancelListener(dialog -> discardVoiceConfirmation())
                 .create();
         voiceConfirmDialog.setOnDismissListener(dialog -> {
@@ -810,7 +814,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         long targetQuoteId = confirmVoiceReplyQuoteId;
         clearVoiceConfirmation(false);
         if (TextUtils.isEmpty(path) || !new File(path).exists()) {
-            Toast.makeText(this, "录音文件已失效，请重新录制", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.forum_record_file_expired), Toast.LENGTH_SHORT).show();
             return;
         }
         uploadAndSendVoice(path, seconds, waveform, targetParentId, targetQuoteId);
@@ -846,7 +850,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         File file = new File(localPath);
         if (!file.exists() || file.length() <= 0) {
             failVoiceUpload(localPath, seconds, waveform, targetParentId, targetQuoteId,
-                    "录音文件不存在");
+                    getString(R.string.forum_record_file_missing));
             return;
         }
         dismissVoiceRetryDialog(false);
@@ -860,7 +864,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                         if (!isVoiceUploadActive(generation, localPath)) return;
                         if (target == null || TextUtils.isEmpty(target.uploadUrl)) {
                             failVoiceUpload(localPath, seconds, waveform, targetParentId,
-                                    targetQuoteId, "无法获取语音上传地址");
+                                    targetQuoteId, getString(R.string.forum_record_upload_url_failed));
                             return;
                         }
                         String tag = "forum_voice_" + UUID.randomUUID();
@@ -890,7 +894,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                                         runOnUiThread(() -> {
                                             if (isVoiceUploadActive(generation, localPath)) {
                                                 failVoiceUpload(localPath, seconds, waveform,
-                                                        targetParentId, targetQuoteId, "语音上传失败");
+                                                        targetParentId, targetQuoteId, getString(R.string.forum_record_upload_failed));
                                             } else {
                                                 deleteQuietly(localPath);
                                                 clearActiveVoicePath(localPath);
@@ -937,10 +941,10 @@ public class ForumTopicActivity extends AppCompatActivity {
         pendingVoiceReplyParentId = targetParentId;
         pendingVoiceReplyQuoteId = targetQuoteId;
         voiceRetryDialog = new AlertDialog.Builder(this)
-                .setTitle("语音发送失败")
-                .setMessage(TextUtils.isEmpty(message) ? "请检查网络后重试" : message)
-                .setNegativeButton("删除", (dialog, which) -> discardPendingVoice())
-                .setPositiveButton("重试", (dialog, which) -> retryPendingVoice())
+                .setTitle(getString(R.string.forum_record_send_failed_title))
+                .setMessage(TextUtils.isEmpty(message) ? getString(R.string.forum_network_retry) : message)
+                .setNegativeButton(R.string.forum_delete, (dialog, which) -> discardPendingVoice())
+                .setPositiveButton(R.string.forum_retry, (dialog, which) -> retryPendingVoice())
                 .setOnCancelListener(dialog -> discardPendingVoice())
                 .create();
         voiceRetryDialog.setOnDismissListener(dialog -> voiceRetryDialog = null);
@@ -960,7 +964,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         pendingVoiceReplyParentId = 0L;
         pendingVoiceReplyQuoteId = 0L;
         if (TextUtils.isEmpty(path) || !new File(path).exists()) {
-            Toast.makeText(this, "录音文件已失效，请重新录制", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.forum_record_file_expired), Toast.LENGTH_SHORT).show();
             return;
         }
         uploadAndSendVoice(path, seconds, waveform, targetParentId, targetQuoteId);
@@ -997,10 +1001,10 @@ public class ForumTopicActivity extends AppCompatActivity {
         pendingVoiceReplyParentId = targetParentId;
         pendingVoiceReplyQuoteId = targetQuoteId;
         voiceRetryDialog = new AlertDialog.Builder(this)
-                .setTitle("语音评论发送失败")
-                .setMessage(TextUtils.isEmpty(message) ? "请检查网络后重试" : message)
-                .setNegativeButton("取消", (dialog, which) -> discardPendingVoice())
-                .setPositiveButton("重试", (dialog, which) -> retryPendingVoiceComment())
+                .setTitle(getString(R.string.forum_record_send_failed_title))
+                .setMessage(TextUtils.isEmpty(message) ? getString(R.string.forum_network_retry) : message)
+                .setNegativeButton(R.string.forum_cancel, (dialog, which) -> discardPendingVoice())
+                .setPositiveButton(R.string.forum_retry, (dialog, which) -> retryPendingVoiceComment())
                 .setOnCancelListener(dialog -> discardPendingVoice())
                 .create();
         voiceRetryDialog.setOnDismissListener(dialog -> voiceRetryDialog = null);
@@ -1034,16 +1038,16 @@ public class ForumTopicActivity extends AppCompatActivity {
         if (composerAction == null || commentInput == null) return;
         boolean hasText = !TextUtils.isEmpty(commentInput.getText().toString().trim());
         if (hasText && !recording) {
-            composerAction.setBackground(roundRect(0xFF1877F2, 24));
-            composerAction.setContentDescription("发送评论");
-            setImageIcon(composerAction, R.drawable.ic_forum_send, 20, Color.WHITE);
+            composerAction.setBackground(null);
+            composerAction.setContentDescription(getString(R.string.forum_send_comment));
+            setImageIcon(composerAction, R.drawable.ic_forum_send, 22, 0xFF1877F2);
             return;
         }
         // Voice input is a lightweight icon button; no gray circular frame.
         composerAction.setBackground(null);
         composerAction.setContentDescription(recording
-                ? (recordingPaused ? "继续或结束录音" : "暂停或结束录音")
-                : "点击开始录音");
+                ? (recordingPaused ? getString(R.string.forum_record_resume_or_finish) : getString(R.string.forum_record_pause_or_finish))
+                : getString(R.string.forum_record_tap_to_start));
         setImageIcon(composerAction,
                 recordingPaused ? R.drawable.ic_forum_play : R.drawable.ic_forum_mic,
                 recordingPaused ? 21 : 25,
@@ -1297,15 +1301,17 @@ public class ForumTopicActivity extends AppCompatActivity {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         String topicUrl = ForumLinkRouter.topicWebUrl(topic.id);
-        labels.add("分享");
+        labels.add(getString(R.string.forum_send_to_contacts));
+        actions.add(() -> ForumShareHelper.sendToTalkami(this, topic.title,
+                TextUtils.isEmpty(topic.summary) ? topic.content : topic.summary, topicUrl));
+        labels.add(getString(R.string.forum_more_share));
         actions.add(() -> shareText(topic.title,
-                safe(topic.title) + "\n" + safe(topic.content) + "\n" + topicUrl));
-        labels.add("复制帖子链接");
-        actions.add(() -> copyTopicText("帖子链接", topicUrl));
-        labels.add("复制引用格式");
-        actions.add(() -> copyTopicText("帖子引用",
-                ForumLinkRouter.markdownReference(topic.title, topicUrl)));
-        labels.add("举报");
+                safe(topic.title) + "\n" + topicUrl));
+        if (manager) {
+            labels.add(getString(R.string.forum_copy_topic_link));
+            actions.add(() -> copyTopicText(getString(R.string.forum_topic_link_label), topicUrl));
+        }
+        labels.add(getString(R.string.forum_report));
         actions.add(this::showReportDialog);
         if (manager || client.hasPermission("dashboard.topic.recommend")) {
             labels.add(topic.recommend ? "取消推荐" : "推荐");
@@ -1335,7 +1341,7 @@ public class ForumTopicActivity extends AppCompatActivity {
 
     private void copyTopicText(String label, String value) {
         boolean copied = ForumLinkRouter.copyToClipboard(this, label, value);
-        Toast.makeText(this, copied ? "已复制" : "复制失败", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, copied ? getString(R.string.forum_copied) : getString(R.string.forum_copy_failed), Toast.LENGTH_SHORT).show();
     }
 
     private boolean canDeleteTopic(ForumApiClient.Topic topic) {
@@ -1429,7 +1435,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         }
         labels.add("举报");
         actions.add(() -> showCommentReportDialog(comment));
-        labels.add("分享");
+        labels.add(getString(R.string.forum_share));
         actions.add(() -> shareText("评论", userName(comment.user) + "：" + safe(comment.content)));
         if (canDeleteComment(comment)) {
             labels.add("删除");
@@ -1738,7 +1744,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         composerAction.setAlpha(value ? 0.55f : 1f);
         if (value) {
             composerAction.setImageDrawable(null);
-            composerAction.setBackground(roundRect(0xFF9ABEF0, 24));
+            composerAction.setBackground(null);
         } else {
             updateComposerAction();
         }
@@ -1750,9 +1756,9 @@ public class ForumTopicActivity extends AppCompatActivity {
         share.putExtra(Intent.EXTRA_SUBJECT, safe(title));
         share.putExtra(Intent.EXTRA_TEXT, safe(content));
         try {
-            startActivity(Intent.createChooser(share, "分享"));
+            startActivity(Intent.createChooser(share, getString(R.string.forum_share)));
         } catch (Throwable error) {
-            Toast.makeText(this, "当前设备无法分享", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.forum_share_unavailable), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -1856,7 +1862,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                     return;
                 }
                 if (!requestVoiceAudioFocus()) {
-                    voicePlaybackError("其他应用正在占用音频");
+                    voicePlaybackError(getString(R.string.forum_audio_in_use));
                     return;
                 }
                 mp.setVolume(1f, 1f);
@@ -1998,7 +2004,7 @@ public class ForumTopicActivity extends AppCompatActivity {
     }
 
     private void voicePlaybackError() {
-        voicePlaybackError("语音播放失败，请重试");
+        voicePlaybackError(getString(R.string.forum_voice_playback_failed));
     }
 
     private void voicePlaybackError(String message) {
@@ -2225,6 +2231,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                 ((ArticleHolder) holder).view.recycle();
             } else if (holder instanceof CommentHolder) {
                 CommentHolder commentHolder = (CommentHolder) holder;
+                commentHolder.videoEmbeds.recycle();
                 commentHolder.imageContainer.recycle();
                 if (playingVoiceView == commentHolder.voice) playingVoiceView = null;
                 commentHolder.voice.setOnClickListener(null);
@@ -2308,9 +2315,12 @@ public class ForumTopicActivity extends AppCompatActivity {
                 holder.voice.setOnLongClickListener(null);
                 holder.body.setVisibility(View.VISIBLE);
                 holder.voice.setVisibility(View.GONE);
-                ForumLinkRouter.setLinkedText(holder.body, ForumHtmlCache.parse(comment.content));
+                ForumLinkRouter.setLinkedText(holder.body, ForumHtmlCache.parse(
+                        ForumVideoEmbedListView.stripStandaloneEmbedUrls(comment.content)));
+                holder.videoEmbeds.bind(comment.content);
             } else {
                 holder.body.setVisibility(View.GONE);
+                holder.videoEmbeds.recycle();
                 holder.voice.setVisibility(View.VISIBLE);
                 String key = String.valueOf(comment.id);
                 holder.voice.setTag(key);
@@ -2332,7 +2342,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                 });
             }
 
-            holder.imageContainer.bind(comment.imageList, dp(220), dp(6),
+            holder.imageContainer.bind(comment.imageList, dp(160), dp(6),
                     isDark() ? 0xFF24262B : 0xFFF0F1F3);
 
             View.OnLongClickListener longClick = v -> {
@@ -2504,6 +2514,13 @@ public class ForumTopicActivity extends AppCompatActivity {
         bodyParams.leftMargin = dp(40);
         root.addView(body, bodyParams);
 
+        ForumVideoEmbedListView videoEmbeds = new ForumVideoEmbedListView(context);
+        LinearLayout.LayoutParams videoParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        videoParams.leftMargin = dp(40);
+        videoParams.rightMargin = dp(2);
+        root.addView(videoEmbeds, videoParams);
+
         VoiceBubbleView voice = new VoiceBubbleView(context);
         voice.setVisibility(View.GONE);
         LinearLayout.LayoutParams voiceParams = new LinearLayout.LayoutParams(dp(176), dp(48));
@@ -2572,6 +2589,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         private final TextView authorMeta;
         private final TextView more;
         private final TextView content;
+        private final ForumVideoEmbedListView videoEmbeds;
         private final ForumRemoteImageListView images;
         private final TextView eyeAction;
         private final TextView likeAction;
@@ -2705,6 +2723,10 @@ public class ForumTopicActivity extends AppCompatActivity {
             addView(content, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+            videoEmbeds = new ForumVideoEmbedListView(context);
+            addView(videoEmbeds, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
             images = new ForumRemoteImageListView(context);
             addView(images, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -2752,6 +2774,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         void bind(@Nullable ForumApiClient.Topic topic) {
             if (topic == null) {
                 setVisibility(GONE);
+                videoEmbeds.recycle();
                 images.recycle();
                 return;
             }
@@ -2797,8 +2820,10 @@ public class ForumTopicActivity extends AppCompatActivity {
             authorMeta.setOnClickListener(openProfile);
 
             String body = TextUtils.isEmpty(topic.content) ? topic.summary : topic.content;
-            ForumLinkRouter.setLinkedText(content, ForumHtmlCache.parse(body));
-            images.bind(topic.imageList, dp(220), dp(10),
+            ForumLinkRouter.setLinkedText(content, ForumHtmlCache.parse(
+                    ForumVideoEmbedListView.stripStandaloneEmbedUrls(body)));
+            videoEmbeds.bind(body);
+            images.bind(topic.imageList, dp(180), dp(10),
                     isDark() ? 0xFF24262B : 0xFFF0F1F3);
 
             bindTopicAction(eyeAction, R.drawable.ic_forum_eye,
@@ -2841,6 +2866,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         }
 
         void recycle() {
+            videoEmbeds.recycle();
             images.recycle();
         }
 
@@ -2905,7 +2931,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             playView = new AppCompatImageView(context);
             playView.setScaleType(android.widget.ImageView.ScaleType.CENTER_INSIDE);
             playView.setPadding(dp(9), dp(9), dp(9), dp(9));
-            addView(playView, new LinearLayout.LayoutParams(dp(34), dp(34)));
+            addView(playView, new LinearLayout.LayoutParams(dp(36), dp(36)));
 
             signalView = new VoiceSignalView(context);
             LinearLayout.LayoutParams signalParams = new LinearLayout.LayoutParams(
@@ -2929,9 +2955,11 @@ public class ForumTopicActivity extends AppCompatActivity {
             signalView.setActive(active);
             durationView.setText(Math.max(0, seconds) + "″");
             durationView.setTextColor(accent);
-            playView.setBackground(null);
+            playView.setBackground(roundRect(active
+                    ? (isDark() ? 0xFF35577D : 0xFFDCEBFF)
+                    : (isDark() ? 0xFF363A42 : 0xFFE1E6EC), 18));
             setImageIcon(playView, active ? R.drawable.ic_forum_pause : R.drawable.ic_forum_play,
-                    15, active ? 0xFF1877F2 : (isDark() ? 0xFFE5E8EC : 0xFF4F5862));
+                    16, active ? 0xFF1877F2 : (isDark() ? 0xFFF2F4F7 : 0xFF45505B));
             setBackground(roundRect(active
                     ? (isDark() ? 0xFF263B57 : 0xFFEAF3FF)
                     : (isDark() ? 0xFF25282E : 0xFFF0F3F7), 24));
@@ -2999,6 +3027,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         final AvatarView avatar;
         final TextView name;
         final TextView body;
+        final ForumVideoEmbedListView videoEmbeds;
         final VoiceBubbleView voice;
         final ForumRemoteImageListView imageContainer;
         final TextView time;
@@ -3016,9 +3045,10 @@ public class ForumTopicActivity extends AppCompatActivity {
             like = (TextView) header.getChildAt(3);
             more = (TextView) header.getChildAt(4);
             body = (TextView) root.getChildAt(1);
-            voice = (VoiceBubbleView) root.getChildAt(2);
-            imageContainer = (ForumRemoteImageListView) root.getChildAt(3);
-            time = (TextView) root.getChildAt(4);
+            videoEmbeds = (ForumVideoEmbedListView) root.getChildAt(2);
+            voice = (VoiceBubbleView) root.getChildAt(3);
+            imageContainer = (ForumRemoteImageListView) root.getChildAt(4);
+            time = (TextView) root.getChildAt(5);
         }
     }
 

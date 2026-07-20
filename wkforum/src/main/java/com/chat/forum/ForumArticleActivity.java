@@ -160,7 +160,7 @@ public class ForumArticleActivity extends AppCompatActivity {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(0, dp(6), 0, 0);
         input = new EditText(this);
-        input.setHint("友善交流，说点什么…");
+        input.setHint(R.string.forum_comment_hint);
         input.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         input.setTextColor(isDark() ? Color.WHITE : 0xFF202328);
         input.setHintTextColor(isDark() ? 0xFF777B82 : 0xFF9A9FA6);
@@ -385,15 +385,18 @@ public class ForumArticleActivity extends AppCompatActivity {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         String articleUrl = ForumLinkRouter.articleWebUrl(article.id);
-        labels.add("分享");
-        actions.add(() -> share(article.title + "\n" + article.summary + "\n" + articleUrl));
-        labels.add("复制文章链接");
-        actions.add(() -> copyArticleText("文章链接", articleUrl));
-        labels.add("复制引用格式");
-        actions.add(() -> copyArticleText("文章引用",
-                ForumLinkRouter.markdownReference(article.title, articleUrl)));
+        boolean manager = ForumApiClient.getInstance().isForumManager();
+        labels.add(getString(R.string.forum_send_to_contacts));
+        actions.add(() -> ForumShareHelper.sendToTalkami(this, article.title,
+                article.summary, articleUrl));
+        labels.add(getString(R.string.forum_more_share));
+        actions.add(() -> share(article.title + "\n" + articleUrl));
+        if (manager) {
+            labels.add(getString(R.string.forum_copy_article_link));
+            actions.add(() -> copyArticleText(getString(R.string.forum_article_link_label), articleUrl));
+        }
         if (!TextUtils.isEmpty(article.sourceUrl)) {
-            labels.add("查看来源");
+            labels.add(getString(R.string.forum_view_source));
             actions.add(() -> ForumLinkRouter.open(this, article.sourceUrl));
         }
         showCompactMenu(labels, actions);
@@ -401,7 +404,7 @@ public class ForumArticleActivity extends AppCompatActivity {
 
     private void copyArticleText(String label, String value) {
         boolean copied = ForumLinkRouter.copyToClipboard(this, label, value);
-        Toast.makeText(this, copied ? "已复制" : "复制失败", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, copied ? R.string.forum_copied : R.string.forum_copy_failed, Toast.LENGTH_SHORT).show();
     }
 
     private void showCompactMenu(List<String> labels, List<Runnable> actions) {
@@ -436,7 +439,7 @@ public class ForumArticleActivity extends AppCompatActivity {
         Intent intent = new Intent(Intent.ACTION_SEND);
         intent.setType("text/plain");
         intent.putExtra(Intent.EXTRA_TEXT, text);
-        startActivity(Intent.createChooser(intent, "分享"));
+        startActivity(Intent.createChooser(intent, getString(R.string.forum_share)));
     }
 
     private boolean isDead() {
@@ -520,6 +523,8 @@ public class ForumArticleActivity extends AppCompatActivity {
         public void onViewRecycled(@NonNull RecyclerView.ViewHolder holder) {
             if (holder instanceof ArticleHeaderHolder) {
                 ((ArticleHeaderHolder) holder).view.recycle();
+            } else if (holder instanceof CommentHolder) {
+                ((CommentHolder) holder).videoEmbeds.recycle();
             }
             super.onViewRecycled(holder);
         }
@@ -614,6 +619,12 @@ public class ForumArticleActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bp.leftMargin = dp(43); bp.topMargin = dp(5);
         root.addView(body, bp);
+        ForumVideoEmbedListView videoEmbeds = new ForumVideoEmbedListView(context);
+        LinearLayout.LayoutParams videoParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        videoParams.leftMargin = dp(43);
+        videoParams.rightMargin = dp(10);
+        root.addView(videoEmbeds, videoParams);
         return root;
     }
 
@@ -627,7 +638,9 @@ public class ForumArticleActivity extends AppCompatActivity {
         boolean owner = article != null && article.user != null && comment.user != null
                 && TextUtils.equals(article.user.id, comment.user.id);
         holder.name.setText(commentName(author, formatTime(comment.createTime), owner));
-        ForumLinkRouter.setLinkedText(holder.body, ForumHtmlCache.parse(comment.content));
+        ForumLinkRouter.setLinkedText(holder.body, ForumHtmlCache.parse(
+                ForumVideoEmbedListView.stripStandaloneEmbedUrls(comment.content)));
+        holder.videoEmbeds.bind(comment.content);
         holder.more.setOnClickListener(v -> showCommentMenu(comment));
         holder.root.setOnClickListener(v -> setReply(comment));
         holder.root.setOnLongClickListener(v -> {
@@ -657,6 +670,7 @@ public class ForumArticleActivity extends AppCompatActivity {
         private final TextView author;
         private final ImageView cover;
         private final TextView content;
+        private final ForumVideoEmbedListView videoEmbeds;
         private final ForumRemoteImageListView bodyImages;
         private final TextView stats;
         private String boundCoverUrl = "";
@@ -707,7 +721,7 @@ public class ForumArticleActivity extends AppCompatActivity {
 
             cover = new ImageView(context);
             cover.setAdjustViewBounds(true);
-            cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            cover.setScaleType(ImageView.ScaleType.FIT_CENTER);
             cover.setBackgroundColor(isDark() ? 0xFF24262B : 0xFFF0F1F3);
             cover.setVisibility(GONE);
             LinearLayout.LayoutParams coverParams = new LinearLayout.LayoutParams(
@@ -719,6 +733,10 @@ public class ForumArticleActivity extends AppCompatActivity {
             content.setMaxLines(Integer.MAX_VALUE);
             content.setEllipsize(null);
             addView(content, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            videoEmbeds = new ForumVideoEmbedListView(context);
+            addView(videoEmbeds, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
             bodyImages = new ForumRemoteImageListView(context);
@@ -756,23 +774,40 @@ public class ForumArticleActivity extends AppCompatActivity {
             author.setOnClickListener(openProfile);
 
             String coverUrl = "";
+            String coverFullUrl = "";
             if (value.cover != null && !TextUtils.isEmpty(value.cover.url)) {
+                coverFullUrl = ForumApiClient.getInstance().resolveUrl(value.cover.url);
                 String remote = TextUtils.isEmpty(value.cover.preview)
                         ? value.cover.url : value.cover.preview;
                 coverUrl = ForumApiClient.getInstance().resolveUrl(remote);
+                if (TextUtils.isEmpty(coverFullUrl)) coverFullUrl = coverUrl;
             }
             cover.setVisibility(TextUtils.isEmpty(coverUrl) ? GONE : VISIBLE);
             if (TextUtils.isEmpty(coverUrl)) {
-                recycle();
+                Glide.with(cover).clear(cover);
+                cover.setImageDrawable(null);
+                cover.setOnClickListener(null);
+                boundCoverUrl = "";
             } else if (!TextUtils.equals(boundCoverUrl, coverUrl)) {
                 Glide.with(cover).clear(cover);
-                Glide.with(cover).load(coverUrl).centerCrop().into(cover);
+                Glide.with(cover).load(coverUrl).fitCenter().into(cover);
                 boundCoverUrl = coverUrl;
+            }
+            if (!TextUtils.isEmpty(coverUrl)) {
+                final String openCoverUrl = TextUtils.isEmpty(coverFullUrl)
+                        ? coverUrl : coverFullUrl;
+                cover.setOnClickListener(v -> {
+                    ArrayList<String> urls = new ArrayList<>();
+                    urls.add(openCoverUrl);
+                    ForumImageViewerActivity.open(ForumArticleActivity.this, urls, 0);
+                });
             }
 
             String body = TextUtils.isEmpty(value.content) ? value.summary : value.content;
-            ForumLinkRouter.setLinkedText(content, ForumHtmlCache.parse(body));
-            bodyImages.bind(extractArticleImages(body), dp(220), dp(10),
+            ForumLinkRouter.setLinkedText(content, ForumHtmlCache.parse(
+                    ForumVideoEmbedListView.stripStandaloneEmbedUrls(body)));
+            videoEmbeds.bind(body);
+            bodyImages.bind(extractArticleImages(body), dp(180), dp(10),
                     isDark() ? 0xFF24262B : 0xFFF0F1F3);
             stats.setText("◉ " + Math.max(0, value.viewCount) + "   评论 "
                     + Math.max(0, value.commentCount));
@@ -782,6 +817,8 @@ public class ForumArticleActivity extends AppCompatActivity {
             Glide.with(cover).clear(cover);
             cover.setImageDrawable(null);
             boundCoverUrl = "";
+            cover.setOnClickListener(null);
+            videoEmbeds.recycle();
             bodyImages.recycle();
         }
     }
@@ -826,6 +863,7 @@ public class ForumArticleActivity extends AppCompatActivity {
     private static final class CommentHolder extends RecyclerView.ViewHolder {
         final LinearLayout root; final AvatarView avatar; final TextView name;
         final TextView more; final TextView body;
+        final ForumVideoEmbedListView videoEmbeds;
         CommentHolder(@NonNull View view) {
             super(view); root = (LinearLayout) view;
             LinearLayout header = (LinearLayout) root.getChildAt(0);
@@ -833,6 +871,7 @@ public class ForumArticleActivity extends AppCompatActivity {
             name = (TextView) header.getChildAt(1);
             more = (TextView) header.getChildAt(2);
             body = (TextView) root.getChildAt(1);
+            videoEmbeds = (ForumVideoEmbedListView) root.getChildAt(2);
         }
     }
 

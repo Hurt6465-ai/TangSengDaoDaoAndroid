@@ -204,7 +204,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         typePill.setGravity(Gravity.CENTER_VERTICAL);
         typePill.setPadding(dp(2), dp(2), dp(2), dp(2));
         typePill.setBackground(roundRect(dark ? 0xFF25272C : 0xFFF1F3F5, 16));
-        LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(dp(258), dp(34));
+        LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(dp(180), dp(34));
         typeParams.topMargin = dp(7);
         form.addView(typePill, typeParams);
         renderTypePill();
@@ -232,7 +232,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         titleParams.topMargin = dp(12);
         form.addView(titleInput, titleParams);
 
-        contentInput = input("分享你的问题、经验或学习内容…", true);
+        contentInput = input(getString(R.string.forum_topic_content_hint), true);
         contentInput.setGravity(Gravity.TOP | Gravity.START);
         contentInput.setMinHeight(dp(220));
         LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -333,7 +333,6 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         typePill.removeAllViews();
         addTypeTab("帖子", TYPE_TOPIC);
         addTypeTab("问答", TYPE_QA);
-        addTypeTab("文章", TYPE_ARTICLE);
         updateTypeDependentViews();
     }
 
@@ -346,7 +345,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         tab.setOnClickListener(v -> {
             if (publishing || topicType == value) return;
             topicType = value;
-            pendingCategoryId = value == TYPE_ARTICLE ? 0L : initialCategoryId;
+            pendingCategoryId = initialCategoryId;
             renderTypePill();
             updateContentHint();
             if (topicType != TYPE_ARTICLE) loadCategories();
@@ -627,13 +626,13 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         labelParams.topMargin = dp(6);
         panel.addView(labelInput, labelParams);
 
-        EditText targetInput = input("文章/帖子 ID 或复制的链接", false);
+        EditText targetInput = input(getString(R.string.forum_relation_target_hint), false);
         LinearLayout.LayoutParams targetParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         targetParams.topMargin = dp(8);
         panel.addView(targetInput, targetParams);
 
-        TextView hint = text("可在目标文章或帖子右上角菜单复制链接；插入后点击会在 App 内打开。",
+        TextView hint = text(getString(R.string.forum_relation_help),
                 12, isDark() ? 0xFF92979F : 0xFF7B818A, false);
         hint.setPadding(0, dp(8), 0, 0);
         panel.addView(hint);
@@ -711,7 +710,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             contentInput.setText(state.getString(STATE_CONTENT, ""));
             restoreSelectedTags(state.getString(STATE_TAGS, ""));
             bountyInput.setText(state.getString(STATE_BOUNTY, ""));
-            topicType = state.getInt(STATE_TYPE, 0);
+            topicType = normalizeComposerType(state.getInt(STATE_TYPE, TYPE_TOPIC));
             pendingCategoryId = state.getLong(STATE_CATEGORY, 0L);
             ArrayList<String> images = state.getStringArrayList(STATE_IMAGES);
             if (images != null) {
@@ -732,11 +731,15 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         contentInput.setText(draft.content);
         restoreSelectedTags(draft.tags);
         bountyInput.setText(draft.bounty);
-        topicType = draft.topicType;
+        topicType = normalizeComposerType(draft.topicType);
         pendingCategoryId = draft.categoryId;
         renderTypePill();
         updateContentHint();
         Toast.makeText(this, "已恢复上次未发布的草稿", Toast.LENGTH_SHORT).show();
+    }
+
+    private int normalizeComposerType(int value) {
+        return value == TYPE_QA ? TYPE_QA : TYPE_TOPIC;
     }
 
     private void saveDraft() {
