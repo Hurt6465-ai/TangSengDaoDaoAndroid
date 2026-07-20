@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="forum_comment_hint">မှတ်ချက်ရေးပါ… YouTube သို့မဟုတ် TikTok လင့်ခ်ကို တိုက်ရိုက်ကူးထည့်နိုင်သည်</string>
+    <string name="forum_topic_content_hint">မေးခွန်း၊ အတွေ့အကြုံ သို့မဟုတ် သင်ယူထားသည့်အကြောင်းအရာကို မျှဝေပါ…\nYouTube သို့မဟုတ် TikTok ဗီဒီယိုလင့်ခ်အပြည့်အစုံကို တိုက်ရိုက်ကူးထည့်နိုင်သည်</string>
+    <string name="forum_send_to_contacts">အဆက်အသွယ်များထံ ပို့ရန်</string>
+    <string name="forum_more_share">နောက်ထပ် မျှဝေရန်</string>
+    <string name="forum_copy_topic_link">ပို့စ်လင့်ခ်ကို ကူးယူရန်</string>
+    <string name="forum_copy_article_link">ဆောင်းပါးလင့်ခ်ကို ကူးယူရန်</string>
+    <string name="forum_topic_link_label">ပို့စ်လင့်ခ်</string>
+    <string name="forum_article_link_label">ဆောင်းပါးလင့်ခ်</string>
+    <string name="forum_report">တိုင်ကြားရန်</string>
+    <string name="forum_view_source">မူရင်းရင်းမြစ်ကို ကြည့်ရန်</string>
+    <string name="forum_copied">ကူးယူပြီးပါပြီ</string>
+    <string name="forum_copy_failed">ကူးယူ၍ မရပါ</string>
+    <string name="forum_share">မျှဝေရန်</string>
+    <string name="forum_share_unavailable">ဤစက်တွင် မျှဝေ၍ မရပါ</string>
+    <string name="forum_sent">ပို့ပြီးပါပြီ</string>
+    <string name="forum_send">ပို့ရန်</string>
+    <string name="forum_send_comment">မှတ်ချက်ပို့ရန်</string>
+
+    <string name="forum_record_permission_required">အသံမှတ်ချက်ပို့ရန် မိုက်ခရိုဖုန်းအသုံးပြုခွင့် လိုအပ်သည်</string>
+    <string name="forum_record_delete">အသံသွင်းချက်ကို ဖျက်ရန်</string>
+    <string name="forum_record_pause">အသံသွင်းခြင်းကို ခဏရပ်ရန်</string>
+    <string name="forum_record_resume">အသံသွင်းခြင်းကို ဆက်ရန်</string>
+    <string name="forum_record_finish">အသံသွင်းခြင်းကို အဆုံးသတ်ရန်</string>
+    <string name="forum_record_stop_preview">အဆုံးသတ်ပြီး နားထောင်ရန်</string>
+    <string name="forum_record_preview_play">အသံသွင်းချက်ကို နားထောင်ရန်</string>
+    <string name="forum_record_preview_pause">နားထောင်ခြင်းကို ခဏရပ်ရန်</string>
+    <string name="forum_record_send_voice">အသံမှတ်ချက်ကို ပို့ရန်</string>
+    <string name="forum_record_tap_to_start">အသံသွင်းရန် နှိပ်ပါ</string>
+    <string name="forum_record_pause_or_finish">ခဏရပ်ရန် သို့မဟုတ် အဆုံးသတ်ရန်</string>
+    <string name="forum_record_resume_or_finish">ဆက်လက်အသံသွင်းရန် သို့မဟုတ် အဆုံးသတ်ရန်</string>
+    <string name="forum_record_directory_failed">အသံသွင်းဖိုင်တွဲကို ဖန်တီး၍ မရပါ</string>
+    <string name="forum_record_start_failed">အသံသွင်းခြင်းကို စတင်၍ မရပါ</string>
+    <string name="forum_record_pause_failed">အသံသွင်းခြင်းကို ခဏရပ်၍ မရပါ</string>
+    <string name="forum_record_resume_failed">အသံသွင်းခြင်းကို ဆက်၍ မရပါ</string>
+    <string name="forum_record_too_short">အသံသွင်းချိန် အလွန်တိုပါသည်</string>
+    <string name="forum_record_preview_failed">အသံသွင်းချက်ကို ဖွင့်၍ မရပါ</string>
+    <string name="forum_record_file_missing">အသံသွင်းဖိုင် မရှိပါ</string>
+    <string name="forum_record_file_expired">အသံသွင်းဖိုင်ကို အသုံးမပြုနိုင်တော့ပါ။ ပြန်လည်အသံသွင်းပါ။</string>
+    <string name="forum_record_send_confirm_title">ဤအသံမှတ်ချက်ကို ပို့မလား။</string>
+    <string name="forum_record_send_confirm_message">ဤအသံသွင်းချက်သည် %1$d စက္ကန့် ကြာသည်။ ပို့ရန် အတည်ပြုပါ၊ ပယ်ဖျက်ပါက အသံသွင်းချက်ကို ဖျက်ပါမည်။</string>
+    <string name="forum_record_send_failed_title">အသံမှတ်ချက်ကို ပို့၍ မရပါ</string>
+
+    <string name="forum_video_open_in">%1$s တွင် ဖွင့်ရန်</string>
+    <string name="forum_video_preparing">ဗီဒီယိုအဖုံးပုံနှင့် ပလေယာကို ပြင်ဆင်နေသည်…</string>
+    <string name="forum_video_short_link_failed">လင့်ခ်တိုကို ဖော်ထုတ်၍ မရပါ။ /video/ ပါသော TikTok လင့်ခ်အပြည့်အစုံကို ကူးထည့်ပါ။</string>
+    <string name="forum_cancel">ပယ်ဖျက်ရန်</string>
+    <string name="forum_delete">ဖျက်ရန်</string>
+    <string name="forum_retry">ထပ်မံကြိုးစားရန်</string>
+    <string name="forum_network_retry">ကွန်ရက်ကို စစ်ဆေးပြီး ထပ်မံကြိုးစားပါ</string>
+    <string name="forum_record_upload_url_failed">အသံဖိုင်တင်ရန် လိပ်စာကို ရယူ၍ မရပါ</string>
+    <string name="forum_record_upload_failed">အသံမှတ်ချက်ကို ဖိုင်တင်၍ မရပါ</string>
+    <string name="forum_audio_in_use">အခြားအက်ပ်တစ်ခုက အသံစနစ်ကို အသုံးပြုနေသည်</string>
+    <string name="forum_voice_playback_failed">အသံမှတ်ချက်ကို ဖွင့်၍ မရပါ။ ထပ်မံကြိုးစားပါ။</string>
+    <string name="forum_relation_target_hint">ဆောင်းပါး/ပို့စ် ID သို့မဟုတ် ဖိုရမ်ဝဘ်လင့်ခ်</string>
+    <string name="forum_relation_help">ဖိုရမ်ဝဘ်လင့်ခ်ကို ကူးထည့်ပါ၊ သို့မဟုတ် ဆောင်းပါး/ပို့စ် ID ကို ရိုက်ထည့်ပါ။ ထည့်သွင်းပြီးနောက် အက်ပ်အတွင်း ဖွင့်နိုင်သည်။</string>
+</resources>
