@@ -24,12 +24,14 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.animation.AlphaAnimation;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ViewFlipper;
 
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -70,6 +72,7 @@ public class LearningFragment extends Fragment {
 
     private WideEdgeDrawerLayout drawerLayout;
     private View sideDrawerView;
+    private ViewFlipper priceFlipper;
     private final Map<String, HskProgressBinding> hskProgressViews = new HashMap<>();
     private int progressLoadToken;
     private long lastCardClickTime;
@@ -101,6 +104,15 @@ public class LearningFragment extends Fragment {
     public void onResume() {
         super.onResume();
         refreshLocalWordProgress();
+        if (priceFlipper != null && priceFlipper.getChildCount() > 1) {
+            priceFlipper.startFlipping();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        if (priceFlipper != null) priceFlipper.stopFlipping();
+        super.onPause();
     }
 
     @Override
@@ -108,6 +120,7 @@ public class LearningFragment extends Fragment {
         progressLoadToken++;
         hskProgressViews.clear();
         sideDrawerView = null;
+        priceFlipper = null;
         drawerLayout = null;
         super.onDestroyView();
     }
@@ -167,49 +180,112 @@ public class LearningFragment extends Fragment {
         HeroImageScrimView scrim = new HeroImageScrimView(requireContext());
         hero.addView(scrim, new FrameLayout.LayoutParams(-1, -1));
 
-        LinearLayout copy = new LinearLayout(requireContext());
-        copy.setOrientation(LinearLayout.VERTICAL);
-        copy.setGravity(Gravity.BOTTOM | Gravity.START);
-        // 文案整体上移，避免贴近内容层顶部。
-        copy.setPadding(dp(20), getTopInset() + dp(56), dp(20), dp(104));
-        hero.addView(copy, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout content = new LinearLayout(requireContext());
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.BOTTOM | Gravity.START);
+        content.setPadding(dp(20), getTopInset() + dp(48), dp(20), dp(92));
+        hero.addView(content, new FrameLayout.LayoutParams(-1, -1));
 
-        TextView tag = text("AI 语伴课 · 零基础", 11, 0xEFFFFFFF, true);
+        TextView tag = text(getString(R.string.learning_home_course_recommendation),
+                11, 0xEFFFFFFF, true);
         tag.setGravity(Gravity.CENTER);
         tag.setPadding(dp(12), dp(6), dp(12), dp(6));
-        tag.setBackground(ripple(
-                rounded(0x2EFFFFFF, dp(RADIUS_PILL), 0x55FFFFFF, dp(1)),
-                0x44FFFFFF,
-                RADIUS_PILL
-        ));
-        copy.addView(tag, new LinearLayout.LayoutParams(-2, -2));
+        tag.setBackground(rounded(0x2EFFFFFF, dp(RADIUS_PILL), 0x55FFFFFF, dp(1)));
+        content.addView(tag, new LinearLayout.LayoutParams(-2, -2));
 
-        TextView title = text("90天搞定汉语口语", 27, Color.WHITE, true);
-        title.setLetterSpacing(-0.01f);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-        titleLp.setMargins(0, dp(12), 0, dp(7));
-        copy.addView(title, titleLp);
+        priceFlipper = new ViewFlipper(requireContext());
+        priceFlipper.setFlipInterval(4800);
+        priceFlipper.setAutoStart(false);
+        priceFlipper.setMeasureAllChildren(false);
 
-        LinearLayout bottomRow = new LinearLayout(requireContext());
-        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
-        bottomRow.setGravity(Gravity.CENTER_VERTICAL);
-        copy.addView(bottomRow, new LinearLayout.LayoutParams(-1, -2));
+        AlphaAnimation in = new AlphaAnimation(0f, 1f);
+        in.setDuration(360);
+        AlphaAnimation out = new AlphaAnimation(1f, 0f);
+        out.setDuration(260);
+        priceFlipper.setInAnimation(in);
+        priceFlipper.setOutAnimation(out);
 
-        TextView sub = text("每天10分钟，与 AI 语伴沉浸对练", 13, 0xE6FFFFFF, false);
-        bottomRow.addView(sub, new LinearLayout.LayoutParams(0, -2, 1f));
+        String[] titles = getResources().getStringArray(R.array.learning_home_plan_titles);
+        String[] subtitles = getResources().getStringArray(R.array.learning_home_plan_subtitles);
+        String[] prices = getResources().getStringArray(R.array.learning_home_plan_prices);
+        String[] notes = getResources().getStringArray(R.array.learning_home_plan_notes);
+        int count = Math.min(Math.min(titles.length, subtitles.length),
+                Math.min(prices.length, notes.length));
+        for (int i = 0; i < count; i++) {
+            priceFlipper.addView(createPriceSlide(
+                    titles[i], subtitles[i], prices[i], notes[i], i, count
+            ), new FrameLayout.LayoutParams(-1, -1));
+        }
 
-        TextView start = text("开始  ›", 13, COLOR_BRAND, true);
-        start.setGravity(Gravity.CENTER);
-        start.setBackground(ripple(
-                rounded(0xF7FFFFFF, dp(18), 0xCCFFFFFF, dp(1)),
-                withAlpha(COLOR_BRAND, 36),
-                18
-        ));
-        bindClick(start, () -> openDirectory("pinyin", "拼音", ""));
-        applyColoredShadow(start, COLOR_BRAND, 4f);
-        attachNativePressAnimator(start, 4f, -2f);
-        bottomRow.addView(start, new LinearLayout.LayoutParams(dp(82), dp(38)));
+        LinearLayout.LayoutParams flipperLp = new LinearLayout.LayoutParams(-1, dp(142));
+        flipperLp.setMargins(0, dp(10), 0, 0);
+        content.addView(priceFlipper, flipperLp);
         return hero;
+    }
+
+    private View createPriceSlide(String title, String subtitle, String price,
+                                  String note, int index, int total) {
+        LinearLayout slide = new LinearLayout(requireContext());
+        slide.setOrientation(LinearLayout.VERTICAL);
+        slide.setGravity(Gravity.CENTER_VERTICAL);
+
+        LinearLayout top = new LinearLayout(requireContext());
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        slide.addView(top, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView titleView = text(title, 25, Color.WHITE, true);
+        titleView.setSingleLine(true);
+        titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        top.addView(titleView, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView position = text(getString(R.string.learning_home_slide_position,
+                index + 1, total), 11, 0xD9FFFFFF, true);
+        position.setGravity(Gravity.CENTER);
+        position.setPadding(dp(9), dp(5), dp(9), dp(5));
+        position.setBackground(rounded(0x26000000, dp(14), 0x44FFFFFF, dp(1)));
+        top.addView(position, new LinearLayout.LayoutParams(-2, -2));
+
+        TextView subtitleView = text(subtitle, 13, 0xE8FFFFFF, false);
+        subtitleView.setSingleLine(true);
+        subtitleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(-1, -2);
+        subtitleLp.setMargins(0, dp(8), 0, dp(13));
+        slide.addView(subtitleView, subtitleLp);
+
+        LinearLayout bottom = new LinearLayout(requireContext());
+        bottom.setOrientation(LinearLayout.HORIZONTAL);
+        bottom.setGravity(Gravity.CENTER_VERTICAL);
+        slide.addView(bottom, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout priceBox = new LinearLayout(requireContext());
+        priceBox.setOrientation(LinearLayout.VERTICAL);
+        bottom.addView(priceBox, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView priceView = text(price, 23, Color.WHITE, true);
+        priceBox.addView(priceView, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView noteView = text(note, 11, 0xD9FFFFFF, false);
+        LinearLayout.LayoutParams noteLp = new LinearLayout.LayoutParams(-1, -2);
+        noteLp.setMargins(0, dp(4), 0, 0);
+        priceBox.addView(noteView, noteLp);
+
+        TextView enroll = text(getString(R.string.learning_home_enroll), 13, COLOR_BRAND, true);
+        enroll.setGravity(Gravity.CENTER);
+        enroll.setBackground(ripple(
+                rounded(0xF8FFFFFF, dp(19), 0xD9FFFFFF, dp(1)),
+                withAlpha(COLOR_BRAND, 36), 19
+        ));
+        bindClick(enroll, () -> onEnrollClick(index));
+        applyColoredShadow(enroll, COLOR_BRAND, 4f);
+        attachNativePressAnimator(enroll, 4f, -2f);
+        bottom.addView(enroll, new LinearLayout.LayoutParams(dp(88), dp(40)));
+        return slide;
+    }
+
+    private void onEnrollClick(int planIndex) {
+        Toast.makeText(requireContext(),
+                getString(R.string.learning_home_enroll_pending), Toast.LENGTH_SHORT).show();
     }
 
     private LinearLayout createContentSheet() {
@@ -220,10 +296,12 @@ public class LearningFragment extends Fragment {
         sheet.setClipToOutline(true);
         applyColoredShadow(sheet, COLOR_BRAND, 12f);
 
-        TextView quickTitle = text("快捷工具", 22, COLOR_TEXT, true);
+        TextView quickTitle = text(getString(R.string.learning_home_quick_tools),
+                22, COLOR_TEXT, true);
         sheet.addView(quickTitle, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView quickSub = text("翻译、阅读与口语练习", 12, COLOR_SUB, false);
+        TextView quickSub = text(getString(R.string.learning_home_quick_tools_subtitle),
+                12, COLOR_SUB, false);
         LinearLayout.LayoutParams quickSubLp = new LinearLayout.LayoutParams(-1, -2);
         quickSubLp.setMargins(0, dp(6), 0, dp(16));
         sheet.addView(quickSub, quickSubLp);
@@ -231,44 +309,79 @@ public class LearningFragment extends Fragment {
         sheet.addView(createToolsPanel(), new LinearLayout.LayoutParams(-1, dp(104)));
         addSpace(sheet, 24);
 
-        addSection(sheet, "拼音", "从发音开始", "更多",
+        addSection(sheet,
+                getString(R.string.learning_home_pinyin_title),
+                getString(R.string.learning_home_pinyin_subtitle),
+                "pinyin",
                 new CardSpec[]{
-                        new CardSpec("声母", "b p m f", "initials"),
-                        new CardSpec("韵母", "a o e i u", "finals"),
-                        new CardSpec("整体", "zhi chi shi", "whole"),
-                        new CardSpec("声调", "一二三四声", "tone")
+                        new CardSpec(getString(R.string.learning_home_initials),
+                                "b p m f", "initials"),
+                        new CardSpec(getString(R.string.learning_home_finals),
+                                "a o e i u", "finals"),
+                        new CardSpec(getString(R.string.learning_home_whole_syllables),
+                                "zhi chi shi", "whole"),
+                        new CardSpec(getString(R.string.learning_home_tones),
+                                getString(R.string.learning_home_tones_desc), "tone")
                 });
 
-        addSection(sheet, "单词", "按等级稳步积累", "更多",
+        addSection(sheet,
+                getString(R.string.learning_home_words_title),
+                getString(R.string.learning_home_words_subtitle),
+                "words",
                 new CardSpec[]{
-                        CardSpec.hsk("HSK 1", "150 词", "hsk1", 1, 150),
-                        CardSpec.hsk("HSK 2", "300 词", "hsk2", 2, 300),
-                        CardSpec.hsk("HSK 3", "600 词", "hsk3", 3, 600),
-                        CardSpec.hsk("HSK 4", "1200 词", "hsk4", 4, 1200)
+                        CardSpec.hsk("HSK 1", getString(R.string.learning_home_words_count, 150),
+                                "hsk1", 1, 150),
+                        CardSpec.hsk("HSK 2", getString(R.string.learning_home_words_count, 300),
+                                "hsk2", 2, 300),
+                        CardSpec.hsk("HSK 3", getString(R.string.learning_home_words_count, 600),
+                                "hsk3", 3, 600),
+                        CardSpec.hsk("HSK 4", getString(R.string.learning_home_words_count, 1200),
+                                "hsk4", 4, 1200)
                 });
 
-        addSection(sheet, "口语", "把中文真正说出来", "更多",
+        addSection(sheet,
+                getString(R.string.learning_home_speaking_title),
+                getString(R.string.learning_home_speaking_subtitle),
+                "speaking",
                 new CardSpec[]{
-                        CardSpec.icon("打招呼", "日常开场", "speak_hello", R.drawable.ic_learning_scene_hello),
-                        CardSpec.icon("点餐", "餐厅购物", "speak_food", R.drawable.ic_learning_scene_food),
-                        CardSpec.icon("求职", "面试工作", "speak_job", R.drawable.ic_learning_scene_job),
-                        CardSpec.icon("购物", "买单砍价", "speak_shop", R.drawable.ic_learning_scene_shop)
+                        CardSpec.icon(getString(R.string.learning_home_speak_hello),
+                                getString(R.string.learning_home_speak_hello_desc),
+                                "speak_hello", R.drawable.ic_learning_scene_hello),
+                        CardSpec.icon(getString(R.string.learning_home_speak_food),
+                                getString(R.string.learning_home_speak_food_desc),
+                                "speak_food", R.drawable.ic_learning_scene_food),
+                        CardSpec.icon(getString(R.string.learning_home_speak_job),
+                                getString(R.string.learning_home_speak_job_desc),
+                                "speak_job", R.drawable.ic_learning_scene_job),
+                        CardSpec.icon(getString(R.string.learning_home_speak_shop),
+                                getString(R.string.learning_home_speak_shop_desc),
+                                "speak_shop", R.drawable.ic_learning_scene_shop)
                 });
 
-        addSection(sheet, "句型", "快速组织完整表达", "更多",
+        addSection(sheet,
+                getString(R.string.learning_home_patterns_title),
+                getString(R.string.learning_home_patterns_subtitle),
+                "patterns",
                 new CardSpec[]{
-                        new CardSpec("我想…", "表达需求", "pattern_want"),
-                        new CardSpec("可以吗", "请求帮助", "pattern_can"),
-                        new CardSpec("怎么…", "询问方法", "pattern_how"),
-                        new CardSpec("为什么", "询问原因", "pattern_why")
+                        new CardSpec(getString(R.string.learning_home_pattern_want),
+                                getString(R.string.learning_home_pattern_want_desc), "pattern_want"),
+                        new CardSpec(getString(R.string.learning_home_pattern_can),
+                                getString(R.string.learning_home_pattern_can_desc), "pattern_can"),
+                        new CardSpec(getString(R.string.learning_home_pattern_how),
+                                getString(R.string.learning_home_pattern_how_desc), "pattern_how"),
+                        new CardSpec(getString(R.string.learning_home_pattern_why),
+                                getString(R.string.learning_home_pattern_why_desc), "pattern_why")
                 });
 
-        addSection(sheet, "语法", "理解中文的结构", "更多",
+        addSection(sheet,
+                getString(R.string.learning_home_grammar_title),
+                getString(R.string.learning_home_grammar_subtitle),
+                "grammar",
                 new CardSpec[]{
-                        new CardSpec("了", "完成 / 变化", "grammar_le"),
-                        new CardSpec("在", "正在进行", "grammar_zai"),
-                        new CardSpec("吗 / 呢", "疑问语气", "grammar_ma"),
-                        new CardSpec("的 / 得", "结构助词", "grammar_de")
+                        new CardSpec("了", getString(R.string.learning_home_grammar_le_desc), "grammar_le"),
+                        new CardSpec("在", getString(R.string.learning_home_grammar_zai_desc), "grammar_zai"),
+                        new CardSpec("吗 / 呢", getString(R.string.learning_home_grammar_ma_desc), "grammar_ma"),
+                        new CardSpec("的 / 得", getString(R.string.learning_home_grammar_de_desc), "grammar_de")
                 });
         return sheet;
     }
@@ -277,7 +390,7 @@ public class LearningFragment extends Fragment {
         MenuHandleView button = new MenuHandleView(requireContext());
         button.setClickable(true);
         button.setFocusable(true);
-        button.setContentDescription("打开学习侧边栏");
+        button.setContentDescription(getString(R.string.learning_home_open_drawer));
         button.setOnClickListener(v -> openDrawer());
         return button;
     }
@@ -286,45 +399,45 @@ public class LearningFragment extends Fragment {
         LinearLayout panel = new LinearLayout(requireContext());
         panel.setOrientation(LinearLayout.HORIZONTAL);
         panel.setGravity(Gravity.CENTER_VERTICAL);
-        panel.setPadding(dp(8), dp(8), dp(8), dp(8));
+        panel.setPadding(dp(6), dp(8), dp(6), dp(8));
         panel.setBackground(gradientRounded(
                 0xFFFFFFFF,
-                0xFFF7F8FF,
+                0xFFF9FAFF,
                 dp(RADIUS_PANEL),
-                0x806B70F7,
+                0x526B70F7,
                 dp(1)
         ));
-        applyColoredShadow(panel, 0xFF6E76F5, 6f);
+        applyColoredShadow(panel, 0xFF6E76F5, 5f);
 
         panel.addView(toolItem(
                 R.drawable.ic_learning_translate,
                 0xFF4D7CFE,
-                "AI翻译",
+                getString(R.string.learning_home_tool_translate),
                 () -> AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")
         ), new LinearLayout.LayoutParams(0, -1, 1f));
-        addHorizontalGap(panel, 6);
+        panel.addView(toolDivider(0xFF4D7CFE), new LinearLayout.LayoutParams(dp(1), dp(42)));
 
         panel.addView(toolItem(
                 R.drawable.ic_learning_book,
                 0xFF7D5CE8,
-                "电子书",
-                () -> openDirectory("books", "电子书", "")
+                getString(R.string.learning_home_tool_books),
+                () -> openDirectory("books", getString(R.string.learning_home_tool_books), "")
         ), new LinearLayout.LayoutParams(0, -1, 1f));
-        addHorizontalGap(panel, 6);
+        panel.addView(toolDivider(0xFF7D5CE8), new LinearLayout.LayoutParams(dp(1), dp(42)));
 
         panel.addView(toolItem(
                 R.drawable.ic_learning_mic,
                 0xFF18A18A,
-                "口语伴",
-                () -> openDirectory("prompts", "口语 Prompt", "")
+                getString(R.string.learning_home_tool_partner),
+                () -> openDirectory("prompts", getString(R.string.learning_home_tool_partner), "")
         ), new LinearLayout.LayoutParams(0, -1, 1f));
-        addHorizontalGap(panel, 6);
+        panel.addView(toolDivider(0xFFED8A4A), new LinearLayout.LayoutParams(dp(1), dp(42)));
 
         panel.addView(toolItem(
                 R.drawable.ic_learning_practice,
                 0xFFED8A4A,
-                "练习题",
-                () -> openDirectory("quiz", "练习题", "")
+                getString(R.string.learning_home_tool_practice),
+                () -> openDirectory("quiz", getString(R.string.learning_home_tool_practice), "")
         ), new LinearLayout.LayoutParams(0, -1, 1f));
         return panel;
     }
@@ -335,16 +448,17 @@ public class LearningFragment extends Fragment {
         item.setGravity(Gravity.CENTER);
         item.setPadding(dp(4), dp(6), dp(4), dp(6));
         item.setBackground(ripple(
-                rounded(withAlpha(accent, 18), dp(16), withAlpha(accent, 92), dp(1)),
-                withAlpha(accent, 38),
+                rounded(Color.TRANSPARENT, dp(16), Color.TRANSPARENT, 0),
+                withAlpha(accent, 28),
                 16
         ));
         bindClick(item, click);
         attachNativePressAnimator(item, 0f, -1f);
 
         FrameLayout iconBox = new FrameLayout(requireContext());
-        iconBox.setBackground(radialGlow(accent));
-        item.addView(iconBox, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        iconBox.setBackground(rounded(withAlpha(accent, 28), dp(15),
+                withAlpha(accent, 72), dp(1)));
+        item.addView(iconBox, new LinearLayout.LayoutParams(dp(46), dp(46)));
 
         ImageView icon = new ImageView(requireContext());
         icon.setImageResource(iconRes);
@@ -361,14 +475,14 @@ public class LearningFragment extends Fragment {
         return item;
     }
 
-    private View toolDivider() {
+    private View toolDivider(int accent) {
         View divider = new View(requireContext());
-        divider.setBackgroundColor(0x247A8498);
+        divider.setBackgroundColor(withAlpha(accent, 30));
         return divider;
     }
 
     private void addSection(LinearLayout parent, String title, String subtitle,
-                            String more, CardSpec[] cards) {
+                            String sectionType, CardSpec[] cards) {
         LinearLayout header = new LinearLayout(requireContext());
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -389,7 +503,8 @@ public class LearningFragment extends Fragment {
         subtitleLp.setMargins(0, dp(5), 0, 0);
         titles.addView(subtitleView, subtitleLp);
 
-        TextView moreView = text(more + "  ›", 13, 0xFF7C8496, true);
+        TextView moreView = text(getString(R.string.learning_home_more) + "  ›",
+                13, 0xFF7C8496, true);
         moreView.setGravity(Gravity.CENTER);
         moreView.setPadding(dp(12), dp(8), dp(10), dp(8));
         moreView.setBackground(ripple(
@@ -397,7 +512,7 @@ public class LearningFragment extends Fragment {
                 withAlpha(COLOR_BRAND, 26),
                 16
         ));
-        bindClick(moreView, () -> openMorePage(title));
+        bindClick(moreView, () -> openDirectory(sectionType, title, ""));
         header.addView(moreView, new LinearLayout.LayoutParams(-2, -2));
 
         LinearLayout grid = new LinearLayout(requireContext());
@@ -418,7 +533,7 @@ public class LearningFragment extends Fragment {
                 if (index < cards.length) {
                     CardSpec cardSpec = cards[index++];
                     View card = smallCard(cardSpec);
-                    card.setMinimumHeight(dp(cardSpec.level > 0 ? 120 : 96));
+                    card.setMinimumHeight(dp(cardSpec.level > 0 ? 108 : 96));
                     row.addView(card, new LinearLayout.LayoutParams(0, -2, 1f));
                 } else {
                     row.addView(new View(requireContext()), new LinearLayout.LayoutParams(0, dp(1), 1f));
@@ -493,41 +608,57 @@ public class LearningFragment extends Fragment {
     }
 
     private void addHskCardContent(FrameLayout card, CardSpec spec, int accent) {
-        LinearLayout row = new LinearLayout(requireContext());
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        card.addView(row, new FrameLayout.LayoutParams(-1, -1));
+        TextView ghost = text(String.valueOf(spec.level), 54,
+                withAlpha(accent, 42), true);
+        ghost.setGravity(Gravity.CENTER);
+        ghost.setIncludeFontPadding(false);
+        ghost.setTranslationX(dp(12));
+        ghost.setTranslationY(dp(10));
+        ghost.setRotation(-8f);
+        FrameLayout.LayoutParams ghostLp = new FrameLayout.LayoutParams(
+                dp(78), dp(82), Gravity.END | Gravity.BOTTOM
+        );
+        ghostLp.setMargins(0, 0, -dp(7), -dp(8));
+        card.addView(ghost, ghostLp);
 
         LinearLayout copy = new LinearLayout(requireContext());
         copy.setOrientation(LinearLayout.VERTICAL);
-        row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+        copy.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout.LayoutParams copyLp = new FrameLayout.LayoutParams(-1, -1);
+        copyLp.setMargins(0, 0, dp(40), 0);
+        card.addView(copy, copyLp);
 
-        TextView eyebrow = text("LEVEL " + spec.level, 10, withAlpha(accent, 210), true);
-        eyebrow.setLetterSpacing(0.08f);
-        copy.addView(eyebrow, new LinearLayout.LayoutParams(-1, -2));
+        View marker = new View(requireContext());
+        marker.setBackground(rounded(accent, dp(3), Color.TRANSPARENT, 0));
+        copy.addView(marker, new LinearLayout.LayoutParams(dp(24), dp(5)));
+
+        LinearLayout titleRow = new LinearLayout(requireContext());
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams titleRowLp = new LinearLayout.LayoutParams(-1, -2);
+        titleRowLp.setMargins(0, dp(8), 0, 0);
+        copy.addView(titleRow, titleRowLp);
 
         TextView title = text(spec.title, 16, COLOR_TEXT, true);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-        titleLp.setMargins(0, dp(7), 0, 0);
-        copy.addView(title, titleLp);
+        titleRow.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
 
-        TextView progressText = text("已学 0 / " + spec.totalWords, 11, withAlpha(accent, 225), true);
+        TextView count = text(spec.desc, 11, withAlpha(accent, 220), true);
+        titleRow.addView(count, new LinearLayout.LayoutParams(-2, -2));
+
+        TextView progressText = text(
+                getString(R.string.learning_home_learned_format, 0, spec.totalWords),
+                11, COLOR_SUB, false);
         LinearLayout.LayoutParams progressTextLp = new LinearLayout.LayoutParams(-1, -2);
         progressTextLp.setMargins(0, dp(7), 0, 0);
         copy.addView(progressText, progressTextLp);
 
         LocalProgressBarView progressBar = new LocalProgressBarView(requireContext(), accent);
-        LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(-1, dp(5));
-        barLp.setMargins(0, dp(7), dp(2), 0);
+        LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(-1, dp(4));
+        barLp.setMargins(0, dp(7), 0, 0);
         copy.addView(progressBar, barLp);
 
         hskProgressViews.put(spec.id,
                 new HskProgressBinding(progressText, progressBar, spec.totalWords));
-
-        LevelBadgeView badge = new LevelBadgeView(requireContext(), spec.level, accent);
-        LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(dp(48), dp(48));
-        badgeLp.setMargins(dp(10), 0, 0, 0);
-        row.addView(badge, badgeLp);
     }
 
     private void addSceneCardContent(FrameLayout card, CardSpec spec, int accent) {
@@ -570,16 +701,16 @@ public class LearningFragment extends Fragment {
         panel.setBackground(drawerBackground());
         panel.setClickable(true);
 
-        TextView kicker = text("LEARNING SPACE", 10, 0xFF7D72E6, true);
+        TextView kicker = text(getString(R.string.learning_home_drawer_kicker), 10, 0xFF7D72E6, true);
         kicker.setLetterSpacing(0.12f);
         panel.addView(kicker, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView title = text("更多服务", 25, COLOR_TEXT, true);
+        TextView title = text(getString(R.string.learning_home_drawer_title), 25, COLOR_TEXT, true);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
         titleLp.setMargins(0, dp(8), 0, 0);
         panel.addView(title, titleLp);
 
-        TextView sub = text("AI、语音与扩展工具", 13, COLOR_SUB, false);
+        TextView sub = text(getString(R.string.learning_home_drawer_subtitle), 13, COLOR_SUB, false);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
         subLp.setMargins(0, dp(6), 0, dp(20));
         panel.addView(sub, subLp);
@@ -595,9 +726,9 @@ public class LearningFragment extends Fragment {
                 0xB3FFFFFF,
                 dp(1)
         ));
-        TextView focusTitle = text("沉浸学习空间", 13, COLOR_TEXT, true);
+        TextView focusTitle = text(getString(R.string.learning_home_drawer_focus_title), 13, COLOR_TEXT, true);
         focusCard.addView(focusTitle, new LinearLayout.LayoutParams(-1, -2));
-        TextView focusSub = text("常用学习能力集中在这里", 11, 0xFF7E879A, false);
+        TextView focusSub = text(getString(R.string.learning_home_drawer_focus_subtitle), 11, 0xFF7E879A, false);
         LinearLayout.LayoutParams focusSubLp = new LinearLayout.LayoutParams(-1, -2);
         focusSubLp.setMargins(0, dp(4), 0, 0);
         focusCard.addView(focusSub, focusSubLp);
@@ -613,24 +744,24 @@ public class LearningFragment extends Fragment {
         list.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(list, new ScrollView.LayoutParams(-1, -2));
 
-        drawerGroupTitle(list, "AI 助手");
-        list.addView(drawerCard("DeepSeek 翻译", "中缅互译、语法解释", 0xFF4D7CFE,
+        drawerGroupTitle(list, getString(R.string.learning_home_drawer_ai_group));
+        list.addView(drawerCard(getString(R.string.learning_home_drawer_deepseek), getString(R.string.learning_home_drawer_deepseek_desc), 0xFF4D7CFE,
                 () -> AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")));
-        list.addView(drawerCard("886.best", "国内学习 AI 入口", 0xFF18AFC5,
+        list.addView(drawerCard("886.best", getString(R.string.learning_home_drawer_886_desc), 0xFF18AFC5,
                 () -> AiScriptWebActivity.open(requireContext(), "886.best", "https://886.best")));
-        list.addView(drawerCard("千问国内版", "qianwen.com", 0xFF8A5AF4,
-                () -> AiScriptWebActivity.open(requireContext(), "千问国内版", "https://www.qianwen.com/")));
-        list.addView(drawerCard("Qwen 国际版", "chat.qwen.ai", 0xFF6366F1,
-                () -> AiScriptWebActivity.open(requireContext(), "Qwen 国际版", "https://chat.qwen.ai/")));
+        list.addView(drawerCard(getString(R.string.learning_home_drawer_qianwen), "qianwen.com", 0xFF8A5AF4,
+                () -> AiScriptWebActivity.open(requireContext(), getString(R.string.learning_home_drawer_qianwen), "https://www.qianwen.com/")));
+        list.addView(drawerCard(getString(R.string.learning_home_drawer_qwen), "chat.qwen.ai", 0xFF6366F1,
+                () -> AiScriptWebActivity.open(requireContext(), getString(R.string.learning_home_drawer_qwen), "https://chat.qwen.ai/")));
 
-        drawerGroupTitle(list, "学习工具");
-        list.addView(drawerCard("语音设置", "WKSpeech 引擎配置", 0xFF12A78E,
+        drawerGroupTitle(list, getString(R.string.learning_home_drawer_tools_group));
+        list.addView(drawerCard(getString(R.string.learning_home_drawer_speech_settings), getString(R.string.learning_home_drawer_speech_desc), 0xFF12A78E,
                 this::openSpeechSettings));
-        list.addView(drawerCard("口语 Prompt", "生活场景对话指令", 0xFFF39A4E,
-                () -> openDirectory("prompts", "口语 Prompt", "")));
+        list.addView(drawerCard(getString(R.string.learning_home_drawer_prompt), getString(R.string.learning_home_drawer_prompt_desc), 0xFFF39A4E,
+                () -> openDirectory("prompts", getString(R.string.learning_home_drawer_prompt), "")));
 
-        drawerGroupTitle(list, "扩展功能");
-        list.addView(drawerCard("脚本中心", "自定义扩展功能", 0xFFE45B85,
+        drawerGroupTitle(list, getString(R.string.learning_home_drawer_extensions));
+        list.addView(drawerCard(getString(R.string.learning_home_drawer_scripts), getString(R.string.learning_home_drawer_scripts_desc), 0xFFE45B85,
                 () -> startActivity(new Intent(requireContext(), ScriptManagerActivity.class))));
 
         panel.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
@@ -699,7 +830,7 @@ public class LearningFragment extends Fragment {
         if (spec == null || spec.id == null) return;
         String type = typeForCardId(spec.id);
         if (type == null) {
-            Toast.makeText(requireContext(), spec.title + " 正在开发中", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), getString(R.string.learning_home_coming_soon, spec.title), Toast.LENGTH_SHORT).show();
             return;
         }
         openDirectory(type, spec.title, spec.id);
@@ -717,22 +848,6 @@ public class LearningFragment extends Fragment {
         return null;
     }
 
-    private void openMorePage(String section) {
-        if ("拼音".equals(section)) {
-            openDirectory("pinyin", "拼音", "");
-        } else if ("单词".equals(section)) {
-            openDirectory("words", "单词", "");
-        } else if ("口语".equals(section)) {
-            openDirectory("speaking", "口语", "");
-        } else if ("句型".equals(section)) {
-            openDirectory("patterns", "句型", "");
-        } else if ("语法".equals(section)) {
-            openDirectory("grammar", "语法", "");
-        } else {
-            Toast.makeText(requireContext(), section + " 更多内容即将上线", Toast.LENGTH_SHORT).show();
-        }
-    }
-
     private void openDirectory(String type, String title, String parentId) {
         LearningDirectoryActivity.open(
                 requireContext(),
@@ -747,7 +862,7 @@ public class LearningFragment extends Fragment {
             Class<?> clazz = Class.forName("com.chat.speech.ui.SpeechSettingsActivity");
             startActivity(new Intent(requireContext(), clazz));
         } catch (Throwable e) {
-            Toast.makeText(requireContext(), "语音插件未安装", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), getString(R.string.learning_home_speech_plugin_missing), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -1052,7 +1167,7 @@ public class LearningFragment extends Fragment {
 
         void update(int value) {
             int learned = Math.max(0, Math.min(total, value));
-            label.setText("已学 " + learned + " / " + total);
+            label.setText(label.getContext().getString(R.string.learning_home_learned_format, learned, total));
             bar.setProgress(learned / (float) total);
         }
     }
@@ -1116,47 +1231,6 @@ public class LearningFragment extends Fragment {
 
         private void drawLine(Canvas canvas, float right, float y, float width) {
             canvas.drawLine(right - width, y, right, y, paint);
-        }
-    }
-
-    /** HSK 静态等级徽章。这里只表达级别，不显示任何虚假的学习进度。 */
-    private static class LevelBadgeView extends View {
-        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint label = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final int level;
-        private final float density;
-
-        LevelBadgeView(Context context, int level, int color) {
-            super(context);
-            this.level = Math.max(1, Math.min(4, level));
-            density = context.getResources().getDisplayMetrics().density;
-
-            fill.setStyle(Paint.Style.FILL);
-            fill.setColor((color & 0x00FFFFFF) | 0x24000000);
-
-            border.setStyle(Paint.Style.STROKE);
-            border.setStrokeWidth(1.4f * density);
-            border.setColor((color & 0x00FFFFFF) | 0x8A000000);
-
-            label.setColor(color);
-            label.setTextAlign(Paint.Align.CENTER);
-            label.setTypeface(Typeface.DEFAULT_BOLD);
-            label.setTextSize(15f * density);
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            float inset = 3.5f * density;
-            float radius = 15f * density;
-            RectF box = new RectF(inset, inset, getWidth() - inset, getHeight() - inset);
-            canvas.drawRoundRect(box, radius, radius, fill);
-            canvas.drawRoundRect(box, radius, radius, border);
-
-            Paint.FontMetrics fm = label.getFontMetrics();
-            float y = getHeight() / 2f - (fm.ascent + fm.descent) / 2f;
-            canvas.drawText(String.valueOf(level), getWidth() / 2f, y, label);
         }
     }
 
