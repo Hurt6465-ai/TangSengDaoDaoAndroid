@@ -28,191 +28,343 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 public class MsTranslatorCompatibleEngine {
-    private static final String ENDPOINT_URL = "https://dev.microsofttranslator.com/apps/endpoint?api-version=1.0";
+    private static final String ENDPOINT_URL =
+            "https://dev.microsofttranslator.com/apps/endpoint?api-version=1.0";
     private static final String APP_ID = "MSTranslatorAndroidApp";
-    private static final String SECRET = "oik6PdDdMnOXemTbwvMn9de/h9lFnfBaCWbGMMZqqoSaQaqUOqjVGm5NqsmjcBI1x+sS9ugjB55HEJWRiFXYFw==";
+    private static final String SECRET =
+            "oik6PdDdMnOXemTbwvMn9de/h9lFnfBaCWbGMMZqqoSaQaqUOqjVGm5NqsmjcBI1x+sS9ugjB55HEJWRiFXYFw==";
 
     private Endpoint cachedEndpoint;
     private String cachedEndpointKey = "";
+    private volatile HttpURLConnection activeConnection;
+    private volatile boolean cancelled;
 
-    public synchronized File synthesize(Context context, String text, String voice, String locale, String audioFormat) throws Exception {
+    public File synthesize(
+            Context context,
+            String text,
+            String voice,
+            String locale,
+            String audioFormat
+    ) throws Exception {
         SpeechPrefs prefs = new SpeechPrefs(context);
-        return synthesize(context, prefs.getActiveSource(), text, voice, locale, audioFormat, prefs.getRatePercent(), prefs.getPitchPercent());
+        return synthesize(
+                context,
+                prefs.getActiveSource(),
+                text,
+                voice,
+                locale,
+                audioFormat,
+                prefs.getRatePercent(),
+                prefs.getPitchPercent()
+        );
     }
 
-    public synchronized File synthesize(Context context, String text, String voice, String locale, String audioFormat, int ratePercent, int pitchPercent) throws Exception {
+    public File synthesize(
+            Context context,
+            String text,
+            String voice,
+            String locale,
+            String audioFormat,
+            int ratePercent,
+            int pitchPercent
+    ) throws Exception {
         SpeechPrefs prefs = new SpeechPrefs(context);
-        return synthesize(context, prefs.getActiveSource(), text, voice, locale, audioFormat, ratePercent, pitchPercent);
+        return synthesize(
+                context,
+                prefs.getActiveSource(),
+                text,
+                voice,
+                locale,
+                audioFormat,
+                ratePercent,
+                pitchPercent
+        );
     }
 
-    public synchronized File synthesize(Context context, TtsSource source, String text, String voice, String locale, String audioFormat, int ratePercent, int pitchPercent) throws Exception {
+    public synchronized File synthesize(
+            Context context,
+            TtsSource source,
+            String text,
+            String voice,
+            String locale,
+            String audioFormat,
+            int ratePercent,
+            int pitchPercent
+    ) throws Exception {
+        cancelled = false;
+        ensureNotCancelled();
         if (source == null) source = TtsSource.builtinMsTranslator();
         source.normalize();
         SpeechPrefs prefs = new SpeechPrefs(context);
-        String format = audioFormat == null || audioFormat.trim().isEmpty() ? source.audioFormat : audioFormat;
+        String format = audioFormat == null || audioFormat.trim().isEmpty()
+                ? source.audioFormat
+                : audioFormat;
         if (format == null || format.trim().isEmpty()) format = prefs.getAudioFormat();
-        String cacheKey = source.id + "|" + format + "|" + voice + "|" + locale + "|r" + ratePercent + "|p" + pitchPercent + "|" + text;
+        String cacheKey = source.id + "|" + format + "|" + voice + "|" + locale
+                + "|r" + ratePercent + "|p" + pitchPercent + "|" + text;
         File output = SpeechCache.audioFile(context, cacheKey);
         if (output.exists() && output.length() > 100) {
+            //noinspection ResultOfMethodCallIgnored
             output.setLastModified(System.currentTimeMillis());
             return output;
         }
+
         Exception lastError = null;
         for (int i = 0; i < 2; i++) {
+            ensureNotCancelled();
             try {
                 Endpoint endpoint = getEndpoint(source);
-                byte[] audio = requestAudio(source, endpoint, buildSsml(text, voice, locale, ratePercent, pitchPercent), format);
-                File tmp = new File(output.getAbsolutePath() + ".tmp");
-                try (FileOutputStream fos = new FileOutputStream(tmp)) {
-                    fos.write(audio);
+                ensureNotCancelled();
+                byte[] audio = requestAudio(
+                        source,
+                        endpoint,
+                        buildSsml(text, voice, locale, ratePercent, pitchPercent),
+                        format
+                );
+                ensureNotCancelled();
+                File temp = new File(output.getAbsolutePath() + ".tmp");
+                try (FileOutputStream fileOutput = new FileOutputStream(temp)) {
+                    fileOutput.write(audio);
                 }
-                if (output.exists()) output.delete();
-                if (!tmp.renameTo(output)) {
-                    try (FileOutputStream fos = new FileOutputStream(output)) {
-                        fos.write(audio);
+                if (output.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    output.delete();
+                }
+                if (!temp.renameTo(output)) {
+                    try (FileOutputStream fileOutput = new FileOutputStream(output)) {
+                        fileOutput.write(audio);
                     }
-                    tmp.delete();
+                    //noinspection ResultOfMethodCallIgnored
+                    temp.delete();
                 }
                 SpeechCache.trim(context);
                 return output;
-            } catch (Exception e) {
-                cachedEndpoint = null;
-                cachedEndpointKey = "";
-                lastError = e;
+            } catch (InterruptedException cancelledError) {
+                throw cancelledError;
+            } catch (Exception error) {
+                clearEndpointCache();
+                lastError = error;
             }
         }
         throw lastError == null ? new RuntimeException("微软兼容源合成失败") : lastError;
     }
 
+    public void cancelActive() {
+        cancelled = true;
+        HttpURLConnection connection = activeConnection;
+        if (connection != null) {
+            try {
+                connection.disconnect();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
     private Endpoint getEndpoint(TtsSource source) throws Exception {
+        ensureNotCancelled();
         if (source == null) source = TtsSource.builtinMsTranslator();
         source.normalize();
-        String endpointUrl = TtsSource.isEmpty(source.endpointUrl) ? ENDPOINT_URL : source.endpointUrl;
+        String endpointUrl = TtsSource.isEmpty(source.endpointUrl)
+                ? ENDPOINT_URL
+                : source.endpointUrl;
         String key = source.id + "|" + endpointUrl + "|" + source.appId;
-        if (cachedEndpoint != null && cachedEndpoint.valid() && key.equals(cachedEndpointKey)) return cachedEndpoint;
+        if (cachedEndpoint != null && cachedEndpoint.valid() && key.equals(cachedEndpointKey)) {
+            return cachedEndpoint;
+        }
+
         String signature = getSign(source);
-        HttpURLConnection conn = (HttpURLConnection) new URL(endpointUrl).openConnection();
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(20000);
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        conn.setRequestProperty("Accept-Language", emptyOr(source.acceptLanguage, "zh-Hans"));
-        conn.setRequestProperty("X-ClientVersion", emptyOr(source.clientVersion, "4.0.530a 5fe1dc6c"));
-        conn.setRequestProperty("X-UserId", emptyOr(source.userId, "0f04d16a175c411e"));
-        conn.setRequestProperty("X-HomeGeographicRegion", emptyOr(source.homeGeographicRegion, "zh-Hans-CN"));
-        conn.setRequestProperty("X-ClientTraceId", UUID.randomUUID().toString());
-        conn.setRequestProperty("X-MT-Signature", signature);
-        conn.setRequestProperty("User-Agent", emptyOr(source.userAgent, "okhttp/4.5.0"));
-        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-        conn.setRequestProperty("Content-Length", "0");
-        conn.setRequestProperty("Accept-Encoding", "gzip");
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(new byte[0]);
+        HttpURLConnection connection = (HttpURLConnection) new URL(endpointUrl).openConnection();
+        registerConnection(connection);
+        try {
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(20000);
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Accept-Language", emptyOr(source.acceptLanguage, "zh-Hans"));
+            connection.setRequestProperty("X-ClientVersion", emptyOr(source.clientVersion, "4.0.530a 5fe1dc6c"));
+            connection.setRequestProperty("X-UserId", emptyOr(source.userId, "0f04d16a175c411e"));
+            connection.setRequestProperty("X-HomeGeographicRegion", emptyOr(source.homeGeographicRegion, "zh-Hans-CN"));
+            connection.setRequestProperty("X-ClientTraceId", UUID.randomUUID().toString());
+            connection.setRequestProperty("X-MT-Signature", signature);
+            connection.setRequestProperty("User-Agent", emptyOr(source.userAgent, "okhttp/4.5.0"));
+            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            connection.setRequestProperty("Content-Length", "0");
+            connection.setRequestProperty("Accept-Encoding", "gzip");
+            try (OutputStream output = connection.getOutputStream()) {
+                output.write(new byte[0]);
+            }
+            ensureNotCancelled();
+            int code = connection.getResponseCode();
+            String body = readString(connection, code >= 200 && code < 300);
+            ensureNotCancelled();
+            if (code != 200) {
+                throw new RuntimeException("终结点信息获取失败: HTTP-" + code + " " + body);
+            }
+            JSONObject object = new JSONObject(body);
+            Endpoint endpoint = new Endpoint(object.optString("r"), object.optString("t"));
+            if (!endpoint.valid()) throw new RuntimeException("终结点信息无效");
+            cachedEndpoint = endpoint;
+            cachedEndpointKey = key;
+            return endpoint;
+        } finally {
+            clearConnection(connection);
+            connection.disconnect();
         }
-        int code = conn.getResponseCode();
-        String body = readString(conn, code >= 200 && code < 300);
-        if (code != 200) throw new RuntimeException("终结点信息获取失败: HTTP-" + code + " " + body);
-        JSONObject object = new JSONObject(body);
-        cachedEndpoint = new Endpoint(object.optString("r"), object.optString("t"));
-        cachedEndpointKey = key;
-        if (!cachedEndpoint.valid()) throw new RuntimeException("终结点信息无效");
-        return cachedEndpoint;
     }
 
-    private byte[] requestAudio(TtsSource source, Endpoint endpoint, String ssml, String format) throws Exception {
+    private byte[] requestAudio(
+            TtsSource source,
+            Endpoint endpoint,
+            String ssml,
+            String format
+    ) throws Exception {
+        ensureNotCancelled();
         String template = source == null ? "" : source.ttsUrlTemplate;
-        if (TtsSource.isEmpty(template)) template = "https://{region}.tts.speech.microsoft.com/cognitiveservices/v1";
-        String url = template.replace("{region}", endpoint.region);
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(30000);
-        conn.setRequestMethod("POST");
-        conn.setDoOutput(true);
-        conn.setRequestProperty("Authorization", endpoint.token);
-        conn.setRequestProperty("Content-Type", "application/ssml+xml");
-        conn.setRequestProperty("X-Microsoft-OutputFormat", format);
-        conn.setRequestProperty("User-Agent", emptyOr(source.userAgent, "okhttp/4.5.0"));
-        byte[] data = ssml.getBytes("UTF-8");
-        conn.setFixedLengthStreamingMode(data.length);
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(data);
+        if (TtsSource.isEmpty(template)) {
+            template = "https://{region}.tts.speech.microsoft.com/cognitiveservices/v1";
         }
-        int code = conn.getResponseCode();
-        byte[] body = readBytes(conn, code >= 200 && code < 300);
-        if (code != 200) throw new RuntimeException("音频获取失败: HTTP-" + code + " " + new String(body, "UTF-8"));
-        return body;
+        String url = template.replace("{region}", endpoint.region);
+        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+        registerConnection(connection);
+        try {
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(30000);
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Authorization", endpoint.token);
+            connection.setRequestProperty("Content-Type", "application/ssml+xml");
+            connection.setRequestProperty("X-Microsoft-OutputFormat", format);
+            connection.setRequestProperty("User-Agent", emptyOr(source.userAgent, "okhttp/4.5.0"));
+            byte[] data = ssml.getBytes("UTF-8");
+            connection.setFixedLengthStreamingMode(data.length);
+            try (OutputStream output = connection.getOutputStream()) {
+                output.write(data);
+            }
+            ensureNotCancelled();
+            int code = connection.getResponseCode();
+            byte[] body = readBytes(connection, code >= 200 && code < 300);
+            ensureNotCancelled();
+            if (code != 200) {
+                throw new RuntimeException(
+                        "音频获取失败: HTTP-" + code + " " + new String(body, "UTF-8")
+                );
+            }
+            return body;
+        } finally {
+            clearConnection(connection);
+            connection.disconnect();
+        }
     }
 
-    private String buildSsml(String text, String voice, String locale, int ratePercent, int pitchPercent) {
+    private String buildSsml(
+            String text,
+            String voice,
+            String locale,
+            int ratePercent,
+            int pitchPercent
+    ) {
         String safe = escapeXml(text);
-        String xmlLang = (locale == null || locale.trim().isEmpty()) ? "zh-CN" : locale;
+        String xmlLang = locale == null || locale.trim().isEmpty() ? "zh-CN" : locale;
         String rate = signedPercent(ratePercent);
         String pitch = signedPercent(pitchPercent);
-        return "<speak xmlns=\"http://www.w3.org/2001/10/synthesis\" xmlns:mstts=\"http://www.w3.org/2001/mstts\" version=\"1.0\" xml:lang=\"" + xmlLang + "\">"
+        return "<speak xmlns=\"http://www.w3.org/2001/10/synthesis\""
+                + " xmlns:mstts=\"http://www.w3.org/2001/mstts\""
+                + " version=\"1.0\" xml:lang=\"" + xmlLang + "\">"
                 + "<voice name=\"" + escapeXml(voice) + "\">"
-                + "<prosody rate=\"" + rate + "\" pitch=\"" + pitch + "\" volume=\"+0%\">"
+                + "<prosody rate=\"" + rate + "\" pitch=\"" + pitch
+                + "\" volume=\"+0%\">"
                 + safe
                 + "</prosody></voice></speak>";
     }
 
     private String signedPercent(int value) {
-        if (value > 0) return "+" + value + "%";
-        return value + "%";
+        return value > 0 ? "+" + value + "%" : value + "%";
     }
 
     private String getSign(TtsSource source) throws Exception {
         if (source == null) source = TtsSource.builtinMsTranslator();
         source.normalize();
-        String endpointUrl = TtsSource.isEmpty(source.endpointUrl) ? ENDPOINT_URL : source.endpointUrl;
+        String endpointUrl = TtsSource.isEmpty(source.endpointUrl)
+                ? ENDPOINT_URL
+                : source.endpointUrl;
         String appId = TtsSource.isEmpty(source.appId) ? APP_ID : source.appId;
         String secret = TtsSource.isEmpty(source.secretBase64) ? SECRET : source.secretBase64;
         String url = endpointUrl.split("://", 2)[1];
-        String encodeUrl = URLEncoder.encode(url, "UTF-8");
+        String encodedUrl = URLEncoder.encode(url, "UTF-8");
         String uuid = UUID.randomUUID().toString().replace("-", "");
         String formattedDate = dateFormat();
-        String raw = (appId + encodeUrl + formattedDate + uuid).toLowerCase(Locale.US);
-        SecretKeySpec keySpec = new SecretKeySpec(Base64.decode(secret, Base64.NO_WRAP), "HmacSHA256");
+        String raw = (appId + encodedUrl + formattedDate + uuid).toLowerCase(Locale.US);
+        SecretKeySpec keySpec = new SecretKeySpec(
+                Base64.decode(secret, Base64.NO_WRAP),
+                "HmacSHA256"
+        );
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(keySpec);
-        String signBase64 = Base64.encodeToString(mac.doFinal(raw.getBytes("UTF-8")), Base64.NO_WRAP);
-        return appId + "::" + signBase64 + "::" + formattedDate + "::" + uuid;
+        String signature = Base64.encodeToString(
+                mac.doFinal(raw.getBytes("UTF-8")),
+                Base64.NO_WRAP
+        );
+        return appId + "::" + signature + "::" + formattedDate + "::" + uuid;
     }
 
     private String dateFormat() {
-        SimpleDateFormat sdf = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss", Locale.US);
-        sdf.setTimeZone(TimeZone.getTimeZone("GMT"));
-        return sdf.format(new Date()).toLowerCase(Locale.US) + "GMT";
+        SimpleDateFormat format = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss", Locale.US);
+        format.setTimeZone(TimeZone.getTimeZone("GMT"));
+        return format.format(new Date()).toLowerCase(Locale.US) + "GMT";
     }
 
-    private static String escapeXml(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;")
+    private void registerConnection(HttpURLConnection connection) throws InterruptedException {
+        ensureNotCancelled();
+        activeConnection = connection;
+        ensureNotCancelled();
+    }
+
+    private void clearConnection(HttpURLConnection connection) {
+        if (activeConnection == connection) activeConnection = null;
+    }
+
+    private void clearEndpointCache() {
+        cachedEndpoint = null;
+        cachedEndpointKey = "";
+    }
+
+    private void ensureNotCancelled() throws InterruptedException {
+        if (cancelled || Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException("微软兼容 TTS 已取消");
+        }
+    }
+
+    private static String escapeXml(String value) {
+        if (value == null) return "";
+        return value.replace("&", "&amp;")
                 .replace("'", "&apos;")
                 .replace("\"", "&quot;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;");
     }
 
-    private static String readString(HttpURLConnection conn, boolean success) throws Exception {
-        return new String(readBytes(conn, success), "UTF-8");
+    private static String readString(HttpURLConnection connection, boolean success) throws Exception {
+        return new String(readBytes(connection, success), "UTF-8");
     }
 
-    private static byte[] readBytes(HttpURLConnection conn, boolean success) throws Exception {
-        InputStream raw = success ? conn.getInputStream() : conn.getErrorStream();
-        if (raw == null) raw = conn.getInputStream();
-        String encoding = conn.getContentEncoding();
-        InputStream in = encoding != null && encoding.toLowerCase(Locale.US).contains("gzip") ? new GZIPInputStream(raw) : raw;
-        try (InputStream input = in; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+    private static byte[] readBytes(HttpURLConnection connection, boolean success) throws Exception {
+        InputStream raw = success ? connection.getInputStream() : connection.getErrorStream();
+        if (raw == null) raw = connection.getInputStream();
+        String encoding = connection.getContentEncoding();
+        InputStream input = encoding != null && encoding.toLowerCase(Locale.US).contains("gzip")
+                ? new GZIPInputStream(raw)
+                : raw;
+        try (InputStream stream = input;
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];
-            int len;
-            while ((len = input.read(buffer)) >= 0) out.write(buffer, 0, len);
-            return out.toByteArray();
+            int length;
+            while ((length = stream.read(buffer)) >= 0) output.write(buffer, 0, length);
+            return output.toByteArray();
         }
     }
 
-
-    private static String emptyOr(String value, String def) {
-        return value == null || value.trim().isEmpty() ? def : value.trim();
+    private static String emptyOr(String value, String fallback) {
+        return value == null || value.trim().isEmpty() ? fallback : value.trim();
     }
 
     private static class Endpoint {

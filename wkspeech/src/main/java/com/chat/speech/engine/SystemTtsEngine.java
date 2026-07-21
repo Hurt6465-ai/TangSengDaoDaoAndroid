@@ -60,6 +60,7 @@ public class SystemTtsEngine {
     }
 
     public synchronized void stop() {
+        pendingText = null;
         if (tts != null) tts.stop();
     }
 
