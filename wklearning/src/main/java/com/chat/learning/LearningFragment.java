@@ -47,6 +47,7 @@ public class LearningFragment extends Fragment {
     private static final int COLOR_BRAND = 0xFF635BFF;
 
     private WideEdgeDrawerLayout drawerLayout;
+    private View sideDrawerView;
     private long lastCardClickTime = 0L;
 
     @Override
@@ -60,12 +61,14 @@ public class LearningFragment extends Fragment {
         View main = createMainPage();
         drawerLayout.addView(main, new DrawerLayout.LayoutParams(-1, -1));
 
-        View drawer = createSideDrawer();
+        sideDrawerView = createSideDrawer();
         DrawerLayout.LayoutParams drawerLp = new DrawerLayout.LayoutParams(getDrawerWidth(), -1);
         drawerLp.gravity = GravityCompat.START;
-        drawerLayout.addView(drawer, drawerLp);
+        drawerLayout.addView(sideDrawerView, drawerLp);
+        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, sideDrawerView);
 
-        int edgeWidth = Math.max(dp(132), (int) (getResources().getDisplayMetrics().widthPixels * 0.30f));
+        int edgeWidth = Math.max(dp(160),
+                (int) (getResources().getDisplayMetrics().widthPixels * 0.38f));
         drawerLayout.setEdgeSwipeWidth(edgeWidth);
         return drawerLayout;
     }
@@ -105,7 +108,9 @@ public class LearningFragment extends Fragment {
                 dp(56), dp(56), Gravity.TOP | Gravity.END
         );
         menuLp.setMargins(0, getTopInset() + dp(6), dp(10), 0);
+        menuButton.setElevation(dp(32));
         page.addView(menuButton, menuLp);
+        menuButton.bringToFront();
 
         // 背景层固定不动，只有整屏内容层随手势向上覆盖。
         return page;
@@ -114,17 +119,11 @@ public class LearningFragment extends Fragment {
     private LinearLayout createContentSheet() {
         LinearLayout sheet = new LinearLayout(requireContext());
         sheet.setOrientation(LinearLayout.VERTICAL);
-        sheet.setPadding(dp(18), dp(12), dp(18), dp(30));
+        sheet.setPadding(dp(18), dp(20), dp(18), dp(30));
         sheet.setBackground(topSheetDrawable());
         sheet.setElevation(dp(12));
         sheet.setClipToOutline(true);
 
-        View handle = new View(requireContext());
-        handle.setBackground(rounded(0xFFD7DCE8, dp(2), Color.TRANSPARENT, 0));
-        LinearLayout.LayoutParams handleLp = new LinearLayout.LayoutParams(dp(38), dp(4));
-        handleLp.gravity = Gravity.CENTER_HORIZONTAL;
-        handleLp.setMargins(0, 0, 0, dp(18));
-        sheet.addView(handle, handleLp);
 
         LinearLayout quickHeader = new LinearLayout(requireContext());
         quickHeader.setOrientation(LinearLayout.VERTICAL);
@@ -200,7 +199,8 @@ public class LearningFragment extends Fragment {
 
         LinearLayout content = new LinearLayout(requireContext());
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), getTopInset() + dp(16), dp(20), dp(76));
+        // 底部说明文字上移，避免贴近上浮内容层。
+        content.setPadding(dp(20), getTopInset() + dp(16), dp(20), dp(116));
         hero.addView(content, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout topRow = new LinearLayout(requireContext());
@@ -233,33 +233,35 @@ public class LearningFragment extends Fragment {
     }
 
     private View createMenuHandle() {
-        FrameLayout box = new FrameLayout(requireContext());
-        // 无背景框，仅保留 56dp 透明触摸区，视觉更轻，点击也更可靠。
-        box.setBackgroundColor(Color.TRANSPARENT);
-        box.setClickable(true);
-        box.setFocusable(true);
-        box.setContentDescription("打开学习侧边栏");
-        box.setOnClickListener(v -> openDrawer());
-
-        LinearLayout bars = new LinearLayout(requireContext());
-        bars.setOrientation(LinearLayout.VERTICAL);
-        bars.setGravity(Gravity.CENTER);
-        bars.setClickable(false);
-        bars.setFocusable(false);
-        box.addView(bars, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
-
-        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(20), dp(2)));
-        addSpace(bars, 5);
-        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(15), dp(2)));
-        addSpace(bars, 5);
-        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(20), dp(2)));
-        return box;
-    }
-
-    private View menuLine() {
-        View view = new View(requireContext());
-        view.setBackground(rounded(0xFFFFFFFF, dp(1), Color.TRANSPARENT, 0));
-        return view;
+        MenuHandleView button = new MenuHandleView(requireContext());
+        button.setClickable(true);
+        button.setFocusable(true);
+        button.setContentDescription("打开学习侧边栏");
+        button.setOnClickListener(v -> openDrawer());
+        button.setOnTouchListener((v, event) -> {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    // 顶部常被 ViewPager、ScrollView 或宿主页抢事件，按下后立即锁定给按钮。
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+                    v.setPressed(true);
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    v.setPressed(false);
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                    if (event.getX() >= 0 && event.getX() <= v.getWidth()
+                            && event.getY() >= 0 && event.getY() <= v.getHeight()) {
+                        v.performClick();
+                    }
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    v.setPressed(false);
+                    v.getParent().requestDisallowInterceptTouchEvent(false);
+                    return true;
+                default:
+                    return true;
+            }
+        });
+        return button;
     }
 
     private View createToolsPanel() {
@@ -657,18 +659,29 @@ public class LearningFragment extends Fragment {
     }
 
     private void openDrawer() {
-        if (drawerLayout != null) drawerLayout.openDrawer(GravityCompat.START);
+        if (drawerLayout == null || sideDrawerView == null) return;
+
+        // 直接使用抽屉 View，避免部分 RTL/宿主布局下 START 重力匹配失败。
+        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, sideDrawerView);
+        sideDrawerView.setVisibility(View.VISIBLE);
+        sideDrawerView.bringToFront();
+        drawerLayout.post(() -> {
+            if (!isAdded() || drawerLayout == null || sideDrawerView == null) return;
+            drawerLayout.openDrawer(sideDrawerView, true);
+        });
     }
 
     private void closeDrawer() {
-        if (drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START);
+        if (drawerLayout != null && sideDrawerView != null
+                && drawerLayout.isDrawerOpen(sideDrawerView)) {
+            drawerLayout.closeDrawer(sideDrawerView, true);
         }
     }
 
     public boolean closeSideMenuIfOpen() {
-        if (drawerLayout != null && drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            drawerLayout.closeDrawer(GravityCompat.START);
+        if (drawerLayout != null && sideDrawerView != null
+                && drawerLayout.isDrawerOpen(sideDrawerView)) {
+            drawerLayout.closeDrawer(sideDrawerView, true);
             return true;
         }
         return false;
@@ -838,6 +851,42 @@ public class LearningFragment extends Fragment {
                 trackingEdgeGesture = false;
             }
             return super.onTouchEvent(event);
+        }
+    }
+
+    /**
+     * 无圆形底托的三横线菜单。三条线右侧对齐，顶部最长、底部最短。
+     * 整个 View 都是 56dp 触摸区，绘制区域仍保持轻巧。
+     */
+    private static class MenuHandleView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final float density;
+
+        MenuHandleView(Context context) {
+            super(context);
+            density = context.getResources().getDisplayMetrics().density;
+            paint.setColor(0xFFF9FBFF);
+            paint.setStrokeWidth(2.15f * density);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setShadowLayer(2.8f * density, 0f, 1.1f * density, 0x66071222);
+            setLayerType(LAYER_TYPE_SOFTWARE, null);
+            setBackgroundColor(Color.TRANSPARENT);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float right = getWidth() * 0.68f;
+            float centerY = getHeight() * 0.50f;
+            float gap = 6.2f * density;
+
+            drawLine(canvas, right, centerY - gap, 22f * density);
+            drawLine(canvas, right, centerY, 16f * density);
+            drawLine(canvas, right, centerY + gap, 10f * density);
+        }
+
+        private void drawLine(Canvas canvas, float right, float y, float width) {
+            canvas.drawLine(right - width, y, right, y, paint);
         }
     }
 
