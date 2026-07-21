@@ -38,6 +38,10 @@ public class FeedWaterfallFragment extends Fragment {
     private RecyclerView recyclerView;
     private ProgressBar loadingView;
     private TextView stateTv;
+    private int hostTopInset;
+    private int hostBottomInset;
+    private int baseTopPadding;
+    private int baseBottomPadding;
 
     public static FeedWaterfallFragment newInstance(String uid) {
         FeedWaterfallFragment fragment = new FeedWaterfallFragment();
@@ -70,25 +74,60 @@ public class FeedWaterfallFragment extends Fragment {
                 2, StaggeredGridLayoutManager.VERTICAL);
         layoutManager.setGapStrategy(StaggeredGridLayoutManager.GAP_HANDLING_NONE);
         recyclerView.setLayoutManager(layoutManager);
-        recyclerView.setNestedScrollingEnabled(false);
+        recyclerView.setNestedScrollingEnabled(true);
         recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         recyclerView.setHasFixedSize(false);
+        baseTopPadding = recyclerView.getPaddingTop();
+        baseBottomPadding = recyclerView.getPaddingBottom();
+        applyHostInsets();
         if (recyclerView.getItemAnimator() != null) recyclerView.getItemAnimator().setChangeDuration(0);
         adapter = new FeedWaterfallAdapter(this::openDetail);
         recyclerView.setAdapter(adapter);
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
-                if (!rv.canScrollVertically(1)) loadMore(false);
+                if (dy <= 0 || adapter == null) return;
+                RecyclerView.LayoutManager manager = rv.getLayoutManager();
+                if (!(manager instanceof StaggeredGridLayoutManager)) return;
+                int[] positions = ((StaggeredGridLayoutManager) manager)
+                        .findLastVisibleItemPositions(null);
+                int last = -1;
+                for (int position : positions) last = Math.max(last, position);
+                if (last >= adapter.getItemCount() - 5) loadMore(false);
             }
         });
         stateTv.setOnClickListener(v -> loadMore(adapter == null || adapter.getItemCount() == 0));
         loadMore(true);
     }
 
-    /** Called by the outer profile scroll because this RecyclerView has nested scrolling off. */
+    /** Retained for compatibility with older profile hosts. */
     public void loadMoreIfNeeded() {
         loadMore(false);
+    }
+
+    /**
+     * Insets supplied by the profile Activity for its overlay top bars and bottom action button.
+     * Values are pixels because they are calculated from the real laid-out overlay positions.
+     */
+    public void setHostInsets(int topInset, int bottomInset) {
+        hostTopInset = Math.max(0, topInset);
+        hostBottomInset = Math.max(0, bottomInset);
+        applyHostInsets();
+    }
+
+    public void scrollToTop() {
+        if (recyclerView != null) recyclerView.scrollToPosition(0);
+    }
+
+    private void applyHostInsets() {
+        if (recyclerView == null) return;
+        int left = recyclerView.getPaddingLeft();
+        int right = recyclerView.getPaddingRight();
+        int top = baseTopPadding + hostTopInset;
+        int bottom = Math.max(baseBottomPadding, hostBottomInset);
+        if (recyclerView.getPaddingTop() == top
+                && recyclerView.getPaddingBottom() == bottom) return;
+        recyclerView.setPadding(left, top, right, bottom);
     }
 
     private void loadMore(boolean first) {
@@ -138,6 +177,7 @@ public class FeedWaterfallFragment extends Fragment {
 
                         updateState(false);
                         requestWaterfallRelayout();
+                        maybeFillViewport();
 
                         // A filtered or duplicate page may contain no new cards while still
                         // advancing the cursor. Skip at most one such page automatically so the
@@ -175,6 +215,17 @@ public class FeedWaterfallFragment extends Fragment {
             currentRecycler.requestLayout();
             if (currentRecycler.getParent() instanceof View) {
                 ((View) currentRecycler.getParent()).requestLayout();
+            }
+        });
+    }
+
+    private void maybeFillViewport() {
+        RecyclerView current = recyclerView;
+        if (current == null || !hasMore || loading || adapter == null) return;
+        current.post(() -> {
+            if (recyclerView != current || loading || !hasMore || adapter == null) return;
+            if (adapter.getItemCount() > 0 && !current.canScrollVertically(1)) {
+                loadMore(false);
             }
         });
     }
