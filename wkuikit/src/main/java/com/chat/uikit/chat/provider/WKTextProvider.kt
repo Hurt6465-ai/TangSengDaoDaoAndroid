@@ -290,7 +290,7 @@ open class WKTextProvider : WKChatBaseProvider() {
         btn.isSelected = cached?.expanded == true
         btn.setMinimumWidth(0)
         btn.setMinimumHeight(0)
-        // 26dp 点击框 + 4dp 内边距，实际图标约 18dp：清楚但不会抢过消息内容。
+        // 28dp 点击框 + 4dp 内边距，实际图标约 20dp；无常驻底框，只保留按压反馈。
         btn.setPadding(dp(4), dp(4), dp(4), dp(4))
         btn.setBackgroundResource(R.drawable.bg_chat_translate_quick)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
@@ -314,10 +314,10 @@ open class WKTextProvider : WKChatBaseProvider() {
                 else -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
             }
         }
-        val lp = LinearLayout.LayoutParams(dp(26), dp(26))
+        val lp = LinearLayout.LayoutParams(dp(28), dp(28))
         lp.gravity = Gravity.BOTTOM
-        lp.leftMargin = dp(4)
-        lp.bottomMargin = dp(1)
+        lp.leftMargin = dp(5)
+        lp.bottomMargin = 0
         parent.addView(btn, lp)
     }
 
