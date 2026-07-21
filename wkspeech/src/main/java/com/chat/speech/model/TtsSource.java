@@ -1,5 +1,7 @@
 package com.chat.speech.model;
 
+import com.chat.speech.engine.EdgeProtocolConfig;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -80,15 +82,16 @@ public class TtsSource {
     public static TtsSource edgeWebSocketTemplate() {
         TtsSource source = new TtsSource();
         source.id = "edge_readaloud_template";
-        source.name = "Edge TTS WebSocket 模板";
+        source.name = "Edge 在线自然语音";
         source.type = TYPE_EDGE_WEBSOCKET;
-        source.category = "在线兼容源 · 预留";
-        source.note = "预留配置。需要后续接入 OkHttp WebSocket 引擎后才能真正朗读。";
+        source.category = "在线主源 · 推荐";
+        source.note = "使用 Edge Read Aloud WebSocket 直连合成自然语音；失败时自动切换微软兼容源和系统 TTS。";
         source.enabled = false;
         source.userEditable = true;
         source.audioFormat = "audio-24khz-48kbitrate-mono-mp3";
-        source.userAgent = "Mozilla/5.0";
-        source.extraJson = "{}";
+        source.userAgent = EdgeProtocolConfig.defaultUserAgent();
+        source.acceptLanguage = EdgeProtocolConfig.DEFAULT_ACCEPT_LANGUAGE;
+        source.extraJson = EdgeProtocolConfig.defaultExtraJson();
         return source;
     }
 
@@ -164,11 +167,21 @@ public class TtsSource {
             if (isEmpty(acceptLanguage)) acceptLanguage = def.acceptLanguage;
             if (isEmpty(homeGeographicRegion)) homeGeographicRegion = def.homeGeographicRegion;
             if (isEmpty(userId)) userId = def.userId;
+        } else if (TYPE_EDGE_WEBSOCKET.equals(type)) {
+            TtsSource def = edgeWebSocketTemplate();
+            if (isEmpty(userAgent) || "Mozilla/5.0".equals(userAgent)) userAgent = def.userAgent;
+            if (isEmpty(acceptLanguage)) acceptLanguage = def.acceptLanguage;
+            if (isEmpty(extraJson) || "{}".equals(extraJson.trim())) extraJson = def.extraJson;
+            if ("edge_readaloud_template".equals(id)) {
+                if (isEmpty(name) || name.contains("模板")) name = def.name;
+                if (isEmpty(category) || category.contains("预留")) category = def.category;
+                if (isEmpty(note) || note.contains("预留") || note.contains("后续接入")) note = def.note;
+            }
         }
     }
 
     public boolean canSpeakOnline() {
-        return TYPE_MS_TRANSLATOR.equals(type);
+        return TYPE_MS_TRANSLATOR.equals(type) || TYPE_EDGE_WEBSOCKET.equals(type);
     }
 
     public String displayType() {
