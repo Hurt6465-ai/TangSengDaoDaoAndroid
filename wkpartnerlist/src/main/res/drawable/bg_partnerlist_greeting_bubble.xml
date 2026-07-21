@@ -1,40 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="58dp"
-    android:height="46dp"
-    android:viewportWidth="58"
-    android:viewportHeight="46">
+    android:width="70dp"
+    android:height="48dp"
+    android:viewportWidth="72"
+    android:viewportHeight="48">
 
-    <!-- A soft tinted shadow keeps the icon lifted without the harsh black outline. -->
+    <!-- 内置的粉紫底部柔影，避免系统 elevation 产生矩形黑影。 -->
     <path
-        android:fillColor="#EDE3F0"
-        android:pathData="M17,4.2 H41 C49.7,4.2 55.5,10.7 55.5,19.2 V22.6 C55.5,31.1 49.7,37.6 41,37.6 H34.1 L28.8,42.2 C27.7,43.2 26,42.4 26,40.9 V37.6 H17 C8.3,37.6 2.5,31.1 2.5,22.6 V19.2 C2.5,10.7 8.3,4.2 17,4.2 Z" />
+        android:fillColor="#26C83F86"
+        android:pathData="M18,5 H54 C63.2,5 69,11.7 69,20.2 V26.8 C69,35.3 63.2,42 54,42 H47.8 C46.3,42 45.2,42.6 44.1,43.7 L40.2,47 C38.8,48 36.5,47.2 36.5,45.6 V42 H18 C8.8,42 3,35.3 3,26.8 V20.2 C3,11.7 8.8,5 18,5 Z" />
 
-    <!-- Rounded premium bubble: warm white to blush gradient and a thin lavender edge. -->
+    <!-- 一体式圆润气泡：主体和短尾巴共用同一条路径，不会出现拼接缝。 -->
     <path
-        android:pathData="M17,2.7 H41 C49.7,2.7 55.5,9.2 55.5,17.7 V21.1 C55.5,29.6 49.7,36.1 41,36.1 H34.1 L28.8,40.7 C27.7,41.7 26,40.9 26,39.4 V36.1 H17 C8.3,36.1 2.5,29.6 2.5,21.1 V17.7 C2.5,9.2 8.3,2.7 17,2.7 Z"
-        android:strokeColor="#DDC8E7"
-        android:strokeLineCap="round"
+        android:pathData="M18,3 H54 C63.2,3 69,9.7 69,18.2 V24.8 C69,33.3 63.2,40 54,40 H47.8 C46.3,40 45.2,40.6 44.1,41.7 L40.2,45.2 C38.8,46.5 36.5,45.5 36.5,43.6 V40 H18 C8.8,40 3,33.3 3,24.8 V18.2 C3,9.7 8.8,3 18,3 Z"
+        android:strokeColor="#55FFFFFF"
         android:strokeLineJoin="round"
-        android:strokeWidth="1.15">
+        android:strokeWidth="0.8">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:endColor="#FFF1F8"
-                android:endX="50"
-                android:endY="39"
-                android:startColor="#FFFFFF"
-                android:startX="7"
+                android:endX="66"
+                android:endY="42"
+                android:startX="8"
                 android:startY="4"
-                android:type="linear" />
+                android:type="linear">
+                <item android:color="#FFFF7CA4" android:offset="0" />
+                <item android:color="#FFF5578A" android:offset="0.52" />
+                <item android:color="#FFDF4F9C" android:offset="1" />
+            </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Delicate top highlight; this replaces the heavy cartoon-style border. -->
+    <!-- 极轻顶部高光，让按钮更通透，但不做廉价的强玻璃反光。 -->
     <path
-        android:fillColor="#00FFFFFF"
-        android:pathData="M15,6.5 H39 C45.2,6.5 49.5,9.8 51.4,14.6"
-        android:strokeColor="#CFFFFFFF"
-        android:strokeLineCap="round"
-        android:strokeWidth="1" />
+        android:fillColor="#52FFFFFF"
+        android:pathData="M18,6 H53 C59.3,6 63.8,9.6 66,14.8 C61.8,11.6 57.8,10.3 52,10.3 H18 C12.7,10.3 8.8,12.3 6.5,15.4 C8,9.8 12.2,6 18,6 Z" />
 </vector>
