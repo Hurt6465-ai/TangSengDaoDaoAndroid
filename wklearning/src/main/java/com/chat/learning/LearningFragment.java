@@ -33,10 +33,15 @@ import android.widget.Toast;
 
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.customview.widget.ViewDragHelper;
 import androidx.fragment.app.Fragment;
 
 import com.chat.userscript.AiScriptWebActivity;
 import com.chat.userscript.ScriptManagerActivity;
+
+import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 学习主页：固定 Hero 背景 + 全宽上浮内容层。
@@ -65,10 +70,13 @@ public class LearningFragment extends Fragment {
 
     private WideEdgeDrawerLayout drawerLayout;
     private View sideDrawerView;
+    private final Map<String, HskProgressBinding> hskProgressViews = new HashMap<>();
+    private int progressLoadToken;
     private long lastCardClickTime;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        hskProgressViews.clear();
         drawerLayout = new WideEdgeDrawerLayout(requireContext());
         drawerLayout.setBackgroundColor(COLOR_PAGE);
         drawerLayout.setScrimColor(0x4010182B);
@@ -83,10 +91,25 @@ public class LearningFragment extends Fragment {
         drawerLayout.addView(sideDrawerView, drawerLp);
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, sideDrawerView);
 
-        int edgeWidth = Math.max(dp(160),
-                (int) (getResources().getDisplayMetrics().widthPixels * 0.38f));
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int edgeWidth = Math.min(dp(180), Math.max(dp(120), (int) (screenWidth * 0.30f)));
         drawerLayout.setEdgeSwipeWidth(edgeWidth);
         return drawerLayout;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        refreshLocalWordProgress();
+    }
+
+    @Override
+    public void onDestroyView() {
+        progressLoadToken++;
+        hskProgressViews.clear();
+        sideDrawerView = null;
+        drawerLayout = null;
+        super.onDestroyView();
     }
 
     private View createMainPage() {
@@ -218,10 +241,10 @@ public class LearningFragment extends Fragment {
 
         addSection(sheet, "单词", "按等级稳步积累", "更多",
                 new CardSpec[]{
-                        CardSpec.hsk("HSK 1", "150 词", "hsk1", 1),
-                        CardSpec.hsk("HSK 2", "300 词", "hsk2", 2),
-                        CardSpec.hsk("HSK 3", "600 词", "hsk3", 3),
-                        CardSpec.hsk("HSK 4", "1200 词", "hsk4", 4)
+                        CardSpec.hsk("HSK 1", "150 词", "hsk1", 1, 150),
+                        CardSpec.hsk("HSK 2", "300 词", "hsk2", 2, 300),
+                        CardSpec.hsk("HSK 3", "600 词", "hsk3", 3, 600),
+                        CardSpec.hsk("HSK 4", "1200 词", "hsk4", 4, 1200)
                 });
 
         addSection(sheet, "口语", "把中文真正说出来", "更多",
@@ -256,28 +279,6 @@ public class LearningFragment extends Fragment {
         button.setFocusable(true);
         button.setContentDescription("打开学习侧边栏");
         button.setOnClickListener(v -> openDrawer());
-        button.setOnTouchListener((v, event) -> {
-            switch (event.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
-                    v.getParent().requestDisallowInterceptTouchEvent(true);
-                    v.setPressed(true);
-                    return true;
-                case MotionEvent.ACTION_UP:
-                    v.setPressed(false);
-                    v.getParent().requestDisallowInterceptTouchEvent(false);
-                    if (event.getX() >= 0 && event.getX() <= v.getWidth()
-                            && event.getY() >= 0 && event.getY() <= v.getHeight()) {
-                        v.performClick();
-                    }
-                    return true;
-                case MotionEvent.ACTION_CANCEL:
-                    v.setPressed(false);
-                    v.getParent().requestDisallowInterceptTouchEvent(false);
-                    return true;
-                default:
-                    return true;
-            }
-        });
         return button;
     }
 
@@ -415,8 +416,9 @@ public class LearningFragment extends Fragment {
 
             for (int column = 0; column < 2; column++) {
                 if (index < cards.length) {
-                    View card = smallCard(cards[index++]);
-                    card.setMinimumHeight(dp(96));
+                    CardSpec cardSpec = cards[index++];
+                    View card = smallCard(cardSpec);
+                    card.setMinimumHeight(dp(cardSpec.level > 0 ? 120 : 96));
                     row.addView(card, new LinearLayout.LayoutParams(0, -2, 1f));
                 } else {
                     row.addView(new View(requireContext()), new LinearLayout.LayoutParams(0, dp(1), 1f));
@@ -509,14 +511,22 @@ public class LearningFragment extends Fragment {
         titleLp.setMargins(0, dp(7), 0, 0);
         copy.addView(title, titleLp);
 
-        TextView desc = text(spec.desc, 12, COLOR_SUB, false);
-        LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(-1, -2);
-        descLp.setMargins(0, dp(5), 0, 0);
-        copy.addView(desc, descLp);
+        TextView progressText = text("已学 0 / " + spec.totalWords, 11, withAlpha(accent, 225), true);
+        LinearLayout.LayoutParams progressTextLp = new LinearLayout.LayoutParams(-1, -2);
+        progressTextLp.setMargins(0, dp(7), 0, 0);
+        copy.addView(progressText, progressTextLp);
+
+        LocalProgressBarView progressBar = new LocalProgressBarView(requireContext(), accent);
+        LinearLayout.LayoutParams barLp = new LinearLayout.LayoutParams(-1, dp(5));
+        barLp.setMargins(0, dp(7), dp(2), 0);
+        copy.addView(progressBar, barLp);
+
+        hskProgressViews.put(spec.id,
+                new HskProgressBinding(progressText, progressBar, spec.totalWords));
 
         LevelBadgeView badge = new LevelBadgeView(requireContext(), spec.level, accent);
         LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(dp(48), dp(48));
-        badgeLp.setMargins(dp(8), 0, 0, 0);
+        badgeLp.setMargins(dp(10), 0, 0, 0);
         row.addView(badge, badgeLp);
     }
 
@@ -741,15 +751,51 @@ public class LearningFragment extends Fragment {
         }
     }
 
+    /**
+     * 单词学习记录已经由 WordProgressStore(SQLite) 保存在本机。
+     * 首页只读取 reviewCount>0 的唯一单词数，不因为打开卡片而虚增进度。
+     */
+    private void refreshLocalWordProgress() {
+        if (drawerLayout == null || hskProgressViews.isEmpty() || !isAdded()) return;
+        final int token = ++progressLoadToken;
+        final Context app = requireContext().getApplicationContext();
+
+        Thread worker = new Thread(() -> {
+            Map<String, Integer> counts = new HashMap<>();
+            WordProgressStore store = new WordProgressStore(app);
+            try {
+                String[] packIds = new String[]{"hsk1", "hsk2", "hsk3", "hsk4"};
+                for (String packId : packIds) {
+                    int learned = 0;
+                    Map<String, WordFsrsScheduler.CardState> states = store.loadPack(packId);
+                    for (WordFsrsScheduler.CardState state : states.values()) {
+                        if (state != null && state.reviewCount > 0) learned++;
+                    }
+                    counts.put(packId, learned);
+                }
+            } finally {
+                store.close();
+            }
+
+            WideEdgeDrawerLayout root = drawerLayout;
+            if (root == null) return;
+            root.post(() -> {
+                if (!isAdded() || token != progressLoadToken) return;
+                for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+                    HskProgressBinding binding = hskProgressViews.get(entry.getKey());
+                    if (binding != null) binding.update(entry.getValue());
+                }
+            });
+        }, "learning-home-progress");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
     private void openDrawer() {
         if (drawerLayout == null || sideDrawerView == null) return;
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, sideDrawerView);
         sideDrawerView.setVisibility(View.VISIBLE);
-        sideDrawerView.bringToFront();
-        drawerLayout.post(() -> {
-            if (!isAdded() || drawerLayout == null || sideDrawerView == null) return;
-            drawerLayout.openDrawer(sideDrawerView, true);
-        });
+        drawerLayout.openDrawer(sideDrawerView, true);
     }
 
     private void closeDrawer() {
@@ -968,25 +1014,76 @@ public class LearningFragment extends Fragment {
         final String id;
         final int iconRes;
         final int level;
+        final int totalWords;
 
         CardSpec(String title, String desc, String id) {
-            this(title, desc, id, 0, 0);
+            this(title, desc, id, 0, 0, 0);
         }
 
-        private CardSpec(String title, String desc, String id, int iconRes, int level) {
+        private CardSpec(String title, String desc, String id, int iconRes,
+                         int level, int totalWords) {
             this.title = title;
             this.desc = desc;
             this.id = id;
             this.iconRes = iconRes;
             this.level = level;
+            this.totalWords = totalWords;
         }
 
         static CardSpec icon(String title, String desc, String id, int iconRes) {
-            return new CardSpec(title, desc, id, iconRes, 0);
+            return new CardSpec(title, desc, id, iconRes, 0, 0);
         }
 
-        static CardSpec hsk(String title, String desc, String id, int level) {
-            return new CardSpec(title, desc, id, 0, level);
+        static CardSpec hsk(String title, String desc, String id, int level, int totalWords) {
+            return new CardSpec(title, desc, id, 0, level, totalWords);
+        }
+    }
+
+    private static class HskProgressBinding {
+        final TextView label;
+        final LocalProgressBarView bar;
+        final int total;
+
+        HskProgressBinding(TextView label, LocalProgressBarView bar, int total) {
+            this.label = label;
+            this.bar = bar;
+            this.total = Math.max(1, total);
+        }
+
+        void update(int value) {
+            int learned = Math.max(0, Math.min(total, value));
+            label.setText("已学 " + learned + " / " + total);
+            bar.setProgress(learned / (float) total);
+        }
+    }
+
+    /** 读取本地 SQLite 后显示的真实进度条；不使用静态装饰数值。 */
+    private static class LocalProgressBarView extends View {
+        private final Paint track = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private float progress;
+
+        LocalProgressBarView(Context context, int accent) {
+            super(context);
+            track.setColor((accent & 0x00FFFFFF) | 0x24000000);
+            fill.setColor(accent);
+        }
+
+        void setProgress(float value) {
+            progress = Math.max(0f, Math.min(1f, value));
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float radius = getHeight() / 2f;
+            RectF full = new RectF(0f, 0f, getWidth(), getHeight());
+            canvas.drawRoundRect(full, radius, radius, track);
+            if (progress <= 0f) return;
+            float width = Math.max(getHeight(), getWidth() * progress);
+            RectF done = new RectF(0f, 0f, Math.min(getWidth(), width), getHeight());
+            canvas.drawRoundRect(done, radius, radius, fill);
         }
     }
 
@@ -1063,13 +1160,18 @@ public class LearningFragment extends Fragment {
         }
     }
 
-    /** 扩大左侧手势触发范围，不依赖 AndroidX 私有字段反射。 */
+    /**
+     * 优先扩大 DrawerLayout 自带拖拽边缘，让抽屉真正跟手移动。
+     * 反射失败时只旁观手势并触发打开，绝不抢走 ScrollView 的事件序列。
+     */
     private static class WideEdgeDrawerLayout extends DrawerLayout {
         private final int touchSlop;
         private int edgeSwipeWidth;
         private float downX;
         private float downY;
-        private boolean trackingEdgeGesture;
+        private boolean fallbackTracking;
+        private boolean fallbackTriggered;
+        private boolean nativeEdgeExpanded;
 
         WideEdgeDrawerLayout(Context context) {
             super(context);
@@ -1079,46 +1181,61 @@ public class LearningFragment extends Fragment {
 
         void setEdgeSwipeWidth(int widthPx) {
             edgeSwipeWidth = Math.max(widthPx, touchSlop * 3);
+            post(this::expandNativeLeftEdge);
+        }
+
+        private void expandNativeLeftEdge() {
+            try {
+                Field draggerField = DrawerLayout.class.getDeclaredField("mLeftDragger");
+                draggerField.setAccessible(true);
+                Object draggerObject = draggerField.get(this);
+                if (!(draggerObject instanceof ViewDragHelper)) return;
+
+                ViewDragHelper dragger = (ViewDragHelper) draggerObject;
+                Field edgeField = ViewDragHelper.class.getDeclaredField("mEdgeSize");
+                edgeField.setAccessible(true);
+                int current = edgeField.getInt(dragger);
+                edgeField.setInt(dragger, Math.max(current, edgeSwipeWidth));
+                nativeEdgeExpanded = true;
+            } catch (Throwable ignored) {
+                nativeEdgeExpanded = false;
+            }
         }
 
         @Override
-        public boolean onInterceptTouchEvent(MotionEvent event) {
+        public boolean dispatchTouchEvent(MotionEvent event) {
+            observeFallbackGesture(event);
+            return super.dispatchTouchEvent(event);
+        }
+
+        private void observeFallbackGesture(MotionEvent event) {
+            if (nativeEdgeExpanded) return;
             int action = event.getActionMasked();
             if (action == MotionEvent.ACTION_DOWN) {
                 downX = event.getX();
                 downY = event.getY();
-                trackingEdgeGesture = downX <= edgeSwipeWidth
+                fallbackTriggered = false;
+                fallbackTracking = downX <= edgeSwipeWidth
                         && !isDrawerOpen(GravityCompat.START);
-            } else if (action == MotionEvent.ACTION_MOVE && trackingEdgeGesture) {
+                return;
+            }
+            if (action == MotionEvent.ACTION_MOVE && fallbackTracking && !fallbackTriggered) {
                 float dx = event.getX() - downX;
                 float dy = event.getY() - downY;
-                if (dx > touchSlop && dx > Math.abs(dy) * 1.15f) {
-                    trackingEdgeGesture = false;
+                if (dx > touchSlop * 2f && dx > Math.abs(dy) * 1.25f) {
+                    fallbackTriggered = true;
+                    fallbackTracking = false;
                     openDrawer(GravityCompat.START, true);
-                    return true;
+                } else if (Math.abs(dy) > touchSlop * 1.5f
+                        && Math.abs(dy) > Math.abs(dx)) {
+                    fallbackTracking = false;
                 }
-                if (Math.abs(dy) > touchSlop && Math.abs(dy) > Math.abs(dx)) {
-                    trackingEdgeGesture = false;
-                }
-            } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                trackingEdgeGesture = false;
+                return;
             }
-            return super.onInterceptTouchEvent(event);
-        }
-
-        @Override
-        public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {
-            if (trackingEdgeGesture && disallowIntercept) return;
-            super.requestDisallowInterceptTouchEvent(disallowIntercept);
-        }
-
-        @Override
-        public boolean onTouchEvent(MotionEvent event) {
-            int action = event.getActionMasked();
             if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                trackingEdgeGesture = false;
+                fallbackTracking = false;
+                fallbackTriggered = false;
             }
-            return super.onTouchEvent(event);
         }
     }
 
