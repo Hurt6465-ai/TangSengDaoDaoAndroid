@@ -8,7 +8,7 @@
     <color name="partnerlist_mode_normal">#ADB5C0</color>
     <color name="partnerlist_hint_text">#B7C1F4</color>
     <color name="partnerlist_quota_text">#C0C8FF</color>
-    <color name="partnerlist_button_text">#FF8FBE</color>
+    <color name="partnerlist_button_text">#FF9BC4</color>
     <color name="partnerlist_surface_text">#C2C8D1</color>
     <color name="partnerlist_active_text">#AEB7C4</color>
     <color name="partnerlist_online_text">#70D6AE</color>
@@ -22,6 +22,6 @@
     <color name="partnerlist_card_base">#FF1D232D</color>
     <color name="partnerlist_card_stroke">#24C9D1DC</color>
     <color name="partnerlist_card_ripple">#20B7C2FF</color>
-    <color name="partnerlist_button_ripple">#2EFF91BE</color>
+    <color name="partnerlist_button_ripple">#2AFF9BC4</color>
     <color name="partnerlist_avatar_placeholder">#323A46</color>
 </resources>
