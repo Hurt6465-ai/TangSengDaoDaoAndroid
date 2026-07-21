@@ -182,7 +182,7 @@
                     android:layout_width="112dp"
                     android:layout_height="42dp"
                     android:layout_marginTop="18dp"
-                    android:background="@drawable/bg_partnerlist_greeting"
+                    android:background="@drawable/bg_partnerlist_retry"
                     android:gravity="center"
                     android:text="@string/partnerlist_retry"
                     android:textColor="@color/partnerlist_quota_text"
