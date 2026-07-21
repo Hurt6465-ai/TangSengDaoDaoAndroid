@@ -4,14 +4,13 @@
     android:height="44dp"
     android:viewportWidth="56"
     android:viewportHeight="44">
+
+    <!-- Iconfont 第一排第 5 个风格：白底、深色粗描边、下方居中气泡尾巴。 -->
     <path
-        android:fillColor="#FCEAF5"
-        android:pathData="M22,2 H38 C48,2 55,9.2 55,19 V21 C55,30.8 48,38 38,38 H18 L3,42 L9.2,32.2 C5.2,29.4 2.5,25.4 2.5,20.5 C2.5,10.2 10.6,2 22,2 Z"
-        android:strokeColor="#E7B7D8"
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18,5.5 C10.5,5.5 5,10.1 5,16.8 L5,21.5 C5,28.2 10.5,32.8 18,32.8 L29.6,32.8 L34.4,38.1 C35.2,39 36.7,38.4 36.7,37.2 L36.7,32.8 L38,32.8 C45.5,32.8 51,28.2 51,21.5 L51,16.8 C51,10.1 45.5,5.5 38,5.5 Z"
+        android:strokeColor="#FF30343B"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:strokeWidth="1" />
-    <path
-        android:fillColor="#8AFFFFFF"
-        android:pathData="M21.5,5 H38 C44.6,5 49.7,8.9 51.7,14.3 C47.4,10.5 43.5,8.6 37.3,8.6 H21.5 C15.5,8.6 10.7,11.4 7.8,15.6 C9.2,9.5 14.3,5 21.5,5 Z" />
+        android:strokeWidth="2.2" />
 </vector>
