@@ -30,8 +30,10 @@ public class SpeechPrefs {
     private static final String KEY_MIXED_READ_ENABLED = "mixed_read_enabled";
     private static final String KEY_RATE_PERCENT = "rate_percent";
     private static final String KEY_PITCH_PERCENT = "pitch_percent";
+    private static final String KEY_EDGE_ENGINE_MIGRATION_V1 = "edge_engine_migration_v1";
 
     public static final String SOURCE_TYPE_MS_TRANSLATOR = TtsSource.TYPE_MS_TRANSLATOR;
+    public static final String SOURCE_TYPE_EDGE_WEBSOCKET = TtsSource.TYPE_EDGE_WEBSOCKET;
     public static final String SOURCE_TYPE_UNKNOWN = TtsSource.TYPE_UNKNOWN;
 
     public static final String DEFAULT_AUDIO_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
@@ -41,11 +43,14 @@ public class SpeechPrefs {
     public static final String DEFAULT_MY_VOICE = "my-MM-NilarNeural";
     public static final String DEFAULT_MY_MALE_VOICE = "my-MM-ThihaNeural";
 
+    private final Context appContext;
     private final SharedPreferences sp;
 
     public SpeechPrefs(Context context) {
-        sp = context.getApplicationContext().getSharedPreferences(PREF, Context.MODE_PRIVATE);
+        appContext = context.getApplicationContext();
+        sp = appContext.getSharedPreferences(PREF, Context.MODE_PRIVATE);
         ensureDefaultSources();
+        migrateEdgeEngineV1();
     }
 
     public boolean isMsEnabled() {
@@ -58,7 +63,7 @@ public class SpeechPrefs {
         if (enabled) {
             setActiveSourceId(TtsSource.builtinMsTranslator().id);
         } else {
-            setActiveSourceId(TtsSource.system().id);
+            setActiveSourceId(TtsSource.edgeWebSocketTemplate().id);
         }
         sp.edit().putBoolean(KEY_MS_ENABLED, enabled).apply();
     }
@@ -139,14 +144,18 @@ public class SpeechPrefs {
     public String getActiveSourceId() {
         String id = sp.getString(KEY_ACTIVE_SOURCE_ID, "");
         if (id == null || id.trim().isEmpty()) {
-            id = sp.getBoolean(KEY_MS_ENABLED, false) ? TtsSource.builtinMsTranslator().id : TtsSource.system().id;
+            id = sp.getBoolean(KEY_MS_ENABLED, false)
+                    ? TtsSource.builtinMsTranslator().id
+                    : TtsSource.edgeWebSocketTemplate().id;
             setActiveSourceId(id);
         }
         return id;
     }
 
     public void setActiveSourceId(String sourceId) {
-        if (sourceId == null || sourceId.trim().isEmpty()) sourceId = TtsSource.system().id;
+        if (sourceId == null || sourceId.trim().isEmpty()) {
+            sourceId = TtsSource.edgeWebSocketTemplate().id;
+        }
         String finalId = sourceId.trim();
         List<TtsSource> sources = getSources();
         boolean has = false;
@@ -155,19 +164,27 @@ public class SpeechPrefs {
             source.enabled = finalId.equals(source.id);
         }
         if (!has) {
-            finalId = TtsSource.system().id;
+            finalId = TtsSource.edgeWebSocketTemplate().id;
             for (TtsSource source : sources) source.enabled = finalId.equals(source.id);
         }
         saveSources(sources);
+        TtsSource selected = null;
+        for (TtsSource source : sources) {
+            if (finalId.equals(source.id)) {
+                selected = source;
+                break;
+            }
+        }
         sp.edit()
                 .putString(KEY_ACTIVE_SOURCE_ID, finalId)
-                .putBoolean(KEY_MS_ENABLED, TtsSource.builtinMsTranslator().id.equals(finalId) || (getSourceById(finalId) != null && TtsSource.TYPE_MS_TRANSLATOR.equals(getSourceById(finalId).type)))
+                .putBoolean(KEY_MS_ENABLED, selected != null && TtsSource.TYPE_MS_TRANSLATOR.equals(selected.type))
                 .apply();
+        TtsCircuitBreaker.reset(spContext(), finalId);
     }
 
     public TtsSource getActiveSource() {
         TtsSource source = getSourceById(getActiveSourceId());
-        return source == null ? TtsSource.system() : source;
+        return source == null ? TtsSource.edgeWebSocketTemplate() : source;
     }
 
     public TtsSource getSourceById(String id) {
@@ -227,19 +244,23 @@ public class SpeechPrefs {
 
     public void deleteSource(String sourceId) {
         if (sourceId == null) return;
-        if (TtsSource.system().id.equals(sourceId) || TtsSource.builtinMsTranslator().id.equals(sourceId)) return;
+        if (TtsSource.system().id.equals(sourceId)
+                || TtsSource.builtinMsTranslator().id.equals(sourceId)
+                || TtsSource.edgeWebSocketTemplate().id.equals(sourceId)) return;
         List<TtsSource> sources = getSources();
         List<TtsSource> kept = new ArrayList<>();
         for (TtsSource source : sources) {
             if (!sourceId.equals(source.id)) kept.add(source);
         }
         saveSources(kept);
-        if (sourceId.equals(getActiveSourceId())) setActiveSourceId(TtsSource.system().id);
+        if (sourceId.equals(getActiveSourceId())) {
+            setActiveSourceId(TtsSource.edgeWebSocketTemplate().id);
+        }
     }
 
     public void resetSources() {
         saveSources(defaultSources());
-        setActiveSourceId(TtsSource.system().id);
+        setActiveSourceId(TtsSource.edgeWebSocketTemplate().id);
     }
 
     public void setImportedSource(String name, int voiceCount) {
@@ -355,30 +376,43 @@ public class SpeechPrefs {
         return list;
     }
 
+    private void migrateEdgeEngineV1() {
+        if (sp.getBoolean(KEY_EDGE_ENGINE_MIGRATION_V1, false)) return;
+        String activeId = sp.getString(KEY_ACTIVE_SOURCE_ID, "");
+        if (activeId == null || activeId.trim().isEmpty()
+                || TtsSource.system().id.equals(activeId)
+                || TtsSource.edgeWebSocketTemplate().id.equals(activeId)) {
+            setActiveSourceId(TtsSource.edgeWebSocketTemplate().id);
+        }
+        sp.edit().putBoolean(KEY_EDGE_ENGINE_MIGRATION_V1, true).apply();
+    }
+
     private void ensureDefaultSources() {
         String json = sp.getString(KEY_SOURCES_JSON, "");
         if (json == null || json.trim().isEmpty()) {
             saveSources(defaultSources());
             if (sp.getString(KEY_ACTIVE_SOURCE_ID, "").isEmpty()) {
-                setActiveSourceId(sp.getBoolean(KEY_MS_ENABLED, false) ? TtsSource.builtinMsTranslator().id : TtsSource.system().id);
+                setActiveSourceId(sp.getBoolean(KEY_MS_ENABLED, false)
+                        ? TtsSource.builtinMsTranslator().id
+                        : TtsSource.edgeWebSocketTemplate().id);
             }
         }
     }
 
     private static List<TtsSource> defaultSources() {
         List<TtsSource> list = new ArrayList<>();
+        list.add(TtsSource.edgeWebSocketTemplate());
         list.add(TtsSource.system());
         list.add(TtsSource.builtinMsTranslator());
-        list.add(TtsSource.edgeWebSocketTemplate());
         return list;
     }
 
     private static List<TtsSource> dedupeSources(List<TtsSource> sources) {
         Map<String, TtsSource> map = new LinkedHashMap<>();
         // Ensure required built-ins always exist.
+        map.put(TtsSource.edgeWebSocketTemplate().id, TtsSource.edgeWebSocketTemplate());
         map.put(TtsSource.system().id, TtsSource.system());
         map.put(TtsSource.builtinMsTranslator().id, TtsSource.builtinMsTranslator());
-        map.put(TtsSource.edgeWebSocketTemplate().id, TtsSource.edgeWebSocketTemplate());
         if (sources != null) {
             for (TtsSource source : sources) {
                 if (source == null) continue;
@@ -387,6 +421,10 @@ public class SpeechPrefs {
             }
         }
         return new ArrayList<>(map.values());
+    }
+
+    private Context spContext() {
+        return appContext;
     }
 
     private static int clamp(int value, int min, int max) {
