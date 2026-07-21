@@ -152,20 +152,21 @@ class TranslateStatusView(context: android.content.Context) : View(context) {
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
-        val color = if (active) {
-            android.graphics.Color.rgb(34, 197, 94)
-        } else {
-            android.graphics.Color.rgb(148, 163, 184)
-        }
+        val cx = width / 2f
+        val cy = height / 2f + AndroidUtilities.dp(3.2f).toFloat()
 
-        dotPaint.color = color
-        dotPaint.alpha = if (active) 255 else 220
-        canvas.drawCircle(
-            width / 2f,
-            height / 2f + AndroidUtilities.dp(3.2f).toFloat(),
-            AndroidUtilities.dp(2.6f).toFloat(),
-            dotPaint
-        )
+        if (active) {
+            // 低饱和翡翠绿光晕 + 实心点，状态明确但不会像荧光灯一样抢眼。
+            dotPaint.color = android.graphics.Color.rgb(43, 138, 120)
+            dotPaint.alpha = 48
+            canvas.drawCircle(cx, cy, AndroidUtilities.dp(4.2f).toFloat(), dotPaint)
+            dotPaint.alpha = 255
+            canvas.drawCircle(cx, cy, AndroidUtilities.dp(2.45f).toFloat(), dotPaint)
+        } else {
+            dotPaint.color = android.graphics.Color.rgb(148, 163, 184)
+            dotPaint.alpha = 190
+            canvas.drawCircle(cx, cy, AndroidUtilities.dp(2.15f).toFloat(), dotPaint)
+        }
     }
 }
 
@@ -257,7 +258,7 @@ class ChatPanelManager(
     private val sourceLangBtn: AppCompatTextView = parentView.findViewById(R.id.sourceLangBtn)
     private val swapLangBtn: AppCompatTextView = parentView.findViewById(R.id.swapLangBtn)
     private val targetLangBtn: AppCompatTextView = parentView.findViewById(R.id.targetLangBtn)
-    private val aiSendToggle: AppCompatTextView = parentView.findViewById(R.id.aiSendToggle)
+    private val aiSendToggle: AppCompatImageView = parentView.findViewById(R.id.aiSendToggle)
     private val aiSendDotHost: View = parentView.findViewById(R.id.aiSendDot)
     private val aiSendStatusView: TranslateStatusView = installTranslateStatusView(aiSendDotHost)
     private var flameLayout: LinearLayout? = null
@@ -1393,19 +1394,12 @@ class ChatPanelManager(
         val sendTranslate = getFlag(keyAiSendTranslate, false)
         sourceLangBtn.text = langLabel(getSetting(keyAiSourceLang, "မြန်မာစာ"))
         targetLangBtn.text = langLabel(getSetting(keyAiTargetLang, "中文"))
-        aiSendToggle.text = "文A"
-        aiSendToggle.rotation = 0f
-        aiSendToggle.gravity = Gravity.CENTER
-        aiSendToggle.includeFontPadding = false
-        aiSendToggle.typeface = android.graphics.Typeface.DEFAULT_BOLD
-        aiSendToggle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-        aiSendToggle.setPadding(AndroidUtilities.dp(1f), AndroidUtilities.dp(1.2f), AndroidUtilities.dp(1f), 0)
-        aiSendToggle.setTextColor(
-            if (sendTranslate) android.graphics.Color.rgb(34, 197, 94) else ContextCompat.getColor(iConversationContext.chatActivity, R.color.color999)
-        )
-        aiSendToggle.alpha = if (sendTranslate) 1f else 0.72f
+        // 输入面板和消息气泡使用同一套“中 / A”双卡片语言标识。
+        // 选中态由 drawable selector 切换为低饱和翡翠绿，不再依赖生硬的“文A”文字。
+        aiSendToggle.isSelected = sendTranslate
+        aiSendToggle.alpha = if (sendTranslate) 1f else 0.82f
         aiSendStatusView.active = sendTranslate
-        aiSendStatusView.alpha = if (sendTranslate) 1f else 0.86f
+        aiSendStatusView.alpha = if (sendTranslate) 1f else 0.78f
     }
 
     private fun langLabel(name: String): String {
