@@ -520,37 +520,9 @@
     </LinearLayout>
 
     <!--
-        ============== 固定作品栏 ==============
-        位于 fixedProfileTopBar 正下方（运行时 setY 定位）。
-        吸顶时显示。无顶部阴影、无上分割线，仅底部 0.5dp 浅分割线。
+        “作品”标题不再单独吸顶。作品滚动时只保留 fixedProfileTopBar，
+        内容里的标题会和资料区一起自然滚出屏幕。
     -->
-    <FrameLayout
-        android:id="@+id/fixedWorksHeader"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_gravity="top"
-        android:background="#FFFFFFFF"
-        android:elevation="0dp"
-        android:stateListAnimator="@null"
-        android:translationZ="0dp"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:layout_marginStart="24dp"
-            android:text="@string/partner_works"
-            android:textColor="#1A1A2E"
-            android:textSize="17sp"
-            android:textStyle="bold" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_gravity="bottom"
-            android:background="#EEF0F4" />
-    </FrameLayout>
 
     <FrameLayout
         android:id="@+id/helloBar"
