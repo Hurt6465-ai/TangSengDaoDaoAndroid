@@ -38,6 +38,7 @@ public class SpeechSettingsActivity extends Activity {
     private static final int REQ_IMPORT = 8201;
     private SpeechPrefs prefs;
     private LinearLayout root;
+    private boolean showAdvanced;
 
     public static void open(Context context) {
         context.startActivity(new Intent(context, SpeechSettingsActivity.class));
@@ -61,35 +62,37 @@ public class SpeechSettingsActivity extends Activity {
         setContentView(scrollView);
 
         addHeader();
-        addSourceManagerSection();
         addVoiceSection();
         addControlSection();
         addTestSection();
         addCacheSection();
+        addAdvancedToggle();
+        if (showAdvanced) addSourceManagerSection();
         addWarnText();
     }
 
     private void addHeader() {
         TextView title = text("语音朗读", 28, Color.rgb(17, 24, 39), true);
         root.addView(title);
-        TextView sub = text("独立 wkspeech 插件。现在支持用户导入/编辑 TTS 源 JSON，不再把接口全部写死在 App 里。聊天窗口、学习页、网页脚本都可以走 SpeechManager.speak(context, text)。", 13, Color.rgb(107, 114, 128), false);
+        TextView sub = text("默认使用 Edge 在线自然语音，失败会自动切换微软兼容源，最后才使用手机系统语音。普通用户只需选择声音和语速。", 13, Color.rgb(107, 114, 128), false);
         sub.setPadding(0, dp(8), 0, dp(14));
         root.addView(sub);
         TtsSource active = prefs.getActiveSource();
-        root.addView(card("当前状态", statusText(active), "切换语音源", this::chooseSource));
+        root.addView(card("当前状态", statusText(active), "切换朗读模式", this::chooseSimpleMode));
     }
 
     private void addSourceManagerSection() {
-        root.addView(section("TTS 源 / 语音包"));
+        root.addView(section("开发者高级设置"));
+        root.addView(seekRow("音调（高级）", "Edge 按 Hz 调整，微软兼容源按百分比调整。通常保持 0 最自然。", prefs.getPitchPercent(), -50, 50, value -> prefs.setPitchPercent(value)));
         root.addView(card("选择语音源", sourceListSummary(), "选择", this::chooseSource));
-        root.addView(card("导入 TTS 源配置 / MultiTTS 包", "支持两类文件：\n1. 唐僧 TTS 源 JSON，可热更新 endpoint、headers、audioFormat、签名参数。\n2. MultiTTS 微软翻译 zip/json/yaml，用于导入发音人和音频格式。", "选择文件", this::openImportPicker));
-        root.addView(card("编辑当前源 JSON", "适合以后微软接口小改时直接前端修改；如果签名算法彻底变了，仍然需要新引擎或脚本源。", "编辑", this::editActiveSourceJson));
+        root.addView(card("导入 TTS 源配置 / MultiTTS 包", "高级兼容功能。支持唐僧 TTS 源 JSON，以及 MultiTTS 微软翻译 zip/json/yaml。普通用户无需配置。", "选择文件", this::openImportPicker));
+        root.addView(card("编辑当前源 JSON", "适合以后 Edge 或微软兼容协议小改时直接更新参数；如果签名算法彻底变化，仍然需要升级引擎。", "编辑", this::editActiveSourceJson));
         root.addView(card("复制当前源模板", "复制当前源 JSON 到剪贴板，方便你发给用户或放到 GitHub/群里更新。", "复制", () -> copyText("tts_source.json", prefs.exportActiveSourcePretty())));
-        root.addView(card("复制全部源配置", "导出系统源、微软兼容源、Edge WebSocket 预留源、自定义源。", "复制", () -> copyText("tts_sources.json", prefs.exportAllSourcesPretty())));
+        root.addView(card("复制全部源配置", "导出 Edge、微软兼容源、系统源和自定义源配置。", "复制", () -> copyText("tts_sources.json", prefs.exportAllSourcesPretty())));
         root.addView(card("重置语音源", "只重置 TTS 源配置，不删除已经导入的发音人列表。", "重置", () -> confirmResetSources()));
         root.addView(sourceCard("系统 TTS", "调用手机系统或用户已安装的第三方 Android TTS 引擎。最稳定，不走服务器。", TtsSource.TYPE_SYSTEM));
-        root.addView(sourceCard("微软翻译兼容源", "当前主力在线源。App 直连用户侧网络，不压你的服务器；非官方，可能失效。", TtsSource.TYPE_MS_TRANSLATOR));
-        root.addView(sourceCard("Edge TTS WebSocket", "预留第二在线备用源。需要后续接 OkHttp WebSocket 引擎；配置可以先导入保存。", TtsSource.TYPE_EDGE_WEBSOCKET));
+        root.addView(sourceCard("Edge 在线自然语音", "当前默认在线主源。已经接入 OkHttp WebSocket；协议变化时可通过源 JSON 更新参数。", TtsSource.TYPE_EDGE_WEBSOCKET));
+        root.addView(sourceCard("微软翻译兼容源", "Edge 失败后的在线备用源。App 直连用户侧网络，不压你的服务器；同样属于非官方兼容链路。", TtsSource.TYPE_MS_TRANSLATOR));
         root.addView(sourceCard("自定义 HTTP / WebSocket", "后续可给火山、阿里、腾讯、OpenAI、自建接口使用；第一版先保存配置，不执行未知接口。", TtsSource.TYPE_CUSTOM_HTTP));
         root.addView(sourceCard("离线语音包", "Piper / sherpa-onnx / 微软离线 / 火山离线需要 native 引擎或模型包，不能只靠 JSON。", TtsSource.TYPE_OFFLINE_RESERVED));
     }
@@ -108,14 +111,13 @@ public class SpeechSettingsActivity extends Activity {
             toast(checked ? "已开启混读" : "已关闭混读");
         }));
         root.addView(seekRow("语速", "在线源和系统 TTS 都会尽量应用。建议口语练习 -10% 到 -25%。", prefs.getRatePercent(), -50, 80, value -> prefs.setRatePercent(value)));
-        root.addView(seekRow("音调", "正数更尖，负数更低。多数场景保持 0% 最自然。", prefs.getPitchPercent(), -50, 50, value -> prefs.setPitchPercent(value)));
     }
 
     private void addTestSection() {
         root.addView(section("试听"));
-        root.addView(card("中文试听", "使用当前语音源、中文发音人、语速、音调。", "播放", () -> SpeechManager.speak(this, "你好，欢迎使用唐僧叨叨学习语音。")));
-        root.addView(card("缅语试听", "使用当前语音源、缅语发音人、语速、音调。", "播放", () -> SpeechManager.speak(this, "မင်္ဂလာပါ။ ကျွန်မ မြန်မာစကား လေ့ကျင့်နေပါတယ်။")));
-        root.addView(card("一句话混读测试", "当前是分段准流式：先按语言切段，每段合成到缓存，再顺序播放。下一步可优化成第一段完成就先播。", "播放", () -> SpeechManager.speak(this, "你好，我们开始练习口语。 မင်္ဂလာပါ၊ စကားပြော လေ့ကျင့်ကြမယ်။")));
+        root.addView(card("中文试听", "使用当前朗读模式、中文发音人和语速。", "播放", () -> SpeechManager.speak(this, "你好，欢迎使用唐僧叨叨学习语音。")));
+        root.addView(card("缅语试听", "使用当前朗读模式、缅语发音人和语速。", "播放", () -> SpeechManager.speak(this, "မင်္ဂလာပါ။ ကျွန်မ မြန်မာစကား လေ့ကျင့်နေပါတယ်။")));
+        root.addView(card("一句话混读测试", "中文和缅语会按语言切段，使用各自发音人合成后顺序播放。", "播放", () -> SpeechManager.speak(this, "你好，我们开始练习口语。 မင်္ဂလာပါ၊ စကားပြော လေ့ကျင့်ကြမယ်။")));
         root.addView(card("停止播放", "停止当前系统 TTS 或在线音频播放。", "停止", () -> SpeechManager.get(this).stop()));
     }
 
@@ -127,24 +129,64 @@ public class SpeechSettingsActivity extends Activity {
         }));
     }
 
+    private void addAdvancedToggle() {
+        root.addView(section("更多"));
+        root.addView(card(
+                "高级语音源设置",
+                showAdvanced
+                        ? "已展开。这里包含源 JSON、Endpoint、协议参数和 MultiTTS 导入。"
+                        : "普通用户不需要设置。仅在调试 Edge 协议或导入兼容源时打开。",
+                showAdvanced ? "收起" : "展开",
+                () -> {
+                    showAdvanced = !showAdvanced;
+                    render();
+                }
+        ));
+    }
+
+    private void chooseSimpleMode() {
+        CharSequence[] items = new CharSequence[]{
+                "在线自然语音（推荐）\nEdge 主源 → 微软兼容源 → 系统语音",
+                "手机系统语音\n完全离线，但音质取决于手机已安装的 TTS",
+                "开发者：选择具体语音源"
+        };
+        new AlertDialog.Builder(this)
+                .setTitle("选择朗读模式")
+                .setItems(items, (dialog, which) -> {
+                    if (which == 0) {
+                        prefs.setActiveSourceId(TtsSource.edgeWebSocketTemplate().id);
+                        toast("已启用在线自然语音");
+                        render();
+                    } else if (which == 1) {
+                        prefs.setActiveSourceId(TtsSource.system().id);
+                        toast("已启用手机系统语音");
+                        render();
+                    } else {
+                        showAdvanced = true;
+                        chooseSource();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
     private void addWarnText() {
-        TextView warn = text("说明：前端直连在线源不会压你的服务器，但非官方源可能失效或限流。JSON 配置能解决 endpoint、格式、headers 等小改；如果签名算法或协议彻底变了，需要升级引擎或做 JS 沙盒源。离线模型类语音包需要 native 引擎和模型文件，不是普通配置。", 12, Color.rgb(107, 114, 128), false);
+        TextView warn = text("说明：Edge 与微软兼容源都由用户手机直连，不占你的服务器带宽。它们不是官方稳定 API，所以插件加入了自动备用、超时取消、时钟偏差修正和 10 分钟熔断。Sherpa 离线识别与离线 TTS 将放到下一批按需下载模型实现。", 12, Color.rgb(107, 114, 128), false);
         warn.setPadding(dp(4), dp(12), dp(4), 0);
         root.addView(warn);
     }
 
     private String statusText(TtsSource active) {
         if (active == null) active = TtsSource.system();
-        return "当前源：" + active.name
-                + "\n类型：" + active.displayType()
-                + "\n导入包：" + prefs.getImportedSourceName()
-                + "\n发音人：" + prefs.getImportedVoiceCount() + " 个"
+        String mode = TtsSource.TYPE_SYSTEM.equals(active.type)
+                ? "手机系统语音"
+                : "在线自然语音（自动备用）";
+        return "模式：" + mode
+                + "\n当前主源：" + active.name
                 + "\n中文：" + prefs.voiceDisplayName(prefs.getZhVoice())
-                + "\n缅语：" + prefs.voiceDisplayName(prefs.getMyVoice())
+                + " · 缅语：" + prefs.voiceDisplayName(prefs.getMyVoice())
                 + "\n语速：" + signed(prefs.getRatePercent()) + "%"
-                + "，音调：" + signed(prefs.getPitchPercent()) + "%"
-                + "\n混读：" + (prefs.isMixedReadEnabled() ? "开启" : "关闭")
-                + "\n格式：" + prefs.getAudioFormat();
+                + " · 混读：" + (prefs.isMixedReadEnabled() ? "开启" : "关闭");
     }
 
     private String sourceListSummary() {
@@ -180,8 +222,10 @@ public class SpeechSettingsActivity extends Activity {
                 .setTitle("选择语音源")
                 .setItems(items, (dialog, which) -> {
                     TtsSource source = list.get(which);
-                    if (!TtsSource.TYPE_SYSTEM.equals(source.type) && !TtsSource.TYPE_MS_TRANSLATOR.equals(source.type)) {
-                        toast("该源已保存，但朗读引擎还未接入，播放时会自动兜底系统 TTS");
+                    if (!TtsSource.TYPE_SYSTEM.equals(source.type)
+                            && !TtsSource.TYPE_MS_TRANSLATOR.equals(source.type)
+                            && !TtsSource.TYPE_EDGE_WEBSOCKET.equals(source.type)) {
+                        toast("该源已保存，但朗读引擎尚未接入，播放时会自动使用推荐在线源或系统 TTS");
                     }
                     prefs.setActiveSourceId(source.id);
                     render();
@@ -243,7 +287,7 @@ public class SpeechSettingsActivity extends Activity {
     private void confirmResetSources() {
         new AlertDialog.Builder(this)
                 .setTitle("重置语音源")
-                .setMessage("会恢复系统 TTS、微软翻译兼容源、Edge WebSocket 模板。不会删除发音人列表。")
+                .setMessage("会恢复 Edge 在线自然语音、微软翻译兼容源和系统 TTS，并把 Edge 设为默认。不会删除发音人列表。")
                 .setPositiveButton("重置", (dialog, which) -> {
                     prefs.resetSources();
                     toast("已重置");
