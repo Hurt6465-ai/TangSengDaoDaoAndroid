@@ -8,7 +8,10 @@ import android.text.TextUtils;
 import android.util.LruCache;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
@@ -323,6 +326,11 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         PartnerPendingStore.Entry relationState = PartnerPendingStore.get(uid);
         boolean contacted = greeted.contains(uid) || relationState != null;
 
+        // RecyclerView may reuse a view while the previous press animation is still running.
+        b.greetingBtn.animate().cancel();
+        b.greetingBtn.setScaleX(1f);
+        b.greetingBtn.setScaleY(1f);
+
         if (sending) {
             b.greetingBtn.setEnabled(false);
             b.greetingBtn.setAlpha(0.72f);
@@ -345,9 +353,9 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
             b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting);
         }
 
+        installGreetingPressEffect(b.greetingBtn);
         b.greetingBtn.setOnClickListener(v -> {
             if (listener == null) return;
-            animatePress(v);
             if (contacted) {
                 listener.onOpenChat(user);
             } else {
@@ -358,8 +366,8 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     }
 
     private void setGreetingHi(TextView textView) {
-        textView.setText("Hi");
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f);
+        textView.setText(R.string.partnerlist_greet);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f);
         textView.setTypeface(MEDIUM);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0.025f);
     }
@@ -401,10 +409,48 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         return clean;
     }
 
-    private void animatePress(View view) {
+    /**
+     * Restrained tactile feedback for the greeting CTA.
+     * It feels alive without the exaggerated bounce of a game-style button.
+     */
+    private void installGreetingPressEffect(View view) {
+        view.setOnTouchListener((v, event) -> {
+            if (!v.isEnabled()) return false;
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    v.animate().cancel();
+                    v.animate()
+                            .scaleX(0.96f)
+                            .scaleY(0.96f)
+                            .alpha(0.96f)
+                            .setDuration(90L)
+                            .setInterpolator(new DecelerateInterpolator())
+                            .start();
+                    break;
+                case MotionEvent.ACTION_UP:
+                    restoreGreetingButton(v, true);
+                    break;
+                case MotionEvent.ACTION_CANCEL:
+                    restoreGreetingButton(v, false);
+                    break;
+                default:
+                    break;
+            }
+            return false;
+        });
+    }
+
+    private void restoreGreetingButton(View view, boolean spring) {
         view.animate().cancel();
-        view.animate().scaleX(0.95f).scaleY(0.95f).setDuration(70L).withEndAction(() ->
-                view.animate().scaleX(1f).scaleY(1f).setDuration(90L).start()).start();
+        view.animate()
+                .scaleX(1f)
+                .scaleY(1f)
+                .alpha(view.isEnabled() ? 1f : 0.72f)
+                .setDuration(spring ? 180L : 130L)
+                .setInterpolator(spring
+                        ? new OvershootInterpolator(1.25f)
+                        : new DecelerateInterpolator())
+                .start();
     }
 
     private int dp(Context context, float value) {
@@ -414,7 +460,10 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     @Override public void onViewRecycled(@NonNull VH holder) {
         holder.binding.cardRoot.setOnClickListener(null);
         holder.binding.greetingBtn.setOnClickListener(null);
+        holder.binding.greetingBtn.setOnTouchListener(null);
         holder.binding.greetingBtn.animate().cancel();
+        holder.binding.greetingBtn.setScaleX(1f);
+        holder.binding.greetingBtn.setScaleY(1f);
         holder.binding.avatarView.showDefaultAvatar("");
         holder.boundUid = null;
         holder.boundVercode = null;
