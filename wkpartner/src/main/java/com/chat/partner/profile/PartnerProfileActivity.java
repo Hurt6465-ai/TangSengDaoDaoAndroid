@@ -23,7 +23,10 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.fragment.app.Fragment;
+
+import com.google.android.material.appbar.AppBarLayout;
 
 import com.alibaba.fastjson.JSONObject;
 import com.chat.base.act.WKWebViewActivity;
@@ -77,6 +80,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private Fragment feedWorksFragment;
     private int lastFeedTopInset = -1;
     private int lastFeedBottomInset = -1;
+    private boolean profileHeaderCollapseRequested;
 
     // These views were moved out of the old Toolbar/AppBar collapsing area. Use findViewById
     // instead of ViewBinding fields, so the Java file does not depend on generated binding fields
@@ -167,7 +171,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void resetInitialScrollState() {
         wkVBinding.appBarLayout.post(() -> {
+            profileHeaderCollapseRequested = false;
             wkVBinding.appBarLayout.setExpanded(true, false);
+            forceAppBarOffset(false);
             applyProfileContentVisibility();
             updateWorksHeaderPin();
             invokeFeedMethod("scrollToTop", new Class<?>[0]);
@@ -340,10 +346,67 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void invokeFeedMethod(String name, Class<?>[] parameterTypes, Object... args) {
         Fragment current = resolveFeedWorksFragment();
         if (current == null) return;
+        invokeFeedMethod(current, name, parameterTypes, args);
+    }
+
+    private void invokeFeedMethod(Fragment fragment, String name, Class<?>[] parameterTypes,
+                                  Object... args) {
+        if (fragment == null) return;
         try {
-            current.getClass().getMethod(name, parameterTypes).invoke(current, args);
+            fragment.getClass().getMethod(name, parameterTypes).invoke(fragment, args);
         } catch (Throwable ignored) {
         }
+    }
+
+    private void installFeedScrollBridge(Fragment fragment) {
+        Runnable collapse = () -> runOnUiThread(() -> setProfileHeaderCollapsed(true));
+        Runnable expand = () -> runOnUiThread(() -> setProfileHeaderCollapsed(false));
+        invokeFeedMethod(fragment, "setProfileHeaderActions",
+                new Class<?>[]{Runnable.class, Runnable.class}, collapse, expand);
+    }
+
+    /**
+     * AppBarLayout normally consumes RecyclerView nested scroll automatically. On several OEM
+     * builds the RecyclerView is hosted one Fragment/FrameLayout level below CoordinatorLayout,
+     * and that nested scroll is not forwarded consistently. This explicit bridge guarantees that
+     * an upward work-list gesture collapses every profile view, leaving only fixedProfileTopBar.
+     */
+    private void setProfileHeaderCollapsed(boolean collapsed) {
+        if (wkVBinding == null || wkVBinding.appBarLayout == null) return;
+        if (profileHeaderCollapseRequested == collapsed) {
+            updateFixedTopBarAppearance(collapsed);
+            return;
+        }
+
+        profileHeaderCollapseRequested = collapsed;
+        wkVBinding.appBarLayout.setExpanded(!collapsed, true);
+        updateFixedTopBarAppearance(collapsed);
+
+        // setExpanded() is asynchronous. Verify once after its animation and force the exact
+        // offset only when an OEM CoordinatorLayout ignored the request.
+        wkVBinding.appBarLayout.postDelayed(() -> {
+            if (wkVBinding == null || profileHeaderCollapseRequested != collapsed) return;
+            int totalRange = wkVBinding.appBarLayout.getTotalScrollRange();
+            int current = Math.abs(wkVBinding.appBarLayout.getTop());
+            boolean reached = collapsed
+                    ? totalRange <= 0 || current >= totalRange - dp(2)
+                    : current <= dp(2);
+            if (!reached) forceAppBarOffset(collapsed);
+            updateFixedTopBarAppearance(collapsed);
+            applyFeedHostInsets();
+        }, 360L);
+    }
+
+    private void forceAppBarOffset(boolean collapsed) {
+        if (wkVBinding == null || wkVBinding.appBarLayout == null) return;
+        ViewGroup.LayoutParams rawParams = wkVBinding.appBarLayout.getLayoutParams();
+        if (!(rawParams instanceof CoordinatorLayout.LayoutParams)) return;
+        CoordinatorLayout.Behavior behavior =
+                ((CoordinatorLayout.LayoutParams) rawParams).getBehavior();
+        if (!(behavior instanceof AppBarLayout.Behavior)) return;
+        int targetOffset = collapsed ? -wkVBinding.appBarLayout.getTotalScrollRange() : 0;
+        ((AppBarLayout.Behavior) behavior).setTopAndBottomOffset(targetOffset);
+        wkVBinding.appBarLayout.requestLayout();
     }
 
     // 固定顶栏分两态：
@@ -614,12 +677,19 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             // Reuse the Fragment that is actually attached to the container. Profile refreshes
             // must not replace the visible list with a detached Fragment or reset its pagination.
             feedWorksFragment = current;
+            installFeedScrollBridge(current);
             lastFeedTopInset = -1;
             lastFeedBottomInset = -1;
             feedWorksSection.setVisibility(View.VISIBLE);
             feedWorksContainer.setVisibility(View.VISIBLE);
-            feedWorksContainer.post(this::updateWorksHeaderPin);
-            feedWorksContainer.postDelayed(this::updateWorksHeaderPin, 120);
+            feedWorksContainer.post(() -> {
+                installFeedScrollBridge(resolveFeedWorksFragment());
+                updateWorksHeaderPin();
+            });
+            feedWorksContainer.postDelayed(() -> {
+                installFeedScrollBridge(resolveFeedWorksFragment());
+                updateWorksHeaderPin();
+            }, 180);
         } catch (Throwable ignored) {
             // wkfeed is optional. Its absence must not break the profile page.
             hideFeedWorks();
