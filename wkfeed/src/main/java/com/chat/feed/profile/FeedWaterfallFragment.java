@@ -5,7 +5,9 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -42,6 +44,11 @@ public class FeedWaterfallFragment extends Fragment {
     private int hostBottomInset;
     private int baseTopPadding;
     private int baseBottomPadding;
+    private Runnable hostCollapseProfileAction;
+    private Runnable hostExpandProfileAction;
+    private float gestureDownY;
+    private int gestureTouchSlop;
+    private boolean gestureDirectionHandled;
 
     public static FeedWaterfallFragment newInstance(String uid) {
         FeedWaterfallFragment fragment = new FeedWaterfallFragment();
@@ -83,9 +90,48 @@ public class FeedWaterfallFragment extends Fragment {
         if (recyclerView.getItemAnimator() != null) recyclerView.getItemAnimator().setChangeDuration(0);
         adapter = new FeedWaterfallAdapter(this::openDetail);
         recyclerView.setAdapter(adapter);
+        gestureTouchSlop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
+        recyclerView.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+            @Override
+            public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        gestureDownY = event.getY();
+                        gestureDirectionHandled = false;
+                        break;
+                    case MotionEvent.ACTION_MOVE:
+                        float deltaY = event.getY() - gestureDownY;
+                        if (!gestureDirectionHandled && Math.abs(deltaY) >= gestureTouchSlop) {
+                            gestureDirectionHandled = true;
+                            if (deltaY < 0f) {
+                                notifyHostCollapseProfile();
+                            } else if (!rv.canScrollVertically(-1)) {
+                                notifyHostExpandProfile();
+                            }
+                        }
+                        break;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        gestureDirectionHandled = false;
+                        break;
+                    default:
+                        break;
+                }
+                return false;
+            }
+        });
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
+                if (dy > 0) {
+                    // Some OEM builds do not reliably forward the nested scroll from a
+                    // RecyclerView hosted inside a Fragment container to AppBarLayout.
+                    // Explicitly request collapse so the profile sheet can never remain fixed.
+                    notifyHostCollapseProfile();
+                } else if (dy < 0 && !rv.canScrollVertically(-1)) {
+                    notifyHostExpandProfile();
+                }
+
                 if (dy <= 0 || adapter == null) return;
                 RecyclerView.LayoutManager manager = rv.getLayoutManager();
                 if (!(manager instanceof StaggeredGridLayoutManager)) return;
@@ -117,6 +163,26 @@ public class FeedWaterfallFragment extends Fragment {
 
     public void scrollToTop() {
         if (recyclerView != null) recyclerView.scrollToPosition(0);
+    }
+
+    /**
+     * Host callbacks are java.lang.Runnable on purpose: wkpartner can register them through
+     * reflection without creating a Gradle dependency from wkfeed back to wkpartner.
+     */
+    public void setProfileHeaderActions(@Nullable Runnable collapseAction,
+                                        @Nullable Runnable expandAction) {
+        hostCollapseProfileAction = collapseAction;
+        hostExpandProfileAction = expandAction;
+    }
+
+    private void notifyHostCollapseProfile() {
+        Runnable action = hostCollapseProfileAction;
+        if (action != null) action.run();
+    }
+
+    private void notifyHostExpandProfile() {
+        Runnable action = hostExpandProfileAction;
+        if (action != null) action.run();
     }
 
     private void applyHostInsets() {
@@ -278,6 +344,8 @@ public class FeedWaterfallFragment extends Fragment {
             recyclerView.setAdapter(null);
         }
         adapter = null;
+        hostCollapseProfileAction = null;
+        hostExpandProfileAction = null;
         recyclerView = null;
         loadingView = null;
         stateTv = null;
