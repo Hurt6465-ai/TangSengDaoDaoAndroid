@@ -2,63 +2,38 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="32"
-    android:viewportHeight="32"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
     android:autoMirrored="false">
 
-    <!-- 上方弧线：箭头位于左侧，并收在图标内侧。 -->
+    <!-- 后层语言卡片：参考图中的“中 / A”叠层翻译符号，保持小尺寸下仍清晰。 -->
     <path
-        android:pathData="M24.2,12.0 C21.9,7.9 16.5,6.4 11.9,8.1 C10.4,8.7 9.2,9.6 8.3,10.8"
+        android:pathData="M4.75,3.25 L12.25,3.25 C13.35,3.25 14.25,4.15 14.25,5.25 L14.25,12.75 C14.25,13.85 13.35,14.75 12.25,14.75 L4.75,14.75 C3.65,14.75 2.75,13.85 2.75,12.75 L2.75,5.25 C2.75,4.15 3.65,3.25 4.75,3.25 Z"
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#6D72E6"
-        android:strokeWidth="1.95"
-        android:strokeLineCap="round" />
+        android:strokeColor="#707B8C"
+        android:strokeWidth="1.55"
+        android:strokeLineJoin="round" />
+
+    <!-- “中”：比直接塞文字更稳定，不受字体和语言环境影响。 -->
     <path
-        android:pathData="M8.3,10.8 L8.7,7.9 M8.3,10.8 L11.2,10.2"
+        android:pathData="M5.25,7.0 L11.75,7.0 L11.75,11.0 L5.25,11.0 Z M8.5,5.55 L8.5,12.45"
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#6D72E6"
-        android:strokeWidth="1.95"
+        android:strokeColor="#707B8C"
+        android:strokeWidth="1.35"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
 
-    <!-- 下方弧线：箭头位于右侧，并收在图标内侧。 -->
+    <!-- 前层语言卡片：深色实底提高聊天气泡旁的识别度。 -->
     <path
-        android:pathData="M7.8,20.0 C10.1,24.1 15.5,25.6 20.1,23.9 C21.6,23.3 22.8,22.4 23.7,21.2"
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#6D72E6"
-        android:strokeWidth="1.95"
-        android:strokeLineCap="round" />
+        android:pathData="M11.75,9.25 L19.25,9.25 C20.35,9.25 21.25,10.15 21.25,11.25 L21.25,18.75 C21.25,19.85 20.35,20.75 19.25,20.75 L11.75,20.75 C10.65,20.75 9.75,19.85 9.75,18.75 L9.75,11.25 C9.75,10.15 10.65,9.25 11.75,9.25 Z"
+        android:fillColor="#354052" />
+
+    <!-- “A”：线条略粗，18–20dp 实际显示尺寸下依然干净。 -->
     <path
-        android:pathData="M23.7,21.2 L23.3,24.1 M23.7,21.2 L20.8,21.8"
+        android:pathData="M12.65,18.15 L15.5,11.85 L18.35,18.15 M13.75,15.75 L17.25,15.75"
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#6D72E6"
-        android:strokeWidth="1.95"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.45"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
-
-    <!-- 缩小后的 Ai，避免压住双向箭头。 -->
-    <path
-        android:pathData="M12.2,19.6 L14.4,13.6 L16.6,19.6 M13.1,17.4 L15.7,17.4"
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#D75A96"
-        android:strokeWidth="1.75"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M18.2,15.5 L18.2,19.6"
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#D75A96"
-        android:strokeWidth="1.75"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M18.2,13.9 L18.2,13.95"
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#D75A96"
-        android:strokeWidth="2.0"
-        android:strokeLineCap="round" />
-
-    <!-- i 右上方独立的小四角星。 -->
-    <path
-        android:pathData="M20.9,12.6 L21.3,13.65 L22.35,14.05 L21.3,14.45 L20.9,15.5 L20.5,14.45 L19.45,14.05 L20.5,13.65 Z"
-        android:fillColor="#F29AB9" />
 </vector>

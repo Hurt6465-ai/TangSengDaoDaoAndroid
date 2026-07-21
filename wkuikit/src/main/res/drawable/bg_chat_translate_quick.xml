@@ -1,13 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
-    android:color="#2EFFFFFF">
-    <item>
+    android:color="#1F667085">
+    <!-- 默认完全透明，仅按下时出现轻微圆形反馈，不再常驻白色圆圈。 -->
+    <item android:id="@android:id/mask">
         <shape android:shape="oval">
-            <!-- 中间完全透明，只保留轻薄白色轮廓。 -->
-            <solid android:color="@android:color/transparent" />
-            <stroke
-                android:width="1dp"
-                android:color="#78FFFFFF" />
+            <solid android:color="@android:color/white" />
         </shape>
     </item>
 </ripple>
