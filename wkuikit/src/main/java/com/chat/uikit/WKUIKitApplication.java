@@ -245,7 +245,7 @@ public class WKUIKitApplication {
             WKMsg wkMsg = (WKMsg) object;
             if (wkMsg.type == WKContentType.WK_TEXT) {
                 ChatItemPopupMenu menu = new ChatItemPopupMenu(
-                        R.drawable.ic_chat_translate_wa,
+                        R.drawable.ic_chat_translate_panel,
                         getContext().getString(com.chat.translate.R.string.wktranslate_translate),
                         (msg, iConversationContext) -> {
                             // Handled in WKChatBaseProvider by tag = chat_translate, so the action stays UI-module agnostic.
