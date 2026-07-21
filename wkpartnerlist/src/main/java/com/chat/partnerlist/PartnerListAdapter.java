@@ -358,10 +358,10 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     }
 
     private void setGreetingHi(TextView textView) {
-        textView.setText("Hi");
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f);
+        textView.setText(R.string.partnerlist_greet);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f);
         textView.setTypeface(MEDIUM);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0.015f);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0f);
     }
 
     private void setCompactButtonText(TextView textView, int textRes) {
