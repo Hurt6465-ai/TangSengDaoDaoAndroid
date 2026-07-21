@@ -290,7 +290,7 @@ open class WKTextProvider : WKChatBaseProvider() {
         btn.isSelected = cached?.expanded == true
         btn.setMinimumWidth(0)
         btn.setMinimumHeight(0)
-        // 28dp 点击框 + 4dp 内边距，实际图标约 20dp；无常驻底框，只保留按压反馈。
+        // 30dp 点击框 + 4dp 内边距，实际图标约 22dp；无常驻底框，只保留按压反馈。
         btn.setPadding(dp(4), dp(4), dp(4), dp(4))
         btn.setBackgroundResource(R.drawable.bg_chat_translate_quick)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
@@ -314,9 +314,9 @@ open class WKTextProvider : WKChatBaseProvider() {
                 else -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
             }
         }
-        val lp = LinearLayout.LayoutParams(dp(28), dp(28))
+        val lp = LinearLayout.LayoutParams(dp(30), dp(30))
         lp.gravity = Gravity.BOTTOM
-        lp.leftMargin = dp(5)
+        lp.leftMargin = dp(6)
         lp.bottomMargin = 0
         parent.addView(btn, lp)
     }
@@ -658,7 +658,7 @@ open class WKTextProvider : WKChatBaseProvider() {
             .setPopDelay(100)// 弹窗延迟时间 default 100毫秒
             .setFlame(uiChatMsgItemEntity.wkMsg.flame)
             .setIsShowPinnedMessage(if (uiChatMsgItemEntity.isShowPinnedMessage) 1 else 0)
-            .addItem(com.chat.uikit.R.drawable.ic_chat_translate_wa,
+            .addItem(com.chat.uikit.R.drawable.ic_chat_translate_panel,
                 context.getString(com.chat.translate.R.string.wktranslate_translate),
                 object : SelectTextHelper.Builder.onSeparateItemClickListener {
                     override fun onClick() {
