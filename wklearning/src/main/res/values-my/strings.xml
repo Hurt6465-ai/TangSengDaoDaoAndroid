@@ -144,4 +144,105 @@
     <string name="pronunciation_status_recording_and_recognizing">အသံသွင်းပြီး သိရှိနေသည်။ ပြီးရန် ထပ်နှိပ်ပါ။</string>
     <string name="pronunciation_try_again">ထပ်စမ်းရန်</string>
     <string name="pronunciation_unrecognized">စာသား မသိရှိနိုင်ပါ</string>
+
+
+    <!-- Learning home: fully localized hero carousel, tools, sections and drawer. -->
+    <string name="learning_home_course_recommendation">အကြံပြု သင်တန်းများ</string>
+    <string name="learning_home_enroll">စာရင်းသွင်းရန်</string>
+    <string name="learning_home_enroll_pending">စာရင်းသွင်းရန် ဝင်ပေါက်ကို မကြာမီ ဖွင့်လှစ်မည်</string>
+    <string name="learning_home_slide_position">%1$d/%2$d</string>
+    <string-array name="learning_home_plan_titles">
+        <item>ရက် ၉၀ တရုတ်စကားပြော သင်တန်း</item>
+        <item>AI ဘာသာစကားမိတ်ဖက် လေ့ကျင့်မှု</item>
+        <item>အရည်အသွေးမြင့် အဖွဲ့ငယ်သင်တန်း</item>
+    </string-array>
+    <string-array name="learning_home_plan_subtitles">
+        <item>စနစ်တကျ သင်ခန်းစာ · AI စကားပြောလေ့ကျင့်မှု</item>
+        <item>နေ့စဉ်စကားပြော · အသံထွက်ပြင်ဆင်မှု</item>
+        <item>ဆရာဦးဆောင် · အဆင့်လိုက် စစ်ဆေးမှု</item>
+    </string-array>
+    <string-array name="learning_home_plan_prices">
+        <item>¥--</item>
+        <item>တစ်လ ¥--</item>
+        <item>¥--</item>
+    </string-array>
+    <string-array name="learning_home_plan_notes">
+        <item>စာရင်းသွင်းမှုဖွင့်ချိန်တွင် စျေးနှုန်းကို ပြင်ဆင်မည်</item>
+        <item>အချိန်မရွေး စတင်နိုင်သည်</item>
+        <item>အဖွဲ့ငယ် နေရာအရေအတွက် ကန့်သတ်ထားသည်</item>
+    </string-array>
+
+    <string name="learning_home_quick_tools">အမြန်ကိရိယာများ</string>
+    <string name="learning_home_quick_tools_subtitle">ဘာသာပြန်၊ စာဖတ်နှင့် စကားပြောလေ့ကျင့်မှု</string>
+    <string name="learning_home_tool_translate">AI ဘာသာပြန်</string>
+    <string name="learning_home_tool_books">အီလက်ထရွန်နစ်စာအုပ်</string>
+    <string name="learning_home_tool_partner">AI စကားပြောဖော်</string>
+    <string name="learning_home_tool_practice">လေ့ကျင့်ခန်း</string>
+
+    <string name="learning_home_pinyin_title">ပင်ယင်</string>
+    <string name="learning_home_pinyin_subtitle">အသံထွက်မှ စတင်ရန်</string>
+    <string name="learning_home_initials">အသံအစ</string>
+    <string name="learning_home_finals">အသံအဆုံး</string>
+    <string name="learning_home_whole_syllables">အပြည့်အစုံဖတ်သံ</string>
+    <string name="learning_home_tones">အသံအနိမ့်အမြင့်</string>
+    <string name="learning_home_tones_desc">ပထမသံမှ စတုတ္ထသံအထိ</string>
+
+    <string name="learning_home_words_title">စကားလုံးများ</string>
+    <string name="learning_home_words_subtitle">အဆင့်အလိုက် တဖြည်းဖြည်း လေ့လာရန်</string>
+    <string name="learning_home_words_count">စကားလုံး %1$d လုံး</string>
+    <string name="learning_home_learned_format">လေ့လာပြီး %1$d / %2$d</string>
+
+    <string name="learning_home_speaking_title">စကားပြော</string>
+    <string name="learning_home_speaking_subtitle">တရုတ်စကားကို အမှန်တကယ် ပြောနိုင်ရန်</string>
+    <string name="learning_home_speak_hello">နှုတ်ဆက်ခြင်း</string>
+    <string name="learning_home_speak_hello_desc">စကားစတင်ခြင်း</string>
+    <string name="learning_home_speak_food">အစားအစာမှာခြင်း</string>
+    <string name="learning_home_speak_food_desc">စားသောက်ဆိုင်အသုံးအနှုန်း</string>
+    <string name="learning_home_speak_job">အလုပ်ရှာခြင်း</string>
+    <string name="learning_home_speak_job_desc">အင်တာဗျူးနှင့် အလုပ်</string>
+    <string name="learning_home_speak_shop">ဈေးဝယ်ခြင်း</string>
+    <string name="learning_home_speak_shop_desc">ငွေရှင်းနှင့် စျေးညှိခြင်း</string>
+
+    <string name="learning_home_patterns_title">ဝါကျပုံစံများ</string>
+    <string name="learning_home_patterns_subtitle">ပြည့်စုံသော ဖော်ပြချက်ကို လျင်မြန်စွာ ဖွဲ့ရန်</string>
+    <string name="learning_home_pattern_want">我想…</string>
+    <string name="learning_home_pattern_want_desc">လိုအပ်ချက်ကို ဖော်ပြရန်</string>
+    <string name="learning_home_pattern_can">可以吗</string>
+    <string name="learning_home_pattern_can_desc">အကူအညီ တောင်းရန်</string>
+    <string name="learning_home_pattern_how">怎么…</string>
+    <string name="learning_home_pattern_how_desc">နည်းလမ်း မေးရန်</string>
+    <string name="learning_home_pattern_why">为什么</string>
+    <string name="learning_home_pattern_why_desc">အကြောင်းရင်း မေးရန်</string>
+
+    <string name="learning_home_grammar_title">သဒ္ဒါ</string>
+    <string name="learning_home_grammar_subtitle">တရုတ်ဘာသာ၏ ဖွဲ့စည်းပုံကို နားလည်ရန်</string>
+    <string name="learning_home_grammar_le_desc">ပြီးဆုံးမှု / ပြောင်းလဲမှု</string>
+    <string name="learning_home_grammar_zai_desc">လုပ်ဆောင်နေဆဲ</string>
+    <string name="learning_home_grammar_ma_desc">မေးခွန်းအကူစကားလုံး</string>
+    <string name="learning_home_grammar_de_desc">ဖွဲ့စည်းပုံအကူစကားလုံး</string>
+    <string name="learning_home_more">ပိုမို</string>
+
+    <string name="learning_home_open_drawer">လေ့လာရေး ဘေးမီနူးကို ဖွင့်ရန်</string>
+    <string name="learning_home_drawer_kicker">LEARNING SPACE</string>
+    <string name="learning_home_drawer_title">အခြားဝန်ဆောင်မှုများ</string>
+    <string name="learning_home_drawer_subtitle">AI၊ အသံနှင့် တိုးချဲ့ကိရိယာများ</string>
+    <string name="learning_home_drawer_focus_title">အာရုံစိုက် လေ့လာရေးနေရာ</string>
+    <string name="learning_home_drawer_focus_subtitle">အဓိက လေ့လာရေးကိရိယာများကို တစ်နေရာတည်းတွင် စုထားသည်</string>
+    <string name="learning_home_drawer_ai_group">AI အကူအညီများ</string>
+    <string name="learning_home_drawer_deepseek">DeepSeek ဘာသာပြန်</string>
+    <string name="learning_home_drawer_deepseek_desc">တရုတ်-မြန်မာ ဘာသာပြန်နှင့် သဒ္ဒါရှင်းလင်းချက်</string>
+    <string name="learning_home_drawer_886_desc">တရုတ်ပြည်တွင်း အသုံးပြုသူများအတွက် AI လေ့လာရေးဝင်ပေါက်</string>
+    <string name="learning_home_drawer_qianwen">Qianwen တရုတ်ဗားရှင်း</string>
+    <string name="learning_home_drawer_qwen">Qwen နိုင်ငံတကာဗားရှင်း</string>
+    <string name="learning_home_drawer_tools_group">လေ့လာရေးကိရိယာများ</string>
+    <string name="learning_home_drawer_speech_settings">အသံဆက်တင်</string>
+    <string name="learning_home_drawer_speech_desc">WKSpeech အင်ဂျင်ကို ပြင်ဆင်ရန်</string>
+    <string name="learning_home_drawer_prompt">စကားပြော Prompt</string>
+    <string name="learning_home_drawer_prompt_desc">နေ့စဉ်အခြေအနေများအတွက် စကားပြောညွှန်ကြားချက်</string>
+    <string name="learning_home_drawer_extensions">တိုးချဲ့လုပ်ဆောင်ချက်များ</string>
+    <string name="learning_home_drawer_scripts">စခရစ် စင်တာ</string>
+    <string name="learning_home_drawer_scripts_desc">စိတ်ကြိုက် တိုးချဲ့လုပ်ဆောင်ချက်များ</string>
+    <string name="learning_home_coming_soon">%1$s ကို ဖန်တီးနေဆဲဖြစ်သည်</string>
+    <string name="learning_home_speech_plugin_missing">အသံပလပ်အင် မတပ်ဆင်ရသေးပါ</string>
+
 </resources>
