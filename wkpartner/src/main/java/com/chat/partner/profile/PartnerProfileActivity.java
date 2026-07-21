@@ -82,7 +82,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     // instead of ViewBinding fields, so the Java file does not depend on generated binding fields
     // that may be absent until the updated XML is compiled.
     private View fixedProfileTopBar;
-    private View fixedWorksHeader;
     private TextView toolbarTitleTv;
     private View toolbarMetaLayout;
     private View toolbarCountryGroup;
@@ -177,7 +176,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
 
     private void ensureFixedTopBarViews() {
         if (fixedProfileTopBar == null) fixedProfileTopBar = findViewById(R.id.fixedProfileTopBar);
-        if (fixedWorksHeader == null) fixedWorksHeader = findViewById(R.id.fixedWorksHeader);
         if (toolbarTitleTv == null) toolbarTitleTv = findViewById(R.id.toolbarTitleTv);
         if (toolbarMetaLayout == null) toolbarMetaLayout = findViewById(R.id.toolbarMetaLayout);
         if (toolbarCountryGroup == null) toolbarCountryGroup = findViewById(R.id.toolbarCountryGroup);
@@ -229,11 +227,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             fixedProfileTopBar.setTranslationZ(0f);
             fixedProfileTopBar.setStateListAnimator(null);
         }
-        if (fixedWorksHeader != null) {
-            fixedWorksHeader.setElevation(0f);
-            fixedWorksHeader.setTranslationZ(0f);
-            fixedWorksHeader.setStateListAnimator(null);
-        }
     }
 
     private int getStatusBarHeight() {
@@ -272,34 +265,31 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         updateFixedTopBarAppearance(isWorksPinned());
     }
 
-    // ============ 作品栏吸顶核心逻辑 ============
-    // 判断依据：内容里的“作品”标题 feedWorksTitleTv 相对 root 的 top
-    // 是否已经到达 fixedProfileTopBar 的 bottom。不使用 scrollY。
+    // ============ 作品区滚动状态 ============
+    // 个人主页滚到作品区后，只保留最顶部的用户名栏。
+    // “作品”标题属于 AppBar 内容，必须和头像、简介、语言、标签一起自然滚出屏幕，
+    // 不能再创建第二条固定吸顶栏，否则顶部会显得拥挤并额外遮挡第一排作品。
     private void updateWorksHeaderPin() {
         ensureFixedTopBarViews();
-        if (wkVBinding == null || fixedWorksHeader == null || feedWorksSection == null) return;
-        positionWorksHeader();
-        boolean pinned = isWorksPinned();
-        fixedWorksHeader.setVisibility(pinned ? View.VISIBLE : View.GONE);
-        updateFixedTopBarAppearance(pinned);
-        if (pinned) {
-            fixedProfileTopBar.bringToFront();
-            fixedWorksHeader.bringToFront();
-            wkVBinding.helloBar.bringToFront();
-        }
+        if (wkVBinding == null || feedWorksSection == null) return;
+
+        boolean worksReachedTop = isWorksPinned();
         if (feedWorksTitleTv != null) {
-            // 隐藏内容流里的标题但保留占位，避免跳动。
-            feedWorksTitleTv.setVisibility(pinned ? View.INVISIBLE : View.VISIBLE);
+            feedWorksTitleTv.setVisibility(View.VISIBLE);
+        }
+
+        // 作品区到达顶部后，把唯一保留的用户名栏切成白底深色模式。
+        updateFixedTopBarAppearance(worksReachedTop);
+        if (fixedProfileTopBar != null) fixedProfileTopBar.bringToFront();
+        if (wkVBinding.helloBar.getVisibility() == View.VISIBLE) {
+            wkVBinding.helloBar.bringToFront();
         }
         applyFeedHostInsets();
     }
 
-    // 把固定作品栏定位到 fixedProfileTopBar 的正下方。
+    // 旧版会在这里定位第二条固定“作品”栏；新结构不再创建该覆盖层。
     private void positionWorksHeader() {
-        ensureFixedTopBarViews();
-        if (wkVBinding == null || fixedWorksHeader == null || fixedProfileTopBar == null) return;
-        int barBottom = topBarHeight > 0 ? topBarHeight : fixedProfileTopBar.getHeight();
-        fixedWorksHeader.setY(barBottom);
+        // No-op by design.
     }
 
     private boolean isWorksPinned() {
@@ -332,11 +322,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         ensureFixedTopBarViews();
         if (feedWorksContainer == null || feedWorksContainer.getVisibility() != View.VISIBLE) return;
 
+        // 作品滚动时顶部只存在用户名栏，不再为“作品”标题预留第二层 inset。
         int overlayBottom = topBarHeight > 0 ? topBarHeight : dp(80);
-        if (fixedWorksHeader != null && fixedWorksHeader.getVisibility() == View.VISIBLE) {
-            overlayBottom += fixedWorksHeader.getHeight() > 0
-                    ? fixedWorksHeader.getHeight() : dp(48);
-        }
         int containerTop = topInRoot(feedWorksContainer);
         int topInset = containerTop == Integer.MAX_VALUE
                 ? 0 : Math.max(0, overlayBottom - containerTop);
@@ -660,7 +647,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (wkVBinding == null) return;
         if (feedWorksSection != null) feedWorksSection.setVisibility(View.GONE);
         if (feedWorksContainer != null) feedWorksContainer.setVisibility(View.GONE);
-        if (fixedWorksHeader != null) fixedWorksHeader.setVisibility(View.GONE);
         if (feedWorksTitleTv != null) feedWorksTitleTv.setVisibility(View.VISIBLE);
         feedWorksFragment = null;
         lastFeedTopInset = -1;
