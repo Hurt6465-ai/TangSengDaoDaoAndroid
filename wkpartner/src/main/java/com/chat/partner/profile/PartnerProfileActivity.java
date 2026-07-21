@@ -24,8 +24,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.fragment.app.Fragment;
-import androidx.core.widget.NestedScrollView;
-import androidx.recyclerview.widget.RecyclerView;
 
 import com.alibaba.fastjson.JSONObject;
 import com.chat.base.act.WKWebViewActivity;
@@ -77,6 +75,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private PartnerProfileEntity profile;
     private String sourceVercode;
     private Fragment feedWorksFragment;
+    private int lastFeedTopInset = -1;
+    private int lastFeedBottomInset = -1;
 
     // These views were moved out of the old Toolbar/AppBar collapsing area. Use findViewById
     // instead of ViewBinding fields, so the Java file does not depend on generated binding fields
@@ -127,12 +127,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.editBtn.setVisibility(View.VISIBLE);
         wkVBinding.editBtn.setImageResource(R.drawable.ic_partner_more_horizontal);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
-        wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
         // 固定顶栏样式只设置一次。它永远是白底深色图标，不再随折叠百分比变化。
         applyFixedTopBarStyle();
         setupCoverParallax();
-        setupWorksScrollBridge();
         setupEntranceAnimation();
         resetInitialScrollState();
     }
@@ -171,9 +169,9 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void resetInitialScrollState() {
         wkVBinding.appBarLayout.post(() -> {
             wkVBinding.appBarLayout.setExpanded(true, false);
-            wkVBinding.nestedScrollView.scrollTo(0, 0);
             applyProfileContentVisibility();
             updateWorksHeaderPin();
+            invokeFeedMethod("scrollToTop", new Class<?>[0]);
         });
     }
 
@@ -245,12 +243,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         return result > 0 ? result : dp(24);
     }
 
-    // 只保留 cover 的视差/缩放，绝不再用折叠百分比驱动顶栏。
+    // 封面折叠百分比只按封面本身计算。资料区现在也属于 AppBar，不能再用总滚动范围，
+    // 否则封面已经消失后顶栏仍可能保持白色图标。
     private void setupCoverParallax() {
         wkVBinding.appBarLayout.addOnOffsetChangedListener((appBarLayout, verticalOffset) -> {
-            int range = appBarLayout.getTotalScrollRange();
-            if (range <= 0) return;
-            float percent = Math.min(1f, Math.max(0f, Math.abs(verticalOffset) * 1f / range));
+            int coverRange = Math.max(1, wkVBinding.collapsingToolbar.getHeight());
+            float percent = Math.min(1f,
+                    Math.max(0f, Math.abs(verticalOffset) * 1f / coverRange));
             currentCollapsePercent = percent;
             float scale = 1f + (0.04f * (1f - percent));
             wkVBinding.coverIv.setScaleX(scale);
@@ -258,31 +257,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             applyProfileContentVisibility();
             updateWorksHeaderPin();
         });
-    }
-
-    private void setupWorksScrollBridge() {
-        wkVBinding.nestedScrollView.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener)
-                (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-                    updateWorksHeaderPin();
-                    if (scrollY > oldScrollY) maybeLoadMoreWorks();
-                });
-    }
-
-    private void maybeLoadMoreWorks() {
-        ensureFixedTopBarViews();
-        if (feedWorksSection == null || feedWorksSection.getVisibility() != View.VISIBLE) return;
-        View child = wkVBinding.nestedScrollView.getChildAt(0);
-        if (child == null) return;
-        int distanceToBottom = child.getBottom()
-                - (wkVBinding.nestedScrollView.getScrollY() + wkVBinding.nestedScrollView.getHeight());
-        if (distanceToBottom > dp(900)) return;
-
-        Fragment current = resolveFeedWorksFragment();
-        if (current == null) return;
-        try {
-            current.getClass().getMethod("loadMoreIfNeeded").invoke(current);
-        } catch (Throwable ignored) {
-        }
     }
 
     // 只隐藏大资料区（大头像、背景墙资料、简介、标签、语言）。
@@ -317,6 +291,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             // 隐藏内容流里的标题但保留占位，避免跳动。
             feedWorksTitleTv.setVisibility(pinned ? View.INVISIBLE : View.VISIBLE);
         }
+        applyFeedHostInsets();
     }
 
     // 把固定作品栏定位到 fixedProfileTopBar 的正下方。
@@ -346,6 +321,42 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.getRoot().getLocationInWindow(rootLoc);
         view.getLocationInWindow(viewLoc);
         return viewLoc[1] - rootLoc[1];
+    }
+
+    /**
+     * Keep the first/last work card clear of the fixed top bars and the bottom action button.
+     * The top inset is calculated from real screen positions, so it grows only when the
+     * RecyclerView actually moves underneath an overlay; there is no blank gap while expanded.
+     */
+    private void applyFeedHostInsets() {
+        ensureFixedTopBarViews();
+        if (feedWorksContainer == null || feedWorksContainer.getVisibility() != View.VISIBLE) return;
+
+        int overlayBottom = topBarHeight > 0 ? topBarHeight : dp(80);
+        if (fixedWorksHeader != null && fixedWorksHeader.getVisibility() == View.VISIBLE) {
+            overlayBottom += fixedWorksHeader.getHeight() > 0
+                    ? fixedWorksHeader.getHeight() : dp(48);
+        }
+        int containerTop = topInRoot(feedWorksContainer);
+        int topInset = containerTop == Integer.MAX_VALUE
+                ? 0 : Math.max(0, overlayBottom - containerTop);
+        int bottomInset = isSelf ? dp(24) : dp(116);
+        if (lastFeedBottomInset == bottomInset
+                && lastFeedTopInset >= 0
+                && Math.abs(lastFeedTopInset - topInset) < dp(2)) return;
+        lastFeedTopInset = topInset;
+        lastFeedBottomInset = bottomInset;
+        invokeFeedMethod("setHostInsets",
+                new Class<?>[]{int.class, int.class}, topInset, bottomInset);
+    }
+
+    private void invokeFeedMethod(String name, Class<?>[] parameterTypes, Object... args) {
+        Fragment current = resolveFeedWorksFragment();
+        if (current == null) return;
+        try {
+            current.getClass().getMethod(name, parameterTypes).invoke(current, args);
+        } catch (Throwable ignored) {
+        }
     }
 
     // 固定顶栏分两态：
@@ -613,15 +624,15 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
                         .commitAllowingStateLoss();
             }
 
-            // Reuse the Fragment that is actually attached to the container. Previously every
-            // profile refresh created a new, unattached Fragment and assigned it here, so the
-            // outer scroll bridge sent load-more calls to an invisible Fragment after onResume.
+            // Reuse the Fragment that is actually attached to the container. Profile refreshes
+            // must not replace the visible list with a detached Fragment or reset its pagination.
             feedWorksFragment = current;
+            lastFeedTopInset = -1;
+            lastFeedBottomInset = -1;
             feedWorksSection.setVisibility(View.VISIBLE);
-            updateWorksHeaderPin();
-            feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 160);
-            feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 480);
-            feedWorksContainer.postDelayed(this::maybeLoadMoreWorks, 650);
+            feedWorksContainer.setVisibility(View.VISIBLE);
+            feedWorksContainer.post(this::updateWorksHeaderPin);
+            feedWorksContainer.postDelayed(this::updateWorksHeaderPin, 120);
         } catch (Throwable ignored) {
             // wkfeed is optional. Its absence must not break the profile page.
             hideFeedWorks();
@@ -648,32 +659,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void hideFeedWorks() {
         if (wkVBinding == null) return;
         if (feedWorksSection != null) feedWorksSection.setVisibility(View.GONE);
+        if (feedWorksContainer != null) feedWorksContainer.setVisibility(View.GONE);
+        if (fixedWorksHeader != null) fixedWorksHeader.setVisibility(View.GONE);
+        if (feedWorksTitleTv != null) feedWorksTitleTv.setVisibility(View.VISIBLE);
         feedWorksFragment = null;
-        updateWorksHeaderPin();
-    }
-
-    private void disableNestedFeedScrolling() {
-        ensureFixedTopBarViews();
-        if (wkVBinding == null || feedWorksContainer == null) return;
-        disableNestedFeedScrolling(feedWorksContainer);
-    }
-
-    private void disableNestedFeedScrolling(View view) {
-        if (view == null) return;
-        if (view instanceof RecyclerView) {
-            RecyclerView recyclerView = (RecyclerView) view;
-            recyclerView.setNestedScrollingEnabled(false);
-            recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-            recyclerView.setHasFixedSize(false);
-            recyclerView.requestLayout();
-            return;
-        }
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                disableNestedFeedScrolling(group.getChildAt(i));
-            }
-        }
+        lastFeedTopInset = -1;
+        lastFeedBottomInset = -1;
+        updateFixedTopBarAppearance(false);
     }
 
     private void bindCover(String cover) {
@@ -971,13 +963,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void bindActionButton(PartnerProfileEntity data) {
         if (isSelf) {
             wkVBinding.helloBar.setVisibility(View.GONE);
-            wkVBinding.bottomActionSpace.setVisibility(View.GONE);
+            if (feedWorksContainer != null) feedWorksContainer.post(this::applyFeedHostInsets);
             return;
         }
         boolean blocked = isBlacklisted(data);
         boolean isFriend = isFriend(data);
         wkVBinding.helloBar.setVisibility(View.VISIBLE);
-        wkVBinding.bottomActionSpace.setVisibility(View.VISIBLE);
         wkVBinding.helloBtnLayout.setEnabled(true);
         wkVBinding.helloBtnLayout.setAlpha(1f);
         if (blocked) {
@@ -990,9 +981,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.helloBtnProgress.setVisibility(View.GONE);
         setHelloButtonWidth(ViewGroup.LayoutParams.MATCH_PARENT);
         isSayHiLoading = false;
+        if (feedWorksContainer != null) feedWorksContainer.post(this::applyFeedHostInsets);
     }
 
     private void onMainActionClick() {
+        // This button sends a real friend application. The entered text is the verification
+        // message attached to that application; it is not the partner greeting/private-message API.
         if (isSayHiLoading) return;
         pressAndRun(wkVBinding.helloBtnLayout, () -> {
             if (isBlacklisted(profile)) {
