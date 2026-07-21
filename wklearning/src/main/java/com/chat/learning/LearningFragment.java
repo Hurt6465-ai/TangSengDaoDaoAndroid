@@ -17,8 +17,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -27,40 +29,32 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.view.GravityCompat;
-import androidx.customview.widget.ViewDragHelper;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 
 import com.chat.userscript.AiScriptWebActivity;
 import com.chat.userscript.ScriptManagerActivity;
 
-import java.lang.reflect.Field;
 
 /**
- * 学习首页：浅色渐变 + 轻玻璃拟态 + 上浮内容抽屉。
- *
- * 设计重点：
- * 1. 顶部使用原生绘制的浅紫蓝氛围背景，不再依赖深色宣传图。
- * 2. 内容面板向上覆盖顶部背景，滚动时形成类似贴吧主页的层次感。
- * 3. 不使用实时模糊，避免低端设备掉帧；通过半透明、描边、渐变和阴影模拟玻璃。
+ * 学习首页：贴吧式双层结构 + 固定背景层 + 全宽内容层。
  */
 public class LearningFragment extends Fragment {
-    private static final int COLOR_PAGE = 0xFFF4F7FD;
-    private static final int COLOR_GLASS = 0xF2FFFFFF;
+    private static final int COLOR_PAGE = 0xFFF3F6FB;
+    private static final int COLOR_GLASS = 0xF4FFFFFF;
     private static final int COLOR_TEXT = 0xFF172033;
     private static final int COLOR_SUB = 0xFF778197;
     private static final int COLOR_BRAND = 0xFF635BFF;
-    private static final int COLOR_BRAND_END = 0xFF4D8DFF;
 
-    private DrawerLayout drawerLayout;
+    private WideEdgeDrawerLayout drawerLayout;
     private long lastCardClickTime = 0L;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        drawerLayout = new DrawerLayout(requireContext());
+        drawerLayout = new WideEdgeDrawerLayout(requireContext());
         drawerLayout.setBackgroundColor(COLOR_PAGE);
         drawerLayout.setScrimColor(0x3D12182A);
-        drawerLayout.setDrawerElevation(dp(24));
+        drawerLayout.setDrawerElevation(dp(18));
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, GravityCompat.START);
 
         View main = createMainPage();
@@ -71,7 +65,8 @@ public class LearningFragment extends Fragment {
         drawerLp.gravity = GravityCompat.START;
         drawerLayout.addView(drawer, drawerLp);
 
-        widenDrawerGestureArea(dp(76));
+        int edgeWidth = Math.max(dp(132), (int) (getResources().getDisplayMetrics().widthPixels * 0.30f));
+        drawerLayout.setEdgeSwipeWidth(edgeWidth);
         return drawerLayout;
     }
 
@@ -81,6 +76,10 @@ public class LearningFragment extends Fragment {
 
         LearningBackdropView backdrop = new LearningBackdropView(requireContext());
         page.addView(backdrop, new FrameLayout.LayoutParams(-1, -1));
+
+        int heroHeight = dp(302);
+        View hero = createHero();
+        page.addView(hero, new FrameLayout.LayoutParams(-1, heroHeight));
 
         ScrollView scrollView = new ScrollView(requireContext());
         scrollView.setFillViewport(true);
@@ -94,24 +93,21 @@ public class LearningFragment extends Fragment {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setClipChildren(false);
         root.setClipToPadding(false);
-        root.setPadding(0, 0, 0, dp(116));
+        root.setPadding(0, heroHeight - dp(44), 0, dp(116));
         scrollView.addView(root, new ScrollView.LayoutParams(-1, -2));
 
-        View hero = createHero();
-        root.addView(hero, new LinearLayout.LayoutParams(-1, dp(330)));
-
         LinearLayout sheet = createContentSheet();
-        LinearLayout.LayoutParams sheetLp = new LinearLayout.LayoutParams(-1, -2);
-        sheetLp.setMargins(dp(12), -dp(42), dp(12), 0);
-        root.addView(sheet, sheetLp);
+        root.addView(sheet, new LinearLayout.LayoutParams(-1, -2));
 
-        // 顶部轻微视差，内容抽屉上推时会更有纵深，但不会增加布局计算压力。
-        scrollView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-            float offset = Math.min(scrollY * 0.18f, dp(42));
-            hero.setTranslationY(offset);
-            hero.setAlpha(Math.max(0.82f, 1f - scrollY / (float) dp(720)));
-        });
+        // 菜单按钮必须位于 ScrollView 之上，否则透明滚动层会截走点击事件。
+        View menuButton = createMenuHandle();
+        FrameLayout.LayoutParams menuLp = new FrameLayout.LayoutParams(
+                dp(56), dp(56), Gravity.TOP | Gravity.END
+        );
+        menuLp.setMargins(0, getTopInset() + dp(6), dp(10), 0);
+        page.addView(menuButton, menuLp);
 
+        // 背景层固定不动，只有整屏内容层随手势向上覆盖。
         return page;
     }
 
@@ -120,12 +116,12 @@ public class LearningFragment extends Fragment {
         sheet.setOrientation(LinearLayout.VERTICAL);
         sheet.setPadding(dp(18), dp(12), dp(18), dp(30));
         sheet.setBackground(topSheetDrawable());
-        sheet.setElevation(dp(13));
+        sheet.setElevation(dp(12));
         sheet.setClipToOutline(true);
 
         View handle = new View(requireContext());
-        handle.setBackground(rounded(0xFFD9DEEA, dp(2), Color.TRANSPARENT, 0));
-        LinearLayout.LayoutParams handleLp = new LinearLayout.LayoutParams(dp(36), dp(4));
+        handle.setBackground(rounded(0xFFD7DCE8, dp(2), Color.TRANSPARENT, 0));
+        LinearLayout.LayoutParams handleLp = new LinearLayout.LayoutParams(dp(38), dp(4));
         handleLp.gravity = Gravity.CENTER_HORIZONTAL;
         handleLp.setMargins(0, 0, 0, dp(18));
         sheet.addView(handle, handleLp);
@@ -194,12 +190,17 @@ public class LearningFragment extends Fragment {
         hero.setClipChildren(false);
         hero.setClipToPadding(false);
 
-        HeroGradientView background = new HeroGradientView(requireContext());
-        hero.addView(background, new FrameLayout.LayoutParams(-1, -1));
+        ImageView image = new ImageView(requireContext());
+        image.setImageResource(R.drawable.learning_home_banner_default);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        hero.addView(image, new FrameLayout.LayoutParams(-1, -1));
+
+        HeroImageScrimView scrim = new HeroImageScrimView(requireContext());
+        hero.addView(scrim, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout content = new LinearLayout(requireContext());
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(16), dp(20), dp(54));
+        content.setPadding(dp(20), getTopInset() + dp(16), dp(20), dp(76));
         hero.addView(content, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout topRow = new LinearLayout(requireContext());
@@ -211,94 +212,53 @@ public class LearningFragment extends Fragment {
         heading.setOrientation(LinearLayout.VERTICAL);
         topRow.addView(heading, new LinearLayout.LayoutParams(0, -2, 1f));
 
-        TextView pageTitle = text("学习", 26, COLOR_TEXT, true);
+        TextView pageTitle = text("学习", 28, Color.WHITE, true);
         heading.addView(pageTitle, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView greeting = text("每天进步一点点", 12, 0xB55E6B82, false);
+        TextView greeting = text("沉浸式中文学习空间", 12, 0xE6F5F8FF, false);
         LinearLayout.LayoutParams greetingLp = new LinearLayout.LayoutParams(-1, -2);
-        greetingLp.setMargins(0, dp(4), 0, 0);
+        greetingLp.setMargins(0, dp(5), 0, 0);
         heading.addView(greeting, greetingLp);
 
-        topRow.addView(createMenuHandle(), new LinearLayout.LayoutParams(dp(42), dp(42)));
+        View spacer = new View(requireContext());
+        content.addView(spacer, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        TextView plan = text("今日学习  ·  从发音开始", 12, 0xFF5B54D6, true);
-        plan.setGravity(Gravity.CENTER);
-        plan.setPadding(dp(12), dp(7), dp(12), dp(7));
-        plan.setBackground(rounded(0xAFFFFFFF, dp(16), 0xC9FFFFFF, dp(1)));
-        LinearLayout.LayoutParams planLp = new LinearLayout.LayoutParams(-2, -2);
-        planLp.setMargins(0, dp(18), 0, dp(10));
-        content.addView(plan, planLp);
-
-        TextView title = text("继续你的中文旅程", 28, COLOR_TEXT, true);
-        title.setLetterSpacing(-0.01f);
-        content.addView(title, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView sub = text("从发音到对话，按自己的节奏稳步前进", 14, 0xCC58647C, false);
+        TextView subtitle = text("从拼音、单词到口语，按自己的节奏慢慢提升。", 14, 0xE9F8FAFF, false);
+        subtitle.setLineSpacing(0, 1.15f);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
-        subLp.setMargins(0, dp(7), 0, dp(14));
-        content.addView(sub, subLp);
+        subLp.setMargins(0, 0, dp(48), 0);
+        content.addView(subtitle, subLp);
 
-        View continueCard = createContinueCard();
-        content.addView(continueCard, new LinearLayout.LayoutParams(-1, dp(82)));
         return hero;
-    }
-
-    private View createContinueCard() {
-        LinearLayout card = new LinearLayout(requireContext());
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(16), dp(11), dp(13), dp(11));
-        card.setBackground(gradientRounded(0xDFFFFFFF, 0xBFFFFFFF, dp(22), 0xE6FFFFFF, dp(1)));
-        card.setElevation(dp(7));
-        bindClick(card, () -> openDirectory("pinyin", "拼音", ""));
-        attachNativePressAnimator(card, 7, 3);
-
-        LinearLayout copy = new LinearLayout(requireContext());
-        copy.setOrientation(LinearLayout.VERTICAL);
-        card.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
-
-        TextView eyebrow = text("继续学习", 11, 0xFF7C8498, true);
-        copy.addView(eyebrow, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView lesson = text("拼音 · 声母与韵母", 16, COLOR_TEXT, true);
-        LinearLayout.LayoutParams lessonLp = new LinearLayout.LayoutParams(-1, -2);
-        lessonLp.setMargins(0, dp(6), 0, 0);
-        copy.addView(lesson, lessonLp);
-
-        TextView meta = text("基础入门  ·  约 8 分钟", 11, 0xFF7E879A, false);
-        LinearLayout.LayoutParams metaLp = new LinearLayout.LayoutParams(-1, -2);
-        metaLp.setMargins(0, dp(6), dp(18), 0);
-        copy.addView(meta, metaLp);
-
-        TextView button = text("继续  ›", 13, Color.WHITE, true);
-        button.setGravity(Gravity.CENTER);
-        button.setBackground(brandGradient(dp(18)));
-        card.addView(button, new LinearLayout.LayoutParams(dp(76), dp(38)));
-        return card;
     }
 
     private View createMenuHandle() {
         FrameLayout box = new FrameLayout(requireContext());
-        box.setBackground(rounded(0x4DFFFFFF, dp(21), 0x99FFFFFF, dp(1)));
-        bindClick(box, this::openDrawer);
-        attachNativePressAnimator(box, 0, 2);
+        // 无背景框，仅保留 56dp 透明触摸区，视觉更轻，点击也更可靠。
+        box.setBackgroundColor(Color.TRANSPARENT);
+        box.setClickable(true);
+        box.setFocusable(true);
+        box.setContentDescription("打开学习侧边栏");
+        box.setOnClickListener(v -> openDrawer());
 
         LinearLayout bars = new LinearLayout(requireContext());
         bars.setOrientation(LinearLayout.VERTICAL);
         bars.setGravity(Gravity.CENTER);
+        bars.setClickable(false);
+        bars.setFocusable(false);
         box.addView(bars, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
 
-        bars.addView(menuLine(dp(17)), new LinearLayout.LayoutParams(dp(17), dp(2)));
-        addSpace(bars, 4);
-        bars.addView(menuLine(dp(13)), new LinearLayout.LayoutParams(dp(13), dp(2)));
-        addSpace(bars, 4);
-        bars.addView(menuLine(dp(17)), new LinearLayout.LayoutParams(dp(17), dp(2)));
+        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(20), dp(2)));
+        addSpace(bars, 5);
+        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(15), dp(2)));
+        addSpace(bars, 5);
+        bars.addView(menuLine(), new LinearLayout.LayoutParams(dp(20), dp(2)));
         return box;
     }
 
-    private View menuLine(int ignored) {
+    private View menuLine() {
         View view = new View(requireContext());
-        view.setBackground(rounded(0xFF384158, dp(1), Color.TRANSPARENT, 0));
+        view.setBackground(rounded(0xFFFFFFFF, dp(1), Color.TRANSPARENT, 0));
         return view;
     }
 
@@ -468,10 +428,10 @@ public class LearningFragment extends Fragment {
     private View createSideDrawer() {
         LinearLayout panel = new LinearLayout(requireContext());
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(20), dp(38), dp(18), dp(20));
+        panel.setPadding(dp(20), getTopInset() + dp(18), dp(18), dp(20));
         panel.setBackground(drawerBackground());
         panel.setClickable(true);
-        panel.setElevation(dp(24));
+        panel.setElevation(dp(18));
 
         TextView kicker = text("LEARNING SPACE", 10, 0xFF8177E7, true);
         kicker.setLetterSpacing(0.12f);
@@ -491,7 +451,7 @@ public class LearningFragment extends Fragment {
         focusCard.setOrientation(LinearLayout.VERTICAL);
         focusCard.setGravity(Gravity.CENTER_VERTICAL);
         focusCard.setPadding(dp(14), dp(10), dp(14), dp(10));
-        focusCard.setBackground(gradientRounded(0x6DDED9FF, 0x45D6EEFF, dp(18), 0xB3FFFFFF, dp(1)));
+        focusCard.setBackground(gradientRounded(0x6DDED9FF, 0x45D6EEFF, dp(16), 0xB3FFFFFF, dp(1)));
 
         TextView focusTitle = text("沉浸学习空间", 13, COLOR_TEXT, true);
         focusCard.addView(focusTitle, new LinearLayout.LayoutParams(-1, -2));
@@ -550,7 +510,7 @@ public class LearningFragment extends Fragment {
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(13), dp(13), dp(12), dp(13));
-        card.setBackground(gradientRounded(0xDFFFFFFF, 0xBFFFFFFF, dp(17), 0xD9FFFFFF, dp(1)));
+        card.setBackground(gradientRounded(0xDFFFFFFF, 0xBFFFFFFF, dp(14), 0xD9FFFFFF, dp(1)));
         bindClick(card, () -> {
             closeDrawer();
             if (click != null) click.run();
@@ -741,46 +701,24 @@ public class LearningFragment extends Fragment {
         view.setStateListAnimator(animator);
     }
 
-    private void widenDrawerGestureArea(final int edgeSizePx) {
-        if (drawerLayout == null) return;
-
-        drawerLayout.post(() -> {
-            try {
-                Field leftDraggerField = DrawerLayout.class.getDeclaredField("mLeftDragger");
-                leftDraggerField.setAccessible(true);
-
-                ViewDragHelper leftDragger = (ViewDragHelper) leftDraggerField.get(drawerLayout);
-                if (leftDragger == null) return;
-
-                Field edgeSizeField = ViewDragHelper.class.getDeclaredField("mEdgeSize");
-                edgeSizeField.setAccessible(true);
-
-                int oldSize = edgeSizeField.getInt(leftDragger);
-                edgeSizeField.setInt(leftDragger, Math.max(oldSize, edgeSizePx));
-            } catch (Throwable ignored) {
-            }
-        });
-    }
-
     private GradientDrawable topSheetDrawable() {
         GradientDrawable drawable = new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xF5FFFFFF, COLOR_GLASS}
+                new int[]{0xF7FFFFFF, COLOR_GLASS}
         );
         float r = dp(30);
-        drawable.setCornerRadii(new float[]{r, r, r, r, dp(12), dp(12), dp(12), dp(12)});
-        drawable.setStroke(dp(1), 0xF2FFFFFF);
+        drawable.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
+        drawable.setStroke(dp(1), 0xEBFFFFFF);
         return drawable;
     }
 
     private GradientDrawable drawerBackground() {
         GradientDrawable drawable = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                new int[]{0xFFF8F7FF, 0xFFF1F8FF, 0xFFFBFCFF}
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0xFFF8F7FF, 0xFFF2F7FF, 0xFFFBFCFF}
         );
-        float r = dp(28);
-        drawable.setCornerRadii(new float[]{0, 0, r, r, r, r, 0, 0});
-        drawable.setStroke(dp(1), 0xFFFFFFFF);
+        drawable.setCornerRadius(0);
+        drawable.setStroke(dp(1), 0xF2FFFFFF);
         return drawable;
     }
 
@@ -800,15 +738,6 @@ public class LearningFragment extends Fragment {
         );
         drawable.setCornerRadius(radius);
         if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
-        return drawable;
-    }
-
-    private GradientDrawable brandGradient(float radius) {
-        GradientDrawable drawable = new GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{COLOR_BRAND, COLOR_BRAND_END}
-        );
-        drawable.setCornerRadius(radius);
         return drawable;
     }
 
@@ -836,11 +765,80 @@ public class LearningFragment extends Fragment {
     }
 
     private int getDrawerWidth() {
-        return (int) (getResources().getDisplayMetrics().widthPixels * 0.82f);
+        return (int) (getResources().getDisplayMetrics().widthPixels * 0.84f);
+    }
+
+    private int getTopInset() {
+        int resId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resId > 0) return getResources().getDimensionPixelSize(resId);
+        return dp(24);
     }
 
     private int dp(float value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    /**
+     * DrawerLayout 默认只允许从很窄的屏幕边缘开始滑动，且依赖内部字段反射的做法
+     * 在不同 AndroidX 版本上容易失效。这里直接识别左侧宽区域的横向手势。
+     */
+    private static class WideEdgeDrawerLayout extends DrawerLayout {
+        private final int touchSlop;
+        private int edgeSwipeWidth;
+        private float downX;
+        private float downY;
+        private boolean trackingEdgeGesture;
+
+        WideEdgeDrawerLayout(Context context) {
+            super(context);
+            touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+            edgeSwipeWidth = touchSlop * 3;
+        }
+
+        void setEdgeSwipeWidth(int widthPx) {
+            edgeSwipeWidth = Math.max(widthPx, touchSlop * 3);
+        }
+
+        @Override
+        public boolean onInterceptTouchEvent(MotionEvent event) {
+            final int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                downX = event.getX();
+                downY = event.getY();
+                trackingEdgeGesture = downX <= edgeSwipeWidth
+                        && !isDrawerOpen(GravityCompat.START);
+            } else if (action == MotionEvent.ACTION_MOVE && trackingEdgeGesture) {
+                float dx = event.getX() - downX;
+                float dy = event.getY() - downY;
+                if (dx > touchSlop && dx > Math.abs(dy) * 1.15f) {
+                    trackingEdgeGesture = false;
+                    openDrawer(GravityCompat.START, true);
+                    return true;
+                }
+                if (Math.abs(dy) > touchSlop && Math.abs(dy) > Math.abs(dx)) {
+                    trackingEdgeGesture = false;
+                }
+            } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                trackingEdgeGesture = false;
+            }
+            return super.onInterceptTouchEvent(event);
+        }
+
+        @Override
+        public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {
+            // 横向手势从左侧触发区开始时，允许父布局继续判断是否打开抽屉。
+            if (trackingEdgeGesture && disallowIntercept) return;
+            super.requestDisallowInterceptTouchEvent(disallowIntercept);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                trackingEdgeGesture = false;
+            }
+            return super.onTouchEvent(event);
+        }
     }
 
     private static class CardSpec {
@@ -872,11 +870,11 @@ public class LearningFragment extends Fragment {
                     new int[]{0xFFF4F1FF, 0xFFF0F8FF, 0xFFFAFCFF},
                     new float[]{0f, 0.48f, 1f}, Shader.TileMode.CLAMP));
             blobOne.setShader(new RadialGradient(w * 0.88f, h * 0.14f, w * 0.50f,
-                    0x3B8AA8FF, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+                    0x328AA8FF, Color.TRANSPARENT, Shader.TileMode.CLAMP));
             blobTwo.setShader(new RadialGradient(w * 0.10f, h * 0.38f, w * 0.43f,
-                    0x2FCB9CFF, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+                    0x22CB9CFF, Color.TRANSPARENT, Shader.TileMode.CLAMP));
             blobThree.setShader(new RadialGradient(w * 0.80f, h * 0.68f, w * 0.52f,
-                    0x24A8E6D5, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+                    0x1CA8E6D5, Color.TRANSPARENT, Shader.TileMode.CLAMP));
         }
 
         @Override
@@ -889,48 +887,49 @@ public class LearningFragment extends Fragment {
         }
     }
 
-    private static class HeroGradientView extends View {
-        private final Paint basePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private static class HeroImageScrimView extends View {
+        private final Paint topShadePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint bottomShadePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint violetPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint bluePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint mintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF ring = new RectF();
 
-        HeroGradientView(Context context) {
+        HeroImageScrimView(Context context) {
             super(context);
             ringPaint.setStyle(Paint.Style.STROKE);
             ringPaint.setStrokeWidth(context.getResources().getDisplayMetrics().density);
-            ringPaint.setColor(0x32FFFFFF);
+            ringPaint.setColor(0x2CFFFFFF);
         }
 
         @Override
         protected void onSizeChanged(int w, int h, int oldw, int oldh) {
             super.onSizeChanged(w, h, oldw, oldh);
-            basePaint.setShader(new LinearGradient(0, 0, w, h,
-                    new int[]{0xFFF0ECFF, 0xFFE9F5FF, 0xFFF8FBFF},
-                    new float[]{0f, 0.56f, 1f}, Shader.TileMode.CLAMP));
-            violetPaint.setShader(new RadialGradient(w * 0.82f, h * 0.16f, w * 0.42f,
-                    0x558E72FF, Color.TRANSPARENT, Shader.TileMode.CLAMP));
-            bluePaint.setShader(new RadialGradient(w * 0.06f, h * 0.57f, w * 0.46f,
-                    0x3D65B7FF, Color.TRANSPARENT, Shader.TileMode.CLAMP));
-            mintPaint.setShader(new RadialGradient(w * 0.76f, h * 0.86f, w * 0.34f,
-                    0x2E70D7C4, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+            topShadePaint.setShader(new LinearGradient(0, 0, 0, h,
+                    new int[]{0x2E0B1528, 0x120D1B2C, 0x00000000},
+                    new float[]{0f, 0.36f, 0.60f}, Shader.TileMode.CLAMP));
+            bottomShadePaint.setShader(new LinearGradient(0, 0, 0, h,
+                    new int[]{0x00000000, 0x552A4660, COLOR_PAGE},
+                    new float[]{0.34f, 0.76f, 1f}, Shader.TileMode.CLAMP));
+            violetPaint.setShader(new RadialGradient(w * 0.80f, h * 0.20f, w * 0.38f,
+                    0x2B9B8DFF, Color.TRANSPARENT, Shader.TileMode.CLAMP));
+            bluePaint.setShader(new RadialGradient(w * 0.10f, h * 0.68f, w * 0.45f,
+                    0x215FD1FF, Color.TRANSPARENT, Shader.TileMode.CLAMP));
         }
 
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            canvas.drawRect(0, 0, getWidth(), getHeight(), basePaint);
-            canvas.drawCircle(getWidth() * 0.82f, getHeight() * 0.16f, getWidth() * 0.42f, violetPaint);
-            canvas.drawCircle(getWidth() * 0.06f, getHeight() * 0.57f, getWidth() * 0.46f, bluePaint);
-            canvas.drawCircle(getWidth() * 0.76f, getHeight() * 0.86f, getWidth() * 0.34f, mintPaint);
+            canvas.drawRect(0, 0, getWidth(), getHeight(), topShadePaint);
+            canvas.drawCircle(getWidth() * 0.80f, getHeight() * 0.20f, getWidth() * 0.38f, violetPaint);
+            canvas.drawCircle(getWidth() * 0.10f, getHeight() * 0.68f, getWidth() * 0.45f, bluePaint);
+            canvas.drawRect(0, 0, getWidth(), getHeight(), bottomShadePaint);
 
-            float size = Math.min(getWidth(), getHeight()) * 0.34f;
-            ring.set(getWidth() - size * 1.12f, -size * 0.25f,
-                    getWidth() + size * 0.12f, size * 0.99f);
+            float size = Math.min(getWidth(), getHeight()) * 0.32f;
+            ring.set(getWidth() - size * 1.1f, size * 0.02f,
+                    getWidth() + size * 0.10f, size * 1.22f);
             canvas.drawOval(ring, ringPaint);
-            ring.inset(size * 0.14f, size * 0.14f);
+            ring.inset(size * 0.16f, size * 0.16f);
             canvas.drawOval(ring, ringPaint);
         }
     }
