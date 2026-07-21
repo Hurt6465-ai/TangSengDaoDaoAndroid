@@ -144,4 +144,105 @@ Time %5$d min</string>
     <string name="pronunciation_status_recording_and_recognizing">Recording and recognizing. Tap again to finish.</string>
     <string name="pronunciation_try_again">Try again</string>
     <string name="pronunciation_unrecognized">No text recognized</string>
+
+
+    <!-- Learning home: fully localized hero carousel, tools, sections and drawer. -->
+    <string name="learning_home_course_recommendation">Featured courses</string>
+    <string name="learning_home_enroll">Enroll</string>
+    <string name="learning_home_enroll_pending">Enrollment will open soon</string>
+    <string name="learning_home_slide_position">%1$d/%2$d</string>
+    <string-array name="learning_home_plan_titles">
+        <item>90-Day Chinese Speaking</item>
+        <item>AI Language Partner</item>
+        <item>Premium Small Group</item>
+    </string-array>
+    <string-array name="learning_home_plan_subtitles">
+        <item>Structured lessons · AI speaking practice</item>
+        <item>Daily conversation · pronunciation support</item>
+        <item>Teacher-led · stage assessment</item>
+    </string-array>
+    <string-array name="learning_home_plan_prices">
+        <item>¥--</item>
+        <item>¥-- / month</item>
+        <item>¥--</item>
+    </string-array>
+    <string-array name="learning_home_plan_notes">
+        <item>Price will be updated when enrollment opens</item>
+        <item>Start anytime</item>
+        <item>Limited small-group seats</item>
+    </string-array>
+
+    <string name="learning_home_quick_tools">Quick tools</string>
+    <string name="learning_home_quick_tools_subtitle">Translate, read, and practice speaking</string>
+    <string name="learning_home_tool_translate">AI Translate</string>
+    <string name="learning_home_tool_books">E-books</string>
+    <string name="learning_home_tool_partner">AI Partner</string>
+    <string name="learning_home_tool_practice">Practice</string>
+
+    <string name="learning_home_pinyin_title">Pinyin</string>
+    <string name="learning_home_pinyin_subtitle">Start with pronunciation</string>
+    <string name="learning_home_initials">Initials</string>
+    <string name="learning_home_finals">Finals</string>
+    <string name="learning_home_whole_syllables">Whole syllables</string>
+    <string name="learning_home_tones">Tones</string>
+    <string name="learning_home_tones_desc">First to fourth tone</string>
+
+    <string name="learning_home_words_title">Words</string>
+    <string name="learning_home_words_subtitle">Build vocabulary level by level</string>
+    <string name="learning_home_words_count">%1$d words</string>
+    <string name="learning_home_learned_format">Learned %1$d / %2$d</string>
+
+    <string name="learning_home_speaking_title">Speaking</string>
+    <string name="learning_home_speaking_subtitle">Turn Chinese into real conversation</string>
+    <string name="learning_home_speak_hello">Greetings</string>
+    <string name="learning_home_speak_hello_desc">Start a conversation</string>
+    <string name="learning_home_speak_food">Ordering</string>
+    <string name="learning_home_speak_food_desc">Restaurant phrases</string>
+    <string name="learning_home_speak_job">Jobs</string>
+    <string name="learning_home_speak_job_desc">Interviews and work</string>
+    <string name="learning_home_speak_shop">Shopping</string>
+    <string name="learning_home_speak_shop_desc">Paying and bargaining</string>
+
+    <string name="learning_home_patterns_title">Sentence patterns</string>
+    <string name="learning_home_patterns_subtitle">Build complete expressions quickly</string>
+    <string name="learning_home_pattern_want">我想…</string>
+    <string name="learning_home_pattern_want_desc">Express a need</string>
+    <string name="learning_home_pattern_can">可以吗</string>
+    <string name="learning_home_pattern_can_desc">Ask for help</string>
+    <string name="learning_home_pattern_how">怎么…</string>
+    <string name="learning_home_pattern_how_desc">Ask how</string>
+    <string name="learning_home_pattern_why">为什么</string>
+    <string name="learning_home_pattern_why_desc">Ask why</string>
+
+    <string name="learning_home_grammar_title">Grammar</string>
+    <string name="learning_home_grammar_subtitle">Understand how Chinese is structured</string>
+    <string name="learning_home_grammar_le_desc">Completion / change</string>
+    <string name="learning_home_grammar_zai_desc">Action in progress</string>
+    <string name="learning_home_grammar_ma_desc">Question particles</string>
+    <string name="learning_home_grammar_de_desc">Structural particles</string>
+    <string name="learning_home_more">More</string>
+
+    <string name="learning_home_open_drawer">Open learning drawer</string>
+    <string name="learning_home_drawer_kicker">LEARNING SPACE</string>
+    <string name="learning_home_drawer_title">More services</string>
+    <string name="learning_home_drawer_subtitle">AI, speech, and extensions</string>
+    <string name="learning_home_drawer_focus_title">Immersive learning space</string>
+    <string name="learning_home_drawer_focus_subtitle">Keep essential learning tools together</string>
+    <string name="learning_home_drawer_ai_group">AI assistants</string>
+    <string name="learning_home_drawer_deepseek">DeepSeek Translate</string>
+    <string name="learning_home_drawer_deepseek_desc">Chinese-Burmese translation and grammar help</string>
+    <string name="learning_home_drawer_886_desc">AI learning entry for users in China</string>
+    <string name="learning_home_drawer_qianwen">Qianwen China</string>
+    <string name="learning_home_drawer_qwen">Qwen Global</string>
+    <string name="learning_home_drawer_tools_group">Learning tools</string>
+    <string name="learning_home_drawer_speech_settings">Speech settings</string>
+    <string name="learning_home_drawer_speech_desc">Configure the WKSpeech engine</string>
+    <string name="learning_home_drawer_prompt">Speaking prompts</string>
+    <string name="learning_home_drawer_prompt_desc">Conversation instructions for daily situations</string>
+    <string name="learning_home_drawer_extensions">Extensions</string>
+    <string name="learning_home_drawer_scripts">Script center</string>
+    <string name="learning_home_drawer_scripts_desc">Custom extension features</string>
+    <string name="learning_home_coming_soon">%1$s is in development</string>
+    <string name="learning_home_speech_plugin_missing">Speech plugin is not installed</string>
+
 </resources>
