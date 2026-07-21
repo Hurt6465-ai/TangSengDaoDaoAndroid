@@ -51,8 +51,8 @@ public class LearningFragment extends Fragment {
 
     // ---------- Design tokens ----------
     private static final int COLOR_PAGE = 0xFFF2F6FC;
-    private static final int COLOR_GLASS_TOP = 0xECFFFFFF;
-    private static final int COLOR_GLASS_BOTTOM = 0xE2FFFFFF;
+    private static final int COLOR_GLASS_TOP = 0xFFFFFFFF;
+    private static final int COLOR_GLASS_BOTTOM = 0xFFF8FAFE;
     private static final int COLOR_TEXT = 0xFF182033;
     private static final int COLOR_SUB = 0xFF7A8498;
     private static final int COLOR_BRAND = 0xFF635BFF;
@@ -287,10 +287,10 @@ public class LearningFragment extends Fragment {
         panel.setGravity(Gravity.CENTER_VERTICAL);
         panel.setPadding(dp(8), dp(8), dp(8), dp(8));
         panel.setBackground(gradientRounded(
-                0xEFFFFFFF,
-                0xDFFFFFFF,
-                dp(RADIUS_PANEL),
                 0xFFFFFFFF,
+                0xFFF7F8FF,
+                dp(RADIUS_PANEL),
+                0x806B70F7,
                 dp(1)
         ));
         applyColoredShadow(panel, 0xFF6E76F5, 6f);
@@ -301,7 +301,7 @@ public class LearningFragment extends Fragment {
                 "AI翻译",
                 () -> AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")
         ), new LinearLayout.LayoutParams(0, -1, 1f));
-        panel.addView(toolDivider(), new LinearLayout.LayoutParams(dp(1), dp(36)));
+        addHorizontalGap(panel, 6);
 
         panel.addView(toolItem(
                 R.drawable.ic_learning_book,
@@ -309,7 +309,7 @@ public class LearningFragment extends Fragment {
                 "电子书",
                 () -> openDirectory("books", "电子书", "")
         ), new LinearLayout.LayoutParams(0, -1, 1f));
-        panel.addView(toolDivider(), new LinearLayout.LayoutParams(dp(1), dp(36)));
+        addHorizontalGap(panel, 6);
 
         panel.addView(toolItem(
                 R.drawable.ic_learning_mic,
@@ -317,7 +317,7 @@ public class LearningFragment extends Fragment {
                 "口语伴",
                 () -> openDirectory("prompts", "口语 Prompt", "")
         ), new LinearLayout.LayoutParams(0, -1, 1f));
-        panel.addView(toolDivider(), new LinearLayout.LayoutParams(dp(1), dp(36)));
+        addHorizontalGap(panel, 6);
 
         panel.addView(toolItem(
                 R.drawable.ic_learning_practice,
@@ -334,8 +334,8 @@ public class LearningFragment extends Fragment {
         item.setGravity(Gravity.CENTER);
         item.setPadding(dp(4), dp(6), dp(4), dp(6));
         item.setBackground(ripple(
-                rounded(Color.TRANSPARENT, dp(16), Color.TRANSPARENT, 0),
-                withAlpha(accent, 30),
+                rounded(withAlpha(accent, 18), dp(16), withAlpha(accent, 92), dp(1)),
+                withAlpha(accent, 38),
                 16
         ));
         bindClick(item, click);
@@ -436,7 +436,7 @@ public class LearningFragment extends Fragment {
         card.setPadding(dp(16), dp(14), dp(14), dp(14));
         card.setClipToOutline(true);
         card.setBackground(ripple(
-                gradientRounded(start, end, dp(RADIUS_CARD), 0xE6FFFFFF, dp(1)),
+                gradientRounded(start, end, dp(RADIUS_CARD), withAlpha(accent, 72), dp(1)),
                 withAlpha(accent, 32),
                 RADIUS_CARD
         ));
@@ -797,20 +797,20 @@ public class LearningFragment extends Fragment {
     }
 
     private int tintForCard(CardSpec spec, boolean start) {
-        if (spec == null || spec.id == null) return start ? 0xFFF1EEFF : 0xFFFBFAFF;
+        if (spec == null || spec.id == null) return start ? 0xFFE6E0FF : 0xFFF3F0FF;
         switch (spec.id) {
-            case "hsk1": return start ? 0xFFEAFBF5 : 0xFFF9FFFC;
-            case "hsk2": return start ? 0xFFE1F8F1 : 0xFFF6FEFB;
-            case "hsk3": return start ? 0xFFD8F2EC : 0xFFF3FCF9;
-            case "hsk4": return start ? 0xFFCFEAE5 : 0xFFEEF9F6;
-            case "speak_hello": return start ? 0xFFFFECEA : 0xFFFFFAF9;
-            case "speak_food": return start ? 0xFFFFF0E5 : 0xFFFFFBF7;
-            case "speak_job": return start ? 0xFFEBEEFF : 0xFFFAFAFF;
-            case "speak_shop": return start ? 0xFFFFEAF3 : 0xFFFFFAFC;
+            case "hsk1": return start ? 0xFFD7F5EA : 0xFFEAFBF5;
+            case "hsk2": return start ? 0xFFCCEFE4 : 0xFFE4F8F1;
+            case "hsk3": return start ? 0xFFC0E7DD : 0xFFDCF3EC;
+            case "hsk4": return start ? 0xFFB3DDD5 : 0xFFD2EAE5;
+            case "speak_hello": return start ? 0xFFFFDCD8 : 0xFFFFEDEA;
+            case "speak_food": return start ? 0xFFFFE2CC : 0xFFFFF1E4;
+            case "speak_job": return start ? 0xFFDCE3FF : 0xFFEDF0FF;
+            case "speak_shop": return start ? 0xFFFFD8E8 : 0xFFFFEBF3;
             default:
-                if (spec.id.startsWith("pattern")) return start ? 0xFFEAF3FF : 0xFFF9FCFF;
-                if (spec.id.startsWith("grammar")) return start ? 0xFFF1ECFF : 0xFFFBF9FF;
-                return start ? 0xFFF0EDFF : 0xFFFBFAFF;
+                if (spec.id.startsWith("pattern")) return start ? 0xFFDCEBFF : 0xFFEDF5FF;
+                if (spec.id.startsWith("grammar")) return start ? 0xFFE6DFFF : 0xFFF2EEFF;
+                return start ? 0xFFE4DEFF : 0xFFF2EFFF;
         }
     }
 
@@ -1022,12 +1022,11 @@ public class LearningFragment extends Fragment {
         }
     }
 
-    /** HSK 等级徽章，仅表达难度层级，不伪造用户学习进度。 */
+    /** HSK 静态等级徽章。这里只表达级别，不显示任何虚假的学习进度。 */
     private static class LevelBadgeView extends View {
-        private final Paint track = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint arc = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint label = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final RectF oval = new RectF();
         private final int level;
         private final float density;
 
@@ -1036,29 +1035,28 @@ public class LearningFragment extends Fragment {
             this.level = Math.max(1, Math.min(4, level));
             density = context.getResources().getDisplayMetrics().density;
 
-            track.setStyle(Paint.Style.STROKE);
-            track.setStrokeWidth(3f * density);
-            track.setStrokeCap(Paint.Cap.ROUND);
-            track.setColor((color & 0x00FFFFFF) | 0x28000000);
+            fill.setStyle(Paint.Style.FILL);
+            fill.setColor((color & 0x00FFFFFF) | 0x24000000);
 
-            arc.setStyle(Paint.Style.STROKE);
-            arc.setStrokeWidth(3f * density);
-            arc.setStrokeCap(Paint.Cap.ROUND);
-            arc.setColor(color);
+            border.setStyle(Paint.Style.STROKE);
+            border.setStrokeWidth(1.4f * density);
+            border.setColor((color & 0x00FFFFFF) | 0x8A000000);
 
             label.setColor(color);
             label.setTextAlign(Paint.Align.CENTER);
             label.setTypeface(Typeface.DEFAULT_BOLD);
-            label.setTextSize(14f * density);
+            label.setTextSize(15f * density);
         }
 
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            float inset = 4f * density;
-            oval.set(inset, inset, getWidth() - inset, getHeight() - inset);
-            canvas.drawArc(oval, -90f, 360f, false, track);
-            canvas.drawArc(oval, -90f, 86f * level, false, arc);
+            float inset = 3.5f * density;
+            float radius = 15f * density;
+            RectF box = new RectF(inset, inset, getWidth() - inset, getHeight() - inset);
+            canvas.drawRoundRect(box, radius, radius, fill);
+            canvas.drawRoundRect(box, radius, radius, border);
+
             Paint.FontMetrics fm = label.getFontMetrics();
             float y = getHeight() / 2f - (fm.ascent + fm.descent) / 2f;
             canvas.drawText(String.valueOf(level), getWidth() / 2f, y, label);
@@ -1124,7 +1122,7 @@ public class LearningFragment extends Fragment {
         }
     }
 
-    /** 页面底层弥散光，内容层半透明后仍能隐约透出。 */
+    /** 页面底层弥散光，仅服务于顶部背景区域；内容层保持不透明。 */
     private static class LearningBackdropView extends View {
         private final Paint base = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint violet = new Paint(Paint.ANTI_ALIAS_FLAG);
