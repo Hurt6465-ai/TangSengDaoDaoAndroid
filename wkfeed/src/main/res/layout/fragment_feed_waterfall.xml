@@ -1,42 +1,89 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/waterfallRoot"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#EEF1F5">
+    android:layout_height="wrap_content"
+    android:layout_margin="5dp"
+    android:background="@drawable/bg_feed_waterfall_card"
+    android:clipToOutline="true"
+    android:elevation="1dp"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/coverIv"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:background="#E8EBF1"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop" />
+
+        <ImageView
+            android:id="@+id/playIconIv"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_feed_waterfall_play_badge"
+            android:contentDescription="@null"
+            android:paddingStart="14dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="12dp"
+            android:src="@drawable/ic_feed_play"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/imageCountTv"
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_feed_chip_dark"
+            android:gravity="center"
+            android:minWidth="42dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="12sp"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <!--
-        个人主页的作品区现在是页面唯一的滚动内容。RecyclerView 必须占满可用空间并
-        保持 nested scrolling，才能正常驱动外层 AppBarLayout 折叠和继续分页。
+        标题与点赞共用同一块自适应信息层，不再让点赞单独占据一整行。
+        标题最多两行；Adapter 会在标题为空时直接隐藏 titleTv。
     -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/feedWaterfallRecyclerView"
+    <FrameLayout
+        android:id="@+id/infoPanel"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#EEF1F5"
-        android:clipToPadding="false"
-        android:nestedScrollingEnabled="true"
-        android:overScrollMode="never"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="24dp" />
-
-    <ProgressBar
-        android:id="@+id/feedWaterfallLoading"
-        style="?android:attr/progressBarStyleLarge"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="center"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/feedWaterfallStateTv"
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
-        android:padding="18dp"
-        android:textColor="#8A8F98"
-        android:textSize="14sp"
-        android:visibility="gone" />
-</FrameLayout>
+        android:paddingStart="9dp"
+        android:paddingTop="7dp"
+        android:paddingEnd="9dp"
+        android:paddingBottom="7dp">
+
+        <TextView
+            android:id="@+id/titleTv"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:lineSpacingExtra="1dp"
+            android:maxLines="2"
+            android:paddingEnd="48dp"
+            android:textColor="#20232C"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/waterfallLikeTv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|bottom"
+            android:includeFontPadding="false"
+            android:textColor="#717784"
+            android:textSize="12sp" />
+    </FrameLayout>
+</LinearLayout>
