@@ -59,7 +59,6 @@ import java.util.Locale;
 
 public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBinding> {
     private static final int REQ_CHANGE_COVER = 7201;
-    private static final String TAG_FEED_WORKS = "partner_profile_feed_works";
     private String uid;
     private boolean isSelf;
     private boolean isSayHiLoading;
@@ -76,6 +75,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private boolean fixedTopBarSolid;
     private PartnerProfileEntity profile;
     private String sourceVercode;
+    private boolean feedWorksAttached;
     private Fragment feedWorksFragment;
 
     // These views were moved out of the old Toolbar/AppBar collapsing area. Use findViewById
@@ -591,62 +591,39 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             return;
         }
         try {
-            Fragment current = resolveFeedWorksFragment();
-            if (current == null || !fragmentMatchesProfileUid(current, uid)) {
-                Class<?> routeClass = Class.forName("com.chat.feed.FeedRoute");
-                Object fragmentObj = routeClass
-                        .getMethod("newUserWaterfallFragment", String.class)
-                        .invoke(null, uid);
-                if (!(fragmentObj instanceof Fragment)) {
-                    hideFeedWorks();
-                    return;
-                }
-                current = (Fragment) fragmentObj;
+            Class<?> routeClass = Class.forName("com.chat.feed.FeedRoute");
+            Object fragmentObj = routeClass.getMethod("newUserWaterfallFragment", String.class).invoke(null, uid);
+            if (!(fragmentObj instanceof Fragment)) {
+                hideFeedWorks();
+                return;
+            }
+            feedWorksSection.setVisibility(View.VISIBLE);
+            updateWorksHeaderPin();
+            feedWorksFragment = (Fragment) fragmentObj;
+            if (!feedWorksAttached) {
+                feedWorksAttached = true;
                 getSupportFragmentManager()
                         .beginTransaction()
-                        .replace(R.id.feedWorksContainer, current, TAG_FEED_WORKS)
+                        .replace(R.id.feedWorksContainer, feedWorksFragment)
                         .commitAllowingStateLoss();
+                // 内嵌作品瀑布流自带 RecyclerView。关闭它的嵌套滚动，
+                // 由外层 NestedScrollView 统一滚动，避免父子互抢。
+                feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 160);
+                feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 480);
+                feedWorksContainer.postDelayed(this::maybeLoadMoreWorks, 650);
+            } else {
+                feedWorksContainer.post(this::disableNestedFeedScrolling);
+                feedWorksContainer.post(this::maybeLoadMoreWorks);
             }
-
-            feedWorksFragment = current;
-            feedWorksSection.setVisibility(View.VISIBLE);
-            feedWorksContainer.setVisibility(View.VISIBLE);
-            updateWorksHeaderPin();
-
-            // The working backup uses one continuous outer NestedScrollView. The embedded
-            // waterfall only measures its content; it must never consume vertical gestures.
-            feedWorksContainer.post(this::disableNestedFeedScrolling);
-            feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 160L);
-            feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 480L);
-            feedWorksContainer.postDelayed(this::maybeLoadMoreWorks, 650L);
         } catch (Throwable ignored) {
-            // wkfeed is optional. Its absence must not break the profile page.
+            // wkfeed 是可选模块。没有安装时不要影响个人主页。
             hideFeedWorks();
         }
-    }
-
-    private Fragment resolveFeedWorksFragment() {
-        Fragment current = getSupportFragmentManager().findFragmentByTag(TAG_FEED_WORKS);
-        if (current == null) {
-            current = getSupportFragmentManager().findFragmentById(R.id.feedWorksContainer);
-        }
-        if (current != null) feedWorksFragment = current;
-        return current != null ? current : feedWorksFragment;
-    }
-
-    private boolean fragmentMatchesProfileUid(Fragment fragment, String expectedUid) {
-        if (fragment == null || TextUtils.isEmpty(expectedUid) || fragment.getArguments() == null) {
-            return false;
-        }
-        String fragmentUid = fragment.getArguments().getString("uid", "");
-        return TextUtils.equals(fragmentUid, expectedUid);
     }
 
     private void hideFeedWorks() {
         if (wkVBinding == null) return;
         if (feedWorksSection != null) feedWorksSection.setVisibility(View.GONE);
-        if (feedWorksContainer != null) feedWorksContainer.setVisibility(View.GONE);
-        if (feedWorksTitleTv != null) feedWorksTitleTv.setVisibility(View.VISIBLE);
         feedWorksFragment = null;
         updateWorksHeaderPin();
     }
@@ -992,7 +969,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     }
 
     private void onMainActionClick() {
-        // This button sends a real friend application; the entered text is its verification message.
         if (isSayHiLoading) return;
         pressAndRun(wkVBinding.helloBtnLayout, () -> {
             if (isBlacklisted(profile)) {
