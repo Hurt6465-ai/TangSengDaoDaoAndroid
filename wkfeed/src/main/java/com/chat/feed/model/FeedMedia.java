@@ -19,6 +19,10 @@ public class FeedMedia implements Serializable {
             "(?:/video/|/v/|/player/v1/)([0-9]{8,32})|(?:video_id|item_id)=([0-9]{8,32})",
             Pattern.CASE_INSENSITIVE
     );
+    private static final Pattern EXPIRES_PATTERN = Pattern.compile(
+            "(?:[?&]|&amp;)(?:x-)?expires=([0-9]{10,13})",
+            Pattern.CASE_INSENSITIVE
+    );
 
     public String type;
     public String thumb_url;
@@ -86,6 +90,20 @@ public class FeedMedia implements Serializable {
             if (isLikelyImageUrl(normalized)) return normalized;
         }
         return "";
+    }
+
+    public boolean isTikTokCoverProbablyExpired(long nowMillis) {
+        String value = tiktokCoverUrl();
+        if (TextUtils.isEmpty(value)) return true;
+        Matcher matcher = EXPIRES_PATTERN.matcher(value);
+        if (!matcher.find()) return false;
+        try {
+            long expires = Long.parseLong(matcher.group(1));
+            if (expires < 10_000_000_000L) expires *= 1000L;
+            return expires <= nowMillis + 60_000L;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     public String tiktokSourceUrl() {
