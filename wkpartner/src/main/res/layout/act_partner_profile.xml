@@ -9,8 +9,9 @@
     android:fitsSystemWindows="false">
 
     <!--
-        封面和资料区统一放进 AppBarLayout，由下面真正可滚动的作品 RecyclerView
-        驱动折叠。避免 NestedScrollView 再嵌套 RecyclerView 导致瀑布流只测出一小截高度。
+        封面和资料区由同一个 AppBarLayout 连续折叠，作品 RecyclerView 是唯一滚动列表。
+        封面不能使用 exitUntilCollapsed：该标记会在第一个子 View 处截断总滚动范围，
+        导致后面的头像、简介、语言和标签无法跟随作品列表滚出屏幕。
     -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
@@ -28,7 +29,7 @@
         <com.google.android.material.appbar.CollapsingToolbarLayout
             android:id="@+id/collapsingToolbar"
             android:layout_width="match_parent"
-            android:layout_height="300dp"
+            android:layout_height="260dp"
             android:fitsSystemWindows="false"
             app:contentScrim="@android:color/transparent"
             app:layout_scrollFlags="scroll"
@@ -66,7 +67,7 @@
             android:id="@+id/contentSheetLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="-28dp"
+            android:layout_marginTop="-18dp"
             android:background="@drawable/bg_partner_content_sheet"
             android:clipChildren="false"
             android:clipToPadding="false"
@@ -89,7 +90,7 @@
                     android:layout_width="97dp"
                     android:layout_height="97dp"
                     android:layout_alignParentStart="true"
-                    android:layout_marginTop="-16dp"
+                    android:layout_marginTop="-32dp"
                     android:background="@drawable/bg_partner_avatar_glow"
                     android:elevation="6dp">
 
