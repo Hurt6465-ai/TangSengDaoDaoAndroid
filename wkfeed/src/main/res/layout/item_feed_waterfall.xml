@@ -17,6 +17,7 @@
             android:id="@+id/coverIv"
             android:layout_width="match_parent"
             android:layout_height="220dp"
+            android:background="#E8EBF1"
             android:contentDescription="@null"
             android:scaleType="centerCrop" />
 
@@ -51,36 +52,44 @@
             android:visibility="gone" />
     </FrameLayout>
 
-    <TextView
-        android:id="@+id/titleTv"
+    <LinearLayout
+        android:id="@+id/infoPanel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:lineSpacingExtra="1dp"
-        android:maxLines="2"
-        android:minHeight="44dp"
-        android:paddingStart="9dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="9dp"
-        android:textColor="#20232C"
-        android:textSize="13sp" />
-
-    <!-- Personal profile already identifies the author, so only retain the lightweight like count. -->
-    <LinearLayout
-        android:id="@+id/statsRow"
-        android:layout_width="match_parent"
-        android:layout_height="30dp"
-        android:gravity="end|center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="9dp"
-        android:paddingEnd="9dp"
-        android:paddingBottom="7dp">
+        android:orientation="vertical">
 
         <TextView
-            android:id="@+id/waterfallLikeTv"
-            android:layout_width="wrap_content"
+            android:id="@+id/titleTv"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#717784"
-            android:textSize="12sp" />
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:lineSpacingExtra="1dp"
+            android:maxLines="2"
+            android:paddingStart="9dp"
+            android:paddingTop="7dp"
+            android:paddingEnd="9dp"
+            android:paddingBottom="2dp"
+            android:textColor="#20232C"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="end|center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="9dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="9dp"
+            android:paddingBottom="7dp">
+
+            <TextView
+                android:id="@+id/waterfallLikeTv"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:textColor="#717784"
+                android:textSize="12sp" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>
