@@ -14,6 +14,7 @@ import com.chat.feed.config.FeedConfig;
 import com.chat.feed.mock.FeedMockData;
 import com.chat.feed.model.CommentListResponse;
 import com.chat.feed.model.FeedListResponse;
+import com.chat.feed.model.FeedTikTokPreview;
 
 import java.io.File;
 import java.util.HashMap;
@@ -102,6 +103,16 @@ public class FeedModel extends WKBaseModel {
                 }
             }
         });
+    }
+
+    public void tiktokPreview(String url, IRequestResultListener<FeedTikTokPreview> listener) {
+        if (TextUtils.isEmpty(url)) {
+            if (listener != null) listener.onFail(400, "TikTok link is empty");
+            return;
+        }
+        Map<String, Object> body = new HashMap<>();
+        body.put("url", url.trim());
+        request(createService(FeedService.class).tiktokPreview(body), listener);
     }
 
     public void comments(String feedId, String cursor, IRequestResultListener<CommentListResponse> listener) {

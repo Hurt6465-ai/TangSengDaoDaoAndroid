@@ -3,6 +3,7 @@ package com.chat.feed;
 import com.chat.base.net.entity.CommonResponse;
 import com.chat.feed.model.CommentListResponse;
 import com.chat.feed.model.FeedListResponse;
+import com.chat.feed.model.FeedTikTokPreview;
 
 import java.util.Map;
 
@@ -29,6 +30,9 @@ public interface FeedService {
     Observable<FeedListResponse> userFeeds(@Path("uid") String uid,
                                            @Query("cursor") String cursor,
                                            @Query("limit") int limit);
+
+    @POST("feed/tiktok/preview")
+    Observable<FeedTikTokPreview> tiktokPreview(@Body Map<String, Object> body);
 
     @GET("feed/{feed_id}/comments")
     Observable<CommentListResponse> comments(@Path("feed_id") String feedId,
