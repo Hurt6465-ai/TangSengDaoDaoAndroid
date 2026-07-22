@@ -31,7 +31,7 @@
             android:layout_height="300dp"
             android:fitsSystemWindows="false"
             app:contentScrim="@android:color/transparent"
-            app:layout_scrollFlags="scroll|exitUntilCollapsed"
+            app:layout_scrollFlags="scroll"
             app:scrimAnimationDuration="280"
             app:statusBarScrim="@android:color/transparent">
 
