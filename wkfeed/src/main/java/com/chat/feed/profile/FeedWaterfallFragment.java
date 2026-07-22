@@ -84,9 +84,13 @@ public class FeedWaterfallFragment extends Fragment {
         hasMore = true;
         skippedPageCount = 0;
         uid = getArguments() == null ? "" : getArguments().getString(ARG_UID, "");
-        recyclerView = view.findViewById(R.id.feedWaterfallRecyclerView);
-        loadingView = view.findViewById(R.id.feedWaterfallLoading);
-        stateTv = view.findViewById(R.id.feedWaterfallStateTv);
+        recyclerView = findFirstViewByType(view, RecyclerView.class);
+        loadingView = findFirstViewByType(view, ProgressBar.class);
+        stateTv = findFirstViewByType(view, TextView.class);
+        if (recyclerView == null || loadingView == null || stateTv == null) {
+            throw new IllegalStateException(
+                    "fragment_feed_waterfall must contain RecyclerView, ProgressBar and TextView");
+        }
         StaggeredGridLayoutManager layoutManager = new StaggeredGridLayoutManager(
                 2, StaggeredGridLayoutManager.VERTICAL);
         layoutManager.setGapStrategy(StaggeredGridLayoutManager.GAP_HANDLING_NONE);
@@ -155,6 +159,20 @@ public class FeedWaterfallFragment extends Fragment {
         });
         stateTv.setOnClickListener(v -> loadMore(adapter == null || adapter.getItemCount() == 0));
         loadMore(true);
+    }
+
+
+    @Nullable
+    private static <T extends View> T findFirstViewByType(@NonNull View root,
+                                                          @NonNull Class<T> viewClass) {
+        if (viewClass.isInstance(root)) return viewClass.cast(root);
+        if (!(root instanceof ViewGroup)) return null;
+        ViewGroup group = (ViewGroup) root;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            T result = findFirstViewByType(group.getChildAt(i), viewClass);
+            if (result != null) return result;
+        }
+        return null;
     }
 
     /** Retained for compatibility with older profile hosts. */
