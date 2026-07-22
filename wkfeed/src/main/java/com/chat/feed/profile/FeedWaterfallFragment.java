@@ -5,9 +5,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -40,15 +38,6 @@ public class FeedWaterfallFragment extends Fragment {
     private RecyclerView recyclerView;
     private ProgressBar loadingView;
     private TextView stateTv;
-    private int hostTopInset;
-    private int hostBottomInset;
-    private int baseTopPadding;
-    private int baseBottomPadding;
-    private Runnable hostCollapseProfileAction;
-    private Runnable hostExpandProfileAction;
-    private float gestureDownY;
-    private int gestureTouchSlop;
-    private boolean gestureDirectionHandled;
 
     public static FeedWaterfallFragment newInstance(String uid) {
         FeedWaterfallFragment fragment = new FeedWaterfallFragment();
@@ -81,119 +70,25 @@ public class FeedWaterfallFragment extends Fragment {
                 2, StaggeredGridLayoutManager.VERTICAL);
         layoutManager.setGapStrategy(StaggeredGridLayoutManager.GAP_HANDLING_NONE);
         recyclerView.setLayoutManager(layoutManager);
-        recyclerView.setNestedScrollingEnabled(true);
+        recyclerView.setNestedScrollingEnabled(false);
         recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         recyclerView.setHasFixedSize(false);
-        baseTopPadding = recyclerView.getPaddingTop();
-        baseBottomPadding = recyclerView.getPaddingBottom();
-        applyHostInsets();
         if (recyclerView.getItemAnimator() != null) recyclerView.getItemAnimator().setChangeDuration(0);
         adapter = new FeedWaterfallAdapter(this::openDetail);
         recyclerView.setAdapter(adapter);
-        gestureTouchSlop = ViewConfiguration.get(requireContext()).getScaledTouchSlop();
-        recyclerView.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
-            @Override
-            public boolean onInterceptTouchEvent(@NonNull RecyclerView rv, @NonNull MotionEvent event) {
-                switch (event.getActionMasked()) {
-                    case MotionEvent.ACTION_DOWN:
-                        gestureDownY = event.getY();
-                        gestureDirectionHandled = false;
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                        float deltaY = event.getY() - gestureDownY;
-                        if (!gestureDirectionHandled && Math.abs(deltaY) >= gestureTouchSlop) {
-                            gestureDirectionHandled = true;
-                            if (deltaY < 0f) {
-                                notifyHostCollapseProfile();
-                            } else if (!rv.canScrollVertically(-1)) {
-                                notifyHostExpandProfile();
-                            }
-                        }
-                        break;
-                    case MotionEvent.ACTION_UP:
-                    case MotionEvent.ACTION_CANCEL:
-                        gestureDirectionHandled = false;
-                        break;
-                    default:
-                        break;
-                }
-                return false;
-            }
-        });
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
-                if (dy > 0) {
-                    // Some OEM builds do not reliably forward the nested scroll from a
-                    // RecyclerView hosted inside a Fragment container to AppBarLayout.
-                    // Explicitly request collapse so the profile sheet can never remain fixed.
-                    notifyHostCollapseProfile();
-                } else if (dy < 0 && !rv.canScrollVertically(-1)) {
-                    notifyHostExpandProfile();
-                }
-
-                if (dy <= 0 || adapter == null) return;
-                RecyclerView.LayoutManager manager = rv.getLayoutManager();
-                if (!(manager instanceof StaggeredGridLayoutManager)) return;
-                int[] positions = ((StaggeredGridLayoutManager) manager)
-                        .findLastVisibleItemPositions(null);
-                int last = -1;
-                for (int position : positions) last = Math.max(last, position);
-                if (last >= adapter.getItemCount() - 5) loadMore(false);
+                if (dy > 0 && !rv.canScrollVertically(1)) loadMore(false);
             }
         });
         stateTv.setOnClickListener(v -> loadMore(adapter == null || adapter.getItemCount() == 0));
         loadMore(true);
     }
 
-    /** Retained for compatibility with older profile hosts. */
+    /** Called by the outer personal-profile scroll near the bottom of the page. */
     public void loadMoreIfNeeded() {
         loadMore(false);
-    }
-
-    /**
-     * Insets supplied by the profile Activity for its overlay top bars and bottom action button.
-     * Values are pixels because they are calculated from the real laid-out overlay positions.
-     */
-    public void setHostInsets(int topInset, int bottomInset) {
-        hostTopInset = Math.max(0, topInset);
-        hostBottomInset = Math.max(0, bottomInset);
-        applyHostInsets();
-    }
-
-    public void scrollToTop() {
-        if (recyclerView != null) recyclerView.scrollToPosition(0);
-    }
-
-    /**
-     * Host callbacks are java.lang.Runnable on purpose: wkpartner can register them through
-     * reflection without creating a Gradle dependency from wkfeed back to wkpartner.
-     */
-    public void setProfileHeaderActions(@Nullable Runnable collapseAction,
-                                        @Nullable Runnable expandAction) {
-        hostCollapseProfileAction = collapseAction;
-        hostExpandProfileAction = expandAction;
-    }
-
-    private void notifyHostCollapseProfile() {
-        Runnable action = hostCollapseProfileAction;
-        if (action != null) action.run();
-    }
-
-    private void notifyHostExpandProfile() {
-        Runnable action = hostExpandProfileAction;
-        if (action != null) action.run();
-    }
-
-    private void applyHostInsets() {
-        if (recyclerView == null) return;
-        int left = recyclerView.getPaddingLeft();
-        int right = recyclerView.getPaddingRight();
-        int top = baseTopPadding + hostTopInset;
-        int bottom = Math.max(baseBottomPadding, hostBottomInset);
-        if (recyclerView.getPaddingTop() == top
-                && recyclerView.getPaddingBottom() == bottom) return;
-        recyclerView.setPadding(left, top, right, bottom);
     }
 
     private void loadMore(boolean first) {
@@ -243,7 +138,6 @@ public class FeedWaterfallFragment extends Fragment {
 
                         updateState(false);
                         requestWaterfallRelayout();
-                        maybeFillViewport();
 
                         // A filtered or duplicate page may contain no new cards while still
                         // advancing the cursor. Skip at most one such page automatically so the
@@ -281,17 +175,6 @@ public class FeedWaterfallFragment extends Fragment {
             currentRecycler.requestLayout();
             if (currentRecycler.getParent() instanceof View) {
                 ((View) currentRecycler.getParent()).requestLayout();
-            }
-        });
-    }
-
-    private void maybeFillViewport() {
-        RecyclerView current = recyclerView;
-        if (current == null || !hasMore || loading || adapter == null) return;
-        current.post(() -> {
-            if (recyclerView != current || loading || !hasMore || adapter == null) return;
-            if (adapter.getItemCount() > 0 && !current.canScrollVertically(1)) {
-                loadMore(false);
             }
         });
     }
@@ -344,8 +227,6 @@ public class FeedWaterfallFragment extends Fragment {
             recyclerView.setAdapter(null);
         }
         adapter = null;
-        hostCollapseProfileAction = null;
-        hostExpandProfileAction = null;
         recyclerView = null;
         loadingView = null;
         stateTv = null;
