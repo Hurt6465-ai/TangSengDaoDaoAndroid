@@ -587,7 +587,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:letterSpacing="0.02"
-                android:text="@string/partner_add_friend"
+                android:text="@string/partner_say_hello"
                 android:textColor="#FFFFFFFF"
                 android:textSize="16sp"
                 android:textStyle="bold" />
