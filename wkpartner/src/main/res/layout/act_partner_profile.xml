@@ -9,14 +9,17 @@
     android:fitsSystemWindows="false">
 
     <!--
-        AppBarLayout 现在只承载背景墙。顶部用户名栏已经从这里移走，
-        所以背景墙怎么折叠/消失都不会影响顶栏。
+        封面和资料区由同一个 AppBarLayout 连续折叠，作品 RecyclerView 是唯一滚动列表。
+        封面不能使用 exitUntilCollapsed：该标记会在第一个子 View 处截断总滚动范围，
+        导致后面的头像、简介、语言和标签无法跟随作品列表滚出屏幕。
     -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
-        android:layout_height="300dp"
+        android:layout_height="wrap_content"
         android:background="@android:color/transparent"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:fitsSystemWindows="false"
         android:elevation="0dp"
         android:stateListAnimator="@null"
@@ -26,10 +29,10 @@
         <com.google.android.material.appbar.CollapsingToolbarLayout
             android:id="@+id/collapsingToolbar"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="300dp"
             android:fitsSystemWindows="false"
             app:contentScrim="@android:color/transparent"
-            app:layout_scrollFlags="scroll|exitUntilCollapsed"
+            app:layout_scrollFlags="scroll"
             app:scrimAnimationDuration="280"
             app:statusBarScrim="@android:color/transparent">
 
@@ -59,17 +62,6 @@
                 android:background="@drawable/bg_partner_cover_mask"
                 app:layout_collapseMode="parallax" />
         </com.google.android.material.appbar.CollapsingToolbarLayout>
-    </com.google.android.material.appbar.AppBarLayout>
-
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/nestedScrollView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fillViewport="true"
-        android:clipChildren="false"
-        android:clipToPadding="false"
-        android:overScrollMode="never"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <LinearLayout
             android:id="@+id/contentSheetLayout"
@@ -79,7 +71,8 @@
             android:clipChildren="false"
             android:clipToPadding="false"
             android:orientation="vertical"
-            android:paddingBottom="32dp">
+            android:paddingBottom="0dp"
+            app:layout_scrollFlags="scroll">
 
             <RelativeLayout
                 android:id="@+id/profileHeaderLayout"
@@ -382,21 +375,21 @@
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
-                <FrameLayout
-                    android:id="@+id/feedWorksContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="#EEF1F5"
-                    android:minHeight="520dp" />
             </LinearLayout>
-
-            <Space
-                android:id="@+id/bottomActionSpace"
-                android:layout_width="match_parent"
-                android:layout_height="120dp" />
         </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!--
+        作品区是 CoordinatorLayout 唯一的滚动子 View。Fragment 内 RecyclerView
+        保持正常回收、分页和嵌套滚动，不再依赖 wrap_content 撑开整个列表。
+    -->
+    <FrameLayout
+        android:id="@+id/feedWorksContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#EEF1F5"
+        android:visibility="gone"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
     <!--
         ============== 固定顶部用户名栏 ==============
@@ -528,37 +521,9 @@
     </LinearLayout>
 
     <!--
-        ============== 固定作品栏 ==============
-        位于 fixedProfileTopBar 正下方（运行时 setY 定位）。
-        吸顶时显示。无顶部阴影、无上分割线，仅底部 0.5dp 浅分割线。
+        “作品”标题不再单独吸顶。作品滚动时只保留 fixedProfileTopBar，
+        内容里的标题会和资料区一起自然滚出屏幕。
     -->
-    <FrameLayout
-        android:id="@+id/fixedWorksHeader"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_gravity="top"
-        android:background="#FFFFFFFF"
-        android:elevation="0dp"
-        android:stateListAnimator="@null"
-        android:translationZ="0dp"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:layout_marginStart="24dp"
-            android:text="@string/partner_works"
-            android:textColor="#1A1A2E"
-            android:textSize="17sp"
-            android:textStyle="bold" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_gravity="bottom"
-            android:background="#EEF0F4" />
-    </FrameLayout>
 
     <FrameLayout
         android:id="@+id/helloBar"
@@ -587,7 +552,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:letterSpacing="0.02"
-                android:text="@string/partner_say_hello"
+                android:text="@string/partner_add_friend"
                 android:textColor="#FFFFFFFF"
                 android:textSize="16sp"
                 android:textStyle="bold" />
