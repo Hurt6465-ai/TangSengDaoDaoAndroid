@@ -1,20 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="#EEF1F5"
-    android:minHeight="520dp">
+    android:layout_height="match_parent"
+    android:background="#EEF1F5">
 
+    <!--
+        个人主页的作品区现在是页面唯一的滚动内容。RecyclerView 必须占满可用空间并
+        保持 nested scrolling，才能正常驱动外层 AppBarLayout 折叠和继续分页。
+    -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/feedWaterfallRecyclerView"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
         android:background="#EEF1F5"
         android:clipToPadding="false"
-        android:nestedScrollingEnabled="false"
+        android:nestedScrollingEnabled="true"
         android:overScrollMode="never"
         android:paddingStart="8dp"
         android:paddingEnd="8dp"
+        android:paddingTop="8dp"
         android:paddingBottom="24dp" />
 
     <ProgressBar
