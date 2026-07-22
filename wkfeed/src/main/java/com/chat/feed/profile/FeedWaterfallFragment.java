@@ -87,9 +87,11 @@ public class FeedWaterfallFragment extends Fragment {
         recyclerView = findFirstViewByType(view, RecyclerView.class);
         loadingView = findFirstViewByType(view, ProgressBar.class);
         stateTv = findFirstViewByType(view, TextView.class);
-        if (recyclerView == null || loadingView == null || stateTv == null) {
-            throw new IllegalStateException(
-                    "fragment_feed_waterfall must contain RecyclerView, ProgressBar and TextView");
+        // Compatibility with older/current layout variants: only RecyclerView is required.
+        // Loading and state views are optional, so a partially applied resource patch cannot
+        // crash the whole profile page at runtime.
+        if (recyclerView == null) {
+            return;
         }
         StaggeredGridLayoutManager layoutManager = new StaggeredGridLayoutManager(
                 2, StaggeredGridLayoutManager.VERTICAL);
@@ -157,7 +159,10 @@ public class FeedWaterfallFragment extends Fragment {
                 if (last >= adapter.getItemCount() - 5) loadMore(false);
             }
         });
-        stateTv.setOnClickListener(v -> loadMore(adapter == null || adapter.getItemCount() == 0));
+        if (stateTv != null) {
+            stateTv.setOnClickListener(v ->
+                    loadMore(adapter == null || adapter.getItemCount() == 0));
+        }
         loadMore(true);
     }
 
@@ -240,7 +245,7 @@ public class FeedWaterfallFragment extends Fragment {
                     public void onSuccess(FeedListResponse result) {
                         if (!isCurrentView(requestGeneration)) return;
                         loading = false;
-                        loadingView.setVisibility(View.GONE);
+                        if (loadingView != null) loadingView.setVisibility(View.GONE);
                         if (result == null) {
                             updateState(false);
                             requestWaterfallRelayout();
@@ -286,7 +291,7 @@ public class FeedWaterfallFragment extends Fragment {
                     public void onFail(int code, String msg) {
                         if (!isCurrentView(requestGeneration)) return;
                         loading = false;
-                        loadingView.setVisibility(View.GONE);
+                        if (loadingView != null) loadingView.setVisibility(View.GONE);
                         updateState(true);
                         requestWaterfallRelayout();
                     }
@@ -297,8 +302,6 @@ public class FeedWaterfallFragment extends Fragment {
         return generation == viewGeneration
                 && isAdded()
                 && recyclerView != null
-                && loadingView != null
-                && stateTv != null
                 && adapter != null;
     }
 
