@@ -1,6 +1,7 @@
 package com.chat.feed.profile;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -9,10 +10,15 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 import com.chat.feed.R;
 import com.chat.feed.model.FeedBean;
 import com.chat.feed.model.FeedMedia;
@@ -23,14 +29,25 @@ import java.util.List;
 import java.util.Set;
 
 public class FeedWaterfallAdapter extends RecyclerView.Adapter<FeedWaterfallAdapter.VH> {
-    public interface OnItemClickListener { void onItemClick(FeedBean item, int position); }
+    public interface OnItemClickListener {
+        void onItemClick(FeedBean item, int position);
+    }
+
+    public interface OnTikTokCoverListener {
+        void onTikTokCoverNeeded(FeedBean item, boolean forceFresh);
+    }
 
     private final ArrayList<FeedBean> items = new ArrayList<>();
     private final OnItemClickListener listener;
+    private OnTikTokCoverListener tikTokCoverListener;
 
     public FeedWaterfallAdapter(OnItemClickListener listener) {
         this.listener = listener;
         setHasStableIds(true);
+    }
+
+    public void setOnTikTokCoverListener(@Nullable OnTikTokCoverListener listener) {
+        tikTokCoverListener = listener;
     }
 
     public void submitList(List<FeedBean> list) {
@@ -67,6 +84,17 @@ public class FeedWaterfallAdapter extends RecyclerView.Adapter<FeedWaterfallAdap
         return position >= 0 && position < items.size() ? items.get(position) : null;
     }
 
+    public void notifyItemChangedByKey(String stableKey) {
+        if (TextUtils.isEmpty(stableKey)) return;
+        for (int i = 0; i < items.size(); i++) {
+            FeedBean item = items.get(i);
+            if (item != null && TextUtils.equals(stableKey, item.stableKey())) {
+                notifyItemChanged(i);
+                return;
+            }
+        }
+    }
+
     @NonNull
     @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -86,21 +114,17 @@ public class FeedWaterfallAdapter extends RecyclerView.Adapter<FeedWaterfallAdap
         int cardWidth = Math.max(dp(holder.itemView, 120), (parentWidth - dp(holder.itemView, 26)) / 2);
         int height = dp(holder.itemView, 230);
         String coverUrl = "";
+        boolean tikTok = item.isTikTok();
+        boolean expiredTikTokCover = false;
         if (media != null) {
             float ratio = media.ratio();
             height = Math.max(dp(holder.itemView, 180),
                     Math.min(dp(holder.itemView, 330), Math.round(cardWidth * ratio)));
-            coverUrl = media.thumbUrl();
-        }
-
-        if (TextUtils.isEmpty(coverUrl)) {
-            clearImageSafely(holder.coverIv);
-        } else {
-            Glide.with(holder.coverIv)
-                    .load(coverUrl)
-                    .centerCrop()
-                    .dontAnimate()
-                    .into(holder.coverIv);
+            String candidateCover = media.thumbUrl();
+            expiredTikTokCover = tikTok
+                    && !TextUtils.isEmpty(candidateCover)
+                    && media.isTikTokCoverProbablyExpired(System.currentTimeMillis());
+            if (!expiredTikTokCover) coverUrl = candidateCover;
         }
 
         ViewGroup.LayoutParams coverParams = holder.coverIv.getLayoutParams();
@@ -109,19 +133,75 @@ public class FeedWaterfallAdapter extends RecyclerView.Adapter<FeedWaterfallAdap
             holder.coverIv.setLayoutParams(coverParams);
         }
 
-        holder.playIconIv.setVisibility(item.isVideo() || item.isTikTok() ? View.VISIBLE : View.GONE);
+        if (TextUtils.isEmpty(coverUrl)) {
+            clearImageSafely(holder.coverIv);
+            if (tikTok) notifyTikTokCoverNeeded(item, expiredTikTokCover);
+        } else if (tikTok) {
+            final String boundKey = item.stableKey();
+            Glide.with(holder.coverIv)
+                    .load(coverUrl)
+                    .centerCrop()
+                    .dontAnimate()
+                    .listener(new RequestListener<Drawable>() {
+                        @Override
+                        public boolean onLoadFailed(@Nullable GlideException e, Object model,
+                                                    @NonNull Target<Drawable> target,
+                                                    boolean isFirstResource) {
+                            int adapterPosition = holder.getBindingAdapterPosition();
+                            FeedBean current = getItem(adapterPosition);
+                            if (current != null && TextUtils.equals(boundKey, current.stableKey())) {
+                                notifyTikTokCoverNeeded(current, true);
+                            }
+                            return false;
+                        }
+
+                        @Override
+                        public boolean onResourceReady(@NonNull Drawable resource, Object model,
+                                                       @NonNull Target<Drawable> target,
+                                                       @NonNull DataSource dataSource,
+                                                       boolean isFirstResource) {
+                            return false;
+                        }
+                    })
+                    .into(holder.coverIv);
+        } else {
+            Glide.with(holder.coverIv)
+                    .load(coverUrl)
+                    .centerCrop()
+                    .dontAnimate()
+                    .into(holder.coverIv);
+        }
+
+        holder.playIconIv.setVisibility(item.isVideo() || tikTok ? View.VISIBLE : View.GONE);
 
         int count = item.safeMedia().size();
-        holder.imageCountTv.setVisibility(!item.isVideo() && !item.isTikTok() && count > 1
+        holder.imageCountTv.setVisibility(!item.isVideo() && !tikTok && count > 1
                 ? View.VISIBLE : View.GONE);
         holder.imageCountTv.setText("1/" + count);
-        holder.titleTv.setText(item.displayTitle());
+
+        // The information area is content-driven: no title means no reserved title block;
+        // one or two lines only consume their real measured height.
+        String title = item.displayTitle();
+        title = title == null ? "" : title.trim();
+        if (TextUtils.isEmpty(title)) {
+            holder.titleTv.setText(null);
+            holder.titleTv.setVisibility(View.GONE);
+        } else {
+            holder.titleTv.setVisibility(View.VISIBLE);
+            holder.titleTv.setText(title);
+        }
+
         holder.likeTv.setText(item.like_count > 0 ? "♡ " + formatCount(item.like_count) : "♡");
         holder.itemView.setOnClickListener(v -> {
             int adapterPosition = holder.getBindingAdapterPosition();
             FeedBean current = getItem(adapterPosition);
             if (listener != null && current != null) listener.onItemClick(current, adapterPosition);
         });
+    }
+
+    private void notifyTikTokCoverNeeded(FeedBean item, boolean forceFresh) {
+        OnTikTokCoverListener callback = tikTokCoverListener;
+        if (callback != null && item != null) callback.onTikTokCoverNeeded(item, forceFresh);
     }
 
     @Override
@@ -152,8 +232,6 @@ public class FeedWaterfallAdapter extends RecyclerView.Adapter<FeedWaterfallAdap
             Glide.with(appContext).clear(imageView);
         }
 
-        // Also remove the currently displayed drawable. If an unusual Context does not expose
-        // an application context, this still prevents a recycled card from showing stale media.
         imageView.setImageDrawable(null);
     }
 
