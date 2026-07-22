@@ -24,8 +24,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.fragment.app.Fragment;
-import androidx.core.widget.NestedScrollView;
-import androidx.recyclerview.widget.RecyclerView;
+
 
 import com.alibaba.fastjson.JSONObject;
 import com.chat.base.act.WKWebViewActivity;
@@ -59,6 +58,7 @@ import java.util.Locale;
 
 public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBinding> {
     private static final int REQ_CHANGE_COVER = 7201;
+    private static final String TAG_FEED_WORKS = "partner_profile_feed_works";
     private String uid;
     private boolean isSelf;
     private boolean isSayHiLoading;
@@ -75,14 +75,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private boolean fixedTopBarSolid;
     private PartnerProfileEntity profile;
     private String sourceVercode;
-    private boolean feedWorksAttached;
     private Fragment feedWorksFragment;
+    private int lastFeedTopInset = -1;
+    private int lastFeedBottomInset = -1;
 
     // These views were moved out of the old Toolbar/AppBar collapsing area. Use findViewById
     // instead of ViewBinding fields, so the Java file does not depend on generated binding fields
     // that may be absent until the updated XML is compiled.
     private View fixedProfileTopBar;
-    private View fixedWorksHeader;
     private TextView toolbarTitleTv;
     private View toolbarMetaLayout;
     private View toolbarCountryGroup;
@@ -127,12 +127,10 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.editBtn.setVisibility(View.VISIBLE);
         wkVBinding.editBtn.setImageResource(R.drawable.ic_partner_more_horizontal);
         wkVBinding.helloBar.setVisibility(isSelf ? View.GONE : View.VISIBLE);
-        wkVBinding.bottomActionSpace.setVisibility(isSelf ? View.GONE : View.VISIBLE);
         wkVBinding.coverIv.setImageResource(R.drawable.bg_partner_cover_default);
         // 固定顶栏样式只设置一次。它永远是白底深色图标，不再随折叠百分比变化。
         applyFixedTopBarStyle();
         setupCoverParallax();
-        setupWorksScrollBridge();
         setupEntranceAnimation();
         resetInitialScrollState();
     }
@@ -171,15 +169,14 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void resetInitialScrollState() {
         wkVBinding.appBarLayout.post(() -> {
             wkVBinding.appBarLayout.setExpanded(true, false);
-            wkVBinding.nestedScrollView.scrollTo(0, 0);
             applyProfileContentVisibility();
             updateWorksHeaderPin();
+            invokeFeedMethod("scrollToTop", new Class<?>[0]);
         });
     }
 
     private void ensureFixedTopBarViews() {
         if (fixedProfileTopBar == null) fixedProfileTopBar = findViewById(R.id.fixedProfileTopBar);
-        if (fixedWorksHeader == null) fixedWorksHeader = findViewById(R.id.fixedWorksHeader);
         if (toolbarTitleTv == null) toolbarTitleTv = findViewById(R.id.toolbarTitleTv);
         if (toolbarMetaLayout == null) toolbarMetaLayout = findViewById(R.id.toolbarMetaLayout);
         if (toolbarCountryGroup == null) toolbarCountryGroup = findViewById(R.id.toolbarCountryGroup);
@@ -231,11 +228,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             fixedProfileTopBar.setTranslationZ(0f);
             fixedProfileTopBar.setStateListAnimator(null);
         }
-        if (fixedWorksHeader != null) {
-            fixedWorksHeader.setElevation(0f);
-            fixedWorksHeader.setTranslationZ(0f);
-            fixedWorksHeader.setStateListAnimator(null);
-        }
     }
 
     private int getStatusBarHeight() {
@@ -245,12 +237,13 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         return result > 0 ? result : dp(24);
     }
 
-    // 只保留 cover 的视差/缩放，绝不再用折叠百分比驱动顶栏。
+    // 封面折叠百分比只按封面本身计算。资料区现在也属于 AppBar，不能再用总滚动范围，
+    // 否则封面已经消失后顶栏仍可能保持白色图标。
     private void setupCoverParallax() {
         wkVBinding.appBarLayout.addOnOffsetChangedListener((appBarLayout, verticalOffset) -> {
-            int range = appBarLayout.getTotalScrollRange();
-            if (range <= 0) return;
-            float percent = Math.min(1f, Math.max(0f, Math.abs(verticalOffset) * 1f / range));
+            int coverRange = Math.max(1, wkVBinding.collapsingToolbar.getHeight());
+            float percent = Math.min(1f,
+                    Math.max(0f, Math.abs(verticalOffset) * 1f / coverRange));
             currentCollapsePercent = percent;
             float scale = 1f + (0.04f * (1f - percent));
             wkVBinding.coverIv.setScaleX(scale);
@@ -258,27 +251,6 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             applyProfileContentVisibility();
             updateWorksHeaderPin();
         });
-    }
-
-    private void setupWorksScrollBridge() {
-        wkVBinding.nestedScrollView.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener)
-                (v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-                    updateWorksHeaderPin();
-                    if (scrollY > oldScrollY) maybeLoadMoreWorks();
-                });
-    }
-
-    private void maybeLoadMoreWorks() {
-        ensureFixedTopBarViews();
-        if (feedWorksFragment == null || feedWorksSection == null || feedWorksSection.getVisibility() != View.VISIBLE) return;
-        View child = wkVBinding.nestedScrollView.getChildAt(0);
-        if (child == null) return;
-        int distanceToBottom = child.getBottom() - (wkVBinding.nestedScrollView.getScrollY() + wkVBinding.nestedScrollView.getHeight());
-        if (distanceToBottom > dp(900)) return;
-        try {
-            feedWorksFragment.getClass().getMethod("loadMoreIfNeeded").invoke(feedWorksFragment);
-        } catch (Throwable ignored) {
-        }
     }
 
     // 只隐藏大资料区（大头像、背景墙资料、简介、标签、语言）。
@@ -294,33 +266,31 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         updateFixedTopBarAppearance(isWorksPinned());
     }
 
-    // ============ 作品栏吸顶核心逻辑 ============
-    // 判断依据：内容里的“作品”标题 feedWorksTitleTv 相对 root 的 top
-    // 是否已经到达 fixedProfileTopBar 的 bottom。不使用 scrollY。
+    // ============ 作品区滚动状态 ============
+    // 个人主页滚到作品区后，只保留最顶部的用户名栏。
+    // “作品”标题属于 AppBar 内容，必须和头像、简介、语言、标签一起自然滚出屏幕，
+    // 不能再创建第二条固定吸顶栏，否则顶部会显得拥挤并额外遮挡第一排作品。
     private void updateWorksHeaderPin() {
         ensureFixedTopBarViews();
-        if (wkVBinding == null || fixedWorksHeader == null || feedWorksSection == null) return;
-        positionWorksHeader();
-        boolean pinned = isWorksPinned();
-        fixedWorksHeader.setVisibility(pinned ? View.VISIBLE : View.GONE);
-        updateFixedTopBarAppearance(pinned);
-        if (pinned) {
-            fixedProfileTopBar.bringToFront();
-            fixedWorksHeader.bringToFront();
+        if (wkVBinding == null || feedWorksSection == null) return;
+
+        boolean worksReachedTop = isWorksPinned();
+        if (feedWorksTitleTv != null) {
+            feedWorksTitleTv.setVisibility(View.VISIBLE);
+        }
+
+        // 作品区到达顶部后，把唯一保留的用户名栏切成白底深色模式。
+        updateFixedTopBarAppearance(worksReachedTop);
+        if (fixedProfileTopBar != null) fixedProfileTopBar.bringToFront();
+        if (wkVBinding.helloBar.getVisibility() == View.VISIBLE) {
             wkVBinding.helloBar.bringToFront();
         }
-        if (feedWorksTitleTv != null) {
-            // 隐藏内容流里的标题但保留占位，避免跳动。
-            feedWorksTitleTv.setVisibility(pinned ? View.INVISIBLE : View.VISIBLE);
-        }
+        applyFeedHostInsets();
     }
 
-    // 把固定作品栏定位到 fixedProfileTopBar 的正下方。
+    // 旧版会在这里定位第二条固定“作品”栏；新结构不再创建该覆盖层。
     private void positionWorksHeader() {
-        ensureFixedTopBarViews();
-        if (wkVBinding == null || fixedWorksHeader == null || fixedProfileTopBar == null) return;
-        int barBottom = topBarHeight > 0 ? topBarHeight : fixedProfileTopBar.getHeight();
-        fixedWorksHeader.setY(barBottom);
+        // No-op by design.
     }
 
     private boolean isWorksPinned() {
@@ -342,6 +312,45 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.getRoot().getLocationInWindow(rootLoc);
         view.getLocationInWindow(viewLoc);
         return viewLoc[1] - rootLoc[1];
+    }
+
+    /**
+     * Keep the first/last work card clear of the fixed top bars and the bottom action button.
+     * The top inset is calculated from real screen positions, so it grows only when the
+     * RecyclerView actually moves underneath an overlay; there is no blank gap while expanded.
+     */
+    private void applyFeedHostInsets() {
+        ensureFixedTopBarViews();
+        if (feedWorksContainer == null || feedWorksContainer.getVisibility() != View.VISIBLE) return;
+
+        // 作品滚动时顶部只存在用户名栏，不再为“作品”标题预留第二层 inset。
+        int overlayBottom = topBarHeight > 0 ? topBarHeight : dp(80);
+        int containerTop = topInRoot(feedWorksContainer);
+        int topInset = containerTop == Integer.MAX_VALUE
+                ? 0 : Math.max(0, overlayBottom - containerTop);
+        int bottomInset = isSelf ? dp(24) : dp(116);
+        if (lastFeedBottomInset == bottomInset
+                && lastFeedTopInset >= 0
+                && Math.abs(lastFeedTopInset - topInset) < dp(2)) return;
+        lastFeedTopInset = topInset;
+        lastFeedBottomInset = bottomInset;
+        invokeFeedMethod("setHostInsets",
+                new Class<?>[]{int.class, int.class}, topInset, bottomInset);
+    }
+
+    private void invokeFeedMethod(String name, Class<?>[] parameterTypes, Object... args) {
+        Fragment current = resolveFeedWorksFragment();
+        if (current == null) return;
+        invokeFeedMethod(current, name, parameterTypes, args);
+    }
+
+    private void invokeFeedMethod(Fragment fragment, String name, Class<?>[] parameterTypes,
+                                  Object... args) {
+        if (fragment == null) return;
+        try {
+            fragment.getClass().getMethod(name, parameterTypes).invoke(fragment, args);
+        } catch (Throwable ignored) {
+        }
     }
 
     // 固定顶栏分两态：
@@ -590,66 +599,78 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
             hideFeedWorks();
             return;
         }
+
         try {
-            Class<?> routeClass = Class.forName("com.chat.feed.FeedRoute");
-            Object fragmentObj = routeClass.getMethod("newUserWaterfallFragment", String.class).invoke(null, uid);
-            if (!(fragmentObj instanceof Fragment)) {
-                hideFeedWorks();
-                return;
-            }
-            feedWorksSection.setVisibility(View.VISIBLE);
-            updateWorksHeaderPin();
-            feedWorksFragment = (Fragment) fragmentObj;
-            if (!feedWorksAttached) {
-                feedWorksAttached = true;
+            Fragment current = resolveFeedWorksFragment();
+            if (current == null || !fragmentMatchesProfileUid(current, uid)) {
+                Class<?> routeClass = Class.forName("com.chat.feed.FeedRoute");
+                Object fragmentObj = routeClass
+                        .getMethod("newUserWaterfallFragment", String.class)
+                        .invoke(null, uid);
+                if (!(fragmentObj instanceof Fragment)) {
+                    hideFeedWorks();
+                    return;
+                }
+                current = (Fragment) fragmentObj;
                 getSupportFragmentManager()
                         .beginTransaction()
-                        .replace(R.id.feedWorksContainer, feedWorksFragment)
+                        .replace(R.id.feedWorksContainer, current, TAG_FEED_WORKS)
                         .commitAllowingStateLoss();
-                // 内嵌作品瀑布流自带 RecyclerView。关闭它的嵌套滚动，
-                // 由外层 NestedScrollView 统一滚动，避免父子互抢。
-                feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 160);
-                feedWorksContainer.postDelayed(this::disableNestedFeedScrolling, 480);
-                feedWorksContainer.postDelayed(this::maybeLoadMoreWorks, 650);
-            } else {
-                feedWorksContainer.post(this::disableNestedFeedScrolling);
-                feedWorksContainer.post(this::maybeLoadMoreWorks);
             }
+
+            // Reuse the Fragment that is actually attached to the container. Profile refreshes
+            // must not replace the visible list with a detached Fragment or reset its pagination.
+            feedWorksFragment = current;
+            lastFeedTopInset = -1;
+            lastFeedBottomInset = -1;
+            feedWorksSection.setVisibility(View.VISIBLE);
+            feedWorksContainer.setVisibility(View.VISIBLE);
+
+            // feedWorksSection changes the measured height and total scroll range of AppBarLayout.
+            // Request one complete layout pass after the Fragment is attached; do not force an
+            // all-or-nothing collapse animation. RecyclerView nested scrolling will drive the
+            // AppBar continuously and naturally on every Android/OEM implementation.
+            wkVBinding.appBarLayout.requestLayout();
+            feedWorksContainer.post(() -> {
+                wkVBinding.appBarLayout.requestLayout();
+                updateWorksHeaderPin();
+            });
+            feedWorksContainer.postDelayed(() -> {
+                wkVBinding.appBarLayout.requestLayout();
+                updateWorksHeaderPin();
+            }, 180);
         } catch (Throwable ignored) {
-            // wkfeed 是可选模块。没有安装时不要影响个人主页。
+            // wkfeed is optional. Its absence must not break the profile page.
             hideFeedWorks();
         }
+    }
+
+    private Fragment resolveFeedWorksFragment() {
+        Fragment current = getSupportFragmentManager().findFragmentByTag(TAG_FEED_WORKS);
+        if (current == null) {
+            current = getSupportFragmentManager().findFragmentById(R.id.feedWorksContainer);
+        }
+        if (current != null) feedWorksFragment = current;
+        return current != null ? current : feedWorksFragment;
+    }
+
+    private boolean fragmentMatchesProfileUid(Fragment fragment, String expectedUid) {
+        if (fragment == null || TextUtils.isEmpty(expectedUid) || fragment.getArguments() == null) {
+            return false;
+        }
+        String fragmentUid = fragment.getArguments().getString("uid", "");
+        return TextUtils.equals(fragmentUid, expectedUid);
     }
 
     private void hideFeedWorks() {
         if (wkVBinding == null) return;
         if (feedWorksSection != null) feedWorksSection.setVisibility(View.GONE);
+        if (feedWorksContainer != null) feedWorksContainer.setVisibility(View.GONE);
+        if (feedWorksTitleTv != null) feedWorksTitleTv.setVisibility(View.VISIBLE);
         feedWorksFragment = null;
-        updateWorksHeaderPin();
-    }
-
-    private void disableNestedFeedScrolling() {
-        ensureFixedTopBarViews();
-        if (wkVBinding == null || feedWorksContainer == null) return;
-        disableNestedFeedScrolling(feedWorksContainer);
-    }
-
-    private void disableNestedFeedScrolling(View view) {
-        if (view == null) return;
-        if (view instanceof RecyclerView) {
-            RecyclerView recyclerView = (RecyclerView) view;
-            recyclerView.setNestedScrollingEnabled(false);
-            recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-            recyclerView.setHasFixedSize(false);
-            recyclerView.requestLayout();
-            return;
-        }
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                disableNestedFeedScrolling(group.getChildAt(i));
-            }
-        }
+        lastFeedTopInset = -1;
+        lastFeedBottomInset = -1;
+        updateFixedTopBarAppearance(false);
     }
 
     private void bindCover(String cover) {
@@ -947,13 +968,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private void bindActionButton(PartnerProfileEntity data) {
         if (isSelf) {
             wkVBinding.helloBar.setVisibility(View.GONE);
-            wkVBinding.bottomActionSpace.setVisibility(View.GONE);
+            if (feedWorksContainer != null) feedWorksContainer.post(this::applyFeedHostInsets);
             return;
         }
         boolean blocked = isBlacklisted(data);
         boolean isFriend = isFriend(data);
         wkVBinding.helloBar.setVisibility(View.VISIBLE);
-        wkVBinding.bottomActionSpace.setVisibility(View.VISIBLE);
         wkVBinding.helloBtnLayout.setEnabled(true);
         wkVBinding.helloBtnLayout.setAlpha(1f);
         if (blocked) {
@@ -966,9 +986,12 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         wkVBinding.helloBtnProgress.setVisibility(View.GONE);
         setHelloButtonWidth(ViewGroup.LayoutParams.MATCH_PARENT);
         isSayHiLoading = false;
+        if (feedWorksContainer != null) feedWorksContainer.post(this::applyFeedHostInsets);
     }
 
     private void onMainActionClick() {
+        // This button sends a real friend application. The entered text is the verification
+        // message attached to that application; it is not the partner greeting/private-message API.
         if (isSayHiLoading) return;
         pressAndRun(wkVBinding.helloBtnLayout, () -> {
             if (isBlacklisted(profile)) {
