@@ -6,5 +6,14 @@
         <activity
             android:name="com.chat.speech.ui.SpeechSettingsActivity"
             android:screenOrientation="portrait" />
+
+        <!-- The extracted third-party native TTS engine is intentionally isolated. If its
+             incompatible native code aborts, the learning/settings UI remains alive and the
+             persistent breadcrumb log records the last completed initialization stage. -->
+        <service
+            android:name="com.chat.speech.service.ByteDanceOfflineTtsService"
+            android:exported="false"
+            android:process=":byte_tts"
+            android:stopWithTask="false" />
     </application>
 </manifest>
