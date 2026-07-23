@@ -7,6 +7,7 @@ import android.os.Looper;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.chat.speech.engine.ByteDanceOfflineTtsEngine;
 import com.chat.speech.engine.EdgeTtsEngine;
 import com.chat.speech.engine.MsTranslatorCompatibleEngine;
 import com.chat.speech.engine.SystemTtsEngine;
@@ -33,6 +34,7 @@ public class SpeechManager {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final EdgeTtsEngine edgeEngine = new EdgeTtsEngine();
     private final MsTranslatorCompatibleEngine msEngine = new MsTranslatorCompatibleEngine();
+    private final ByteDanceOfflineTtsEngine byteDanceOfflineEngine = new ByteDanceOfflineTtsEngine();
     private final AtomicLong requestGeneration = new AtomicLong(0L);
     private final Object taskLock = new Object();
 
@@ -53,7 +55,27 @@ public class SpeechManager {
         get(context).speakAuto(text);
     }
 
+    /** Compatibility entry used by the learning module. */
+    public static void speak(Context context, String text, String lang, String mode) {
+        get(context).speakDetailed(text, null, lang, mode);
+    }
+
+    /** Learning entry that keeps both Hanzi and the teacher-provided pinyin. */
+    public static void speak(
+            Context context,
+            String text,
+            String pinyin,
+            String lang,
+            String mode
+    ) {
+        get(context).speakDetailed(text, pinyin, lang, mode);
+    }
+
     public void speakAuto(String text) {
+        speakDetailed(text, null, SpeechSegment.LANG_ZH, "word");
+    }
+
+    private void speakDetailed(String text, String pinyin, String lang, String mode) {
         if (text == null || text.trim().isEmpty()) return;
         String cleanText = text.trim();
         long generation = requestGeneration.incrementAndGet();
@@ -71,18 +93,75 @@ public class SpeechManager {
         }
 
         synchronized (taskLock) {
-            activeTask = executor.submit(() -> synthesizeAndPlay(
-                    generation,
-                    cleanText,
-                    prefs,
-                    activeSource
-            ));
+            if (TtsSource.TYPE_BYTEDANCE_OFFLINE.equals(activeSource.type)) {
+                activeTask = executor.submit(() -> synthesizeOfflineAndPlay(
+                        generation,
+                        cleanText,
+                        pinyin,
+                        lang,
+                        mode,
+                        prefs,
+                        activeSource
+                ));
+            } else {
+                activeTask = executor.submit(() -> synthesizeAndPlay(
+                        generation,
+                        cleanText,
+                        prefs,
+                        activeSource
+                ));
+            }
         }
     }
 
     public void stop() {
         requestGeneration.incrementAndGet();
         cancelCurrentWork();
+    }
+
+    private void synthesizeOfflineAndPlay(
+            long generation,
+            String originalText,
+            String pinyin,
+            String lang,
+            String mode,
+            SpeechPrefs prefs,
+            TtsSource activeSource
+    ) {
+        try {
+            ensureCurrent(generation);
+            if (SpeechSegment.LANG_MY.equals(lang) || containsMyanmar(originalText)) {
+                throw new IllegalStateException("当前字节离线包只包含中文模型");
+            }
+            File file = byteDanceOfflineEngine.synthesize(
+                    app,
+                    originalText,
+                    pinyin,
+                    mode,
+                    prefs.getByteDanceVoice(),
+                    prefs.getByteDanceSampleRate(),
+                    prefs.getRatePercent()
+            );
+            ensureCurrent(generation);
+            List<File> files = new ArrayList<>();
+            files.add(file);
+            mainHandler.post(() -> {
+                if (isCurrent(generation)) playFiles(files, 0, generation);
+            });
+        } catch (InterruptedException cancelled) {
+            Thread.currentThread().interrupt();
+        } catch (Exception error) {
+            Log.w(TAG, "ByteDance offline TTS failed, using online fallback", error);
+            if (isCurrent(generation)) {
+                String message = error.getMessage();
+                mainHandler.post(() -> Toast.makeText(
+                        app,
+                        "字节离线语音失败，已回退在线/系统语音：" + (message == null ? "未知错误" : message),
+                        Toast.LENGTH_LONG
+                ).show());
+                synthesizeAndPlay(generation, originalText, prefs, activeSource);
+            }
+        }
     }
 
     private void synthesizeAndPlay(
@@ -191,6 +270,9 @@ public class SpeechManager {
 
         if (activeSource != null && TtsSource.TYPE_MS_TRANSLATOR.equals(activeSource.type)) {
             addSource(result, added, prefs.getSourceById(TtsSource.edgeWebSocketTemplate().id));
+        } else if (activeSource != null && TtsSource.TYPE_BYTEDANCE_OFFLINE.equals(activeSource.type)) {
+            addSource(result, added, prefs.getSourceById(TtsSource.edgeWebSocketTemplate().id));
+            addSource(result, added, prefs.getSourceById(TtsSource.builtinMsTranslator().id));
         } else {
             addSource(result, added, prefs.getSourceById(TtsSource.builtinMsTranslator().id));
         }
@@ -229,6 +311,7 @@ public class SpeechManager {
         }
         edgeEngine.cancelActive();
         msEngine.cancelActive();
+        byteDanceOfflineEngine.cancelActive();
         try {
             SystemTtsEngine.get(app).stop();
         } catch (Throwable ignored) {
@@ -297,6 +380,15 @@ public class SpeechManager {
                 "在线自然语音暂不可用，已使用系统语音",
                 Toast.LENGTH_SHORT
         ).show();
+    }
+
+    private static boolean containsMyanmar(String text) {
+        if (text == null) return false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c >= '\u1000' && c <= '\u109f') return true;
+        }
+        return false;
     }
 
     private void ensureCurrent(long generation) throws InterruptedException {

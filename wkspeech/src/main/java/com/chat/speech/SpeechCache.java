@@ -13,9 +13,15 @@ public class SpeechCache {
     private SpeechCache() {}
 
     public static File audioFile(Context context, String key) {
+        return audioFile(context, key, "mp3");
+    }
+
+    public static File audioFile(Context context, String key, String extension) {
         File dir = new File(context.getApplicationContext().getCacheDir(), "wkspeech/tts");
         if (!dir.exists()) dir.mkdirs();
-        return new File(dir, md5(key) + ".mp3");
+        String ext = extension == null ? "mp3" : extension.trim().toLowerCase();
+        if (!ext.matches("[a-z0-9]{2,5}")) ext = "mp3";
+        return new File(dir, md5(key) + "." + ext);
     }
 
     public static void trim(Context context) {

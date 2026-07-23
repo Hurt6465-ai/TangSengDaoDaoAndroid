@@ -10,6 +10,7 @@ import com.chat.speech.model.TtsVoice;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,9 +32,12 @@ public class SpeechPrefs {
     private static final String KEY_RATE_PERCENT = "rate_percent";
     private static final String KEY_PITCH_PERCENT = "pitch_percent";
     private static final String KEY_EDGE_ENGINE_MIGRATION_V1 = "edge_engine_migration_v1";
+    private static final String KEY_BYTEDANCE_PACKAGE_ROOT = "bytedance_package_root";
+    private static final String KEY_BYTEDANCE_VOICE = "bytedance_voice";
 
     public static final String SOURCE_TYPE_MS_TRANSLATOR = TtsSource.TYPE_MS_TRANSLATOR;
     public static final String SOURCE_TYPE_EDGE_WEBSOCKET = TtsSource.TYPE_EDGE_WEBSOCKET;
+    public static final String SOURCE_TYPE_BYTEDANCE_OFFLINE = TtsSource.TYPE_BYTEDANCE_OFFLINE;
     public static final String SOURCE_TYPE_UNKNOWN = TtsSource.TYPE_UNKNOWN;
 
     public static final String DEFAULT_AUDIO_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
@@ -116,6 +120,47 @@ public class SpeechPrefs {
     public void setMyVoice(String voice) {
         if (voice == null || voice.trim().isEmpty()) return;
         sp.edit().putString(KEY_MY_VOICE, voice.trim()).apply();
+    }
+
+    public String getByteDancePackageRoot() {
+        String path = sp.getString(KEY_BYTEDANCE_PACKAGE_ROOT, "");
+        return path == null ? "" : path.trim();
+    }
+
+    public void setByteDancePackageRoot(String path) {
+        sp.edit().putString(KEY_BYTEDANCE_PACKAGE_ROOT, path == null ? "" : path.trim()).apply();
+    }
+
+    public boolean isByteDancePackageReady() {
+        String root = getByteDancePackageRoot();
+        if (root.isEmpty()) return false;
+        File bytedance = new File(root);
+        return bytedance.isDirectory()
+                && new File(bytedance, "midu/speech_license.licbag").isFile()
+                && (new File(bytedance, "midu/zh-cn/ptl.dat").isFile()
+                || new File(bytedance, "fanqie/zh-cn/ptl.dat").isFile());
+    }
+
+    public String getByteDanceVoice() {
+        String voice = sp.getString(KEY_BYTEDANCE_VOICE, "BV001_24k");
+        return voice == null || voice.trim().isEmpty() ? "BV001_24k" : voice.trim();
+    }
+
+    public void setByteDanceVoice(String voice) {
+        if (voice == null || voice.trim().isEmpty()) return;
+        sp.edit().putString(KEY_BYTEDANCE_VOICE, voice.trim()).apply();
+    }
+
+    public int getByteDanceSampleRate() {
+        return getByteDanceVoice().contains("_24k") ? 24000 : 16000;
+    }
+
+    public List<TtsVoice> getByteDanceVoices() {
+        List<TtsVoice> result = new ArrayList<>();
+        for (TtsVoice voice : getAllVoices()) {
+            if (TtsSource.byteDanceOffline().id.equals(voice.sourceId)) result.add(voice);
+        }
+        return result;
     }
 
     public String getAudioFormat() {
