@@ -7,12 +7,12 @@ import android.os.Looper;
 import android.util.Log;
 import android.widget.Toast;
 
-import com.chat.speech.engine.ByteDanceOfflineTtsEngine;
 import com.chat.speech.engine.EdgeTtsEngine;
 import com.chat.speech.engine.MsTranslatorCompatibleEngine;
 import com.chat.speech.engine.SystemTtsEngine;
 import com.chat.speech.model.SpeechSegment;
 import com.chat.speech.model.TtsSource;
+import com.chat.speech.service.ByteDanceOfflineServiceClient;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -34,7 +34,7 @@ public class SpeechManager {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final EdgeTtsEngine edgeEngine = new EdgeTtsEngine();
     private final MsTranslatorCompatibleEngine msEngine = new MsTranslatorCompatibleEngine();
-    private final ByteDanceOfflineTtsEngine byteDanceOfflineEngine = new ByteDanceOfflineTtsEngine();
+    private final ByteDanceOfflineServiceClient byteDanceOfflineClient;
     private final AtomicLong requestGeneration = new AtomicLong(0L);
     private final Object taskLock = new Object();
 
@@ -44,6 +44,7 @@ public class SpeechManager {
 
     private SpeechManager(Context context) {
         app = context.getApplicationContext();
+        byteDanceOfflineClient = new ByteDanceOfflineServiceClient(app);
     }
 
     public static synchronized SpeechManager get(Context context) {
@@ -133,8 +134,7 @@ public class SpeechManager {
             if (SpeechSegment.LANG_MY.equals(lang) || containsMyanmar(originalText)) {
                 throw new IllegalStateException("当前字节离线包只包含中文模型");
             }
-            File file = byteDanceOfflineEngine.synthesize(
-                    app,
+            File file = byteDanceOfflineClient.synthesize(
                     originalText,
                     pinyin,
                     mode,
@@ -311,7 +311,7 @@ public class SpeechManager {
         }
         edgeEngine.cancelActive();
         msEngine.cancelActive();
-        byteDanceOfflineEngine.cancelActive();
+        byteDanceOfflineClient.cancelActive();
         try {
             SystemTtsEngine.get(app).stop();
         } catch (Throwable ignored) {
