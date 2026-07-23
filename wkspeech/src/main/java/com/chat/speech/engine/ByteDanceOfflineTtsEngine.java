@@ -50,7 +50,10 @@ public final class ByteDanceOfflineTtsEngine {
     private static final int WORK_MODE_OFFLINE = 2048;
     private static final int DIRECTIVE_START_ENGINE = 1000;
     private static final int DIRECTIVE_STOP_ENGINE = 1001;
+    private static final int DIRECTIVE_SYNC_STOP_ENGINE = 2001;
     private static final int DIRECTIVE_SYNTHESIS = 1400;
+    private static final int ERROR_PLAYER_WITHOUT_START = -900;
+    private static final int ERROR_WRONG_ENGINE_STATE = -1000;
     private static final int MESSAGE_ENGINE_ERROR = 1003;
     private static final int MESSAGE_AUDIO_DATA = 1400;
     // The original MultiTTS adapter only releases its synthesis latch on 1409.
@@ -67,6 +70,7 @@ public final class ByteDanceOfflineTtsEngine {
     private volatile String activeError;
     private volatile String fatalEngineError;
     private volatile boolean cancelled;
+    private volatile boolean engineRunning;
 
     public File synthesize(
             Context context,
@@ -94,18 +98,20 @@ public final class ByteDanceOfflineTtsEngine {
         String actualText = text == null ? "" : text.trim();
         String textType = "plain";
         if ("spelling".equalsIgnoreCase(mode) && pinyin != null && !pinyin.trim().isEmpty()) {
-            // MultiTTS does not synthesize the Hanzi in spelling mode. It first turns the supplied
-            // pinyin into teaching text, e.g. bà -> "b à", then lets the ByteDance Chinese
-            // frontend read that text. Keep this as plain text rather than SSML so the result
-            // matches the original third-party app's pinyin-spelling behaviour.
-            String teachingText = PinyinNormalizer.buildTeachingSpellingText(pinyin);
-            if (!teachingText.isEmpty()) actualText = teachingText;
-            Log.i(TAG, "Spelling input: " + actualText);
+            // The display form remains "b à" / "n ǐ，h ǎo", but bare Latin initials must not be
+            // sent to a multilingual frontend: it correctly reads them as English letter names.
+            // Replace only the initials with their Mandarin classroom aliases and preserve the
+            // tone-marked finals that this imported Chinese frontend already pronounces correctly.
+            String displayText = PinyinNormalizer.buildTeachingSpellingText(pinyin);
+            String mandarinText = PinyinNormalizer.buildMandarinSpellingText(pinyin);
+            if (!mandarinText.isEmpty()) actualText = mandarinText;
+            Log.i(TAG, "Spelling display=" + displayText + ", input=" + actualText);
+            SpeechDebugLog.append(app, "engine.spelling_display=" + displayText);
             SpeechDebugLog.append(app, "engine.spelling_input=" + actualText);
         }
         if (actualText.isEmpty()) throw new IllegalArgumentException("朗读内容为空");
 
-        String cacheKey = "bytedance-offline|" + resources.signature + "|" + textType + "|"
+        String cacheKey = "bytedance-offline-v5|" + resources.signature + "|" + textType + "|"
                 + ratePercent + "|" + actualText;
         File cached = SpeechCache.audioFile(app, cacheKey, "wav");
         if (cached.exists() && cached.length() > 44L) {
@@ -134,6 +140,19 @@ public final class ByteDanceOfflineTtsEngine {
                 SpeechDebugLog.append(app, "engine.send_synthesis text=" + abbreviate(actualText));
                 int result = sendDirective(DIRECTIVE_SYNTHESIS, "");
                 SpeechDebugLog.append(app, "engine.send_synthesis.result=" + result);
+                if (result == ERROR_PLAYER_WITHOUT_START || result == ERROR_WRONG_ENGINE_STATE) {
+                    // A previous asynchronous stop may have completed just before this request.
+                    // Never reuse a stopped engine: rebuild it once and retry the directive.
+                    SpeechDebugLog.append(app, "engine.send_synthesis.recover state=" + result);
+                    destroyEngineOnly();
+                    ensureInitialized(app, resources);
+                    setOptionString("tts_text_type", textType);
+                    setOptionInt("tts_speed", speedValue(ratePercent));
+                    setOptionInt("tts_volume", 10);
+                    setOptionString("tts_text", actualText);
+                    result = sendDirective(DIRECTIVE_SYNTHESIS, "");
+                    SpeechDebugLog.append(app, "engine.send_synthesis.retry_result=" + result);
+                }
                 if (result != 0) throw new IllegalStateException("离线合成启动失败：" + result);
                 if (!activeLatch.await(SYNTHESIS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException("离线合成超时");
@@ -163,31 +182,40 @@ public final class ByteDanceOfflineTtsEngine {
         CountDownLatch latch = activeLatch;
         if (latch != null) latch.countDown();
         synchronized (lock) {
-            if (engine != null) {
+            if (engine == null) return;
+            int stopResult = Integer.MIN_VALUE;
+            try {
+                stopResult = sendDirective(DIRECTIVE_SYNC_STOP_ENGINE, "");
+                SpeechDebugLog.append(logContext, "engine.stop.sync_result=" + stopResult);
+            } catch (Throwable error) {
+                SpeechDebugLog.append(logContext, "engine.stop.sync_error="
+                        + error.getClass().getSimpleName() + ": " + error.getMessage());
+            }
+            if (stopResult != 0) {
                 try {
-                    sendDirective(DIRECTIVE_STOP_ENGINE, "");
-                } catch (Throwable ignored) {
+                    int fallbackResult = sendDirective(DIRECTIVE_STOP_ENGINE, "");
+                    SpeechDebugLog.append(logContext, "engine.stop.fallback_result="
+                            + fallbackResult);
+                } catch (Throwable error) {
+                    SpeechDebugLog.append(logContext, "engine.stop.fallback_error="
+                            + error.getClass().getSimpleName() + ": " + error.getMessage());
                 }
             }
+            // A stopped vendor engine returns -900 if it is reused. Destroy it here so the next
+            // request always executes the full start sequence.
+            destroyEngineOnly();
         }
     }
 
     public void destroy() {
+        cancelActive();
         synchronized (lock) {
-            cancelActive();
-            if (engine != null) {
-                try {
-                    invokeEngine("destroyEngine", new Class<?>[0]);
-                } catch (Throwable ignored) {
-                }
-            }
-            engine = null;
-            initializedSignature = "";
+            destroyEngineOnly();
         }
     }
 
     private void ensureInitialized(Context context, VoiceResources resources) throws Exception {
-        if (engine != null && resources.signature.equals(initializedSignature)) {
+        if (engine != null && engineRunning && resources.signature.equals(initializedSignature)) {
             SpeechDebugLog.append(context, "engine.init.reuse signature=" + resources.signature);
             return;
         }
@@ -269,6 +297,7 @@ public final class ByteDanceOfflineTtsEngine {
             destroyEngineOnly();
             throw new IllegalStateException("字节离线引擎启动失败：" + startResult);
         }
+        engineRunning = true;
         initializedSignature = resources.signature;
         Log.i(TAG, "Offline engine initialized: " + resources.signature);
         SpeechDebugLog.append(context, "engine.init.success signature=" + resources.signature);
@@ -321,6 +350,8 @@ public final class ByteDanceOfflineTtsEngine {
                 return;
             }
             // Preserve non-audio status callbacks (1001/1002/1403/1404/1408, etc.) for diagnosis.
+            // Do not change engineRunning from an asynchronous 1002 callback here: it may belong
+            // to an older engine instance. Our explicit stop path destroys the instance directly.
             SpeechDebugLog.append(logContext, "engine.callback.status type=" + type
                     + decodeMessage(data, length));
         } catch (Throwable error) {
@@ -611,6 +642,7 @@ public final class ByteDanceOfflineTtsEngine {
             }
         }
         engine = null;
+        engineRunning = false;
         initializedSignature = "";
     }
 
