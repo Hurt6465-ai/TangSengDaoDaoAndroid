@@ -1109,17 +1109,50 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             return;
         }
         DeepSeekRequest request = buildDeepSeekRequest(action);
-        DeepSeekAssistant.openAction(this, request, (text, sendNow) -> {
-            if (TextUtils.isEmpty(text) || wkVBinding == null) return;
+        DeepSeekAssistant.openAction(this, request, (text, sendNow) -> runOnUiThread(() -> {
+            if (TextUtils.isEmpty(text) || wkVBinding == null || isFinishing()) return;
+
+            restoreChatAfterDeepSeek();
             EditText editText = wkVBinding.editText;
             editText.setText(text);
             editText.setSelection(text.length());
             editText.requestFocus();
+
+            if (chatAdapter != null && chatAdapter.getItemCount() > 0) {
+                wkVBinding.recyclerView.post(() -> scrollToPosition(chatAdapter.getItemCount() - 1));
+            }
+
             if (sendNow) {
-                // 走聊天输入框原有发送流程，保留回复、编辑、陌生人限制和发送状态处理。
-                wkVBinding.sendIV.post(wkVBinding.sendIV::performClick);
+                // 等 TextWatcher 把右侧按钮切换成发送状态后再点击，避免仍处于语音按钮状态。
+                wkVBinding.sendIV.postDelayed(() -> {
+                    if (!isFinishing() && wkVBinding != null && !TextUtils.isEmpty(wkVBinding.editText.getText())) {
+                        wkVBinding.sendIV.performClick();
+                        if (chatAdapter != null && chatAdapter.getItemCount() > 0) {
+                            wkVBinding.recyclerView.postDelayed(
+                                    () -> scrollToPosition(chatAdapter.getItemCount() - 1), 180);
+                        }
+                    }
+                }, 180);
             } else {
-                SoftKeyboardUtils.getInstance().showSoftKeyBoard(this, editText);
+                editText.postDelayed(() -> {
+                    if (mHelper != null) mHelper.toKeyboardState();
+                    SoftKeyboardUtils.getInstance().showSoftKeyBoard(this, editText);
+                }, 180);
+            }
+        }), this::restoreChatAfterDeepSeek);
+    }
+
+    private void restoreChatAfterDeepSeek() {
+        runOnUiThread(() -> {
+            if (wkVBinding == null || isFinishing()) return;
+            if (mHelper != null) mHelper.resetState();
+            wkVBinding.recyclerViewLayout.setVisibility(View.VISIBLE);
+            wkVBinding.recyclerView.setVisibility(View.VISIBLE);
+            wkVBinding.recyclerView.setAlpha(1f);
+            wkVBinding.recyclerView.setTranslationY(0f);
+            wkVBinding.recyclerViewLayout.setTranslationY(0f);
+            if (chatAdapter != null && chatAdapter.getItemCount() > 0) {
+                wkVBinding.recyclerView.post(() -> scrollToPosition(chatAdapter.getItemCount() - 1));
             }
         });
     }
