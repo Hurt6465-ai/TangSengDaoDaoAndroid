@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application>
         <activity
-            android:name=".browse.FeedBrowseActivity"
-            android:screenOrientation="portrait"
-            android:theme="@style/WKFeedFullScreenTheme" />
+            android:name="com.chat.speech.ui.SpeechSettingsActivity"
+            android:screenOrientation="portrait" />
 
-        <activity
-            android:name=".publish.FeedPublishActivity"
-            android:screenOrientation="portrait"
-            android:theme="@style/WKFeedFullScreenTheme"
-            android:windowSoftInputMode="adjustResize" />
+        <!-- The extracted third-party native TTS engine is intentionally isolated. If its
+             incompatible native code aborts, the learning/settings UI remains alive and the
+             persistent breadcrumb log records the last completed initialization stage. -->
+        <service
+            android:name="com.chat.speech.service.ByteDanceOfflineTtsService"
+            android:exported="false"
+            android:process=":byte_tts"
+            android:stopWithTask="false" />
     </application>
 </manifest>
