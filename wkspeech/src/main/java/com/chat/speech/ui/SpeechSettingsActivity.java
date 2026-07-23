@@ -25,6 +25,7 @@ import android.widget.Toast;
 import com.chat.speech.SpeechCache;
 import com.chat.speech.SpeechManager;
 import com.chat.speech.SpeechPrefs;
+import com.chat.speech.debug.SpeechDebugLog;
 import com.chat.speech.importer.ByteDanceOfflinePackageImporter;
 import com.chat.speech.importer.MultiTtsImporter;
 import com.chat.speech.importer.TtsSourceConfigImporter;
@@ -129,10 +130,48 @@ public class SpeechSettingsActivity extends Activity {
         root.addView(section("试听"));
         root.addView(card("中文试听", "使用当前朗读模式、中文发音人和语速。", "播放", () -> SpeechManager.speak(this, "你好，欢迎使用唐僧叨叨学习语音。")));
         root.addView(card("缅语试听", "使用当前朗读模式、缅语发音人和语速。", "播放", () -> SpeechManager.speak(this, "မင်္ဂလာပါ။ ကျွန်မ မြန်မာစကား လေ့ကျင့်နေပါတယ်။")));
-        root.addView(card("拼音拼读试听：爸", "应读成 b—à，而不是只读完整音节 bà。日志中会显示 Spelling input: b à。", "播放", () -> SpeechManager.speak(this, "爸", "bà", "zh-CN", "spelling")));
-        root.addView(card("拼音拼读试听：你好", "应依次读成 n—ǐ、h—ǎo。", "播放", () -> SpeechManager.speak(this, "你好", "nǐ hǎo", "zh-CN", "spelling")));
+        root.addView(card("拼音拼读试听：爸", "应读成 b—à，而不是只读完整音节 bà。新版会在独立语音进程运行，Native 崩溃不会把此页面关闭。", "播放", () -> {
+            SpeechDebugLog.append(this, "ui.test_click 爸 bà -> b à");
+            toast("已提交离线拼读：b—à");
+            SpeechManager.speak(this, "爸", "bà", "zh-CN", "spelling");
+        }));
+        root.addView(card("拼音拼读试听：你好", "应依次读成 n—ǐ、h—ǎo。", "播放", () -> {
+            SpeechDebugLog.append(this, "ui.test_click 你好 nǐ hǎo");
+            toast("已提交离线拼读：n—ǐ，h—ǎo");
+            SpeechManager.speak(this, "你好", "nǐ hǎo", "zh-CN", "spelling");
+        }));
+        root.addView(card("离线诊断日志", "最后记录：\n" + SpeechDebugLog.lastLine(this)
+                + "\n\n即使字节 Native 子进程崩溃，这份日志仍保留。", "查看 / 复制", this::showByteDanceDebugLog));
+        root.addView(card("清空离线诊断日志", "清空后重新点击一次“爸”，更容易判断具体崩在哪一步。", "清空", () -> {
+            SpeechDebugLog.clear(this);
+            toast("离线诊断日志已清空");
+            render();
+        }));
         root.addView(card("一句话混读测试", "字节离线包只含中文；遇到缅语时会自动使用在线备用源或系统 TTS。", "播放", () -> SpeechManager.speak(this, "你好，我们开始练习口语。 မင်္ဂလာပါ၊ စကားပြော လေ့ကျင့်ကြမယ်။")));
-        root.addView(card("停止播放", "停止当前系统 TTS 或在线音频播放。", "停止", () -> SpeechManager.get(this).stop()));
+        root.addView(card("停止播放", "停止当前系统 TTS、在线音频或离线子进程中的合成。", "停止", () -> SpeechManager.get(this).stop()));
+    }
+
+    private void showByteDanceDebugLog() {
+        String log = SpeechDebugLog.read(this);
+        EditText view = new EditText(this);
+        view.setText(log);
+        view.setTextSize(11);
+        view.setMinLines(16);
+        view.setGravity(Gravity.TOP | Gravity.START);
+        view.setSingleLine(false);
+        view.setTextIsSelectable(true);
+        view.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        int padding = dp(12);
+        view.setPadding(padding, padding, padding, padding);
+        new AlertDialog.Builder(this)
+                .setTitle("字节离线语音诊断日志")
+                .setView(view)
+                .setPositiveButton("复制全部", (dialog, which) ->
+                        copyText("bytedance_debug.log", SpeechDebugLog.read(this)))
+                .setNeutralButton("刷新", (dialog, which) -> showByteDanceDebugLog())
+                .setNegativeButton("关闭", null)
+                .show();
     }
 
     private void addCacheSection() {
