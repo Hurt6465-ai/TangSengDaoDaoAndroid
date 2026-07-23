@@ -76,10 +76,16 @@ public final class DeepSeekAssistant {
     }
 
     public static void openAction(FragmentActivity activity, DeepSeekRequest request, ReplyCallback callback) {
+        openAction(activity, request, callback, null);
+    }
+
+    public static void openAction(FragmentActivity activity, DeepSeekRequest request,
+                                  ReplyCallback callback, StateCallback closeCallback) {
         if (activity.getSupportFragmentManager().findFragmentByTag(TAG) != null) return;
         DeepSeekContactStore.apply(activity, request);
         DeepSeekAssistantDialog dialog = DeepSeekAssistantDialog.newAction(request);
         dialog.setReplyCallback(callback);
+        dialog.setStateCallback(closeCallback);
         dialog.show(activity.getSupportFragmentManager(), TAG);
     }
 

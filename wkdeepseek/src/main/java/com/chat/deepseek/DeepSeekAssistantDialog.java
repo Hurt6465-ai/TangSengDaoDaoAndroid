@@ -1,10 +1,10 @@
 package com.chat.deepseek;
 
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
@@ -67,7 +67,9 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
     private boolean loginMode;
     private boolean promptPrepared;
     private boolean promptFilled;
+    private boolean promptSubmitted;
     private int fillAttempts;
+    private int submitAttempts;
     private boolean fallbackCopied;
     private String pendingPrompt = "";
     private DeepSeekRequest request;
@@ -132,18 +134,26 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
         super.onStart();
         if (!(getDialog() instanceof BottomSheetDialog)) return;
         BottomSheetDialog dialog = (BottomSheetDialog) getDialog();
+        dialog.setCanceledOnTouchOutside(false);
         FrameLayout sheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
         if (sheet == null) return;
+
+        // 固定窗口高度并彻底关闭 BottomSheet 拖动。
+        // 之前半展开状态会抢走 WebView 的上下滑动手势，导致网页无法正常滚动，
+        // 返回聊天页时也可能残留面板位移状态。
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
         ViewGroup.LayoutParams lp = sheet.getLayoutParams();
-        lp.height = loginMode ? ViewGroup.LayoutParams.MATCH_PARENT : Math.round(screenHeight * 0.86f);
+        lp.height = loginMode
+                ? ViewGroup.LayoutParams.MATCH_PARENT
+                : Math.round(screenHeight * 0.60f);
         sheet.setLayoutParams(lp);
+
         BottomSheetBehavior<FrameLayout> behavior = BottomSheetBehavior.from(sheet);
-        behavior.setSkipCollapsed(loginMode);
-        behavior.setFitToContents(false);
-        behavior.setHalfExpandedRatio(0.58f);
-        behavior.setExpandedOffset(dp(18));
-        behavior.setState(loginMode ? BottomSheetBehavior.STATE_EXPANDED : BottomSheetBehavior.STATE_HALF_EXPANDED);
+        behavior.setDraggable(false);
+        behavior.setHideable(false);
+        behavior.setSkipCollapsed(true);
+        behavior.setFitToContents(true);
+        behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
     }
 
     private View buildContent(Context context) {
@@ -179,6 +189,8 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
         root.addView(progressBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(2)));
 
         webView = new WebView(context);
+        webView.setNestedScrollingEnabled(true);
+        webView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
         configureWebView(webView);
         root.addView(webView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
@@ -449,8 +461,9 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
             boolean success = "true".equals(value) || "\"true\"".equals(value);
             if (success) {
                 promptFilled = true;
-                statusView.setText(R.string.wkdeepseek_filled);
+                statusView.setText(R.string.wkdeepseek_submitting);
                 installReplyButtons();
+                handler.postDelayed(this::submitPromptAutomatically, 350);
                 return;
             }
             fillAttempts++;
@@ -462,6 +475,48 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
                 statusView.setText(R.string.wkdeepseek_fill_failed);
             }
         });
+    }
+
+    private void submitPromptAutomatically() {
+        if (promptSubmitted || webView == null || !isAdded()) return;
+        webView.evaluateJavascript(buildSubmitScript(), value -> {
+            String result = value == null ? "" : value.replace("\"", "");
+            boolean submitted = "clicked".equals(result)
+                    || "requested".equals(result)
+                    || "enter".equals(result);
+            if (submitted) {
+                promptSubmitted = true;
+                statusView.setText(R.string.wkdeepseek_thinking);
+                installReplyButtons();
+                return;
+            }
+            submitAttempts++;
+            if (submitAttempts < 8) {
+                handler.postDelayed(this::submitPromptAutomatically, 450);
+            } else {
+                statusView.setText(R.string.wkdeepseek_submit_failed);
+            }
+        });
+    }
+
+    /**
+     * 自动提交只操作当前用户可见的 DeepSeek 输入区，不调用或拦截任何私有接口。
+     * 先找输入框附近可见且可点击的发送按钮，再退回 form.requestSubmit/Enter。
+     */
+    private String buildSubmitScript() {
+        return "(function(){try{" +
+                "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;}" +
+                "var boxes=Array.from(document.querySelectorAll('textarea,[contenteditable=\"true\"],[role=\"textbox\"]')).filter(function(x){return visible(x)&&!x.disabled&&x.getAttribute('aria-disabled')!=='true';});" +
+                "var el=boxes.length?boxes[boxes.length-1]:null;if(!el)return 'no-input';" +
+                "var er=el.getBoundingClientRect();var buttons=Array.from(document.querySelectorAll('button')).filter(function(b){return visible(b)&&!b.disabled&&b.getAttribute('aria-disabled')!=='true';});" +
+                "function score(b){var t=((b.innerText||'')+' '+(b.getAttribute('aria-label')||'')+' '+(b.getAttribute('title')||'')+' '+(b.getAttribute('data-testid')||'')).toLowerCase();" +
+                "if(/stop|停止|取消|cancel|attach|附件|upload|上传|mic|voice|语音|new chat|新建/.test(t))return -9999;" +
+                "var br=b.getBoundingClientRect(),v=0;if(/send|发送|submit/.test(t))v+=1000;if(br.left>=er.left)v+=100;v-=Math.abs(br.top-er.top)+Math.abs(br.left-er.right)*0.15;return v;}" +
+                "var ranked=buttons.map(function(b){return {b:b,s:score(b)};}).filter(function(x){return x.s>-9000;}).sort(function(a,b){return b.s-a.s;});" +
+                "if(ranked.length&&ranked[0].s>-400){ranked[0].b.click();return 'clicked';}" +
+                "var form=el.closest('form');if(form&&typeof form.requestSubmit==='function'){form.requestSubmit();return 'requested';}" +
+                "['keydown','keypress','keyup'].forEach(function(type){el.dispatchEvent(new KeyboardEvent(type,{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true,cancelable:true}));});return 'enter';" +
+                "}catch(e){return 'error';}})();";
     }
 
     private String buildFillScript(String prompt) {
@@ -487,18 +542,19 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
         String js = "(function(){" +
                 "if(window.__tsddDeepSeekInstalled)return;window.__tsddDeepSeekInstalled=true;" +
                 "var fallbackMode='" + fallbackMode + "';" +
-                "function button(label,mode,code){var b=document.createElement('button');b.type='button';b.textContent=label;" +
-                "b.style.cssText='border:0;border-radius:16px;padding:6px 10px;background:rgba(255,255,255,.96);color:#295eea;font-size:12px;box-shadow:0 2px 10px rgba(0,0,0,.12);margin-left:6px';" +
-                "b.onclick=function(e){e.preventDefault();e.stopPropagation();var t=(code.innerText||'').trim();if(t)location.href='tsdd-deepseek://result?mode='+mode+'&text='+encodeURIComponent(t);};return b;}" +
+                "function go(mode,text){if(!text)return;location.href='tsdd-deepseek://result?mode='+mode+'&text='+encodeURIComponent(text);}" +
+                "function button(label,mode,code){var b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.tsddAction='1';" +
+                "b.style.cssText='border:0;border-radius:16px;padding:7px 12px;background:#edf3ff;color:#295eea;font-size:12px;font-weight:600;margin-left:8px';" +
+                "b.onclick=function(e){e.preventDefault();e.stopPropagation();go(mode,(code.innerText||'').trim());};return b;}" +
                 "function add(){document.querySelectorAll('pre code').forEach(function(code){" +
-                "var pre=code.closest('pre');if(!pre||pre.dataset.tsddReady==='1')return;" +
+                "if(code.dataset.tsddReady==='1')return;var pre=code.closest('pre');if(!pre)return;" +
                 "var cls=(code.className||'').toLowerCase();var mode=cls.indexOf('translate')>=0?'copy':(cls.indexOf('reply')>=0?'use':fallbackMode);" +
-                "pre.dataset.tsddReady='1';pre.style.position='relative';" +
-                "var box=document.createElement('div');box.style.cssText='position:absolute;right:8px;top:8px;z-index:9999;display:flex;align-items:center';" +
+                "code.dataset.tsddReady='1';var box=document.createElement('div');box.dataset.tsddReplyBar='1';" +
+                "box.style.cssText='display:flex;justify-content:flex-end;align-items:center;padding:8px 2px 12px 2px';" +
                 "if(mode==='copy'){box.appendChild(button('复制译文','copy',code));}" +
-                "else{box.appendChild(button('填入','use',code));box.appendChild(button('发送','send',code));}" +
-                "pre.appendChild(box);});}" +
-                "var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,1500);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});add();" +
+                "else{box.appendChild(button('填入聊天','use',code));box.appendChild(button('直接发送','send',code));}" +
+                "if(pre.parentNode)pre.parentNode.insertBefore(box,pre.nextSibling);});}" +
+                "var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,450);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});add();" +
                 "})();";
         webView.evaluateJavascript(js, null);
     }
@@ -514,22 +570,16 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
             Toast.makeText(requireContext(), R.string.wkdeepseek_translation_copied, Toast.LENGTH_SHORT).show();
             return;
         }
-        if ("send".equals(mode)) {
-            new AlertDialog.Builder(requireContext())
-                    .setTitle(R.string.wkdeepseek_send_confirm)
-                    .setMessage(cleanText)
-                    .setNegativeButton(R.string.wkdeepseek_cancel, null)
-                    .setPositiveButton(R.string.wkdeepseek_send, (dialog, which) -> {
-                        copyText(cleanText);
-                        if (replyCallback != null) replyCallback.onReply(cleanText, true);
-                        dismissAllowingStateLoss();
-                    })
-                    .show();
-            return;
-        }
+
+        // 用户点击“直接发送”本身就是明确确认，不再额外弹一次确认框。
+        // 回调由聊天页走原有 sendIV 发送流程，不绕过回复、编辑和陌生人限制。
         copyText(cleanText);
-        if (replyCallback != null) replyCallback.onReply(cleanText, false);
-        Toast.makeText(requireContext(), R.string.wkdeepseek_reply_used, Toast.LENGTH_SHORT).show();
+        if (replyCallback != null) {
+            replyCallback.onReply(cleanText, "send".equals(mode));
+        }
+        if (!"send".equals(mode)) {
+            Toast.makeText(requireContext(), R.string.wkdeepseek_reply_used, Toast.LENGTH_SHORT).show();
+        }
         dismissAllowingStateLoss();
     }
 
@@ -594,6 +644,14 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    @Override
+    public void onDismiss(@NonNull DialogInterface dialog) {
+        super.onDismiss(dialog);
+        if (!loginMode && stateCallback != null) {
+            stateCallback.onChanged();
+        }
     }
 
     @Override
