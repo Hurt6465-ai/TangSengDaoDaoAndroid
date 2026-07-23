@@ -8,6 +8,7 @@ import android.util.Log;
 import com.chat.speech.PinyinNormalizer;
 import com.chat.speech.SpeechCache;
 import com.chat.speech.SpeechPrefs;
+import com.chat.speech.debug.SpeechDebugLog;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -45,6 +46,7 @@ public final class ByteDanceOfflineTtsEngine {
     private static final int MESSAGE_AUDIO_DATA_END = 1409;
 
     private final Object lock = new Object();
+    private Context logContext;
     private Object engine;
     private ClassLoader runtimeLoader;
     private String initializedSignature = "";
@@ -63,13 +65,19 @@ public final class ByteDanceOfflineTtsEngine {
             int ratePercent
     ) throws Exception {
         Context app = context.getApplicationContext();
+        logContext = app;
+        SpeechDebugLog.append(app, "engine.synthesize.begin mode=" + mode
+                + " text=" + abbreviate(text) + " pinyin=" + abbreviate(pinyin));
         requireArm64();
         SpeechPrefs prefs = new SpeechPrefs(app);
         String rootPath = prefs.getByteDancePackageRoot();
         if (rootPath.isEmpty()) throw new IllegalStateException("尚未导入字节离线语音包");
 
         File bytedanceRoot = new File(rootPath);
+        SpeechDebugLog.append(app, "engine.resolve_resources root=" + bytedanceRoot.getAbsolutePath()
+                + " voice=" + voice + " sampleRate=" + sampleRate);
         VoiceResources resources = resolveResources(bytedanceRoot, voice, sampleRate);
+        SpeechDebugLog.append(app, "engine.resources_ready signature=" + resources.signature);
         String actualText = text == null ? "" : text.trim();
         String textType = "plain";
         if ("spelling".equalsIgnoreCase(mode) && pinyin != null && !pinyin.trim().isEmpty()) {
@@ -80,6 +88,7 @@ public final class ByteDanceOfflineTtsEngine {
             String teachingText = PinyinNormalizer.buildTeachingSpellingText(pinyin);
             if (!teachingText.isEmpty()) actualText = teachingText;
             Log.i(TAG, "Spelling input: " + actualText);
+            SpeechDebugLog.append(app, "engine.spelling_input=" + actualText);
         }
         if (actualText.isEmpty()) throw new IllegalArgumentException("朗读内容为空");
 
@@ -89,6 +98,7 @@ public final class ByteDanceOfflineTtsEngine {
         if (cached.exists() && cached.length() > 44L) {
             //noinspection ResultOfMethodCallIgnored
             cached.setLastModified(System.currentTimeMillis());
+            SpeechDebugLog.append(app, "engine.cache_hit bytes=" + cached.length());
             return cached;
         }
 
@@ -103,7 +113,9 @@ public final class ByteDanceOfflineTtsEngine {
                 setOptionInt("tts_speed", speedValue(ratePercent));
                 setOptionInt("tts_volume", 10);
                 setOptionString("tts_text", actualText);
+                SpeechDebugLog.append(app, "engine.send_synthesis text=" + abbreviate(actualText));
                 int result = sendDirective(DIRECTIVE_SYNTHESIS, "");
+                SpeechDebugLog.append(app, "engine.send_synthesis.result=" + result);
                 if (result != 0) throw new IllegalStateException("离线合成启动失败：" + result);
                 if (!activeLatch.await(SYNTHESIS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException("离线合成超时");
@@ -118,6 +130,7 @@ public final class ByteDanceOfflineTtsEngine {
                 if (audio.length == 0) throw new IllegalStateException("离线引擎没有返回音频数据");
                 writeAudioFile(cached, audio, resources.sampleRate);
                 SpeechCache.trim(app);
+                SpeechDebugLog.append(app, "engine.synthesize.success bytes=" + cached.length());
                 return cached;
             } finally {
                 activeLatch = null;
@@ -155,17 +168,32 @@ public final class ByteDanceOfflineTtsEngine {
     }
 
     private void ensureInitialized(Context context, VoiceResources resources) throws Exception {
-        if (engine != null && resources.signature.equals(initializedSignature)) return;
+        if (engine != null && resources.signature.equals(initializedSignature)) {
+            SpeechDebugLog.append(context, "engine.init.reuse signature=" + resources.signature);
+            return;
+        }
+        SpeechDebugLog.append(context, "engine.init.begin signature=" + resources.signature);
         destroyEngineOnly();
-        preloadNativeLibraries();
+
+        SpeechDebugLog.append(context, "engine.runtime_loader.begin");
         runtimeLoader = createRuntimeLoader(context);
+        SpeechDebugLog.append(context, "engine.runtime_loader.ready");
+
+        // The previous test package loaded the .so files directly but never advanced
+        // SpeechEngineLoader's own state. The vendor SDK expects setAdapter() + load() before
+        // createEngine(); skipping it can terminate inside native bridge creation.
+        installVendorLibraryLoader(context);
 
         Class<?> generator = runtimeLoader.loadClass("com.bytedance.speech.speechengine.SpeechEngineGenerator");
+        SpeechDebugLog.append(context, "engine.prepare_environment.begin");
         invokePrepareEnvironment(generator, context);
+        SpeechDebugLog.append(context, "engine.prepare_environment.ready");
         engine = generator.getMethod("getInstance").invoke(null);
         if (engine == null) throw new IllegalStateException("无法创建字节离线语音引擎");
 
+        SpeechDebugLog.append(context, "engine.createEngine.begin");
         invokeEngine("createEngine", new Class<?>[0]);
+        SpeechDebugLog.append(context, "engine.createEngine.ready");
         setOptionInt("tts_work_mode", WORK_MODE_OFFLINE);
         setOptionString("engine_name", "tts");
         setOptionString("authenticate_type", "pre_bind");
@@ -185,22 +213,29 @@ public final class ByteDanceOfflineTtsEngine {
         setOptionBoolean("tts_limit_cpu_usage", false);
         setOptionInt("tts_data_callback_mode", 2);
 
+        SpeechDebugLog.append(context, "engine.initEngine.begin");
         Object initValue = invokeEngine("initEngine", new Class<?>[0]);
         int initResult = initValue instanceof Number ? ((Number) initValue).intValue() : 0;
+        SpeechDebugLog.append(context, "engine.initEngine.result=" + initResult);
         if (initResult != 0) {
             destroyEngineOnly();
             throw new IllegalStateException("字节离线引擎初始化失败：" + initResult);
         }
+        SpeechDebugLog.append(context, "engine.listener.begin");
         installListener();
+        SpeechDebugLog.append(context, "engine.listener.ready");
         setOptionString("tts_voice_offline", "other");
         setOptionString("tts_voice_type_offline", resources.voiceType);
+        SpeechDebugLog.append(context, "engine.start.begin");
         int startResult = sendDirective(DIRECTIVE_START_ENGINE, "");
+        SpeechDebugLog.append(context, "engine.start.result=" + startResult);
         if (startResult != 0) {
             destroyEngineOnly();
             throw new IllegalStateException("字节离线引擎启动失败：" + startResult);
         }
         initializedSignature = resources.signature;
         Log.i(TAG, "Offline engine initialized: " + resources.signature);
+        SpeechDebugLog.append(context, "engine.init.success signature=" + resources.signature);
     }
 
     private void installListener() throws Exception {
@@ -232,6 +267,8 @@ public final class ByteDanceOfflineTtsEngine {
                 return;
             }
             if ((type == MESSAGE_SYNTHESIS_END || type == MESSAGE_AUDIO_DATA_END)) {
+                SpeechDebugLog.append(logContext, "engine.callback.end type=" + type
+                        + " audioBytes=" + (activeAudio == null ? 0 : activeAudio.size()));
                 CountDownLatch latch = activeLatch;
                 if (latch != null) latch.countDown();
                 return;
@@ -239,11 +276,13 @@ public final class ByteDanceOfflineTtsEngine {
             // Vendor errors are commonly delivered as a negative message type with UTF-8 data.
             if (type < 0) {
                 activeError = "离线合成错误：" + type + decodeMessage(data, length);
+                SpeechDebugLog.append(logContext, "engine.callback.error " + activeError);
                 CountDownLatch latch = activeLatch;
                 if (latch != null) latch.countDown();
             }
         } catch (Throwable error) {
             activeError = "离线音频回调失败：" + error.getMessage();
+            SpeechDebugLog.append(logContext, "engine.callback.exception " + activeError);
             CountDownLatch latch = activeLatch;
             if (latch != null) latch.countDown();
         }
@@ -413,11 +452,20 @@ public final class ByteDanceOfflineTtsEngine {
         initializedSignature = "";
     }
 
-    private static void preloadNativeLibraries() {
-        System.loadLibrary("ttcrypto");
-        System.loadLibrary("ttboringssl");
-        System.loadLibrary("sscronet");
-        System.loadLibrary("speechengine");
+    private void installVendorLibraryLoader(Context context) throws Exception {
+        SpeechDebugLog.append(context, "engine.vendor_loader.begin");
+        Class<?> loaderClass = runtimeLoader.loadClass(
+                "com.bytedance.speech.speechengine.SpeechEngineLoader"
+        );
+        Object loader = loaderClass.getMethod("getInstance").invoke(null);
+
+        // Do not preload libspeechengine.so from the app class loader. SpeechEngineLoader creates
+        // its own built-in PluginAdapter (com.bytedance.speech.speechengine.a); because that class
+        // lives in runtimeLoader, System.loadLibrary() is associated with the same class loader as
+        // SpeechEngineBridge's native methods. Loading it earlier from the host class loader can
+        // produce an "already loaded in another classloader" failure and abort bridge creation.
+        Object state = loaderClass.getMethod("load").invoke(loader);
+        SpeechDebugLog.append(context, "engine.vendor_loader.state=" + String.valueOf(state));
     }
 
     private static void requireArm64() {
@@ -493,6 +541,12 @@ public final class ByteDanceOfflineTtsEngine {
     private static void writeLeShort(BufferedOutputStream out, int value) throws Exception {
         out.write(value & 0xff);
         out.write((value >>> 8) & 0xff);
+    }
+
+    private static String abbreviate(String text) {
+        if (text == null) return "";
+        String clean = text.replace('\n', ' ').replace('\r', ' ');
+        return clean.length() <= 100 ? clean : clean.substring(0, 100) + "...";
     }
 
     private static final class VoiceResources {
