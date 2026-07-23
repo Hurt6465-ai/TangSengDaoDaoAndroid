@@ -39,11 +39,13 @@ public final class DeepSeekAssistant {
     }
 
     static void markConnected(Context context) {
+        // 登录确认后需要立刻让聊天页读取到 enabled=true。
+        // commit() 避免登录页回调紧接着刷新界面时仍读到旧值。
         context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean(KEY_CONNECTED_ONCE, true)
                 .putBoolean(KEY_ENABLED, true)
-                .apply();
+                .commit();
     }
 
     private static boolean hasConnectedOnce(Context context) {

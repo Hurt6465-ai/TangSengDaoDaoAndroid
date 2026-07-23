@@ -74,6 +74,14 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
     private DeepSeekAssistant.ReplyCallback replyCallback;
     private DeepSeekAssistant.StateCallback stateCallback;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private boolean loginConfirmed;
+    private boolean loginProbeInFlight;
+    private int loginWaitAttempts;
+    private final Runnable loginProbeRunnable = this::runLoginProbe;
+
+    private interface LoginStateCallback {
+        void onResult(boolean loggedIn);
+    }
 
     public static DeepSeekAssistantDialog newLogin() {
         DeepSeekAssistantDialog dialog = new DeepSeekAssistantDialog();
@@ -156,7 +164,13 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
         toolbar.addView(statusView, new LinearLayout.LayoutParams(0, dp(46), 1f));
 
         TextView close = toolbarButton(context, loginMode ? getString(R.string.wkdeepseek_done) : getString(R.string.wkdeepseek_close));
-        close.setOnClickListener(v -> dismissAllowingStateLoss());
+        close.setOnClickListener(v -> {
+            if (loginMode && !loginConfirmed) {
+                verifyLoginBeforeClose();
+            } else {
+                dismissAllowingStateLoss();
+            }
+        });
         toolbar.addView(close, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40)));
         root.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -215,6 +229,11 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
                 progressBar.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
+                // DeepSeek 登录后经常使用 SPA 路由，页面不会再次触发 onPageFinished。
+                // 在页面主体基本可用时主动探测输入框，避免已经登录却一直无法开启。
+                if (loginMode && newProgress >= 80) {
+                    scheduleLoginProbe(250);
+                }
             }
         });
         view.setWebViewClient(new WebViewClient() {
@@ -238,15 +257,21 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
                 super.onPageFinished(view, url);
                 progressBar.setVisibility(View.GONE);
                 if (loginMode) {
-                    if (looksLoggedIn(url)) {
-                        statusView.setText("DeepSeek 已登录，可以返回聊天");
-                        DeepSeekAssistant.markConnected(requireContext());
-                        if (stateCallback != null) stateCallback.onChanged();
-                    } else {
-                        statusView.setText(R.string.wkdeepseek_need_login);
-                    }
+                    scheduleLoginProbe(150);
                 } else {
                     installReplyButtons();
+                    tryFillPrompt();
+                }
+            }
+
+            @Override
+            public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+                super.doUpdateVisitedHistory(view, url, isReload);
+                // 登录成功后 DeepSeek 可能只通过 history.pushState 改地址，
+                // 这里负责捕获 /a/chat 等单页路由变化。
+                if (loginMode) {
+                    scheduleLoginProbe(120);
+                } else {
                     tryFillPrompt();
                 }
             }
@@ -271,6 +296,97 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
                 return true;
             }
         });
+    }
+
+    private void scheduleLoginProbe(long delayMs) {
+        if (!loginMode || loginConfirmed || webView == null) return;
+        handler.removeCallbacks(loginProbeRunnable);
+        handler.postDelayed(loginProbeRunnable, Math.max(0L, delayMs));
+    }
+
+    private void runLoginProbe() {
+        if (!loginMode || loginConfirmed || webView == null || !isAdded()) return;
+        probeLoginState(loggedIn -> {
+            if (!isAdded() || webView == null || loginConfirmed) return;
+            if (loggedIn) {
+                confirmLogin();
+            } else {
+                // 登录页面由 React 动态渲染，持续轻量探测，直到用户登录或关闭。
+                scheduleLoginProbe(900);
+            }
+        });
+    }
+
+    private void verifyLoginBeforeClose() {
+        if (webView == null || !isAdded()) return;
+        statusView.setText("正在确认 DeepSeek 登录状态…");
+        probeLoginState(loggedIn -> {
+            if (!isAdded()) return;
+            if (loggedIn) {
+                confirmLogin();
+                dismissAllowingStateLoss();
+            } else {
+                statusView.setText("尚未检测到登录，请先完成登录或注册");
+                Toast.makeText(requireContext(), "登录成功后再点击完成", Toast.LENGTH_SHORT).show();
+                scheduleLoginProbe(700);
+            }
+        });
+    }
+
+    private void confirmLogin() {
+        if (loginConfirmed || !isAdded()) return;
+        loginConfirmed = true;
+        handler.removeCallbacks(loginProbeRunnable);
+        CookieManager.getInstance().flush();
+        DeepSeekAssistant.markConnected(requireContext());
+        statusView.setText("DeepSeek 已登录，聊天助手已开启");
+        if (stateCallback != null) stateCallback.onChanged();
+    }
+
+    private void probeLoginState(LoginStateCallback callback) {
+        if (callback == null) return;
+        if (webView == null || !isAdded()) {
+            callback.onResult(false);
+            return;
+        }
+        String currentUrl = webView.getUrl();
+        if (looksLoggedInByUrl(currentUrl)) {
+            callback.onResult(true);
+            return;
+        }
+        if (looksLikeLoginUrl(currentUrl)) {
+            callback.onResult(false);
+            return;
+        }
+        if (loginProbeInFlight) {
+            handler.postDelayed(() -> probeLoginState(callback), 120);
+            return;
+        }
+        loginProbeInFlight = true;
+        try {
+            webView.evaluateJavascript(buildLoginProbeScript(), value -> {
+                loginProbeInFlight = false;
+                boolean loggedIn = "\"logged\"".equals(value) || "logged".equals(value);
+                callback.onResult(loggedIn);
+            });
+        } catch (Exception ignored) {
+            loginProbeInFlight = false;
+            callback.onResult(false);
+        }
+    }
+
+    private String buildLoginProbeScript() {
+        return "(function(){try{" +
+                "var path=(location.pathname||'').toLowerCase();" +
+                "if(/(^|\\/)(login|signin|sign-in|sign_in|register|signup|sign-up|sign_up)(\\/|$)/.test(path))return 'login';" +
+                "function visible(el){if(!el)return false;var s=getComputedStyle(el);var r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;}" +
+                "var password=Array.from(document.querySelectorAll('input[type=\"password\"]')).some(visible);if(password)return 'login';" +
+                "var boxes=Array.from(document.querySelectorAll('textarea,[contenteditable=\"true\"],[role=\"textbox\"]'));" +
+                "var composer=boxes.some(function(el){if(!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;" +
+                "var tag=(el.tagName||'').toUpperCase();if(tag==='INPUT')return false;" +
+                "return tag==='TEXTAREA'||el.getAttribute('contenteditable')==='true'||el.getAttribute('role')==='textbox';});" +
+                "if(path.indexOf('/a/chat')===0||composer)return 'logged';return 'unknown';" +
+                "}catch(e){return 'unknown';}})();";
     }
 
     private void preparePrompt() {
@@ -308,11 +424,26 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
     }
 
     private void tryFillPrompt() {
+        if (promptFilled || webView == null || TextUtils.isEmpty(pendingPrompt) || !isAdded()) return;
+        probeLoginState(loggedIn -> {
+            if (!isAdded() || webView == null || promptFilled) return;
+            if (!loggedIn) {
+                loginWaitAttempts++;
+                if (loginWaitAttempts < 12) {
+                    statusView.setText(R.string.wkdeepseek_connecting);
+                    handler.postDelayed(this::tryFillPrompt, 800);
+                } else {
+                    statusView.setText(R.string.wkdeepseek_need_login);
+                }
+                return;
+            }
+            loginWaitAttempts = 0;
+            fillPromptNow();
+        });
+    }
+
+    private void fillPromptNow() {
         if (promptFilled || webView == null || TextUtils.isEmpty(pendingPrompt)) return;
-        if (!looksLoggedIn(webView.getUrl())) {
-            statusView.setText(R.string.wkdeepseek_need_login);
-            return;
-        }
         String js = buildFillScript(pendingPrompt);
         webView.evaluateJavascript(js, value -> {
             boolean success = "true".equals(value) || "\"true\"".equals(value);
@@ -414,10 +545,23 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
                 && (host.equals("chat.deepseek.com") || host.endsWith(".deepseek.com"));
     }
 
-    private boolean looksLoggedIn(String url) {
+    private boolean looksLoggedInByUrl(String url) {
         if (TextUtils.isEmpty(url)) return false;
         String lower = url.toLowerCase(Locale.ROOT);
-        return lower.contains("chat.deepseek.com/a/chat") && !lower.contains("login") && !lower.contains("sign_in");
+        return lower.contains("chat.deepseek.com/a/chat") && !looksLikeLoginUrl(lower);
+    }
+
+    private boolean looksLikeLoginUrl(String url) {
+        if (TextUtils.isEmpty(url)) return false;
+        String lower = url.toLowerCase(Locale.ROOT);
+        return lower.contains("/login")
+                || lower.contains("/signin")
+                || lower.contains("/sign-in")
+                || lower.contains("/sign_in")
+                || lower.contains("/register")
+                || lower.contains("/signup")
+                || lower.contains("/sign-up")
+                || lower.contains("/sign_up");
     }
 
     private boolean isOnline(Context context) {
@@ -454,6 +598,7 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
 
     @Override
     public void onDestroyView() {
+        handler.removeCallbacks(loginProbeRunnable);
         if (webView != null) {
             webView.stopLoading();
             webView.setWebChromeClient(null);
