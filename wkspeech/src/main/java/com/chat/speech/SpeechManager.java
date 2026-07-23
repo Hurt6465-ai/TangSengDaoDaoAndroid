@@ -10,6 +10,7 @@ import android.widget.Toast;
 import com.chat.speech.engine.EdgeTtsEngine;
 import com.chat.speech.engine.MsTranslatorCompatibleEngine;
 import com.chat.speech.engine.SystemTtsEngine;
+import com.chat.speech.debug.SpeechDebugLog;
 import com.chat.speech.model.SpeechSegment;
 import com.chat.speech.model.TtsSource;
 import com.chat.speech.service.ByteDanceOfflineServiceClient;
@@ -134,19 +135,49 @@ public class SpeechManager {
             if (SpeechSegment.LANG_MY.equals(lang) || containsMyanmar(originalText)) {
                 throw new IllegalStateException("当前字节离线包只包含中文模型");
             }
-            File file = byteDanceOfflineClient.synthesize(
-                    originalText,
-                    pinyin,
-                    mode,
-                    prefs.getByteDanceVoice(),
-                    prefs.getByteDanceSampleRate(),
-                    prefs.getRatePercent()
-            );
-            ensureCurrent(generation);
             List<File> files = new ArrayList<>();
-            files.add(file);
+            boolean nativePinyinMode = "spelling".equalsIgnoreCase(mode)
+                    && pinyin != null
+                    && !pinyin.trim().isEmpty();
+
+            if (nativePinyinMode) {
+                // Keep the two inputs separate. First let the ByteDance frontend read the complete
+                // tone-marked pinyin through its native pinyin path, then read the original Hanzi
+                // once as a complete word or phrase, like a teacher finishing a spelling drill.
+                SpeechDebugLog.append(app, "manager.spelling_sequence=pinyin_then_word");
+                files.add(byteDanceOfflineClient.synthesize(
+                        originalText,
+                        pinyin,
+                        "spelling",
+                        prefs.getByteDanceVoice(),
+                        prefs.getByteDanceSampleRate(),
+                        prefs.getRatePercent()
+                ));
+                SpeechDebugLog.append(app, "manager.spelling_pinyin_ready");
+                ensureCurrent(generation);
+                files.add(byteDanceOfflineClient.synthesize(
+                        originalText,
+                        null,
+                        "word",
+                        prefs.getByteDanceVoice(),
+                        prefs.getByteDanceSampleRate(),
+                        prefs.getRatePercent()
+                ));
+                SpeechDebugLog.append(app, "manager.spelling_word_ready");
+            } else {
+                files.add(byteDanceOfflineClient.synthesize(
+                        originalText,
+                        pinyin,
+                        mode,
+                        prefs.getByteDanceVoice(),
+                        prefs.getByteDanceSampleRate(),
+                        prefs.getRatePercent()
+                ));
+            }
+            ensureCurrent(generation);
+            long interFileDelayMs = nativePinyinMode ? 280L : 0L;
             mainHandler.post(() -> {
-                if (isCurrent(generation)) playFiles(files, 0, generation);
+                if (isCurrent(generation)) playFiles(files, 0, generation, interFileDelayMs);
             });
         } catch (InterruptedException cancelled) {
             Thread.currentThread().interrupt();
@@ -187,7 +218,7 @@ public class SpeechManager {
             }
             ensureCurrent(generation);
             mainHandler.post(() -> {
-                if (isCurrent(generation)) playFiles(files, 0, generation);
+                if (isCurrent(generation)) playFiles(files, 0, generation, 0L);
             });
         } catch (InterruptedException cancelled) {
             Thread.currentThread().interrupt();
@@ -326,7 +357,12 @@ public class SpeechManager {
         mainHandler.post(this::releaseCurrentPlayer);
     }
 
-    private void playFiles(List<File> files, int index, long generation) {
+    private void playFiles(
+            List<File> files,
+            int index,
+            long generation,
+            long interFileDelayMs
+    ) {
         if (!isCurrent(generation) || files == null || index >= files.size()) return;
         File file = files.get(index);
         try {
@@ -340,7 +376,13 @@ public class SpeechManager {
                 } catch (Throwable ignored) {
                 }
                 if (currentPlayer == completed) currentPlayer = null;
-                if (isCurrent(generation)) playFiles(files, index + 1, generation);
+                if (!isCurrent(generation)) return;
+                Runnable next = () -> playFiles(files, index + 1, generation, interFileDelayMs);
+                if (interFileDelayMs > 0L && index + 1 < files.size()) {
+                    mainHandler.postDelayed(next, interFileDelayMs);
+                } else {
+                    next.run();
+                }
             });
             player.setOnErrorListener((failed, what, extra) -> {
                 try {
@@ -348,7 +390,9 @@ public class SpeechManager {
                 } catch (Throwable ignored) {
                 }
                 if (currentPlayer == failed) currentPlayer = null;
-                if (isCurrent(generation)) playFiles(files, index + 1, generation);
+                if (isCurrent(generation)) {
+                    playFiles(files, index + 1, generation, interFileDelayMs);
+                }
                 return true;
             });
             player.prepare();
@@ -360,7 +404,9 @@ public class SpeechManager {
         } catch (Exception error) {
             Log.w(TAG, "Unable to play synthesized audio", error);
             releaseCurrentPlayer();
-            if (isCurrent(generation)) playFiles(files, index + 1, generation);
+            if (isCurrent(generation)) {
+                playFiles(files, index + 1, generation, interFileDelayMs);
+            }
         }
     }
 
