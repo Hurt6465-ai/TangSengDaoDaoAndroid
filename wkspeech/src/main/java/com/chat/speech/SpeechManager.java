@@ -74,7 +74,7 @@ public class SpeechManager {
     }
 
     public void speakAuto(String text) {
-        speakDetailed(text, null, SpeechSegment.LANG_ZH, "word");
+        speakDetailed(text, null, SpeechSegment.LANG_OTHER, "auto");
     }
 
     private void speakDetailed(String text, String pinyin, String lang, String mode) {
@@ -96,15 +96,24 @@ public class SpeechManager {
 
         synchronized (taskLock) {
             if (TtsSource.TYPE_BYTEDANCE_OFFLINE.equals(activeSource.type)) {
-                activeTask = executor.submit(() -> synthesizeOfflineAndPlay(
-                        generation,
-                        cleanText,
-                        pinyin,
-                        lang,
-                        mode,
-                        prefs,
-                        activeSource
-                ));
+                if ("auto".equalsIgnoreCase(mode)) {
+                    activeTask = executor.submit(() -> synthesizeAutoWithByteDanceAndPlay(
+                            generation,
+                            cleanText,
+                            prefs,
+                            activeSource
+                    ));
+                } else {
+                    activeTask = executor.submit(() -> synthesizeOfflineAndPlay(
+                            generation,
+                            cleanText,
+                            pinyin,
+                            lang,
+                            mode,
+                            prefs,
+                            activeSource
+                    ));
+                }
             } else {
                 activeTask = executor.submit(() -> synthesizeAndPlay(
                         generation,
@@ -119,6 +128,62 @@ public class SpeechManager {
     public void stop() {
         requestGeneration.incrementAndGet();
         cancelCurrentWork(true);
+    }
+
+    private void synthesizeAutoWithByteDanceAndPlay(
+            long generation,
+            String originalText,
+            SpeechPrefs prefs,
+            TtsSource activeSource
+    ) {
+        try {
+            List<SpeechSegment> segments = SpeechSegmenter.splitByLanguage(originalText);
+            if (segments.isEmpty()) {
+                segments = new ArrayList<>();
+                segments.add(new SpeechSegment(originalText.trim(), SpeechSegment.LANG_OTHER));
+            }
+
+            List<File> files = new ArrayList<>();
+            SourcePlan onlinePlan = null;
+            for (SpeechSegment segment : segments) {
+                ensureCurrent(generation);
+                if (SpeechSegment.LANG_MY.equals(segment.lang)) {
+                    if (onlinePlan == null) {
+                        onlinePlan = new SourcePlan(buildOnlineSourceOrder(prefs, activeSource));
+                        if (onlinePlan.sources.isEmpty()) {
+                            throw new IllegalStateException("没有可用的缅语在线语音源");
+                        }
+                    }
+                    files.add(synthesizeSegment(segment, prefs, onlinePlan));
+                } else {
+                    files.add(byteDanceOfflineClient.synthesize(
+                            segment.text,
+                            null,
+                            "word",
+                            prefs.getByteDanceVoice(),
+                            prefs.getByteDanceSampleRate(),
+                            prefs.getRatePercent(),
+                            prefs.getPitchPercent()
+                    ));
+                }
+            }
+            ensureCurrent(generation);
+            mainHandler.post(() -> {
+                if (isCurrent(generation)) playFiles(files, 0, generation, 0L);
+            });
+        } catch (InterruptedException cancelled) {
+            Thread.currentThread().interrupt();
+        } catch (Exception error) {
+            Log.w(TAG, "Automatic language TTS failed", error);
+            mainHandler.post(() -> {
+                if (!isCurrent(generation)) return;
+                SystemTtsEngine.get(app).speak(
+                        originalText,
+                        prefs.getSystemRate(),
+                        prefs.getSystemPitch()
+                );
+            });
+        }
     }
 
     private void synthesizeOfflineAndPlay(
@@ -151,7 +216,8 @@ public class SpeechManager {
                         "spelling",
                         prefs.getByteDanceVoice(),
                         prefs.getByteDanceSampleRate(),
-                        prefs.getRatePercent()
+                        prefs.getRatePercent(),
+                        prefs.getPitchPercent()
                 ));
                 SpeechDebugLog.append(app, "manager.spelling_pinyin_ready");
                 ensureCurrent(generation);
@@ -161,7 +227,8 @@ public class SpeechManager {
                         "word",
                         prefs.getByteDanceVoice(),
                         prefs.getByteDanceSampleRate(),
-                        prefs.getRatePercent()
+                        prefs.getRatePercent(),
+                        prefs.getPitchPercent()
                 ));
                 SpeechDebugLog.append(app, "manager.spelling_word_ready");
             } else {
@@ -171,7 +238,8 @@ public class SpeechManager {
                         mode,
                         prefs.getByteDanceVoice(),
                         prefs.getByteDanceSampleRate(),
-                        prefs.getRatePercent()
+                        prefs.getRatePercent(),
+                        prefs.getPitchPercent()
                 ));
             }
             ensureCurrent(generation);

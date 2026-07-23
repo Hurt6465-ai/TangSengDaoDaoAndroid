@@ -41,9 +41,11 @@ public class SpeechPrefs {
     public static final String SOURCE_TYPE_UNKNOWN = TtsSource.TYPE_UNKNOWN;
 
     public static final String DEFAULT_AUDIO_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
-    public static final String DEFAULT_ZH_VOICE = "zh-CN-XiaoxiaoNeural";
-    public static final String DEFAULT_ZH_MALE_VOICE = "zh-CN-YunxiNeural";
+    public static final String DEFAULT_ZH_VOICE = "zh-CN-XiaoxiaoMultilingualNeural";
     public static final String DEFAULT_ZH_MULTI_VOICE = "zh-CN-XiaochenMultilingualNeural";
+    public static final String DEFAULT_ZH_CHILD_GIRL_VOICE = "zh-CN-XiaoyouNeural";
+    public static final String DEFAULT_ZH_CHILD_VOICE = "zh-CN-XiaoshuangNeural";
+    public static final String DEFAULT_ZH_MALE_VOICE = "zh-CN-YunxiNeural";
     public static final String DEFAULT_MY_VOICE = "my-MM-NilarNeural";
     public static final String DEFAULT_MY_MALE_VOICE = "my-MM-ThihaNeural";
 
@@ -96,6 +98,26 @@ public class SpeechPrefs {
         sp.edit().putInt(KEY_PITCH_PERCENT, clamp(value, -50, 50)).apply();
     }
 
+    /** User-facing direct multiplier, where 1.00 is the normal speed. */
+    public float getRateValue() {
+        return Math.max(0.50f, Math.min(1.80f, 1.0f + getRatePercent() / 100f));
+    }
+
+    public void setRateValue(float value) {
+        float safe = Math.max(0.50f, Math.min(1.80f, value));
+        setRatePercent(Math.round((safe - 1.0f) * 100f));
+    }
+
+    /** User-facing direct multiplier, where 1.00 is the normal pitch. */
+    public float getPitchValue() {
+        return Math.max(0.50f, Math.min(1.50f, 1.0f + getPitchPercent() / 100f));
+    }
+
+    public void setPitchValue(float value) {
+        float safe = Math.max(0.50f, Math.min(1.50f, value));
+        setPitchPercent(Math.round((safe - 1.0f) * 100f));
+    }
+
     public float getSystemRate() {
         return Math.max(0.5f, Math.min(2.0f, 1.0f + getRatePercent() / 100f));
     }
@@ -111,6 +133,23 @@ public class SpeechPrefs {
     public void setZhVoice(String voice) {
         if (voice == null || voice.trim().isEmpty()) return;
         sp.edit().putString(KEY_ZH_VOICE, voice.trim()).apply();
+    }
+
+    public boolean isSimpleMicrosoftVoice(String code) {
+        if (code == null) return false;
+        for (TtsVoice voice : getSimpleMicrosoftVoices()) {
+            if (code.equals(voice.code)) return true;
+        }
+        return false;
+    }
+
+    public List<TtsVoice> getSimpleMicrosoftVoices() {
+        List<TtsVoice> list = new ArrayList<>();
+        list.add(new TtsVoice(DEFAULT_ZH_VOICE, "晓晓 · 多语言", "zh-CN", TtsVoice.GENDER_FEMALE));
+        list.add(new TtsVoice(DEFAULT_ZH_MULTI_VOICE, "晓辰 · 多语言", "zh-CN", TtsVoice.GENDER_FEMALE));
+        list.add(new TtsVoice(DEFAULT_ZH_CHILD_GIRL_VOICE, "晓悠 · 童声", "zh-CN", TtsVoice.GENDER_FEMALE));
+        list.add(new TtsVoice(DEFAULT_ZH_CHILD_VOICE, "晓双 · 童声", "zh-CN", TtsVoice.GENDER_FEMALE));
+        return list;
     }
 
     public String getMyVoice() {
@@ -291,7 +330,8 @@ public class SpeechPrefs {
         if (sourceId == null) return;
         if (TtsSource.system().id.equals(sourceId)
                 || TtsSource.builtinMsTranslator().id.equals(sourceId)
-                || TtsSource.edgeWebSocketTemplate().id.equals(sourceId)) return;
+                || TtsSource.edgeWebSocketTemplate().id.equals(sourceId)
+                || TtsSource.byteDanceOffline().id.equals(sourceId)) return;
         List<TtsSource> sources = getSources();
         List<TtsSource> kept = new ArrayList<>();
         for (TtsSource source : sources) {
@@ -347,20 +387,24 @@ public class SpeechPrefs {
     }
 
     public List<TtsVoice> getAllVoices() {
-        List<TtsVoice> list = new ArrayList<>();
+        Map<String, TtsVoice> merged = new LinkedHashMap<>();
+        for (TtsVoice voice : defaultVoices()) {
+            merged.put(voice.sourceId + "|" + voice.code, voice);
+        }
         String json = sp.getString(KEY_IMPORTED_VOICES_JSON, "");
         if (json != null && !json.trim().isEmpty()) {
             try {
                 JSONArray array = new JSONArray(json);
                 for (int i = 0; i < array.length(); i++) {
                     TtsVoice voice = TtsVoice.fromJson(array.optJSONObject(i));
-                    if (voice != null && !voice.code.isEmpty()) list.add(voice);
+                    if (voice != null && !voice.code.isEmpty()) {
+                        merged.put(voice.sourceId + "|" + voice.code, voice);
+                    }
                 }
             } catch (Exception ignored) {
             }
         }
-        if (list.isEmpty()) list.addAll(defaultVoices());
-        return list;
+        return new ArrayList<>(merged.values());
     }
 
     public List<TtsVoice> getVoicesForLocalePrefix(String prefix) {
@@ -410,14 +454,12 @@ public class SpeechPrefs {
 
     public static List<TtsVoice> defaultVoices() {
         List<TtsVoice> list = new ArrayList<>();
-        list.add(new TtsVoice(DEFAULT_ZH_VOICE, "晓晓", "zh-CN", TtsVoice.GENDER_FEMALE));
-        list.add(new TtsVoice(DEFAULT_ZH_MALE_VOICE, "云希", "zh-CN", TtsVoice.GENDER_MALE));
-        list.add(new TtsVoice(DEFAULT_ZH_MULTI_VOICE, "晓辰 多语言", "zh-CN", TtsVoice.GENDER_FEMALE));
-        list.add(new TtsVoice("zh-CN-XiaoxiaoMultilingualNeural", "晓晓 多语言", "zh-CN", TtsVoice.GENDER_FEMALE));
+        list.add(new TtsVoice(DEFAULT_ZH_VOICE, "晓晓 · 多语言", "zh-CN", TtsVoice.GENDER_FEMALE));
+        list.add(new TtsVoice(DEFAULT_ZH_MULTI_VOICE, "晓辰 · 多语言", "zh-CN", TtsVoice.GENDER_FEMALE));
+        list.add(new TtsVoice(DEFAULT_ZH_CHILD_GIRL_VOICE, "晓悠 · 童声", "zh-CN", TtsVoice.GENDER_FEMALE));
+        list.add(new TtsVoice(DEFAULT_ZH_CHILD_VOICE, "晓双 · 童声", "zh-CN", TtsVoice.GENDER_FEMALE));
         list.add(new TtsVoice(DEFAULT_MY_VOICE, "Nilar", "my-MM", TtsVoice.GENDER_FEMALE));
         list.add(new TtsVoice(DEFAULT_MY_MALE_VOICE, "Thiha", "my-MM", TtsVoice.GENDER_MALE));
-        list.add(new TtsVoice("en-US-JennyNeural", "Jenny", "en-US", TtsVoice.GENDER_FEMALE));
-        list.add(new TtsVoice("en-US-GuyNeural", "Guy", "en-US", TtsVoice.GENDER_MALE));
         return list;
     }
 
@@ -447,6 +489,7 @@ public class SpeechPrefs {
     private static List<TtsSource> defaultSources() {
         List<TtsSource> list = new ArrayList<>();
         list.add(TtsSource.edgeWebSocketTemplate());
+        list.add(TtsSource.byteDanceOffline());
         list.add(TtsSource.system());
         list.add(TtsSource.builtinMsTranslator());
         return list;
@@ -456,6 +499,7 @@ public class SpeechPrefs {
         Map<String, TtsSource> map = new LinkedHashMap<>();
         // Ensure required built-ins always exist.
         map.put(TtsSource.edgeWebSocketTemplate().id, TtsSource.edgeWebSocketTemplate());
+        map.put(TtsSource.byteDanceOffline().id, TtsSource.byteDanceOffline());
         map.put(TtsSource.system().id, TtsSource.system());
         map.put(TtsSource.builtinMsTranslator().id, TtsSource.builtinMsTranslator());
         if (sources != null) {
