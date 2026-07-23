@@ -12,7 +12,10 @@
     <string name="wkdeepseek_done">完成</string>
     <string name="wkdeepseek_connecting">正在连接 DeepSeek…</string>
     <string name="wkdeepseek_reading">正在读取聊天记录…</string>
-    <string name="wkdeepseek_filled">内容已填入，请点击 DeepSeek 的发送按钮</string>
+    <string name="wkdeepseek_filled">内容已填入</string>
+    <string name="wkdeepseek_submitting">正在自动提交给 DeepSeek…</string>
+    <string name="wkdeepseek_thinking">DeepSeek 正在思考…</string>
+    <string name="wkdeepseek_submit_failed">自动提交失败，内容已填入，请点击网页发送按钮</string>
     <string name="wkdeepseek_fill_failed">自动填入失败，完整内容已复制，请手动粘贴</string>
     <string name="wkdeepseek_need_login">请先登录或注册 DeepSeek</string>
     <string name="wkdeepseek_no_network">需要网络才能使用 DeepSeek 助手</string>
