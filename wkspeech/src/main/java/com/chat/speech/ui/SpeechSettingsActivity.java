@@ -22,6 +22,7 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.chat.speech.PinyinNormalizer;
 import com.chat.speech.SpeechCache;
 import com.chat.speech.SpeechManager;
 import com.chat.speech.SpeechPrefs;
@@ -41,6 +42,10 @@ public class SpeechSettingsActivity extends Activity {
     private SpeechPrefs prefs;
     private LinearLayout root;
     private boolean showAdvanced;
+    private EditText customSpeechInput;
+    private EditText customHanziInput;
+    private String customSpeechValue = "nǐ hǎo";
+    private String customHanziValue = "你好";
 
     public static void open(Context context) {
         context.startActivity(new Intent(context, SpeechSettingsActivity.class));
@@ -54,6 +59,7 @@ public class SpeechSettingsActivity extends Activity {
     }
 
     private void render() {
+        captureCustomTestInputs();
         ScrollView scrollView = new ScrollView(this);
         scrollView.setFillViewport(true);
         scrollView.setBackgroundColor(Color.rgb(247, 249, 252));
@@ -130,25 +136,139 @@ public class SpeechSettingsActivity extends Activity {
         root.addView(section("试听"));
         root.addView(card("中文试听", "使用当前朗读模式、中文发音人和语速。", "播放", () -> SpeechManager.speak(this, "你好，欢迎使用唐僧叨叨学习语音。")));
         root.addView(card("缅语试听", "使用当前朗读模式、缅语发音人和语速。", "播放", () -> SpeechManager.speak(this, "မင်္ဂလာပါ။ ကျွန်မ မြန်မာစကား လေ့ကျင့်နေပါတယ်။")));
-        root.addView(card("拼音拼读试听：爸", "应读成 b—à，而不是只读完整音节 bà。新版会在独立语音进程运行，Native 崩溃不会把此页面关闭。", "播放", () -> {
-            SpeechDebugLog.append(this, "ui.test_click 爸 bà -> b à");
-            toast("已提交离线拼读：b—à");
-            SpeechManager.speak(this, "爸", "bà", "zh-CN", "spelling");
-        }));
-        root.addView(card("拼音拼读试听：你好", "应依次读成 n—ǐ、h—ǎo。", "播放", () -> {
-            SpeechDebugLog.append(this, "ui.test_click 你好 nǐ hǎo");
-            toast("已提交离线拼读：n—ǐ，h—ǎo");
-            SpeechManager.speak(this, "你好", "nǐ hǎo", "zh-CN", "spelling");
-        }));
+        addCustomByteDanceTestCard();
         root.addView(card("离线诊断日志", "最后记录：\n" + SpeechDebugLog.lastLine(this)
                 + "\n\n即使字节 Native 子进程崩溃，这份日志仍保留。", "查看 / 复制", this::showByteDanceDebugLog));
-        root.addView(card("清空离线诊断日志", "清空后重新点击一次“爸”，更容易判断具体崩在哪一步。", "清空", () -> {
+        root.addView(card("清空离线诊断日志", "清空后重新输入文字测试，更容易判断字节前端实际收到的内容。", "清空", () -> {
             SpeechDebugLog.clear(this);
             toast("离线诊断日志已清空");
             render();
         }));
         root.addView(card("一句话混读测试", "字节离线包只含中文；遇到缅语时会自动使用在线备用源或系统 TTS。", "播放", () -> SpeechManager.speak(this, "你好，我们开始练习口语。 မင်္ဂလာပါ၊ စကားပြော လေ့ကျင့်ကြမယ်။")));
         root.addView(card("停止播放", "停止当前系统 TTS、在线音频或离线子进程中的合成。", "停止", () -> SpeechManager.get(this).stop()));
+    }
+
+    private void addCustomByteDanceTestCard() {
+        LinearLayout panel = baseCard();
+        panel.addView(text("字节离线自定义测试", 17, Color.rgb(17, 24, 39), true));
+
+        TextView description = text(
+                "上框可输入任意汉字或完整带调拼音。点“原样朗读”时不拆分、不替换，直接把输入交给字节 plain text 前端。下框填写对应汉字后，可测试“拼音朗读完，再完整读一次词语”。",
+                13,
+                Color.rgb(107, 114, 128),
+                false
+        );
+        description.setPadding(0, dp(6), 0, dp(12));
+        panel.addView(description);
+
+        TextView inputLabel = text("测试文本（汉字或带调拼音）", 13, Color.rgb(55, 65, 81), true);
+        inputLabel.setPadding(0, 0, 0, dp(6));
+        panel.addView(inputLabel);
+        customSpeechInput = testInput(customSpeechValue, "例如：nǐ hǎo、bà、你好");
+        panel.addView(customSpeechInput, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        TextView hanziLabel = text("对应完整汉字（仅“拼音后读汉字”使用）", 13, Color.rgb(55, 65, 81), true);
+        hanziLabel.setPadding(0, dp(12), 0, dp(6));
+        panel.addView(hanziLabel);
+        customHanziInput = testInput(customHanziValue, "例如：你好、爸");
+        panel.addView(customHanziInput, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.setPadding(0, dp(14), 0, 0);
+
+        TextView rawButton = actionButton("原样朗读", Color.rgb(24, 119, 242));
+        LinearLayout.LayoutParams rawParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        rawParams.setMargins(0, 0, dp(6), 0);
+        buttons.addView(rawButton, rawParams);
+
+        TextView sequenceButton = actionButton("拼音后读汉字", Color.rgb(16, 96, 184));
+        LinearLayout.LayoutParams sequenceParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+        sequenceParams.setMargins(dp(6), 0, 0, 0);
+        buttons.addView(sequenceButton, sequenceParams);
+
+        rawButton.setOnClickListener(v -> playCustomRawInput());
+        sequenceButton.setOnClickListener(v -> playCustomPinyinThenHanzi());
+        panel.addView(buttons);
+        root.addView(panel);
+    }
+
+    private EditText testInput(String value, String hint) {
+        EditText input = new EditText(this);
+        input.setText(value == null ? "" : value);
+        input.setHint(hint);
+        input.setTextSize(16);
+        input.setTextColor(Color.rgb(17, 24, 39));
+        input.setHintTextColor(Color.rgb(156, 163, 175));
+        input.setSingleLine(false);
+        input.setMaxLines(3);
+        input.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        input.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        input.setPadding(dp(12), dp(8), dp(12), dp(8));
+        input.setBackground(rounded(Color.rgb(249, 250, 251), dp(12), Color.rgb(209, 213, 219), 1));
+        return input;
+    }
+
+    private TextView actionButton(String label, int color) {
+        TextView button = text(label, 14, Color.WHITE, true);
+        button.setGravity(Gravity.CENTER);
+        button.setBackground(rounded(color, dp(13), Color.TRANSPARENT, 0));
+        return button;
+    }
+
+    private void playCustomRawInput() {
+        if (!prepareByteDanceForTest()) return;
+        captureCustomTestInputs();
+        String value = PinyinNormalizer.normalizePlainText(customSpeechValue);
+        if (value.isEmpty()) {
+            toast("请输入要朗读的汉字或带调拼音");
+            return;
+        }
+        SpeechDebugLog.append(this, "ui.custom_raw text=" + value);
+        toast("已原样提交：" + value);
+        SpeechManager.speak(this, value, "zh-CN", "word");
+    }
+
+    private void playCustomPinyinThenHanzi() {
+        if (!prepareByteDanceForTest()) return;
+        captureCustomTestInputs();
+        String pinyin = PinyinNormalizer.normalizeNativePinyin(customSpeechValue);
+        String hanzi = PinyinNormalizer.normalizePlainText(customHanziValue);
+        if (pinyin.isEmpty()) {
+            toast("上框请输入完整带调拼音，例如 nǐ hǎo");
+            return;
+        }
+        if (hanzi.isEmpty()) {
+            toast("下框请输入拼音对应的完整汉字");
+            return;
+        }
+        SpeechDebugLog.append(this, "ui.custom_sequence pinyin=" + pinyin + " hanzi=" + hanzi);
+        toast("先读拼音，再读完整汉字");
+        SpeechManager.speak(this, hanzi, pinyin, "zh-CN", "spelling");
+    }
+
+    private boolean prepareByteDanceForTest() {
+        if (!prefs.isByteDancePackageReady()) {
+            toast("请先导入字节离线语音包");
+            return false;
+        }
+        TtsSource active = prefs.getActiveSource();
+        if (active == null || !TtsSource.TYPE_BYTEDANCE_OFFLINE.equals(active.type)) {
+            prefs.setActiveSourceId(TtsSource.byteDanceOffline().id);
+            toast("已自动切换到字节跳动离线语音");
+        }
+        return true;
+    }
+
+    private void captureCustomTestInputs() {
+        if (customSpeechInput != null) {
+            customSpeechValue = customSpeechInput.getText().toString();
+        }
+        if (customHanziInput != null) {
+            customHanziValue = customHanziInput.getText().toString();
+        }
     }
 
     private void showByteDanceDebugLog() {
