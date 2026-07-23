@@ -29,7 +29,8 @@ public final class ByteDanceOfflineServiceClient {
             String mode,
             String voice,
             int sampleRate,
-            int ratePercent
+            int ratePercent,
+            int pitchPercent
     ) throws Exception {
         String requestId = UUID.randomUUID().toString();
         CountDownLatch latch = new CountDownLatch(1);
@@ -68,6 +69,7 @@ public final class ByteDanceOfflineServiceClient {
             request.putExtra(ByteDanceOfflineTtsService.EXTRA_VOICE, voice);
             request.putExtra(ByteDanceOfflineTtsService.EXTRA_SAMPLE_RATE, sampleRate);
             request.putExtra(ByteDanceOfflineTtsService.EXTRA_RATE_PERCENT, ratePercent);
+            request.putExtra(ByteDanceOfflineTtsService.EXTRA_PITCH_PERCENT, pitchPercent);
             if (app.startService(request) == null) {
                 throw new IllegalStateException("无法启动字节离线语音进程");
             }

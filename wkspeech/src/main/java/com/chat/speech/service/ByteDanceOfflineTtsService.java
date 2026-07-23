@@ -24,6 +24,7 @@ public final class ByteDanceOfflineTtsService extends Service {
     public static final String EXTRA_VOICE = "voice";
     public static final String EXTRA_SAMPLE_RATE = "sample_rate";
     public static final String EXTRA_RATE_PERCENT = "rate_percent";
+    public static final String EXTRA_PITCH_PERCENT = "pitch_percent";
     public static final String EXTRA_OK = "ok";
     public static final String EXTRA_FILE_PATH = "file_path";
     public static final String EXTRA_ERROR = "error";
@@ -60,6 +61,7 @@ public final class ByteDanceOfflineTtsService extends Service {
         String voice = value(intent, EXTRA_VOICE);
         int sampleRate = intent.getIntExtra(EXTRA_SAMPLE_RATE, 24000);
         int ratePercent = intent.getIntExtra(EXTRA_RATE_PERCENT, 0);
+        int pitchPercent = intent.getIntExtra(EXTRA_PITCH_PERCENT, 0);
         SpeechDebugLog.append(this, "remote_service.request id=" + requestId
                 + " mode=" + mode + " text=" + abbreviate(text)
                 + " pinyin=" + abbreviate(pinyin));
@@ -67,7 +69,8 @@ public final class ByteDanceOfflineTtsService extends Service {
         EXECUTOR.execute(() -> {
             try {
                 File file = ENGINE.synthesize(
-                        getApplicationContext(), text, pinyin, mode, voice, sampleRate, ratePercent
+                        getApplicationContext(), text, pinyin, mode, voice, sampleRate,
+                        ratePercent, pitchPercent
                 );
                 SpeechDebugLog.append(this, "remote_service.success id=" + requestId
                         + " bytes=" + file.length());
