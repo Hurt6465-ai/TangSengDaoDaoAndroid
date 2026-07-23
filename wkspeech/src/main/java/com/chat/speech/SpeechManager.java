@@ -151,15 +151,18 @@ public class SpeechManager {
         } catch (InterruptedException cancelled) {
             Thread.currentThread().interrupt();
         } catch (Exception error) {
-            Log.w(TAG, "ByteDance offline TTS failed, using online fallback", error);
+            // Do not hide an offline-engine failure behind a Microsoft/system voice. When the user
+            // explicitly selects ByteDance offline TTS, silence plus the real error is the only
+            // reliable way to verify whether the imported engine works.
+            Log.w(TAG, "ByteDance offline TTS failed; fallback intentionally disabled", error);
             if (isCurrent(generation)) {
                 String message = error.getMessage();
                 mainHandler.post(() -> Toast.makeText(
                         app,
-                        "字节离线语音失败，已回退在线/系统语音：" + (message == null ? "未知错误" : message),
+                        "字节离线语音失败：" + (message == null ? "未知错误" : message)
+                                + "。不会切换微软发音人，请复制离线诊断日志。",
                         Toast.LENGTH_LONG
                 ).show());
-                synthesizeAndPlay(generation, originalText, prefs, activeSource);
             }
         }
     }
