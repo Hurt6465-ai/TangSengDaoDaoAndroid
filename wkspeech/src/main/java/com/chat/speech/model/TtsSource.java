@@ -11,6 +11,7 @@ public class TtsSource {
     public static final String TYPE_EDGE_WEBSOCKET = "edge_websocket";
     public static final String TYPE_CUSTOM_HTTP = "custom_http";
     public static final String TYPE_CUSTOM_WEBSOCKET = "custom_websocket";
+    public static final String TYPE_BYTEDANCE_OFFLINE = "bytedance_offline";
     public static final String TYPE_OFFLINE_RESERVED = "offline_reserved";
     public static final String TYPE_UNKNOWN = "unknown";
 
@@ -76,6 +77,19 @@ public class TtsSource {
         source.homeGeographicRegion = "zh-Hans-CN";
         source.userId = "0f04d16a175c411e";
         source.httpMethod = "POST";
+        return source;
+    }
+
+    public static TtsSource byteDanceOffline() {
+        TtsSource source = new TtsSource();
+        source.id = "bytedance_offline";
+        source.name = "字节跳动第三方离线语音";
+        source.type = TYPE_BYTEDANCE_OFFLINE;
+        source.category = "本地离线 · 中文";
+        source.note = "使用导入到本机的 MultiTTS 字节离线模型；不请求 AppID、Token 或网络。当前运行库仅支持 arm64-v8a。";
+        source.enabled = false;
+        source.userEditable = false;
+        source.audioFormat = "pcm-wav";
         return source;
     }
 
@@ -184,12 +198,17 @@ public class TtsSource {
         return TYPE_MS_TRANSLATOR.equals(type) || TYPE_EDGE_WEBSOCKET.equals(type);
     }
 
+    public boolean canSpeakOffline() {
+        return TYPE_BYTEDANCE_OFFLINE.equals(type) || TYPE_SYSTEM.equals(type);
+    }
+
     public String displayType() {
         if (TYPE_SYSTEM.equals(type)) return "系统 TTS";
         if (TYPE_MS_TRANSLATOR.equals(type)) return "微软翻译兼容源";
         if (TYPE_EDGE_WEBSOCKET.equals(type)) return "Edge TTS WebSocket";
         if (TYPE_CUSTOM_HTTP.equals(type)) return "自定义 HTTP TTS";
         if (TYPE_CUSTOM_WEBSOCKET.equals(type)) return "自定义 WebSocket TTS";
+        if (TYPE_BYTEDANCE_OFFLINE.equals(type)) return "字节跳动离线 TTS";
         if (TYPE_OFFLINE_RESERVED.equals(type)) return "离线语音包";
         return type == null || type.isEmpty() ? "未知" : type;
     }
