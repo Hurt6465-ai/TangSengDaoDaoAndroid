@@ -1,6 +1,7 @@
 package com.chat.feed.profile;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,6 +14,11 @@ import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 import com.chat.feed.R;
 import com.chat.feed.model.FeedBean;
 import com.chat.feed.model.FeedMedia;
@@ -25,11 +31,22 @@ import java.util.Set;
 public class FeedWaterfallAdapter extends RecyclerView.Adapter<FeedWaterfallAdapter.VH> {
     public interface OnItemClickListener { void onItemClick(FeedBean item, int position); }
 
+    public interface OnTikTokCoverListener {
+        void onTikTokCoverNeeded(FeedBean item, FeedMedia media, boolean forceFresh);
+    }
+
     private final ArrayList<FeedBean> items = new ArrayList<>();
     private final OnItemClickListener listener;
+    private final OnTikTokCoverListener tiktokCoverListener;
 
     public FeedWaterfallAdapter(OnItemClickListener listener) {
+        this(listener, null);
+    }
+
+    public FeedWaterfallAdapter(OnItemClickListener listener,
+                                OnTikTokCoverListener tiktokCoverListener) {
         this.listener = listener;
+        this.tiktokCoverListener = tiktokCoverListener;
         setHasStableIds(true);
     }
 
@@ -93,14 +110,47 @@ public class FeedWaterfallAdapter extends RecyclerView.Adapter<FeedWaterfallAdap
             coverUrl = media.thumbUrl();
         }
 
+        boolean tikTok = media != null && media.isTikTok();
+        boolean expiredTikTokCover = tikTok
+                && media.isTikTokCoverProbablyExpired(System.currentTimeMillis());
+
         if (TextUtils.isEmpty(coverUrl)) {
             clearImageSafely(holder.coverIv);
+            if (tikTok && tiktokCoverListener != null) {
+                tiktokCoverListener.onTikTokCoverNeeded(item, media, false);
+            }
         } else {
-            Glide.with(holder.coverIv)
+            com.bumptech.glide.RequestBuilder<Drawable> request = Glide.with(holder.coverIv)
                     .load(coverUrl)
                     .centerCrop()
-                    .dontAnimate()
-                    .into(holder.coverIv);
+                    .dontAnimate();
+            if (tikTok) {
+                request = request
+                        .diskCacheStrategy(DiskCacheStrategy.DATA)
+                        .listener(new RequestListener<Drawable>() {
+                            @Override
+                            public boolean onLoadFailed(GlideException e, Object model,
+                                                        Target<Drawable> target,
+                                                        boolean isFirstResource) {
+                                if (tiktokCoverListener != null) {
+                                    tiktokCoverListener.onTikTokCoverNeeded(item, media, true);
+                                }
+                                return false;
+                            }
+
+                            @Override
+                            public boolean onResourceReady(Drawable resource, Object model,
+                                                           Target<Drawable> target,
+                                                           DataSource dataSource,
+                                                           boolean isFirstResource) {
+                                return false;
+                            }
+                        });
+            }
+            request.into(holder.coverIv);
+            if (expiredTikTokCover && tiktokCoverListener != null) {
+                tiktokCoverListener.onTikTokCoverNeeded(item, media, true);
+            }
         }
 
         ViewGroup.LayoutParams coverParams = holder.coverIv.getLayoutParams();
