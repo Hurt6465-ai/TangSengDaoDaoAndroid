@@ -80,7 +80,7 @@ public class SpeechManager {
         if (text == null || text.trim().isEmpty()) return;
         String cleanText = text.trim();
         long generation = requestGeneration.incrementAndGet();
-        cancelCurrentWork();
+        cancelCurrentWork(false);
 
         SpeechPrefs prefs = new SpeechPrefs(app);
         TtsSource activeSource = prefs.getActiveSource();
@@ -117,7 +117,7 @@ public class SpeechManager {
 
     public void stop() {
         requestGeneration.incrementAndGet();
-        cancelCurrentWork();
+        cancelCurrentWork(true);
     }
 
     private void synthesizeOfflineAndPlay(
@@ -305,7 +305,7 @@ public class SpeechManager {
         return segments;
     }
 
-    private void cancelCurrentWork() {
+    private void cancelCurrentWork(boolean stopRemoteOfflineEngine) {
         synchronized (taskLock) {
             if (activeTask != null) {
                 activeTask.cancel(true);
@@ -314,7 +314,11 @@ public class SpeechManager {
         }
         edgeEngine.cancelActive();
         msEngine.cancelActive();
-        byteDanceOfflineClient.cancelActive();
+        // Starting the next word must not send STOP_ENGINE to the reusable ByteDance process.
+        // The vendor SDK returns -900 when a stopped engine is reused. The old request result is
+        // already discarded by requestGeneration; only an explicit user stop tears down the
+        // remote offline engine. Its single-thread service serializes any request still finishing.
+        if (stopRemoteOfflineEngine) byteDanceOfflineClient.cancelActive();
         try {
             SystemTtsEngine.get(app).stop();
         } catch (Throwable ignored) {

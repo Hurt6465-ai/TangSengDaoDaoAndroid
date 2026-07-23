@@ -2,8 +2,10 @@ package com.chat.speech;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /** Utilities used by the learning TTS path. */
 public final class PinyinNormalizer {
@@ -13,6 +15,16 @@ public final class PinyinNormalizer {
             "g", "k", "h", "j", "q", "x", "r", "z", "c", "s",
             "y", "w"
     );
+
+    /**
+     * Mandarin classroom readings for initials.
+     *
+     * Do not send a bare Latin initial such as "n" or "h" to the TTS frontend. In mixed-language
+     * text the frontend correctly treats those letters as English and reads them as letter names.
+     * These Chinese aliases keep the complete spelling prompt in the Mandarin frontend while the
+     * UI can still display the familiar form "n—ǐ".
+     */
+    private static final Map<String, String> INITIAL_MANDARIN_ALIAS = createInitialAliases();
 
     private PinyinNormalizer() {}
 
@@ -65,7 +77,7 @@ public final class PinyinNormalizer {
     }
 
     /**
-     * Builds the same teaching-style text used by the third-party app.
+     * Builds text for display/logging only.
      *
      * Examples:
      * bà      -> b à
@@ -73,8 +85,8 @@ public final class PinyinNormalizer {
      * zhōng   -> zh ōng
      * ài      -> ài
      *
-     * The returned value is intentionally plain text. The ByteDance Chinese frontend recognises
-     * this spelling form and reads the initial followed by the tone-marked final.
+     * Bare Latin initials in this value must not be sent directly to TTS because a multilingual
+     * frontend will pronounce them as English letter names.
      */
     public static String buildTeachingSpellingText(String pinyin) {
         List<String> numbered = syllables(pinyin);
@@ -89,26 +101,51 @@ public final class PinyinNormalizer {
         return result.toString();
     }
 
-    public static String splitSyllableForTeaching(String numberedSyllable) {
-        if (numberedSyllable == null) return "";
-        String value = numberedSyllable.trim().toLowerCase(Locale.US);
-        if (value.isEmpty()) return "";
-
-        int tone = 5;
-        char last = value.charAt(value.length() - 1);
-        if (last >= '1' && last <= '5') {
-            tone = last - '0';
-            value = value.substring(0, value.length() - 1);
+    /**
+     * Builds the actual Mandarin-only input sent to ByteDance offline TTS.
+     *
+     * Examples:
+     * bà      -> 玻，à
+     * nǐ hǎo  -> 讷，ǐ；喝，ǎo
+     * zhōng   -> 知，ōng
+     * ài      -> ài
+     *
+     * The tone-marked final remains unchanged because the imported Chinese frontend already reads
+     * it correctly. Only the initial is replaced with its standard Mandarin classroom reading so
+     * it can no longer be routed through the English frontend.
+     */
+    public static String buildMandarinSpellingText(String pinyin) {
+        List<String> numbered = syllables(pinyin);
+        if (numbered.isEmpty()) return "";
+        StringBuilder result = new StringBuilder();
+        for (String syllable : numbered) {
+            SyllableParts parts = parseSyllable(syllable);
+            if (parts == null || parts.markedSyllable.isEmpty()) continue;
+            if (result.length() > 0) result.append('；');
+            if (parts.initial.isEmpty() || parts.markedFinal.isEmpty()) {
+                result.append(parts.markedSyllable);
+                continue;
+            }
+            String alias = INITIAL_MANDARIN_ALIAS.get(parts.initial);
+            if (alias == null || alias.isEmpty()) {
+                // Defensive fallback: keep the complete Chinese syllable instead of exposing a
+                // Latin initial to the English frontend.
+                result.append(parts.markedSyllable);
+            } else {
+                result.append(alias).append('，').append(parts.markedFinal);
+            }
         }
-        if (value.isEmpty()) return "";
-
-        String initial = findInitial(value);
-        String marked = toneNumberToMark(value, tone);
-        if (initial.isEmpty() || marked.length() <= initial.length()) return marked;
-        return initial + " " + marked.substring(initial.length());
+        return result.toString();
     }
 
-    /** Keeps the older forced-pronunciation SSML path available for future fallback testing. */
+    public static String splitSyllableForTeaching(String numberedSyllable) {
+        SyllableParts parts = parseSyllable(numberedSyllable);
+        if (parts == null) return "";
+        if (parts.initial.isEmpty() || parts.markedFinal.isEmpty()) return parts.markedSyllable;
+        return parts.initial + " " + parts.markedFinal;
+    }
+
+    /** Keeps the forced-pronunciation SSML path available for future controlled testing. */
     public static String buildSpellingSsml(String hanzi, String pinyin) {
         List<String> syllables = syllables(pinyin);
         if (syllables.isEmpty()) return "";
@@ -132,6 +169,28 @@ public final class PinyinNormalizer {
                     .append("</phoneme>");
         }
         return ssml.append("</speak>").toString();
+    }
+
+    private static SyllableParts parseSyllable(String numberedSyllable) {
+        if (numberedSyllable == null) return null;
+        String value = numberedSyllable.trim().toLowerCase(Locale.US);
+        if (value.isEmpty()) return null;
+
+        int tone = 5;
+        char last = value.charAt(value.length() - 1);
+        if (last >= '1' && last <= '5') {
+            tone = last - '0';
+            value = value.substring(0, value.length() - 1);
+        }
+        if (value.isEmpty()) return null;
+
+        String initial = findInitial(value);
+        String marked = toneNumberToMark(value, tone);
+        String markedFinal = "";
+        if (!initial.isEmpty() && marked.length() > initial.length()) {
+            markedFinal = marked.substring(initial.length());
+        }
+        return new SyllableParts(initial, marked, markedFinal);
     }
 
     private static String findInitial(String syllable) {
@@ -177,6 +236,34 @@ public final class PinyinNormalizer {
             case 'ü': return "ǖǘǚǜ".charAt(tone - 1);
             default: return 0;
         }
+    }
+
+    private static Map<String, String> createInitialAliases() {
+        Map<String, String> result = new HashMap<>();
+        result.put("b", "玻");
+        result.put("p", "坡");
+        result.put("m", "摸");
+        result.put("f", "佛");
+        result.put("d", "得");
+        result.put("t", "特");
+        result.put("n", "讷");
+        result.put("l", "勒");
+        result.put("g", "哥");
+        result.put("k", "科");
+        result.put("h", "喝");
+        result.put("j", "基");
+        result.put("q", "欺");
+        result.put("x", "希");
+        result.put("zh", "知");
+        result.put("ch", "吃");
+        result.put("sh", "诗");
+        result.put("r", "日");
+        result.put("z", "资");
+        result.put("c", "雌");
+        result.put("s", "思");
+        result.put("y", "衣");
+        result.put("w", "乌");
+        return result;
     }
 
     private static List<String> chineseCodePoints(String value) {
@@ -253,6 +340,18 @@ public final class PinyinNormalizer {
             case 'ǹ': return new Mark('n', 4);
             case 'ḿ': return new Mark('m', 2);
             default: return null;
+        }
+    }
+
+    private static final class SyllableParts {
+        final String initial;
+        final String markedSyllable;
+        final String markedFinal;
+
+        SyllableParts(String initial, String markedSyllable, String markedFinal) {
+            this.initial = initial;
+            this.markedSyllable = markedSyllable;
+            this.markedFinal = markedFinal;
         }
     }
 
