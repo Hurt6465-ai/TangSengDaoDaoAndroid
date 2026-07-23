@@ -77,63 +77,87 @@ public final class PinyinNormalizer {
     }
 
     /**
-     * Builds text for display/logging only.
+     * Builds the classroom spelling sequence shown in logs or UI.
      *
      * Examples:
-     * bà      -> b à
-     * nǐ hǎo  -> n ǐ，h ǎo
-     * zhōng   -> zh ōng
-     * ài      -> ài
+     * 爸 + bà       -> b  à  爸
+     * 你 + nǐ       -> n  ǐ  你
+     * 你好 + nǐ hǎo -> n  ǐ  你；h  ǎo  好；你好
      *
-     * Bare Latin initials in this value must not be sent directly to TTS because a multilingual
-     * frontend will pronounce them as English letter names.
+     * Each syllable is completed by its Hanzi. A multi-syllable word or phrase is read once more
+     * at the end, matching the common teaching rhythm "声母—韵母—完整音节，最后整词".
      */
+    public static String buildTeachingSpellingText(String hanzi, String pinyin) {
+        return buildSpellingSequence(hanzi, pinyin, false);
+    }
+
+    /** Backward-compatible display helper. */
     public static String buildTeachingSpellingText(String pinyin) {
-        List<String> numbered = syllables(pinyin);
-        if (numbered.isEmpty()) return "";
-        StringBuilder result = new StringBuilder();
-        for (String syllable : numbered) {
-            String teaching = splitSyllableForTeaching(syllable);
-            if (teaching.isEmpty()) continue;
-            if (result.length() > 0) result.append('，');
-            result.append(teaching);
-        }
-        return result.toString();
+        return buildTeachingSpellingText(null, pinyin);
     }
 
     /**
-     * Builds the actual Mandarin-only input sent to ByteDance offline TTS.
+     * Builds the Mandarin-only text actually sent to ByteDance offline TTS.
+     *
+     * MultiTTS does not contain a hidden pinyin-splitting algorithm in its ByteDance adapter: after
+     * its generic replacement stage it forwards the resulting string to SpeechEngine unchanged.
+     * A bare Latin initial therefore risks being routed to the English frontend. We replace only
+     * that initial with its standard Mandarin classroom reading, retain the tone-marked final, then
+     * append the corresponding Hanzi and finally the complete multi-syllable word/phrase.
      *
      * Examples:
-     * bà      -> 玻，à
-     * nǐ hǎo  -> 讷，ǐ；喝，ǎo
-     * zhōng   -> 知，ōng
-     * ài      -> ài
-     *
-     * The tone-marked final remains unchanged because the imported Chinese frontend already reads
-     * it correctly. Only the initial is replaced with its standard Mandarin classroom reading so
-     * it can no longer be routed through the English frontend.
+     * 爸 + bà       -> 玻，à，爸
+     * 你 + nǐ       -> 讷，ǐ，你
+     * 你好 + nǐ hǎo -> 讷，ǐ，你；喝，ǎo，好；你好
      */
+    public static String buildMandarinSpellingText(String hanzi, String pinyin) {
+        return buildSpellingSequence(hanzi, pinyin, true);
+    }
+
+    /** Backward-compatible synthesis helper. */
     public static String buildMandarinSpellingText(String pinyin) {
+        return buildMandarinSpellingText(null, pinyin);
+    }
+
+    private static String buildSpellingSequence(String hanzi, String pinyin, boolean forSynthesis) {
         List<String> numbered = syllables(pinyin);
         if (numbered.isEmpty()) return "";
+
+        List<String> characters = chineseCodePoints(hanzi);
+        boolean aligned = characters.size() == numbered.size();
         StringBuilder result = new StringBuilder();
-        for (String syllable : numbered) {
-            SyllableParts parts = parseSyllable(syllable);
+
+        for (int i = 0; i < numbered.size(); i++) {
+            SyllableParts parts = parseSyllable(numbered.get(i));
             if (parts == null || parts.markedSyllable.isEmpty()) continue;
             if (result.length() > 0) result.append('；');
+
             if (parts.initial.isEmpty() || parts.markedFinal.isEmpty()) {
                 result.append(parts.markedSyllable);
-                continue;
-            }
-            String alias = INITIAL_MANDARIN_ALIAS.get(parts.initial);
-            if (alias == null || alias.isEmpty()) {
-                // Defensive fallback: keep the complete Chinese syllable instead of exposing a
-                // Latin initial to the English frontend.
-                result.append(parts.markedSyllable);
+            } else if (forSynthesis) {
+                String alias = INITIAL_MANDARIN_ALIAS.get(parts.initial);
+                if (alias == null || alias.isEmpty()) {
+                    // Never expose an unknown bare Latin initial to the multilingual frontend.
+                    result.append(parts.markedSyllable);
+                } else {
+                    result.append(alias).append('，').append(parts.markedFinal);
+                }
             } else {
-                result.append(alias).append('，').append(parts.markedFinal);
+                result.append(parts.initial).append(' ').append(parts.markedFinal);
             }
+
+            if (aligned) {
+                result.append(forSynthesis ? '，' : ' ').append(characters.get(i));
+            }
+        }
+
+        String completeHanzi = joinHanCharacters(characters);
+        if (numbered.size() > 1 && !completeHanzi.isEmpty()) {
+            result.append('；').append(completeHanzi);
+        } else if (!aligned && !completeHanzi.isEmpty()) {
+            // When syllable and Hanzi counts do not align, still finish with the original word so
+            // the learner hears the complete target once after the spelling sequence.
+            result.append('；').append(completeHanzi);
         }
         return result.toString();
     }
@@ -275,6 +299,14 @@ public final class PinyinNormalizer {
             if (isHan(cp)) result.add(new String(Character.toChars(cp)));
         }
         return result;
+    }
+
+    private static String joinHanCharacters(List<String> characters) {
+        StringBuilder result = new StringBuilder();
+        if (characters != null) {
+            for (String character : characters) result.append(character);
+        }
+        return result.toString();
     }
 
     private static boolean isHan(int cp) {

@@ -137,13 +137,13 @@ public class SpeechPrefs {
         File bytedance = new File(root);
         return bytedance.isDirectory()
                 && new File(bytedance, "midu/speech_license.licbag").isFile()
-                && (new File(bytedance, "midu/zh-cn/ptl.dat").isFile()
-                || new File(bytedance, "fanqie/zh-cn/ptl.dat").isFile());
+                && new File(bytedance, "midu/zh-cn/ptl.dat").isFile()
+                && new File(bytedance, "midu/BV119_24k_streaming/ptl.dat").isFile();
     }
 
     public String getByteDanceVoice() {
-        String voice = sp.getString(KEY_BYTEDANCE_VOICE, "BV001_24k");
-        return voice == null || voice.trim().isEmpty() ? "BV001_24k" : voice.trim();
+        String voice = sp.getString(KEY_BYTEDANCE_VOICE, "BV119_24k");
+        return voice == null || voice.trim().isEmpty() ? "BV119_24k" : voice.trim();
     }
 
     public void setByteDanceVoice(String voice) {
