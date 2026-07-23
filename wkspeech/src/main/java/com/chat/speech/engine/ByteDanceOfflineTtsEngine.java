@@ -79,7 +79,8 @@ public final class ByteDanceOfflineTtsEngine {
             String mode,
             String voice,
             int sampleRate,
-            int ratePercent
+            int ratePercent,
+            int pitchPercent
     ) throws Exception {
         Context app = context.getApplicationContext();
         logContext = app;
@@ -110,7 +111,7 @@ public final class ByteDanceOfflineTtsEngine {
         if (actualText.isEmpty()) throw new IllegalArgumentException("朗读内容为空");
 
         String cacheKey = "bytedance-offline-v10-native-pinyin|" + resources.signature + "|"
-                + textType + "|" + ratePercent + "|" + actualText;
+                + textType + "|" + ratePercent + "|" + pitchPercent + "|" + actualText;
         File cached = SpeechCache.audioFile(app, cacheKey, "wav");
         if (cached.exists() && cached.length() > 44L) {
             //noinspection ResultOfMethodCallIgnored
@@ -133,6 +134,7 @@ public final class ByteDanceOfflineTtsEngine {
                 }
                 setOptionString("tts_text_type", textType);
                 setOptionInt("tts_speed", speedValue(ratePercent));
+                setOptionInt("tts_pitch", pitchValue(pitchPercent));
                 setOptionInt("tts_volume", 10);
                 setOptionString("tts_text", actualText);
                 SpeechDebugLog.append(app, "engine.send_synthesis text=" + abbreviate(actualText));
@@ -146,6 +148,7 @@ public final class ByteDanceOfflineTtsEngine {
                     ensureInitialized(app, resources);
                     setOptionString("tts_text_type", textType);
                     setOptionInt("tts_speed", speedValue(ratePercent));
+                    setOptionInt("tts_pitch", pitchValue(pitchPercent));
                     setOptionInt("tts_volume", 10);
                     setOptionString("tts_text", actualText);
                     result = sendDirective(DIRECTIVE_SYNTHESIS, "");
@@ -670,6 +673,10 @@ public final class ByteDanceOfflineTtsEngine {
 
     private static int speedValue(int ratePercent) {
         return Math.max(5, Math.min(18, Math.round(10f * (1f + ratePercent / 100f))));
+    }
+
+    private static int pitchValue(int pitchPercent) {
+        return Math.max(5, Math.min(15, Math.round(10f * (1f + pitchPercent / 100f))));
     }
 
     private static void writeAudioFile(File target, byte[] data, int sampleRate) throws Exception {
