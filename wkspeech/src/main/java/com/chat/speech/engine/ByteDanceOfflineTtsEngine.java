@@ -95,24 +95,22 @@ public final class ByteDanceOfflineTtsEngine {
                 + " voice=" + voice + " sampleRate=" + sampleRate);
         VoiceResources resources = resolveResources(bytedanceRoot, voice, sampleRate);
         SpeechDebugLog.append(app, "engine.resources_ready signature=" + resources.signature);
-        String actualText = text == null ? "" : text.trim();
+        String actualText = PinyinNormalizer.normalizePlainText(text);
         String textType = "plain";
         if ("spelling".equalsIgnoreCase(mode) && pinyin != null && !pinyin.trim().isEmpty()) {
-            // The display form remains "b à" / "n ǐ，h ǎo", but bare Latin initials must not be
-            // sent to a multilingual frontend: it correctly reads them as English letter names.
-            // Replace only the initials with their Mandarin classroom aliases and preserve the
-            // tone-marked finals that this imported Chinese frontend already pronounces correctly.
-            String displayText = PinyinNormalizer.buildTeachingSpellingText(text, pinyin);
-            String mandarinText = PinyinNormalizer.buildMandarinSpellingText(text, pinyin);
-            if (!mandarinText.isEmpty()) actualText = mandarinText;
-            Log.i(TAG, "Spelling display=" + displayText + ", input=" + actualText);
-            SpeechDebugLog.append(app, "engine.spelling_display=" + displayText);
+            // MultiTTS forwards complete tone-marked pinyin as plain text. Do not split initials
+            // and finals and do not replace initials with Chinese placeholder characters. The
+            // imported ByteDance Chinese frontend has its own pinyin parsing path.
+            String nativePinyin = PinyinNormalizer.normalizeNativePinyin(pinyin);
+            if (!nativePinyin.isEmpty()) actualText = nativePinyin;
+            Log.i(TAG, "Native pinyin input=" + actualText);
+            SpeechDebugLog.append(app, "engine.spelling_native_pinyin=" + actualText);
             SpeechDebugLog.append(app, "engine.spelling_input=" + actualText);
         }
         if (actualText.isEmpty()) throw new IllegalArgumentException("朗读内容为空");
 
-        String cacheKey = "bytedance-offline-v6|" + resources.signature + "|" + textType + "|"
-                + ratePercent + "|" + actualText;
+        String cacheKey = "bytedance-offline-v10-native-pinyin|" + resources.signature + "|"
+                + textType + "|" + ratePercent + "|" + actualText;
         File cached = SpeechCache.audioFile(app, cacheKey, "wav");
         if (cached.exists() && cached.length() > 44L) {
             //noinspection ResultOfMethodCallIgnored
