@@ -123,6 +123,8 @@ import com.chat.uikit.user.ProfileNavigator;
 import com.chat.uikit.user.service.UserModel;
 import com.chat.uikit.view.WKPlayVoiceUtils;
 import com.chat.translate.ui.TranslateSettingsActivity;
+import com.chat.deepseek.DeepSeekAssistant;
+import com.chat.deepseek.DeepSeekRequest;
 import com.effective.android.panel.PanelSwitchHelper;
 import com.effective.android.panel.interfaces.ContentScrollMeasurer;
 import com.effective.android.panel.interfaces.listener.OnPanelChangeListener;
@@ -147,6 +149,7 @@ import com.xinbida.wukongim.message.type.WKConnectStatus;
 import com.xinbida.wukongim.message.type.WKSendMsgResult;
 import com.xinbida.wukongim.msgmodel.WKImageContent;
 import com.xinbida.wukongim.msgmodel.WKMessageContent;
+import com.xinbida.wukongim.msgmodel.WKTextContent;
 import com.xinbida.wukongim.msgmodel.WKMsgEntity;
 import com.xinbida.wukongim.msgmodel.WKReply;
 
@@ -250,7 +253,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private static final String KEY_AI_AUTO_TRANSLATE = "chat_ai_auto_translate";
     private static final String KEY_AI_SEND_TRANSLATE = "chat_ai_send_translate";
     private static final String KEY_AI_WINGMAN_ENABLED = "chat_ai_wingman_enabled";
+    private static final String KEY_DEEPSEEK_OLD_FLAGS_SAVED = "deepseek_old_ai_flags_saved";
+    private static final String KEY_DEEPSEEK_OLD_SEND_TRANSLATE = "deepseek_old_send_translate";
+    private static final String KEY_DEEPSEEK_OLD_WINGMAN = "deepseek_old_wingman";
     private static final String KEY_IMAGE_COMPRESS = "chat_image_compress";
+
+    private interface BooleanAction {
+        void onChanged(boolean value);
+    }
 
 
     // 图片字段反射缓存：key 为 Content 的 class，value 为可写入路径的 Field。避免每次发图都全量反射。
@@ -685,11 +695,29 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         });
         addDivider(group);
 
-        addChatMoreRow(group, getString(R.string.chat_more_ai_translate), false, () -> {
+        boolean deepSeekEnabled = DeepSeekAssistant.isEnabled(this);
+        addChatMoreSwitchRow(group, getString(com.chat.deepseek.R.string.wkdeepseek_name), deepSeekEnabled, enabled -> {
             dialog.dismiss();
-            showChatAiSettingsDialog();
+            if (enabled) {
+                if (!DeepSeekAssistant.isEnabled(this)) {
+                    DeepSeekAssistant.requestFirstEnable(this, this::refreshDeepSeekAssistantBar);
+                } else {
+                    refreshDeepSeekAssistantBar();
+                }
+            } else {
+                DeepSeekAssistant.setEnabled(this, false);
+                refreshDeepSeekAssistantBar();
+            }
         });
         addDivider(group);
+
+        if (!deepSeekEnabled) {
+            addChatMoreRow(group, getString(R.string.chat_more_ai_translate), false, () -> {
+                dialog.dismiss();
+                showChatAiSettingsDialog();
+            });
+            addDivider(group);
+        }
 
         addChatMoreRow(group, getString(R.string.clear_history), true, () -> {
             dialog.dismiss();
@@ -757,6 +785,32 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1);
         lp.leftMargin = AndroidUtilities.dp(18f);
         parent.addView(line, lp);
+    }
+
+    private void addChatMoreSwitchRow(LinearLayout parent, String text, boolean checked, BooleanAction action) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(AndroidUtilities.dp(18f), 0, AndroidUtilities.dp(10f), 0);
+        row.setBackground(Theme.createSelectorDrawable(Color.argb(22, 0, 0, 0)));
+
+        TextView textTv = new TextView(this);
+        textTv.setText(text);
+        textTv.setGravity(Gravity.CENTER_VERTICAL);
+        textTv.setSingleLine(true);
+        textTv.setTextSize(15);
+        textTv.setIncludeFontPadding(false);
+        textTv.setTextColor(ContextCompat.getColor(this, R.color.popupTextColor));
+        row.addView(textTv, LayoutHelper.createLinear(0, 44, 1f));
+
+        Switch toggle = new Switch(this);
+        toggle.setChecked(checked);
+        row.addView(toggle, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 44));
+        toggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (action != null) action.onChanged(isChecked);
+        });
+        row.setOnClickListener(v -> toggle.setChecked(!toggle.isChecked()));
+        parent.addView(row, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 44));
     }
 
     private void addChatMoreRow(LinearLayout parent, String text, boolean danger, Runnable action) {
@@ -1010,6 +1064,121 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         editText.setTextSize(14);
         parent.addView(editText, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         return editText;
+    }
+
+    private void initDeepSeekAssistantBar() {
+        wkVBinding.deepSeekReplyBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_REPLY));
+        wkVBinding.deepSeekTranslateBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_TRANSLATE));
+        wkVBinding.deepSeekPolishBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_POLISH));
+        wkVBinding.deepSeekSettingsBtn.setOnClickListener(v -> {
+            DeepSeekRequest request = buildDeepSeekRequest(DeepSeekRequest.ACTION_REPLY);
+            DeepSeekAssistant.showSettings(this, request, this::refreshDeepSeekAssistantBar);
+        });
+        refreshDeepSeekAssistantBar();
+    }
+
+    private void refreshDeepSeekAssistantBar() {
+        if (wkVBinding == null) return;
+        boolean enabled = DeepSeekAssistant.isEnabled(this);
+        boolean oldFlagsSaved = getLocalFlag(KEY_DEEPSEEK_OLD_FLAGS_SAVED, false);
+        if (enabled) {
+            // DeepSeek 模式替代旧助手，但关闭后要恢复用户原来的翻译设置。
+            if (!oldFlagsSaved) {
+                putLocalFlag(KEY_DEEPSEEK_OLD_SEND_TRANSLATE, getLocalFlag(KEY_AI_SEND_TRANSLATE, false));
+                putLocalFlag(KEY_DEEPSEEK_OLD_WINGMAN, getLocalFlag(KEY_AI_WINGMAN_ENABLED, false));
+                putLocalFlag(KEY_DEEPSEEK_OLD_FLAGS_SAVED, true);
+            }
+            putLocalFlag(KEY_AI_SEND_TRANSLATE, false);
+            putLocalFlag(KEY_AI_WINGMAN_ENABLED, false);
+        } else if (oldFlagsSaved) {
+            putLocalFlag(KEY_AI_SEND_TRANSLATE, getLocalFlag(KEY_DEEPSEEK_OLD_SEND_TRANSLATE, false));
+            putLocalFlag(KEY_AI_WINGMAN_ENABLED, getLocalFlag(KEY_DEEPSEEK_OLD_WINGMAN, false));
+            putLocalFlag(KEY_DEEPSEEK_OLD_FLAGS_SAVED, false);
+        }
+        wkVBinding.deepSeekAssistBar.setVisibility(enabled ? View.VISIBLE : View.GONE);
+        wkVBinding.aiAssistBar.setVisibility(enabled ? View.GONE : View.VISIBLE);
+    }
+
+    private void openDeepSeekAction(int action) {
+        if (channelType != WKChannelType.PERSONAL) {
+            WKToastUtils.getInstance().showToastNormal("DeepSeek 聊天助手当前只支持单聊");
+            return;
+        }
+        if (!DeepSeekAssistant.isEnabled(this)) {
+            DeepSeekAssistant.requestFirstEnable(this, this::refreshDeepSeekAssistantBar);
+            return;
+        }
+        DeepSeekRequest request = buildDeepSeekRequest(action);
+        DeepSeekAssistant.openAction(this, request, (text, sendNow) -> {
+            if (TextUtils.isEmpty(text) || wkVBinding == null) return;
+            EditText editText = wkVBinding.editText;
+            editText.setText(text);
+            editText.setSelection(text.length());
+            editText.requestFocus();
+            if (sendNow) {
+                // 走聊天输入框原有发送流程，保留回复、编辑、陌生人限制和发送状态处理。
+                wkVBinding.sendIV.post(wkVBinding.sendIV::performClick);
+            } else {
+                SoftKeyboardUtils.getInstance().showSoftKeyBoard(this, editText);
+            }
+        });
+    }
+
+    private DeepSeekRequest buildDeepSeekRequest(int action) {
+        DeepSeekRequest request = new DeepSeekRequest();
+        request.action = action;
+        request.channelId = channelId;
+        request.channelType = channelType;
+        request.selfUid = loginUID;
+        request.draft = wkVBinding == null || wkVBinding.editText.getText() == null
+                ? "" : wkVBinding.editText.getText().toString().trim();
+        request.myNativeLanguage = getMyProfileLanguage("native_languages", "native_language", "自动");
+        request.myLearningLanguages = getMyProfileLanguage("learning_languages", "learning_language", "");
+        request.peerNativeLanguage = getChannelLanguage("native_languages", "native_language", "自动");
+        request.peerLearningLanguages = getChannelLanguage("learning_languages", "learning_language", "");
+        return request;
+    }
+
+    private String getMyProfileLanguage(String plural, String singular, String fallback) {
+        String prefix = TextUtils.isEmpty(loginUID) ? "current" : loginUID;
+        android.content.SharedPreferences sp = getSharedPreferences("front_profile_extra", MODE_PRIVATE);
+        String value = sp.getString(prefix + "_" + plural, "");
+        if (TextUtils.isEmpty(value)) value = sp.getString(prefix + "_" + singular, "");
+        return TextUtils.isEmpty(value) ? fallback : value;
+    }
+
+    private String getChannelLanguage(String plural, String singular, String fallback) {
+        WKChannel channel = getCurrentChatChannel();
+        if (channel == null) return fallback;
+        Object value = null;
+        if (channel.remoteExtraMap != null) {
+            value = channel.remoteExtraMap.get(plural);
+            if (value == null) value = channel.remoteExtraMap.get(singular);
+        }
+        if (value == null && channel.localExtra != null) {
+            value = channel.localExtra.get(plural);
+            if (value == null) value = channel.localExtra.get(singular);
+        }
+        String normalized = normalizeLanguageValue(value);
+        return TextUtils.isEmpty(normalized) ? fallback : normalized;
+    }
+
+    private String normalizeLanguageValue(Object value) {
+        if (value == null) return "";
+        if (value instanceof List) {
+            StringBuilder out = new StringBuilder();
+            for (Object item : (List<?>) value) {
+                if (item == null || TextUtils.isEmpty(item.toString())) continue;
+                if (out.length() > 0) out.append(", ");
+                out.append(item.toString().trim());
+            }
+            return out.toString();
+        }
+        String text = value.toString().trim();
+        if ((text.startsWith("[") && text.endsWith("]")) || (text.startsWith("{") && text.endsWith("}"))) {
+            text = text.replace("[", "").replace("]", "").replace("\"", "").trim();
+        }
+        return text;
     }
 
     private void showChatAiSettingsDialog() {
@@ -1362,6 +1531,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         isShowChatActivity = true;
         WKUIKitApplication.getInstance().chattingChannelID = channelId;
         isUploadReadMsg = true;
+        refreshDeepSeekAssistantBar();
         chatPanelManager.initRefreshListener();
         EndpointManager.getInstance().invoke("start_screen_shot", this);
 
@@ -1532,6 +1702,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
         CommonAnim.getInstance().showOrHide(numberTextView, false, false);
         addChatMoreButton();
+        initDeepSeekAssistantBar();
 
         ((DefaultItemAnimator) Objects.requireNonNull(wkVBinding.recyclerView.getItemAnimator())).setSupportsChangeAnimations(false);
         chatAdapter = new ChatAdapter(this, ChatAdapter.AdapterType.normalMessage);
