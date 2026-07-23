@@ -1,15 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
-        <provider
-            android:name="com.chat.partnerlist.PartnerListInitProvider"
-            android:authorities="${applicationId}.partnerlist.init"
-            android:exported="false"
-            android:initOrder="90" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
+    <application>
         <activity
-            android:name="com.chat.partnerlist.PartnerListActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
-            android:exported="false"
+            android:name="com.chat.speech.ui.SpeechSettingsActivity"
             android:screenOrientation="portrait" />
+
+        <!-- The extracted third-party native TTS engine is intentionally isolated. If its
+             incompatible native code aborts, the learning/settings UI remains alive and the
+             persistent breadcrumb log records the last completed initialization stage. -->
+        <service
+            android:name="com.chat.speech.service.ByteDanceOfflineTtsService"
+            android:exported="false"
+            android:process=":byte_tts"
+            android:stopWithTask="false" />
     </application>
 </manifest>
