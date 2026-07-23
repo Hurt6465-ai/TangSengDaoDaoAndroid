@@ -73,8 +73,7 @@ public final class ByteDanceOfflineTtsService extends Service {
                         + " bytes=" + file.length());
                 sendResult(requestId, true, file.getAbsolutePath(), null);
             } catch (Throwable error) {
-                String message = error.getClass().getSimpleName() + ": "
-                        + (error.getMessage() == null ? "无错误信息" : error.getMessage());
+                String message = describeThrowable(error);
                 SpeechDebugLog.append(this, "remote_service.error id=" + requestId + " " + message);
                 sendResult(requestId, false, null, message);
             } finally {
@@ -97,6 +96,31 @@ public final class ByteDanceOfflineTtsService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+
+    private static String describeThrowable(Throwable error) {
+        if (error == null) return "未知错误";
+        StringBuilder result = new StringBuilder();
+        Throwable current = error;
+        int depth = 0;
+        while (current != null && depth < 8) {
+            if (depth > 0) result.append(" <- ");
+            result.append(current.getClass().getName());
+            String message = current.getMessage();
+            if (message != null && !message.trim().isEmpty()) {
+                result.append(": ").append(message.trim());
+            }
+            Throwable next = current.getCause();
+            if (next == current) break;
+            current = next;
+            depth++;
+        }
+        StackTraceElement[] stack = error.getStackTrace();
+        if (stack != null && stack.length > 0) {
+            result.append(" @ ").append(stack[0]);
+        }
+        return result.toString();
     }
 
     private static String value(Intent intent, String key) {
