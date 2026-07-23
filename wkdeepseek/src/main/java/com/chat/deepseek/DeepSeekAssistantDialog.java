@@ -1,12 +1,15 @@
 package com.chat.deepseek;
 
 import android.annotation.SuppressLint;
+import android.app.Dialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Rect;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
@@ -19,6 +22,9 @@ import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.webkit.CookieManager;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.SslErrorHandler;
@@ -36,17 +42,16 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
-import com.google.android.material.bottomsheet.BottomSheetBehavior;
-import com.google.android.material.bottomsheet.BottomSheetDialog;
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
+import androidx.fragment.app.DialogFragment;
+import androidx.fragment.app.FragmentActivity;
 
 import org.json.JSONObject;
 
 import java.util.Locale;
+import java.util.Random;
 
 
-public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
+public class DeepSeekAssistantDialog extends DialogFragment {
     private static final String URL = "https://chat.deepseek.com/";
     private static final String ARG_LOGIN = "login";
     private static final String ARG_ACTION = "action";
@@ -60,6 +65,12 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
     private static final String ARG_DRAFT = "draft";
     private static final String ARG_BACKGROUND = "background";
     private static final String ARG_PURPOSE = "purpose";
+    /**
+     * DeepSeek 当前发送按钮使用的上箭头 SVG path。自动提交只在检测到这个
+     * 可见、可点击的按钮后执行，避免误点附件、语音、停止生成等按钮。
+     */
+    private static final String DEEPSEEK_SEND_ICON_PATH =
+            "M8.3125 0.981587C8.66767 1.0545 8.97902 1.20558 9.2627 1.43374C9.48724 1.61438 9.73029 1.85933 9.97949 2.10854L14.707 6.83608L13.293 8.25014L9 3.95717V15.0431H7V3.95717L2.70703 8.25014L1.29297 6.83608L6.02051 2.10854C6.26971 1.85933 6.51277 1.61438 6.7373 1.43374C6.97662 1.24126 7.28445 1.04542 7.6875 0.981587C7.8973 0.94841 8.1031 0.956564 8.3125 0.981587Z";
 
     private WebView webView;
     private TextView statusView;
@@ -70,16 +81,26 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
     private boolean promptSubmitted;
     private int fillAttempts;
     private int submitAttempts;
+    private int submitVerifyAttempts;
+    private boolean submitClickPending;
     private boolean fallbackCopied;
     private String pendingPrompt = "";
     private DeepSeekRequest request;
     private DeepSeekAssistant.ReplyCallback replyCallback;
     private DeepSeekAssistant.StateCallback stateCallback;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Random timingRandom = new Random();
     private boolean loginConfirmed;
     private boolean loginProbeInFlight;
     private int loginWaitAttempts;
     private final Runnable loginProbeRunnable = this::runLoginProbe;
+    private FrameLayout dialogRoot;
+    private LinearLayout contentPanel;
+    private int normalPanelHeight;
+    private boolean closing;
+    private boolean pendingReplyDelivery;
+    private String pendingReplyText = "";
+    private boolean pendingReplySendNow;
 
     private interface LoginStateCallback {
         void onResult(boolean loggedIn);
@@ -129,37 +150,72 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
         return buildContent(requireContext());
     }
 
+    @NonNull
+    @Override
+    public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
+        Dialog dialog = new Dialog(requireContext());
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCanceledOnTouchOutside(false);
+        return dialog;
+    }
+
     @Override
     public void onStart() {
         super.onStart();
-        if (!(getDialog() instanceof BottomSheetDialog)) return;
-        BottomSheetDialog dialog = (BottomSheetDialog) getDialog();
-        dialog.setCanceledOnTouchOutside(false);
-        FrameLayout sheet = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
-        if (sheet == null) return;
+        Dialog dialog = getDialog();
+        if (dialog == null) return;
+        Window window = dialog.getWindow();
+        if (window == null) return;
 
-        // 固定窗口高度并彻底关闭 BottomSheet 拖动。
-        // 之前半展开状态会抢走 WebView 的上下滑动手势，导致网页无法正常滚动，
-        // 返回聊天页时也可能残留面板位移状态。
-        int screenHeight = getResources().getDisplayMetrics().heightPixels;
-        ViewGroup.LayoutParams lp = sheet.getLayoutParams();
-        lp.height = loginMode
-                ? ViewGroup.LayoutParams.MATCH_PARENT
-                : Math.round(screenHeight * 0.60f);
-        sheet.setLayoutParams(lp);
+        // 使用普通固定高度 Dialog，而不是 BottomSheet。这样网页滚动、聊天列表和
+        // PanelSwitchLayout 互不抢手势，也不会在关闭时残留 BottomSheet 位移。
+        window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        window.setGravity(Gravity.BOTTOM);
+        window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+        WindowManager.LayoutParams attributes = window.getAttributes();
+        attributes.width = ViewGroup.LayoutParams.MATCH_PARENT;
+        attributes.height = ViewGroup.LayoutParams.MATCH_PARENT;
+        attributes.gravity = Gravity.BOTTOM;
+        attributes.dimAmount = loginMode ? 0.32f : 0.18f;
+        window.setAttributes(attributes);
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
-        BottomSheetBehavior<FrameLayout> behavior = BottomSheetBehavior.from(sheet);
-        behavior.setDraggable(false);
-        behavior.setHideable(false);
-        behavior.setSkipCollapsed(true);
-        behavior.setFitToContents(true);
-        behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.setNavigationBarColor(Color.WHITE);
+        }
+        updatePanelHeight();
     }
 
     private View buildContent(Context context) {
-        LinearLayout root = new LinearLayout(context);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.WHITE);
+        dialogRoot = new FrameLayout(context);
+        dialogRoot.setBackgroundColor(Color.TRANSPARENT);
+        dialogRoot.setClickable(true);
+        dialogRoot.setFocusable(true);
+
+        contentPanel = new LinearLayout(context);
+        contentPanel.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable panelBackground = new GradientDrawable();
+        panelBackground.setColor(Color.WHITE);
+        if (!loginMode) {
+            float radius = dp(18);
+            panelBackground.setCornerRadii(new float[]{radius, radius, radius, radius, 0, 0, 0, 0});
+        }
+        contentPanel.setBackground(panelBackground);
+        contentPanel.setClickable(true);
+
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        normalPanelHeight = loginMode ? screenHeight : Math.round(screenHeight * 0.68f);
+        FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                loginMode ? ViewGroup.LayoutParams.MATCH_PARENT : normalPanelHeight,
+                Gravity.BOTTOM);
+        dialogRoot.addView(contentPanel, panelParams);
+        dialogRoot.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
+                updatePanelHeight());
+        dialogRoot.getViewTreeObserver().addOnGlobalLayoutListener(this::updatePanelHeight);
 
         LinearLayout toolbar = new LinearLayout(context);
         toolbar.setOrientation(LinearLayout.HORIZONTAL);
@@ -178,21 +234,24 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
             if (loginMode && !loginConfirmed) {
                 verifyLoginBeforeClose();
             } else {
-                dismissAllowingStateLoss();
+                dismissAssistant();
             }
         });
         toolbar.addView(close, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40)));
-        root.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        contentPanel.addView(toolbar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         progressBar = new ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal);
         progressBar.setIndeterminate(true);
-        root.addView(progressBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(2)));
+        contentPanel.addView(progressBar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(2)));
 
         webView = new WebView(context);
         webView.setNestedScrollingEnabled(true);
         webView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        webView.setVerticalScrollBarEnabled(true);
+        webView.setFocusable(true);
+        webView.setFocusableInTouchMode(true);
         configureWebView(webView);
-        root.addView(webView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        contentPanel.addView(webView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         if (!isOnline(context)) {
             statusView.setText(R.string.wkdeepseek_no_network);
@@ -201,7 +260,32 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
             webView.loadUrl(URL);
             if (!loginMode) preparePrompt();
         }
-        return root;
+        return dialogRoot;
+    }
+
+    private void updatePanelHeight() {
+        if (dialogRoot == null || contentPanel == null) return;
+        int rootHeight = dialogRoot.getHeight();
+        if (rootHeight <= 0) return;
+
+        // 某些 Android/WebView 组合不会严格执行 ADJUST_RESIZE。再通过可见窗口范围
+        // 计算键盘遮挡高度，把整个网页面板抬到输入法上方，保证 DeepSeek 底部输入框可见。
+        Rect visibleFrame = new Rect();
+        dialogRoot.getWindowVisibleDisplayFrame(visibleFrame);
+        int visibleHeight = visibleFrame.height() > 0 ? visibleFrame.height() : rootHeight;
+        int availableHeight = Math.min(rootHeight, visibleHeight);
+        int bottomMargin = Math.max(0, rootHeight - visibleFrame.bottom);
+
+        ViewGroup.LayoutParams rawParams = contentPanel.getLayoutParams();
+        if (!(rawParams instanceof FrameLayout.LayoutParams)) return;
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) rawParams;
+        int targetHeight = loginMode ? availableHeight : Math.min(normalPanelHeight, availableHeight);
+        if (params.height != targetHeight || params.bottomMargin != bottomMargin) {
+            params.height = targetHeight;
+            params.bottomMargin = bottomMargin;
+            params.gravity = Gravity.BOTTOM;
+            contentPanel.setLayoutParams(params);
+        }
     }
 
     private TextView toolbarButton(Context context, String text) {
@@ -304,7 +388,7 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
                 statusView.setText("DeepSeek 页面已被系统回收，请重新打开");
                 view.destroy();
-                dismissAllowingStateLoss();
+                dismissAssistant();
                 return true;
             }
         });
@@ -336,7 +420,7 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
             if (!isAdded()) return;
             if (loggedIn) {
                 confirmLogin();
-                dismissAllowingStateLoss();
+                dismissAssistant();
             } else {
                 statusView.setText("尚未检测到登录，请先完成登录或注册");
                 Toast.makeText(requireContext(), "登录成功后再点击完成", Toast.LENGTH_SHORT).show();
@@ -463,7 +547,7 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
                 promptFilled = true;
                 statusView.setText(R.string.wkdeepseek_submitting);
                 installReplyButtons();
-                handler.postDelayed(this::submitPromptAutomatically, 350);
+                handler.postDelayed(this::submitPromptAutomatically, randomDelay(480, 920));
                 return;
             }
             fillAttempts++;
@@ -478,21 +562,54 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
     }
 
     private void submitPromptAutomatically() {
-        if (promptSubmitted || webView == null || !isAdded()) return;
+        if (promptSubmitted || submitClickPending || webView == null || !isAdded()) return;
         webView.evaluateJavascript(buildSubmitScript(), value -> {
-            String result = value == null ? "" : value.replace("\"", "");
-            boolean submitted = "clicked".equals(result)
-                    || "requested".equals(result)
-                    || "enter".equals(result);
-            if (submitted) {
+            String result = cleanJsResult(value);
+            if ("clicked".equals(result)) {
+                // 不在 click() 返回后立刻当成成功。先确认输入框已经清空、发送图标消失
+                // 或页面进入生成状态，避免 React 尚未处理点击时误报“已发送”。
+                submitClickPending = true;
+                submitVerifyAttempts = 0;
+                statusView.setText(R.string.wkdeepseek_submitting);
+                handler.postDelayed(this::verifyPromptSubmission, randomDelay(520, 900));
+                return;
+            }
+
+            submitAttempts++;
+            if (submitAttempts < 12) {
+                // DeepSeek 只有在输入内容被 React 接收后才显示可点击的上箭头。
+                // 这里使用小范围等待抖动是为了适配页面渲染时序，不用于规避风控。
+                handler.postDelayed(this::submitPromptAutomatically, randomDelay(360, 720));
+            } else {
+                statusView.setText(R.string.wkdeepseek_submit_failed);
+            }
+        });
+    }
+
+    private void verifyPromptSubmission() {
+        if (promptSubmitted || webView == null || !isAdded()) return;
+        webView.evaluateJavascript(buildSubmitVerifyScript(), value -> {
+            String result = cleanJsResult(value);
+            if ("submitted".equals(result)) {
+                submitClickPending = false;
                 promptSubmitted = true;
                 statusView.setText(R.string.wkdeepseek_thinking);
                 installReplyButtons();
                 return;
             }
+
+            submitVerifyAttempts++;
+            if (submitVerifyAttempts < 5) {
+                handler.postDelayed(this::verifyPromptSubmission, randomDelay(420, 760));
+                return;
+            }
+
+            // 点击后页面仍没有进入生成状态，允许重新探测一次发送图标。
+            // 只有同一个精确上箭头再次可见、可点击时才会再次 click。
+            submitClickPending = false;
             submitAttempts++;
-            if (submitAttempts < 8) {
-                handler.postDelayed(this::submitPromptAutomatically, 450);
+            if (submitAttempts < 12) {
+                handler.postDelayed(this::submitPromptAutomatically, randomDelay(520, 900));
             } else {
                 statusView.setText(R.string.wkdeepseek_submit_failed);
             }
@@ -500,23 +617,56 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
     }
 
     /**
-     * 自动提交只操作当前用户可见的 DeepSeek 输入区，不调用或拦截任何私有接口。
-     * 先找输入框附近可见且可点击的发送按钮，再退回 form.requestSubmit/Enter。
+     * 自动提交只操作 DeepSeek 页面中与用户给出的 SVG path 完全匹配的发送按钮。
+     * 不再使用“离输入框最近的按钮”、requestSubmit 或 Enter 兜底，避免误触。
      */
     private String buildSubmitScript() {
+        String expectedPath = JSONObject.quote(DEEPSEEK_SEND_ICON_PATH);
         return "(function(){try{" +
-                "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;}" +
+                "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;}" +
+                "function norm(v){return (v||'').trim().replace(/\\s+/g,' ');}" +
+                "var expected=norm(" + expectedPath + ");" +
                 "var boxes=Array.from(document.querySelectorAll('textarea,[contenteditable=\"true\"],[role=\"textbox\"]')).filter(function(x){return visible(x)&&!x.disabled&&x.getAttribute('aria-disabled')!=='true';});" +
-                "var el=boxes.length?boxes[boxes.length-1]:null;if(!el)return 'no-input';" +
-                "var er=el.getBoundingClientRect();var buttons=Array.from(document.querySelectorAll('button')).filter(function(b){return visible(b)&&!b.disabled&&b.getAttribute('aria-disabled')!=='true';});" +
-                "function score(b){var t=((b.innerText||'')+' '+(b.getAttribute('aria-label')||'')+' '+(b.getAttribute('title')||'')+' '+(b.getAttribute('data-testid')||'')).toLowerCase();" +
-                "if(/stop|停止|取消|cancel|attach|附件|upload|上传|mic|voice|语音|new chat|新建/.test(t))return -9999;" +
-                "var br=b.getBoundingClientRect(),v=0;if(/send|发送|submit/.test(t))v+=1000;if(br.left>=er.left)v+=100;v-=Math.abs(br.top-er.top)+Math.abs(br.left-er.right)*0.15;return v;}" +
-                "var ranked=buttons.map(function(b){return {b:b,s:score(b)};}).filter(function(x){return x.s>-9000;}).sort(function(a,b){return b.s-a.s;});" +
-                "if(ranked.length&&ranked[0].s>-400){ranked[0].b.click();return 'clicked';}" +
-                "var form=el.closest('form');if(form&&typeof form.requestSubmit==='function'){form.requestSubmit();return 'requested';}" +
-                "['keydown','keypress','keyup'].forEach(function(type){el.dispatchEvent(new KeyboardEvent(type,{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true,cancelable:true}));});return 'enter';" +
+                "var input=boxes.length?boxes[boxes.length-1]:null;if(!input)return 'no-input';" +
+                "var text=((input.value!==undefined?input.value:input.innerText)||input.textContent||'').trim();if(!text)return 'empty-input';" +
+                "var paths=Array.from(document.querySelectorAll('svg[viewBox=\"0 0 16 16\"] path,svg[viewbox=\"0 0 16 16\"] path'));" +
+                "var path=paths.find(function(p){return visible(p.closest('svg'))&&norm(p.getAttribute('d'))===expected;});" +
+                "if(!path)return 'no-send-icon';" +
+                "var button=path.closest('button,[role=\"button\"]');if(!button||!visible(button))return 'no-send-button';" +
+                "if(button.disabled||button.getAttribute('aria-disabled')==='true')return 'send-disabled';" +
+                "try{button.focus({preventScroll:true});}catch(ignore){try{button.focus();}catch(ignore2){}}button.click();return 'clicked';" +
                 "}catch(e){return 'error';}})();";
+    }
+
+    private String buildSubmitVerifyScript() {
+        String expectedPath = JSONObject.quote(DEEPSEEK_SEND_ICON_PATH);
+        return "(function(){try{" +
+                "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;}" +
+                "function norm(v){return (v||'').trim().replace(/\\s+/g,' ');}" +
+                "var expected=norm(" + expectedPath + ");" +
+                "var boxes=Array.from(document.querySelectorAll('textarea,[contenteditable=\"true\"],[role=\"textbox\"]')).filter(function(x){return visible(x)&&!x.disabled&&x.getAttribute('aria-disabled')!=='true';});" +
+                "var input=boxes.length?boxes[boxes.length-1]:null;" +
+                "var text=input?(((input.value!==undefined?input.value:input.innerText)||input.textContent||'').trim()):'';" +
+                "var sendVisible=Array.from(document.querySelectorAll('svg[viewBox=\"0 0 16 16\"] path,svg[viewbox=\"0 0 16 16\"] path')).some(function(p){var b=p.closest('button,[role=\"button\"]');return norm(p.getAttribute('d'))===expected&&visible(p.closest('svg'))&&b&&visible(b)&&!b.disabled&&b.getAttribute('aria-disabled')!=='true';});" +
+                "var stopVisible=Array.from(document.querySelectorAll('button,[role=\"button\"]')).some(function(b){if(!visible(b))return false;var t=((b.innerText||'')+' '+(b.getAttribute('aria-label')||'')+' '+(b.getAttribute('title')||'')).toLowerCase();return /stop|停止生成|停止/.test(t);});" +
+                "if(!text||stopVisible||!sendVisible)return 'submitted';return 'waiting';" +
+                "}catch(e){return 'waiting';}})();";
+    }
+
+    private String cleanJsResult(String value) {
+        if (value == null) return "";
+        String result = value.trim();
+        if (result.length() >= 2 && result.startsWith("\"") && result.endsWith("\"")) {
+            result = result.substring(1, result.length() - 1);
+        }
+        return result.replace("\\\"", "\"");
+    }
+
+    private long randomDelay(int minMs, int maxMs) {
+        int low = Math.max(0, minMs);
+        int high = Math.max(low, maxMs);
+        if (high == low) return low;
+        return low + timingRandom.nextInt(high - low + 1);
     }
 
     private String buildFillScript(String prompt) {
@@ -574,13 +724,39 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
         // 用户点击“直接发送”本身就是明确确认，不再额外弹一次确认框。
         // 回调由聊天页走原有 sendIV 发送流程，不绕过回复、编辑和陌生人限制。
         copyText(cleanText);
-        if (replyCallback != null) {
-            replyCallback.onReply(cleanText, "send".equals(mode));
-        }
-        if (!"send".equals(mode)) {
+        pendingReplyText = cleanText;
+        pendingReplySendNow = "send".equals(mode);
+        pendingReplyDelivery = true;
+        if (!pendingReplySendNow) {
             Toast.makeText(requireContext(), R.string.wkdeepseek_reply_used, Toast.LENGTH_SHORT).show();
         }
-        dismissAllowingStateLoss();
+        // 先关闭网页和输入法，再把结果交给聊天页，避免两个 Window 同时争夺 IME/焦点。
+        dismissAssistant();
+    }
+
+    private void dismissAssistant() {
+        if (closing) return;
+        closing = true;
+        hideWebKeyboard();
+        // 给输入法一个很短的时间从 Dialog Window 脱离，避免关闭后继续压缩聊天页。
+        handler.postDelayed(() -> {
+            if (isAdded()) {
+                dismissAllowingStateLoss();
+            }
+        }, 90);
+    }
+
+    private void hideWebKeyboard() {
+        if (webView == null) return;
+        try {
+            webView.clearFocus();
+            InputMethodManager imm = (InputMethodManager) requireContext()
+                    .getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null && webView.getWindowToken() != null) {
+                imm.hideSoftInputFromWindow(webView.getWindowToken(), 0);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private void copyText(String text) {
@@ -648,14 +824,31 @@ public class DeepSeekAssistantDialog extends BottomSheetDialogFragment {
 
     @Override
     public void onDismiss(@NonNull DialogInterface dialog) {
+        hideWebKeyboard();
         super.onDismiss(dialog);
+
         if (!loginMode && stateCallback != null) {
             stateCallback.onChanged();
+        }
+
+        if (pendingReplyDelivery && replyCallback != null) {
+            final DeepSeekAssistant.ReplyCallback callback = replyCallback;
+            final String text = pendingReplyText;
+            final boolean sendNow = pendingReplySendNow;
+            pendingReplyDelivery = false;
+            FragmentActivity activity = getActivity();
+            if (activity != null && !activity.isFinishing()) {
+                activity.getWindow().getDecorView().postDelayed(
+                        () -> callback.onReply(text, sendNow), 120);
+            } else {
+                callback.onReply(text, sendNow);
+            }
         }
     }
 
     @Override
     public void onDestroyView() {
+        hideWebKeyboard();
         handler.removeCallbacks(loginProbeRunnable);
         if (webView != null) {
             webView.stopLoading();
