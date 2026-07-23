@@ -17,11 +17,15 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.concurrent.CountDownLatch;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.concurrent.TimeUnit;
 
 import dalvik.system.DexClassLoader;
@@ -36,6 +40,12 @@ public final class ByteDanceOfflineTtsEngine {
     private static final String TAG = "ByteDanceOfflineTts";
     private static final String RUNTIME_ASSET = "bytedance_runtime/bytedance_runtime.jar";
     private static final long SYNTHESIS_TIMEOUT_SECONDS = 45L;
+    private static final String[] NATIVE_LIBRARIES = {
+            "libttcrypto.so",
+            "libttboringssl.so",
+            "libsscronet.so",
+            "libspeechengine.so"
+    };
 
     private static final int WORK_MODE_OFFLINE = 2048;
     private static final int DIRECTIVE_START_ENGINE = 1000;
@@ -179,16 +189,32 @@ public final class ByteDanceOfflineTtsEngine {
         runtimeLoader = createRuntimeLoader(context);
         SpeechDebugLog.append(context, "engine.runtime_loader.ready");
 
-        // The previous test package loaded the .so files directly but never advanced
-        // SpeechEngineLoader's own state. The vendor SDK expects setAdapter() + load() before
-        // createEngine(); skipping it can terminate inside native bridge creation.
-        installVendorLibraryLoader(context);
-
+        /*
+         * Keep the exact initialization order used by the original third-party app:
+         *
+         *   1. SpeechEngineGenerator.PrepareEnvironment(context, application)
+         *   2. SpeechEngineGenerator.getInstance()
+         *   3. createEngine()
+         *
+         * getInstance() initializes the vendor implementation class. Its static initializer calls
+         * SpeechEngineLoader.load() by itself. Calling SpeechEngineLoader.load() before
+         * PrepareEnvironment() is wrong for this SDK build because libspeechengine.so depends on
+         * the Cronet/crypto libraries prepared in step 1.
+         */
         Class<?> generator = runtimeLoader.loadClass("com.bytedance.speech.speechengine.SpeechEngineGenerator");
-        SpeechDebugLog.append(context, "engine.prepare_environment.begin");
-        invokePrepareEnvironment(generator, context);
-        SpeechDebugLog.append(context, "engine.prepare_environment.ready");
-        engine = generator.getMethod("getInstance").invoke(null);
+        SpeechDebugLog.append(context, "engine.prepare_environment.begin nativeDir="
+                + context.getApplicationInfo().nativeLibraryDir);
+        boolean prepared = invokePrepareEnvironment(generator, context);
+        SpeechDebugLog.append(context, "engine.prepare_environment.result=" + prepared);
+
+        SpeechDebugLog.append(context, "engine.getInstance.begin (vendor loader runs here)");
+        try {
+            engine = generator.getMethod("getInstance").invoke(null);
+        } catch (InvocationTargetException error) {
+            throw reflectionFailure("SpeechEngineGenerator.getInstance", error);
+        }
+        SpeechDebugLog.append(context, "engine.getInstance.ready class="
+                + (engine == null ? "null" : engine.getClass().getName()));
         if (engine == null) throw new IllegalStateException("无法创建字节离线语音引擎");
 
         SpeechDebugLog.append(context, "engine.createEngine.begin");
@@ -376,12 +402,122 @@ public final class ByteDanceOfflineTtsEngine {
         jar.setWritable(false, false);
         File optimized = new File(dir, "opt");
         if (!optimized.exists() && !optimized.mkdirs()) throw new IllegalStateException("无法创建 Dex 优化目录");
+        File nativeDir = prepareNativeLibraries(context);
+        SpeechDebugLog.append(context, "engine.runtime_loader.native_path="
+                + nativeDir.getAbsolutePath());
         return new DexClassLoader(
                 jar.getAbsolutePath(),
                 optimized.getAbsolutePath(),
-                context.getApplicationInfo().nativeLibraryDir,
+                nativeDir.getAbsolutePath(),
                 context.getClassLoader()
         );
+    }
+
+    /**
+     * A library module's JNI files may stay uncompressed inside base.apk on modern Android builds.
+     * In that case ApplicationInfo.nativeLibraryDir does not contain real files and a newly-created
+     * DexClassLoader cannot see the host PathClassLoader's internal "apk!/lib/arm64-v8a" path.
+     * Extract the four vendor libraries to a private, read-only directory and give that directory
+     * explicitly to the vendor DexClassLoader.
+     */
+    private static File prepareNativeLibraries(Context context) throws Exception {
+        File targetDir = context.getDir("bytedance_offline_native", Context.MODE_PRIVATE);
+        if (!targetDir.isDirectory() && !targetDir.mkdirs()) {
+            throw new IllegalStateException("无法创建字节离线 Native 目录");
+        }
+        for (String library : NATIVE_LIBRARIES) {
+            File target = new File(targetDir, library);
+            if (target.isFile() && target.length() > 0L) {
+                // Existing libraries came from this APK build. Keep them unless a later extraction
+                // finds a different size; this avoids rewriting executable files every request.
+                continue;
+            }
+            if (!extractNativeLibrary(context, library, target)) {
+                throw new IllegalStateException("APK 中缺少字节离线运行库：" + library);
+            }
+            SpeechDebugLog.append(context, "engine.native.ready " + library
+                    + " bytes=" + target.length());
+        }
+        return targetDir;
+    }
+
+    private static boolean extractNativeLibrary(
+            Context context,
+            String library,
+            File target
+    ) throws Exception {
+        File installed = new File(context.getApplicationInfo().nativeLibraryDir, library);
+        if (installed.isFile() && installed.length() > 0L) {
+            copyNativeFile(installed, target);
+            return true;
+        }
+
+        String[] apkPaths = applicationApkPaths(context);
+        String entryName = "lib/arm64-v8a/" + library;
+        for (String apkPath : apkPaths) {
+            if (apkPath == null || apkPath.trim().isEmpty()) continue;
+            File apk = new File(apkPath);
+            if (!apk.isFile()) continue;
+            try (ZipFile zip = new ZipFile(apk)) {
+                ZipEntry entry = zip.getEntry(entryName);
+                if (entry == null || entry.isDirectory()) continue;
+                try (InputStream input = new BufferedInputStream(zip.getInputStream(entry))) {
+                    copyNativeStream(input, target);
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String[] applicationApkPaths(Context context) {
+        String source = context.getApplicationInfo().sourceDir;
+        String[] splits = context.getApplicationInfo().splitSourceDirs;
+        int splitCount = splits == null ? 0 : splits.length;
+        String[] result = new String[1 + splitCount];
+        result[0] = source;
+        if (splitCount > 0) System.arraycopy(splits, 0, result, 1, splitCount);
+        return result;
+    }
+
+    private static void copyNativeFile(File source, File target) throws Exception {
+        try (InputStream input = new BufferedInputStream(new FileInputStream(source))) {
+            copyNativeStream(input, target);
+        }
+    }
+
+    private static void copyNativeStream(InputStream input, File target) throws Exception {
+        File temp = new File(target.getAbsolutePath() + ".tmp");
+        //noinspection ResultOfMethodCallIgnored
+        temp.delete();
+        try (BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(temp))) {
+            byte[] buffer = new byte[64 * 1024];
+            int count;
+            while ((count = input.read(buffer)) >= 0) output.write(buffer, 0, count);
+        }
+        if (temp.length() <= 0L) {
+            //noinspection ResultOfMethodCallIgnored
+            temp.delete();
+            throw new IllegalStateException("复制 Native 库失败：" + target.getName());
+        }
+        // Dynamic code must be immutable before Android loads it.
+        //noinspection ResultOfMethodCallIgnored
+        temp.setReadable(true, true);
+        //noinspection ResultOfMethodCallIgnored
+        temp.setExecutable(true, true);
+        //noinspection ResultOfMethodCallIgnored
+        temp.setWritable(false, false);
+        //noinspection ResultOfMethodCallIgnored
+        target.delete();
+        if (!temp.renameTo(target)) {
+            throw new IllegalStateException("安装 Native 库失败：" + target.getName());
+        }
+        //noinspection ResultOfMethodCallIgnored
+        target.setReadable(true, true);
+        //noinspection ResultOfMethodCallIgnored
+        target.setExecutable(true, true);
+        //noinspection ResultOfMethodCallIgnored
+        target.setWritable(false, false);
     }
 
     private static long assetSize(Context context, String name) throws Exception {
@@ -394,14 +530,19 @@ public final class ByteDanceOfflineTtsEngine {
         return total;
     }
 
-    private static void invokePrepareEnvironment(Class<?> generator, Context context) throws Exception {
+    private static boolean invokePrepareEnvironment(Class<?> generator, Context context) throws Exception {
         Method prepare = findMethod(generator, "PrepareEnvironment", 2);
         Application application = (Application) context.getApplicationContext();
         Class<?> first = prepare.getParameterTypes()[0];
         Object firstArg = Application.class.isAssignableFrom(first) ? application : context;
         Class<?> second = prepare.getParameterTypes()[1];
         Object secondArg = Application.class.isAssignableFrom(second) ? application : context;
-        prepare.invoke(null, firstArg, secondArg);
+        try {
+            Object value = prepare.invoke(null, firstArg, secondArg);
+            return !(value instanceof Boolean) || (Boolean) value;
+        } catch (InvocationTargetException error) {
+            throw reflectionFailure("SpeechEngineGenerator.PrepareEnvironment", error);
+        }
     }
 
     private Object invokeEngine(String name, Class<?>[] types, Object... args) throws Exception {
@@ -411,7 +552,11 @@ public final class ByteDanceOfflineTtsEngine {
         } catch (NoSuchMethodException ignored) {
             method = findMethod(engine.getClass(), name, args.length);
         }
-        return method.invoke(engine, args);
+        try {
+            return method.invoke(engine, args);
+        } catch (InvocationTargetException error) {
+            throw reflectionFailure(engine.getClass().getName() + "." + name, error);
+        }
     }
 
     private void setOptionString(String key, String value) throws Exception {
@@ -452,20 +597,17 @@ public final class ByteDanceOfflineTtsEngine {
         initializedSignature = "";
     }
 
-    private void installVendorLibraryLoader(Context context) throws Exception {
-        SpeechDebugLog.append(context, "engine.vendor_loader.begin");
-        Class<?> loaderClass = runtimeLoader.loadClass(
-                "com.bytedance.speech.speechengine.SpeechEngineLoader"
-        );
-        Object loader = loaderClass.getMethod("getInstance").invoke(null);
-
-        // Do not preload libspeechengine.so from the app class loader. SpeechEngineLoader creates
-        // its own built-in PluginAdapter (com.bytedance.speech.speechengine.a); because that class
-        // lives in runtimeLoader, System.loadLibrary() is associated with the same class loader as
-        // SpeechEngineBridge's native methods. Loading it earlier from the host class loader can
-        // produce an "already loaded in another classloader" failure and abort bridge creation.
-        Object state = loaderClass.getMethod("load").invoke(loader);
-        SpeechDebugLog.append(context, "engine.vendor_loader.state=" + String.valueOf(state));
+    private static Exception reflectionFailure(
+            String stage,
+            InvocationTargetException wrapper
+    ) {
+        Throwable cause = wrapper.getCause() == null ? wrapper : wrapper.getCause();
+        String message = cause.getMessage();
+        String detail = stage + " 失败：" + cause.getClass().getName()
+                + (message == null || message.trim().isEmpty() ? "" : " · " + message.trim());
+        if (cause instanceof Error) throw (Error) cause;
+        if (cause instanceof Exception) return new IllegalStateException(detail, cause);
+        return new IllegalStateException(detail, cause);
     }
 
     private static void requireArm64() {
