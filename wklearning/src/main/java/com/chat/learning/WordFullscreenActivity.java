@@ -851,7 +851,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private void speakSpelling() {
         WordItem item = current();
-        if (item != null) LearningTtsBridge.speak(this, item.word,
+        if (item != null) LearningTtsBridge.speak(this, item.word, item.pinyin,
                 LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_SPELLING);
     }
 

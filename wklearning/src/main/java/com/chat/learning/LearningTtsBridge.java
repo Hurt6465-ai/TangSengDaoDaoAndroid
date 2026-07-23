@@ -14,6 +14,7 @@ import java.lang.reflect.Method;
  * wkspeech / 微软发音脚本 / 字节离线 TTS 插件实现。
  *
  * 插件侧后续只要暴露以下任一静态方法即可被自动命中：
+ * - speak(Context, String, String, String, String) // text, pinyin, lang, mode
  * - speak(Context, String, String)
  * - speak(Context, String)
  * - speak(String, String)
@@ -28,16 +29,21 @@ final class LearningTtsBridge {
     private LearningTtsBridge() {}
 
     static boolean speak(Context context, String text, String lang, String mode) {
+        return speak(context, text, null, lang, mode);
+    }
+
+    static boolean speak(Context context, String text, String pinyin, String lang, String mode) {
         if (context == null || text == null || text.trim().length() == 0) return false;
         Context app = context.getApplicationContext();
         String content = text.trim();
-        if (tryStatic(app, content, lang, mode)) return true;
-        if (tryIntent(app, content, lang, mode)) return true;
+        String pronunciation = pinyin == null ? "" : pinyin.trim();
+        if (tryStatic(app, content, pronunciation, lang, mode)) return true;
+        if (tryIntent(app, content, pronunciation, lang, mode)) return true;
         Toast.makeText(context, context.getString(R.string.word_tts_plugin_missing), Toast.LENGTH_SHORT).show();
         return false;
     }
 
-    private static boolean tryStatic(Context context, String text, String lang, String mode) {
+    private static boolean tryStatic(Context context, String text, String pinyin, String lang, String mode) {
         String[] classNames = new String[]{
                 "com.chat.speech.SpeechManager",
                 "com.chat.speech.TsddTtsManager",
@@ -52,6 +58,7 @@ final class LearningTtsBridge {
             try {
                 Class<?> cls = Class.forName(clsName);
                 for (String m : methodNames) {
+                    if (invoke(cls, m, new Class[]{Context.class, String.class, String.class, String.class, String.class}, new Object[]{context, text, pinyin, lang, mode})) return true;
                     if (invoke(cls, m, new Class[]{Context.class, String.class, String.class, String.class}, new Object[]{context, text, lang, mode})) return true;
                     if (invoke(cls, m, new Class[]{String.class, String.class, String.class}, new Object[]{text, lang, mode})) return true;
                     if (invoke(cls, m, new Class[]{Context.class, String.class, String.class}, new Object[]{context, text, lang})) return true;
@@ -75,11 +82,12 @@ final class LearningTtsBridge {
         }
     }
 
-    private static boolean tryIntent(Context context, String text, String lang, String mode) {
+    private static boolean tryIntent(Context context, String text, String pinyin, String lang, String mode) {
         try {
             Intent intent = new Intent("com.chat.speech.action.SPEAK");
             intent.setPackage(context.getPackageName());
             intent.putExtra("text", text);
+            intent.putExtra("pinyin", pinyin);
             intent.putExtra("lang", lang);
             intent.putExtra("mode", mode);
             java.util.List<ResolveInfo> receivers = context.getPackageManager().queryBroadcastReceivers(intent, 0);
