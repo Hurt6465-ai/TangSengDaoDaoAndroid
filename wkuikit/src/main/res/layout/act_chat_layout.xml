@@ -228,6 +228,74 @@
                         </FrameLayout>
                     </LinearLayout>
 
+                    <LinearLayout
+                        android:id="@+id/deepSeekAssistBar"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginBottom="6dp"
+                        android:background="@drawable/chat_edit_bg"
+                        android:elevation="8dp"
+                        android:gravity="center"
+                        android:orientation="horizontal"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="4dp"
+                        android:visibility="gone">
+
+                        <androidx.appcompat.widget.AppCompatTextView
+                            android:id="@+id/deepSeekReplyBtn"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:paddingStart="10dp"
+                            android:paddingEnd="10dp"
+                            android:text="@string/wkdeepseek_reply"
+                            android:textColor="@color/colorDark"
+                            android:textSize="13sp" />
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="16dp"
+                            android:background="#1F64748B" />
+
+                        <androidx.appcompat.widget.AppCompatTextView
+                            android:id="@+id/deepSeekTranslateBtn"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:paddingStart="10dp"
+                            android:paddingEnd="10dp"
+                            android:text="@string/wkdeepseek_translate"
+                            android:textColor="@color/colorDark"
+                            android:textSize="13sp" />
+
+                        <View
+                            android:layout_width="1dp"
+                            android:layout_height="16dp"
+                            android:background="#1F64748B" />
+
+                        <androidx.appcompat.widget.AppCompatTextView
+                            android:id="@+id/deepSeekPolishBtn"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:paddingStart="10dp"
+                            android:paddingEnd="10dp"
+                            android:text="@string/wkdeepseek_polish"
+                            android:textColor="@color/colorDark"
+                            android:textSize="13sp" />
+
+                        <androidx.appcompat.widget.AppCompatTextView
+                            android:id="@+id/deepSeekSettingsBtn"
+                            android:layout_width="34dp"
+                            android:layout_height="match_parent"
+                            android:contentDescription="@string/wkdeepseek_settings"
+                            android:gravity="center"
+                            android:text="⚙"
+                            android:textColor="@color/color999"
+                            android:textSize="17sp" />
+                    </LinearLayout>
+
                     <FrameLayout
                         android:id="@+id/panelView"
                         android:layout_width="match_parent"
