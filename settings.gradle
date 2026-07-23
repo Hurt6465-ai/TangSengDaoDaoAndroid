@@ -42,6 +42,7 @@ include ':wklearning'
 
 include ':wkspeech'
 include ':wktranslate'
+include ':wkdeepseek'
 include ':wkdating'
 
 include ':wkforum'
