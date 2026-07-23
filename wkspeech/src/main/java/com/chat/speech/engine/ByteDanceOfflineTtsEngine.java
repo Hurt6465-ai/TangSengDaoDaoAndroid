@@ -51,8 +51,10 @@ public final class ByteDanceOfflineTtsEngine {
     private static final int DIRECTIVE_START_ENGINE = 1000;
     private static final int DIRECTIVE_STOP_ENGINE = 1001;
     private static final int DIRECTIVE_SYNTHESIS = 1400;
+    private static final int MESSAGE_ENGINE_ERROR = 1003;
     private static final int MESSAGE_AUDIO_DATA = 1400;
-    private static final int MESSAGE_SYNTHESIS_END = 1404;
+    // The original MultiTTS adapter only releases its synthesis latch on 1409.
+    // 1403/1404/1408 are intermediate status/progress messages, not audio completion.
     private static final int MESSAGE_AUDIO_DATA_END = 1409;
 
     private final Object lock = new Object();
@@ -63,6 +65,7 @@ public final class ByteDanceOfflineTtsEngine {
     private volatile CountDownLatch activeLatch;
     private volatile ByteArrayOutputStream activeAudio;
     private volatile String activeError;
+    private volatile String fatalEngineError;
     private volatile boolean cancelled;
 
     public File synthesize(
@@ -119,6 +122,11 @@ public final class ByteDanceOfflineTtsEngine {
             activeAudio = new ByteArrayOutputStream(64 * 1024);
             activeLatch = new CountDownLatch(1);
             try {
+                if (fatalEngineError != null && !fatalEngineError.isEmpty()) {
+                    String error = fatalEngineError;
+                    destroyEngineOnly();
+                    throw new IllegalStateException(error);
+                }
                 setOptionString("tts_text_type", textType);
                 setOptionInt("tts_speed", speedValue(ratePercent));
                 setOptionInt("tts_volume", 10);
@@ -134,6 +142,7 @@ public final class ByteDanceOfflineTtsEngine {
                     throw new InterruptedException("离线语音已取消");
                 }
                 if (activeError != null && !activeError.isEmpty()) {
+                    destroyEngineOnly();
                     throw new IllegalStateException(activeError);
                 }
                 byte[] audio = activeAudio.toByteArray();
@@ -184,6 +193,7 @@ public final class ByteDanceOfflineTtsEngine {
         }
         SpeechDebugLog.append(context, "engine.init.begin signature=" + resources.signature);
         destroyEngineOnly();
+        fatalEngineError = null;
 
         SpeechDebugLog.append(context, "engine.runtime_loader.begin");
         runtimeLoader = createRuntimeLoader(context);
@@ -292,20 +302,27 @@ public final class ByteDanceOfflineTtsEngine {
                 if (out != null) out.write(data, 0, Math.min(length, data.length));
                 return;
             }
-            if ((type == MESSAGE_SYNTHESIS_END || type == MESSAGE_AUDIO_DATA_END)) {
+            if (type == MESSAGE_AUDIO_DATA_END) {
                 SpeechDebugLog.append(logContext, "engine.callback.end type=" + type
                         + " audioBytes=" + (activeAudio == null ? 0 : activeAudio.size()));
                 CountDownLatch latch = activeLatch;
                 if (latch != null) latch.countDown();
                 return;
             }
-            // Vendor errors are commonly delivered as a negative message type with UTF-8 data.
-            if (type < 0) {
-                activeError = "离线合成错误：" + type + decodeMessage(data, length);
-                SpeechDebugLog.append(logContext, "engine.callback.error " + activeError);
+            // The vendor adapter reports its terminal SDK error with positive message type 1003.
+            // Negative types are kept as a defensive fallback for other engine builds.
+            if (type == MESSAGE_ENGINE_ERROR || type < 0) {
+                String error = "离线合成错误：" + type + decodeMessage(data, length);
+                fatalEngineError = error;
+                activeError = error;
+                SpeechDebugLog.append(logContext, "engine.callback.error " + error);
                 CountDownLatch latch = activeLatch;
                 if (latch != null) latch.countDown();
+                return;
             }
+            // Preserve non-audio status callbacks (1001/1002/1403/1404/1408, etc.) for diagnosis.
+            SpeechDebugLog.append(logContext, "engine.callback.status type=" + type
+                    + decodeMessage(data, length));
         } catch (Throwable error) {
             activeError = "离线音频回调失败：" + error.getMessage();
             SpeechDebugLog.append(logContext, "engine.callback.exception " + activeError);
