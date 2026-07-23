@@ -1,0 +1,30 @@
+<resources>
+    <string name="wkdeepseek_name">DeepSeek 聊天助手</string>
+    <string name="wkdeepseek_reply">回复建议</string>
+    <string name="wkdeepseek_translate">翻译</string>
+    <string name="wkdeepseek_polish">润色</string>
+    <string name="wkdeepseek_settings">设置</string>
+    <string name="wkdeepseek_close">关闭</string>
+    <string name="wkdeepseek_first_title">开启 DeepSeek 聊天助手</string>
+    <string name="wkdeepseek_first_message">聊天助手会把当前会话最近的部分文字消息发送到你登录的 DeepSeek 网页，用于翻译和生成回复。\n\n首次使用需要登录或注册 DeepSeek。请勿提交密码、验证码、银行卡、身份证和其他敏感内容。</string>
+    <string name="wkdeepseek_login_register">登录或注册 DeepSeek</string>
+    <string name="wkdeepseek_cancel">取消</string>
+    <string name="wkdeepseek_done">完成</string>
+    <string name="wkdeepseek_connecting">正在连接 DeepSeek…</string>
+    <string name="wkdeepseek_reading">正在读取聊天记录…</string>
+    <string name="wkdeepseek_filled">内容已填入，请点击 DeepSeek 的发送按钮</string>
+    <string name="wkdeepseek_fill_failed">自动填入失败，完整内容已复制，请手动粘贴</string>
+    <string name="wkdeepseek_need_login">请先登录或注册 DeepSeek</string>
+    <string name="wkdeepseek_no_network">需要网络才能使用 DeepSeek 助手</string>
+    <string name="wkdeepseek_no_messages">没有可用于分析的文字消息</string>
+    <string name="wkdeepseek_reply_used">已填入聊天输入框</string>
+    <string name="wkdeepseek_send_confirm">发送此回复？</string>
+    <string name="wkdeepseek_send">发送</string>
+    <string name="wkdeepseek_translation_copied">译文已复制</string>
+    <string name="wkdeepseek_settings_title">当前联系人助手设置</string>
+    <string name="wkdeepseek_my_native">我的母语</string>
+    <string name="wkdeepseek_peer_native">对方母语</string>
+    <string name="wkdeepseek_background">聊天背景（可选）</string>
+    <string name="wkdeepseek_purpose">聊天目的（可选）</string>
+    <string name="wkdeepseek_save">保存</string>
+</resources>
