@@ -23,11 +23,17 @@ import com.chat.feed.browse.FeedBrowseActivity;
 import com.chat.feed.model.FeedBean;
 import com.chat.feed.model.FeedListResponse;
 import com.chat.feed.model.FeedMedia;
+import com.chat.feed.model.FeedTikTokPreview;
 
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 public class FeedWaterfallFragment extends Fragment {
     private static final String ARG_UID = "uid";
+    private static final long TIKTOK_RETRY_COOLDOWN_MS = 60_000L;
     private String uid;
     private String cursor = "";
     private boolean loading;
@@ -42,6 +48,8 @@ public class FeedWaterfallFragment extends Fragment {
     private int hostBottomInset;
     private int baseTopPadding;
     private int baseBottomPadding;
+    private final Set<String> tiktokCoverResolving = new HashSet<>();
+    private final Map<String, Long> tiktokCoverFailedAt = new HashMap<>();
 
     public static FeedWaterfallFragment newInstance(String uid) {
         FeedWaterfallFragment fragment = new FeedWaterfallFragment();
@@ -81,7 +89,7 @@ public class FeedWaterfallFragment extends Fragment {
         baseBottomPadding = recyclerView.getPaddingBottom();
         applyHostInsets();
         if (recyclerView.getItemAnimator() != null) recyclerView.getItemAnimator().setChangeDuration(0);
-        adapter = new FeedWaterfallAdapter(this::openDetail);
+        adapter = new FeedWaterfallAdapter(this::openDetail, this::resolveTikTokCover);
         recyclerView.setAdapter(adapter);
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -240,6 +248,107 @@ public class FeedWaterfallFragment extends Fragment {
         stateTv.setText(error ? R.string.feed_retry : R.string.feed_empty_posts);
     }
 
+
+    private void resolveTikTokCover(FeedBean item, FeedMedia media, boolean forceFresh) {
+        if (item == null || media == null || !media.isTikTok() || !isAdded()) return;
+        String sourceUrl = media.tiktokSourceUrl();
+        if (TextUtils.isEmpty(sourceUrl)) return;
+
+        String key = sourceUrl;
+        long now = System.currentTimeMillis();
+        Long failedAt = tiktokCoverFailedAt.get(key);
+        if (failedAt != null && now - failedAt < TIKTOK_RETRY_COOLDOWN_MS) return;
+        if (!tiktokCoverResolving.add(key)) return;
+
+        int generation = viewGeneration;
+        if (forceFresh) {
+            resolveTikTokCoverDirect(item, media, key, sourceUrl, generation);
+            return;
+        }
+
+        FeedModel.getInstance().tiktokPreview(sourceUrl,
+                new IRequestResultListener<FeedTikTokPreview>() {
+                    @Override
+                    public void onSuccess(FeedTikTokPreview result) {
+                        if (!isCurrentView(generation)) {
+                            tiktokCoverResolving.remove(key);
+                            return;
+                        }
+                        if (result != null && !TextUtils.isEmpty(result.bestCoverUrl())) {
+                            finishTikTokCoverSuccess(item, media, key, sourceUrl, result, generation);
+                        } else {
+                            resolveTikTokCoverDirect(item, media, key, sourceUrl, generation);
+                        }
+                    }
+
+                    @Override
+                    public void onFail(int code, String msg) {
+                        if (!isCurrentView(generation)) {
+                            tiktokCoverResolving.remove(key);
+                            return;
+                        }
+                        resolveTikTokCoverDirect(item, media, key, sourceUrl, generation);
+                    }
+                });
+    }
+
+    private void resolveTikTokCoverDirect(FeedBean item, FeedMedia media, String key,
+                                          String sourceUrl, int generation) {
+        TikTokCoverResolver.resolve(sourceUrl, new TikTokCoverResolver.Callback() {
+            @Override
+            public void onSuccess(FeedTikTokPreview preview) {
+                finishTikTokCoverSuccess(item, media, key, sourceUrl, preview, generation);
+            }
+
+            @Override
+            public void onFail(String message) {
+                finishTikTokCoverFailure(key);
+            }
+        });
+    }
+
+    private void finishTikTokCoverSuccess(FeedBean item, FeedMedia media, String key,
+                                          String sourceUrl, FeedTikTokPreview preview,
+                                          int generation) {
+        tiktokCoverResolving.remove(key);
+        if (!isCurrentView(generation) || preview == null) return;
+        String coverUrl = preview.bestCoverUrl();
+        if (TextUtils.isEmpty(coverUrl)) {
+            finishTikTokCoverFailure(key);
+            return;
+        }
+
+        media.cover_url = coverUrl;
+        String videoId = preview.bestVideoId();
+        String resolvedUrl = preview.bestUrl();
+        if (!TextUtils.isEmpty(videoId)) media.external_id = videoId;
+        if (!TextUtils.isEmpty(resolvedUrl)) media.external_url = resolvedUrl;
+        else if (TextUtils.isEmpty(media.external_url)) media.external_url = sourceUrl;
+        media.external_provider = "tiktok";
+        if (!TextUtils.isEmpty(preview.title)) media.external_title = preview.title;
+        if (!TextUtils.isEmpty(preview.author_name)) media.external_author = preview.author_name;
+
+        tiktokCoverFailedAt.remove(key);
+        notifyFeedChanged(item.stableKey());
+    }
+
+    private void finishTikTokCoverFailure(String key) {
+        tiktokCoverResolving.remove(key);
+        tiktokCoverFailedAt.put(key, System.currentTimeMillis());
+    }
+
+    private void notifyFeedChanged(String stableKey) {
+        FeedWaterfallAdapter currentAdapter = adapter;
+        if (currentAdapter == null || TextUtils.isEmpty(stableKey)) return;
+        for (int i = 0; i < currentAdapter.getItemCount(); i++) {
+            FeedBean candidate = currentAdapter.getItem(i);
+            if (candidate != null && TextUtils.equals(stableKey, candidate.stableKey())) {
+                currentAdapter.notifyItemChanged(i);
+                return;
+            }
+        }
+    }
+
     private void openDetail(FeedBean item, int position) {
         if (item == null || !isAdded()) return;
         if (item.isTikTok() && openTikTok(item.firstMedia())) return;
@@ -277,6 +386,8 @@ public class FeedWaterfallFragment extends Fragment {
             recyclerView.clearOnScrollListeners();
             recyclerView.setAdapter(null);
         }
+        tiktokCoverResolving.clear();
+        tiktokCoverFailedAt.clear();
         adapter = null;
         recyclerView = null;
         loadingView = null;
