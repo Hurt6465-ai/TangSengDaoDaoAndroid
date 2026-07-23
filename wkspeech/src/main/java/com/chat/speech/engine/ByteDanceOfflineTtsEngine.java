@@ -102,8 +102,8 @@ public final class ByteDanceOfflineTtsEngine {
             // sent to a multilingual frontend: it correctly reads them as English letter names.
             // Replace only the initials with their Mandarin classroom aliases and preserve the
             // tone-marked finals that this imported Chinese frontend already pronounces correctly.
-            String displayText = PinyinNormalizer.buildTeachingSpellingText(pinyin);
-            String mandarinText = PinyinNormalizer.buildMandarinSpellingText(pinyin);
+            String displayText = PinyinNormalizer.buildTeachingSpellingText(text, pinyin);
+            String mandarinText = PinyinNormalizer.buildMandarinSpellingText(text, pinyin);
             if (!mandarinText.isEmpty()) actualText = mandarinText;
             Log.i(TAG, "Spelling display=" + displayText + ", input=" + actualText);
             SpeechDebugLog.append(app, "engine.spelling_display=" + displayText);
@@ -111,7 +111,7 @@ public final class ByteDanceOfflineTtsEngine {
         }
         if (actualText.isEmpty()) throw new IllegalArgumentException("朗读内容为空");
 
-        String cacheKey = "bytedance-offline-v5|" + resources.signature + "|" + textType + "|"
+        String cacheKey = "bytedance-offline-v6|" + resources.signature + "|" + textType + "|"
                 + ratePercent + "|" + actualText;
         File cached = SpeechCache.audioFile(app, cacheKey, "wav");
         if (cached.exists() && cached.length() > 44L) {
@@ -373,7 +373,7 @@ public final class ByteDanceOfflineTtsEngine {
 
     private static VoiceResources resolveResources(File bytedanceRoot, String selectedVoice, int requestedRate) throws Exception {
         String voice = selectedVoice == null || selectedVoice.trim().isEmpty()
-                ? "BV001_24k" : selectedVoice.trim();
+                ? "BV119_24k" : selectedVoice.trim();
         String normalizedCode = voice;
         String variant = "";
         if (normalizedCode.endsWith("-md")) {
