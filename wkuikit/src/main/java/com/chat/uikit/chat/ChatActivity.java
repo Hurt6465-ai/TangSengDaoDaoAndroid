@@ -1108,53 +1108,40 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             DeepSeekAssistant.requestFirstEnable(this, this::refreshDeepSeekAssistantBar);
             return;
         }
+
+        // 先读取草稿，再只隐藏聊天页输入法。DeepSeek 使用独立 Dialog Window，
+        // 不再 reset PanelSwitchLayout，也不改变 RecyclerView 的滚动位置。
         DeepSeekRequest request = buildDeepSeekRequest(action);
+        SoftKeyboardUtils.getInstance().hideSoftKeyboard(this);
+
         DeepSeekAssistant.openAction(this, request, (text, sendNow) -> runOnUiThread(() -> {
             if (TextUtils.isEmpty(text) || wkVBinding == null || isFinishing()) return;
 
-            restoreChatAfterDeepSeek();
             EditText editText = wkVBinding.editText;
             editText.setText(text);
             editText.setSelection(text.length());
-            editText.requestFocus();
-
-            if (chatAdapter != null && chatAdapter.getItemCount() > 0) {
-                wkVBinding.recyclerView.post(() -> scrollToPosition(chatAdapter.getItemCount() - 1));
-            }
 
             if (sendNow) {
-                // 等 TextWatcher 把右侧按钮切换成发送状态后再点击，避免仍处于语音按钮状态。
+                // 等 TextWatcher 把语音按钮切换成发送按钮后，复用聊天页原有发送流程。
+                // 不手动滚动 RecyclerView，发送回调会按原逻辑更新列表。
                 wkVBinding.sendIV.postDelayed(() -> {
-                    if (!isFinishing() && wkVBinding != null && !TextUtils.isEmpty(wkVBinding.editText.getText())) {
+                    if (!isFinishing()
+                            && wkVBinding != null
+                            && wkVBinding.editText.getText() != null
+                            && !TextUtils.isEmpty(wkVBinding.editText.getText().toString().trim())) {
                         wkVBinding.sendIV.performClick();
-                        if (chatAdapter != null && chatAdapter.getItemCount() > 0) {
-                            wkVBinding.recyclerView.postDelayed(
-                                    () -> scrollToPosition(chatAdapter.getItemCount() - 1), 180);
-                        }
                     }
-                }, 180);
+                }, 220);
             } else {
+                // “填入聊天”直接写进输入框并打开键盘，不需要再从剪贴板粘贴。
                 editText.postDelayed(() -> {
+                    if (isFinishing() || wkVBinding == null) return;
+                    editText.requestFocus();
                     if (mHelper != null) mHelper.toKeyboardState();
                     SoftKeyboardUtils.getInstance().showSoftKeyBoard(this, editText);
-                }, 180);
+                }, 220);
             }
-        }), this::restoreChatAfterDeepSeek);
-    }
-
-    private void restoreChatAfterDeepSeek() {
-        runOnUiThread(() -> {
-            if (wkVBinding == null || isFinishing()) return;
-            if (mHelper != null) mHelper.resetState();
-            wkVBinding.recyclerViewLayout.setVisibility(View.VISIBLE);
-            wkVBinding.recyclerView.setVisibility(View.VISIBLE);
-            wkVBinding.recyclerView.setAlpha(1f);
-            wkVBinding.recyclerView.setTranslationY(0f);
-            wkVBinding.recyclerViewLayout.setTranslationY(0f);
-            if (chatAdapter != null && chatAdapter.getItemCount() > 0) {
-                wkVBinding.recyclerView.post(() -> scrollToPosition(chatAdapter.getItemCount() - 1));
-            }
-        });
+        }), this::refreshDeepSeekAssistantBar);
     }
 
     private DeepSeekRequest buildDeepSeekRequest(int action) {
