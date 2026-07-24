@@ -1074,7 +1074,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     private void initDeepSeekAssistantBar() {
         wkVBinding.deepSeekReplyBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_REPLY));
-        wkVBinding.deepSeekTranslateBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_TRANSLATE));
         wkVBinding.deepSeekPolishBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_POLISH));
         wkVBinding.deepSeekSettingsBtn.setOnClickListener(v -> {
             DeepSeekRequest request = buildDeepSeekRequest(DeepSeekRequest.ACTION_REPLY);
@@ -1107,7 +1106,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     private void openDeepSeekAction(int action) {
         if (channelType != WKChannelType.PERSONAL) {
-            WKToastUtils.getInstance().showToastNormal("DeepSeek 聊天助手当前只支持单聊");
+            WKToastUtils.getInstance().showToastNormal("DeepSeek 社交助手当前只支持单聊");
             return;
         }
         if (!DeepSeekAssistant.isEnabled(this)) {
