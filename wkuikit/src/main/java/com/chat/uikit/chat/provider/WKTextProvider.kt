@@ -196,9 +196,7 @@ open class WKTextProvider : WKChatBaseProvider() {
         // 翻译区会在同一个 RecyclerView cell 内动态增加/删除。LayoutTransition 会把
         // 被删除的旧气泡临时放进 overlay 再播放消失动画，此时新气泡已经加入，视觉上
         // 就会出现两层气泡叠在一起。文本消息单元不需要这种动画，绑定时明确关闭。
-        contentTvLayout.layoutTransition?.cancel()
         contentTvLayout.layoutTransition = null
-        buttonParent.layoutTransition?.cancel()
         buttonParent.layoutTransition = null
 
         // RecyclerView 会复用 item，必须递归清理旧按钮；否则旧 view 会残留到每一条消息上。
