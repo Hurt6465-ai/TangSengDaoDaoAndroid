@@ -106,7 +106,7 @@ public final class SpeechSettingsActivity extends Activity {
 
     private void addEngineSection() {
         LinearLayout card = baseCard();
-        card.addView(label("TTS 引擎"));
+        card.addView(label("语音模式"));
 
         TtsSource active = prefs.getActiveSource();
         boolean byteDance = active != null
@@ -117,8 +117,8 @@ public final class SpeechSettingsActivity extends Activity {
         selector.setPadding(dp(4), dp(4), dp(4), dp(4));
         selector.setBackground(rounded(Color.rgb(239, 242, 247), dp(14), Color.TRANSPARENT, 0));
 
-        TextView microsoft = engineButton("微软", !byteDance);
-        TextView byteButton = engineButton("字节", byteDance);
+        TextView microsoft = engineButton("自然朗读", !byteDance);
+        TextView byteButton = engineButton("拼音专用", byteDance);
         selector.addView(microsoft, new LinearLayout.LayoutParams(0, dp(44), 1f));
         selector.addView(byteButton, new LinearLayout.LayoutParams(0, dp(44), 1f));
         card.addView(selector);
@@ -155,7 +155,9 @@ public final class SpeechSettingsActivity extends Activity {
         boolean byteDance = active != null
                 && TtsSource.TYPE_BYTEDANCE_OFFLINE.equals(active.type);
         String voiceCode = byteDance ? prefs.getByteDanceVoice() : prefs.getZhVoice();
-        String voiceName = simpleVoiceName(voiceCode);
+        String voiceName = byteDance
+                ? "拼音专用"
+                : simpleVoiceName(voiceCode);
         card.addView(selectorRow("发音人", voiceName, "选择", byteDance
                 ? this::chooseByteDanceVoice
                 : this::chooseMicrosoftVoice));
@@ -299,17 +301,41 @@ public final class SpeechSettingsActivity extends Activity {
     }
 
     private void chooseByteDanceVoice() {
-        List<TtsVoice> voices = prefs.getByteDanceVoices();
+        List<TtsVoice> voices =
+                prefs.getByteDanceVoices();
+
         if (voices.isEmpty()) {
             openImportPicker();
             return;
         }
-        CharSequence[] items = new CharSequence[voices.size()];
-        for (int i = 0; i < voices.size(); i++) items[i] = voices.get(i).name;
+
+        /*
+         * The compact offline package normally contains one voice. Do not expose
+         * vendor model names or internal voice codes in the user-facing UI.
+         */
+        if (voices.size() == 1) {
+            prefs.setByteDanceVoice(
+                    voices.get(0).code
+            );
+            render();
+            return;
+        }
+
+        CharSequence[] items =
+                new CharSequence[voices.size()];
+
+        for (int i = 0; i < voices.size(); i++) {
+            items[i] = i == 0
+                    ? "拼音专用"
+                    : "拼音专用 " + (i + 1);
+        }
+
         new AlertDialog.Builder(this)
                 .setTitle("发音人")
                 .setItems(items, (dialog, which) -> {
-                    prefs.setByteDanceVoice(voices.get(which).code);
+                    prefs.setByteDanceVoice(
+                            voices.get(which).code
+                    );
                     render();
                 })
                 .setNegativeButton("取消", null)
@@ -317,8 +343,20 @@ public final class SpeechSettingsActivity extends Activity {
     }
 
     private String simpleVoiceName(String code) {
+        if (code != null
+                && code.toUpperCase(Locale.ROOT)
+                .startsWith("BV")) {
+            return "拼音专用";
+        }
+
         TtsVoice voice = prefs.findVoice(code);
-        if (voice != null && voice.name != null && !voice.name.trim().isEmpty()) return voice.name;
+
+        if (voice != null
+                && voice.name != null
+                && !voice.name.trim().isEmpty()) {
+            return voice.name;
+        }
+
         return code == null ? "" : code;
     }
 
