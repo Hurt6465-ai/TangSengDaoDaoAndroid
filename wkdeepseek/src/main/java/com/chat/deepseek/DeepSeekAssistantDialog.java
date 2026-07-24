@@ -52,6 +52,7 @@ import java.util.Random;
 
 public class DeepSeekAssistantDialog extends DialogFragment {
     private static final String URL = "https://chat.deepseek.com/";
+    private static final String NEW_CHAT_URL = "https://chat.deepseek.com/a/chat/";
     private static final String ARG_LOGIN = "login";
     private static final String ARG_ACTION = "action";
     private static final String ARG_CHANNEL_ID = "channel_id";
@@ -128,6 +129,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private boolean webUiPrepareInFlight;
     private int webUiPrepareAttempts;
     private final Runnable webUiPrepareRunnable = () -> applyWebUiPreferences(false);
+    private String mappedConversationId = "";
+    private String conversationRouteTarget = "";
+    private boolean conversationRouteLoading;
+    private int conversationRouteCorrections;
 
     private interface LoginStateCallback {
         void onResult(boolean loggedIn);
@@ -351,7 +356,20 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             progressBar.setVisibility(View.GONE);
             notifyUser(getString(R.string.wkdeepseek_no_network));
         } else {
-            webView.loadUrl(URL);
+            String startUrl = URL;
+            if (!loginMode) {
+                mappedConversationId = DeepSeekConversationStore.getConversationId(context, request);
+                startUrl = TextUtils.isEmpty(mappedConversationId)
+                        ? NEW_CHAT_URL
+                        : DeepSeekConversationStore.conversationUrl(mappedConversationId);
+                conversationRouteTarget = startUrl;
+                conversationRouteLoading = true;
+                DeepSeekHistoryLog.log("CONVERSATION_ROUTE_START",
+                        "mapped=" + !TextUtils.isEmpty(mappedConversationId)
+                                + " channel=" + safeChannelForLog(request)
+                                + " url=" + safeUrl(startUrl));
+            }
+            webView.loadUrl(startUrl);
             if (!loginMode) preparePrompt();
         }
         return dialogRoot;
@@ -435,6 +453,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
+                conversationRouteLoading = true;
                 DeepSeekHistoryLog.log("WEB_PAGE_STARTED", "url=" + safeUrl(url)
                         + " " + viewState(view, "web"));
             }
@@ -446,6 +465,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 view.setVisibility(View.VISIBLE);
                 if (progressBar != null) progressBar.setVisibility(View.GONE);
                 if (!loginMode && statusView != null) statusView.setVisibility(View.GONE);
+                conversationRouteLoading = false;
+                handleConversationNavigation(url);
                 DeepSeekHistoryLog.log("WEB_PAGE_FINISHED", "url=" + safeUrl(url)
                         + " promptFilled=" + promptFilled
                         + " promptSubmitted=" + promptSubmitted
@@ -468,6 +489,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 // 这里负责捕获 /a/chat 等单页路由变化。
                 DeepSeekHistoryLog.log("WEB_HISTORY", "reload=" + isReload
                         + " url=" + safeUrl(url));
+                handleConversationNavigation(url);
                 if (loginMode) {
                     scheduleLoginProbe(120);
                 } else {
@@ -677,6 +699,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 }
                 return;
             }
+            if (!ensureConversationRouteReady()) return;
             boolean resumedAfterLogin = loginWaitAttempts > 0;
             loginWaitAttempts = 0;
             loginReminderShown = false;
@@ -690,6 +713,150 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 fillPromptNow();
             }
         });
+    }
+
+    /**
+     * Makes sure an action starts in the conversation assigned to the current Talkami contact.
+     * DeepSeek often redirects to the last web conversation after login; without this gate the
+     * prompt for contact B could be appended to contact A's DeepSeek history.
+     */
+    private boolean ensureConversationRouteReady() {
+        if (loginMode || webView == null || request == null) return true;
+        String currentUrl = webView.getUrl();
+        if (TextUtils.isEmpty(currentUrl)) {
+            handler.postDelayed(this::tryFillPrompt, 220);
+            return false;
+        }
+        if (looksLikeLoginUrl(currentUrl)) return true;
+
+        String currentId = DeepSeekConversationStore.extractConversationId(currentUrl);
+        if (!TextUtils.isEmpty(mappedConversationId)) {
+            if (TextUtils.equals(mappedConversationId, currentId)) {
+                conversationRouteCorrections = 0;
+                return true;
+            }
+            if (conversationRouteCorrections >= 3) {
+                DeepSeekHistoryLog.log("CONVERSATION_ROUTE_RESET",
+                        "reason=mapped_route_unavailable expected="
+                                + shortConversationId(mappedConversationId)
+                                + " actual=" + shortConversationId(currentId));
+                DeepSeekConversationStore.clear(requireContext(), request);
+                mappedConversationId = "";
+                conversationRouteCorrections = 0;
+                loadConversationRoute(NEW_CHAT_URL, "mapped_route_unavailable");
+                return false;
+            }
+            loadConversationRoute(DeepSeekConversationStore.conversationUrl(mappedConversationId),
+                    "restore_mapped");
+            return false;
+        }
+
+        // No mapping yet: never reuse whichever old DeepSeek conversation the website opened by
+        // itself. The first successful prompt creates a fresh /a/chat/s/{id}, which is then bound.
+        if (!TextUtils.isEmpty(currentId) && !promptSubmitted) {
+            loadConversationRoute(NEW_CHAT_URL, "avoid_last_web_conversation");
+            return false;
+        }
+        if (DeepSeekConversationStore.isNewChatUrl(currentUrl)) {
+            conversationRouteCorrections = 0;
+            return true;
+        }
+        if (!promptSubmitted) {
+            loadConversationRoute(NEW_CHAT_URL, "open_new_chat");
+            return false;
+        }
+        return true;
+    }
+
+    private void loadConversationRoute(String url, String reason) {
+        if (webView == null || TextUtils.isEmpty(url) || !isAdded()) return;
+        if (conversationRouteLoading && TextUtils.equals(conversationRouteTarget, url)) {
+            handler.postDelayed(this::tryFillPrompt, 260);
+            return;
+        }
+        conversationRouteCorrections++;
+        conversationRouteTarget = url;
+        conversationRouteLoading = true;
+        webUiPrepared = false;
+        webUiPrepareInFlight = false;
+        webUiPrepareAttempts = 0;
+        fillAttempts = 0;
+        if (!promptSubmitted) {
+            // The transport hook lives in the page's JavaScript world and is destroyed by loadUrl.
+            // Reinstall it before filling the composer on the newly loaded conversation route.
+            promptTransportPrepared = false;
+            promptTransportInFlight = false;
+            promptTransportEnabled = false;
+        }
+        DeepSeekHistoryLog.log("CONVERSATION_ROUTE_LOAD", "reason=" + reason
+                + " corrections=" + conversationRouteCorrections
+                + " url=" + safeUrl(url));
+        webView.loadUrl(url);
+    }
+
+    private void handleConversationNavigation(String url) {
+        if (loginMode || request == null || TextUtils.isEmpty(url)) return;
+        String conversationId = DeepSeekConversationStore.extractConversationId(url);
+        if (TextUtils.isEmpty(conversationId)) return;
+
+        if (!TextUtils.isEmpty(mappedConversationId)
+                && !TextUtils.equals(mappedConversationId, conversationId)
+                && !promptFilled) {
+            // A login redirect landed on another old conversation. Do not bind or submit there.
+            handler.post(() -> loadConversationRoute(
+                    DeepSeekConversationStore.conversationUrl(mappedConversationId),
+                    "redirected_to_other_conversation"));
+            return;
+        }
+
+        if (promptSubmitted) {
+            saveActiveConversation(conversationId, "navigation_after_submit");
+        } else if (TextUtils.equals(mappedConversationId, conversationId)) {
+            // Touch the entry so frequently used contacts survive bounded-LRU cleanup.
+            DeepSeekConversationStore.save(requireContext(), request, conversationId);
+        }
+    }
+
+    private void captureConversationFromCurrentUrl() {
+        if (loginMode || !promptSubmitted || request == null || webView == null || !isAdded()) return;
+        String conversationId = DeepSeekConversationStore.extractConversationId(webView.getUrl());
+        if (TextUtils.isEmpty(conversationId)) return;
+        saveActiveConversation(conversationId, "capture_after_submit");
+    }
+
+    private void saveActiveConversation(String conversationId, String reason) {
+        if (TextUtils.isEmpty(conversationId) || request == null) return;
+        if (!TextUtils.isEmpty(mappedConversationId)
+                && !TextUtils.equals(mappedConversationId, conversationId)) {
+            DeepSeekHistoryLog.log("CONVERSATION_MAPPING_IGNORED", "reason=" + reason
+                    + " expected=" + shortConversationId(mappedConversationId)
+                    + " actual=" + shortConversationId(conversationId));
+            return;
+        }
+        boolean changed = !TextUtils.equals(mappedConversationId, conversationId);
+        DeepSeekConversationStore.save(requireContext(), request, conversationId);
+        mappedConversationId = conversationId;
+        conversationRouteCorrections = 0;
+        if (changed) {
+            DeepSeekHistoryLog.log("CONVERSATION_MAPPING_SAVED", "reason=" + reason
+                    + " id=" + shortConversationId(conversationId)
+                    + " channel=" + safeChannelForLog(request));
+        }
+    }
+
+    private static String shortConversationId(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        String clean = value.trim();
+        if (clean.length() <= 12) return clean;
+        return clean.substring(0, 6) + "..." + clean.substring(clean.length() - 4);
+    }
+
+    private static String safeChannelForLog(DeepSeekRequest request) {
+        if (request == null || TextUtils.isEmpty(request.channelId)) return "";
+        String channel = request.channelId.trim();
+        if (channel.length() <= 10) return channel + "/" + request.channelType;
+        return channel.substring(0, 5) + "..." + channel.substring(channel.length() - 3)
+                + "/" + request.channelType;
     }
 
     private void scheduleWebUiPreparation(long delayMs) {
@@ -805,7 +972,20 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 return;
             }
             fillAttempts++;
-            if (fillAttempts < 7) {
+            // A saved DeepSeek conversation may have been deleted or may belong to a different
+            // DeepSeek login. If its composer never becomes available, discard only this mapping
+            // and retry on a clean new-chat route instead of trapping the user on a dead page.
+            if (!TextUtils.isEmpty(mappedConversationId) && fillAttempts >= 10) {
+                DeepSeekHistoryLog.log("CONVERSATION_MAPPING_STALE",
+                        "id=" + shortConversationId(mappedConversationId));
+                DeepSeekConversationStore.clear(requireContext(), request);
+                mappedConversationId = "";
+                fillAttempts = 0;
+                conversationRouteCorrections = 0;
+                loadConversationRoute(NEW_CHAT_URL, "stale_mapping");
+                return;
+            }
+            if (fillAttempts < 12) {
                 handler.postDelayed(this::tryFillPrompt, 420);
             } else if (!fallbackCopied && isAdded()) {
                 fallbackCopied = true;
@@ -874,6 +1054,11 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             if ("submitted".equals(result)) {
                 submitClickPending = false;
                 promptSubmitted = true;
+                captureConversationFromCurrentUrl();
+                handler.postDelayed(this::captureConversationFromCurrentUrl, 250);
+                handler.postDelayed(this::captureConversationFromCurrentUrl, 800);
+                handler.postDelayed(this::captureConversationFromCurrentUrl, 1800);
+                handler.postDelayed(this::captureConversationFromCurrentUrl, 3500);
                 statusView.setText(R.string.wkdeepseek_thinking);
                 hideSubmittedPromptBubble();
                 installReplyButtons();
@@ -1409,6 +1594,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         handler.removeCallbacks(loginProbeRunnable);
         handler.removeCallbacks(webUiPrepareRunnable);
         if (webView != null) {
+            captureConversationFromCurrentUrl();
             webView.stopLoading();
             webView.setWebChromeClient(null);
             webView.setWebViewClient(null);
