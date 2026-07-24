@@ -133,6 +133,11 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private String conversationRouteTarget = "";
     private boolean conversationRouteLoading;
     private int conversationRouteCorrections;
+    private String fullContextSnapshot = "";
+    private int fullContextSnapshotCount;
+    private boolean contextPlanApplied;
+    private boolean forceFullContextForFreshConversation;
+    private int promptBuildGeneration;
 
     private interface LoginStateCallback {
         void onResult(boolean loggedIn);
@@ -192,7 +197,11 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     public View onCreateView(@NonNull android.view.LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         Bundle args = getArguments() == null ? Bundle.EMPTY : getArguments();
         loginMode = args.getBoolean(ARG_LOGIN, false);
-        if (!loginMode) request = requestFrom(args);
+        if (!loginMode) {
+            request = requestFrom(args);
+            fullContextSnapshot = request.contextSnapshot;
+            fullContextSnapshotCount = request.contextSnapshotCount;
+        }
         DeepSeekHistoryLog.log("DIALOG_ON_CREATE_VIEW", "loginMode=" + loginMode
                 + " action=" + (request == null ? -1 : request.action)
                 + " saved=" + (savedInstanceState != null));
@@ -646,8 +655,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
     private void loadMessagesAndBuildPrompt() {
         if (!isAdded() || request == null) return;
+        applyContextPlanIfNeeded();
+        final int generation = ++promptBuildGeneration;
         DeepSeekMessageLoader.load(request, result -> handler.post(() -> {
-            if (!isAdded()) return;
+            if (!isAdded() || generation != promptBuildGeneration) return;
             if (result.messageCount == 0 && request.action != DeepSeekRequest.ACTION_POLISH) {
                 statusView.setText(R.string.wkdeepseek_no_messages);
                 notifyUser(getString(R.string.wkdeepseek_no_messages));
@@ -676,6 +687,73 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 notifyUser("生成提示词失败");
             }
         }));
+    }
+
+    private void applyContextPlanIfNeeded() {
+        if (contextPlanApplied || request == null || !isAdded()) return;
+        Context context = getContext();
+        boolean hasMappedConversation = !TextUtils.isEmpty(mappedConversationId);
+        DeepSeekConversationStore.ContextPlan plan = DeepSeekConversationStore.planContext(
+                context, request, hasMappedConversation, forceFullContextForFreshConversation);
+        request.contextSnapshot = plan.snapshot;
+        request.contextSnapshotCount = plan.count;
+        request.contextSyncMode = plan.mode;
+        contextPlanApplied = true;
+        forceFullContextForFreshConversation = false;
+        DeepSeekHistoryLog.log("CONTEXT_REUSE_PLAN", "mode=" + plan.mode
+                + " mapped=" + hasMappedConversation
+                + " full_count=" + fullContextSnapshotCount
+                + " send_count=" + plan.count
+                + " send_chars=" + plan.snapshot.length());
+    }
+
+    /**
+     * A deleted/inaccessible mapped DeepSeek conversation must restart with the complete current
+     * Talkami snapshot. Reusing the previously built delta on a fresh conversation would omit
+     * essential history and produce an answer without enough context.
+     */
+    private void resetMappingAndPromptForFreshConversation(String reason) {
+        Context context = getContext();
+        if (context != null && request != null) {
+            DeepSeekConversationStore.clear(context, request);
+        }
+        mappedConversationId = "";
+        forceFullContextForFreshConversation = true;
+        contextPlanApplied = false;
+        if (request != null) {
+            request.contextSnapshot = fullContextSnapshot;
+            request.contextSnapshotCount = fullContextSnapshotCount;
+            request.contextSyncMode = "full";
+        }
+        promptBuildGeneration++;
+        pendingPrompt = "";
+        promptFilled = false;
+        promptSubmitted = false;
+        promptTransportToken = "";
+        promptVisibleText = "";
+        promptVisibleLabel = "";
+        promptTransportPrepared = false;
+        promptTransportInFlight = false;
+        promptTransportEnabled = false;
+        fillAttempts = 0;
+        submitAttempts = 0;
+        submitVerifyAttempts = 0;
+        submitReadyPending = false;
+        submitClickPending = false;
+        fallbackCopied = false;
+        webUiPrepared = false;
+        webUiPrepareInFlight = false;
+        webUiPrepareAttempts = 0;
+        DeepSeekHistoryLog.log("CONVERSATION_MAPPING_CLEARED", "reason=" + reason
+                + " restore_full_count=" + fullContextSnapshotCount);
+        loadMessagesAndBuildPrompt();
+    }
+
+    private void markContextSnapshotSubmitted() {
+        Context context = getContext();
+        if (context == null || request == null || TextUtils.isEmpty(fullContextSnapshot)) return;
+        DeepSeekConversationStore.markContextSubmitted(
+                context, request, fullContextSnapshot);
     }
 
     private void tryFillPrompt() {
@@ -740,8 +818,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                         "reason=mapped_route_unavailable expected="
                                 + shortConversationId(mappedConversationId)
                                 + " actual=" + shortConversationId(currentId));
-                DeepSeekConversationStore.clear(requireContext(), request);
-                mappedConversationId = "";
+                resetMappingAndPromptForFreshConversation("mapped_route_unavailable");
                 conversationRouteCorrections = 0;
                 loadConversationRoute(NEW_CHAT_URL, "mapped_route_unavailable");
                 return false;
@@ -801,7 +878,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
         if (!TextUtils.isEmpty(mappedConversationId)
                 && !TextUtils.equals(mappedConversationId, conversationId)
-                && !promptFilled) {
+                && !promptSubmitted) {
             // A login redirect landed on another old conversation. Do not bind or submit there.
             handler.post(() -> loadConversationRoute(
                     DeepSeekConversationStore.conversationUrl(mappedConversationId),
@@ -978,8 +1055,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             if (!TextUtils.isEmpty(mappedConversationId) && fillAttempts >= 10) {
                 DeepSeekHistoryLog.log("CONVERSATION_MAPPING_STALE",
                         "id=" + shortConversationId(mappedConversationId));
-                DeepSeekConversationStore.clear(requireContext(), request);
-                mappedConversationId = "";
+                resetMappingAndPromptForFreshConversation("stale_mapping");
                 fillAttempts = 0;
                 conversationRouteCorrections = 0;
                 loadConversationRoute(NEW_CHAT_URL, "stale_mapping");
@@ -1054,6 +1130,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             if ("submitted".equals(result)) {
                 submitClickPending = false;
                 promptSubmitted = true;
+                markContextSnapshotSubmitted();
                 captureConversationFromCurrentUrl();
                 handler.postDelayed(this::captureConversationFromCurrentUrl, 250);
                 handler.postDelayed(this::captureConversationFromCurrentUrl, 800);
@@ -1157,7 +1234,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "}catch(e){return false;}})();";
     }
 
-    /** 隐藏本次短提示气泡，避免它占用回答空间。 */
     /** 隐藏本次短提示气泡，避免它占用回答空间。 */
     private void hideSubmittedPromptBubble() {
         if (webView == null || TextUtils.isEmpty(promptVisibleLabel)) return;

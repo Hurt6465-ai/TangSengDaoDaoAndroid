@@ -31,6 +31,8 @@ public final class DeepSeekRequest {
      */
     public String contextSnapshot = "";
     public int contextSnapshotCount = 0;
+    /** Internal description of whether this request carries full, incremental or checkpoint context. */
+    public String contextSyncMode = "full";
     public DeepSeekContactProfile contactProfile = new DeepSeekContactProfile();
     public int action = ACTION_REPLY;
 

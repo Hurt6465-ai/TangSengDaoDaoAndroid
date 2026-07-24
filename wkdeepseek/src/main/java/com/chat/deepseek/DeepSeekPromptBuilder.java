@@ -39,7 +39,7 @@ final class DeepSeekPromptBuilder {
                 .replace("{PROFILE_SUMMARY}", safe(profile.conversationSummary, "未记录"))
                 .replace("{KNOWN_FACTS}", profile.knownFactsText())
                 .replace("{SENSITIVE_TOPICS}", profile.sensitiveTopicsText())
-                .replace("{CONTEXT_STATUS}", request.contextEnabled ? "已开启" : "已关闭，仅使用当前目标消息或草稿")
+                .replace("{CONTEXT_STATUS}", contextStatus(request))
                 .replace("{MESSAGES}", safe(result.formattedMessages, "无"))
                 .replace("{TARGET_MESSAGE}", safe(result.targetMessage, "无"))
                 .replace("{TARGET_MESSAGE_ID}", safe(result.targetMessageId, ""))
@@ -50,6 +50,31 @@ final class DeepSeekPromptBuilder {
         if (!references.isEmpty()) output.append("\n\n").append(references.trim());
         if (!task.isEmpty()) output.append("\n\n").append(prompt.trim());
         return output.toString();
+    }
+
+    private static String contextStatus(DeepSeekRequest request) {
+        if (request == null || !request.contextEnabled) {
+            return "已关闭，仅使用当前目标消息或草稿";
+        }
+        String mode = request.contextSyncMode == null ? "" : request.contextSyncMode.trim();
+        if ("delta".equals(mode)) {
+            return "已开启并复用同一 DeepSeek 会话；以下仅列上次成功提交后新增的消息，更早内容沿用本会话已有上下文";
+        }
+        if ("already_synced".equals(mode)) {
+            return "已开启并复用同一 DeepSeek 会话；本次没有新增聊天记录，请结合目标消息和本会话已有上下文";
+        }
+        if ("migration_checkpoint".equals(mode)
+                || "periodic_checkpoint".equals(mode)
+                || "realign_checkpoint".equals(mode)) {
+            return "已开启并复用同一 DeepSeek 会话；以下是最近消息校准片段，避免重复提交整段历史";
+        }
+        if ("disabled_or_empty".equals(mode)) {
+            return "已开启，但本次没有可附加的聊天快照；请结合目标消息和本会话已有上下文";
+        }
+        if ("context_limit_expanded".equals(mode)) {
+            return "已开启；上下文数量上限已扩大，本次重新提交完整有效窗口，之后继续增量同步";
+        }
+        return "已开启；以下是本次完整有效聊天窗口";
     }
 
     private static String safe(String value, String fallback) {
