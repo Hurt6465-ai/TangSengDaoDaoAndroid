@@ -124,6 +124,10 @@ Text match: %2$d%% (not a professional pronunciation score)</string>
     <string name="word_check_answer_first">Check the answer first</string>
     <string name="word_tts_settings_hint">Adjust the voice and speed in Speech settings</string>
     <string name="word_plan_message">Reviews today: %1$d. New words: %2$d. Remaining: %3$d.</string>
+    <string name="word_group_total">%1$d words in this group</string>
+    <string name="word_restart_group">Practice this group again</string>
+    <string name="word_back_to_library">Back to word library</string>
+    <string name="word_tts_settings_open_failed">Unable to open speech settings</string>
     <string name="word_session_complete">Session complete</string>
     <string name="word_session_stats">Again %1$d
 Hard %2$d
