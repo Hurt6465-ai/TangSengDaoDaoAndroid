@@ -81,6 +81,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private final ArrayList<WordItem> queue = new ArrayList<>();
     private final Map<String, Integer> againRepeats = new HashMap<>();
     private final Map<String, Integer> hardRepeats = new HashMap<>();
+    private final ArrayList<WordItem> allWords = new ArrayList<>();
+    private final Map<String, WordFsrsScheduler.Rating> sessionRatings = new HashMap<>();
 
     private WordCardContainer card;
     private FrameLayout cardHost;
@@ -108,6 +110,11 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private boolean thresholdFeedbackSent;
     private boolean pendingGestureRender;
     private boolean sessionFinished;
+    private boolean practiceOnly;
+    private boolean ratingLocked;
+    private boolean flipAnimating;
+    private View completionView;
+    private Runnable pendingAutoRead;
     private int totalInitial;
     private int sessionReviewInitial;
     private int sessionNewInitial;
@@ -142,6 +149,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        cancelPendingAutoRead();
         super.onDestroy();
         try { if (toneGenerator != null) toneGenerator.release(); } catch (Throwable ignored) {}
         try { progressStore.close(); } catch (Throwable ignored) {}
@@ -211,23 +219,47 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void setWords(List<WordItem> source) {
+        cancelPendingAutoRead();
+
+        allWords.clear();
+        if (source != null) {
+            for (WordItem item : source) {
+                if (item != null) allWords.add(item);
+            }
+        }
+
         queue.clear();
+        againRepeats.clear();
+        hardRepeats.clear();
+        sessionRatings.clear();
+
+        countAgain = 0;
+        countHard = 0;
+        countGood = 0;
+        countEasy = 0;
+
+        practiceOnly = false;
+        ratingLocked = false;
+        flipAnimating = false;
+        pendingGestureRender = false;
         sessionReviewInitial = 0;
         sessionNewInitial = 0;
+        sessionStartedAt = System.currentTimeMillis();
 
-        Map<String, WordFsrsScheduler.CardState> states = progressStore.loadPack(packId);
+        Map<String, WordFsrsScheduler.CardState> states =
+                progressStore.loadPack(packId);
+
         long now = System.currentTimeMillis();
         ArrayList<WordItem> due = new ArrayList<>();
         ArrayList<WordItem> fresh = new ArrayList<>();
 
-        if (source != null) {
-            for (WordItem item : source) {
-                WordFsrsScheduler.CardState state = states.get(item.id);
-                if (state == null || state.reviewCount == 0) {
-                    fresh.add(item);
-                } else if (state.dueAt <= now) {
-                    due.add(item);
-                }
+        for (WordItem item : allWords) {
+            WordFsrsScheduler.CardState state = states.get(item.id);
+
+            if (state == null || state.reviewCount == 0) {
+                fresh.add(item);
+            } else if (state.dueAt <= now) {
+                due.add(item);
             }
         }
 
@@ -238,12 +270,15 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
         int reviewLimit = Math.min(DEFAULT_REVIEW_LIMIT, due.size());
         int newLimit = Math.min(DEFAULT_NEW_LIMIT, fresh.size());
+
         queue.addAll(due.subList(0, reviewLimit));
         queue.addAll(fresh.subList(0, newLimit));
+
         sessionReviewInitial = reviewLimit;
         sessionNewInitial = newLimit;
         totalInitial = queue.size();
         sessionFinished = false;
+
         renderCurrent();
     }
 
@@ -368,7 +403,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
         autoReadView.setOnClickListener(v -> {
             settings.edit().putBoolean("auto_read", !autoRead()).apply();
             bindTopControls();
-            if (autoRead()) speakWord();
+            cancelPendingAutoRead();
+            if (autoRead()) speakCurrentFace();
         });
         LinearLayout.LayoutParams autoLp = new LinearLayout.LayoutParams(dp(92), dp(38));
         autoLp.setMargins(dp(8), 0, 0, 0);
@@ -470,18 +506,42 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void renderCurrent() {
+        cancelPendingAutoRead();
+        ratingLocked = false;
+        flipAnimating = false;
+
         if (queue.isEmpty()) {
             showCompletion();
             return;
         }
+
+        removeCompletionView();
+
+        card.setVisibility(View.VISIBLE);
+        leftBackdrop.setVisibility(View.VISIBLE);
+        rightBackdrop.setVisibility(View.VISIBLE);
+        downBackdrop.setVisibility(View.VISIBLE);
+        leftMark.setVisibility(View.VISIBLE);
+        rightMark.setVisibility(View.VISIBLE);
+        downMark.setVisibility(View.VISIBLE);
+
         sessionFinished = false;
-        if (ratingRow != null) ratingRow.setVisibility(View.VISIBLE);
+
+        if (ratingRow != null) {
+            ratingRow.setVisibility(View.VISIBLE);
+        }
+
         favoriteView.setVisibility(View.VISIBLE);
-        for (TextView button : ratingButtons.values()) button.setEnabled(true);
+
+        for (TextView button : ratingButtons.values()) {
+            button.setEnabled(true);
+        }
+
         frontFace = true;
         front.setVisibility(View.VISIBLE);
         backScroll.setVisibility(View.GONE);
         backScroll.scrollTo(0, 0);
+
         bindTopControls();
         bindFront();
         bindBack();
@@ -490,7 +550,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
         bindRatingAvailability();
         resetBackdrop();
         card.resetImmediately();
-        if (autoRead()) card.postDelayed(this::speakWord, 160);
+
+        scheduleAutoReadWord();
     }
 
     private void bindTopControls() {
@@ -508,7 +569,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         pinyinView.setVisibility(showPinyin() && item.pinyin.length() > 0 ? View.VISIBLE : View.GONE);
         phoneticView.setText(item.phoneticMy);
         phoneticView.setVisibility(showPhonetic() && item.phoneticMy.length() > 0 ? View.VISIBLE : View.GONE);
-        int done = Math.max(0, totalInitial - Math.min(totalInitial, queue.size()));
+        int done = Math.min(totalInitial, sessionRatings.size());
         progressView.setText(title + "  ·  " + Math.min(totalInitial, done + 1) + "/" + Math.max(1, totalInitial));
     }
 
@@ -705,72 +766,168 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void onRatingClick(WordFsrsScheduler.Rating rating) {
-        if (queue.isEmpty()) return;
-        if (frontFace && rating != WordFsrsScheduler.Rating.AGAIN) {
-            flipCard();
-            Toast.makeText(this, R.string.word_check_answer_first, Toast.LENGTH_SHORT).show();
+        if (queue.isEmpty() || ratingLocked || flipAnimating) {
             return;
         }
+
+        if (frontFace && rating != WordFsrsScheduler.Rating.AGAIN) {
+            flipCard();
+            Toast.makeText(
+                    this,
+                    R.string.word_check_answer_first,
+                    Toast.LENGTH_SHORT
+            ).show();
+            return;
+        }
+
         rateCurrent(rating, false);
     }
 
-    private void rateCurrent(WordFsrsScheduler.Rating rating, boolean fromGesture) {
+    private void rateCurrent(
+            WordFsrsScheduler.Rating rating,
+            boolean fromGesture
+    ) {
         WordItem item = current();
-        if (item == null) return;
-        WordFsrsScheduler.CardState state = progressStore.load(item.packId, item.id);
-        WordFsrsScheduler.Result result = scheduler.review(state, rating, System.currentTimeMillis());
-        progressStore.save(item.packId, item.id, result.card);
+
+        if (item == null || ratingLocked || flipAnimating) {
+            return;
+        }
+
+        cancelPendingAutoRead();
+        ratingLocked = true;
+
+        /*
+         * Normal study updates FSRS. Repeating the completed group is practice-only,
+         * so it must not overwrite the review schedule generated by the real session.
+         */
+        if (!practiceOnly) {
+            WordFsrsScheduler.CardState state =
+                    progressStore.load(item.packId, item.id);
+
+            WordFsrsScheduler.Result result =
+                    scheduler.review(
+                            state,
+                            rating,
+                            System.currentTimeMillis()
+                    );
+
+            progressStore.save(
+                    item.packId,
+                    item.id,
+                    result.card
+            );
+        }
+
         queue.remove(0);
+
+        /*
+         * A word may be rated AGAIN first and GOOD later. Session statistics use the
+         * latest rating for each word instead of counting every repeated appearance.
+         */
+        sessionRatings.put(item.progressKey(), rating);
+        recalculateSessionCounts();
+
         if (rating == WordFsrsScheduler.Rating.AGAIN) {
-            countAgain++;
-            int count = againRepeats.getOrDefault(item.progressKey(), 0);
+            int count = againRepeats.getOrDefault(
+                    item.progressKey(),
+                    0
+            );
+
             if (count < 2) {
-                againRepeats.put(item.progressKey(), count + 1);
+                againRepeats.put(
+                        item.progressKey(),
+                        count + 1
+                );
                 queue.add(item);
             }
         } else if (rating == WordFsrsScheduler.Rating.HARD) {
-            countHard++;
-            int count = hardRepeats.getOrDefault(item.progressKey(), 0);
+            int count = hardRepeats.getOrDefault(
+                    item.progressKey(),
+                    0
+            );
+
             if (count < 1) {
-                hardRepeats.put(item.progressKey(), count + 1);
+                hardRepeats.put(
+                        item.progressKey(),
+                        count + 1
+                );
                 queue.add(item);
             }
-        } else if (rating == WordFsrsScheduler.Rating.GOOD) {
-            countGood++;
-        } else {
-            countEasy++;
         }
+
         if (fromGesture) {
             pendingGestureRender = true;
-        } else {
-            card.animate().alpha(0.45f).scaleX(0.97f).scaleY(0.97f).setDuration(90)
-                    .withEndAction(() -> {
-                        card.setAlpha(1f);
-                        card.setScaleX(1f);
-                        card.setScaleY(1f);
-                        renderCurrent();
-                    }).start();
+            return;
+        }
+
+        card.animate()
+                .alpha(0.45f)
+                .scaleX(0.97f)
+                .scaleY(0.97f)
+                .setDuration(90)
+                .withEndAction(() -> {
+                    card.setAlpha(1f);
+                    card.setScaleX(1f);
+                    card.setScaleY(1f);
+                    renderCurrent();
+                })
+                .start();
+    }
+
+    private void recalculateSessionCounts() {
+        countAgain = 0;
+        countHard = 0;
+        countGood = 0;
+        countEasy = 0;
+
+        for (WordFsrsScheduler.Rating value : sessionRatings.values()) {
+            if (value == WordFsrsScheduler.Rating.AGAIN) {
+                countAgain++;
+            } else if (value == WordFsrsScheduler.Rating.HARD) {
+                countHard++;
+            } else if (value == WordFsrsScheduler.Rating.GOOD) {
+                countGood++;
+            } else if (value == WordFsrsScheduler.Rating.EASY) {
+                countEasy++;
+            }
         }
     }
 
     private boolean commitGesture(WordCardContainer.Direction direction) {
+        if (queue.isEmpty() || ratingLocked || flipAnimating) {
+            return false;
+        }
+
         if (direction == WordCardContainer.Direction.LEFT) {
             rateCurrent(WordFsrsScheduler.Rating.AGAIN, true);
             return true;
         }
+
         if (direction == WordCardContainer.Direction.RIGHT) {
             if (frontFace) {
-                flipCard();
+                WordItem expected = current();
                 Toast.makeText(this, R.string.word_check_answer_first, Toast.LENGTH_SHORT).show();
+                card.postDelayed(() -> {
+                    if (expected != null
+                            && current() == expected
+                            && frontFace
+                            && !sessionFinished
+                            && !ratingLocked) {
+                        flipCard();
+                    }
+                }, 190L);
                 return false;
             }
+
             rateCurrent(WordFsrsScheduler.Rating.GOOD, true);
             return true;
         }
+
         if (direction == WordCardContainer.Direction.DOWN && frontFace) {
             toggleFavorite();
             return true;
         }
+
         return false;
     }
 
@@ -813,17 +970,42 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void flipCard() {
-        if (queue.isEmpty()) return;
-        frontFace = !frontFace;
+        if (queue.isEmpty() || ratingLocked || flipAnimating) {
+            return;
+        }
+
+        cancelPendingAutoRead();
+        WordItem expected = current();
+        boolean showFront = !frontFace;
+        frontFace = showFront;
+        flipAnimating = true;
         bindRatingAvailability();
-        View hide = frontFace ? backScroll : front;
-        View show = frontFace ? front : backScroll;
-        card.animate().rotationY(86f).setDuration(100).withEndAction(() -> {
-            hide.setVisibility(View.GONE);
-            show.setVisibility(View.VISIBLE);
-            card.setRotationY(-86f);
-            card.animate().rotationY(0f).setDuration(110).start();
-        }).start();
+
+        View hide = showFront ? backScroll : front;
+        View show = showFront ? front : backScroll;
+
+        card.animate()
+                .rotationY(86f)
+                .setDuration(100)
+                .withEndAction(() -> {
+                    hide.setVisibility(View.GONE);
+                    show.setVisibility(View.VISIBLE);
+                    card.setRotationY(-86f);
+                    card.animate()
+                            .rotationY(0f)
+                            .setDuration(110)
+                            .withEndAction(() -> {
+                                flipAnimating = false;
+                                if (!frontFace
+                                        && expected != null
+                                        && current() == expected
+                                        && !sessionFinished) {
+                                    scheduleAutoReadMeaning(expected);
+                                }
+                            })
+                            .start();
+                })
+                .start();
     }
 
     private void toggleFavorite() {
@@ -847,6 +1029,62 @@ public class WordFullscreenActivity extends AppCompatActivity {
         WordItem item = current();
         if (item != null) LearningTtsBridge.speak(this, item.word,
                 LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_WORD);
+    }
+
+    private void speakMeaning() {
+        speakMeaning(current());
+    }
+
+    private void speakMeaning(WordItem item) {
+        if (item == null || item.meaningMy.length() == 0) return;
+        LearningTtsBridge.speak(this, item.meaningMy, "my-MM", "auto");
+    }
+
+    private void speakCurrentFace() {
+        if (frontFace) {
+            speakWord();
+        } else {
+            speakMeaning();
+        }
+    }
+
+    private void scheduleAutoReadWord() {
+        if (!autoRead()) return;
+        WordItem expected = current();
+        if (expected == null) return;
+
+        pendingAutoRead = () -> {
+            pendingAutoRead = null;
+            if (!sessionFinished
+                    && frontFace
+                    && !flipAnimating
+                    && current() == expected) {
+                speakWord();
+            }
+        };
+        card.postDelayed(pendingAutoRead, 160L);
+    }
+
+    private void scheduleAutoReadMeaning(WordItem expected) {
+        if (!autoRead() || expected == null || expected.meaningMy.length() == 0) return;
+
+        pendingAutoRead = () -> {
+            pendingAutoRead = null;
+            if (!sessionFinished
+                    && !frontFace
+                    && !flipAnimating
+                    && current() == expected) {
+                speakMeaning(expected);
+            }
+        };
+        card.postDelayed(pendingAutoRead, 80L);
+    }
+
+    private void cancelPendingAutoRead() {
+        if (card != null && pendingAutoRead != null) {
+            card.removeCallbacks(pendingAutoRead);
+        }
+        pendingAutoRead = null;
     }
 
     private void speakSpelling() {
@@ -895,7 +1133,20 @@ public class WordFullscreenActivity extends AppCompatActivity {
             return true;
         }
         if (titleText.equals(getString(R.string.word_menu_tts_settings))) {
-            Toast.makeText(this, R.string.word_tts_settings_hint, Toast.LENGTH_SHORT).show();
+            try {
+                Intent intent = new Intent();
+                intent.setClassName(
+                        this,
+                        "com.chat.speech.ui.SpeechSettingsActivity"
+                );
+                startActivity(intent);
+            } catch (Throwable error) {
+                Toast.makeText(
+                        this,
+                        R.string.word_tts_settings_open_failed,
+                        Toast.LENGTH_SHORT
+                ).show();
+            }
             return true;
         }
         return false;
@@ -926,39 +1177,198 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void showCompletion() {
+        if (sessionFinished && completionView != null) {
+            return;
+        }
+
+        cancelPendingAutoRead();
         sessionFinished = true;
-        if (ratingRow != null) ratingRow.setVisibility(View.GONE);
-        cardHost.removeAllViews();
+        ratingLocked = false;
+        flipAnimating = false;
+        pendingGestureRender = false;
+
+        if (ratingRow != null) {
+            ratingRow.setVisibility(View.GONE);
+        }
+
+        card.animate().cancel();
+        card.setVisibility(View.GONE);
+        leftBackdrop.setVisibility(View.GONE);
+        rightBackdrop.setVisibility(View.GONE);
+        downBackdrop.setVisibility(View.GONE);
+        leftMark.setVisibility(View.GONE);
+        rightMark.setVisibility(View.GONE);
+        downMark.setVisibility(View.GONE);
+
+        removeCompletionView();
+
         LinearLayout done = new LinearLayout(this);
         done.setOrientation(LinearLayout.VERTICAL);
         done.setGravity(Gravity.CENTER);
-        done.setPadding(dp(28), dp(28), dp(28), dp(28));
+        done.setPadding(
+                dp(28),
+                dp(28),
+                dp(28),
+                dp(28)
+        );
         done.setBackground(cardBackground());
-        TextView icon = label("✓", 52, COLOR_GREEN, true);
+
+        TextView icon = label(
+                "✓",
+                52,
+                COLOR_GREEN,
+                true
+        );
         icon.setGravity(Gravity.CENTER);
-        done.addView(icon, new LinearLayout.LayoutParams(-1, -2));
-        TextView heading = label(getString(R.string.word_session_complete), 25, COLOR_TEXT, true);
+        done.addView(
+                icon,
+                new LinearLayout.LayoutParams(-1, -2)
+        );
+
+        TextView heading = label(
+                getString(R.string.word_session_complete),
+                25,
+                COLOR_TEXT,
+                true
+        );
         heading.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams headingLp = new LinearLayout.LayoutParams(-1, -2);
+
+        LinearLayout.LayoutParams headingLp =
+                new LinearLayout.LayoutParams(-1, -2);
         headingLp.setMargins(0, dp(10), 0, 0);
         done.addView(heading, headingLp);
-        long minutes = Math.max(1, (System.currentTimeMillis() - sessionStartedAt) / 60_000L);
-        TextView stats = label(getString(R.string.word_session_stats,
-                countAgain, countHard, countGood, countEasy, minutes), 16, COLOR_SUB, false);
+
+        int groupTotal = allWords.isEmpty()
+                ? Math.max(totalInitial, sessionRatings.size())
+                : allWords.size();
+
+        TextView groupCount = label(
+                getString(R.string.word_group_total, groupTotal),
+                15,
+                COLOR_SUB,
+                false
+        );
+        groupCount.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams groupLp =
+                new LinearLayout.LayoutParams(-1, -2);
+        groupLp.setMargins(0, dp(12), 0, 0);
+        done.addView(groupCount, groupLp);
+
+        long minutes = Math.max(
+                1,
+                (System.currentTimeMillis() - sessionStartedAt) / 60_000L
+        );
+        TextView stats = label(
+                getString(
+                        R.string.word_session_stats,
+                        countAgain,
+                        countHard,
+                        countGood,
+                        countEasy,
+                        minutes
+                ),
+                16,
+                COLOR_SUB,
+                false
+        );
         stats.setGravity(Gravity.CENTER);
         stats.setLineSpacing(dp(8), 1f);
-        LinearLayout.LayoutParams statsLp = new LinearLayout.LayoutParams(-1, -2);
-        statsLp.setMargins(0, dp(18), 0, 0);
+
+        LinearLayout.LayoutParams statsLp =
+                new LinearLayout.LayoutParams(-1, -2);
+        statsLp.setMargins(0, dp(14), 0, 0);
         done.addView(stats, statsLp);
-        TextView finish = chip(getString(R.string.word_finish), 0xFF4F46E5, Color.WHITE);
-        finish.setGravity(Gravity.CENTER);
-        finish.setOnClickListener(v -> finish());
-        LinearLayout.LayoutParams finishLp = new LinearLayout.LayoutParams(-1, dp(50));
-        finishLp.setMargins(0, dp(24), 0, 0);
-        done.addView(finish, finishLp);
-        FrameLayout.LayoutParams doneLp = new FrameLayout.LayoutParams(-1, -1);
+
+        TextView restart = chip(
+                getString(R.string.word_restart_group),
+                COLOR_BRAND,
+                Color.WHITE
+        );
+        restart.setGravity(Gravity.CENTER);
+        restart.setOnClickListener(v -> restartGroup());
+
+        LinearLayout.LayoutParams restartLp =
+                new LinearLayout.LayoutParams(-1, dp(50));
+        restartLp.setMargins(0, dp(26), 0, 0);
+        done.addView(restart, restartLp);
+
+        TextView back = chip(
+                getString(R.string.word_back_to_library),
+                0xFFF1F5F9,
+                COLOR_TEXT
+        );
+        back.setGravity(Gravity.CENTER);
+        back.setOnClickListener(v -> finish());
+
+        LinearLayout.LayoutParams backLp =
+                new LinearLayout.LayoutParams(-1, dp(50));
+        backLp.setMargins(0, dp(10), 0, 0);
+        done.addView(back, backLp);
+
+        FrameLayout.LayoutParams doneLp =
+                new FrameLayout.LayoutParams(-1, -1);
         doneLp.setMargins(0, dp(18), 0, dp(18));
+
+        completionView = done;
         cardHost.addView(done, doneLp);
+    }
+
+    private void restartGroup() {
+        cancelPendingAutoRead();
+        removeCompletionView();
+
+        if (allWords.isEmpty()) {
+            sessionFinished = false;
+            loadWords();
+            return;
+        }
+
+        queue.clear();
+        queue.addAll(allWords);
+
+        againRepeats.clear();
+        hardRepeats.clear();
+        sessionRatings.clear();
+
+        countAgain = 0;
+        countHard = 0;
+        countGood = 0;
+        countEasy = 0;
+
+        /*
+         * Repeating a completed group is practice-only and must not overwrite the
+         * FSRS review dates that were just generated by the normal study session.
+         */
+        practiceOnly = true;
+        ratingLocked = false;
+        flipAnimating = false;
+        sessionFinished = false;
+        pendingGestureRender = false;
+        frontFace = true;
+
+        sessionReviewInitial = 0;
+        sessionNewInitial = queue.size();
+        totalInitial = queue.size();
+        sessionStartedAt = System.currentTimeMillis();
+
+        card.setVisibility(View.VISIBLE);
+        leftBackdrop.setVisibility(View.VISIBLE);
+        rightBackdrop.setVisibility(View.VISIBLE);
+        downBackdrop.setVisibility(View.VISIBLE);
+        leftMark.setVisibility(View.VISIBLE);
+        rightMark.setVisibility(View.VISIBLE);
+        downMark.setVisibility(View.VISIBLE);
+
+        renderCurrent();
+    }
+
+    private void removeCompletionView() {
+        if (completionView == null) return;
+        try {
+            cardHost.removeView(completionView);
+        } catch (Throwable ignored) {
+        }
+        completionView = null;
     }
 
     private boolean autoRead() { return settings.getBoolean("auto_read", true); }
