@@ -259,22 +259,6 @@
                             android:background="#1F64748B" />
 
                         <androidx.appcompat.widget.AppCompatTextView
-                            android:id="@+id/deepSeekTranslateBtn"
-                            android:layout_width="wrap_content"
-                            android:layout_height="match_parent"
-                            android:gravity="center"
-                            android:paddingStart="10dp"
-                            android:paddingEnd="10dp"
-                            android:text="@string/wkdeepseek_translate"
-                            android:textColor="@color/colorDark"
-                            android:textSize="13sp" />
-
-                        <View
-                            android:layout_width="1dp"
-                            android:layout_height="16dp"
-                            android:background="#1F64748B" />
-
-                        <androidx.appcompat.widget.AppCompatTextView
                             android:id="@+id/deepSeekPolishBtn"
                             android:layout_width="wrap_content"
                             android:layout_height="match_parent"
