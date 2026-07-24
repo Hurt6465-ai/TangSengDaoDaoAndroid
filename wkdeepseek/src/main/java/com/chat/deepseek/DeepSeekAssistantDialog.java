@@ -110,6 +110,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private boolean closing;
     private boolean pendingReplyDelivery;
     private String pendingReplyText = "";
+    private String pendingReplyLocalDisplayText = "";
     private boolean pendingReplySendNow;
     private boolean pendingTranslationDelivery;
     private String pendingTranslationText = "";
@@ -249,11 +250,9 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         contentPanel.setOnClickListener(v -> {
             // 消费点击，防止冒泡到透明区域关闭监听。
         });
-        if (!loginMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            // 顶部原生工具条移除后，WebView 会直接贴到面板顶部；启用轮廓裁剪，
-            // 防止网页白底盖住圆角。
-            contentPanel.setClipToOutline(true);
-        }
+        // 不对包含 WebView 的父容器启用 clipToOutline。部分 MIUI/Android WebView
+        // 在透明全屏 Dialog + 非统一圆角轮廓下会得到空裁剪区域，表现为整页白屏。
+        contentPanel.setClipToOutline(false);
 
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
         // 登录页全屏；普通助手只让底部面板占 60%，透明上半区仍可看到并关闭聊天页。
@@ -296,11 +295,21 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             contentPanel.addView(progressBar, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(2)));
         } else {
+            // 普通助手也把状态控件加入布局，但默认不占空间。这样主页面加载失败时
+            // 不会只剩一块白色区域，而能显示明确错误；加载期间保留一条细进度线。
             statusView.setVisibility(View.GONE);
-            progressBar.setVisibility(View.GONE);
+            statusView.setPadding(dp(16), dp(10), dp(16), dp(10));
+            contentPanel.addView(statusView, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            progressBar.setVisibility(View.VISIBLE);
+            contentPanel.addView(progressBar, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(2)));
         }
 
         webView = new WebView(context);
+        webView.setBackgroundColor(Color.WHITE);
+        webView.setAlpha(1f);
+        webView.setVisibility(View.VISIBLE);
         webView.setNestedScrollingEnabled(true);
         webView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
         webView.setVerticalScrollBarEnabled(true);
@@ -356,8 +365,12 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         view.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
-                if (progressBar != null && loginMode) {
+                if (progressBar != null) {
                     progressBar.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
+                }
+                if (view != null) {
+                    view.setAlpha(1f);
+                    view.setVisibility(View.VISIBLE);
                 }
                 // DeepSeek 登录后经常使用 SPA 路由，页面不会再次触发 onPageFinished。
                 // 在页面主体基本可用时主动探测输入框，避免已经登录却一直无法开启。
@@ -387,7 +400,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                view.setAlpha(1f);
+                view.setVisibility(View.VISIBLE);
                 if (progressBar != null) progressBar.setVisibility(View.GONE);
+                if (!loginMode && statusView != null) statusView.setVisibility(View.GONE);
                 if (loginMode) {
                     scheduleLoginProbe(150);
                 } else {
@@ -420,6 +436,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             public void onReceivedSslError(WebView view, SslErrorHandler handler, android.net.http.SslError error) {
                 handler.cancel();
                 statusView.setText("DeepSeek 安全连接失败");
+                statusView.setVisibility(View.VISIBLE);
+                if (progressBar != null) progressBar.setVisibility(View.GONE);
                 notifyUser("DeepSeek 安全连接失败");
             }
 
@@ -428,6 +446,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 super.onReceivedError(view, request, error);
                 if (request.isForMainFrame()) {
                     statusView.setText("DeepSeek 页面加载失败，请检查网络后重试");
+                    statusView.setVisibility(View.VISIBLE);
+                    if (progressBar != null) progressBar.setVisibility(View.GONE);
                     notifyUser("DeepSeek 页面加载失败，请检查网络后重试");
                 }
             }
@@ -660,32 +680,38 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;}" +
                 "function txt(el){return ((el&&(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')))||'').replace(/\\s+/g,' ').trim();}" +
                 "function norm(el){return txt(el).replace(/\\s+/g,'').toLowerCase();}" +
-                "function interactive(el){var cur=el,n=0;while(cur&&cur!==document.documentElement&&n++<7){var role=(cur.getAttribute&&cur.getAttribute('role'))||'';var tag=(cur.tagName||'').toLowerCase();var style=getComputedStyle(cur);if(tag==='button'||tag==='a'||tag==='label'||/button|radio|switch|checkbox|menuitem|option|tab/.test(role)||cur.hasAttribute('tabindex')||style.cursor==='pointer')return cur;cur=cur.parentElement;}return el;}" +
-                "function selected(el){var cur=el,n=0;while(cur&&cur!==document.documentElement&&n++<5){var c=String(cur.className||'').toLowerCase();" +
+                "function selected(el){if(!el)return false;var cur=el,n=0;while(cur&&cur!==document.documentElement&&n++<4){var c=String(cur.className||'').toLowerCase();" +
                 "if(/(^|[ _-])(selected|active|checked|current)([ _-]|$)/.test(c))return true;" +
                 "if(cur.getAttribute('aria-checked')==='true'||cur.getAttribute('aria-pressed')==='true'||cur.getAttribute('aria-selected')==='true'||cur.getAttribute('aria-current')==='true')return true;" +
                 "var ds=String(cur.getAttribute('data-state')||'').toLowerCase();if(ds==='checked'||ds==='selected'||ds==='active'||ds==='on')return true;" +
                 "if(cur.getAttribute('data-selected')==='true'||cur.getAttribute('data-active')==='true')return true;cur=cur.parentElement;}return false;}" +
                 "function click(el){if(!el||!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;" +
+                "var r=el.getBoundingClientRect();if(r.width>window.innerWidth*0.98&&r.height>window.innerHeight*0.45)return false;" +
                 "try{el.focus({preventScroll:true});}catch(e){try{el.focus();}catch(e2){}}" +
-                "['pointerdown','mousedown','mouseup'].forEach(function(type){try{el.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,view:window}));}catch(e){}});" +
-                "try{el.click();}catch(e){try{el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));}catch(e2){return false;}}return true;}" +
-                "function pool(){return Array.from(document.querySelectorAll('button,a,label,[role],div[data-model-type],span,div')).filter(function(el){return visible(el)&&txt(el).length>0&&txt(el).length<100;});}" +
-                "function hideDownloads(){var re=/(下载(\\s*deepseek)?(\\s*应用|\\s*app)|打开(\\s*deepseek)?(\\s*应用|\\s*app)|在\\s*app\\s*中打开|download\\s*(the\\s*)?app|get\\s*(the\\s*)?app|open\\s*in\\s*app)/i;" +
-                "pool().forEach(function(el){if(re.test(txt(el))){var target=interactive(el);target.style.setProperty('display','none','important');target.style.setProperty('visibility','hidden','important');target.setAttribute('aria-hidden','true');}});}" +
-                "function enforce(allowMenu){hideDownloads();var list=pool(),changed=false,retry=false,now=Date.now();" +
-                "var expertNode=list.find(function(el){var dmt=String(el.getAttribute('data-model-type')||'').toLowerCase();var t=norm(el);return dmt==='expert'||t==='专家模式'||t==='专家'||t==='expert'||t==='expertmode'||t.indexOf('专家模式')>=0;});" +
-                "var quickNode=list.find(function(el){var t=norm(el);return t==='快速模式'||t==='快速'||t==='quickmode'||t==='quick';});" +
-                "var expert=expertNode?interactive(expertNode):null,quick=quickNode?interactive(quickNode):null;" +
-                "if(expert){var expertOn=selected(expert),quickOn=selected(quick);if(!expertOn&&(quickOn||!window.__tsddExpertRequested||now-(window.__tsddExpertClickAt||0)>1600)){if(click(expert)){window.__tsddExpertRequested=true;window.__tsddExpertClickAt=now;window.__tsddExpertClickCount=(window.__tsddExpertClickCount||0)+1;changed=true;}}if(!selected(expert)&&(window.__tsddExpertClickCount||0)<3)retry=true;}" +
-                "else{retry=true;if(allowMenu){var trigger=list.find(function(el){var t=norm(el);return (el.getAttribute('aria-haspopup')||'')!==''&&(/快速模式|普通模式|标准模式|常规模式|quickmode|normalmode|standardmode|^模式$|^mode$/.test(t));});" +
-                "if(trigger&&(!window.__tsddModeMenuTryAt||now-window.__tsddModeMenuTryAt>1200)){window.__tsddModeMenuTryAt=now;if(click(interactive(trigger)))changed=true;}}}" +
-                "function disable(re){var node=list.find(function(x){return re.test(txt(x));});var el=node?interactive(node):null;if(el&&selected(el)&&click(el))changed=true;}" +
+                "try{el.click();return true;}catch(e){try{el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}catch(e2){return false;}}}" +
+                // DeepSeek currently renders the expert choice as:
+                // <div class="dfb78875"><span class="_321831d">专家模式</span></div>
+                // It is not a semantic button, so locate this exact compact row explicitly. Do not
+                // restore broad div/span scanning because a large React container can share the text.
+                "function pool(){var q='button,a,label,[role=\"button\"],[role=\"radio\"],[role=\"switch\"],[role=\"checkbox\"],[role=\"menuitem\"],[role=\"option\"],[role=\"tab\"],[data-model-type],[tabindex]:not([tabindex=\"-1\"])';" +
+                "return Array.from(document.querySelectorAll(q)).filter(function(el){var t=txt(el);return visible(el)&&t.length>0&&t.length<80;});}" +
+                "function exactExpert(){var labels=Array.from(document.querySelectorAll('div.dfb78875>span._321831d,span._321831d')).filter(function(el){return norm(el)==='专家模式';}),rows=[];" +
+                "labels.forEach(function(label){var row=label.closest('div.dfb78875');if(!row||!visible(row))return;var r=row.getBoundingClientRect();if(r.width<36||r.height<22||r.height>96||r.width>window.innerWidth*0.96)return;if(rows.indexOf(row)<0)rows.push(row);});" +
+                "if(!rows.length)return null;var option=null;rows.some(function(row){var p=row.parentElement,depth=0;while(p&&p!==document.body&&depth++<4){var modeRows=Array.from(p.querySelectorAll('div.dfb78875')).filter(visible);var modeTexts=modeRows.map(norm),hasOtherMode=modeTexts.some(function(t){return t==='快速模式'||t==='快速'||t==='普通模式'||t==='标准模式'||t==='常规模式'||t==='思考模式'||t==='深度思考';});if(modeRows.length>=2&&modeTexts.indexOf('专家模式')>=0&&hasOtherMode){option=row;return true;}p=p.parentElement;}return false;});" +
+                "return {el:option||rows[0],isOption:!!option};}" +
+                "function hideDownloads(list){var re=/(下载(\\s*deepseek)?(\\s*应用|\\s*app)|打开(\\s*deepseek)?(\\s*应用|\\s*app)|在\\s*app\\s*中打开|download\\s*(the\\s*)?app|get\\s*(the\\s*)?app|open\\s*in\\s*app)/i;" +
+                "list.forEach(function(el){if(re.test(txt(el))){var r=el.getBoundingClientRect();if(r.height<120&&r.width<window.innerWidth*0.95){el.style.setProperty('display','none','important');el.setAttribute('aria-hidden','true');}}});}" +
+                "function enforce(allowMenu){var list=pool(),changed=false,retry=false,now=Date.now();hideDownloads(list);" +
+                "var exact=exactExpert(),expert=exact?exact.el:list.find(function(el){var d=String(el.getAttribute('data-model-type')||'').toLowerCase(),t=norm(el);return d==='expert'||t==='专家模式'||t==='专家'||t==='expert'||t==='expertmode';});" +
+                "var quick=list.find(function(el){var t=norm(el);return t==='快速模式'||t==='快速'||t==='quickmode'||t==='quick';});" +
+                "if(expert&&!window.__tsddExpertDone){if(selected(expert)){window.__tsddExpertDone=true;}else if(!window.__tsddExpertClickAt||now-window.__tsddExpertClickAt>900){if(click(expert)){window.__tsddExpertClickAt=now;window.__tsddExpertClickCount=(window.__tsddExpertClickCount||0)+1;changed=true;if(exact&&exact.isOption)window.__tsddExpertDone=true;else retry=true;}}if(!window.__tsddExpertDone&&(window.__tsddExpertClickCount||0)<5)retry=true;}" +
+                "else if(!window.__tsddExpertDone&&allowMenu){retry=true;var trigger=list.find(function(el){var t=norm(el);return (el.getAttribute('aria-haspopup')||'')!==''&&(/快速模式|普通模式|标准模式|常规模式|quickmode|normalmode|standardmode|^模式$|^mode$/.test(t));});if(trigger&&(!window.__tsddModeMenuTryAt||now-window.__tsddModeMenuTryAt>1200)){window.__tsddModeMenuTryAt=now;if(click(trigger))changed=true;}}" +
+                "function disable(re){var el=list.find(function(x){return re.test(txt(x))&&selected(x);});if(el&&click(el))changed=true;}" +
                 "disable(/(^|\\s)(深度思考|深度思索|思考|deepthink|deep\\s*think|thinking|reasoning)(\\s|$)/i);" +
                 "disable(/(^|\\s)(智能搜索|联网搜索|网络搜索|搜索|smart\\s*search|web\\s*search|search|browse)(\\s|$)/i);" +
                 "return changed?'changed':(retry?'retry':'stable');}" +
                 "window.__tsddEnforcePrefs=enforce;" +
-                "if(!window.__tsddPrefObserver){window.__tsddPrefObserver=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(function(){try{if(window.__tsddEnforcePrefs)window.__tsddEnforcePrefs(false);}catch(e){}},180);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','aria-checked','aria-pressed','aria-selected','data-state','data-selected','data-active']});}" +
+                "if(!window.__tsddPrefObserver){window.__tsddPrefObserver=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(function(){try{if(window.__tsddEnforcePrefs)window.__tsddEnforcePrefs(false);}catch(e){}},240);}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','aria-checked','aria-pressed','aria-selected','data-state','data-selected','data-active']});}" +
                 "return enforce(true);" +
                 "}catch(e){return 'error';}})();";
     }
@@ -916,13 +942,15 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         String js = "(function(){" +
                 "if(window.__tsddDeepSeekInstalled)return;window.__tsddDeepSeekInstalled=true;" +
                 "var fallbackMode='" + fallbackMode + "';" +
-                "function go(mode,text){if(!text)return;location.href='tsdd-deepseek://result?mode='+mode+'&text='+encodeURIComponent(text);}" +
-                "function button(label,mode,code){var b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.tsddAction='1';" +
+                "function go(mode,text,local){if(!text)return;var u='tsdd-deepseek://result?mode='+mode+'&text='+encodeURIComponent(text);if(local)u+='&local='+encodeURIComponent(local);location.href=u;}" +
+                "function localTextFor(pre){try{var n=pre?pre.nextElementSibling:null,steps=0;while(n&&steps++<6){if(n.tagName==='PRE'||/^H[1-6]$/.test(n.tagName))break;var t=(n.innerText||n.textContent||'').trim();var m=t.match(/(?:【?本地显示】?|我的母语翻译)\\s*[：:]\\s*([\\s\\S]+)/);if(m){var v=(m[1]||'').trim().split(/\\n(?=【|#{1,6}\\s)/)[0].trim();if(v)return v;}n=n.nextElementSibling;}return '';}catch(e){return '';}}" +
+                "function button(label,mode,code,pre){var b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.tsddAction='1';" +
                 "b.style.cssText='border:0;border-radius:16px;padding:7px 12px;background:#edf3ff;color:#295eea;font-size:12px;font-weight:600;margin-left:8px';" +
-                "b.onclick=function(e){e.preventDefault();e.stopPropagation();go(mode,(code.innerText||'').trim());};return b;}" +
+                "b.onclick=function(e){e.preventDefault();e.stopPropagation();var local=(mode==='use'||mode==='send')?localTextFor(pre):'';go(mode,(code.innerText||'').trim(),local);};return b;}" +
                 "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;}" +
-                "function composerRoot(){var boxes=Array.from(document.querySelectorAll('textarea,[contenteditable=\"true\"],[role=\"textbox\"]')).filter(visible);var input=boxes.length?boxes[boxes.length-1]:null;if(!input)return null;var root=input.closest('form')||input,cur=root,n=0,maxH=Math.max(190,window.innerHeight*0.48);while(cur.parentElement&&n++<6){var p=cur.parentElement,r=p.getBoundingClientRect(),pos=getComputedStyle(p).position;if(r.width<window.innerWidth*0.45)break;if(/fixed|sticky/.test(pos)&&r.height<window.innerHeight*0.70){root=p;break;}if(r.height>maxH)break;root=p;cur=p;}return root;}" +
-                "function hideComposer(){var root=composerRoot();if(root){root.dataset.tsddComposerHidden='1';root.style.setProperty('display','none','important');root.style.setProperty('visibility','hidden','important');root.style.setProperty('height','0','important');root.style.setProperty('min-height','0','important');root.style.setProperty('margin','0','important');root.style.setProperty('padding','0','important');}document.documentElement.style.setProperty('scroll-padding-bottom','8px','important');}" +
+                "function composerRoot(){var boxes=Array.from(document.querySelectorAll('textarea,[contenteditable=\"true\"],[role=\"textbox\"]')).filter(visible);boxes.sort(function(a,b){return a.getBoundingClientRect().top-b.getBoundingClientRect().top;});var input=boxes.length?boxes[boxes.length-1]:null;if(!input)return null;var best=input,cur=input,n=0,maxH=Math.min(320,Math.max(150,window.innerHeight*0.38));while(cur.parentElement&&n++<6){var p=cur.parentElement;if(p===document.body||p===document.documentElement)break;var r=p.getBoundingClientRect();if(r.width<window.innerWidth*0.45||r.height<=0||r.height>maxH||r.bottom<window.innerHeight*0.55)break;if(p.querySelectorAll('article,pre,[data-message-id],[data-testid*=message]').length>2)break;best=p;cur=p;}return best;}" +
+                "function hideComposer(){var root=composerRoot();if(!root||root===document.body||root===document.documentElement)return;var r=root.getBoundingClientRect(),maxH=Math.min(320,Math.max(150,window.innerHeight*0.38));if(r.height>maxH||r.width>window.innerWidth*1.01)return;root.dataset.tsddComposerHidden='1';root.style.setProperty('display','none','important');root.style.setProperty('visibility','hidden','important');root.style.setProperty('pointer-events','none','important');document.documentElement.style.setProperty('scroll-padding-bottom','8px','important');}" +
+                "function keepComposerHidden(){hideComposer();setTimeout(hideComposer,250);setTimeout(hideComposer,850);setTimeout(hideComposer,1700);}" +
                 "function cleanup(){var seen={};document.querySelectorAll('[data-tsdd-reply-bar]').forEach(function(bar){var owner=bar.dataset.tsddOwner||'';if(!owner||seen[owner]||!document.querySelector('pre[data-tsdd-pre-id=\"'+owner+'\"]'))bar.remove();else seen[owner]=true;});}" +
                 "function add(){cleanup();if(!window.__tsddAnswerPhase||!window.__tsddAnswerReady||Date.now()<(window.__tsddAnswerNotBefore||0))return;var added=false,lastPre=null;document.querySelectorAll('pre code').forEach(function(code){" +
                 "var pre=code.closest('pre');if(!pre||pre.dataset.tsddIgnore==='1'||code.dataset.tsddIgnore==='1')return;if(code.dataset.tsddReady==='1')return;" +
@@ -930,11 +958,11 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "if(!pre.dataset.tsddPreId){window.__tsddPreSeq=(window.__tsddPreSeq||0)+1;pre.dataset.tsddPreId='p'+window.__tsddPreSeq;}var owner=pre.dataset.tsddPreId;if(document.querySelector('[data-tsdd-reply-bar][data-tsdd-owner=\"'+owner+'\"]')){code.dataset.tsddReady='1';return;}" +
                 "code.dataset.tsddReady='1';var box=document.createElement('div');box.dataset.tsddReplyBar='1';box.dataset.tsddOwner=owner;" +
                 "box.style.cssText='display:flex;justify-content:flex-end;align-items:center;padding:8px 2px 12px 2px';" +
-                "if(mode==='profile'){box.appendChild(button('更新联系人记录','profile',code));}" +
-                "else if(mode==='copy'){box.appendChild(button('复制译文','copy',code));}" +
-                "else if(mode==='translate_use'){box.appendChild(button('显示译文','translate_use',code));box.appendChild(button('复制译文','copy',code));}" +
-                "else{box.appendChild(button('填入聊天','use',code));box.appendChild(button('直接发送','send',code));}" +
-                "if(pre.parentNode){pre.parentNode.insertBefore(box,pre.nextSibling);added=true;lastPre=pre;}});if(added||window.__tsddResultReady){window.__tsddResultReady=true;hideComposer();setTimeout(hideComposer,250);if(lastPre)setTimeout(function(){try{lastPre.scrollIntoView({behavior:'smooth',block:'end'});}catch(e){lastPre.scrollIntoView(false);}},180);}}" +
+                "if(mode==='profile'){box.appendChild(button('更新联系人记录','profile',code,pre));}" +
+                "else if(mode==='copy'){box.appendChild(button('复制译文','copy',code,pre));}" +
+                "else if(mode==='translate_use'){box.appendChild(button('显示译文','translate_use',code,pre));box.appendChild(button('复制译文','copy',code,pre));}" +
+                "else{box.appendChild(button('填入聊天','use',code,pre));box.appendChild(button('直接发送','send',code,pre));}" +
+                "if(pre.parentNode){pre.parentNode.insertBefore(box,pre.nextSibling);added=true;lastPre=pre;}});if(added||window.__tsddResultReady){window.__tsddResultReady=true;keepComposerHidden();if(lastPre)setTimeout(function(){try{lastPre.scrollIntoView({behavior:'smooth',block:'end'});}catch(e){lastPre.scrollIntoView(false);}},180);}}" +
                 "window.__tsddDeepSeekAdd=add;var timer=null;if(!window.__tsddResultObserver){window.__tsddResultObserver=true;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,520);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});}add();" +
                 "})();";
         webView.evaluateJavascript(js, null);
@@ -943,9 +971,12 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private void handlePluginUrl(Uri uri) {
         if (!"result".equals(uri.getHost())) return;
         String text = uri.getQueryParameter("text");
+        String localDisplayText = uri.getQueryParameter("local");
         String mode = uri.getQueryParameter("mode");
         if (TextUtils.isEmpty(text) || text.length() > 12000) return;
         final String cleanText = text.trim();
+        final String cleanLocalDisplayText = TextUtils.isEmpty(localDisplayText)
+                ? cleanText : localDisplayText.trim();
         if ("copy".equals(mode)) {
             copyText(cleanText);
             Toast.makeText(requireContext(), R.string.wkdeepseek_translation_copied, Toast.LENGTH_SHORT).show();
@@ -964,19 +995,21 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if ("send".equals(mode)) {
             new android.app.AlertDialog.Builder(requireContext())
                     .setTitle(R.string.wkdeepseek_send_confirm)
-                    .setMessage(cleanText)
+                    .setMessage(cleanLocalDisplayText)
                     .setNegativeButton(R.string.wkdeepseek_cancel, null)
-                    .setPositiveButton(R.string.wkdeepseek_send, (dialog, which) -> deliverReply(cleanText, true))
+                    .setPositiveButton(R.string.wkdeepseek_send,
+                            (dialog, which) -> deliverReply(cleanText, cleanLocalDisplayText, true))
                     .show();
             return;
         }
-        deliverReply(cleanText, false);
+        deliverReply(cleanText, cleanLocalDisplayText, false);
     }
 
-    private void deliverReply(String text, boolean sendNow) {
+    private void deliverReply(String text, String localDisplayText, boolean sendNow) {
         if (TextUtils.isEmpty(text)) return;
         copyText(text);
         pendingReplyText = text;
+        pendingReplyLocalDisplayText = TextUtils.isEmpty(localDisplayText) ? text : localDisplayText;
         pendingReplySendNow = sendNow;
         pendingReplyDelivery = true;
         if (!sendNow) {
@@ -1127,14 +1160,15 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if (pendingReplyDelivery && replyCallback != null) {
             final DeepSeekAssistant.ReplyCallback callback = replyCallback;
             final String text = pendingReplyText;
+            final String localDisplayText = pendingReplyLocalDisplayText;
             final boolean sendNow = pendingReplySendNow;
             pendingReplyDelivery = false;
             FragmentActivity activity = getActivity();
             if (activity != null && !activity.isFinishing()) {
                 activity.getWindow().getDecorView().postDelayed(
-                        () -> callback.onReply(text, sendNow), 280);
+                        () -> callback.onReply(text, localDisplayText, sendNow), 280);
             } else {
-                callback.onReply(text, sendNow);
+                callback.onReply(text, localDisplayText, sendNow);
             }
         }
     }
