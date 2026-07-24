@@ -108,6 +108,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private LinearLayout contentPanel;
     private int normalPanelHeight;
     private boolean closing;
+    private String dismissReason = "unknown";
+    private int lastLoggedProgressBucket = -1;
     private boolean pendingReplyDelivery;
     private String pendingReplyText = "";
     private String pendingReplyLocalDisplayText = "";
@@ -176,6 +178,9 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         Bundle args = getArguments() == null ? Bundle.EMPTY : getArguments();
         loginMode = args.getBoolean(ARG_LOGIN, false);
         if (!loginMode) request = requestFrom(args);
+        DeepSeekHistoryLog.log("DIALOG_ON_CREATE_VIEW", "loginMode=" + loginMode
+                + " action=" + (request == null ? -1 : request.action)
+                + " saved=" + (savedInstanceState != null));
         return buildContent(requireContext());
     }
 
@@ -186,6 +191,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         Bundle args = getArguments() == null ? Bundle.EMPTY : getArguments();
         dialog.setCanceledOnTouchOutside(!args.getBoolean(ARG_LOGIN, false));
+        DeepSeekHistoryLog.log("DIALOG_ON_CREATE_DIALOG", "loginMode="
+                + args.getBoolean(ARG_LOGIN, false));
         return dialog;
     }
 
@@ -225,6 +232,17 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             window.setNavigationBarColor(Color.WHITE);
         }
+        DeepSeekHistoryLog.log("DIALOG_ON_START", "loginMode=" + loginMode
+                + " window=" + attributes.width + "x" + attributes.height
+                + " flags=0x" + Integer.toHexString(attributes.flags)
+                + " softInput=0x" + Integer.toHexString(attributes.softInputMode)
+                + " panelTarget=" + normalPanelHeight);
+        if (dialogRoot != null) {
+            dialogRoot.post(() -> DeepSeekHistoryLog.log("DIALOG_LAYOUT_READY",
+                    viewState(dialogRoot, "root") + " "
+                            + viewState(contentPanel, "panel") + " "
+                            + viewState(webView, "web")));
+        }
     }
 
     private View buildContent(Context context) {
@@ -234,7 +252,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         dialogRoot.setFocusable(true);
         if (!loginMode) {
             // 面板以外的透明区域就是关闭热区。面板本身会消费点击，不会误关。
-            dialogRoot.setOnClickListener(v -> dismissAssistant());
+            dialogRoot.setOnClickListener(v -> dismissAssistant("outside_tap"));
         }
 
         contentPanel = new LinearLayout(context);
@@ -365,6 +383,13 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         view.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
+                int bucket = Math.min(4, Math.max(0, newProgress / 25));
+                if (bucket != lastLoggedProgressBucket) {
+                    lastLoggedProgressBucket = bucket;
+                    DeepSeekHistoryLog.log("WEB_PROGRESS", "progress=" + newProgress
+                            + " url=" + safeUrl(view == null ? null : view.getUrl())
+                            + " " + viewState(view, "web"));
+                }
                 if (progressBar != null) {
                     progressBar.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
                 }
@@ -398,12 +423,23 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             }
 
             @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                DeepSeekHistoryLog.log("WEB_PAGE_STARTED", "url=" + safeUrl(url)
+                        + " " + viewState(view, "web"));
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 view.setAlpha(1f);
                 view.setVisibility(View.VISIBLE);
                 if (progressBar != null) progressBar.setVisibility(View.GONE);
                 if (!loginMode && statusView != null) statusView.setVisibility(View.GONE);
+                DeepSeekHistoryLog.log("WEB_PAGE_FINISHED", "url=" + safeUrl(url)
+                        + " promptFilled=" + promptFilled
+                        + " promptSubmitted=" + promptSubmitted
+                        + " " + viewState(view, "web"));
                 if (loginMode) {
                     scheduleLoginProbe(150);
                 } else {
@@ -420,6 +456,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 super.doUpdateVisitedHistory(view, url, isReload);
                 // 登录成功后 DeepSeek 可能只通过 history.pushState 改地址，
                 // 这里负责捕获 /a/chat 等单页路由变化。
+                DeepSeekHistoryLog.log("WEB_HISTORY", "reload=" + isReload
+                        + " url=" + safeUrl(url));
                 if (loginMode) {
                     scheduleLoginProbe(120);
                 } else {
@@ -435,6 +473,9 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             @Override
             public void onReceivedSslError(WebView view, SslErrorHandler handler, android.net.http.SslError error) {
                 handler.cancel();
+                DeepSeekHistoryLog.log("WEB_SSL_ERROR", "url="
+                        + safeUrl(error == null ? null : error.getUrl())
+                        + " primary=" + (error == null ? -1 : error.getPrimaryError()));
                 statusView.setText("DeepSeek 安全连接失败");
                 statusView.setVisibility(View.VISIBLE);
                 if (progressBar != null) progressBar.setVisibility(View.GONE);
@@ -445,6 +486,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
                 if (request.isForMainFrame()) {
+                    DeepSeekHistoryLog.log("WEB_MAIN_FRAME_ERROR", "code="
+                            + (error == null ? -1 : error.getErrorCode())
+                            + " desc=" + (error == null ? "" : String.valueOf(error.getDescription()))
+                            + " url=" + safeUrl(request.getUrl() == null ? null : request.getUrl().toString()));
                     statusView.setText("DeepSeek 页面加载失败，请检查网络后重试");
                     statusView.setVisibility(View.VISIBLE);
                     if (progressBar != null) progressBar.setVisibility(View.GONE);
@@ -454,6 +499,9 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                DeepSeekHistoryLog.log("WEB_RENDER_GONE", "didCrash="
+                        + (detail != null && detail.didCrash())
+                        + " priority=" + (detail == null ? -1 : detail.rendererPriorityAtExit()));
                 statusView.setText("DeepSeek 页面已被系统回收，请重新打开");
                 notifyUser("DeepSeek 页面已被系统回收，请重新打开");
                 if (webView == view) webView = null;
@@ -1041,11 +1089,28 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     }
 
     private void dismissAssistant() {
-        if (closing) return;
+        dismissAssistant("internal");
+    }
+
+    private void dismissAssistant(String reason) {
+        if (closing) {
+            DeepSeekHistoryLog.log("DIALOG_DISMISS_DUPLICATE", "reason=" + reason
+                    + " current=" + dismissReason);
+            return;
+        }
+        dismissReason = TextUtils.isEmpty(reason) ? "unknown" : reason;
         closing = true;
+        DeepSeekHistoryLog.log("DIALOG_DISMISS_REQUEST", "reason=" + dismissReason
+                + " added=" + isAdded()
+                + " stateSaved=" + fragmentStateSaved()
+                + " " + viewState(dialogRoot, "root")
+                + " " + viewState(contentPanel, "panel")
+                + " " + viewState(webView, "web"));
         hideWebKeyboard();
         // 给输入法一个很短的时间从 Dialog Window 脱离，避免关闭后继续压缩聊天页。
         handler.postDelayed(() -> {
+            DeepSeekHistoryLog.log("DIALOG_DISMISS_EXECUTE", "reason=" + dismissReason
+                    + " added=" + isAdded());
             if (isAdded()) {
                 dismissAllowingStateLoss();
             }
@@ -1142,8 +1207,43 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        DeepSeekHistoryLog.log("DIALOG_ON_RESUME", "activity=" + activityState()
+                + " " + viewState(dialogRoot, "root")
+                + " " + viewState(webView, "web"));
+    }
+
+    @Override
+    public void onPause() {
+        DeepSeekHistoryLog.log("DIALOG_ON_PAUSE", "activity=" + activityState()
+                + " " + viewState(dialogRoot, "root")
+                + " " + viewState(webView, "web"));
+        super.onPause();
+    }
+
+    @Override
+    public void onStop() {
+        DeepSeekHistoryLog.log("DIALOG_ON_STOP", "activity=" + activityState()
+                + " reason=" + dismissReason);
+        super.onStop();
+    }
+
+    @Override
+    public void onCancel(@NonNull DialogInterface dialog) {
+        dismissReason = "system_cancel";
+        DeepSeekHistoryLog.log("DIALOG_ON_CANCEL", viewState(dialogRoot, "root")
+                + " " + viewState(webView, "web"));
+        super.onCancel(dialog);
+    }
+
+    @Override
     public void onDismiss(@NonNull DialogInterface dialog) {
         hideWebKeyboard();
+        DeepSeekHistoryLog.log("DIALOG_ON_DISMISS_BEFORE", "reason=" + dismissReason
+                + " pendingReply=" + pendingReplyDelivery
+                + " pendingTranslation=" + pendingTranslationDelivery
+                + " activity=" + activityState());
         super.onDismiss(dialog);
 
         if (pendingTranslationDelivery && translationCallback != null) {
@@ -1171,10 +1271,15 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 callback.onReply(text, sendNow);
             }
         }
+        DeepSeekHistoryLog.log("DIALOG_ON_DISMISS_AFTER", "reason=" + dismissReason
+                + " activity=" + activityState());
     }
 
     @Override
     public void onDestroyView() {
+        DeepSeekHistoryLog.log("DIALOG_ON_DESTROY_VIEW_BEGIN", "reason=" + dismissReason
+                + " activity=" + activityState()
+                + " " + viewState(webView, "web"));
         hideWebKeyboard();
         handler.removeCallbacks(loginProbeRunnable);
         handler.removeCallbacks(webUiPrepareRunnable);
@@ -1188,5 +1293,50 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         CookieManager.getInstance().flush();
         handler.removeCallbacksAndMessages(null);
         super.onDestroyView();
+        DeepSeekHistoryLog.log("DIALOG_ON_DESTROY_VIEW_END", "reason=" + dismissReason
+                + " activity=" + activityState());
+    }
+
+    private boolean fragmentStateSaved() {
+        try {
+            return isAdded() && getParentFragmentManager().isStateSaved();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private String activityState() {
+        FragmentActivity activity = getActivity();
+        if (activity == null) return "null";
+        return activity.getClass().getSimpleName()
+                + " finishing=" + activity.isFinishing()
+                + " destroyed=" + (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1
+                && activity.isDestroyed())
+                + " lifecycle=" + activity.getLifecycle().getCurrentState();
+    }
+
+    private static String viewState(View view, String name) {
+        if (view == null) return name + "=null";
+        ViewGroup.LayoutParams lp = view.getLayoutParams();
+        return name + "{vis=" + view.getVisibility()
+                + ",shown=" + view.isShown()
+                + ",attached=" + view.isAttachedToWindow()
+                + ",size=" + view.getWidth() + "x" + view.getHeight()
+                + ",measured=" + view.getMeasuredWidth() + "x" + view.getMeasuredHeight()
+                + ",lp=" + (lp == null ? "null" : lp.width + "x" + lp.height)
+                + ",alpha=" + view.getAlpha()
+                + ",ty=" + view.getTranslationY()
+                + "}";
+    }
+
+    private static String safeUrl(String url) {
+        if (TextUtils.isEmpty(url)) return "";
+        try {
+            Uri uri = Uri.parse(url);
+            return String.valueOf(uri.getScheme()) + "://" + String.valueOf(uri.getHost())
+                    + String.valueOf(uri.getPath());
+        } catch (Throwable ignored) {
+            return "invalid";
+        }
     }
 }
