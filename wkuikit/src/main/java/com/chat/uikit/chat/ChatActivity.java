@@ -1292,7 +1292,86 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         request.myLearningLanguages = getMyProfileLanguage("learning_languages", "learning_language", "");
         request.peerNativeLanguage = getChannelLanguage("native_languages", "native_language", "自动");
         request.peerLearningLanguages = getChannelLanguage("learning_languages", "learning_language", "");
+        populateDeepSeekContextSnapshot(request);
         return request;
+    }
+
+    /**
+     * Copies the messages already loaded in the visible chat adapter into a plain-text snapshot.
+     * This is intentionally read-only. Do not use getOrSyncHistoryMessages() for the assistant:
+     * that API emits refresh events and was the cause of visible history items being removed.
+     */
+    private void populateDeepSeekContextSnapshot(DeepSeekRequest request) {
+        if (request == null || chatAdapter == null || WKReader.isEmpty(chatAdapter.getData())) return;
+
+        final int maxMessages = 120;
+        final int maxChars = 18000;
+        ArrayList<String> lines = new ArrayList<>();
+        String latestPeerText = "";
+        String latestPeerId = "";
+
+        for (WKUIChatMsgItemEntity item : chatAdapter.getData()) {
+            if (item == null || item.wkMsg == null) continue;
+            WKMsg msg = item.wkMsg;
+            if (!shouldUseForMsgLinks(msg)) continue;
+            if (msg.remoteExtra != null && (msg.remoteExtra.revoke == 1 || msg.remoteExtra.isMutualDeleted == 1)) continue;
+
+            String content = "";
+            try {
+                if (msg.baseContentMsgModel != null) content = msg.baseContentMsgModel.getDisplayContent();
+            } catch (Exception ignored) {
+            }
+            if (TextUtils.isEmpty(content)) content = msg.content;
+            content = sanitizeDeepSeekContextText(content);
+            if (TextUtils.isEmpty(content)) continue;
+
+            boolean mine = TextUtils.equals(loginUID, msg.fromUID);
+            lines.add((mine ? "我：" : "对方：") + content);
+            if (!mine && msg.type == WKContentType.WK_TEXT) {
+                latestPeerText = content;
+                latestPeerId = deepSeekMessageId(msg);
+            }
+        }
+
+        StringBuilder snapshot = new StringBuilder();
+        int kept = 0;
+        for (int i = lines.size() - 1; i >= 0 && kept < maxMessages; i--) {
+            String line = lines.get(i);
+            if (snapshot.length() + line.length() + 1 > maxChars && snapshot.length() > 0) break;
+            if (snapshot.length() == 0) snapshot.insert(0, line);
+            else snapshot.insert(0, line + "\n");
+            kept++;
+        }
+        request.contextSnapshot = snapshot.toString();
+        request.contextSnapshotCount = kept;
+        if (TextUtils.isEmpty(request.targetMessageText) && !TextUtils.isEmpty(latestPeerText)) {
+            request.targetMessageText = latestPeerText;
+            request.targetMessageId = latestPeerId;
+        }
+        if (shouldTraceDeepSeekHistory()) {
+            DeepSeekHistoryLog.log("CONTEXT_SNAPSHOT_READY", "count=" + kept
+                    + " chars=" + request.contextSnapshot.length()
+                    + " target=" + (!TextUtils.isEmpty(request.targetMessageText)));
+        }
+    }
+
+    private String sanitizeDeepSeekContextText(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        String clean = value.replace('\u0000', ' ').replace("```", "` ` `").trim();
+        if ((clean.startsWith("{") && clean.endsWith("}")) || clean.startsWith("__cp_harmony_rtc__:")) {
+            return "";
+        }
+        if (clean.length() > 1200) clean = clean.substring(0, 1200) + "…";
+        return clean;
+    }
+
+    private String deepSeekMessageId(WKMsg msg) {
+        if (msg == null) return "";
+        if (!TextUtils.isEmpty(msg.messageID) && !"0".equals(msg.messageID)) return msg.messageID;
+        if (!TextUtils.isEmpty(msg.clientMsgNO)) return msg.clientMsgNO;
+        if (msg.messageSeq > 0) return String.valueOf(msg.messageSeq);
+        if (msg.orderSeq > 0) return String.valueOf(msg.orderSeq);
+        return "";
     }
 
     private String getMyProfileLanguage(String plural, String singular, String fallback) {
