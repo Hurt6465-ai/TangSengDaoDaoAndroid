@@ -134,7 +134,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
         panel.addView(wordView, wordLp);
 
         if (!pinyin.isEmpty()) {
-            TextView pinyinView = text(pinyin, 20, COLOR_ACCENT, true);
+            TextView pinyinView = text(pinyin, 20, COLOR_ACCENT, false);
             pinyinView.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams pinyinLp = new LinearLayout.LayoutParams(-1, -2);
             pinyinLp.setMargins(0, dp(3), 0, 0);

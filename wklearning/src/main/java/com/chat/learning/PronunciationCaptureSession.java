@@ -38,9 +38,10 @@ final class PronunciationCaptureSession {
     private static final int BITS_PER_SAMPLE = 16;
 
     private static final long MAX_CAPTURE_MS = 7_000L;
-    private static final long WAIT_FOR_SPEECH_MS = 3_500L;
-    private static final long SILENCE_TO_FINISH_MS = 950L;
-    private static final long MIN_SPEECH_MS = 260L;
+    private static final long WAIT_FOR_SPEECH_MS = 5_000L;
+    private static final long SILENCE_TO_FINISH_MS = 1_200L;
+    private static final long MIN_SPEECH_MS = 360L;
+    private static final long IGNORE_EARLY_ENDPOINT_MS = 700L;
     private static final long RESULT_GRACE_MS = 3_000L;
     private static final float SPEECH_THRESHOLD_DB = -42.0f;
 
@@ -108,6 +109,7 @@ final class PronunciationCaptureSession {
     private String bestPartialText = "";
     private float recognizerConfidence = -1f;
     private int recognitionError;
+    private volatile long captureStartedElapsed;
 
     private final Runnable maxDurationStop = this::stop;
     private final Runnable resultTimeout = () -> {
@@ -158,9 +160,18 @@ final class PronunciationCaptureSession {
                 intent.putExtra(EXTRA_AUDIO_SOURCE_SAMPLING_RATE, SAMPLE_RATE);
             }
 
-            // Start recognition first so the service is ready before PCM begins.
-            recognizer.startListening(intent);
-            startCapture(sharedPcmStream);
+            if (sharedPcmStream) {
+                // Feed PCM before asking the recognizer to consume the pipe. Starting the recognizer
+                // on an empty pipe makes some Google/Xiaomi services report end-of-speech
+                // immediately, which used to close the exercise as soon as the button was tapped.
+                startCapture(true);
+                if (!captureRunning) throw new IllegalStateException("Audio capture did not start");
+                recognizer.startListening(intent);
+            } else {
+                // Older Android versions have no public injected-audio API. Keep the legacy order.
+                recognizer.startListening(intent);
+                startCapture(false);
+            }
         } catch (Throwable error) {
             recognitionDone = true;
             recognitionError = SpeechRecognizer.ERROR_CLIENT;
@@ -215,6 +226,7 @@ final class PronunciationCaptureSession {
         bestPartialText = "";
         recognizerConfidence = -1f;
         recognitionError = 0;
+        captureStartedElapsed = 0L;
     }
 
     private Intent createRecognitionIntent() {
@@ -270,6 +282,7 @@ final class PronunciationCaptureSession {
             wavFile = new File(directory, "practice_" + stamp + ".wav");
 
             audioRecord.startRecording();
+            captureStartedElapsed = SystemClock.elapsedRealtime();
             captureRunning = true;
             listener.onStateChanged(State.LISTENING);
             main.postDelayed(maxDurationStop, MAX_CAPTURE_MS);
@@ -501,15 +514,21 @@ final class PronunciationCaptureSession {
         @Override public void onBufferReceived(byte[] buffer) { }
 
         @Override public void onEndOfSpeech() {
-            // The recognizer may detect the endpoint before our own PCM detector.
-            stop();
+            // With an injected PCM stream, our own silence detector is authoritative. Some
+            // recognizers emit this callback before the first PCM packet has been consumed.
+            if (sharedPcmStream) return;
+            long elapsed = captureStartedElapsed <= 0L ? 0L
+                    : SystemClock.elapsedRealtime() - captureStartedElapsed;
+            if (elapsed >= IGNORE_EARLY_ENDPOINT_MS) stop();
         }
 
         @Override public void onError(int error) {
             promotePartialResult();
             recognitionError = recognizedText.isEmpty() ? error : 0;
             recognitionDone = true;
-            requestCaptureStop();
+            // Do not terminate microphone capture because the recognizer failed early. The learner
+            // should still be able to finish recording and play it back; delivery waits for both
+            // sides to complete.
             scheduleResultTimeout();
             maybeDeliver();
         }
@@ -529,7 +548,9 @@ final class PronunciationCaptureSession {
                 recognizerConfidence = confidence[0];
             }
             recognitionDone = true;
-            requestCaptureStop();
+            // A real non-empty result is a safe endpoint. Empty/instant results are ignored and
+            // the PCM silence detector keeps the session alive.
+            if (!recognizedText.isEmpty()) requestCaptureStop();
             maybeDeliver();
         }
 

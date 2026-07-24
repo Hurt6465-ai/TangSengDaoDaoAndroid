@@ -100,6 +100,8 @@ final class LearningWordRepository {
             String memoryTip = first(memoryTipMy, memoryTipZh);
             String pinyin = PinyinUtils.resolve(word,
                     item.optString("pinyin_override", ""), item.optString("pinyin", ""));
+            String ttsPinyin = PinyinUtils.resolveForSpeech(word,
+                    item.optString("tts_pinyin_override", ""), pinyin);
             String exampleText = item.optString("example", "");
             String examplePinyin = PinyinUtils.resolve(exampleText,
                     item.optString("example_pinyin_override", ""), item.optString("example_pinyin", ""));
@@ -108,6 +110,7 @@ final class LearningWordRepository {
                     item.optString("id", packId + "_" + i),
                     word,
                     pinyin,
+                    ttsPinyin,
                     item.optString("phonetic_my", ""),
                     first(item.optString("part_of_speech", ""), item.optString("part_of_speech_my", "")),
                     meaningMy,

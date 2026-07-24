@@ -10,6 +10,7 @@ final class WordItem {
     final String id;
     final String word;
     final String pinyin;
+    final String ttsPinyin;
     final String phoneticMy;
     final String partOfSpeech;
     final String meaningMy;
@@ -30,6 +31,7 @@ final class WordItem {
             String id,
             String word,
             String pinyin,
+            String ttsPinyin,
             String phoneticMy,
             String partOfSpeech,
             String meaningMy,
@@ -48,6 +50,7 @@ final class WordItem {
         this.id = safe(id);
         this.word = safe(word);
         this.pinyin = safe(pinyin);
+        this.ttsPinyin = safe(ttsPinyin);
         this.phoneticMy = safe(phoneticMy);
         this.partOfSpeech = safe(partOfSpeech);
         this.meaningMy = safe(meaningMy);

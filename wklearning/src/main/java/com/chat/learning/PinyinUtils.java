@@ -6,13 +6,65 @@ import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
 import net.sourceforge.pinyin4j.format.HanyuPinyinToneType;
 import net.sourceforge.pinyin4j.format.HanyuPinyinVCharType;
 
-/** Chinese-to-pinyin helper. Polyphonic words should provide pinyin_override. */
+import java.text.Normalizer;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+/** Chinese-to-pinyin helper. Polyphonic words and neutral tones must use word-level rules. */
 final class PinyinUtils {
+    /**
+     * Pinyin4j works character by character. It cannot know word boundaries, neutral tones or
+     * context-dependent readings. Keep a small built-in fallback for the bundled HSK preview so
+     * cached/remote packs without explicit overrides still sound correct.
+     */
+    private static final Map<String, String> WORD_PINYIN;
+    private static final Map<String, String> WORD_TTS_PINYIN;
+
+    static {
+        Map<String, String> display = new HashMap<>();
+        display.put("你好", "nǐ hǎo");
+        display.put("谢谢", "xiè xie");
+        display.put("再见", "zài jiàn");
+        display.put("可以", "kě yǐ");
+        display.put("朋友", "péng you");
+        display.put("学习", "xué xí");
+        display.put("工作", "gōng zuò");
+        display.put("银行", "yín háng");
+        WORD_PINYIN = Collections.unmodifiableMap(display);
+
+        Map<String, String> speech = new HashMap<>();
+        speech.put("你好", "nǐ hǎo");
+        speech.put("谢谢", "xiè xie");
+        speech.put("再见", "zài jiàn");
+        // Direct pinyin input bypasses some lexical tone-sandhi logic. Use the actual spoken tone.
+        speech.put("可以", "ké yǐ");
+        speech.put("朋友", "péng you");
+        speech.put("学习", "xué xí");
+        speech.put("工作", "gōng zuò");
+        speech.put("银行", "yín háng");
+        WORD_TTS_PINYIN = Collections.unmodifiableMap(speech);
+    }
+
     private PinyinUtils() {}
 
     static String resolve(String word, String override, String legacyPinyin) {
         if (notEmpty(override)) return normalize(override);
         if (notEmpty(legacyPinyin)) return normalize(legacyPinyin);
+        String known = WORD_PINYIN.get(safeWord(word));
+        if (known != null) return known;
+        return generatePerCharacter(word);
+    }
+
+    /** Separate display orthography from the pinyin string sent to the TTS frontend. */
+    static String resolveForSpeech(String word, String override, String displayPinyin) {
+        if (notEmpty(override)) return normalize(override);
+        String known = WORD_TTS_PINYIN.get(safeWord(word));
+        if (known != null) return known;
+        return normalize(displayPinyin);
+    }
+
+    private static String generatePerCharacter(String word) {
         if (!notEmpty(word)) return "";
         try {
             HanyuPinyinOutputFormat format = new HanyuPinyinOutputFormat();
@@ -46,7 +98,12 @@ final class PinyinUtils {
     }
 
     private static String normalize(String value) {
-        return value == null ? "" : value.trim().replaceAll("\\s+", " ");
+        if (value == null) return "";
+        return Normalizer.normalize(value.trim().replaceAll("\\s+", " "), Normalizer.Form.NFC);
+    }
+
+    private static String safeWord(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private static boolean notEmpty(String value) {

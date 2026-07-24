@@ -406,7 +406,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         wordView.setGravity(Gravity.CENTER);
         box.addView(wordView, new LinearLayout.LayoutParams(-1, -2));
 
-        pinyinView = label("", 21, COLOR_BLUE, true);
+        pinyinView = label("", 21, COLOR_BLUE, false);
         pinyinView.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams pyLp = new LinearLayout.LayoutParams(-1, -2);
         pyLp.setMargins(0, dp(8), 0, 0);
@@ -522,7 +522,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
         header.setGravity(Gravity.BOTTOM);
         TextView backWord = label(item.word, 31, COLOR_TEXT, true);
         header.addView(backWord, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView backPinyin = label(showPinyin() ? item.pinyin : "", 16, COLOR_BLUE, true);
+        TextView backPinyin = label(showPinyin() ? item.pinyin : "", 16, COLOR_BLUE, false);
         backPinyin.setGravity(Gravity.END);
         header.addView(backPinyin, new LinearLayout.LayoutParams(0, -2, 1f));
         backContent.addView(header, new LinearLayout.LayoutParams(-1, -2));
@@ -851,7 +851,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
 
     private void speakSpelling() {
         WordItem item = current();
-        if (item != null) LearningTtsBridge.speak(this, item.word, item.pinyin,
+        if (item != null) LearningTtsBridge.speak(this, item.word, item.ttsPinyin,
                 LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_SPELLING);
     }
 
