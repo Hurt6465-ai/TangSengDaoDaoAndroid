@@ -34,6 +34,7 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.fragment.app.FragmentActivity
 import androidx.emoji2.widget.EmojiTextView
 import com.chat.base.WKBaseApplication
 import com.chat.base.act.WKWebViewActivity
@@ -69,6 +70,8 @@ import com.chat.base.utils.WKPermissions
 import com.chat.base.utils.WKPermissions.IPermissionResult
 import com.chat.base.utils.WKToastUtils
 import com.chat.base.views.BubbleLayout
+import com.chat.deepseek.DeepSeekAssistant
+import com.chat.deepseek.DeepSeekRequest
 import com.chat.uikit.R
 import com.chat.uikit.user.UserDetailActivity
 import com.chat.translate.api.ChatTranslateRequest
@@ -373,12 +376,89 @@ open class WKTextProvider : WKChatBaseProvider() {
         translateMessageIntoBubble(uiChatMsgItemEntity, text, cacheKey, false)
     }
 
+    private fun openDeepSeekTranslation(
+        uiChatMsgItemEntity: WKUIChatMsgItemEntity,
+        text: String,
+        cacheKey: String
+    ): Boolean {
+        val activity = context as? FragmentActivity ?: return false
+        if (!DeepSeekAssistant.isEnabled(activity)) return false
+        val msg = uiChatMsgItemEntity.wkMsg ?: return false
+        val request = DeepSeekRequest().apply {
+            action = DeepSeekRequest.ACTION_TRANSLATE
+            channelId = msg.channelID ?: ""
+            channelType = msg.channelType
+            selfUid = WKConfig.getInstance().uid ?: ""
+            myNativeLanguage = getChatTranslateTargetLang()
+            peerNativeLanguage = "自动"
+            targetMessageText = text
+            targetMessageId = when {
+                !TextUtils.isEmpty(msg.messageID) && msg.messageID != "0" -> msg.messageID
+                !TextUtils.isEmpty(msg.clientMsgNO) -> msg.clientMsgNO
+                msg.messageSeq > 0 -> msg.messageSeq.toString()
+                else -> ""
+            }
+            contextEnabled = true
+            contextLimit = 50
+        }
+        var delivered = false
+        val opened = DeepSeekAssistant.openTranslation(
+            activity,
+            request,
+            DeepSeekAssistant.TranslationCallback { translated: String ->
+                delivered = true
+                Handler(Looper.getMainLooper()).post {
+                    if (!TextUtils.isEmpty(translated)) {
+                        saveTranslationCache(cacheKey, translated, true, "ok")
+                    } else {
+                        saveTranslationCache(
+                            cacheKey,
+                            context.getString(com.chat.translate.R.string.wktranslate_translate_failed),
+                            true,
+                            "error"
+                        )
+                    }
+                    notifyMessageChanged()
+                }
+            },
+            DeepSeekAssistant.StateCallback {
+                Handler(Looper.getMainLooper()).post {
+                    val latest = readTranslationCache(cacheKey)
+                    if (!delivered && latest?.status == "loading") {
+                        saveTranslationCache(
+                            cacheKey,
+                            context.getString(com.chat.translate.R.string.wktranslate_translate_failed),
+                            true,
+                            "error"
+                        )
+                        notifyMessageChanged()
+                    }
+                }
+            }
+        )
+        if (opened) {
+            saveTranslationCache(
+                cacheKey,
+                context.getString(com.chat.translate.R.string.wktranslate_translating),
+                true,
+                "loading"
+            )
+            notifyMessageChanged()
+            return true
+        }
+        WKToastUtils.getInstance().showToastNormal(
+            context.getString(com.chat.deepseek.R.string.wkdeepseek_busy)
+        )
+        return true
+    }
+
     private fun translateMessageIntoBubble(
         uiChatMsgItemEntity: WKUIChatMsgItemEntity,
         text: String,
         cacheKey: String,
         requestWingman: Boolean
     ) {
+        if (openDeepSeekTranslation(uiChatMsgItemEntity, text, cacheKey)) return
         val appContext = context.applicationContext
         val translateMode = TranslatePrefs.getMode(appContext)
         if (translateMode == TranslateMode.AI && !TranslatePrefs.hasUsableAi(appContext)) {
