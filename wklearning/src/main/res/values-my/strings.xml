@@ -124,6 +124,10 @@
     <string name="word_check_answer_first">အဖြေကို အရင်ကြည့်ပါ</string>
     <string name="word_tts_settings_hint">အသံဆက်တင်တွင် အသံနှင့် အမြန်နှုန်းကို ပြင်ပါ</string>
     <string name="word_plan_message">ယနေ့ ပြန်လေ့ကျင့်ရန် %1$d လုံး၊ အသစ် %2$d လုံး၊ လက်ရှိ ကျန် %3$d လုံး။</string>
+    <string name="word_group_total">ဒီအုပ်စုတွင် စကားလုံး %1$d လုံးရှိသည်</string>
+    <string name="word_restart_group">ဒီအုပ်စုကို ပြန်လေ့ကျင့်မယ်</string>
+    <string name="word_back_to_library">စကားလုံးစာရင်းသို့ ပြန်သွားမယ်</string>
+    <string name="word_tts_settings_open_failed">အသံဆက်တင်ကို ဖွင့်၍မရပါ</string>
     <string name="word_session_complete">ဒီအုပ်စုပြီးပါပြီ</string>
     <string name="word_session_stats">မမှတ်မိ %1$d
 မရှင်းသေး %2$d
