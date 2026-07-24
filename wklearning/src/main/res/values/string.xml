@@ -128,6 +128,10 @@
     <string name="word_check_answer_first">请先查看答案</string>
     <string name="word_tts_settings_hint">请在语音设置中调整发音人和语速</string>
     <string name="word_plan_message">今日复习 %1$d 个，新词 %2$d 个，当前剩余 %3$d 个。</string>
+    <string name="word_group_total">本组 %1$d 个单词</string>
+    <string name="word_restart_group">重新练习本组</string>
+    <string name="word_back_to_library">返回词库</string>
+    <string name="word_tts_settings_open_failed">无法打开语音设置</string>
     <string name="word_session_complete">本组完成</string>
     <string name="word_session_stats">不认识 %1$d
 模糊 %2$d
