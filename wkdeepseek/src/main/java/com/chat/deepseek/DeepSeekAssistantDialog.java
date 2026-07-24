@@ -1166,9 +1166,9 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             FragmentActivity activity = getActivity();
             if (activity != null && !activity.isFinishing()) {
                 activity.getWindow().getDecorView().postDelayed(
-                        () -> callback.onReply(text, localDisplayText, sendNow), 280);
+                        () -> callback.onReply(text, sendNow), 280);
             } else {
-                callback.onReply(text, localDisplayText, sendNow);
+                callback.onReply(text, sendNow);
             }
         }
     }
