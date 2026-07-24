@@ -17,6 +17,14 @@ public final class DeepSeekRequest {
     public String draft = "";
     public String background = "";
     public String purpose = "自然继续聊天";
+    public String relationshipStage = "auto";
+    public String preferredStyle = "natural";
+    public int flirtLevel = 0;
+    public boolean contextEnabled = true;
+    public int contextLimit = 100;
+    public String targetMessageId = "";
+    public String targetMessageText = "";
+    public DeepSeekContactProfile contactProfile = new DeepSeekContactProfile();
     public int action = ACTION_REPLY;
 
     public String safeMyNative() {

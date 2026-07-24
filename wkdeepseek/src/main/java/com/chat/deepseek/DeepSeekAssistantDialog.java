@@ -64,6 +64,14 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private static final String ARG_DRAFT = "draft";
     private static final String ARG_BACKGROUND = "background";
     private static final String ARG_PURPOSE = "purpose";
+    private static final String ARG_RELATIONSHIP_STAGE = "relationship_stage";
+    private static final String ARG_PREFERRED_STYLE = "preferred_style";
+    private static final String ARG_FLIRT_LEVEL = "flirt_level";
+    private static final String ARG_CONTEXT_ENABLED = "context_enabled";
+    private static final String ARG_CONTEXT_LIMIT = "context_limit";
+    private static final String ARG_TARGET_MESSAGE_ID = "target_message_id";
+    private static final String ARG_TARGET_MESSAGE_TEXT = "target_message_text";
+    private static final String ARG_CONTACT_PROFILE = "contact_profile";
     /**
      * DeepSeek 当前发送按钮使用的上箭头 SVG path。自动提交只在检测到这个
      * 可见、可点击的按钮后执行，避免误点附件、语音、停止生成等按钮。
@@ -87,6 +95,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private String pendingPrompt = "";
     private DeepSeekRequest request;
     private DeepSeekAssistant.ReplyCallback replyCallback;
+    private DeepSeekAssistant.TranslationCallback translationCallback;
     private DeepSeekAssistant.StateCallback stateCallback;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Random timingRandom = new Random();
@@ -102,6 +111,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private boolean pendingReplyDelivery;
     private String pendingReplyText = "";
     private boolean pendingReplySendNow;
+    private boolean pendingTranslationDelivery;
+    private String pendingTranslationText = "";
     private boolean webUiPrepared;
     private boolean webUiPrepareInFlight;
     private int webUiPrepareAttempts;
@@ -134,12 +145,24 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         args.putString(ARG_DRAFT, request.draft);
         args.putString(ARG_BACKGROUND, request.background);
         args.putString(ARG_PURPOSE, request.purpose);
+        args.putString(ARG_RELATIONSHIP_STAGE, request.relationshipStage);
+        args.putString(ARG_PREFERRED_STYLE, request.preferredStyle);
+        args.putInt(ARG_FLIRT_LEVEL, request.flirtLevel);
+        args.putBoolean(ARG_CONTEXT_ENABLED, request.contextEnabled);
+        args.putInt(ARG_CONTEXT_LIMIT, request.contextLimit);
+        args.putString(ARG_TARGET_MESSAGE_ID, request.targetMessageId);
+        args.putString(ARG_TARGET_MESSAGE_TEXT, request.targetMessageText);
+        args.putString(ARG_CONTACT_PROFILE, request.contactProfile == null ? "{}" : request.contactProfile.toJson());
         dialog.setArguments(args);
         return dialog;
     }
 
     void setReplyCallback(DeepSeekAssistant.ReplyCallback callback) {
         this.replyCallback = callback;
+    }
+
+    void setTranslationCallback(DeepSeekAssistant.TranslationCallback callback) {
+        this.translationCallback = callback;
     }
 
     void setStateCallback(DeepSeekAssistant.StateCallback callback) {
@@ -451,7 +474,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         handler.removeCallbacks(loginProbeRunnable);
         CookieManager.getInstance().flush();
         DeepSeekAssistant.markConnected(requireContext());
-        statusView.setText("DeepSeek 已登录，聊天助手已开启");
+        statusView.setText("DeepSeek 已登录，社交助手已开启");
         if (stateCallback != null) stateCallback.onChanged();
     }
 
@@ -849,7 +872,12 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
     private void installReplyButtons() {
         if (webView == null) return;
-        String fallbackMode = request != null && request.action == DeepSeekRequest.ACTION_TRANSLATE ? "copy" : "use";
+        String fallbackMode;
+        if (request != null && request.action == DeepSeekRequest.ACTION_TRANSLATE) {
+            fallbackMode = translationCallback != null ? "translate_use" : "copy";
+        } else {
+            fallbackMode = "use";
+        }
         String js = "(function(){" +
                 "if(window.__tsddDeepSeekInstalled)return;window.__tsddDeepSeekInstalled=true;" +
                 "var fallbackMode='" + fallbackMode + "';" +
@@ -859,10 +887,12 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "b.onclick=function(e){e.preventDefault();e.stopPropagation();go(mode,(code.innerText||'').trim());};return b;}" +
                 "function add(){document.querySelectorAll('pre code').forEach(function(code){" +
                 "if(code.dataset.tsddReady==='1')return;var pre=code.closest('pre');if(!pre)return;" +
-                "var cls=(code.className||'').toLowerCase();var mode=cls.indexOf('translate')>=0?'copy':(cls.indexOf('reply')>=0?'use':fallbackMode);" +
+                "var cls=(code.className||'').toLowerCase(),raw=(code.innerText||'').trim();var looksProfile=cls.indexOf('profile')>=0||(raw.charAt(0)==='{'&&raw.indexOf('\"interaction_state\"')>=0);var mode=looksProfile?'profile':(cls.indexOf('translate')>=0?fallbackMode:(cls.indexOf('reply')>=0?'use':fallbackMode));" +
                 "code.dataset.tsddReady='1';var box=document.createElement('div');box.dataset.tsddReplyBar='1';" +
                 "box.style.cssText='display:flex;justify-content:flex-end;align-items:center;padding:8px 2px 12px 2px';" +
-                "if(mode==='copy'){box.appendChild(button('复制译文','copy',code));}" +
+                "if(mode==='profile'){box.appendChild(button('更新联系人记录','profile',code));}" +
+                "else if(mode==='copy'){box.appendChild(button('复制译文','copy',code));}" +
+                "else if(mode==='translate_use'){box.appendChild(button('显示译文','translate_use',code));box.appendChild(button('复制译文','copy',code));}" +
                 "else{box.appendChild(button('填入聊天','use',code));box.appendChild(button('直接发送','send',code));}" +
                 "if(pre.parentNode)pre.parentNode.insertBefore(box,pre.nextSibling);});}" +
                 "var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,450);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});add();" +
@@ -874,25 +904,67 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if (!"result".equals(uri.getHost())) return;
         String text = uri.getQueryParameter("text");
         String mode = uri.getQueryParameter("mode");
-        if (TextUtils.isEmpty(text) || text.length() > 4000) return;
+        if (TextUtils.isEmpty(text) || text.length() > 12000) return;
         final String cleanText = text.trim();
         if ("copy".equals(mode)) {
             copyText(cleanText);
             Toast.makeText(requireContext(), R.string.wkdeepseek_translation_copied, Toast.LENGTH_SHORT).show();
             return;
         }
+        if ("profile".equals(mode)) {
+            confirmProfileUpdate(cleanText);
+            return;
+        }
+        if ("translate_use".equals(mode)) {
+            pendingTranslationText = cleanText;
+            pendingTranslationDelivery = true;
+            dismissAssistant();
+            return;
+        }
+        if ("send".equals(mode)) {
+            new android.app.AlertDialog.Builder(requireContext())
+                    .setTitle(R.string.wkdeepseek_send_confirm)
+                    .setMessage(cleanText)
+                    .setNegativeButton(R.string.wkdeepseek_cancel, null)
+                    .setPositiveButton(R.string.wkdeepseek_send, (dialog, which) -> deliverReply(cleanText, true))
+                    .show();
+            return;
+        }
+        deliverReply(cleanText, false);
+    }
 
-        // 用户点击“直接发送”本身就是明确确认，不再额外弹一次确认框。
-        // 回调由聊天页走原有 sendIV 发送流程，不绕过回复、编辑和陌生人限制。
-        copyText(cleanText);
-        pendingReplyText = cleanText;
-        pendingReplySendNow = "send".equals(mode);
+    private void deliverReply(String text, boolean sendNow) {
+        if (TextUtils.isEmpty(text)) return;
+        copyText(text);
+        pendingReplyText = text;
+        pendingReplySendNow = sendNow;
         pendingReplyDelivery = true;
-        if (!pendingReplySendNow) {
+        if (!sendNow) {
             Toast.makeText(requireContext(), R.string.wkdeepseek_reply_used, Toast.LENGTH_SHORT).show();
         }
-        // 先关闭网页和输入法，再把结果交给聊天页，避免两个 Window 同时争夺 IME/焦点。
         dismissAssistant();
+    }
+
+    private void confirmProfileUpdate(String raw) {
+        DeepSeekProfileParser.Update update = DeepSeekProfileParser.parse(raw);
+        if (update == null) {
+            Toast.makeText(requireContext(), R.string.wkdeepseek_profile_invalid, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String description = DeepSeekProfileParser.describe(update);
+        new android.app.AlertDialog.Builder(requireContext())
+                .setTitle(R.string.wkdeepseek_profile_update_title)
+                .setMessage(description)
+                .setNegativeButton(R.string.wkdeepseek_ignore, null)
+                .setPositiveButton(R.string.wkdeepseek_save, (dialog, which) -> {
+                    if (request == null) return;
+                    DeepSeekContactProfile profile = request.contactProfile == null
+                            ? new DeepSeekContactProfile() : request.contactProfile;
+                    update.applyTo(profile);
+                    DeepSeekContactStore.saveProfile(requireContext(), request, profile);
+                    Toast.makeText(requireContext(), R.string.wkdeepseek_profile_saved, Toast.LENGTH_SHORT).show();
+                })
+                .show();
     }
 
     private void dismissAssistant() {
@@ -980,6 +1052,14 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         out.draft = args.getString(ARG_DRAFT, "");
         out.background = args.getString(ARG_BACKGROUND, "");
         out.purpose = args.getString(ARG_PURPOSE, "自然继续聊天");
+        out.relationshipStage = args.getString(ARG_RELATIONSHIP_STAGE, "auto");
+        out.preferredStyle = args.getString(ARG_PREFERRED_STYLE, "natural");
+        out.flirtLevel = args.getInt(ARG_FLIRT_LEVEL, 0);
+        out.contextEnabled = args.getBoolean(ARG_CONTEXT_ENABLED, true);
+        out.contextLimit = args.getInt(ARG_CONTEXT_LIMIT, 100);
+        out.targetMessageId = args.getString(ARG_TARGET_MESSAGE_ID, "");
+        out.targetMessageText = args.getString(ARG_TARGET_MESSAGE_TEXT, "");
+        out.contactProfile = DeepSeekContactProfile.fromJson(args.getString(ARG_CONTACT_PROFILE, "{}"));
         DeepSeekContactStore.apply(requireContext(), out);
         return out;
     }
@@ -992,6 +1072,13 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     public void onDismiss(@NonNull DialogInterface dialog) {
         hideWebKeyboard();
         super.onDismiss(dialog);
+
+        if (pendingTranslationDelivery && translationCallback != null) {
+            final DeepSeekAssistant.TranslationCallback callback = translationCallback;
+            final String text = pendingTranslationText;
+            pendingTranslationDelivery = false;
+            callback.onTranslation(text);
+        }
 
         if (!loginMode && stateCallback != null) {
             stateCallback.onChanged();

@@ -22,22 +22,44 @@ final class DeepSeekMessageLoader {
     static final class Result {
         final String formattedMessages;
         final String targetMessage;
+        final String targetMessageId;
         final int messageCount;
 
-        Result(String formattedMessages, String targetMessage, int messageCount) {
+        Result(String formattedMessages, String targetMessage, String targetMessageId, int messageCount) {
             this.formattedMessages = formattedMessages;
             this.targetMessage = targetMessage;
+            this.targetMessageId = targetMessageId;
             this.messageCount = messageCount;
         }
     }
 
-    private static final int MAX_CHARS_REPLY = 14000;
-    private static final int MAX_CHARS_TRANSLATE = 9000;
+    private static final int MAX_CHARS_REPLY = 18000;
+    private static final int MAX_CHARS_TRANSLATE = 10000;
+    private static final int MAX_CHARS_POLISH = 9000;
+    private static final int MAX_SINGLE_MESSAGE_CHARS = 1200;
 
     private DeepSeekMessageLoader() {}
 
     static void load(DeepSeekRequest request, Callback callback) {
-        int limit = request.action == DeepSeekRequest.ACTION_REPLY ? 100 : 50;
+        if (request == null || callback == null) return;
+        if (!request.contextEnabled && request.action == DeepSeekRequest.ACTION_POLISH) {
+            callback.onResult(new Result("", "", "", 0));
+            return;
+        }
+        if (!request.contextEnabled && !TextUtils.isEmpty(request.targetMessageText)) {
+            callback.onResult(new Result("", sanitize(request.targetMessageText), safeId(request), 1));
+            return;
+        }
+        int limit;
+        if (!request.contextEnabled) {
+            limit = 20;
+        } else if (request.action == DeepSeekRequest.ACTION_REPLY) {
+            limit = normalizeLimit(request.contextLimit);
+        } else if (request.action == DeepSeekRequest.ACTION_TRANSLATE) {
+            limit = Math.min(50, normalizeLimit(request.contextLimit));
+        } else {
+            limit = Math.min(50, normalizeLimit(request.contextLimit));
+        }
         WKIM.getInstance().getMsgManager().getOrSyncHistoryMessages(
                 request.channelId,
                 request.channelType,
@@ -49,7 +71,6 @@ final class DeepSeekMessageLoader {
                 new IGetOrSyncHistoryMsgBack() {
                     @Override
                     public void onSyncing() {
-                        // The dialog already shows a loading state.
                     }
 
                     @Override
@@ -65,33 +86,49 @@ final class DeepSeekMessageLoader {
         list.removeIf(msg -> msg == null || msg.isDeleted == 1 || isRevoked(msg));
         Collections.sort(list, Comparator.comparingLong(DeepSeekMessageLoader::orderValue));
 
-        int maxChars = request.action == DeepSeekRequest.ACTION_REPLY ? MAX_CHARS_REPLY : MAX_CHARS_TRANSLATE;
+        int maxChars = request.action == DeepSeekRequest.ACTION_REPLY
+                ? MAX_CHARS_REPLY
+                : (request.action == DeepSeekRequest.ACTION_TRANSLATE ? MAX_CHARS_TRANSLATE : MAX_CHARS_POLISH);
         ArrayList<String> lines = new ArrayList<>();
-        String target = "";
+        String target = sanitize(request.targetMessageText);
+        String targetId = safeId(request);
         SimpleDateFormat format = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault());
 
         for (WKMsg msg : list) {
             String content = content(msg);
             if (TextUtils.isEmpty(content)) continue;
+            String sanitized = sanitize(content);
             String who = TextUtils.equals(request.selfUid, msg.fromUID) ? "我" : "对方";
             long timestamp = msg.timestamp;
             if (timestamp > 0 && timestamp < 100000000000L) timestamp *= 1000L;
             String time = timestamp > 0 ? format.format(new Date(timestamp)) : "时间未知";
-            String line = "[" + time + "] " + who + "：" + sanitize(content);
+            String line = "[" + time + "] " + who + "：" + sanitized;
             lines.add(line);
-            if ("对方".equals(who)) target = sanitize(content);
+
+            String id = messageId(msg);
+            if (!TextUtils.isEmpty(request.targetMessageId) && TextUtils.equals(request.targetMessageId, id)) {
+                target = sanitized;
+                targetId = id;
+            } else if (TextUtils.isEmpty(request.targetMessageText) && "对方".equals(who)) {
+                target = sanitized;
+                targetId = id;
+            }
         }
 
-        // Keep the newest messages when text exceeds the WebView-friendly budget.
         StringBuilder out = new StringBuilder();
-        for (int i = lines.size() - 1; i >= 0; i--) {
-            String line = lines.get(i);
-            if (out.length() + line.length() + 1 > maxChars && out.length() > 0) break;
-            if (out.length() == 0) out.insert(0, line);
-            else out.insert(0, line + "\n");
+        if (request.contextEnabled) {
+            for (int i = lines.size() - 1; i >= 0; i--) {
+                String line = lines.get(i);
+                if (out.length() + line.length() + 1 > maxChars && out.length() > 0) break;
+                if (out.length() == 0) out.insert(0, line);
+                else out.insert(0, line + "\n");
+            }
+        } else if (request.action == DeepSeekRequest.ACTION_REPLY && !TextUtils.isEmpty(target)) {
+            out.append("[当前消息] 对方：").append(target);
         }
         int kept = out.length() == 0 ? 0 : out.toString().split("\n", -1).length;
-        return new Result(out.toString(), target, kept);
+        if (!TextUtils.isEmpty(target) && kept == 0) kept = 1;
+        return new Result(out.toString(), target, targetId, kept);
     }
 
     private static boolean isRevoked(WKMsg msg) {
@@ -123,16 +160,37 @@ final class DeepSeekMessageLoader {
         if (TextUtils.isEmpty(display)) display = msg.content;
         if (TextUtils.isEmpty(display)) return "";
         String value = display.trim();
-        // Do not upload internal payload JSON as conversational context.
         if ((value.startsWith("{") && value.endsWith("}")) || value.length() > 4000) return "";
+        if (value.startsWith("__cp_harmony_rtc__:")) return "";
         return value;
     }
 
     private static String sanitize(String value) {
         if (value == null) return "";
-        return value
+        String clean = value
                 .replace('\u0000', ' ')
                 .replace("```", "` ` `")
                 .trim();
+        return clean.length() <= MAX_SINGLE_MESSAGE_CHARS
+                ? clean
+                : clean.substring(0, MAX_SINGLE_MESSAGE_CHARS) + "…";
+    }
+
+    private static String safeId(DeepSeekRequest request) {
+        return request == null || request.targetMessageId == null ? "" : request.targetMessageId.trim();
+    }
+
+    private static String messageId(WKMsg msg) {
+        if (msg == null) return "";
+        if (!TextUtils.isEmpty(msg.messageID) && !"0".equals(msg.messageID)) return msg.messageID;
+        if (!TextUtils.isEmpty(msg.clientMsgNO)) return msg.clientMsgNO;
+        if (msg.messageSeq > 0) return String.valueOf(msg.messageSeq);
+        if (msg.orderSeq > 0) return String.valueOf(msg.orderSeq);
+        return "";
+    }
+
+    private static int normalizeLimit(int value) {
+        if (value <= 0) return 100;
+        return Math.max(20, Math.min(120, value));
     }
 }
