@@ -758,9 +758,19 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "labels.forEach(function(label){var row=label.closest('div.dfb78875');if(!row||!visible(row))return;var r=row.getBoundingClientRect();if(r.width<36||r.height<22||r.height>96||r.width>window.innerWidth*0.96)return;if(rows.indexOf(row)<0)rows.push(row);});" +
                 "if(!rows.length)return null;var option=null;rows.some(function(row){var p=row.parentElement,depth=0;while(p&&p!==document.body&&depth++<4){var modeRows=Array.from(p.querySelectorAll('div.dfb78875')).filter(visible);var modeTexts=modeRows.map(norm),hasOtherMode=modeTexts.some(function(t){return t==='快速模式'||t==='快速'||t==='普通模式'||t==='标准模式'||t==='常规模式'||t==='思考模式'||t==='深度思考';});if(modeRows.length>=2&&modeTexts.indexOf('专家模式')>=0&&hasOtherMode){option=row;return true;}p=p.parentElement;}return false;});" +
                 "return {el:option||rows[0],isOption:!!option};}" +
-                "function hideDownloads(list){var re=/(下载(\\s*deepseek)?(\\s*应用|\\s*app)|打开(\\s*deepseek)?(\\s*应用|\\s*app)|在\\s*app\\s*中打开|download\\s*(the\\s*)?app|get\\s*(the\\s*)?app|open\\s*in\\s*app)/i;" +
-                "list.forEach(function(el){if(re.test(txt(el))){var r=el.getBoundingClientRect();if(r.height<120&&r.width<window.innerWidth*0.95){el.style.setProperty('display','none','important');el.setAttribute('aria-hidden','true');}}});}" +
-                "function enforce(allowMenu){var list=pool(),changed=false,retry=false,now=Date.now();hideDownloads(list);" +
+                "function hideElement(el,allowWide){if(!el)return false;var r=el.getBoundingClientRect();if(r.height<=0||r.height>180)return false;if(!allowWide&&r.width>window.innerWidth*0.95)return false;el.style.setProperty('display','none','important');el.style.setProperty('visibility','hidden','important');el.style.setProperty('pointer-events','none','important');el.setAttribute('aria-hidden','true');return true;}" +
+                "function clickable(el){return el&&el.closest?el.closest('button,a,[role=\"button\"],[role=\"menuitem\"],[tabindex]:not([tabindex=\"-1\"])'):null;}" +
+                "function hidePageChrome(list){" +
+                // Exact quick-mode welcome card from the current DeepSeek DOM.
+                "document.querySelectorAll('div._5758a85,div._6c7e7df').forEach(function(el){if(norm(el)==='使用快速模式开始对话'){var card=el.closest('div._5758a85')||el;hideElement(card,true);}});" +
+                // Download-app button: stable content node plus exact visible label.
+                "document.querySelectorAll('span.ds-button__content').forEach(function(el){var t=norm(el);if(t==='下载应用'||t==='下载app'||t==='downloadapp'||t==='getapp'){hideElement(clickable(el)||el.parentElement,false);}});" +
+                // Text and accessibility fallbacks.
+                "list.forEach(function(el){var t=norm(el);if(t==='下载应用'||t==='下载app'||t==='downloadapp'||t==='getapp'||t==='新对话'||t==='新建对话'||t==='开启新对话'||t==='newchat'||t==='newconversation'||t==='分享'||t==='share'){hideElement(el,false);}});" +
+                // Exact SVG path fallbacks for the current icon-only new-chat and share buttons.
+                "document.querySelectorAll('svg path').forEach(function(path){var d=path.getAttribute('d')||'',target=null;if(d.indexOf('M9.99994 1.22943')>=0&&d.indexOf('M9.21913 6.36949')>=0&&d.indexOf('M13.6304 9.22487')>=0){target=clickable(path);}else if(d.indexOf('M9.73047 1.98239')>=0&&d.indexOf('M18.3906 8.83005')>=0&&d.indexOf('M17.2881 9.73142')>=0){target=clickable(path);}if(target)hideElement(target,false);});" +
+                "}" +
+                "function enforce(allowMenu){var list=pool(),changed=false,retry=false,now=Date.now();hidePageChrome(list);" +
                 "var exact=exactExpert(),expert=exact?exact.el:list.find(function(el){var d=String(el.getAttribute('data-model-type')||'').toLowerCase(),t=norm(el);return d==='expert'||t==='专家模式'||t==='专家'||t==='expert'||t==='expertmode';});" +
                 "var quick=list.find(function(el){var t=norm(el);return t==='快速模式'||t==='快速'||t==='quickmode'||t==='quick';});" +
                 "if(expert&&!window.__tsddExpertDone){if(selected(expert)){window.__tsddExpertDone=true;}else if(!window.__tsddExpertClickAt||now-window.__tsddExpertClickAt>900){if(click(expert)){window.__tsddExpertClickAt=now;window.__tsddExpertClickCount=(window.__tsddExpertClickCount||0)+1;changed=true;if(exact&&exact.isOption)window.__tsddExpertDone=true;else retry=true;}}if(!window.__tsddExpertDone&&(window.__tsddExpertClickCount||0)<5)retry=true;}" +
@@ -769,8 +779,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "disable(/(^|\\s)(深度思考|深度思索|思考|deepthink|deep\\s*think|thinking|reasoning)(\\s|$)/i);" +
                 "disable(/(^|\\s)(智能搜索|联网搜索|网络搜索|搜索|smart\\s*search|web\\s*search|search|browse)(\\s|$)/i);" +
                 "return changed?'changed':(retry?'retry':'stable');}" +
-                "window.__tsddEnforcePrefs=enforce;" +
-                "if(!window.__tsddPrefObserver){window.__tsddPrefObserver=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(function(){try{if(window.__tsddEnforcePrefs)window.__tsddEnforcePrefs(false);}catch(e){}},240);}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','aria-checked','aria-pressed','aria-selected','data-state','data-selected','data-active']});}" +
+                "window.__tsddHidePageChrome=function(){try{hidePageChrome(pool());}catch(e){}};window.__tsddEnforcePrefs=enforce;" +
+                "if(!window.__tsddPrefObserver){window.__tsddPrefObserver=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(function(){try{if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();if(window.__tsddEnforcePrefs)window.__tsddEnforcePrefs(false);}catch(e){}},180);}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','aria-checked','aria-pressed','aria-selected','data-state','data-selected','data-active']});}" +
                 "return enforce(true);" +
                 "}catch(e){return 'error';}})();";
     }
@@ -1152,13 +1162,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             return;
         }
         if ("send".equals(mode)) {
-            new android.app.AlertDialog.Builder(requireContext())
-                    .setTitle(R.string.wkdeepseek_send_confirm)
-                    .setMessage(cleanLocalDisplayText)
-                    .setNegativeButton(R.string.wkdeepseek_cancel, null)
-                    .setPositiveButton(R.string.wkdeepseek_send,
-                            (dialog, which) -> deliverReply(cleanText, cleanLocalDisplayText, true))
-                    .show();
+            // The user already reviewed the reply and explicitly tapped “直接发送”.
+            deliverReply(cleanText, cleanLocalDisplayText, true);
             return;
         }
         deliverReply(cleanText, cleanLocalDisplayText, false);
