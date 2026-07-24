@@ -958,23 +958,33 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 webUiPrepareInFlight = false;
                 String result = cleanJsResult(value);
                 webUiPrepareAttempts++;
+                DeepSeekHistoryLog.log("WEB_UI_PREF_RESULT", "attempt=" + webUiPrepareAttempts
+                        + " result=" + result + " continue=" + continueFill);
 
-                // 专家模式可能比输入框晚渲染，或先要展开模式菜单。允许多轮复查，
-                // 但达到上限后仍继续提交，避免网页改版导致助手完全不可用。
-                if (("changed".equals(result) || "retry".equals(result))
-                        && webUiPrepareAttempts < 8) {
-                    handler.postDelayed(() -> applyWebUiPreferences(continueFill), randomDelay(160, 260));
+                if ("expert-ready".equals(result)) {
+                    webUiPrepared = true;
+                    if (continueFill || !TextUtils.isEmpty(pendingPrompt)) {
+                        handler.postDelayed(this::tryFillPrompt, 40);
+                    }
                     return;
                 }
-                webUiPrepared = true;
-                if (continueFill || !TextUtils.isEmpty(pendingPrompt)) {
-                    handler.postDelayed(this::tryFillPrompt, 30);
+
+                // Never submit in an unconfirmed mode. DeepSeek renders the mode chip/menu late on
+                // some WebView builds, so keep retrying until the visible header explicitly says
+                // "专家模式" and the optional thinking/search toggles have been switched off.
+                webUiPrepared = false;
+                if (statusView != null) statusView.setText("正在切换专家模式…");
+                if (webUiPrepareAttempts == 24) {
+                    notifyUser("暂时无法确认专家模式，正在继续重试");
                 }
+                handler.postDelayed(() -> applyWebUiPreferences(continueFill),
+                        webUiPrepareAttempts < 24 ? randomDelay(180, 300) : 900L);
             });
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             webUiPrepareInFlight = false;
-            webUiPrepared = true;
-            if (continueFill) fillPromptNow();
+            webUiPrepared = false;
+            DeepSeekHistoryLog.log("WEB_UI_PREF_ERROR", e.getClass().getSimpleName());
+            handler.postDelayed(() -> applyWebUiPreferences(continueFill), 700L);
         }
     }
 
@@ -983,49 +993,24 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;}" +
                 "function txt(el){return ((el&&(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')))||'').replace(/\\s+/g,' ').trim();}" +
                 "function norm(el){return txt(el).replace(/\\s+/g,'').toLowerCase();}" +
-                "function selected(el){if(!el)return false;var cur=el,n=0;while(cur&&cur!==document.documentElement&&n++<4){var c=String(cur.className||'').toLowerCase();" +
-                "if(/(^|[ _-])(selected|active|checked|current)([ _-]|$)/.test(c))return true;" +
-                "if(cur.getAttribute('aria-checked')==='true'||cur.getAttribute('aria-pressed')==='true'||cur.getAttribute('aria-selected')==='true'||cur.getAttribute('aria-current')==='true')return true;" +
-                "var ds=String(cur.getAttribute('data-state')||'').toLowerCase();if(ds==='checked'||ds==='selected'||ds==='active'||ds==='on')return true;" +
-                "if(cur.getAttribute('data-selected')==='true'||cur.getAttribute('data-active')==='true')return true;cur=cur.parentElement;}return false;}" +
-                "function click(el){if(!el||!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;" +
-                "var r=el.getBoundingClientRect();if(r.width>window.innerWidth*0.98&&r.height>window.innerHeight*0.45)return false;" +
-                "try{el.focus({preventScroll:true});}catch(e){try{el.focus();}catch(e2){}}" +
-                "try{el.click();return true;}catch(e){try{el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}catch(e2){return false;}}}" +
-                "function pool(){var q='button,a,label,[role=\\\"button\\\"],[role=\\\"radio\\\"],[role=\\\"switch\\\"],[role=\\\"checkbox\\\"],[role=\\\"menuitem\\\"],[role=\\\"option\\\"],[role=\\\"tab\\\"],[data-model-type],[tabindex]:not([tabindex=\\\"-1\\\"])';" +
-                "return Array.from(document.querySelectorAll(q)).filter(function(el){var t=txt(el);return visible(el)&&t.length>0&&t.length<80;});}" +
-                "function exactExpert(){var labels=Array.from(document.querySelectorAll('div.dfb78875>span._321831d,span._321831d')).filter(function(el){return norm(el)==='专家模式';}),rows=[];" +
-                "labels.forEach(function(label){var row=label.closest('div.dfb78875');if(!row||!visible(row))return;var r=row.getBoundingClientRect();if(r.width<36||r.height<22||r.height>96||r.width>window.innerWidth*0.96)return;if(rows.indexOf(row)<0)rows.push(row);});" +
-                "if(!rows.length)return null;var option=null;rows.some(function(row){var p=row.parentElement,depth=0;while(p&&p!==document.body&&depth++<4){var modeRows=Array.from(p.querySelectorAll('div.dfb78875')).filter(visible);var modeTexts=modeRows.map(norm),hasOtherMode=modeTexts.some(function(t){return t==='快速模式'||t==='快速'||t==='普通模式'||t==='标准模式'||t==='常规模式'||t==='思考模式'||t==='深度思考';});if(modeRows.length>=2&&modeTexts.indexOf('专家模式')>=0&&hasOtherMode){option=row;return true;}p=p.parentElement;}return false;});" +
-                "return {el:option||rows[0],isOption:!!option};}" +
+                "function selected(el){if(!el)return false;var cur=el,n=0;while(cur&&cur!==document.documentElement&&n++<5){var c=String(cur.className||'').toLowerCase();if(/(^|[ _-])(selected|active|checked|current)([ _-]|$)/.test(c))return true;if(cur.getAttribute('aria-checked')==='true'||cur.getAttribute('aria-pressed')==='true'||cur.getAttribute('aria-selected')==='true'||cur.getAttribute('aria-current')==='true')return true;var ds=String(cur.getAttribute('data-state')||'').toLowerCase();if(ds==='checked'||ds==='selected'||ds==='active'||ds==='on')return true;if(cur.getAttribute('data-selected')==='true'||cur.getAttribute('data-active')==='true')return true;cur=cur.parentElement;}return false;}" +
+                "function click(el){if(!el||!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;var r=el.getBoundingClientRect();if(r.width>window.innerWidth*0.98&&r.height>window.innerHeight*0.45)return false;try{el.focus({preventScroll:true});}catch(e){try{el.focus();}catch(e2){}}try{el.click();return true;}catch(e){try{el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}catch(e2){return false;}}}" +
+                "function pool(){var q='button,a,label,[role=\"button\"],[role=\"radio\"],[role=\"switch\"],[role=\"checkbox\"],[role=\"menuitem\"],[role=\"option\"],[role=\"tab\"],[data-model-type],[tabindex]:not([tabindex=\"-1\"])';return Array.from(document.querySelectorAll(q)).filter(function(el){var t=txt(el);return visible(el)&&t.length>0&&t.length<100;});}" +
+                "function compact(el){if(!el||!visible(el))return false;var r=el.getBoundingClientRect();return r.width>=20&&r.height>=18&&r.height<=100&&r.width<=window.innerWidth*0.96;}" +
+                "function knownModeText(value){var t=String(value||'').replace(/\\s+/g,'').toLowerCase();return /^(专家模式|专家|快速模式|快速|普通模式|标准模式|常规模式|思考模式|深度思考|expertmode|expert|quickmode|quick|normalmode|standardmode)$/.test(t);}" +
+                "function actionRoot(node){var cur=node,fallback=null,n=0;while(cur&&cur!==document.body&&cur!==document.documentElement&&n++<9){var r=cur.getBoundingClientRect(),tag=String(cur.tagName||'').toLowerCase(),role=String(cur.getAttribute&&cur.getAttribute('role')||'').toLowerCase(),cls=String(cur.className||'').toLowerCase(),isCompact=r.width>=16&&r.height>=16&&r.width<=220&&r.height<=110;if(isCompact&&(tag==='button'||tag==='a'||role==='button'||role==='menuitem'||role==='option'||(cur.hasAttribute&&cur.hasAttribute('tabindex'))))return cur;if(!fallback&&isCompact&&(/ds-button|button|toggle|mode|c03d486a/.test(cls)||getComputedStyle(cur).cursor==='pointer'||typeof cur.onclick==='function'))fallback=cur;cur=cur.parentElement;}return fallback;}" +
+                "function currentModeLabel(){var selectors=['span._46a12ab','.c03d486a span','.the-header span','[data-model-type]'];var nodes=[];selectors.forEach(function(q){try{nodes=nodes.concat(Array.from(document.querySelectorAll(q)));}catch(e){}});var seen=[];for(var i=0;i<nodes.length;i++){var el=nodes[i];if(seen.indexOf(el)>=0||!visible(el))continue;seen.push(el);var t=norm(el);if(!knownModeText(t))continue;var r=el.getBoundingClientRect();if(r.top>window.innerHeight*0.32||r.height>80)continue;return el;}return null;}" +
+                "function expertOption(){var nodes=Array.from(document.querySelectorAll('button,[role=\"button\"],[role=\"menuitem\"],[role=\"option\"],label,div,span')).filter(function(el){return compact(el)&&norm(el)==='专家模式';});for(var i=0;i<nodes.length;i++){var el=nodes[i],r=el.getBoundingClientRect();if(r.top<window.innerHeight*0.02)continue;var root=actionRoot(el)||el;if(!compact(root))continue;var cls=String(root.className||'').toLowerCase();if(root.closest&&root.closest('.the-header')&&!/menu|option|popover|dropdown/.test(cls))continue;return root;}return null;}" +
                 "function hideElement(el,allowWide){if(!el)return false;var r=el.getBoundingClientRect();if(r.height<=0||r.height>220)return false;if(!allowWide&&r.width>window.innerWidth*0.96)return false;el.style.setProperty('display','none','important');el.style.setProperty('visibility','hidden','important');el.style.setProperty('pointer-events','none','important');el.setAttribute('aria-hidden','true');return true;}" +
-                // DeepSeek 部分图标不是标准 button。向上寻找真正的小型操作容器，
-                // 优先语义按钮，其次才使用 ds-button/cursor:pointer 的紧凑父节点。
-                "function actionRoot(node){var cur=node,fallback=null,n=0;while(cur&&cur!==document.body&&cur!==document.documentElement&&n++<9){var r=cur.getBoundingClientRect(),tag=String(cur.tagName||'').toLowerCase(),role=String(cur.getAttribute&&cur.getAttribute('role')||'').toLowerCase(),cls=String(cur.className||'').toLowerCase(),compact=r.width>=16&&r.height>=16&&r.width<=190&&r.height<=100;" +
-                "if(compact&&(tag==='button'||tag==='a'||role==='button'||role==='menuitem'||(cur.hasAttribute&&cur.hasAttribute('tabindex'))))return cur;" +
-                "if(!fallback&&compact&&(/ds-button|button|icon/.test(cls)||(getComputedStyle(cur).cursor==='pointer')||typeof cur.onclick==='function'))fallback=cur;cur=cur.parentElement;}return fallback;}" +
-                "function hideExactText(scope,words){Array.from((scope||document).querySelectorAll('button,a,[role=\\\"button\\\"],[role=\\\"menuitem\\\"],span,div')).forEach(function(el){var t=norm(el);if(words.indexOf(t)<0)return;var root=actionRoot(el)||el;if(root&&root!==document.body&&root!==document.documentElement)hideElement(root,false);});}" +
+                "function hideExactText(scope,words){Array.from((scope||document).querySelectorAll('button,a,[role=\"button\"],[role=\"menuitem\"],span,div')).forEach(function(el){var t=norm(el);if(words.indexOf(t)<0)return;var root=actionRoot(el)||el;if(root&&root!==document.body&&root!==document.documentElement)hideElement(root,false);});}" +
                 "function hideCodeDownloads(){document.querySelectorAll('pre').forEach(function(pre){var scope=pre.parentElement;if(!scope)return;var r=scope.getBoundingClientRect();if(r.height>520&&scope.parentElement){var p=scope.parentElement,pr=p.getBoundingClientRect();if(pr.height>0&&pr.height<520)scope=p;}hideExactText(scope,['下载','download']);});}" +
-                "function hidePageChrome(list){" +
-                "document.querySelectorAll('div._5758a85,div._6c7e7df').forEach(function(el){if(norm(el)==='使用快速模式开始对话'){var card=el.closest('div._5758a85')||el;hideElement(card,true);}});" +
-                "document.querySelectorAll('span.ds-button__content').forEach(function(el){var t=norm(el);if(t==='下载应用'||t==='下载app'||t==='downloadapp'||t==='getapp'){hideElement(actionRoot(el)||el.parentElement,false);}});" +
-                "hideExactText(document,['下载应用','下载app','downloadapp','getapp','新对话','新建对话','开启新对话','newchat','newconversation','分享','share']);" +
-                "document.querySelectorAll('svg path').forEach(function(path){var d=path.getAttribute('d')||'',target=null;" +
-                "if(d.indexOf('M9.99994 1.22943')>=0&&d.indexOf('M9.21913 6.36949')>=0&&d.indexOf('M13.6304 9.22487')>=0)target=actionRoot(path);" +
-                "else if(d.indexOf('M9.73047 1.98239')>=0&&d.indexOf('M18.3906 8.83005')>=0&&d.indexOf('M17.2881 9.73142')>=0)target=actionRoot(path);" +
-                "if(target)hideElement(target,false);});hideCodeDownloads();}" +
-                "function enforce(allowMenu){var list=pool(),changed=false,retry=false,now=Date.now();hidePageChrome(list);" +
-                "var exact=exactExpert(),expert=exact?exact.el:list.find(function(el){var d=String(el.getAttribute('data-model-type')||'').toLowerCase(),t=norm(el);return d==='expert'||t==='专家模式'||t==='专家'||t==='expert'||t==='expertmode';});" +
-                "if(expert&&!window.__tsddExpertDone){if(selected(expert)){window.__tsddExpertDone=true;}else if(!window.__tsddExpertClickAt||now-window.__tsddExpertClickAt>900){if(click(expert)){window.__tsddExpertClickAt=now;window.__tsddExpertClickCount=(window.__tsddExpertClickCount||0)+1;changed=true;if(exact&&exact.isOption)window.__tsddExpertDone=true;else retry=true;}}if(!window.__tsddExpertDone&&(window.__tsddExpertClickCount||0)<5)retry=true;}" +
-                "else if(!window.__tsddExpertDone&&allowMenu){retry=true;var trigger=list.find(function(el){var t=norm(el);return (el.getAttribute('aria-haspopup')||'')!==''&&(/快速模式|普通模式|标准模式|常规模式|quickmode|normalmode|standardmode|^模式$|^mode$/.test(t));});if(trigger&&(!window.__tsddModeMenuTryAt||now-window.__tsddModeMenuTryAt>1200)){window.__tsddModeMenuTryAt=now;if(click(trigger))changed=true;}}" +
-                "function disable(re){var el=list.find(function(x){return re.test(txt(x))&&selected(x);});if(el&&click(el))changed=true;}" +
-                "disable(/(^|\\s)(深度思考|深度思索|思考|deepthink|deep\\s*think|thinking|reasoning)(\\s|$)/i);" +
-                "disable(/(^|\\s)(智能搜索|联网搜索|网络搜索|搜索|smart\\s*search|web\\s*search|search|browse)(\\s|$)/i);" +
-                "return changed?'changed':(retry?'retry':'stable');}" +
-                "window.__tsddHidePageChrome=function(){try{hidePageChrome(pool());}catch(e){}};window.__tsddEnforcePrefs=enforce;" +
-                "if(!window.__tsddPrefObserver){window.__tsddPrefObserver=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(function(){try{if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();if(window.__tsddEnforcePrefs)window.__tsddEnforcePrefs(false);}catch(e){}},90);}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','aria-checked','aria-pressed','aria-selected','data-state','data-selected','data-active']});}" +
+                "function hidePageChrome(){document.querySelectorAll('div._5758a85,div._6c7e7df').forEach(function(el){if(norm(el)==='使用快速模式开始对话'){var card=el.closest('div._5758a85')||el;hideElement(card,true);}});document.querySelectorAll('span.ds-button__content').forEach(function(el){var t=norm(el);if(t==='下载应用'||t==='下载app'||t==='downloadapp'||t==='getapp'){hideElement(actionRoot(el)||el.parentElement,false);}});hideExactText(document,['下载应用','下载app','downloadapp','getapp','新对话','新建对话','开启新对话','newchat','newconversation','分享','share']);document.querySelectorAll('svg path').forEach(function(path){var d=path.getAttribute('d')||'',target=null;if(d.indexOf('M9.99994 1.22943')>=0&&d.indexOf('M9.21913 6.36949')>=0&&d.indexOf('M13.6304 9.22487')>=0)target=actionRoot(path);else if(d.indexOf('M9.73047 1.98239')>=0&&d.indexOf('M18.3906 8.83005')>=0&&d.indexOf('M17.2881 9.73142')>=0)target=actionRoot(path);if(target)hideElement(target,false);});hideCodeDownloads();}" +
+                "function disableSelected(list,re){var el=list.find(function(x){return re.test(txt(x))&&selected(x);});return !!(el&&click(el));}" +
+                "function enforce(allowMenu){var list=pool(),now=Date.now();hidePageChrome();var label=currentModeLabel(),mode=label?norm(label):'';if(mode!=='专家模式'&&mode!=='专家'&&mode!=='expertmode'&&mode!=='expert'){var option=expertOption();if(option&&(!window.__tsddExpertOptionAt||now-window.__tsddExpertOptionAt>650)){window.__tsddExpertOptionAt=now;if(click(option))return 'changed';}if(allowMenu&&label&&(!window.__tsddModeTriggerAt||now-window.__tsddModeTriggerAt>650)){window.__tsddModeTriggerAt=now;var trigger=label.closest('.c03d486a')||actionRoot(label)||label.parentElement;if(click(trigger))return 'changed';}return 'retry';}" +
+                "window.__tsddExpertDone=true;var changed=false;if(disableSelected(list,/(^|\\s)(深度思考|深度思索|思考|deepthink|deep\\s*think|thinking|reasoning)(\\s|$)/i))changed=true;if(disableSelected(list,/(^|\\s)(智能搜索|联网搜索|网络搜索|搜索|smart\\s*search|web\\s*search|search|browse)(\\s|$)/i))changed=true;return changed?'changed':'expert-ready';}" +
+                "window.__tsddHidePageChrome=function(){try{hidePageChrome();}catch(e){}};window.__tsddEnforcePrefs=enforce;if(!window.__tsddPrefObserverV3){window.__tsddPrefObserverV3=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(function(){try{hidePageChrome();enforce(false);}catch(e){}},100);}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','aria-checked','aria-pressed','aria-selected','data-state','data-selected','data-active']});}" +
                 "return enforce(true);" +
-                "}catch(e){return 'stable';}})();";
+                "}catch(e){return 'retry';}})();";
     }
 
     private void fillPromptNow() {
@@ -1138,8 +1123,11 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 handler.postDelayed(this::captureConversationFromCurrentUrl, 3500);
                 statusView.setText(R.string.wkdeepseek_thinking);
                 hideSubmittedPromptBubble();
-                installReplyButtons();
+                // Flip into answer phase before reinstalling the observer. DeepSeek may already have
+                // created the streaming assistant container at this point; installing first would
+                // incorrectly mark that new container as historical content.
                 beginAnswerObservation();
+                installReplyButtons();
                 return;
             }
 
@@ -1346,18 +1334,18 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     }
 
     /**
-     * 提交完成后才开始识别回答代码块。提交前以及刚提交时出现的代码块属于我们发送
-     * 给 DeepSeek 的提示词，必须标记为忽略，否则会在用户提示气泡下面重复叠加
-     * “填入聊天/直接发送”按钮。
+     * 提交完成后开启本轮回答观察。历史回答已在提交前标记，避免复用会话时给旧内容
+     * 重复添加“填入聊天/直接发送”按钮。
      */
     private void beginAnswerObservation() {
         if (webView == null || !isAdded()) return;
         String js = "(function(){try{" +
-                // 只标记调用这一刻已经存在的代码块。不能再延迟 120/320ms 重复标记，
-                // 否则 DeepSeek 很快返回时，真正的回答代码块也会被误判成提示词。
-                "function markExisting(){document.querySelectorAll('pre code').forEach(function(code){code.dataset.tsddIgnore='1';var pre=code.closest('pre');if(pre)pre.dataset.tsddIgnore='1';});document.querySelectorAll('[data-tsdd-reply-bar]').forEach(function(x){x.remove();});}" +
-                "window.__tsddAnswerPhase=true;window.__tsddAnswerReady=false;window.__tsddAnswerNotBefore=Date.now()+100;markExisting();" +
-                "setTimeout(function(){window.__tsddAnswerReady=true;if(window.__tsddDeepSeekAdd)window.__tsddDeepSeekAdd();},120);return 'ok';" +
+                // Existing messages are marked when the result observer is installed before submit.
+                // At this point a new assistant placeholder may already exist, so never mark current
+                // message roots here or the streaming answer would be ignored permanently.
+                "document.querySelectorAll('[data-tsdd-reply-bar]').forEach(function(x){x.remove();});" +
+                "window.__tsddAnswerPhase=true;window.__tsddAnswerReady=false;window.__tsddResultReady=false;window.__tsddAnswerNotBefore=Date.now()+120;" +
+                "setTimeout(function(){window.__tsddAnswerReady=true;if(window.__tsddDeepSeekAddV3)window.__tsddDeepSeekAddV3();},150);return 'ok';" +
                 "}catch(e){return 'error';}})();";
         try {
             webView.evaluateJavascript(js, null);
@@ -1374,33 +1362,32 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             fallbackMode = "use";
         }
         String js = "(function(){" +
-                "if(window.__tsddDeepSeekInstalled){if(window.__tsddDeepSeekAdd)window.__tsddDeepSeekAdd();return;}window.__tsddDeepSeekInstalled=true;" +
-                "var fallbackMode='" + fallbackMode + "';" +
-                "function go(mode,text,local){if(!text)return;var u='tsdd-deepseek://result?mode='+mode+'&text='+encodeURIComponent(text);if(local)u+='&local='+encodeURIComponent(local);location.href=u;}" +
-                "function norm(v){return String(v||'').replace(/\\s+/g,'').toLowerCase();}" +
+                "function norm(v){return String(v||'').replace(/\\s+/g,' ').trim();}" +
+                "function compact(v){return String(v||'').replace(/\\s+/g,'').toLowerCase();}" +
                 "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;}" +
-                "function actionRoot(node){var cur=node,fallback=null,n=0;while(cur&&cur!==document.body&&cur!==document.documentElement&&n++<8){var r=cur.getBoundingClientRect(),tag=String(cur.tagName||'').toLowerCase(),role=String(cur.getAttribute&&cur.getAttribute('role')||'').toLowerCase(),cls=String(cur.className||'').toLowerCase(),compact=r.width>=16&&r.height>=16&&r.width<=190&&r.height<=100;if(compact&&(tag==='button'||tag==='a'||role==='button'||role==='menuitem'||(cur.hasAttribute&&cur.hasAttribute('tabindex'))))return cur;if(!fallback&&compact&&(/ds-button|button|icon/.test(cls)||getComputedStyle(cur).cursor==='pointer'||typeof cur.onclick==='function'))fallback=cur;cur=cur.parentElement;}return fallback;}" +
-                "function hideNativeDownload(pre){var scope=pre&&pre.parentElement;if(!scope)return;Array.from(scope.querySelectorAll('button,a,[role=\\\"button\\\"],span,div')).forEach(function(el){var t=norm((el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')));if(t!=='下载'&&t!=='download')return;var root=actionRoot(el)||el;if(root&&root!==document.body)root.style.setProperty('display','none','important');});}" +
-                "function localTextFor(pre){try{var n=pre?pre.nextElementSibling:null,steps=0;while(n&&steps++<6){if(n.tagName==='PRE'||/^H[1-6]$/.test(n.tagName))break;var t=(n.innerText||n.textContent||'').trim();var m=t.match(/(?:【?本地显示】?|我的母语翻译)\\s*[：:]\\s*([\\s\\S]+)/);if(m){var v=(m[1]||'').trim().split(/\\n(?=【|#{1,6}\\s)/)[0].trim();if(v)return v;}n=n.nextElementSibling;}return '';}catch(e){return '';}}" +
-                "function button(label,mode,code,pre){var b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.tsddAction='1';" +
-                "b.style.cssText='display:inline-flex!important;visibility:visible!important;align-items:center;justify-content:center;border:0;border-radius:17px;padding:8px 13px;background:#edf3ff;color:#295eea;font-size:13px;font-weight:600;margin-left:8px;min-height:34px;position:relative;z-index:8';" +
-                "b.onclick=function(e){e.preventDefault();e.stopPropagation();var local=(mode==='use'||mode==='send')?localTextFor(pre):'';go(mode,(code.innerText||'').trim(),local);};return b;}" +
-                "function composerRoot(){var boxes=Array.from(document.querySelectorAll('textarea,[contenteditable=\\\"true\\\"],[role=\\\"textbox\\\"]')).filter(visible);boxes.sort(function(a,b){return a.getBoundingClientRect().top-b.getBoundingClientRect().top;});var input=boxes.length?boxes[boxes.length-1]:null;if(!input)return null;var best=input,cur=input,n=0,maxH=Math.min(320,Math.max(150,window.innerHeight*0.38));while(cur.parentElement&&n++<6){var p=cur.parentElement;if(p===document.body||p===document.documentElement)break;var r=p.getBoundingClientRect();if(r.width<window.innerWidth*0.45||r.height<=0||r.height>maxH||r.bottom<window.innerHeight*0.55)break;if(p.querySelectorAll('article,pre,[data-message-id],[data-testid*=message]').length>2)break;best=p;cur=p;}return best;}" +
-                "function hideComposer(){var root=composerRoot();if(!root||root===document.body||root===document.documentElement)return;var r=root.getBoundingClientRect(),maxH=Math.min(320,Math.max(150,window.innerHeight*0.38));if(r.height>maxH||r.width>window.innerWidth*1.01)return;root.dataset.tsddComposerHidden='1';root.style.setProperty('display','none','important');root.style.setProperty('visibility','hidden','important');root.style.setProperty('pointer-events','none','important');document.documentElement.style.setProperty('scroll-padding-bottom','8px','important');}" +
-                "function keepComposerHidden(){hideComposer();setTimeout(hideComposer,180);setTimeout(hideComposer,650);setTimeout(hideComposer,1400);}" +
-                "function cleanup(){var seen={};document.querySelectorAll('[data-tsdd-reply-bar]').forEach(function(bar){var owner=bar.dataset.tsddOwner||'';if(!owner||seen[owner]||!document.querySelector('pre[data-tsdd-pre-id=\\\"'+owner+'\\\"]'))bar.remove();else seen[owner]=true;});}" +
-                "function add(){cleanup();if(!window.__tsddAnswerPhase||!window.__tsddAnswerReady||Date.now()<(window.__tsddAnswerNotBefore||0))return;var added=false,lastPre=null;document.querySelectorAll('pre code').forEach(function(code){" +
-                "var pre=code.closest('pre');if(!pre||pre.dataset.tsddIgnore==='1'||code.dataset.tsddIgnore==='1')return;hideNativeDownload(pre);if(code.dataset.tsddReady==='1')return;" +
-                "var cls=(code.className||'').toLowerCase(),raw=(code.innerText||'').trim(),header=norm((pre.parentElement&&pre.parentElement.innerText)||'');var looksProfile=cls.indexOf('profile')>=0||(raw.charAt(0)==='{'&&raw.indexOf('\\\"interaction_state\\\"')>=0);var mode=looksProfile?'profile':((cls.indexOf('translate')>=0||header.indexOf('translate')===0)?fallbackMode:((cls.indexOf('reply')>=0||header.indexOf('reply')===0)?'use':fallbackMode));" +
-                "if(!pre.dataset.tsddPreId){window.__tsddPreSeq=(window.__tsddPreSeq||0)+1;pre.dataset.tsddPreId='p'+window.__tsddPreSeq;}var owner=pre.dataset.tsddPreId;if(document.querySelector('[data-tsdd-reply-bar][data-tsdd-owner=\\\"'+owner+'\\\"]')){code.dataset.tsddReady='1';return;}" +
-                "var box=document.createElement('div');box.dataset.tsddReplyBar='1';box.dataset.tsddOwner=owner;box.style.cssText='display:flex!important;visibility:visible!important;justify-content:flex-end;align-items:center;flex-wrap:wrap;padding:8px 2px 12px;position:relative;z-index:7';" +
-                "if(mode==='profile')box.appendChild(button('更新联系人记录','profile',code,pre));" +
-                "else if(mode==='copy')box.appendChild(button('复制译文','copy',code,pre));" +
-                "else if(mode==='translate_use'){box.appendChild(button('显示译文','translate_use',code,pre));box.appendChild(button('复制译文','copy',code,pre));}" +
-                "else{box.appendChild(button('填入聊天','use',code,pre));box.appendChild(button('直接发送','send',code,pre));}" +
-                "if(pre.parentNode){pre.parentNode.insertBefore(box,pre.nextSibling);code.dataset.tsddReady='1';added=true;lastPre=pre;}});" +
-                "if(added||window.__tsddResultReady){window.__tsddResultReady=true;keepComposerHidden();if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();if(lastPre)setTimeout(function(){try{lastPre.scrollIntoView({behavior:'smooth',block:'end'});}catch(e){lastPre.scrollIntoView(false);}},120);}}" +
-                "window.__tsddDeepSeekAdd=add;var timer=null;if(!window.__tsddResultObserver){window.__tsddResultObserver=true;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,80);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});}add();" +
+                "function restoreComposer(){document.querySelectorAll('[data-tsdd-composer-hidden]').forEach(function(root){root.removeAttribute('data-tsdd-composer-hidden');root.removeAttribute('aria-hidden');root.style.removeProperty('display');root.style.removeProperty('visibility');root.style.removeProperty('pointer-events');});document.documentElement.style.removeProperty('scroll-padding-bottom');}" +
+                "function markBaseline(){if(window.__tsddAnswerPhase)return;document.querySelectorAll('.ds-assistant-message-main-content').forEach(function(root){root.dataset.tsddIgnoreAnswer='1';});document.querySelectorAll('pre code').forEach(function(code){code.dataset.tsddIgnore='1';var pre=code.closest('pre');if(pre)pre.dataset.tsddIgnore='1';});}" +
+                "restoreComposer();markBaseline();" +
+                "if(window.__tsddDeepSeekInstalledV3){if(window.__tsddDeepSeekAddV3)window.__tsddDeepSeekAddV3();return;}" +
+                "window.__tsddDeepSeekInstalledV3=true;" +
+                "var fallbackMode='" + fallbackMode + "';" +
+"function go(mode,text,local){if(!text)return;var u='tsdd-deepseek://result?mode='+mode+'&text='+encodeURIComponent(text);if(local)u+='&local='+encodeURIComponent(local);location.href=u;}" +
+                "function actionRoot(node){var cur=node,fallback=null,n=0;while(cur&&cur!==document.body&&cur!==document.documentElement&&n++<8){var r=cur.getBoundingClientRect(),tag=String(cur.tagName||'').toLowerCase(),role=String(cur.getAttribute&&cur.getAttribute('role')||'').toLowerCase(),cls=String(cur.className||'').toLowerCase(),isCompact=r.width>=16&&r.height>=16&&r.width<=190&&r.height<=100;if(isCompact&&(tag==='button'||tag==='a'||role==='button'||role==='menuitem'||(cur.hasAttribute&&cur.hasAttribute('tabindex'))))return cur;if(!fallback&&isCompact&&(/ds-button|button|icon/.test(cls)||getComputedStyle(cur).cursor==='pointer'||typeof cur.onclick==='function'))fallback=cur;cur=cur.parentElement;}return fallback;}" +
+                "function hideNativeDownload(pre){var scope=pre&&pre.parentElement;if(!scope)return;Array.from(scope.querySelectorAll('button,a,[role=\"button\"],span,div')).forEach(function(el){var t=compact(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title'));if(t!=='下载'&&t!=='download')return;var root=actionRoot(el)||el;if(root&&root!==document.body)root.style.setProperty('display','none','important');});}" +
+                "function button(label,mode,text,local){var b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.tsddAction='1';b.style.cssText='display:inline-flex!important;visibility:visible!important;align-items:center;justify-content:center;border:0;border-radius:17px;padding:8px 13px;background:#edf3ff;color:#295eea;font-size:13px;font-weight:600;margin-left:8px;min-height:34px;position:relative;z-index:8';b.onclick=function(e){e.preventDefault();e.stopPropagation();go(mode,text,local||'');};return b;}" +
+                "function nextValue(elements,start,re,maxSteps){for(var i=start+1,steps=0;i<elements.length&&steps++<(maxSteps||5);i++){var t=norm(elements[i].innerText||elements[i].textContent);var m=t.match(re);if(m&&norm(m[1]))return {value:norm(m[1]),element:elements[i]};if(/^(?:【?(?:建议|版本)\\s*\\d+】?)$/.test(t)||/^(?:原文|回复原文|对方语言|发送内容)\\s*[：:]/.test(t))break;}return null;}" +
+                "function rows(root){return Array.from(root.querySelectorAll('p,li')).filter(function(el){return visible(el)&&!el.closest('[data-tsdd-reply-bar]');});}" +
+                "function ownerFor(el,prefix){if(!el.dataset.tsddPlainOwner){window.__tsddPlainSeq=(window.__tsddPlainSeq||0)+1;el.dataset.tsddPlainOwner=prefix+(window.__tsddPlainSeq);}return el.dataset.tsddPlainOwner;}" +
+                "function addBar(anchor,owner,buttons){if(!anchor||!anchor.parentNode||document.querySelector('[data-tsdd-reply-bar][data-tsdd-owner=\"'+owner+'\"]'))return false;var box=document.createElement('div');box.dataset.tsddReplyBar='1';box.dataset.tsddOwner=owner;box.style.cssText='display:flex!important;visibility:visible!important;justify-content:flex-end;align-items:center;flex-wrap:wrap;padding:8px 2px 12px;position:relative;z-index:7';buttons.forEach(function(b){box.appendChild(b);});anchor.parentNode.insertBefore(box,anchor.nextSibling);return true;}" +
+                "function parsePlain(root){if(!root||root.dataset.tsddIgnoreAnswer==='1')return {added:false,last:null};var elements=rows(root),added=false,last=null;if(fallbackMode==='translate_use'||fallbackMode==='copy'){for(var i=0;i<elements.length;i++){var t=norm(elements[i].innerText||elements[i].textContent),m=t.match(/^(?:自然)?译文\\s*[：:]\\s*([\\s\\S]+)$/);if(!m||!norm(m[1]))continue;var translated=norm(m[1]),owner=ownerFor(elements[i],'t');var buttons=[];if(fallbackMode==='translate_use')buttons.push(button('显示译文','translate_use',translated,''));buttons.push(button('复制译文','copy',translated,''));if(addBar(elements[i],owner,buttons)){added=true;last=elements[i];}break;}return {added:added,last:last};}" +
+                "for(var j=0;j<elements.length;j++){var line=norm(elements[j].innerText||elements[j].textContent);var match=line.match(/^(?:原文|回复原文|对方语言|发送内容)\\s*[：:]\\s*([\\s\\S]+)$/);if(!match||!norm(match[1]))continue;var original=norm(match[1]);var translatedInfo=nextValue(elements,j,/^(?:译文|我的母语译文|中文译文|本地显示)\\s*[：:]\\s*([\\s\\S]+)$/,5);if(!translatedInfo)continue;var translated=translatedInfo.value,anchor=translatedInfo.element,owner=ownerFor(anchor,'r'),combined=original+(translated?'\\n'+translated:'');var buttons=[button('填入聊天','use',original,translated),button('直接发送','send',original,translated),button('复制原文+译文','copy',combined,'')];if(addBar(anchor,owner,buttons)){added=true;last=anchor;}}" +
+                "return {added:added,last:last};}" +
+                "function localTextFor(pre){try{var n=pre?pre.nextElementSibling:null,steps=0;while(n&&steps++<6){if(n.tagName==='PRE'||/^H[1-6]$/.test(n.tagName))break;var t=norm(n.innerText||n.textContent),m=t.match(/(?:译文|本地显示|我的母语翻译)\\s*[：:]\\s*([\\s\\S]+)/);if(m&&norm(m[1]))return {value:norm(m[1]),element:n};n=n.nextElementSibling;}return {value:'',element:null};}catch(e){return {value:'',element:null};}}" +
+                "function plainCard(pre,original,translated){if(pre.dataset.tsddPlainCardId){return document.querySelector('[data-tsdd-plain-card=\"'+pre.dataset.tsddPlainCardId+'\"]');}window.__tsddCardSeq=(window.__tsddCardSeq||0)+1;var id='c'+window.__tsddCardSeq,card=document.createElement('div');pre.dataset.tsddPlainCardId=id;card.dataset.tsddPlainCard=id;card.style.cssText='display:block;margin:8px 0 2px;padding:10px 12px;border-radius:10px;background:rgba(127,127,127,.08);white-space:pre-wrap;word-break:break-word;';var a=document.createElement('div');a.textContent='原文：'+original;card.appendChild(a);if(translated){var b=document.createElement('div');b.style.marginTop='6px';b.textContent='译文：'+translated;card.appendChild(b);}pre.parentNode.insertBefore(card,pre);pre.style.setProperty('display','none','important');return card;}" +
+                "function parseCodeFallback(){var added=false,last=null;document.querySelectorAll('pre code').forEach(function(code){var pre=code.closest('pre');if(!pre||pre.dataset.tsddIgnore==='1'||code.dataset.tsddIgnore==='1'||code.dataset.tsddReadyV3==='1')return;hideNativeDownload(pre);var raw=norm(code.innerText||''),cls=String(code.className||'').toLowerCase(),looksProfile=cls.indexOf('profile')>=0||(raw.charAt(0)==='{'&&raw.indexOf('\"interaction_state\"')>=0);if(looksProfile){var owner=ownerFor(pre,'p');if(addBar(pre,owner,[button('更新联系人记录','profile',raw,'')])){added=true;last=pre;}code.dataset.tsddReadyV3='1';return;}var local=localTextFor(pre),card=plainCard(pre,raw,local.value),owner2=ownerFor(card,'f'),buttons;if(fallbackMode==='translate_use'||fallbackMode==='copy'){buttons=[];if(fallbackMode==='translate_use')buttons.push(button('显示译文','translate_use',raw,''));buttons.push(button('复制译文','copy',raw,''));}else{var combined=raw+(local.value?'\\n'+local.value:'');buttons=[button('填入聊天','use',raw,local.value),button('直接发送','send',raw,local.value),button('复制原文+译文','copy',combined,'')];}if(addBar(card,owner2,buttons)){added=true;last=card;}if(local.element)local.element.style.setProperty('display','none','important');code.dataset.tsddReadyV3='1';});return {added:added,last:last};}" +
+                "function cleanup(){restoreComposer();var seen={};document.querySelectorAll('[data-tsdd-reply-bar]').forEach(function(bar){var owner=bar.dataset.tsddOwner||'';if(!owner||seen[owner])bar.remove();else seen[owner]=true;});}" +
+                "function add(){cleanup();if(!window.__tsddAnswerPhase||!window.__tsddAnswerReady||Date.now()<(window.__tsddAnswerNotBefore||0))return;var added=false,last=null;Array.from(document.querySelectorAll('.ds-assistant-message-main-content')).forEach(function(root){var out=parsePlain(root);if(out.added){added=true;last=out.last;}});var fallback=parseCodeFallback();if(fallback.added){added=true;last=fallback.last;}if(added||window.__tsddResultReady){window.__tsddResultReady=true;restoreComposer();if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();if(last)setTimeout(function(){try{last.scrollIntoView({behavior:'smooth',block:'end'});}catch(e){last.scrollIntoView(false);}},120);}}" +
+                "window.__tsddDeepSeekAddV3=add;var timer=null;if(!window.__tsddResultObserverV3){window.__tsddResultObserverV3=true;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,90);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','style','disabled','aria-disabled']});}add();" +
                 "})();";
         webView.evaluateJavascript(js, null);
     }
@@ -1416,7 +1403,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 ? cleanText : localDisplayText.trim();
         if ("copy".equals(mode)) {
             copyText(cleanText);
-            Toast.makeText(requireContext(), R.string.wkdeepseek_translation_copied, Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "已复制", Toast.LENGTH_SHORT).show();
             return;
         }
         if ("profile".equals(mode)) {
@@ -1439,7 +1426,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
     private void deliverReply(String text, String localDisplayText, boolean sendNow) {
         if (TextUtils.isEmpty(text)) return;
-        copyText(text);
+        String localText = TextUtils.isEmpty(localDisplayText) ? "" : localDisplayText.trim();
+        String clipboardText = TextUtils.isEmpty(localText) || TextUtils.equals(text.trim(), localText)
+                ? text : text.trim() + "\n" + localText;
+        copyText(clipboardText);
         pendingReplyText = text;
         pendingReplyLocalDisplayText = TextUtils.isEmpty(localDisplayText) ? text : localDisplayText;
         pendingReplySendNow = sendNow;
@@ -1646,7 +1636,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if (pendingReplyDelivery && replyCallback != null) {
             final DeepSeekAssistant.ReplyCallback callback = replyCallback;
             final String text = pendingReplyText;
-            final String localDisplayText = pendingReplyLocalDisplayText;
             final boolean sendNow = pendingReplySendNow;
             pendingReplyDelivery = false;
             FragmentActivity activity = getActivity();
