@@ -1169,7 +1169,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                                 && !TextUtils.isEmpty(wkVBinding.editText.getText().toString().trim())) {
                             wkVBinding.sendIV.performClick();
                         }
-                    }, 280);
+                    }, 80);
                 } else {
                     // “填入聊天”只写回原输入框，覆盖层关闭后再打开键盘。
                     editText.postDelayed(() -> {
@@ -1177,7 +1177,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                         editText.requestFocus();
                         if (mHelper != null) mHelper.toKeyboardState();
                         SoftKeyboardUtils.getInstance().showSoftKeyBoard(this, editText);
-                    }, 320);
+                    }, 120);
                 }
             }), this::onDeepSeekWindowClosed);
         });
