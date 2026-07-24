@@ -95,6 +95,12 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private boolean submitClickPending;
     private boolean fallbackCopied;
     private String pendingPrompt = "";
+    private String promptTransportToken = "";
+    private String promptVisibleText = "";
+    private String promptVisibleLabel = "";
+    private boolean promptTransportPrepared;
+    private boolean promptTransportInFlight;
+    private boolean promptTransportEnabled;
     private DeepSeekRequest request;
     private DeepSeekAssistant.ReplyCallback replyCallback;
     private DeepSeekAssistant.TranslationCallback translationCallback;
@@ -637,6 +643,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             }
             try {
                 pendingPrompt = DeepSeekPromptBuilder.build(requireContext(), request, result);
+                preparePromptTransportText();
                 // 提示词准备完成时重新校验一次网页模式，避免页面进度 70% 时过早
                 // 判定“稳定”，导致专家模式/思考/搜索尚未渲染就直接提交。
                 webUiPrepared = false;
@@ -711,13 +718,13 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 // 专家模式可能比输入框晚渲染，或先要展开模式菜单。允许多轮复查，
                 // 但达到上限后仍继续提交，避免网页改版导致助手完全不可用。
                 if (("changed".equals(result) || "retry".equals(result))
-                        && webUiPrepareAttempts < 12) {
-                    handler.postDelayed(() -> applyWebUiPreferences(continueFill), randomDelay(280, 460));
+                        && webUiPrepareAttempts < 8) {
+                    handler.postDelayed(() -> applyWebUiPreferences(continueFill), randomDelay(160, 260));
                     return;
                 }
                 webUiPrepared = true;
                 if (continueFill || !TextUtils.isEmpty(pendingPrompt)) {
-                    handler.postDelayed(this::tryFillPrompt, 80);
+                    handler.postDelayed(this::tryFillPrompt, 30);
                 }
             });
         } catch (Exception ignored) {
@@ -770,7 +777,13 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
     private void fillPromptNow() {
         if (promptFilled || webView == null || TextUtils.isEmpty(pendingPrompt)) return;
-        String js = buildFillScript(pendingPrompt);
+        if (!promptTransportPrepared) {
+            prepareHiddenPromptTransport();
+            return;
+        }
+        String composerText = promptTransportEnabled && !TextUtils.isEmpty(promptVisibleText)
+                ? promptVisibleText : pendingPrompt;
+        String js = buildFillScript(composerText);
         webView.evaluateJavascript(js, value -> {
             boolean success = "true".equals(value) || "\"true\"".equals(value);
             if (success) {
@@ -779,12 +792,12 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 installReplyButtons();
                 // 给 DeepSeek 的 React 输入状态留出更充分的稳定时间。
                 // 每次都使用随机等待，避免填入后立即触发发送。
-                handler.postDelayed(this::submitPromptAutomatically, randomDelay(1400, 2800));
+                handler.postDelayed(this::submitPromptAutomatically, randomDelay(300, 600));
                 return;
             }
             fillAttempts++;
             if (fillAttempts < 7) {
-                handler.postDelayed(this::tryFillPrompt, 900);
+                handler.postDelayed(this::tryFillPrompt, 420);
             } else if (!fallbackCopied && isAdded()) {
                 fallbackCopied = true;
                 copyText(pendingPrompt);
@@ -802,13 +815,13 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 // 发送图标出现后也不立刻点击，再等待一段随机时间并重新确认。
                 // 这样既能避免 React 刚完成重绘时的误触，也让发送节奏不会过快。
                 submitReadyPending = true;
-                handler.postDelayed(this::clickPromptSendButton, randomDelay(650, 1450));
+                handler.postDelayed(this::clickPromptSendButton, randomDelay(180, 360));
                 return;
             }
 
             submitAttempts++;
             if (submitAttempts < 12) {
-                handler.postDelayed(this::submitPromptAutomatically, randomDelay(700, 1350));
+                handler.postDelayed(this::submitPromptAutomatically, randomDelay(300, 550));
             } else {
                 statusView.setText(R.string.wkdeepseek_submit_failed);
                 notifyUser(getString(R.string.wkdeepseek_submit_failed));
@@ -830,14 +843,14 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 submitClickPending = true;
                 submitVerifyAttempts = 0;
                 statusView.setText(R.string.wkdeepseek_submitting);
-                handler.postDelayed(this::verifyPromptSubmission, randomDelay(700, 1250));
+                handler.postDelayed(this::verifyPromptSubmission, randomDelay(250, 500));
                 return;
             }
 
             // 随机等待期间按钮可能被 React 重绘。此时重新探测，绝不盲目连点。
             submitAttempts++;
             if (submitAttempts < 12) {
-                handler.postDelayed(this::submitPromptAutomatically, randomDelay(800, 1500));
+                handler.postDelayed(this::submitPromptAutomatically, randomDelay(320, 600));
             } else {
                 statusView.setText(R.string.wkdeepseek_submit_failed);
                 notifyUser(getString(R.string.wkdeepseek_submit_failed));
@@ -853,6 +866,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 submitClickPending = false;
                 promptSubmitted = true;
                 statusView.setText(R.string.wkdeepseek_thinking);
+                hideSubmittedPromptBubble();
                 installReplyButtons();
                 beginAnswerObservation();
                 return;
@@ -860,7 +874,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
             submitVerifyAttempts++;
             if (submitVerifyAttempts < 5) {
-                handler.postDelayed(this::verifyPromptSubmission, randomDelay(650, 1150));
+                handler.postDelayed(this::verifyPromptSubmission, randomDelay(260, 500));
                 return;
             }
 
@@ -869,12 +883,105 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             submitClickPending = false;
             submitAttempts++;
             if (submitAttempts < 12) {
-                handler.postDelayed(this::submitPromptAutomatically, randomDelay(900, 1650));
+                handler.postDelayed(this::submitPromptAutomatically, randomDelay(380, 700));
             } else {
                 statusView.setText(R.string.wkdeepseek_submit_failed);
                 notifyUser(getString(R.string.wkdeepseek_submit_failed));
             }
         });
+    }
+
+
+    private void preparePromptTransportText() {
+        long nonce = Math.abs(System.nanoTime() ^ timingRandom.nextLong());
+        promptTransportToken = "<!--TALKAMI_PROMPT_" + Long.toHexString(nonce) + "-->";
+        if (request == null) {
+            promptVisibleLabel = "正在处理，请稍候…";
+        } else if (request.action == DeepSeekRequest.ACTION_TRANSLATE) {
+            promptVisibleLabel = "正在翻译所选消息…";
+        } else if (request.action == DeepSeekRequest.ACTION_POLISH) {
+            promptVisibleLabel = "正在润色这段消息…";
+        } else {
+            promptVisibleLabel = "正在分析聊天并生成回复…";
+        }
+        // HTML 注释在 DeepSeek 的 Markdown 气泡中不可见，但仍会保留在请求正文里，
+        // 供页面主世界的 fetch/XHR 钩子精确替换为完整提示词。
+        promptVisibleText = promptVisibleLabel + "\n" + promptTransportToken;
+        promptTransportPrepared = false;
+        promptTransportInFlight = false;
+        promptTransportEnabled = false;
+    }
+
+    private void prepareHiddenPromptTransport() {
+        if (promptTransportPrepared || promptTransportInFlight || webView == null || !isAdded()) return;
+        if (TextUtils.isEmpty(promptTransportToken) || TextUtils.isEmpty(promptVisibleText)) {
+            promptTransportPrepared = true;
+            promptTransportEnabled = false;
+            fillPromptNow();
+            return;
+        }
+        promptTransportInFlight = true;
+        try {
+            webView.evaluateJavascript(buildPromptTransportInstallScript(), value -> {
+                promptTransportInFlight = false;
+                promptTransportPrepared = true;
+                promptTransportEnabled = "true".equals(value) || "\"true\"".equals(value);
+                fillPromptNow();
+            });
+        } catch (Exception ignored) {
+            promptTransportInFlight = false;
+            promptTransportPrepared = true;
+            promptTransportEnabled = false;
+            fillPromptNow();
+        }
+    }
+
+    /**
+     * 在页面主世界拦截本次 DeepSeek 请求：网页输入框只显示一行短提示，真正发送
+     * 给 DeepSeek 的仍是完整上下文提示词。只替换包含本次唯一 token 的字符串，
+     * 不扫描、不修改其他请求。
+     */
+    private String buildPromptTransportInstallScript() {
+        String token = JSONObject.quote(promptTransportToken);
+        String fullPrompt = JSONObject.quote(pendingPrompt);
+        String pageCode = "(function(){try{" +
+                "var token=" + token + ",full=" + fullPrompt + ";" +
+                "window.__tsddPromptMap=window.__tsddPromptMap||{};window.__tsddPromptMap[token]=full;" +
+                "if(window.__tsddPromptHookInstalled)return;window.__tsddPromptHookInstalled=true;" +
+                "function patch(v,d){if(d>10||v==null)return v;if(typeof v==='string'){var map=window.__tsddPromptMap||{};for(var k in map){if(Object.prototype.hasOwnProperty.call(map,k)&&v.indexOf(k)>=0)return map[k];}return v;}" +
+                "if(Array.isArray(v)){for(var i=0;i<v.length;i++)v[i]=patch(v[i],d+1);return v;}" +
+                "if(Object.prototype.toString.call(v)==='[object Object]'){Object.keys(v).forEach(function(k){v[k]=patch(v[k],d+1);});}return v;}" +
+                "function body(b){if(typeof b!=='string')return b;var t=b.trim();if(!t||(t.charAt(0)!=='{'&&t.charAt(0)!=='['))return b;try{return JSON.stringify(patch(JSON.parse(b),0));}catch(e){return b;}}" +
+                "var oldFetch=window.fetch;if(typeof oldFetch==='function'){window.fetch=async function(input,init){try{if(init&&Object.prototype.hasOwnProperty.call(init,'body')){var ni=Object.assign({},init,{body:body(init.body)});return oldFetch.call(this,input,ni);}" +
+                "if(typeof Request!=='undefined'&&input instanceof Request&&!/GET|HEAD/i.test(input.method)){var ot=await input.clone().text(),nt=body(ot);if(nt!==ot)return oldFetch.call(this,new Request(input,{body:nt}),init);}}catch(e){}return oldFetch.apply(this,arguments);};}" +
+                "if(typeof XMLHttpRequest!=='undefined'){var oldSend=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(b){try{return oldSend.call(this,body(b));}catch(e){return oldSend.call(this,b);}};}" +
+                "}catch(e){}})();";
+        String quotedCode = JSONObject.quote(pageCode);
+        return "(function(){try{var s=document.createElement('script');s.textContent=" + quotedCode + ";" +
+                "(document.documentElement||document.head||document.body).appendChild(s);s.remove();" +
+                "return !!(window.__tsddPromptHookInstalled&&window.__tsddPromptMap&&window.__tsddPromptMap[" + token + "]);" +
+                "}catch(e){return false;}})();";
+    }
+
+    /** 隐藏本次短提示气泡，避免它占用回答空间。 */
+    private void hideSubmittedPromptBubble() {
+        if (webView == null || TextUtils.isEmpty(promptVisibleLabel)) return;
+        String label = JSONObject.quote(promptVisibleLabel);
+        String js = "(function(){try{" +
+                "var label=" + label + ";window.__tsddPromptLabel=label;" +
+                "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;}" +
+                "function norm(v){return String(v||'').replace(/\\s+/g,' ').trim();}" +
+                "function hide(){var all=Array.from(document.querySelectorAll('div,article,p,span')).filter(function(el){if(!visible(el))return false;var t=norm(el.innerText||el.textContent);return t===label||t.indexOf(label)===0;});" +
+                "if(!all.length)return false;all.sort(function(a,b){return a.getBoundingClientRect().top-b.getBoundingClientRect().top;});var leaf=all[all.length-1],best=leaf,cur=leaf,n=0;" +
+                "while(cur&&cur.parentElement&&n++<6){var p=cur.parentElement,r=p.getBoundingClientRect(),t=norm(p.innerText||p.textContent);if(p===document.body||p===document.documentElement)break;if(p.querySelector('textarea,[contenteditable=\\\"true\\\"],[role=\\\"textbox\\\"]'))break;if(r.height>0&&r.height<window.innerHeight*0.42&&r.width<window.innerWidth*1.01&&t.indexOf(label)>=0&&t.length<label.length+180){best=p;cur=p;}else break;}" +
+                "best.dataset.tsddPromptHidden='1';best.style.setProperty('display','none','important');return true;}" +
+                "hide();setTimeout(hide,180);setTimeout(hide,650);" +
+                "if(!window.__tsddPromptHideObserver){window.__tsddPromptHideObserver=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(hide,120);}).observe(document.documentElement,{childList:true,subtree:true});}" +
+                "return true;}catch(e){return false;}})();";
+        try {
+            webView.evaluateJavascript(js, null);
+        } catch (Exception ignored) {
+        }
     }
 
     private String buildSendReadyProbeScript() {
@@ -974,8 +1081,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if (webView == null || !isAdded()) return;
         String js = "(function(){try{" +
                 "function clearPromptBlocks(){document.querySelectorAll('pre code').forEach(function(code){code.dataset.tsddIgnore='1';var pre=code.closest('pre');if(pre)pre.dataset.tsddIgnore='1';});document.querySelectorAll('[data-tsdd-reply-bar]').forEach(function(x){x.remove();});}" +
-                "window.__tsddEnforcePrefs=null;window.__tsddAnswerPhase=true;window.__tsddAnswerReady=false;window.__tsddAnswerNotBefore=Date.now()+900;clearPromptBlocks();" +
-                "setTimeout(clearPromptBlocks,220);setTimeout(clearPromptBlocks,600);setTimeout(function(){window.__tsddAnswerReady=true;if(window.__tsddDeepSeekAdd)window.__tsddDeepSeekAdd();},920);return 'ok';" +
+                "window.__tsddEnforcePrefs=null;window.__tsddAnswerPhase=true;window.__tsddAnswerReady=false;window.__tsddAnswerNotBefore=Date.now()+420;clearPromptBlocks();" +
+                "setTimeout(clearPromptBlocks,120);setTimeout(clearPromptBlocks,320);setTimeout(function(){window.__tsddAnswerReady=true;if(window.__tsddDeepSeekAdd)window.__tsddDeepSeekAdd();},440);return 'ok';" +
                 "}catch(e){return 'error';}})();";
         try {
             webView.evaluateJavascript(js, null);
@@ -1015,7 +1122,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "else if(mode==='translate_use'){box.appendChild(button('显示译文','translate_use',code,pre));box.appendChild(button('复制译文','copy',code,pre));}" +
                 "else{box.appendChild(button('填入聊天','use',code,pre));box.appendChild(button('直接发送','send',code,pre));}" +
                 "if(pre.parentNode){pre.parentNode.insertBefore(box,pre.nextSibling);added=true;lastPre=pre;}});if(added||window.__tsddResultReady){window.__tsddResultReady=true;keepComposerHidden();if(lastPre)setTimeout(function(){try{lastPre.scrollIntoView({behavior:'smooth',block:'end'});}catch(e){lastPre.scrollIntoView(false);}},180);}}" +
-                "window.__tsddDeepSeekAdd=add;var timer=null;if(!window.__tsddResultObserver){window.__tsddResultObserver=true;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,520);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});}add();" +
+                "window.__tsddDeepSeekAdd=add;var timer=null;if(!window.__tsddResultObserver){window.__tsddResultObserver=true;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,180);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});}add();" +
                 "})();";
         webView.evaluateJavascript(js, null);
     }
@@ -1118,7 +1225,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             if (isAdded()) {
                 dismissAllowingStateLoss();
             }
-        }, 90);
+        }, 40);
     }
 
     private void hideWebKeyboard() {
@@ -1272,7 +1379,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             FragmentActivity activity = getActivity();
             if (activity != null && !activity.isFinishing()) {
                 activity.getWindow().getDecorView().postDelayed(
-                        () -> callback.onReply(text, sendNow), 280);
+                        () -> callback.onReply(text, sendNow), 60);
             } else {
                 callback.onReply(text, sendNow);
             }
