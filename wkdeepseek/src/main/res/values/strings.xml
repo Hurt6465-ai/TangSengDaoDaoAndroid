@@ -1,12 +1,12 @@
 <resources>
-    <string name="wkdeepseek_name">DeepSeek 聊天助手</string>
-    <string name="wkdeepseek_reply">回复建议</string>
+    <string name="wkdeepseek_name">DeepSeek 社交助手</string>
+    <string name="wkdeepseek_reply">✨ 帮我回</string>
     <string name="wkdeepseek_translate">翻译</string>
     <string name="wkdeepseek_polish">润色</string>
     <string name="wkdeepseek_settings">设置</string>
     <string name="wkdeepseek_close">关闭</string>
-    <string name="wkdeepseek_first_title">开启 DeepSeek 聊天助手</string>
-    <string name="wkdeepseek_first_message">聊天助手会把当前会话最近的部分文字消息发送到你登录的 DeepSeek 网页，用于翻译和生成回复。\n\n首次使用需要登录或注册 DeepSeek。请勿提交密码、验证码、银行卡、身份证和其他敏感内容。</string>
+    <string name="wkdeepseek_first_title">开启 DeepSeek 社交助手</string>
+    <string name="wkdeepseek_first_message">DeepSeek 社交助手会将当前会话中的部分文字消息、双方语言资料、联系人背景和你的当前草稿发送到你登录的 DeepSeek 网页，用于翻译、润色和生成回复建议。\n\n助手不会自动发送消息。首次使用需要登录或注册 DeepSeek，请勿提交密码、验证码、银行卡、身份证和其他敏感内容。</string>
     <string name="wkdeepseek_login_register">登录或注册 DeepSeek</string>
     <string name="wkdeepseek_cancel">取消</string>
     <string name="wkdeepseek_done">完成</string>
@@ -20,8 +20,9 @@
     <string name="wkdeepseek_need_login">请先登录或注册 DeepSeek</string>
     <string name="wkdeepseek_no_network">需要网络才能使用 DeepSeek 助手</string>
     <string name="wkdeepseek_no_messages">没有可用于分析的文字消息</string>
+    <string name="wkdeepseek_busy">DeepSeek 助手正在使用，请先关闭当前窗口</string>
     <string name="wkdeepseek_reply_used">已填入聊天输入框</string>
-    <string name="wkdeepseek_send_confirm">发送此回复？</string>
+    <string name="wkdeepseek_send_confirm">确认发送此回复？</string>
     <string name="wkdeepseek_send">发送</string>
     <string name="wkdeepseek_translation_copied">译文已复制</string>
     <string name="wkdeepseek_settings_title">当前联系人助手设置</string>
@@ -29,5 +30,24 @@
     <string name="wkdeepseek_peer_native">对方母语</string>
     <string name="wkdeepseek_background">聊天背景（可选）</string>
     <string name="wkdeepseek_purpose">聊天目的（可选）</string>
+    <string name="wkdeepseek_relationship_stage">关系阶段</string>
+    <string name="wkdeepseek_preferred_style">回复风格</string>
+    <string name="wkdeepseek_flirt_level">允许暧昧程度</string>
+    <string name="wkdeepseek_context_enabled">读取近期聊天上下文</string>
+    <string name="wkdeepseek_context_limit">上下文数量</string>
+    <string name="wkdeepseek_contact_record_title">联系人助手记录</string>
+    <string name="wkdeepseek_no_contact_record">联系人助手记录：暂无长期记录。DeepSeek 给出可靠更新建议时，可由你确认保存。</string>
+    <string name="wkdeepseek_record_state">互动状态</string>
+    <string name="wkdeepseek_record_trend">近期趋势</string>
+    <string name="wkdeepseek_record_summary">摘要</string>
+    <string name="wkdeepseek_record_facts">已知信息</string>
+    <string name="wkdeepseek_clear_record">清除联系人记录</string>
+    <string name="wkdeepseek_clear_record_confirm">清除互动状态、趋势、摘要、已知信息和重要事件？关系阶段、风格、目的和背景设置会保留。</string>
+    <string name="wkdeepseek_clear">清除</string>
+    <string name="wkdeepseek_record_cleared">联系人记录已清除</string>
+    <string name="wkdeepseek_profile_update_title">更新联系人助手记录</string>
+    <string name="wkdeepseek_profile_invalid">联系人记录格式无效，已忽略</string>
+    <string name="wkdeepseek_profile_saved">联系人助手记录已保存</string>
+    <string name="wkdeepseek_ignore">忽略</string>
     <string name="wkdeepseek_save">保存</string>
 </resources>
