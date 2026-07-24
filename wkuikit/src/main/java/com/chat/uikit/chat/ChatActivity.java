@@ -29,7 +29,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.Parcelable;
 import android.text.SpannableString;
 import android.text.TextUtils;
 import android.util.Log;
@@ -259,9 +258,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private static final String KEY_DEEPSEEK_OLD_WINGMAN = "deepseek_old_wingman";
     private static final String KEY_IMAGE_COMPRESS = "chat_image_compress";
 
-    // DeepSeek 使用独立的固定高度 Window。这里只保存 RecyclerView 自己的完整布局状态，
-    // 不再手动记录首条位置，也不主动操作 PanelSwitchLayout，避免退出后历史消息消失。
-    private Parcelable deepSeekRecyclerState;
     private boolean deepSeekOpening = false;
 
     private interface BooleanAction {
@@ -1116,16 +1112,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (deepSeekOpening || isFinishing() || wkVBinding == null) return;
 
         deepSeekOpening = true;
-        captureDeepSeekRecyclerState();
         DeepSeekRequest request = buildDeepSeekRequest(action);
 
-        // DeepSeek 现在使用真实的 60% 高度 Dialog Window，不会再覆盖整屏。
-        // 这里故意不调用 resetToolBar()/hookSystemBackByPanelSwitcher()/强制隐藏输入法，
-        // 避免聊天页 PanelSwitchLayout 在另一个 Window 打开时被改成错误高度。
+        // DeepSeek 是聊天页上方的透明覆盖层。不要隐藏输入框、聊天列表，也不要保存或
+        // 强制恢复 RecyclerView 状态；覆盖层关闭后，原聊天页保持完全原样。
         wkVBinding.rootView.post(() -> {
             if (isFinishing() || wkVBinding == null) {
                 deepSeekOpening = false;
-                deepSeekRecyclerState = null;
                 return;
             }
             DeepSeekAssistant.openAction(this, request, (text, sendNow) -> runOnUiThread(() -> {
@@ -1147,7 +1140,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                         }
                     }, 280);
                 } else {
-                    // “填入聊天”直接写入输入框，待 RecyclerView 状态恢复后再打开键盘。
+                    // “填入聊天”只写回原输入框，覆盖层关闭后再打开键盘。
                     editText.postDelayed(() -> {
                         if (isFinishing() || wkVBinding == null) return;
                         editText.requestFocus();
@@ -1159,86 +1152,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         });
     }
 
-    /**
-     * 保存 LayoutManager 的完整 Parcelable 状态。它比“首条位置 + offset”更可靠，
-     * 能同时保留反向布局、锚点方向、未填满区域和像素偏移。
-     */
-    private void captureDeepSeekRecyclerState() {
-        deepSeekRecyclerState = null;
-        if (linearLayoutManager == null || wkVBinding == null || chatAdapter == null) return;
-        wkVBinding.recyclerView.stopScroll();
-        RecyclerView.ItemAnimator animator = wkVBinding.recyclerView.getItemAnimator();
-        if (animator != null) animator.endAnimations();
-        try {
-            deepSeekRecyclerState = linearLayoutManager.onSaveInstanceState();
-        } catch (Exception e) {
-            Log.w("ChatActivity", "save DeepSeek recycler state failed", e);
-        }
-    }
-
-    /** DeepSeek 正常关闭、填入或直接发送，统一从这里恢复聊天页。 */
+    /** DeepSeek 正常关闭、填入或直接发送，聊天页本身不做任何重排。 */
     private void onDeepSeekWindowClosed() {
         deepSeekOpening = false;
         refreshDeepSeekAssistantBar();
-        restoreChatAfterDeepSeek();
-    }
-
-    private void restoreChatAfterDeepSeek() {
-        if (wkVBinding == null || isFinishing()) {
-            deepSeekRecyclerState = null;
-            return;
-        }
-
-        final Parcelable savedState = deepSeekRecyclerState;
-        deepSeekRecyclerState = null;
-
-        // 只恢复必要的可见性，不刷新 Adapter、不强制滚到底部、不重置 PanelSwitchHelper。
-        View content = findViewById(R.id.content_view);
-        if (content != null) {
-            content.clearAnimation();
-            content.setVisibility(View.VISIBLE);
-            content.setAlpha(1f);
-        }
-        wkVBinding.recyclerViewLayout.clearAnimation();
-        wkVBinding.recyclerViewLayout.setVisibility(View.VISIBLE);
-        wkVBinding.recyclerViewLayout.setAlpha(1f);
-        wkVBinding.recyclerView.clearAnimation();
-        wkVBinding.recyclerView.setVisibility(View.VISIBLE);
-        wkVBinding.recyclerView.setAlpha(1f);
-        wkVBinding.recyclerView.stopScroll();
-
-        RecyclerView.ItemAnimator animator = wkVBinding.recyclerView.getItemAnimator();
-        if (animator != null) animator.endAnimations();
-        wkVBinding.rootView.requestLayout();
-        wkVBinding.recyclerView.requestLayout();
-
-        // Dialog Window 和它的输入法退出是异步的。等 RecyclerView 真正拥有非零尺寸、
-        // 且不在计算布局时再恢复状态；最多等待约 300ms，避免恢复调用被系统吞掉。
-        wkVBinding.recyclerView.postOnAnimation(() ->
-                restoreDeepSeekRecyclerState(savedState, 0));
-    }
-
-    private void restoreDeepSeekRecyclerState(@Nullable Parcelable savedState, int attempt) {
-        if (wkVBinding == null || isFinishing() || linearLayoutManager == null || chatAdapter == null) return;
-        RecyclerView recyclerView = wkVBinding.recyclerView;
-        boolean layoutReady = recyclerView.getWidth() > 0
-                && recyclerView.getHeight() > 0
-                && !recyclerView.isComputingLayout();
-        if (!layoutReady && attempt < 10) {
-            recyclerView.postDelayed(() -> restoreDeepSeekRecyclerState(savedState, attempt + 1), 32L);
-            return;
-        }
-
-        if (savedState != null && chatAdapter.getItemCount() > 0) {
-            try {
-                linearLayoutManager.onRestoreInstanceState(savedState);
-            } catch (Exception e) {
-                Log.w("ChatActivity", "restore DeepSeek recycler state failed", e);
-            }
-        }
-        recyclerView.requestLayout();
-        recyclerView.invalidateItemDecorations();
-        recyclerView.postInvalidateOnAnimation();
     }
 
     private DeepSeekRequest buildDeepSeekRequest(int action) {
