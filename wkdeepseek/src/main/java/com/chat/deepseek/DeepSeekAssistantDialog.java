@@ -232,14 +232,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         window.setGravity(loginMode ? Gravity.CENTER : Gravity.BOTTOM);
 
-        // 普通助手不需要用户在 DeepSeek 输入框继续打字。让透明覆盖 Window 与输入法
-        // 完全隔离，避免它改变唐僧聊天页 PanelSwitchLayout/RecyclerView 的高度。
-        // 登录页仍需输入账号密码，因此保持正常的输入法交互。
-        if (loginMode) {
-            window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-        } else {
-            window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
-        }
+        // 登录页和普通助手页都必须允许 WebView 输入框调用系统输入法。
+        // FLAG_ALT_FOCUSABLE_IM 会让 Dialog 永远位于输入法之上，导致网页 textarea
+        // 即使已经获得焦点，也无法弹出软键盘。
+        window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
 
         WindowManager.LayoutParams attributes = window.getAttributes();
         attributes.width = ViewGroup.LayoutParams.MATCH_PARENT;
@@ -248,10 +244,9 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         attributes.dimAmount = 0f;
         window.setAttributes(attributes);
         window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        window.setSoftInputMode((loginMode
-                ? WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
-                : WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
-                | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+        window.setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                        | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             window.setNavigationBarColor(Color.WHITE);
@@ -357,6 +352,24 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         webView.setVerticalScrollBarEnabled(true);
         webView.setFocusable(true);
         webView.setFocusableInTouchMode(true);
+        webView.setOnTouchListener((v, event) -> {
+            if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
+                Dialog dialog = getDialog();
+                Window window = dialog == null ? null : dialog.getWindow();
+
+                if (window != null) {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+                    window.setSoftInputMode(
+                            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                                    | WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED);
+                }
+
+                v.setFocusable(true);
+                v.setFocusableInTouchMode(true);
+                v.requestFocusFromTouch();
+            }
+            return false;
+        });
         configureWebView(webView);
         contentPanel.addView(webView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
@@ -971,14 +984,29 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
                 // Never submit in an unconfirmed mode. DeepSeek renders the mode chip/menu late on
                 // some WebView builds, so keep retrying until the visible header explicitly says
-                // "专家模式" and the optional thinking/search toggles have been switched off.
+                // "专家模式"。模式切换脚本不再操作思考/搜索开关，也不会抢输入框焦点。
                 webUiPrepared = false;
-                if (statusView != null) statusView.setText("正在切换专家模式…");
-                if (webUiPrepareAttempts == 24) {
-                    notifyUser("暂时无法确认专家模式，正在继续重试");
+                if (statusView != null) {
+                    statusView.setText("正在切换专家模式…");
                 }
-                handler.postDelayed(() -> applyWebUiPreferences(continueFill),
-                        webUiPrepareAttempts < 24 ? randomDelay(180, 300) : 900L);
+
+                if (webUiPrepareAttempts == 30) {
+                    notifyUser("暂时没有找到专家模式入口，正在继续重试");
+                }
+
+                long delay;
+                if ("changed".equals(result)) {
+                    // 刚点击模式入口或专家选项，等待 React 完成重绘。
+                    delay = randomDelay(180, 280);
+                } else if (webUiPrepareAttempts < 30) {
+                    delay = randomDelay(260, 420);
+                } else {
+                    delay = 1200L;
+                }
+
+                handler.postDelayed(
+                        () -> applyWebUiPreferences(continueFill),
+                        delay);
             });
         } catch (Exception e) {
             webUiPrepareInFlight = false;
@@ -990,26 +1018,226 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
     private String buildWebUiPreferenceScript() {
         return "(function(){try{" +
-                "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;}" +
-                "function txt(el){return ((el&&(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')))||'').replace(/\\s+/g,' ').trim();}" +
-                "function norm(el){return txt(el).replace(/\\s+/g,'').toLowerCase();}" +
-                "function selected(el){if(!el)return false;var cur=el,n=0;while(cur&&cur!==document.documentElement&&n++<5){var c=String(cur.className||'').toLowerCase();if(/(^|[ _-])(selected|active|checked|current)([ _-]|$)/.test(c))return true;if(cur.getAttribute('aria-checked')==='true'||cur.getAttribute('aria-pressed')==='true'||cur.getAttribute('aria-selected')==='true'||cur.getAttribute('aria-current')==='true')return true;var ds=String(cur.getAttribute('data-state')||'').toLowerCase();if(ds==='checked'||ds==='selected'||ds==='active'||ds==='on')return true;if(cur.getAttribute('data-selected')==='true'||cur.getAttribute('data-active')==='true')return true;cur=cur.parentElement;}return false;}" +
-                "function click(el){if(!el||!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;var r=el.getBoundingClientRect();if(r.width>window.innerWidth*0.98&&r.height>window.innerHeight*0.45)return false;try{el.focus({preventScroll:true});}catch(e){try{el.focus();}catch(e2){}}try{el.click();return true;}catch(e){try{el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}catch(e2){return false;}}}" +
-                "function pool(){var q='button,a,label,[role=\"button\"],[role=\"radio\"],[role=\"switch\"],[role=\"checkbox\"],[role=\"menuitem\"],[role=\"option\"],[role=\"tab\"],[data-model-type],[tabindex]:not([tabindex=\"-1\"])';return Array.from(document.querySelectorAll(q)).filter(function(el){var t=txt(el);return visible(el)&&t.length>0&&t.length<100;});}" +
-                "function compact(el){if(!el||!visible(el))return false;var r=el.getBoundingClientRect();return r.width>=20&&r.height>=18&&r.height<=100&&r.width<=window.innerWidth*0.96;}" +
-                "function knownModeText(value){var t=String(value||'').replace(/\\s+/g,'').toLowerCase();return /^(专家模式|专家|快速模式|快速|普通模式|标准模式|常规模式|思考模式|深度思考|expertmode|expert|quickmode|quick|normalmode|standardmode)$/.test(t);}" +
-                "function actionRoot(node){var cur=node,fallback=null,n=0;while(cur&&cur!==document.body&&cur!==document.documentElement&&n++<9){var r=cur.getBoundingClientRect(),tag=String(cur.tagName||'').toLowerCase(),role=String(cur.getAttribute&&cur.getAttribute('role')||'').toLowerCase(),cls=String(cur.className||'').toLowerCase(),isCompact=r.width>=16&&r.height>=16&&r.width<=220&&r.height<=110;if(isCompact&&(tag==='button'||tag==='a'||role==='button'||role==='menuitem'||role==='option'||(cur.hasAttribute&&cur.hasAttribute('tabindex'))))return cur;if(!fallback&&isCompact&&(/ds-button|button|toggle|mode|c03d486a/.test(cls)||getComputedStyle(cur).cursor==='pointer'||typeof cur.onclick==='function'))fallback=cur;cur=cur.parentElement;}return fallback;}" +
-                "function currentModeLabel(){var selectors=['span._46a12ab','.c03d486a span','.the-header span','[data-model-type]'];var nodes=[];selectors.forEach(function(q){try{nodes=nodes.concat(Array.from(document.querySelectorAll(q)));}catch(e){}});var seen=[];for(var i=0;i<nodes.length;i++){var el=nodes[i];if(seen.indexOf(el)>=0||!visible(el))continue;seen.push(el);var t=norm(el);if(!knownModeText(t))continue;var r=el.getBoundingClientRect();if(r.top>window.innerHeight*0.32||r.height>80)continue;return el;}return null;}" +
-                "function expertOption(){var nodes=Array.from(document.querySelectorAll('button,[role=\"button\"],[role=\"menuitem\"],[role=\"option\"],label,div,span')).filter(function(el){return compact(el)&&norm(el)==='专家模式';});for(var i=0;i<nodes.length;i++){var el=nodes[i],r=el.getBoundingClientRect();if(r.top<window.innerHeight*0.02)continue;var root=actionRoot(el)||el;if(!compact(root))continue;var cls=String(root.className||'').toLowerCase();if(root.closest&&root.closest('.the-header')&&!/menu|option|popover|dropdown/.test(cls))continue;return root;}return null;}" +
-                "function hideElement(el,allowWide){if(!el)return false;var r=el.getBoundingClientRect();if(r.height<=0||r.height>220)return false;if(!allowWide&&r.width>window.innerWidth*0.96)return false;el.style.setProperty('display','none','important');el.style.setProperty('visibility','hidden','important');el.style.setProperty('pointer-events','none','important');el.setAttribute('aria-hidden','true');return true;}" +
-                "function hideExactText(scope,words){Array.from((scope||document).querySelectorAll('button,a,[role=\"button\"],[role=\"menuitem\"],span,div')).forEach(function(el){var t=norm(el);if(words.indexOf(t)<0)return;var root=actionRoot(el)||el;if(root&&root!==document.body&&root!==document.documentElement)hideElement(root,false);});}" +
-                "function hideCodeDownloads(){document.querySelectorAll('pre').forEach(function(pre){var scope=pre.parentElement;if(!scope)return;var r=scope.getBoundingClientRect();if(r.height>520&&scope.parentElement){var p=scope.parentElement,pr=p.getBoundingClientRect();if(pr.height>0&&pr.height<520)scope=p;}hideExactText(scope,['下载','download']);});}" +
-                "function hidePageChrome(){document.querySelectorAll('div._5758a85,div._6c7e7df').forEach(function(el){if(norm(el)==='使用快速模式开始对话'){var card=el.closest('div._5758a85')||el;hideElement(card,true);}});document.querySelectorAll('span.ds-button__content').forEach(function(el){var t=norm(el);if(t==='下载应用'||t==='下载app'||t==='downloadapp'||t==='getapp'){hideElement(actionRoot(el)||el.parentElement,false);}});hideExactText(document,['下载应用','下载app','downloadapp','getapp','新对话','新建对话','开启新对话','newchat','newconversation','分享','share']);document.querySelectorAll('svg path').forEach(function(path){var d=path.getAttribute('d')||'',target=null;if(d.indexOf('M9.99994 1.22943')>=0&&d.indexOf('M9.21913 6.36949')>=0&&d.indexOf('M13.6304 9.22487')>=0)target=actionRoot(path);else if(d.indexOf('M9.73047 1.98239')>=0&&d.indexOf('M18.3906 8.83005')>=0&&d.indexOf('M17.2881 9.73142')>=0)target=actionRoot(path);if(target)hideElement(target,false);});hideCodeDownloads();}" +
-                "function disableSelected(list,re){var el=list.find(function(x){return re.test(txt(x))&&selected(x);});return !!(el&&click(el));}" +
-                "function enforce(allowMenu){var list=pool(),now=Date.now();hidePageChrome();var label=currentModeLabel(),mode=label?norm(label):'';if(mode!=='专家模式'&&mode!=='专家'&&mode!=='expertmode'&&mode!=='expert'){var option=expertOption();if(option&&(!window.__tsddExpertOptionAt||now-window.__tsddExpertOptionAt>650)){window.__tsddExpertOptionAt=now;if(click(option))return 'changed';}if(allowMenu&&label&&(!window.__tsddModeTriggerAt||now-window.__tsddModeTriggerAt>650)){window.__tsddModeTriggerAt=now;var trigger=label.closest('.c03d486a')||actionRoot(label)||label.parentElement;if(click(trigger))return 'changed';}return 'retry';}" +
-                "window.__tsddExpertDone=true;var changed=false;if(disableSelected(list,/(^|\\s)(深度思考|深度思索|思考|deepthink|deep\\s*think|thinking|reasoning)(\\s|$)/i))changed=true;if(disableSelected(list,/(^|\\s)(智能搜索|联网搜索|网络搜索|搜索|smart\\s*search|web\\s*search|search|browse)(\\s|$)/i))changed=true;return changed?'changed':'expert-ready';}" +
-                "window.__tsddHidePageChrome=function(){try{hidePageChrome();}catch(e){}};window.__tsddEnforcePrefs=enforce;if(!window.__tsddPrefObserverV3){window.__tsddPrefObserverV3=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(function(){try{hidePageChrome();enforce(false);}catch(e){}},100);}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','aria-checked','aria-pressed','aria-selected','data-state','data-selected','data-active']});}" +
-                "return enforce(true);" +
+                "function visible(el){" +
+                "if(!el)return false;" +
+                "var s=getComputedStyle(el),r=el.getBoundingClientRect();" +
+                "return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;" +
+                "}" +
+
+                "function text(el){" +
+                "return ((el&&(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')))||'')" +
+                ".replace(/\\s+/g,' ').trim();" +
+                "}" +
+
+                "function norm(v){" +
+                "return String(v||'').replace(/\\s+/g,'').toLowerCase();" +
+                "}" +
+
+                "function compact(el){" +
+                "if(!visible(el))return false;" +
+                "var r=el.getBoundingClientRect();" +
+                "return r.width>=16&&r.height>=16&&r.width<=260&&r.height<=120;" +
+                "}" +
+
+                "function actionRoot(node){" +
+                "var cur=node,fallback=null,n=0;" +
+                "while(cur&&cur!==document.body&&cur!==document.documentElement&&n++<8){" +
+                "var r=cur.getBoundingClientRect();" +
+                "var tag=String(cur.tagName||'').toLowerCase();" +
+                "var role=String(cur.getAttribute&&cur.getAttribute('role')||'').toLowerCase();" +
+                "var cls=String(cur.className||'').toLowerCase();" +
+                "var ok=r.width>=16&&r.height>=16&&r.width<=280&&r.height<=130;" +
+                "if(ok&&(tag==='button'||tag==='a'||role==='button'||role==='menuitem'||role==='option'||" +
+                "(cur.hasAttribute&&cur.hasAttribute('tabindex'))))return cur;" +
+                "if(!fallback&&ok&&(/ds-button|button|toggle|mode|menu|option|c03d486a/.test(cls)||" +
+                "getComputedStyle(cur).cursor==='pointer'||typeof cur.onclick==='function'))fallback=cur;" +
+                "cur=cur.parentElement;" +
+                "}" +
+                "return fallback;" +
+                "}" +
+
+                // 不再调用 focus()，避免模式检测脚本抢走 DeepSeek 输入框焦点。
+                "function click(el){" +
+                "if(!el||!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;" +
+                "try{el.click();return true;}catch(e){" +
+                "try{" +
+                "el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));" +
+                "return true;" +
+                "}catch(e2){return false;}" +
+                "}" +
+                "}" +
+
+                "function hideElement(el){" +
+                "if(!el||el===document.body||el===document.documentElement)return false;" +
+                "var r=el.getBoundingClientRect();" +
+                "if(r.height<=0||r.height>220||r.width>window.innerWidth*0.98)return false;" +
+                "el.style.setProperty('display','none','important');" +
+                "el.style.setProperty('visibility','hidden','important');" +
+                "el.style.setProperty('pointer-events','none','important');" +
+                "el.setAttribute('aria-hidden','true');" +
+                "return true;" +
+                "}" +
+
+                "function hideExactButtons(words){" +
+                "var selector='button,a,[role=\"button\"],[role=\"menuitem\"],[tabindex]:not([tabindex=\"-1\"])';" +
+                "Array.from(document.querySelectorAll(selector)).forEach(function(el){" +
+                "if(words.indexOf(norm(text(el)))<0)return;" +
+                "hideElement(actionRoot(el)||el);" +
+                "});" +
+                "}" +
+
+                "function hideCodeDownloads(){" +
+                "document.querySelectorAll('pre').forEach(function(pre){" +
+                "var scope=pre.parentElement;" +
+                "if(!scope)return;" +
+                "Array.from(scope.querySelectorAll('button,a,[role=\"button\"],[tabindex]')).forEach(function(el){" +
+                "var t=norm(text(el));" +
+                "if(t==='下载'||t==='download')hideElement(actionRoot(el)||el);" +
+                "});" +
+                "});" +
+                "}" +
+
+                "function hidePageChrome(){" +
+                "document.querySelectorAll('span.ds-button__content').forEach(function(el){" +
+                "var t=norm(text(el));" +
+                "if(t==='下载应用'||t==='下载app'||t==='downloadapp'||t==='getapp')" +
+                "hideElement(actionRoot(el)||el.parentElement);" +
+                "});" +
+
+                "hideExactButtons([" +
+                "'下载应用','下载app','downloadapp','getapp'," +
+                "'新对话','新建对话','开启新对话','newchat','newconversation'," +
+                "'分享','share'" +
+                "]);" +
+
+                "document.querySelectorAll('svg path').forEach(function(path){" +
+                "var d=path.getAttribute('d')||'',target=null;" +
+
+                // 顶部新对话按钮。
+                "if(d.indexOf('M9.99994 1.22943')>=0&&" +
+                "d.indexOf('M9.21913 6.36949')>=0&&" +
+                "d.indexOf('M13.6304 9.22487')>=0){" +
+                "target=actionRoot(path);" +
+                "}" +
+
+                // 顶部分享按钮。
+                "else if(d.indexOf('M9.73047 1.98239')>=0&&" +
+                "d.indexOf('M18.3906 8.83005')>=0&&" +
+                "d.indexOf('M17.2881 9.73142')>=0){" +
+                "target=actionRoot(path);" +
+                "}" +
+
+                "if(target)hideElement(target);" +
+                "});" +
+
+                "hideCodeDownloads();" +
+                "}" +
+
+                "function isExpertText(value){" +
+                "var t=norm(value);" +
+                "return t==='专家模式'||t==='专家'||t==='expertmode'||t==='expert';" +
+                "}" +
+
+                "function expertReady(){" +
+                "var selectors=[" +
+                "'.the-header .c03d486a'," +
+                "'.the-header span._46a12ab'," +
+                "'.the-header [data-model-type]'" +
+                "];" +
+
+                "for(var i=0;i<selectors.length;i++){" +
+                "var nodes=Array.from(document.querySelectorAll(selectors[i]));" +
+                "for(var j=0;j<nodes.length;j++){" +
+                "if(visible(nodes[j])&&isExpertText(text(nodes[j])))return true;" +
+                "}" +
+                "}" +
+                "return false;" +
+                "}" +
+
+                "function findExpertOption(){" +
+                "var selector='button,[role=\"button\"],[role=\"menuitem\"],[role=\"option\"],li,[tabindex]:not([tabindex=\"-1\"]),div,span';" +
+                "var nodes=Array.from(document.querySelectorAll(selector));" +
+
+                "for(var i=0;i<nodes.length;i++){" +
+                "var el=nodes[i];" +
+                "if(!visible(el)||!isExpertText(text(el)))continue;" +
+
+                // 当前顶部标签不是菜单选项。
+                "if(el.closest&&el.closest('.the-header'))continue;" +
+
+                "var root=actionRoot(el);" +
+                "if(root&&compact(root))return root;" +
+                "}" +
+                "return null;" +
+                "}" +
+
+                "function findModeTrigger(){" +
+                // 用户提供的 DOM 中，专家模式入口就在 .the-header .c03d486a。
+                "var nodes=Array.from(document.querySelectorAll('.the-header .c03d486a'));" +
+                "for(var i=0;i<nodes.length;i++){" +
+                "if(!visible(nodes[i])||!compact(nodes[i]))continue;" +
+                "return actionRoot(nodes[i])||nodes[i];" +
+                "}" +
+
+                "var labels=Array.from(document.querySelectorAll('.the-header span._46a12ab'));" +
+                "for(var j=0;j<labels.length;j++){" +
+                "if(!visible(labels[j]))continue;" +
+                "var root=actionRoot(labels[j])||labels[j].parentElement;" +
+                "if(root&&compact(root))return root;" +
+                "}" +
+
+                // 用顶部菱形模式图标作为最后的精确兜底。
+                "var paths=Array.from(document.querySelectorAll('.the-header svg path'));" +
+                "for(var k=0;k<paths.length;k++){" +
+                "var d=paths[k].getAttribute('d')||'';" +
+                "if(d.indexOf('M11.0289 2.0918')<0||d.indexOf('M3.41858 5.46484')<0)continue;" +
+                "var chip=paths[k].closest('.c03d486a')||actionRoot(paths[k]);" +
+                "if(chip&&visible(chip))return chip;" +
+                "}" +
+
+                "return null;" +
+                "}" +
+
+                // 观察器只负责隐藏页面按钮，绝不再切模式或抢输入框焦点。
+                "window.__tsddHidePageChrome=function(){" +
+                "try{hidePageChrome();}catch(e){}" +
+                "};" +
+
+                "if(!window.__tsddChromeObserverV4){" +
+                "window.__tsddChromeObserverV4=true;" +
+                "var chromeTimer=null;" +
+                "new MutationObserver(function(){" +
+                "clearTimeout(chromeTimer);" +
+                "chromeTimer=setTimeout(function(){" +
+                "try{hidePageChrome();}catch(e){}" +
+                "},120);" +
+                "}).observe(document.documentElement,{" +
+                "childList:true," +
+                "subtree:true" +
+                "});" +
+                "}" +
+
+                // 已经是专家模式，不操作深度思考和搜索开关。
+                "if(expertReady()){" +
+                "hidePageChrome();" +
+                "return 'expert-ready';" +
+                "}" +
+
+                // 菜单已打开时，直接选择专家模式。
+                "var option=findExpertOption();" +
+                "if(option&&click(option))return 'changed';" +
+
+                // 菜单没有打开时，点击顶部模式入口。
+                "var now=Date.now();" +
+                "var trigger=findModeTrigger();" +
+                "if(trigger&&(!window.__tsddModeTriggerAt||now-window.__tsddModeTriggerAt>700)){" +
+                "window.__tsddModeTriggerAt=now;" +
+                "if(click(trigger))return 'changed';" +
+                "}" +
+
+                // 不再隐藏“使用快速模式开始对话”整块区域，避免把专家模式入口一起隐藏。
+                "hidePageChrome();" +
+                "return 'retry';" +
                 "}catch(e){return 'retry';}})();";
     }
 
