@@ -71,6 +71,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private static final String ARG_CONTEXT_LIMIT = "context_limit";
     private static final String ARG_TARGET_MESSAGE_ID = "target_message_id";
     private static final String ARG_TARGET_MESSAGE_TEXT = "target_message_text";
+    private static final String ARG_CONTEXT_SNAPSHOT = "context_snapshot";
+    private static final String ARG_CONTEXT_SNAPSHOT_COUNT = "context_snapshot_count";
     private static final String ARG_CONTACT_PROFILE = "contact_profile";
     /**
      * DeepSeek 当前发送按钮使用的上箭头 SVG path。自动提交只在检测到这个
@@ -155,6 +157,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         args.putInt(ARG_CONTEXT_LIMIT, request.contextLimit);
         args.putString(ARG_TARGET_MESSAGE_ID, request.targetMessageId);
         args.putString(ARG_TARGET_MESSAGE_TEXT, request.targetMessageText);
+        args.putString(ARG_CONTEXT_SNAPSHOT, request.contextSnapshot);
+        args.putInt(ARG_CONTEXT_SNAPSHOT_COUNT, request.contextSnapshotCount);
         args.putString(ARG_CONTACT_PROFILE, request.contactProfile == null ? "{}" : request.contactProfile.toJson());
         dialog.setArguments(args);
         return dialog;
@@ -1197,6 +1201,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         out.contextLimit = args.getInt(ARG_CONTEXT_LIMIT, 100);
         out.targetMessageId = args.getString(ARG_TARGET_MESSAGE_ID, "");
         out.targetMessageText = args.getString(ARG_TARGET_MESSAGE_TEXT, "");
+        out.contextSnapshot = args.getString(ARG_CONTEXT_SNAPSHOT, "");
+        out.contextSnapshotCount = args.getInt(ARG_CONTEXT_SNAPSHOT_COUNT, 0);
         out.contactProfile = DeepSeekContactProfile.fromJson(args.getString(ARG_CONTACT_PROFILE, "{}"));
         DeepSeekContactStore.apply(requireContext(), out);
         return out;

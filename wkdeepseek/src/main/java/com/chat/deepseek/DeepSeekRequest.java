@@ -24,6 +24,13 @@ public final class DeepSeekRequest {
     public int contextLimit = 100;
     public String targetMessageId = "";
     public String targetMessageText = "";
+    /**
+     * Snapshot of the messages already loaded by ChatActivity. DeepSeek must not call
+     * getOrSyncHistoryMessages(), because that API emits refresh callbacks and may mutate
+     * the visible chat adapter while the assistant window is open.
+     */
+    public String contextSnapshot = "";
+    public int contextSnapshotCount = 0;
     public DeepSeekContactProfile contactProfile = new DeepSeekContactProfile();
     public int action = ACTION_REPLY;
 
