@@ -183,7 +183,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
         Dialog dialog = new Dialog(requireContext());
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setCanceledOnTouchOutside(false);
+        Bundle args = getArguments() == null ? Bundle.EMPTY : getArguments();
+        dialog.setCanceledOnTouchOutside(!args.getBoolean(ARG_LOGIN, false));
         return dialog;
     }
 
@@ -195,25 +196,29 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         Window window = dialog.getWindow();
         if (window == null) return;
 
-        // 普通助手使用“真实的固定高度 Window”，而不是全屏透明 Window 里再放一个
-        // 60% 高度的面板。全屏透明 Window 会在部分系统上接管整屏 Insets/IME 布局，
-        // 关闭后 Activity 的 PanelSwitchLayout 可能保留错误高度，表现为历史消息消失。
         window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        window.setGravity(Gravity.BOTTOM);
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-        window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+        window.setGravity(loginMode ? Gravity.CENTER : Gravity.BOTTOM);
 
-        int windowHeight = loginMode
-                ? ViewGroup.LayoutParams.MATCH_PARENT
-                : normalPanelHeight;
+        // 普通助手不需要用户在 DeepSeek 输入框继续打字。让透明覆盖 Window 与输入法
+        // 完全隔离，避免它改变唐僧聊天页 PanelSwitchLayout/RecyclerView 的高度。
+        // 登录页仍需输入账号密码，因此保持正常的输入法交互。
+        if (loginMode) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+        } else {
+            window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+        }
+
         WindowManager.LayoutParams attributes = window.getAttributes();
         attributes.width = ViewGroup.LayoutParams.MATCH_PARENT;
-        attributes.height = windowHeight;
-        attributes.gravity = Gravity.BOTTOM;
+        attributes.height = ViewGroup.LayoutParams.MATCH_PARENT;
+        attributes.gravity = loginMode ? Gravity.CENTER : Gravity.BOTTOM;
         attributes.dimAmount = 0f;
         window.setAttributes(attributes);
-        window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, windowHeight);
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        window.setSoftInputMode((loginMode
+                ? WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                : WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
                 | WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -226,6 +231,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         dialogRoot.setBackgroundColor(Color.TRANSPARENT);
         dialogRoot.setClickable(true);
         dialogRoot.setFocusable(true);
+        if (!loginMode) {
+            // 面板以外的透明区域就是关闭热区。面板本身会消费点击，不会误关。
+            dialogRoot.setOnClickListener(v -> dismissAssistant());
+        }
 
         contentPanel = new LinearLayout(context);
         contentPanel.setOrientation(LinearLayout.VERTICAL);
@@ -237,6 +246,9 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         }
         contentPanel.setBackground(panelBackground);
         contentPanel.setClickable(true);
+        contentPanel.setOnClickListener(v -> {
+            // 消费点击，防止冒泡到透明区域关闭监听。
+        });
         if (!loginMode && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             // 顶部原生工具条移除后，WebView 会直接贴到面板顶部；启用轮廓裁剪，
             // 防止网页白底盖住圆角。
@@ -244,12 +256,11 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         }
 
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
-        // 登录页全屏；普通助手的 Dialog Window 本身就是固定 60% 高度。
-        // WebView 只在这个 Window 内滚动，顶部聊天历史不再被透明 Dialog 覆盖。
+        // 登录页全屏；普通助手只让底部面板占 60%，透明上半区仍可看到并关闭聊天页。
         normalPanelHeight = loginMode ? screenHeight : Math.max(dp(360), Math.round(screenHeight * 0.60f));
         FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
+                loginMode ? ViewGroup.LayoutParams.MATCH_PARENT : normalPanelHeight,
                 Gravity.BOTTOM);
         dialogRoot.addView(contentPanel, panelParams);
 
@@ -625,9 +636,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 String result = cleanJsResult(value);
                 webUiPrepareAttempts++;
 
-                // 点击模式或关闭开关后，等待 React 完成重绘再复查。最多复查 6 次，
-                // 找不到控件时按最佳努力继续，避免网页改版后整个助手不可用。
-                if ("changed".equals(result) && webUiPrepareAttempts < 6) {
+                // 专家模式可能比输入框晚渲染，或先要展开模式菜单。允许多轮复查，
+                // 但达到上限后仍继续提交，避免网页改版导致助手完全不可用。
+                if (("changed".equals(result) || "retry".equals(result))
+                        && webUiPrepareAttempts < 12) {
                     handler.postDelayed(() -> applyWebUiPreferences(continueFill), randomDelay(280, 460));
                     return;
                 }
@@ -647,30 +659,34 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         return "(function(){try{" +
                 "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;}" +
                 "function txt(el){return ((el&&(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')))||'').replace(/\\s+/g,' ').trim();}" +
-                "function selected(el){if(!el)return false;var c=String(el.className||'').toLowerCase();" +
-                "if(/(^|[ _-])(selected|active|checked)([ _-]|$)/.test(c))return true;" +
-                "if(el.getAttribute('aria-checked')==='true'||el.getAttribute('aria-pressed')==='true'||el.getAttribute('aria-selected')==='true')return true;" +
-                "var ds=String(el.getAttribute('data-state')||'').toLowerCase();if(ds==='checked'||ds==='selected'||ds==='active'||ds==='on')return true;" +
-                "return el.getAttribute('data-selected')==='true'||el.getAttribute('data-active')==='true';}" +
+                "function norm(el){return txt(el).replace(/\\s+/g,'').toLowerCase();}" +
+                "function interactive(el){var cur=el,n=0;while(cur&&cur!==document.documentElement&&n++<7){var role=(cur.getAttribute&&cur.getAttribute('role'))||'';var tag=(cur.tagName||'').toLowerCase();var style=getComputedStyle(cur);if(tag==='button'||tag==='a'||tag==='label'||/button|radio|switch|checkbox|menuitem|option|tab/.test(role)||cur.hasAttribute('tabindex')||style.cursor==='pointer')return cur;cur=cur.parentElement;}return el;}" +
+                "function selected(el){var cur=el,n=0;while(cur&&cur!==document.documentElement&&n++<5){var c=String(cur.className||'').toLowerCase();" +
+                "if(/(^|[ _-])(selected|active|checked|current)([ _-]|$)/.test(c))return true;" +
+                "if(cur.getAttribute('aria-checked')==='true'||cur.getAttribute('aria-pressed')==='true'||cur.getAttribute('aria-selected')==='true'||cur.getAttribute('aria-current')==='true')return true;" +
+                "var ds=String(cur.getAttribute('data-state')||'').toLowerCase();if(ds==='checked'||ds==='selected'||ds==='active'||ds==='on')return true;" +
+                "if(cur.getAttribute('data-selected')==='true'||cur.getAttribute('data-active')==='true')return true;cur=cur.parentElement;}return false;}" +
                 "function click(el){if(!el||!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;" +
                 "try{el.focus({preventScroll:true});}catch(e){try{el.focus();}catch(e2){}}" +
                 "['pointerdown','mousedown','mouseup'].forEach(function(type){try{el.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,view:window}));}catch(e){}});" +
                 "try{el.click();}catch(e){try{el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));}catch(e2){return false;}}return true;}" +
-                "function pool(){return Array.from(document.querySelectorAll('[role=\"radio\"],button,[role=\"button\"],[role=\"switch\"],[role=\"checkbox\"],[role=\"menuitem\"],[role=\"option\"],div[data-model-type],a')).filter(visible);}" +
+                "function pool(){return Array.from(document.querySelectorAll('button,a,label,[role],div[data-model-type],span,div')).filter(function(el){return visible(el)&&txt(el).length>0&&txt(el).length<100;});}" +
                 "function hideDownloads(){var re=/(下载(\\s*deepseek)?(\\s*应用|\\s*app)|打开(\\s*deepseek)?(\\s*应用|\\s*app)|在\\s*app\\s*中打开|download\\s*(the\\s*)?app|get\\s*(the\\s*)?app|open\\s*in\\s*app)/i;" +
-                "pool().forEach(function(el){if(re.test(txt(el))){el.style.setProperty('display','none','important');el.style.setProperty('visibility','hidden','important');el.setAttribute('aria-hidden','true');}});}" +
-                "function enforce(allowMenu){hideDownloads();var list=pool(),changed=false;" +
-                "var expert=list.find(function(el){var dmt=String(el.getAttribute('data-model-type')||'').toLowerCase();var t=txt(el).replace(/\\s+/g,'').toLowerCase();return dmt==='expert'||t==='专家模式'||t==='专家'||t==='expert'||t.indexOf('expertmode')>=0||t.indexOf('专家模式')>=0;});" +
-                "if(expert){if(!selected(expert)&&click(expert))changed=true;}" +
-                "else if(allowMenu){var trigger=list.find(function(el){var t=txt(el).replace(/\\s+/g,'').toLowerCase();return (el.getAttribute('aria-haspopup')||'')!==''&&(/快速模式|普通模式|标准模式|常规模式|quickmode|normalmode|standardmode|^模式$|^mode$/.test(t));});" +
-                "var now=Date.now();if(trigger&&(!window.__tsddModeMenuTryAt||now-window.__tsddModeMenuTryAt>1800)){window.__tsddModeMenuTryAt=now;if(click(trigger))changed=true;}}" +
-                "function disable(re){var el=list.find(function(x){return re.test(txt(x))&&selected(x);});if(el&&click(el))changed=true;}" +
+                "pool().forEach(function(el){if(re.test(txt(el))){var target=interactive(el);target.style.setProperty('display','none','important');target.style.setProperty('visibility','hidden','important');target.setAttribute('aria-hidden','true');}});}" +
+                "function enforce(allowMenu){hideDownloads();var list=pool(),changed=false,retry=false,now=Date.now();" +
+                "var expertNode=list.find(function(el){var dmt=String(el.getAttribute('data-model-type')||'').toLowerCase();var t=norm(el);return dmt==='expert'||t==='专家模式'||t==='专家'||t==='expert'||t==='expertmode'||t.indexOf('专家模式')>=0;});" +
+                "var quickNode=list.find(function(el){var t=norm(el);return t==='快速模式'||t==='快速'||t==='quickmode'||t==='quick';});" +
+                "var expert=expertNode?interactive(expertNode):null,quick=quickNode?interactive(quickNode):null;" +
+                "if(expert){var expertOn=selected(expert),quickOn=selected(quick);if(!expertOn&&(quickOn||!window.__tsddExpertRequested||now-(window.__tsddExpertClickAt||0)>1600)){if(click(expert)){window.__tsddExpertRequested=true;window.__tsddExpertClickAt=now;window.__tsddExpertClickCount=(window.__tsddExpertClickCount||0)+1;changed=true;}}if(!selected(expert)&&(window.__tsddExpertClickCount||0)<3)retry=true;}" +
+                "else{retry=true;if(allowMenu){var trigger=list.find(function(el){var t=norm(el);return (el.getAttribute('aria-haspopup')||'')!==''&&(/快速模式|普通模式|标准模式|常规模式|quickmode|normalmode|standardmode|^模式$|^mode$/.test(t));});" +
+                "if(trigger&&(!window.__tsddModeMenuTryAt||now-window.__tsddModeMenuTryAt>1200)){window.__tsddModeMenuTryAt=now;if(click(interactive(trigger)))changed=true;}}}" +
+                "function disable(re){var node=list.find(function(x){return re.test(txt(x));});var el=node?interactive(node):null;if(el&&selected(el)&&click(el))changed=true;}" +
                 "disable(/(^|\\s)(深度思考|深度思索|思考|deepthink|deep\\s*think|thinking|reasoning)(\\s|$)/i);" +
                 "disable(/(^|\\s)(智能搜索|联网搜索|网络搜索|搜索|smart\\s*search|web\\s*search|search|browse)(\\s|$)/i);" +
-                "return changed;}" +
+                "return changed?'changed':(retry?'retry':'stable');}" +
                 "window.__tsddEnforcePrefs=enforce;" +
                 "if(!window.__tsddPrefObserver){window.__tsddPrefObserver=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(function(){try{if(window.__tsddEnforcePrefs)window.__tsddEnforcePrefs(false);}catch(e){}},180);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','aria-checked','aria-pressed','aria-selected','data-state','data-selected','data-active']});}" +
-                "return enforce(true)?'changed':'stable';" +
+                "return enforce(true);" +
                 "}catch(e){return 'error';}})();";
     }
 
@@ -760,6 +776,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 promptSubmitted = true;
                 statusView.setText(R.string.wkdeepseek_thinking);
                 installReplyButtons();
+                beginAnswerObservation();
                 return;
             }
 
@@ -870,6 +887,24 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "}catch(e){return false;}})();";
     }
 
+    /**
+     * 提交完成后才开始识别回答代码块。提交前以及刚提交时出现的代码块属于我们发送
+     * 给 DeepSeek 的提示词，必须标记为忽略，否则会在用户提示气泡下面重复叠加
+     * “填入聊天/直接发送”按钮。
+     */
+    private void beginAnswerObservation() {
+        if (webView == null || !isAdded()) return;
+        String js = "(function(){try{" +
+                "function clearPromptBlocks(){document.querySelectorAll('pre code').forEach(function(code){code.dataset.tsddIgnore='1';var pre=code.closest('pre');if(pre)pre.dataset.tsddIgnore='1';});document.querySelectorAll('[data-tsdd-reply-bar]').forEach(function(x){x.remove();});}" +
+                "window.__tsddEnforcePrefs=null;window.__tsddAnswerPhase=true;window.__tsddAnswerReady=false;window.__tsddAnswerNotBefore=Date.now()+900;clearPromptBlocks();" +
+                "setTimeout(clearPromptBlocks,220);setTimeout(clearPromptBlocks,600);setTimeout(function(){window.__tsddAnswerReady=true;if(window.__tsddDeepSeekAdd)window.__tsddDeepSeekAdd();},920);return 'ok';" +
+                "}catch(e){return 'error';}})();";
+        try {
+            webView.evaluateJavascript(js, null);
+        } catch (Exception ignored) {
+        }
+    }
+
     private void installReplyButtons() {
         if (webView == null) return;
         String fallbackMode;
@@ -885,17 +920,22 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "function button(label,mode,code){var b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.tsddAction='1';" +
                 "b.style.cssText='border:0;border-radius:16px;padding:7px 12px;background:#edf3ff;color:#295eea;font-size:12px;font-weight:600;margin-left:8px';" +
                 "b.onclick=function(e){e.preventDefault();e.stopPropagation();go(mode,(code.innerText||'').trim());};return b;}" +
-                "function add(){document.querySelectorAll('pre code').forEach(function(code){" +
-                "if(code.dataset.tsddReady==='1')return;var pre=code.closest('pre');if(!pre)return;" +
+                "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;}" +
+                "function composerRoot(){var boxes=Array.from(document.querySelectorAll('textarea,[contenteditable=\"true\"],[role=\"textbox\"]')).filter(visible);var input=boxes.length?boxes[boxes.length-1]:null;if(!input)return null;var root=input.closest('form')||input,cur=root,n=0,maxH=Math.max(190,window.innerHeight*0.48);while(cur.parentElement&&n++<6){var p=cur.parentElement,r=p.getBoundingClientRect(),pos=getComputedStyle(p).position;if(r.width<window.innerWidth*0.45)break;if(/fixed|sticky/.test(pos)&&r.height<window.innerHeight*0.70){root=p;break;}if(r.height>maxH)break;root=p;cur=p;}return root;}" +
+                "function hideComposer(){var root=composerRoot();if(root){root.dataset.tsddComposerHidden='1';root.style.setProperty('display','none','important');root.style.setProperty('visibility','hidden','important');root.style.setProperty('height','0','important');root.style.setProperty('min-height','0','important');root.style.setProperty('margin','0','important');root.style.setProperty('padding','0','important');}document.documentElement.style.setProperty('scroll-padding-bottom','8px','important');}" +
+                "function cleanup(){var seen={};document.querySelectorAll('[data-tsdd-reply-bar]').forEach(function(bar){var owner=bar.dataset.tsddOwner||'';if(!owner||seen[owner]||!document.querySelector('pre[data-tsdd-pre-id=\"'+owner+'\"]'))bar.remove();else seen[owner]=true;});}" +
+                "function add(){cleanup();if(!window.__tsddAnswerPhase||!window.__tsddAnswerReady||Date.now()<(window.__tsddAnswerNotBefore||0))return;var added=false,lastPre=null;document.querySelectorAll('pre code').forEach(function(code){" +
+                "var pre=code.closest('pre');if(!pre||pre.dataset.tsddIgnore==='1'||code.dataset.tsddIgnore==='1')return;if(code.dataset.tsddReady==='1')return;" +
                 "var cls=(code.className||'').toLowerCase(),raw=(code.innerText||'').trim();var looksProfile=cls.indexOf('profile')>=0||(raw.charAt(0)==='{'&&raw.indexOf('\"interaction_state\"')>=0);var mode=looksProfile?'profile':(cls.indexOf('translate')>=0?fallbackMode:(cls.indexOf('reply')>=0?'use':fallbackMode));" +
-                "code.dataset.tsddReady='1';var box=document.createElement('div');box.dataset.tsddReplyBar='1';" +
+                "if(!pre.dataset.tsddPreId){window.__tsddPreSeq=(window.__tsddPreSeq||0)+1;pre.dataset.tsddPreId='p'+window.__tsddPreSeq;}var owner=pre.dataset.tsddPreId;if(document.querySelector('[data-tsdd-reply-bar][data-tsdd-owner=\"'+owner+'\"]')){code.dataset.tsddReady='1';return;}" +
+                "code.dataset.tsddReady='1';var box=document.createElement('div');box.dataset.tsddReplyBar='1';box.dataset.tsddOwner=owner;" +
                 "box.style.cssText='display:flex;justify-content:flex-end;align-items:center;padding:8px 2px 12px 2px';" +
                 "if(mode==='profile'){box.appendChild(button('更新联系人记录','profile',code));}" +
                 "else if(mode==='copy'){box.appendChild(button('复制译文','copy',code));}" +
                 "else if(mode==='translate_use'){box.appendChild(button('显示译文','translate_use',code));box.appendChild(button('复制译文','copy',code));}" +
                 "else{box.appendChild(button('填入聊天','use',code));box.appendChild(button('直接发送','send',code));}" +
-                "if(pre.parentNode)pre.parentNode.insertBefore(box,pre.nextSibling);});}" +
-                "var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,450);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});add();" +
+                "if(pre.parentNode){pre.parentNode.insertBefore(box,pre.nextSibling);added=true;lastPre=pre;}});if(added||window.__tsddResultReady){window.__tsddResultReady=true;hideComposer();setTimeout(hideComposer,250);if(lastPre)setTimeout(function(){try{lastPre.scrollIntoView({behavior:'smooth',block:'end'});}catch(e){lastPre.scrollIntoView(false);}},180);}}" +
+                "window.__tsddDeepSeekAdd=add;var timer=null;if(!window.__tsddResultObserver){window.__tsddResultObserver=true;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,520);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});}add();" +
                 "})();";
         webView.evaluateJavascript(js, null);
     }
