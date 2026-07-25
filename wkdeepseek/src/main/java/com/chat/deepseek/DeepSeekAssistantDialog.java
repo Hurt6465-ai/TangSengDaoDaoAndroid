@@ -36,6 +36,7 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -44,6 +45,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentActivity;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.Locale;
@@ -114,6 +116,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private final Runnable loginProbeRunnable = this::runLoginProbe;
     private FrameLayout dialogRoot;
     private LinearLayout contentPanel;
+    private FrameLayout assistantHost;
+    private ScrollView nativeReplyScroll;
+    private LinearLayout nativeReplyList;
+    private String nativeReplySignature = "";
     private int normalPanelHeight;
     private boolean closing;
     private String dismissReason = "unknown";
@@ -372,7 +378,25 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             return false;
         });
         configureWebView(webView);
-        contentPanel.addView(webView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        assistantHost = new FrameLayout(context);
+        assistantHost.addView(webView, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        nativeReplyScroll = new ScrollView(context);
+        nativeReplyScroll.setFillViewport(true);
+        nativeReplyScroll.setVisibility(View.GONE);
+        nativeReplyScroll.setBackgroundColor(Color.WHITE);
+        nativeReplyList = new LinearLayout(context);
+        nativeReplyList.setOrientation(LinearLayout.VERTICAL);
+        nativeReplyList.setPadding(dp(16), dp(14), dp(16), dp(24));
+        nativeReplyScroll.addView(nativeReplyList, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        assistantHost.addView(nativeReplyScroll, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        contentPanel.addView(assistantHost, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         if (!isOnline(context)) {
             statusView.setText(R.string.wkdeepseek_no_network);
@@ -1437,9 +1461,42 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         }
         String js = "(function(){\n  function norm(v){return String(v||'').replace(/\\s+/g,' ').trim();}\n  function raw(v){return String(v||'').trim();}\n  function compact(v){return norm(v).replace(/\\s+/g,'').toLowerCase();}\n  function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;}\n  function restoreComposer(){document.querySelectorAll('[data-tsdd-composer-hidden]').forEach(function(root){root.removeAttribute('data-tsdd-composer-hidden');root.removeAttribute('aria-hidden');root.style.removeProperty('display');root.style.removeProperty('visibility');root.style.removeProperty('pointer-events');});document.documentElement.style.removeProperty('scroll-padding-bottom');}\n  function injectStyle(){\n    if(document.getElementById('tsdd-deepseek-result-style-v9'))return;\n    var s=document.createElement('style');\n    s.id='tsdd-deepseek-result-style-v9';\n    s.textContent='[data-tsdd-reply-card]{display:block!important;margin:8px 0 6px!important;padding:13px 14px!important;border-radius:13px!important;background:#f3f6ff!important;border:1px solid #cbd8ff!important;color:#1f2937!important;font-size:16px!important;line-height:1.65!important;white-space:pre-wrap!important;word-break:break-word!important;box-shadow:0 4px 14px rgba(20,35,70,.06)!important}[data-tsdd-back-translation]{display:block!important;margin:6px 0 8px!important;padding:10px 12px!important;border-radius:11px!important;background:#eefaf5!important;border:1px solid #bce6d5!important;color:#275b4b!important;font-size:14px!important;line-height:1.55!important;white-space:pre-wrap!important;word-break:break-word!important}[data-tsdd-translation-card]{display:block!important;margin:10px 0 8px!important;padding:12px 13px!important;border-radius:12px!important;background:#eefaf5!important;border:1px solid #bce6d5!important;color:#174f3e!important;font-size:15px!important;line-height:1.65!important;white-space:pre-wrap!important;word-break:break-word!important}[data-tsdd-reply-bar]{margin-bottom:10px!important}[data-tsdd-send-surface-v9]{position:relative!important;padding-bottom:64px!important;cursor:pointer!important;-webkit-tap-highlight-color:transparent!important}[data-tsdd-send-surface-v9]::after{content:\"发送\";display:block!important;position:absolute!important;left:0!important;right:0!important;bottom:4px!important;height:44px!important;line-height:44px!important;text-align:center!important;border-radius:22px!important;background:#0b8f68!important;color:#fff!important;font-size:15px!important;font-weight:700!important;box-shadow:0 3px 10px rgba(11,143,104,.18)!important;pointer-events:none!important}[data-tsdd-action]{box-shadow:none!important}';\n    (document.head||document.documentElement).appendChild(s);\n  }\n  function markBaseline(){if(window.__tsddAnswerPhase)return;document.querySelectorAll('.ds-assistant-message-main-content').forEach(function(root){root.dataset.tsddIgnoreAnswer='1';});document.querySelectorAll('pre code').forEach(function(code){code.dataset.tsddIgnore='1';var pre=code.closest('pre');if(pre)pre.dataset.tsddIgnore='1';});}\n  function ownerFor(el,prefix){if(!el.dataset.tsddPlainOwner){window.__tsddPlainSeq=(window.__tsddPlainSeq||0)+1;el.dataset.tsddPlainOwner=prefix+window.__tsddPlainSeq;}return el.dataset.tsddPlainOwner;}\n  function hideNativeCodeActions(pre){\n    if(!pre)return;var scopes=[pre];if(pre.parentElement)scopes.push(pre.parentElement);if(pre.parentElement&&pre.parentElement.parentElement)scopes.push(pre.parentElement.parentElement);\n    scopes.forEach(function(scope){\n      scope.querySelectorAll('button,a,[role=\"button\"],[role=\"menuitem\"]').forEach(function(el){if(el.dataset.tsddAction==='1')return;var label=compact((el.innerText||'')+' '+(el.getAttribute('aria-label')||'')+' '+(el.getAttribute('title')||''));if(/复制|copy|下载|download|savecode/.test(label))el.style.setProperty('display','none','important');});\n      scope.querySelectorAll('span,div').forEach(function(el){if(el.dataset.tsddAction==='1'||el.dataset.tsddReplyCard==='1')return;var label=compact(el.innerText||el.textContent);var r=el.getBoundingClientRect();if(label==='reply'&&r.width<180&&r.height<80)el.style.setProperty('display','none','important');});\n    });\n  }\n  function hideAllCodeActions(root){(root||document).querySelectorAll('pre').forEach(hideNativeCodeActions);}\n  restoreComposer();injectStyle();markBaseline();if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();hideAllCodeActions(document);\n  if(window.__tsddDeepSeekInstalledV9){if(window.__tsddDeepSeekAddV9)window.__tsddDeepSeekAddV9();return;}\n  window.__tsddDeepSeekInstalledV9=true;\n  var fallbackMode=" + JSONObject.quote(fallbackMode) + ";\n  function go(mode,text,local){if(!text)return;var u='tsdd-deepseek://result?mode='+mode+'&text='+encodeURIComponent(text);if(local)u+='&local='+encodeURIComponent(local);location.href=u;}\n  function button(label,mode,text,local,tone){var b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.tsddAction='1';var strong=tone==='primary'||tone==='success',bg=tone==='success'?'#0b8f68':(tone==='primary'?'#315fe9':'#edf3ff'),fg=strong?'#fff':'#295eea',border=strong?'0':'1px solid #cfdbff';b.style.cssText='display:inline-flex!important;visibility:visible!important;align-items:center;justify-content:center;border:'+border+';border-radius:18px;padding:9px 15px;background:'+bg+';color:'+fg+';font-size:14px;font-weight:650;margin-left:8px;min-height:36px;position:relative;z-index:8';b.onclick=function(e){e.preventDefault();e.stopPropagation();go(mode,text,local||'');};return b;}\n  function addBar(anchor,owner,buttons,signature){if(!anchor||!anchor.parentNode)return false;var old=document.querySelector('[data-tsdd-reply-bar][data-tsdd-owner=\"'+owner+'\"]');if(old&&old.dataset.tsddSignature===signature)return false;if(old)old.remove();var box=document.createElement('div');box.dataset.tsddReplyBar='1';box.dataset.tsddOwner=owner;box.dataset.tsddSignature=signature;box.style.cssText='display:flex!important;visibility:visible!important;justify-content:flex-end;align-items:center;flex-wrap:wrap;padding:7px 0 11px;position:relative;z-index:7';buttons.forEach(function(b){box.appendChild(b);});anchor.parentNode.insertBefore(box,anchor.nextSibling);return true;}\n  function nearLabel(pre){var n=pre?pre.previousElementSibling:null,steps=0;while(n&&steps++<5){if(n.tagName==='PRE')break;var t=norm(n.innerText||n.textContent);if(t&&t.length<100)return t;n=n.previousElementSibling;}return '';}\n  function codeKind(code,pre){var cls=compact(code.className||''),label=compact(nearLabel(pre));if(/profile/.test(cls))return 'profile';if(/translation|translate|译文|直译/.test(cls)||/译文|直译|translation/.test(label))return 'translation';if(/reply|response|回复/.test(cls)||/选项|建议|版本|回复|reply/.test(label))return 'reply';return (fallbackMode==='translate_use'||fallbackMode==='copy')?'translation':'reply';}\n  function codeText(code){return raw(code&&(code.innerText||code.textContent)||'');}\n  function currentBlocks(root){return Array.from(root.querySelectorAll('pre code')).filter(function(code){var pre=code.closest('pre');return pre&&pre.dataset.tsddIgnore!=='1'&&code.dataset.tsddIgnore!=='1'&&codeText(code);});}\n  function rows(root){return Array.from(root.querySelectorAll('p,li')).filter(function(el){return visible(el)&&!el.closest('pre')&&!el.closest('[data-tsdd-reply-bar]')&&!el.closest('[data-tsdd-synthetic]');});}\n  function after(a,b){return !!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);}\n  function findBackTranslation(root,pre,nextPre){var list=rows(root);for(var i=0;i<list.length;i++){var row=list[i];if(!after(pre,row))continue;if(nextPre&&after(nextPre,row))break;var t=norm(row.innerText||row.textContent),m=t.match(/^(?:回译|译文|我的母语译文|中文译文|本地显示)\\s*[：:]\\s*([\\s\\S]+)$/);if(m&&norm(m[1]))return {row:row,text:norm(m[1])};}return null;}\n  function styleBackTranslation(info){if(!info||!info.row)return;info.row.dataset.tsddBackTranslation='1';info.row.textContent='回译：'+info.text;}\n  function makeTranslationCard(text,anchor,key){var old=document.querySelector('[data-tsdd-translation-card][data-tsdd-owner=\"'+key+'\"]');if(old){old.textContent='译文：'+text;return old;}var card=document.createElement('div');card.dataset.tsddTranslationCard='1';card.dataset.tsddOwner=key;card.textContent='译文：'+text;anchor.parentNode.insertBefore(card,anchor.nextSibling);return card;}\n  function convertTranslationCode(pre,text,key){var card=makeTranslationCard(text,pre,key);hideNativeCodeActions(pre);pre.style.setProperty('display','none','important');return card;}\n  function makeReplyCard(pre,text,key){var card=document.querySelector('[data-tsdd-reply-card][data-tsdd-owner=\"'+key+'\"]');if(!card){card=document.createElement('div');card.dataset.tsddReplyCard='1';card.dataset.tsddOwner=key;pre.parentNode.insertBefore(card,pre);}var body=card.querySelector('[data-tsdd-reply-text]');if(!body){body=document.createElement('div');body.dataset.tsddReplyText='1';card.insertBefore(body,card.firstChild);}body.textContent=text;hideNativeCodeActions(pre);pre.style.setProperty('display','none','important');return card;}\n  function armSendSurface(anchor,text,local,signature){if(!anchor||!text)return false;anchor.dataset.tsddSendSurfaceV9='1';anchor.dataset.tsddSendSignature=signature;anchor.__tsddSendText=text;anchor.__tsddSendLocal=local||'';if(!anchor.__tsddSendListenerV9){anchor.__tsddSendListenerV9=true;anchor.addEventListener('click',function(e){var r=anchor.getBoundingClientRect();var y=(typeof e.clientY==='number'&&e.clientY>0)?e.clientY:r.bottom;if(y<r.bottom-58)return;e.preventDefault();e.stopPropagation();go('send',anchor.__tsddSendText||'',anchor.__tsddSendLocal||'');},true);}return true;}\n  function processCodes(root){\n    if(!root||root.dataset.tsddIgnoreAnswer==='1')return {added:false,last:null};\n    var blocks=currentBlocks(root),added=false,last=null;if(!blocks.length)return {added:false,last:null};\n    hideAllCodeActions(root);\n    if(fallbackMode==='translate_use'||fallbackMode==='copy'){\n      var first=blocks.find(function(c){return codeKind(c,c.closest('pre'))==='translation';})||blocks[0];\n      var pre=first.closest('pre'),translated=codeText(first),owner=ownerFor(pre,'t'),card=convertTranslationCode(pre,translated,owner),buttons=[];\n      if(fallbackMode==='translate_use')buttons.push(button('显示译文','translate_use',translated,'','success'));\n      buttons.push(button('复制译文','copy',translated,'',''));\n      if(addBar(card,owner,buttons,'translation:'+translated)){added=true;last=card;}\n      return {added:added,last:last};\n    }\n    var replies=blocks.filter(function(c){return codeKind(c,c.closest('pre'))==='reply';});\n    replies.forEach(function(replyCode,index){\n      var replyPre=replyCode.closest('pre'),original=codeText(replyCode),nextPre=index+1<replies.length?replies[index+1].closest('pre'):null;\n      var back=findBackTranslation(root,replyPre,nextPre),translated=back?back.text:'',actionAnchor=null;if(back){styleBackTranslation(back);actionAnchor=back.row;}\n      if(!translated){\n        for(var i=0;i<blocks.length;i++){var c=blocks[i],p=c.closest('pre');if(p===replyPre||!after(replyPre,p))continue;if(nextPre&&after(nextPre,p))break;if(codeKind(c,p)==='translation'){translated=codeText(c);var keyT=ownerFor(p,'bt'),cardT=convertTranslationCode(p,translated,keyT);cardT.dataset.tsddBackTranslation='1';cardT.removeAttribute('data-tsdd-translation-card');cardT.textContent='回译：'+translated;actionAnchor=cardT;break;}}\n      }\n      var owner=ownerFor(replyPre,'r'),card=makeReplyCard(replyPre,original,owner);\n      if(armSendSurface(card,original,translated,'reply:'+original+'|'+translated)){added=true;}last=card;\n    });\n    return {added:added,last:last};\n  }\n  function parsePlain(root){\n    if(!root||root.dataset.tsddIgnoreAnswer==='1'||currentBlocks(root).length)return {added:false,last:null};\n    var elements=rows(root),added=false,last=null;\n    if(fallbackMode==='translate_use'||fallbackMode==='copy'){\n      for(var i=0;i<elements.length;i++){var t=norm(elements[i].innerText||elements[i].textContent),m=t.match(/^(?:自然)?译文\\s*[：:]\\s*([\\s\\S]+)$/);if(!m||!norm(m[1]))continue;var translated=norm(m[1]),row=elements[i],key=ownerFor(row,'pt');row.dataset.tsddTranslationCard='1';var buttons=[];if(fallbackMode==='translate_use')buttons.push(button('显示译文','translate_use',translated,'','success'));buttons.push(button('复制译文','copy',translated,'',''));if(addBar(row,key,buttons,'plain-translation:'+translated)){added=true;last=row;}break;}\n      return {added:added,last:last};\n    }\n    for(var j=0;j<elements.length;j++){\n      var line=norm(elements[j].innerText||elements[j].textContent),match=line.match(/^(?:回复|原文|回复原文|对方语言|发送内容)\\s*[：:]\\s*([\\s\\S]+)$/);if(!match||!norm(match[1]))continue;\n      var original=norm(match[1]),back=null;\n      for(var k=j+1;k<elements.length&&k<=j+5;k++){var tt=norm(elements[k].innerText||elements[k].textContent),tm=tt.match(/^(?:回译|译文|我的母语译文|中文译文|本地显示)\\s*[：:]\\s*([\\s\\S]+)$/);if(tm&&norm(tm[1])){back={row:elements[k],text:norm(tm[1])};break;}if(/^(?:回复|原文|回复原文|对方语言|发送内容)\\s*[：:]/.test(tt))break;}\n      var key2=ownerFor(elements[j],'pr'),card=document.querySelector('[data-tsdd-reply-card][data-tsdd-owner=\"'+key2+'\"]');\n      if(!card){card=document.createElement('div');card.dataset.tsddReplyCard='1';card.dataset.tsddOwner=key2;elements[j].parentNode.insertBefore(card,elements[j].nextSibling);}var body2=card.querySelector('[data-tsdd-reply-text]');if(!body2){body2=document.createElement('div');body2.dataset.tsddReplyText='1';card.insertBefore(body2,card.firstChild);}body2.textContent=original;elements[j].style.setProperty('display','none','important');\n      if(back)styleBackTranslation(back);var local=back?back.text:'';\n      if(armSendSurface(card,original,local,'plain-reply:'+original+'|'+local)){added=true;}last=card;\n    }\n    return {added:added,last:last};\n  }\n  function cleanup(){restoreComposer();injectStyle();if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();hideAllCodeActions(document);document.querySelectorAll('[data-tsdd-send-host]').forEach(function(x){x.remove();});var seen={};document.querySelectorAll('[data-tsdd-reply-bar]').forEach(function(bar){var labels=compact(bar.innerText||bar.textContent);if(/填入聊天|直接发送|^发送$/.test(labels)){bar.remove();return;}var owner=bar.dataset.tsddOwner||'';if(!owner||seen[owner])bar.remove();else seen[owner]=true;});document.querySelectorAll('[data-tsdd-send-bar-v8]').forEach(function(bar){bar.remove();});}\n  function add(){cleanup();if(!window.__tsddAnswerPhase||!window.__tsddAnswerReady||Date.now()<(window.__tsddAnswerNotBefore||0))return;var added=false,last=null;Array.from(document.querySelectorAll('.ds-assistant-message-main-content')).forEach(function(root){var coded=processCodes(root);if(coded.added){added=true;last=coded.last;}var plain=parsePlain(root);if(plain.added){added=true;last=plain.last;}});if(added||window.__tsddResultReady){window.__tsddResultReady=true;restoreComposer();if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();hideAllCodeActions(document);if(last)setTimeout(function(){try{last.scrollIntoView({behavior:'smooth',block:'end'});}catch(e){last.scrollIntoView(false);}},120);}}\n  window.__tsddDeepSeekAddV9=add;window.__tsddDeepSeekAddV8=add;window.__tsddDeepSeekAddV6=add;window.__tsddDeepSeekAddV5=add;window.__tsddDeepSeekAddV4=add;window.__tsddDeepSeekAddV3=add;\n  var timer=null;if(!window.__tsddResultObserverV9){window.__tsddResultObserverV9=true;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,110);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','style','disabled','aria-disabled','aria-label','title']});}\n  add();\n})();";
         webView.evaluateJavascript(js, null);
+        installNativeReplyOptionsBridge();
+    }
+
+    private void installNativeReplyOptionsBridge() {
+        if (webView == null || request == null
+                || request.action == DeepSeekRequest.ACTION_TRANSLATE) return;
+        String js = "(function(){try{" +
+                "if(window.__tsddNativeReplyV10){if(window.__tsddNativeReplyScanV10)window.__tsddNativeReplyScanV10();return 'exists';}" +
+                "window.__tsddNativeReplyV10=true;" +
+                "function norm(v){return String(v||'').replace(/\\s+/g,' ').trim();}" +
+                "function raw(v){return String(v||'').trim();}" +
+                "function labelBefore(pre){var n=pre,steps=0;while(n&&steps++<8){n=n.previousElementSibling;if(!n)break;var t=norm(n.innerText||n.textContent);if(t&&t.length<120&&/选项|版本|建议|自然|轻松|直接|延续|话题/.test(t))return t;}return '';}" +
+                "function rows(root){return Array.from(root.querySelectorAll('p,li')).filter(function(x){return !x.closest('pre');});}" +
+                "function after(a,b){return !!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);}" +
+                "function localAfter(root,pre,nextPre){var list=rows(root);for(var i=0;i<list.length;i++){var row=list[i];if(!after(pre,row))continue;if(nextPre&&after(nextPre,row))break;var t=norm(row.innerText||row.textContent),m=t.match(/^(?:回译|译文|我的母语译文|中文译文|本地显示)\\s*[：:]\\s*([\\s\\S]+)$/);if(m&&norm(m[1]))return norm(m[1]);}return '';}" +
+                "function collect(){var roots=Array.from(document.querySelectorAll('.ds-assistant-message-main-content'));if(!roots.length)return [];var root=roots[roots.length-1];var codes=Array.from(root.querySelectorAll('pre code')).filter(function(c){var t=raw(c.innerText||c.textContent),k=(c.className||'').toLowerCase();return t&&!/translation|translate|profile/.test(k);});var out=[];for(var i=0;i<codes.length;i++){var code=codes[i],pre=code.closest('pre');if(!pre)continue;var text=raw(code.innerText||code.textContent);if(!text)continue;var next=i+1<codes.length?codes[i+1].closest('pre'):null;out.push({label:labelBefore(pre)||('选项 '+(i+1)),text:text,local:localAfter(root,pre,next)});}if(out.length)return out;var ps=rows(root);for(var j=0;j<ps.length;j++){var line=norm(ps[j].innerText||ps[j].textContent),m=line.match(/^(?:回复|原文|回复原文|对方语言|发送内容)\\s*[：:]\\s*([\\s\\S]+)$/);if(!m||!norm(m[1]))continue;var local='';for(var k=j+1;k<ps.length&&k<=j+5;k++){var t=norm(ps[k].innerText||ps[k].textContent),lm=t.match(/^(?:回译|译文|我的母语译文|中文译文|本地显示)\\s*[：:]\\s*([\\s\\S]+)$/);if(lm&&norm(lm[1])){local=norm(lm[1]);break;}}out.push({label:'选项 '+(out.length+1),text:norm(m[1]),local:local});}return out;}" +
+                "function generating(){return Array.from(document.querySelectorAll('button,[role=\"button\"]')).some(function(b){var t=norm((b.innerText||'')+' '+(b.getAttribute('aria-label')||'')+' '+(b.getAttribute('title')||''));var st=getComputedStyle(b),r=b.getBoundingClientRect();return st.display!=='none'&&st.visibility!=='hidden'&&r.width>0&&r.height>0&&/停止生成|停止|stopgenerating|stopgeneration/.test(t.toLowerCase().replace(/\\s+/g,''));});}" +
+                "window.__tsddNativeReplyBaselineV10=JSON.stringify(collect());" +
+                "function publish(){if(generating())return;var items=collect();if(!items.length)return;var data=JSON.stringify(items),sig=data;if(sig===window.__tsddNativeReplyBaselineV10||window.__tsddNativeReplySigV10===sig)return;window.__tsddNativeReplySigV10=sig;location.href='tsdd-deepseek://options?data='+encodeURIComponent(data);}" +
+                "var timer=null;window.__tsddNativeReplyScanV10=function(){clearTimeout(timer);timer=setTimeout(publish,1100);};" +
+                "new MutationObserver(function(){window.__tsddNativeReplyScanV10();}).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','style','aria-label','title']});" +
+                "window.__tsddNativeReplyScanV10();return 'installed';" +
+                "}catch(e){return 'error:'+String(e&&e.message||e);}})();";
+        try {
+            webView.evaluateJavascript(js, value -> DeepSeekHistoryLog.log(
+                    "NATIVE_REPLY_BRIDGE", "result=" + cleanJsResult(value) + " ui=v10"));
+        } catch (Exception e) {
+            DeepSeekHistoryLog.log("NATIVE_REPLY_BRIDGE_ERROR", e.getClass().getSimpleName());
+        }
     }
 
     private void handlePluginUrl(Uri uri) {
+        if ("options".equals(uri.getHost())) {
+            showNativeReplyOptions(uri.getQueryParameter("data"));
+            return;
+        }
         if (!"result".equals(uri.getHost())) return;
         String text = uri.getQueryParameter("text");
         String localDisplayText = uri.getQueryParameter("local");
@@ -1469,6 +1526,133 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             return;
         }
         deliverReply(cleanText, cleanLocalDisplayText, false);
+    }
+
+    private void showNativeReplyOptions(String rawJson) {
+        if (TextUtils.isEmpty(rawJson) || rawJson.length() > 30000 || !isAdded()) return;
+        try {
+            JSONArray array = new JSONArray(rawJson);
+            if (array.length() == 0) return;
+            String signature = array.toString();
+            if (TextUtils.equals(signature, nativeReplySignature)
+                    && nativeReplyScroll != null
+                    && nativeReplyScroll.getVisibility() == View.VISIBLE) {
+                return;
+            }
+            nativeReplySignature = signature;
+            renderNativeReplyOptions(array);
+        } catch (Exception e) {
+            DeepSeekHistoryLog.log("NATIVE_REPLY_PARSE_ERROR", e.getClass().getSimpleName());
+        }
+    }
+
+    private void renderNativeReplyOptions(JSONArray array) {
+        if (nativeReplyList == null || nativeReplyScroll == null || webView == null) return;
+        nativeReplyList.removeAllViews();
+
+        TextView title = new TextView(requireContext());
+        title.setText("聊天回复建议");
+        title.setTextColor(Color.rgb(24, 31, 42));
+        title.setTextSize(20);
+        title.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        title.setPadding(dp(2), 0, 0, dp(4));
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        nativeReplyList.addView(title, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView subtitle = new TextView(requireContext());
+        subtitle.setText("选择一条直接发送，对方只会收到目标语言；回译仅在我方显示");
+        subtitle.setTextColor(Color.rgb(116, 124, 138));
+        subtitle.setTextSize(13);
+        subtitle.setPadding(dp(2), 0, 0, dp(10));
+        nativeReplyList.addView(subtitle, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        int rendered = 0;
+        for (int i = 0; i < array.length(); i++) {
+            JSONObject item = array.optJSONObject(i);
+            if (item == null) continue;
+            String text = item.optString("text", "").trim();
+            String local = item.optString("local", "").trim();
+            String label = item.optString("label", "").trim();
+            if (TextUtils.isEmpty(text)) continue;
+            rendered++;
+            addNativeReplyCard(rendered, label, text, local);
+        }
+        if (rendered == 0) return;
+
+        webView.setVisibility(View.GONE);
+        nativeReplyScroll.setVisibility(View.VISIBLE);
+        nativeReplyScroll.scrollTo(0, 0);
+        DeepSeekHistoryLog.log("NATIVE_REPLY_SHOWN", "count=" + rendered + " ui=v10");
+    }
+
+    private void addNativeReplyCard(int index, String label, String text, String local) {
+        Context context = requireContext();
+        LinearLayout card = new LinearLayout(context);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        GradientDrawable cardBg = new GradientDrawable();
+        cardBg.setColor(Color.rgb(247, 249, 255));
+        cardBg.setCornerRadius(dp(14));
+        cardBg.setStroke(dp(1), Color.rgb(215, 224, 249));
+        card.setBackground(cardBg);
+
+        String safeLabel = TextUtils.isEmpty(label) ? "选项 " + index : label;
+        TextView labelView = new TextView(context);
+        labelView.setText(safeLabel);
+        labelView.setTextColor(Color.rgb(36, 45, 62));
+        labelView.setTextSize(16);
+        labelView.setTypeface(labelView.getTypeface(), android.graphics.Typeface.BOLD);
+        labelView.setPadding(0, 0, 0, dp(8));
+        card.addView(labelView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView replyView = new TextView(context);
+        replyView.setText(text);
+        replyView.setTextColor(Color.rgb(27, 34, 47));
+        replyView.setTextSize(17);
+        replyView.setLineSpacing(dp(3), 1f);
+        replyView.setTextIsSelectable(true);
+        card.addView(replyView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        if (!TextUtils.isEmpty(local)) {
+            TextView localView = new TextView(context);
+            localView.setText("回译：" + local);
+            localView.setTextColor(Color.rgb(40, 91, 74));
+            localView.setTextSize(14);
+            localView.setLineSpacing(dp(2), 1f);
+            localView.setPadding(0, dp(10), 0, 0);
+            card.addView(localView, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+
+        TextView send = new TextView(context);
+        send.setText("发送");
+        send.setTextColor(Color.WHITE);
+        send.setTextSize(15);
+        send.setGravity(Gravity.CENTER);
+        send.setTypeface(send.getTypeface(), android.graphics.Typeface.BOLD);
+        GradientDrawable sendBg = new GradientDrawable();
+        sendBg.setColor(Color.rgb(11, 143, 104));
+        sendBg.setCornerRadius(dp(22));
+        send.setBackground(sendBg);
+        send.setOnClickListener(v -> {
+            DeepSeekHistoryLog.log("NATIVE_REPLY_SEND", "index=" + index
+                    + " text_chars=" + text.length()
+                    + " local_chars=" + local.length());
+            deliverReply(text, local, true);
+        });
+        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        sendParams.topMargin = dp(12);
+        card.addView(send, sendParams);
+
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardParams.bottomMargin = dp(12);
+        nativeReplyList.addView(card, cardParams);
     }
 
     private void deliverReply(String text, String localDisplayText, boolean sendNow) {
