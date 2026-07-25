@@ -231,6 +231,29 @@ class ChatPanelManager(
         }
     }
 
+    /**
+     * The serialized payload inherited from WKTextContent contains only remoteText, so the peer
+     * receives only the natural reply. The sender sees that reply plus a local back-translation.
+     */
+    private class DeepSeekReplyTextContent(
+        remoteText: String,
+        backTranslation: String
+    ) : WKTextContent(remoteText) {
+        private val localDisplayText: String = run {
+            val remote = remoteText.trim()
+            val back = backTranslation.trim()
+            if (back.isEmpty() || back == remote) remote else "$remote\n回译：$back"
+        }
+
+        override fun getDisplayContent(): String {
+            return localDisplayText
+        }
+
+        override fun getSearchableWord(): String {
+            return localDisplayText
+        }
+    }
+
     private data class PendingBeforeSendTranslate(
         val originalText: String,
         val mentionUids: ArrayList<String>?,
@@ -240,6 +263,8 @@ class ChatPanelManager(
 
     private val beforeSendTranslateQueue = ArrayDeque<PendingBeforeSendTranslate>()
     private var beforeSendTranslateRunning = false
+    private var pendingDeepSeekReplyText = ""
+    private var pendingDeepSeekBackTranslation = ""
     private var handlingKeyboardSend = false
 
 
@@ -488,6 +513,26 @@ class ChatPanelManager(
 
     fun getEditText(): ContactEditText {
         return this.editText
+    }
+
+    /**
+     * Fills the composer with the peer-facing reply while keeping the back-translation only in
+     * local memory. If the user edits the reply, the stale back-translation is discarded.
+     */
+    fun setDeepSeekReplyDraft(remoteText: String, backTranslation: String?) {
+        val reply = remoteText.trim()
+        if (reply.isEmpty()) return
+        pendingDeepSeekReplyText = reply
+        pendingDeepSeekBackTranslation = backTranslation?.trim().orEmpty()
+            .takeUnless { it == reply }
+            .orEmpty()
+        editText.setText(reply)
+        editText.setSelection(reply.length)
+    }
+
+    private fun clearPendingDeepSeekReply() {
+        pendingDeepSeekReplyText = ""
+        pendingDeepSeekBackTranslation = ""
     }
 
     fun showReplyLayout(mMsg: WKMsg) {
@@ -1501,6 +1546,26 @@ ${content}"""
         if (TextUtils.isEmpty(content)) return
         content = editText.text.toString()
 
+        val isDeepSeekReply = pendingDeepSeekReplyText.isNotEmpty()
+                && content == pendingDeepSeekReplyText
+        val deepSeekBackTranslation = if (isDeepSeekReply) {
+            pendingDeepSeekBackTranslation
+        } else {
+            ""
+        }
+        clearPendingDeepSeekReply()
+        if (isDeepSeekReply) {
+            // This text is already written in the peer-facing language. Do not run it through the
+            // API before-send translator. The back-translation is sender-only display content.
+            sendTextNow(
+                remoteContent = content,
+                localDisplayContent = null,
+                reply = buildReplySnapshot(iConversationContext.replyMsg),
+                deepSeekBackTranslation = deepSeekBackTranslation
+            )
+            return
+        }
+
         val drawable = EmojiManager.getInstance().getDrawable(iConversationContext.chatActivity, content)
         if (!getFlag(keyAiSendTranslate, false) && drawable != null && iConversationContext.replyMsg == null) {
             val resultObject = EndpointManager.getInstance().invoke(
@@ -1629,12 +1694,18 @@ ${content}"""
         localDisplayContent: String?,
         mentionUids: List<String>? = null,
         entities: List<WKMsgEntity>? = null,
-        reply: WKReply? = null
+        reply: WKReply? = null,
+        deepSeekBackTranslation: String? = null
     ) {
-        val textMsgModel = if (!TextUtils.isEmpty(localDisplayContent) && localDisplayContent != remoteContent) {
-            LocalOriginalTextContent(remoteContent, localDisplayContent!!)
-        } else {
-            WKTextContent(remoteContent)
+        val textMsgModel = when {
+            !TextUtils.isEmpty(deepSeekBackTranslation)
+                    && deepSeekBackTranslation != remoteContent -> {
+                DeepSeekReplyTextContent(remoteContent, deepSeekBackTranslation!!)
+            }
+            !TextUtils.isEmpty(localDisplayContent) && localDisplayContent != remoteContent -> {
+                LocalOriginalTextContent(remoteContent, localDisplayContent!!)
+            }
+            else -> WKTextContent(remoteContent)
         }
 
         val list = mentionUids ?: editText.allUIDs
@@ -2157,6 +2228,10 @@ ${content}"""
             override fun onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) {
                 this.start = start
                 this.count = count
+                if (pendingDeepSeekReplyText.isNotEmpty()
+                    && s.toString() != pendingDeepSeekReplyText) {
+                    clearPendingDeepSeekReply()
+                }
                 updateSendButtonMode()
                 if (!TextUtils.isEmpty(s.toString())) {
                     val content = StringUtils.replaceBlank(s.toString())

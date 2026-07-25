@@ -29,7 +29,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemClock;
 import android.text.SpannableString;
 import android.text.TextUtils;
 import android.util.Log;
@@ -125,7 +124,6 @@ import com.chat.uikit.user.service.UserModel;
 import com.chat.uikit.view.WKPlayVoiceUtils;
 import com.chat.translate.ui.TranslateSettingsActivity;
 import com.chat.deepseek.DeepSeekAssistant;
-import com.chat.deepseek.DeepSeekHistoryLog;
 import com.chat.deepseek.DeepSeekRequest;
 import com.effective.android.panel.PanelSwitchHelper;
 import com.effective.android.panel.interfaces.ContentScrollMeasurer;
@@ -259,10 +257,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private static final String KEY_DEEPSEEK_OLD_SEND_TRANSLATE = "deepseek_old_send_translate";
     private static final String KEY_DEEPSEEK_OLD_WINGMAN = "deepseek_old_wingman";
     private static final String KEY_IMAGE_COMPRESS = "chat_image_compress";
-
-    private boolean deepSeekOpening = false;
-    private long deepSeekHistoryTraceUntil = 0L;
-    private String deepSeekLastLayoutSignature = "";
 
     private interface BooleanAction {
         void onChanged(boolean value);
@@ -1074,24 +1068,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     private void initDeepSeekAssistantBar() {
         wkVBinding.deepSeekReplyBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_REPLY));
+        wkVBinding.deepSeekTranslateBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_TRANSLATE));
         wkVBinding.deepSeekPolishBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_POLISH));
         wkVBinding.deepSeekSettingsBtn.setOnClickListener(v -> {
             DeepSeekRequest request = buildDeepSeekRequest(DeepSeekRequest.ACTION_REPLY);
             DeepSeekAssistant.showSettings(this, request, this::refreshDeepSeekAssistantBar);
         });
         refreshDeepSeekAssistantBar();
-        wkVBinding.recyclerView.addOnLayoutChangeListener((view, left, top, right, bottom,
-                                                           oldLeft, oldTop, oldRight, oldBottom) -> {
-            if (!shouldTraceDeepSeekHistory()) return;
-            String signature = deepSeekLayoutSignature();
-            if (!TextUtils.equals(signature, deepSeekLastLayoutSignature)) {
-                DeepSeekHistoryLog.log("RECYCLER_LAYOUT_CHANGED", "old="
-                        + oldLeft + "," + oldTop + "," + oldRight + "," + oldBottom
-                        + " new=" + left + "," + top + "," + right + "," + bottom
-                        + " signature=" + signature);
-                deepSeekLastLayoutSignature = signature;
-            }
-        });
     }
 
     private void refreshDeepSeekAssistantBar() {
@@ -1114,170 +1097,65 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }
         wkVBinding.deepSeekAssistBar.setVisibility(enabled ? View.VISIBLE : View.GONE);
         wkVBinding.aiAssistBar.setVisibility(enabled ? View.GONE : View.VISIBLE);
-        if (shouldTraceDeepSeekHistory()) {
-            logDeepSeekHistorySnapshot("ASSIST_BAR_REFRESH enabled=" + enabled);
-        }
     }
 
     private void openDeepSeekAction(int action) {
         if (channelType != WKChannelType.PERSONAL) {
-            WKToastUtils.getInstance().showToastNormal("DeepSeek 社交助手当前只支持单聊");
+            WKToastUtils.getInstance().showToastNormal("DeepSeek 聊天助手当前只支持单聊");
             return;
         }
         if (!DeepSeekAssistant.isEnabled(this)) {
             DeepSeekAssistant.requestFirstEnable(this, this::refreshDeepSeekAssistantBar);
             return;
         }
-        if (deepSeekOpening || isFinishing() || wkVBinding == null) return;
-
-        DeepSeekHistoryLog.begin(this, channelId, channelType);
-        deepSeekHistoryTraceUntil = SystemClock.uptimeMillis() + 20_000L;
-        deepSeekOpening = true;
         DeepSeekRequest request = buildDeepSeekRequest(action);
-        logDeepSeekHistorySnapshot("OPEN_REQUEST action=" + action);
+        DeepSeekAssistant.openAction(this, request, (text, localDisplayText, sendNow) -> runOnUiThread(() -> {
+            if (TextUtils.isEmpty(text) || wkVBinding == null || chatPanelManager == null || isFinishing()) return;
 
-        // DeepSeek 是聊天页上方的透明覆盖层。不要隐藏输入框、聊天列表，也不要保存或
-        // 强制恢复 RecyclerView 状态；覆盖层关闭后，原聊天页保持完全原样。
-        wkVBinding.rootView.post(() -> {
-            if (isFinishing() || wkVBinding == null) {
-                DeepSeekHistoryLog.log("OPEN_ABORT", "finishing=" + isFinishing()
-                        + " bindingNull=" + (wkVBinding == null));
-                deepSeekOpening = false;
-                DeepSeekHistoryLog.end("open_abort");
-                return;
+            restoreChatAfterDeepSeek();
+            // Only the peer-facing language is written into the composer and sent remotely. The
+            // back-translation remains local and is attached to the sender's displayed message.
+            chatPanelManager.setDeepSeekReplyDraft(text, localDisplayText);
+            EditText editText = wkVBinding.editText;
+            editText.requestFocus();
+
+            if (chatAdapter != null && chatAdapter.getItemCount() > 0) {
+                wkVBinding.recyclerView.post(() -> scrollToPosition(chatAdapter.getItemCount() - 1));
             }
-            logDeepSeekHistorySnapshot("OPEN_BEFORE_DIALOG_SHOW");
-            scheduleDeepSeekHistorySnapshot("OPEN_AFTER_100MS", 100L);
-            scheduleDeepSeekHistorySnapshot("OPEN_AFTER_500MS", 500L);
-            scheduleDeepSeekHistorySnapshot("OPEN_AFTER_1500MS", 1500L);
-            DeepSeekAssistant.openAction(this, request, (text, sendNow) -> runOnUiThread(() -> {
-                DeepSeekHistoryLog.log("REPLY_CALLBACK", "sendNow=" + sendNow
-                        + " textLength=" + (text == null ? -1 : text.length()));
-                if (TextUtils.isEmpty(text) || wkVBinding == null || isFinishing()) return;
 
-                EditText editText = wkVBinding.editText;
-                editText.setText(text);
-                editText.setSelection(text.length());
-
-                if (sendNow) {
-                    // 等聊天输入框 TextWatcher 把语音按钮切换成发送按钮后，
-                    // 继续复用原有发送流程，不绕过回复、编辑和陌生人限制。
-                    wkVBinding.sendIV.postDelayed(() -> {
-                        if (!isFinishing()
-                                && wkVBinding != null
-                                && wkVBinding.editText.getText() != null
-                                && !TextUtils.isEmpty(wkVBinding.editText.getText().toString().trim())) {
-                            wkVBinding.sendIV.performClick();
+            if (sendNow) {
+                // 等 TextWatcher 把右侧按钮切换成发送状态后再点击，避免仍处于语音按钮状态。
+                wkVBinding.sendIV.postDelayed(() -> {
+                    if (!isFinishing() && wkVBinding != null && !TextUtils.isEmpty(wkVBinding.editText.getText())) {
+                        wkVBinding.sendIV.performClick();
+                        if (chatAdapter != null && chatAdapter.getItemCount() > 0) {
+                            wkVBinding.recyclerView.postDelayed(
+                                    () -> scrollToPosition(chatAdapter.getItemCount() - 1), 180);
                         }
-                    }, 80);
-                } else {
-                    // “填入聊天”只写回原输入框，覆盖层关闭后再打开键盘。
-                    editText.postDelayed(() -> {
-                        if (isFinishing() || wkVBinding == null) return;
-                        editText.requestFocus();
-                        if (mHelper != null) mHelper.toKeyboardState();
-                        SoftKeyboardUtils.getInstance().showSoftKeyBoard(this, editText);
-                    }, 120);
-                }
-            }), this::onDeepSeekWindowClosed);
+                    }
+                }, 180);
+            } else {
+                editText.postDelayed(() -> {
+                    if (mHelper != null) mHelper.toKeyboardState();
+                    SoftKeyboardUtils.getInstance().showSoftKeyBoard(this, editText);
+                }, 180);
+            }
+        }), this::restoreChatAfterDeepSeek);
+    }
+
+    private void restoreChatAfterDeepSeek() {
+        runOnUiThread(() -> {
+            if (wkVBinding == null || isFinishing()) return;
+            if (mHelper != null) mHelper.resetState();
+            wkVBinding.recyclerViewLayout.setVisibility(View.VISIBLE);
+            wkVBinding.recyclerView.setVisibility(View.VISIBLE);
+            wkVBinding.recyclerView.setAlpha(1f);
+            wkVBinding.recyclerView.setTranslationY(0f);
+            wkVBinding.recyclerViewLayout.setTranslationY(0f);
+            if (chatAdapter != null && chatAdapter.getItemCount() > 0) {
+                wkVBinding.recyclerView.post(() -> scrollToPosition(chatAdapter.getItemCount() - 1));
+            }
         });
-    }
-
-    /** DeepSeek 正常关闭、填入或直接发送，聊天页本身不做任何重排。 */
-    private void onDeepSeekWindowClosed() {
-        logDeepSeekHistorySnapshot("CLOSE_CALLBACK_BEFORE_REFRESH");
-        deepSeekOpening = false;
-        deepSeekHistoryTraceUntil = SystemClock.uptimeMillis() + 8_000L;
-        refreshDeepSeekAssistantBar();
-        logDeepSeekHistorySnapshot("CLOSE_CALLBACK_AFTER_REFRESH");
-        scheduleDeepSeekHistorySnapshot("CLOSE_AFTER_100MS", 100L);
-        scheduleDeepSeekHistorySnapshot("CLOSE_AFTER_400MS", 400L);
-        scheduleDeepSeekHistorySnapshot("CLOSE_AFTER_1000MS", 1000L);
-        scheduleDeepSeekHistorySnapshot("CLOSE_AFTER_2500MS", 2500L);
-        if (wkVBinding != null) {
-            wkVBinding.rootView.postDelayed(() -> {
-                logDeepSeekHistorySnapshot("CLOSE_AFTER_5000MS_FINAL");
-                DeepSeekHistoryLog.end("post_close_complete");
-            }, 5000L);
-        }
-    }
-
-    private void scheduleDeepSeekHistorySnapshot(String event, long delayMs) {
-        if (wkVBinding == null) return;
-        wkVBinding.rootView.postDelayed(() -> logDeepSeekHistorySnapshot(event), delayMs);
-    }
-
-    private boolean shouldTraceDeepSeekHistory() {
-        return deepSeekOpening || SystemClock.uptimeMillis() <= deepSeekHistoryTraceUntil;
-    }
-
-    private void logDeepSeekHistorySnapshot(String event) {
-        if (wkVBinding == null) {
-            DeepSeekHistoryLog.log(event, "binding=null finishing=" + isFinishing());
-            return;
-        }
-        RecyclerView recyclerView = wkVBinding.recyclerView;
-        int adapterCount = chatAdapter == null ? -1 : chatAdapter.getItemCount();
-        int dataCount = chatAdapter == null || chatAdapter.getData() == null
-                ? -1 : chatAdapter.getData().size();
-        int first = -1;
-        int last = -1;
-        RecyclerView.LayoutManager manager = recyclerView.getLayoutManager();
-        if (manager instanceof LinearLayoutManager) {
-            LinearLayoutManager linear = (LinearLayoutManager) manager;
-            first = linear.findFirstVisibleItemPosition();
-            last = linear.findLastVisibleItemPosition();
-        }
-        String recycler = viewDebugState(recyclerView, "rv")
-                + " adapterSame=" + (recyclerView.getAdapter() == chatAdapter)
-                + " adapterCount=" + adapterCount
-                + " dataCount=" + dataCount
-                + " childCount=" + recyclerView.getChildCount()
-                + " first=" + first
-                + " last=" + last
-                + " scrollState=" + recyclerView.getScrollState()
-                + " offset=" + recyclerView.computeVerticalScrollOffset()
-                + " extent=" + recyclerView.computeVerticalScrollExtent()
-                + " range=" + recyclerView.computeVerticalScrollRange()
-                + " canUp=" + recyclerView.canScrollVertically(-1)
-                + " canDown=" + recyclerView.canScrollVertically(1)
-                + " computing=" + recyclerView.isComputingLayout();
-        String detail = "opening=" + deepSeekOpening
-                + " focus=" + hasWindowFocus()
-                + " lifecycle=" + getLifecycle().getCurrentState()
-                + " finishing=" + isFinishing()
-                + " root=" + viewDebugState(wkVBinding.rootView, "root")
-                + " listLayout=" + viewDebugState(wkVBinding.recyclerViewLayout, "listLayout")
-                + " " + recycler
-                + " deepBar=" + viewDebugState(wkVBinding.deepSeekAssistBar, "deepBar")
-                + " aiBar=" + viewDebugState(wkVBinding.aiAssistBar, "aiBar")
-                + " edit=" + viewDebugState(wkVBinding.editText, "edit");
-        DeepSeekHistoryLog.log(event, detail);
-    }
-
-    private String deepSeekLayoutSignature() {
-        if (wkVBinding == null) return "binding=null";
-        RecyclerView rv = wkVBinding.recyclerView;
-        return rv.getVisibility() + ":" + rv.getWidth() + "x" + rv.getHeight()
-                + ":children=" + rv.getChildCount()
-                + ":items=" + (chatAdapter == null ? -1 : chatAdapter.getItemCount())
-                + ":root=" + wkVBinding.rootView.getWidth() + "x" + wkVBinding.rootView.getHeight()
-                + ":bars=" + wkVBinding.deepSeekAssistBar.getVisibility()
-                + "/" + wkVBinding.aiAssistBar.getVisibility();
-    }
-
-    private static String viewDebugState(View view, String name) {
-        if (view == null) return name + "=null";
-        ViewGroup.LayoutParams params = view.getLayoutParams();
-        return name + "{vis=" + view.getVisibility()
-                + ",shown=" + view.isShown()
-                + ",attached=" + view.isAttachedToWindow()
-                + ",size=" + view.getWidth() + "x" + view.getHeight()
-                + ",measured=" + view.getMeasuredWidth() + "x" + view.getMeasuredHeight()
-                + ",lp=" + (params == null ? "null" : params.width + "x" + params.height)
-                + ",alpha=" + view.getAlpha()
-                + ",ty=" + view.getTranslationY()
-                + "}";
     }
 
     private DeepSeekRequest buildDeepSeekRequest(int action) {
@@ -1297,9 +1175,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     /**
-     * Copies the messages already loaded in the visible chat adapter into a plain-text snapshot.
-     * This is intentionally read-only. Do not use getOrSyncHistoryMessages() for the assistant:
-     * that API emits refresh events and was the cause of visible history items being removed.
+     * Copies only messages already loaded by this ChatActivity. This is deliberately read-only:
+     * calling the IM history-sync API here can refresh the open adapter and make visible messages
+     * disappear while the DeepSeek WebView is open.
      */
     private void populateDeepSeekContextSnapshot(DeepSeekRequest request) {
         if (request == null || chatAdapter == null || WKReader.isEmpty(chatAdapter.getData())) return;
@@ -1314,11 +1192,16 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (item == null || item.wkMsg == null) continue;
             WKMsg msg = item.wkMsg;
             if (!shouldUseForMsgLinks(msg)) continue;
-            if (msg.remoteExtra != null && (msg.remoteExtra.revoke == 1 || msg.remoteExtra.isMutualDeleted == 1)) continue;
+            if (msg.remoteExtra != null
+                    && (msg.remoteExtra.revoke == 1 || msg.remoteExtra.isMutualDeleted == 1)) {
+                continue;
+            }
 
             String content = "";
             try {
-                if (msg.baseContentMsgModel != null) content = msg.baseContentMsgModel.getDisplayContent();
+                if (msg.baseContentMsgModel != null) {
+                    content = msg.baseContentMsgModel.getDisplayContent();
+                }
             } catch (Exception ignored) {
             }
             if (TextUtils.isEmpty(content)) content = msg.content;
@@ -1326,6 +1209,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (TextUtils.isEmpty(content)) continue;
 
             boolean mine = TextUtils.equals(loginUID, msg.fromUID);
+            // Locally displayed back-translation is not part of the message delivered to the peer.
+            // Do not feed it back into later AI context as if the sender had typed both languages.
+            if (mine) {
+                int backTranslationAt = content.lastIndexOf("\n回译：");
+                if (backTranslationAt > 0) {
+                    content = content.substring(0, backTranslationAt).trim();
+                }
+            }
             lines.add((mine ? "我：" : "对方：") + content);
             if (!mine && msg.type == WKContentType.WK_TEXT) {
                 latestPeerText = content;
@@ -1348,17 +1239,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             request.targetMessageText = latestPeerText;
             request.targetMessageId = latestPeerId;
         }
-        if (shouldTraceDeepSeekHistory()) {
-            DeepSeekHistoryLog.log("CONTEXT_SNAPSHOT_READY", "count=" + kept
-                    + " chars=" + request.contextSnapshot.length()
-                    + " target=" + (!TextUtils.isEmpty(request.targetMessageText)));
-        }
     }
 
     private String sanitizeDeepSeekContextText(String value) {
         if (TextUtils.isEmpty(value)) return "";
         String clean = value.replace('\u0000', ' ').replace("```", "` ` `").trim();
-        if ((clean.startsWith("{") && clean.endsWith("}")) || clean.startsWith("__cp_harmony_rtc__:")) {
+        if ((clean.startsWith("{") && clean.endsWith("}"))
+                || clean.startsWith("__cp_harmony_rtc__:")) {
             return "";
         }
         if (clean.length() > 1200) clean = clean.substring(0, 1200) + "…";
@@ -1763,18 +1650,12 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     @Override
     protected void onResume() {
         super.onResume();
-        if (shouldTraceDeepSeekHistory()) {
-            logDeepSeekHistorySnapshot("ACTIVITY_ON_RESUME_BEGIN");
-        }
         isShowChatActivity = true;
         WKUIKitApplication.getInstance().chattingChannelID = channelId;
         isUploadReadMsg = true;
         refreshDeepSeekAssistantBar();
         chatPanelManager.initRefreshListener();
         EndpointManager.getInstance().invoke("start_screen_shot", this);
-        if (shouldTraceDeepSeekHistory()) {
-            scheduleDeepSeekHistorySnapshot("ACTIVITY_ON_RESUME_AFTER_300MS", 300L);
-        }
 
         Object addSecurityModule = EndpointManager.getInstance().invoke("add_security_module", null);
         if (addSecurityModule instanceof Boolean) {
@@ -1950,37 +1831,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         linearLayoutManager = new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false);
         wkVBinding.recyclerView.setLayoutManager(linearLayoutManager);
         wkVBinding.recyclerView.setAdapter(chatAdapter);
-        chatAdapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
-            private void trace(String event) {
-                if (shouldTraceDeepSeekHistory()) logDeepSeekHistorySnapshot(event);
-            }
-
-            @Override
-            public void onChanged() {
-                trace("ADAPTER_ON_CHANGED");
-            }
-
-            @Override
-            public void onItemRangeInserted(int positionStart, int itemCount) {
-                trace("ADAPTER_INSERT start=" + positionStart + " count=" + itemCount);
-            }
-
-            @Override
-            public void onItemRangeRemoved(int positionStart, int itemCount) {
-                trace("ADAPTER_REMOVE start=" + positionStart + " count=" + itemCount);
-            }
-
-            @Override
-            public void onItemRangeChanged(int positionStart, int itemCount) {
-                trace("ADAPTER_CHANGE start=" + positionStart + " count=" + itemCount);
-            }
-
-            @Override
-            public void onItemRangeMoved(int fromPosition, int toPosition, int itemCount) {
-                trace("ADAPTER_MOVE from=" + fromPosition + " to=" + toPosition
-                        + " count=" + itemCount);
-            }
-        });
         wkVBinding.recyclerView.setItemAnimator(new MyItemAnimator());
         chatAdapter.setAnimationFirstOnly(true);
         chatAdapter.setAnimationEnable(false);
@@ -3800,10 +3650,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     @Override
     protected void onDestroy() {
-        if (shouldTraceDeepSeekHistory()) {
-            logDeepSeekHistorySnapshot("ACTIVITY_ON_DESTROY_BEFORE_SUPER");
-            DeepSeekHistoryLog.end("activity_destroyed");
-        }
         PartnerPendingStore.removeListener(partnerPendingListener);
         super.onDestroy();
         if (chatPanelManager != null) chatPanelManager.onDestroy();
@@ -3897,26 +3743,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     @Override
-    protected void onPause() {
-        if (shouldTraceDeepSeekHistory()) {
-            logDeepSeekHistorySnapshot("ACTIVITY_ON_PAUSE");
-        }
-        super.onPause();
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (shouldTraceDeepSeekHistory()) {
-            logDeepSeekHistorySnapshot("ACTIVITY_WINDOW_FOCUS=" + hasFocus);
-        }
-    }
-
-    @Override
     protected void onStop() {
-        if (shouldTraceDeepSeekHistory()) {
-            logDeepSeekHistorySnapshot("ACTIVITY_ON_STOP_BEFORE_SUPER");
-        }
         super.onStop();
         isShowChatActivity = false;
         WKUIKitApplication.getInstance().chattingChannelID = "";
