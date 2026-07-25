@@ -22,7 +22,12 @@ import androidx.fragment.app.FragmentActivity;
 
 public final class DeepSeekAssistant {
     public interface ReplyCallback {
-        void onReply(@NonNull String text, boolean sendNow);
+        /**
+         * @param text reply in the peer-facing language; this is the only text sent remotely
+         * @param localDisplayText back-translation for the sender's local bubble only
+         * @param sendNow true to send immediately, false to place the reply in the input box
+         */
+        void onReply(@NonNull String text, @NonNull String localDisplayText, boolean sendNow);
     }
 
     public interface TranslationCallback {
