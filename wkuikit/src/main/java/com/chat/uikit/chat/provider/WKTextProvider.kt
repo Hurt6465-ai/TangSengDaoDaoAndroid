@@ -382,6 +382,49 @@ open class WKTextProvider : WKChatBaseProvider() {
         translateMessageIntoBubble(uiChatMsgItemEntity, text, cacheKey, false)
     }
 
+
+    /**
+     * Bubble translation must use the messages already loaded by the current ChatActivity.
+     * This is a read-only snapshot: never call the IM history-sync API here because it can
+     * refresh the open adapter and make visible messages disappear while the WebView is open.
+     */
+    private fun populateDeepSeekTranslationContext(request: DeepSeekRequest) {
+        val adapter = getAdapter() as? ChatAdapter ?: return
+        if (adapter.data.isNullOrEmpty()) return
+
+        val selfUid = WKConfig.getInstance().uid ?: ""
+        val lines = ArrayList<String>()
+        for (item in adapter.data) {
+            val msg = item?.wkMsg ?: continue
+            if (msg.type != WKContentType.WK_TEXT) continue
+            if (msg.isDeleted != 0) continue
+            if (msg.remoteExtra?.revoke == 1 || msg.remoteExtra?.isMutualDeleted == 1) continue
+
+            var content = getMessageText(msg)
+                .replace('\u0000', ' ')
+                .replace("```", "` ` `")
+                .trim()
+            if (content.isEmpty() || isRtcSignalText(content)) continue
+            if (content.length > 1200) content = content.substring(0, 1200) + "…"
+
+            val mine = TextUtils.equals(selfUid, msg.fromUID)
+            lines.add((if (mine) "我：" else "对方：") + content)
+        }
+
+        val snapshot = StringBuilder()
+        var kept = 0
+        for (i in lines.size - 1 downTo 0) {
+            if (kept >= 50) break
+            val line = lines[i]
+            val nextLength = snapshot.length + line.length + if (snapshot.isEmpty()) 0 else 1
+            if (nextLength > 10000 && snapshot.isNotEmpty()) break
+            if (snapshot.isEmpty()) snapshot.insert(0, line) else snapshot.insert(0, line + "\n")
+            kept++
+        }
+        request.contextSnapshot = snapshot.toString()
+        request.contextSnapshotCount = kept
+    }
+
     private fun openDeepSeekTranslation(
         uiChatMsgItemEntity: WKUIChatMsgItemEntity,
         text: String,
@@ -407,6 +450,7 @@ open class WKTextProvider : WKChatBaseProvider() {
             contextEnabled = true
             contextLimit = 50
         }
+        populateDeepSeekTranslationContext(request)
         var delivered = false
         val opened = DeepSeekAssistant.openTranslation(
             activity,
