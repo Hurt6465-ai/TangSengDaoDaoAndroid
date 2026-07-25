@@ -52,7 +52,6 @@ import java.util.Random;
 
 public class DeepSeekAssistantDialog extends DialogFragment {
     private static final String URL = "https://chat.deepseek.com/";
-    private static final String NEW_CHAT_URL = "https://chat.deepseek.com/a/chat/";
     private static final String ARG_LOGIN = "login";
     private static final String ARG_ACTION = "action";
     private static final String ARG_CHANNEL_ID = "channel_id";
@@ -138,6 +137,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private boolean contextPlanApplied;
     private boolean forceFullContextForFreshConversation;
     private int promptBuildGeneration;
+    private boolean freshConversationClickInFlight;
+    private int freshConversationClickAttempts;
 
     private interface LoginStateCallback {
         void onResult(boolean loggedIn);
@@ -378,20 +379,20 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             progressBar.setVisibility(View.GONE);
             notifyUser(getString(R.string.wkdeepseek_no_network));
         } else {
-            String startUrl = URL;
             if (!loginMode) {
                 mappedConversationId = DeepSeekConversationStore.getConversationId(context, request);
-                startUrl = TextUtils.isEmpty(mappedConversationId)
-                        ? NEW_CHAT_URL
+                conversationRouteTarget = TextUtils.isEmpty(mappedConversationId)
+                        ? URL
                         : DeepSeekConversationStore.conversationUrl(mappedConversationId);
-                conversationRouteTarget = startUrl;
-                conversationRouteLoading = true;
+                conversationRouteLoading = false;
                 DeepSeekHistoryLog.log("CONVERSATION_ROUTE_START",
                         "mapped=" + !TextUtils.isEmpty(mappedConversationId)
                                 + " channel=" + safeChannelForLog(request)
-                                + " url=" + safeUrl(startUrl));
+                                + " cold_start=homepage");
             }
-            webView.loadUrl(startUrl);
+            // First load the stable homepage so the React shell, cookies and model selector render.
+            // Contact routing is performed only after login detection succeeds.
+            webView.loadUrl(URL);
             if (!loginMode) preparePrompt();
         }
         return dialogRoot;
@@ -815,7 +816,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if (loginMode || webView == null || request == null) return true;
         String currentUrl = webView.getUrl();
         if (TextUtils.isEmpty(currentUrl)) {
-            handler.postDelayed(this::tryFillPrompt, 220);
+            handler.postDelayed(this::tryFillPrompt, 260);
             return false;
         }
         if (looksLikeLoginUrl(currentUrl)) return true;
@@ -833,7 +834,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                                 + " actual=" + shortConversationId(currentId));
                 resetMappingAndPromptForFreshConversation("mapped_route_unavailable");
                 conversationRouteCorrections = 0;
-                loadConversationRoute(NEW_CHAT_URL, "mapped_route_unavailable");
+                loadConversationRoute(URL, "mapped_route_unavailable_home");
                 return false;
             }
             loadConversationRoute(DeepSeekConversationStore.conversationUrl(mappedConversationId),
@@ -841,21 +842,56 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             return false;
         }
 
-        // No mapping yet: never reuse whichever old DeepSeek conversation the website opened by
-        // itself. The first successful prompt creates a fresh /a/chat/s/{id}, which is then bound.
+        // A first-use contact must not inherit the last conversation opened in DeepSeek.
+        // Do not cold-load /a/chat/: on some Android WebView versions that route renders a blank
+        // React shell. Click DeepSeek's own visible "开启新对话" control after the homepage loads.
         if (!TextUtils.isEmpty(currentId) && !promptSubmitted) {
-            loadConversationRoute(NEW_CHAT_URL, "avoid_last_web_conversation");
+            openFreshConversationFromPage();
             return false;
         }
-        if (DeepSeekConversationStore.isNewChatUrl(currentUrl)) {
-            conversationRouteCorrections = 0;
-            return true;
-        }
-        if (!promptSubmitted) {
-            loadConversationRoute(NEW_CHAT_URL, "open_new_chat");
-            return false;
-        }
+
+        // Root or /a/chat without a conversation id is the fresh composer. At this point the
+        // normal login probe has already confirmed that a usable composer exists.
+        conversationRouteCorrections = 0;
+        freshConversationClickAttempts = 0;
         return true;
+    }
+
+    private void openFreshConversationFromPage() {
+        if (webView == null || freshConversationClickInFlight || !isAdded()) return;
+        freshConversationClickInFlight = true;
+        String script = "(function(){try{" +
+                "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;}" +
+                "function norm(el){return ((el&&(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')))||'').replace(/\\s+/g,'').toLowerCase();}" +
+                "var names=['开启新对话','新对话','新建对话','newchat','newconversation'];" +
+                "var nodes=Array.from(document.querySelectorAll('button,a,[role=\\\"button\\\"],[role=\\\"menuitem\\\"],[tabindex]:not([tabindex=\\\"-1\\\"]),._5a8ac7a'));" +
+                "var target=nodes.find(function(el){return visible(el)&&names.indexOf(norm(el))>=0;});" +
+                "if(!target){var spans=Array.from(document.querySelectorAll('span,div')).filter(function(el){return visible(el)&&names.indexOf(norm(el))>=0;});" +
+                "if(spans.length){target=spans[0].closest('button,a,[role=\\\"button\\\"],[tabindex],._5a8ac7a')||spans[0];}}" +
+                "if(!target)return 'retry';target.click();return 'clicked';" +
+                "}catch(e){return 'retry';}})();";
+        try {
+            webView.evaluateJavascript(script, value -> {
+                freshConversationClickInFlight = false;
+                String result = cleanJsResult(value);
+                freshConversationClickAttempts++;
+                if ("clicked".equals(result)) {
+                    webUiPrepared = false;
+                    webUiPrepareAttempts = 0;
+                    handler.postDelayed(this::tryFillPrompt, 500);
+                } else if (freshConversationClickAttempts < 12) {
+                    handler.postDelayed(this::tryFillPrompt, 500);
+                } else {
+                    // Fail open on the already rendered page instead of replacing it with a blank
+                    // direct route. The user can still see the page and the expert-mode selector.
+                    freshConversationClickAttempts = 0;
+                    handler.postDelayed(this::tryFillPrompt, 800);
+                }
+            });
+        } catch (Exception ignored) {
+            freshConversationClickInFlight = false;
+            handler.postDelayed(this::tryFillPrompt, 700);
+        }
     }
 
     private void loadConversationRoute(String url, String reason) {
@@ -871,6 +907,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         webUiPrepareInFlight = false;
         webUiPrepareAttempts = 0;
         fillAttempts = 0;
+        freshConversationClickInFlight = false;
         if (!promptSubmitted) {
             // The transport hook lives in the page's JavaScript world and is destroyed by loadUrl.
             // Reinstall it before filling the composer on the newly loaded conversation route.
@@ -971,274 +1008,65 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 webUiPrepareInFlight = false;
                 String result = cleanJsResult(value);
                 webUiPrepareAttempts++;
-                DeepSeekHistoryLog.log("WEB_UI_PREF_RESULT", "attempt=" + webUiPrepareAttempts
-                        + " result=" + result + " continue=" + continueFill);
 
-                if ("expert-ready".equals(result)) {
-                    webUiPrepared = true;
-                    if (continueFill || !TextUtils.isEmpty(pendingPrompt)) {
-                        handler.postDelayed(this::tryFillPrompt, 40);
-                    }
+                // 专家模式可能比输入框晚渲染，或先要展开模式菜单。允许多轮复查，
+                // 但达到上限后仍继续提交，避免网页改版导致助手完全不可用。
+                if (("changed".equals(result) || "retry".equals(result))
+                        && webUiPrepareAttempts < 12) {
+                    handler.postDelayed(() -> applyWebUiPreferences(continueFill), randomDelay(280, 460));
                     return;
                 }
-
-                // Never submit in an unconfirmed mode. DeepSeek renders the mode chip/menu late on
-                // some WebView builds, so keep retrying until the visible header explicitly says
-                // "专家模式"。模式切换脚本不再操作思考/搜索开关，也不会抢输入框焦点。
-                webUiPrepared = false;
-                if (statusView != null) {
-                    statusView.setText("正在切换专家模式…");
+                webUiPrepared = true;
+                if (continueFill || !TextUtils.isEmpty(pendingPrompt)) {
+                    handler.postDelayed(this::tryFillPrompt, 80);
                 }
-
-                if (webUiPrepareAttempts == 30) {
-                    notifyUser("暂时没有找到专家模式入口，正在继续重试");
-                }
-
-                long delay;
-                if ("changed".equals(result)) {
-                    // 刚点击模式入口或专家选项，等待 React 完成重绘。
-                    delay = randomDelay(180, 280);
-                } else if (webUiPrepareAttempts < 30) {
-                    delay = randomDelay(260, 420);
-                } else {
-                    delay = 1200L;
-                }
-
-                handler.postDelayed(
-                        () -> applyWebUiPreferences(continueFill),
-                        delay);
             });
-        } catch (Exception e) {
+        } catch (Exception ignored) {
             webUiPrepareInFlight = false;
-            webUiPrepared = false;
-            DeepSeekHistoryLog.log("WEB_UI_PREF_ERROR", e.getClass().getSimpleName());
-            handler.postDelayed(() -> applyWebUiPreferences(continueFill), 700L);
+            webUiPrepared = true;
+            if (continueFill) fillPromptNow();
         }
     }
 
     private String buildWebUiPreferenceScript() {
         return "(function(){try{" +
-                "function visible(el){" +
-                "if(!el)return false;" +
-                "var s=getComputedStyle(el),r=el.getBoundingClientRect();" +
-                "return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;" +
-                "}" +
-
-                "function text(el){" +
-                "return ((el&&(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')))||'')" +
-                ".replace(/\\s+/g,' ').trim();" +
-                "}" +
-
-                "function norm(v){" +
-                "return String(v||'').replace(/\\s+/g,'').toLowerCase();" +
-                "}" +
-
-                "function compact(el){" +
-                "if(!visible(el))return false;" +
-                "var r=el.getBoundingClientRect();" +
-                "return r.width>=16&&r.height>=16&&r.width<=260&&r.height<=120;" +
-                "}" +
-
-                "function actionRoot(node){" +
-                "var cur=node,fallback=null,n=0;" +
-                "while(cur&&cur!==document.body&&cur!==document.documentElement&&n++<8){" +
-                "var r=cur.getBoundingClientRect();" +
-                "var tag=String(cur.tagName||'').toLowerCase();" +
-                "var role=String(cur.getAttribute&&cur.getAttribute('role')||'').toLowerCase();" +
-                "var cls=String(cur.className||'').toLowerCase();" +
-                "var ok=r.width>=16&&r.height>=16&&r.width<=280&&r.height<=130;" +
-                "if(ok&&(tag==='button'||tag==='a'||role==='button'||role==='menuitem'||role==='option'||" +
-                "(cur.hasAttribute&&cur.hasAttribute('tabindex'))))return cur;" +
-                "if(!fallback&&ok&&(/ds-button|button|toggle|mode|menu|option|c03d486a/.test(cls)||" +
-                "getComputedStyle(cur).cursor==='pointer'||typeof cur.onclick==='function'))fallback=cur;" +
-                "cur=cur.parentElement;" +
-                "}" +
-                "return fallback;" +
-                "}" +
-
-                // 不再调用 focus()，避免模式检测脚本抢走 DeepSeek 输入框焦点。
-                "function click(el){" +
-                "if(!el||!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;" +
-                "try{el.click();return true;}catch(e){" +
-                "try{" +
-                "el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));" +
-                "return true;" +
-                "}catch(e2){return false;}" +
-                "}" +
-                "}" +
-
-                "function hideElement(el){" +
-                "if(!el||el===document.body||el===document.documentElement)return false;" +
-                "var r=el.getBoundingClientRect();" +
-                "if(r.height<=0||r.height>220||r.width>window.innerWidth*0.98)return false;" +
-                "el.style.setProperty('display','none','important');" +
-                "el.style.setProperty('visibility','hidden','important');" +
-                "el.style.setProperty('pointer-events','none','important');" +
-                "el.setAttribute('aria-hidden','true');" +
-                "return true;" +
-                "}" +
-
-                "function hideExactButtons(words){" +
-                "var selector='button,a,[role=\"button\"],[role=\"menuitem\"],[tabindex]:not([tabindex=\"-1\"])';" +
-                "Array.from(document.querySelectorAll(selector)).forEach(function(el){" +
-                "if(words.indexOf(norm(text(el)))<0)return;" +
-                "hideElement(actionRoot(el)||el);" +
-                "});" +
-                "}" +
-
-                "function hideCodeDownloads(){" +
-                "document.querySelectorAll('pre').forEach(function(pre){" +
-                "var scope=pre.parentElement;" +
-                "if(!scope)return;" +
-                "Array.from(scope.querySelectorAll('button,a,[role=\"button\"],[tabindex]')).forEach(function(el){" +
-                "var t=norm(text(el));" +
-                "if(t==='下载'||t==='download')hideElement(actionRoot(el)||el);" +
-                "});" +
-                "});" +
-                "}" +
-
-                "function hidePageChrome(){" +
-                "document.querySelectorAll('span.ds-button__content').forEach(function(el){" +
-                "var t=norm(text(el));" +
-                "if(t==='下载应用'||t==='下载app'||t==='downloadapp'||t==='getapp')" +
-                "hideElement(actionRoot(el)||el.parentElement);" +
-                "});" +
-
-                "hideExactButtons([" +
-                "'下载应用','下载app','downloadapp','getapp'," +
-                "'新对话','新建对话','开启新对话','newchat','newconversation'," +
-                "'分享','share'" +
-                "]);" +
-
-                "document.querySelectorAll('svg path').forEach(function(path){" +
-                "var d=path.getAttribute('d')||'',target=null;" +
-
-                // 顶部新对话按钮。
-                "if(d.indexOf('M9.99994 1.22943')>=0&&" +
-                "d.indexOf('M9.21913 6.36949')>=0&&" +
-                "d.indexOf('M13.6304 9.22487')>=0){" +
-                "target=actionRoot(path);" +
-                "}" +
-
-                // 顶部分享按钮。
-                "else if(d.indexOf('M9.73047 1.98239')>=0&&" +
-                "d.indexOf('M18.3906 8.83005')>=0&&" +
-                "d.indexOf('M17.2881 9.73142')>=0){" +
-                "target=actionRoot(path);" +
-                "}" +
-
-                "if(target)hideElement(target);" +
-                "});" +
-
-                "hideCodeDownloads();" +
-                "}" +
-
-                "function isExpertText(value){" +
-                "var t=norm(value);" +
-                "return t==='专家模式'||t==='专家'||t==='expertmode'||t==='expert';" +
-                "}" +
-
-                "function expertReady(){" +
-                "var selectors=[" +
-                "'.the-header .c03d486a'," +
-                "'.the-header span._46a12ab'," +
-                "'.the-header [data-model-type]'" +
-                "];" +
-
-                "for(var i=0;i<selectors.length;i++){" +
-                "var nodes=Array.from(document.querySelectorAll(selectors[i]));" +
-                "for(var j=0;j<nodes.length;j++){" +
-                "if(visible(nodes[j])&&isExpertText(text(nodes[j])))return true;" +
-                "}" +
-                "}" +
-                "return false;" +
-                "}" +
-
-                "function findExpertOption(){" +
-                "var selector='button,[role=\"button\"],[role=\"menuitem\"],[role=\"option\"],li,[tabindex]:not([tabindex=\"-1\"]),div,span';" +
-                "var nodes=Array.from(document.querySelectorAll(selector));" +
-
-                "for(var i=0;i<nodes.length;i++){" +
-                "var el=nodes[i];" +
-                "if(!visible(el)||!isExpertText(text(el)))continue;" +
-
-                // 当前顶部标签不是菜单选项。
-                "if(el.closest&&el.closest('.the-header'))continue;" +
-
-                "var root=actionRoot(el);" +
-                "if(root&&compact(root))return root;" +
-                "}" +
-                "return null;" +
-                "}" +
-
-                "function findModeTrigger(){" +
-                // 用户提供的 DOM 中，专家模式入口就在 .the-header .c03d486a。
-                "var nodes=Array.from(document.querySelectorAll('.the-header .c03d486a'));" +
-                "for(var i=0;i<nodes.length;i++){" +
-                "if(!visible(nodes[i])||!compact(nodes[i]))continue;" +
-                "return actionRoot(nodes[i])||nodes[i];" +
-                "}" +
-
-                "var labels=Array.from(document.querySelectorAll('.the-header span._46a12ab'));" +
-                "for(var j=0;j<labels.length;j++){" +
-                "if(!visible(labels[j]))continue;" +
-                "var root=actionRoot(labels[j])||labels[j].parentElement;" +
-                "if(root&&compact(root))return root;" +
-                "}" +
-
-                // 用顶部菱形模式图标作为最后的精确兜底。
-                "var paths=Array.from(document.querySelectorAll('.the-header svg path'));" +
-                "for(var k=0;k<paths.length;k++){" +
-                "var d=paths[k].getAttribute('d')||'';" +
-                "if(d.indexOf('M11.0289 2.0918')<0||d.indexOf('M3.41858 5.46484')<0)continue;" +
-                "var chip=paths[k].closest('.c03d486a')||actionRoot(paths[k]);" +
-                "if(chip&&visible(chip))return chip;" +
-                "}" +
-
-                "return null;" +
-                "}" +
-
-                // 观察器只负责隐藏页面按钮，绝不再切模式或抢输入框焦点。
-                "window.__tsddHidePageChrome=function(){" +
-                "try{hidePageChrome();}catch(e){}" +
-                "};" +
-
-                "if(!window.__tsddChromeObserverV4){" +
-                "window.__tsddChromeObserverV4=true;" +
-                "var chromeTimer=null;" +
-                "new MutationObserver(function(){" +
-                "clearTimeout(chromeTimer);" +
-                "chromeTimer=setTimeout(function(){" +
-                "try{hidePageChrome();}catch(e){}" +
-                "},120);" +
-                "}).observe(document.documentElement,{" +
-                "childList:true," +
-                "subtree:true" +
-                "});" +
-                "}" +
-
-                // 已经是专家模式，不操作深度思考和搜索开关。
-                "if(expertReady()){" +
-                "hidePageChrome();" +
-                "return 'expert-ready';" +
-                "}" +
-
-                // 菜单已打开时，直接选择专家模式。
-                "var option=findExpertOption();" +
-                "if(option&&click(option))return 'changed';" +
-
-                // 菜单没有打开时，点击顶部模式入口。
-                "var now=Date.now();" +
-                "var trigger=findModeTrigger();" +
-                "if(trigger&&(!window.__tsddModeTriggerAt||now-window.__tsddModeTriggerAt>700)){" +
-                "window.__tsddModeTriggerAt=now;" +
-                "if(click(trigger))return 'changed';" +
-                "}" +
-
-                // 不再隐藏“使用快速模式开始对话”整块区域，避免把专家模式入口一起隐藏。
-                "hidePageChrome();" +
-                "return 'retry';" +
-                "}catch(e){return 'retry';}})();";
+                "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;}" +
+                "function txt(el){return ((el&&(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')))||'').replace(/\\s+/g,' ').trim();}" +
+                "function norm(el){return txt(el).replace(/\\s+/g,'').toLowerCase();}" +
+                "function selected(el){if(!el)return false;var cur=el,n=0;while(cur&&cur!==document.documentElement&&n++<4){var c=String(cur.className||'').toLowerCase();" +
+                "if(/(^|[ _-])(selected|active|checked|current)([ _-]|$)/.test(c))return true;" +
+                "if(cur.getAttribute('aria-checked')==='true'||cur.getAttribute('aria-pressed')==='true'||cur.getAttribute('aria-selected')==='true'||cur.getAttribute('aria-current')==='true')return true;" +
+                "var ds=String(cur.getAttribute('data-state')||'').toLowerCase();if(ds==='checked'||ds==='selected'||ds==='active'||ds==='on')return true;" +
+                "if(cur.getAttribute('data-selected')==='true'||cur.getAttribute('data-active')==='true')return true;cur=cur.parentElement;}return false;}" +
+                "function click(el){if(!el||!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;" +
+                "var r=el.getBoundingClientRect();if(r.width>window.innerWidth*0.98&&r.height>window.innerHeight*0.45)return false;" +
+                "try{el.focus({preventScroll:true});}catch(e){try{el.focus();}catch(e2){}}" +
+                "try{el.click();return true;}catch(e){try{el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}catch(e2){return false;}}}" +
+                // DeepSeek currently renders the expert choice as:
+                // <div class="dfb78875"><span class="_321831d">专家模式</span></div>
+                // It is not a semantic button, so locate this exact compact row explicitly. Do not
+                // restore broad div/span scanning because a large React container can share the text.
+                "function pool(){var q='button,a,label,[role=\"button\"],[role=\"radio\"],[role=\"switch\"],[role=\"checkbox\"],[role=\"menuitem\"],[role=\"option\"],[role=\"tab\"],[data-model-type],[tabindex]:not([tabindex=\"-1\"])';" +
+                "return Array.from(document.querySelectorAll(q)).filter(function(el){var t=txt(el);return visible(el)&&t.length>0&&t.length<80;});}" +
+                "function exactExpert(){var labels=Array.from(document.querySelectorAll('div.dfb78875>span._321831d,span._321831d')).filter(function(el){return norm(el)==='专家模式';}),rows=[];" +
+                "labels.forEach(function(label){var row=label.closest('div.dfb78875');if(!row||!visible(row))return;var r=row.getBoundingClientRect();if(r.width<36||r.height<22||r.height>96||r.width>window.innerWidth*0.96)return;if(rows.indexOf(row)<0)rows.push(row);});" +
+                "if(!rows.length)return null;var option=null;rows.some(function(row){var p=row.parentElement,depth=0;while(p&&p!==document.body&&depth++<4){var modeRows=Array.from(p.querySelectorAll('div.dfb78875')).filter(visible);var modeTexts=modeRows.map(norm),hasOtherMode=modeTexts.some(function(t){return t==='快速模式'||t==='快速'||t==='普通模式'||t==='标准模式'||t==='常规模式'||t==='思考模式'||t==='深度思考';});if(modeRows.length>=2&&modeTexts.indexOf('专家模式')>=0&&hasOtherMode){option=row;return true;}p=p.parentElement;}return false;});" +
+                "return {el:option||rows[0],isOption:!!option};}" +
+                "function hideDownloads(list){var re=/(下载(\\s*deepseek)?(\\s*应用|\\s*app)|打开(\\s*deepseek)?(\\s*应用|\\s*app)|在\\s*app\\s*中打开|download\\s*(the\\s*)?app|get\\s*(the\\s*)?app|open\\s*in\\s*app)/i;" +
+                "list.forEach(function(el){if(re.test(txt(el))){var r=el.getBoundingClientRect();if(r.height<120&&r.width<window.innerWidth*0.95){el.style.setProperty('display','none','important');el.setAttribute('aria-hidden','true');}}});}" +
+                "function enforce(allowMenu){var list=pool(),changed=false,retry=false,now=Date.now();hideDownloads(list);" +
+                "var exact=exactExpert(),expert=exact?exact.el:list.find(function(el){var d=String(el.getAttribute('data-model-type')||'').toLowerCase(),t=norm(el);return d==='expert'||t==='专家模式'||t==='专家'||t==='expert'||t==='expertmode';});" +
+                "var quick=list.find(function(el){var t=norm(el);return t==='快速模式'||t==='快速'||t==='quickmode'||t==='quick';});" +
+                "if(expert&&!window.__tsddExpertDone){if(selected(expert)){window.__tsddExpertDone=true;}else if(!window.__tsddExpertClickAt||now-window.__tsddExpertClickAt>900){if(click(expert)){window.__tsddExpertClickAt=now;window.__tsddExpertClickCount=(window.__tsddExpertClickCount||0)+1;changed=true;if(exact&&exact.isOption)window.__tsddExpertDone=true;else retry=true;}}if(!window.__tsddExpertDone&&(window.__tsddExpertClickCount||0)<5)retry=true;}" +
+                "else if(!window.__tsddExpertDone&&allowMenu){retry=true;var trigger=list.find(function(el){var t=norm(el);return (el.getAttribute('aria-haspopup')||'')!==''&&(/快速模式|普通模式|标准模式|常规模式|quickmode|normalmode|standardmode|^模式$|^mode$/.test(t));});if(trigger&&(!window.__tsddModeMenuTryAt||now-window.__tsddModeMenuTryAt>1200)){window.__tsddModeMenuTryAt=now;if(click(trigger))changed=true;}}" +
+                "function disable(re){var el=list.find(function(x){return re.test(txt(x))&&selected(x);});if(el&&click(el))changed=true;}" +
+                "disable(/(^|\\s)(深度思考|深度思索|思考|deepthink|deep\\s*think|thinking|reasoning)(\\s|$)/i);" +
+                "disable(/(^|\\s)(智能搜索|联网搜索|网络搜索|搜索|smart\\s*search|web\\s*search|search|browse)(\\s|$)/i);" +
+                "return changed?'changed':(retry?'retry':'stable');}" +
+                "window.__tsddEnforcePrefs=enforce;" +
+                "if(!window.__tsddPrefObserver){window.__tsddPrefObserver=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(function(){try{if(window.__tsddEnforcePrefs)window.__tsddEnforcePrefs(false);}catch(e){}},240);}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','aria-checked','aria-pressed','aria-selected','data-state','data-selected','data-active']});}" +
+                "return enforce(true);" +
+                "}catch(e){return 'error';}})();";
     }
 
     private void fillPromptNow() {
@@ -1271,7 +1099,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 resetMappingAndPromptForFreshConversation("stale_mapping");
                 fillAttempts = 0;
                 conversationRouteCorrections = 0;
-                loadConversationRoute(NEW_CHAT_URL, "stale_mapping");
+                loadConversationRoute(URL, "stale_mapping_home");
                 return;
             }
             if (fillAttempts < 12) {
