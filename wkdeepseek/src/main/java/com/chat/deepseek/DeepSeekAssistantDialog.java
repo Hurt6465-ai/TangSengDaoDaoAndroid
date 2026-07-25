@@ -1791,7 +1791,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "function roots(){var selectors=['.ds-assistant-message-main-content','[data-message-author-role=assistant]','[class*=assistant-message]'];var all=[];selectors.forEach(function(q){document.querySelectorAll(q).forEach(function(x){if(all.indexOf(x)<0)all.push(x);});});all.sort(function(a,b){if(a===b)return 0;return (a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING)?-1:1;});var base=Number(window.__tsddNativeBaselineCount||0);if(window.__tsddNativeBaselineReady&&all.length>base)return all.slice(base);if(window.__tsddNativeBaselineReady&&all.length){var last=all[all.length-1],now=raw(last.innerText||last.textContent),before=raw(window.__tsddNativeBaselineText||'');if(now&&now!==before)return [last];return [];}return all;}" +
                 "function generating(){return Array.from(document.querySelectorAll('button,[role=\\\"button\\\"]')).some(function(b){var t=norm((b.innerText||'')+' '+(b.getAttribute('aria-label')||'')+' '+(b.getAttribute('title')||'')).toLowerCase().replace(/\\s+/g,'');var s=getComputedStyle(b),r=b.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0&&/停止生成|停止|stopgenerating|stopgeneration/.test(t);});}" +
                 "function localAfter(root,anchor,nextAnchor){var list=Array.from(root.querySelectorAll('[data-tsdd-back-translation],p,li'));for(var i=0;i<list.length;i++){var row=list[i];if(!after(anchor,row))continue;if(nextAnchor&&after(nextAnchor,row))break;var t=norm(row.innerText||row.textContent),m=t.match(/^(?:回译|我的母语译文|中文回译|本地显示)\\s*[：:]\\s*([\\s\\S]+)$/);if(m&&norm(m[1]))return norm(m[1]);}return '';}" +
-                "function meta(root){var out={translation:'',analysis:''},rows=Array.from(root.querySelectorAll('p,li,h1,h2,h3'));for(var i=0;i<rows.length;i++){if(rows[i].closest('pre'))continue;var t=norm(rows[i].innerText||rows[i].textContent),m;if(!out.translation&&(m=t.match(/^(?:对方(?:最新)?消息(?:的)?(?:翻译|译文)|对方原话(?:翻译|译文)|消息翻译|译文)\\s*[：:]\\s*([\\s\\S]+)$/))){out.translation=norm(m[1]);continue;}if(!out.analysis&&(m=t.match(/^(?:意图(?:与|和|\\/)?情绪(?:分析)?|意图分析|情绪分析|分析)\\s*[：:]\\s*([\\s\\S]+)$/))){out.analysis=norm(m[1]);}}return out;}" +
+                "function splitMetaValue(value){var t=norm(value),m=t.match(/^([\\s\\S]*?)\\s*(?:意图(?:与|和|\\/)?情绪(?:分析)?|意图分析|情绪分析|分析)\\s*[：:]\\s*([\\s\\S]+)$/);return m?{translation:norm(m[1]),analysis:norm(m[2])}:{translation:t,analysis:''};}" +
+                "function meta(root){var out={translation:'',analysis:''},rows=Array.from(root.querySelectorAll('p,li,h1,h2,h3'));for(var i=0;i<rows.length;i++){if(rows[i].closest('pre'))continue;var t=norm(rows[i].innerText||rows[i].textContent),m;if(!out.translation&&(m=t.match(/^(?:对方(?:最新)?消息(?:的)?(?:翻译|译文)|对方原话(?:翻译|译文)|消息翻译|译文)\\s*[：:]\\s*([\\s\\S]+)$/))){var parts=splitMetaValue(m[1]);out.translation=parts.translation;if(!out.analysis&&parts.analysis)out.analysis=parts.analysis;continue;}if(!out.analysis&&(m=t.match(/^(?:意图(?:与|和|\\/)?情绪(?:分析)?|意图分析|情绪分析|分析)\\s*[：:]\\s*([\\s\\S]+)$/))){out.analysis=norm(m[1]);}}return out;}" +
                 "function add(out,seen,text,local){text=raw(text);local=norm(local);if(!text)return;var key=text+'\\n'+local;if(seen[key])return;seen[key]=1;out.push({text:text,local:local});}" +
                 "var rs=roots(),root=rs.length?rs[rs.length-1]:null,state='ok';if(!root&&!window.__tsddNativeBaselineReady){var anchors=Array.from(document.querySelectorAll('[data-tsdd-reply-card],pre'));var last=anchors.length?anchors[anchors.length-1]:null;if(last){root=last.closest('article,[data-message-author-role=assistant],main')||last.parentElement;state='fallback_root';}}if(!root)return JSON.stringify({state:'no_root',generating:generating(),translation:'',analysis:'',items:[]});var info=meta(root),out=[],seen={};" +
                 "var cards=Array.from(root.querySelectorAll('[data-tsdd-reply-card]'));cards.forEach(function(card,i){var body=card.querySelector('[data-tsdd-reply-text]'),text=raw(body?body.innerText||body.textContent:card.innerText||card.textContent),next=i+1<cards.length?cards[i+1]:null;add(out,seen,text,localAfter(root,card,next));});" +
@@ -1856,7 +1857,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         try {
             JSONObject payload = new JSONObject(rawJson);
             String translation = payload.optString("translation", "").trim();
-            String analysis = limitCodePoints(payload.optString("analysis", "").trim(), 50);
+            String analysis = payload.optString("analysis", "").trim();
+            String[] normalizedMeta = normalizeNativeTranslationAndAnalysis(translation, analysis);
+            translation = normalizedMeta[0];
+            analysis = limitCodePoints(normalizedMeta[1], 50);
             JSONArray items = payload.optJSONArray("items");
             if (items == null) items = new JSONArray();
 
@@ -1898,7 +1902,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         Context context = requireContext();
         LinearLayout card = new LinearLayout(context);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(12), dp(10), dp(12), dp(10));
+        card.setPadding(dp(11), dp(9), dp(11), dp(9));
         GradientDrawable background = new GradientDrawable();
         background.setColor(Color.rgb(239, 250, 246));
         background.setCornerRadius(dp(12));
@@ -1906,41 +1910,89 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         card.setBackground(background);
 
         if (!TextUtils.isEmpty(translation)) {
-            TextView label = new TextView(context);
-            label.setText(request != null && request.action == DeepSeekRequest.ACTION_TRANSLATE
-                    ? "译文" : "对方消息译文");
-            label.setTextColor(Color.rgb(43, 113, 88));
-            label.setTextSize(12);
-            label.setTypeface(label.getTypeface(), android.graphics.Typeface.BOLD);
-            label.setPadding(0, 0, 0, dp(3));
-            card.addView(label, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            LinearLayout translationRow = new LinearLayout(context);
+            translationRow.setOrientation(LinearLayout.HORIZONTAL);
+            translationRow.setGravity(Gravity.TOP);
 
-            TextView value = new TextView(context);
-            value.setText(translation);
-            value.setTextColor(Color.rgb(28, 69, 55));
-            value.setTextSize(15);
-            value.setLineSpacing(dp(2), 1f);
-            value.setTextIsSelectable(true);
-            card.addView(value, new LinearLayout.LayoutParams(
+            TextView translationLabel = new TextView(context);
+            translationLabel.setText("译文：");
+            translationLabel.setTextColor(Color.rgb(211, 47, 47));
+            translationLabel.setTextSize(14);
+            translationLabel.setIncludeFontPadding(false);
+            translationLabel.setTypeface(translationLabel.getTypeface(), android.graphics.Typeface.BOLD);
+            translationRow.addView(translationLabel, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            TextView translationValue = new TextView(context);
+            translationValue.setText(translation);
+            translationValue.setTextColor(Color.rgb(28, 69, 55));
+            translationValue.setTextSize(15);
+            translationValue.setIncludeFontPadding(false);
+            translationValue.setLineSpacing(dp(2), 1f);
+            translationValue.setTextIsSelectable(true);
+            LinearLayout.LayoutParams translationValueParams = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            translationRow.addView(translationValue, translationValueParams);
+
+            card.addView(translationRow, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
 
         if (!TextUtils.isEmpty(analysis)) {
-            TextView insight = new TextView(context);
-            insight.setText("意图/情绪：" + analysis);
-            insight.setTextColor(Color.rgb(80, 99, 92));
-            insight.setTextSize(13);
-            insight.setLineSpacing(dp(1), 1f);
-            insight.setPadding(0, TextUtils.isEmpty(translation) ? 0 : dp(6), 0, 0);
-            card.addView(insight, new LinearLayout.LayoutParams(
+            LinearLayout analysisRow = new LinearLayout(context);
+            analysisRow.setOrientation(LinearLayout.HORIZONTAL);
+            analysisRow.setGravity(Gravity.TOP);
+            analysisRow.setPadding(0, TextUtils.isEmpty(translation) ? 0 : dp(6), 0, 0);
+
+            TextView analysisLabel = new TextView(context);
+            analysisLabel.setText("分析：");
+            analysisLabel.setTextColor(Color.rgb(105, 116, 111));
+            analysisLabel.setTextSize(11);
+            analysisLabel.setIncludeFontPadding(false);
+            analysisLabel.setTypeface(analysisLabel.getTypeface(), android.graphics.Typeface.BOLD);
+            analysisRow.addView(analysisLabel, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            TextView analysisValue = new TextView(context);
+            analysisValue.setText(analysis);
+            analysisValue.setTextColor(Color.rgb(80, 99, 92));
+            analysisValue.setTextSize(13);
+            analysisValue.setIncludeFontPadding(false);
+            analysisValue.setLineSpacing(dp(1), 1f);
+            analysisValue.setTextIsSelectable(true);
+            LinearLayout.LayoutParams analysisValueParams = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            analysisRow.addView(analysisValue, analysisValueParams);
+
+            card.addView(analysisRow, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.bottomMargin = dp(8);
+        params.bottomMargin = dp(7);
         nativeReplyList.addView(card, params);
+    }
+
+    private String[] normalizeNativeTranslationAndAnalysis(String translation, String analysis) {
+        String cleanTranslation = TextUtils.isEmpty(translation) ? "" : translation.trim();
+        String cleanAnalysis = TextUtils.isEmpty(analysis) ? "" : analysis.trim();
+
+        cleanTranslation = cleanTranslation.replaceFirst(
+                "^(?:对方(?:最新)?消息(?:的)?(?:翻译|译文)|对方原话(?:翻译|译文)|消息翻译|译文)\\s*[：:]\\s*", "");
+        cleanAnalysis = cleanAnalysis.replaceFirst(
+                "^(?:意图(?:与|和|/)?情绪(?:分析)?|意图分析|情绪分析|分析)\\s*[：:]\\s*", "");
+
+        java.util.regex.Matcher embeddedAnalysis = java.util.regex.Pattern.compile(
+                "(?s)^([\\s\\S]*?)\\s*(?:意图(?:与|和|/)?情绪(?:分析)?|意图分析|情绪分析|分析)\\s*[：:]\\s*([\\s\\S]+)$")
+                .matcher(cleanTranslation);
+        if (embeddedAnalysis.matches()) {
+            cleanTranslation = embeddedAnalysis.group(1).trim();
+            if (TextUtils.isEmpty(cleanAnalysis)) {
+                cleanAnalysis = embeddedAnalysis.group(2).trim();
+            }
+        }
+        return new String[]{cleanTranslation, cleanAnalysis};
     }
 
     private void renderNativeReplyOptions(JSONArray array, String translation, String analysis) {
