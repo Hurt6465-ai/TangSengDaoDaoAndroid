@@ -21,7 +21,7 @@ public final class DeepSeekRequest {
     public String preferredStyle = "natural";
     public int flirtLevel = 0;
     public boolean contextEnabled = true;
-    public int contextLimit = 100;
+    public int contextLimit = 0; // 0 = do not truncate locally; only shrink after DeepSeek explicitly reports overflow
     public String targetMessageId = "";
     public String targetMessageText = "";
     /**

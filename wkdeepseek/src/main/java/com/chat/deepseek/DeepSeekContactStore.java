@@ -33,7 +33,7 @@ final class DeepSeekContactStore {
         request.preferredStyle = readString(sp, request, "preferred_style", request.preferredStyle);
         request.flirtLevel = readInt(sp, request, "flirt_level", request.flirtLevel);
         request.contextEnabled = readBoolean(sp, request, "context_enabled", request.contextEnabled);
-        request.contextLimit = normalizeContextLimit(readInt(sp, request, "context_limit", request.contextLimit));
+        request.contextLimit = 0; // old 30/60/80 settings are intentionally ignored
         request.contactProfile = DeepSeekContactProfile.fromJson(readString(sp, request, "profile", ""));
         if (TextUtils.isEmpty(request.contactProfile.relationshipStage)) {
             request.contactProfile.relationshipStage = request.relationshipStage;
@@ -63,7 +63,7 @@ final class DeepSeekContactStore {
                 .putString(key(request, "preferred_style"), safe(request.preferredStyle))
                 .putInt(key(request, "flirt_level"), DeepSeekContactProfile.clamp(request.flirtLevel, 0, 2))
                 .putBoolean(key(request, "context_enabled"), request.contextEnabled)
-                .putInt(key(request, "context_limit"), normalizeContextLimit(request.contextLimit))
+                .remove(key(request, "context_limit"))
                 .putString(key(request, "profile"), request.contactProfile.toJson())
                 .apply();
     }
@@ -124,9 +124,6 @@ final class DeepSeekContactStore {
         return value;
     }
 
-    private static int normalizeContextLimit(int value) {
-        return value <= 50 ? 50 : 100;
-    }
 
     private static String safe(String value) {
         return value == null ? "" : value.trim();

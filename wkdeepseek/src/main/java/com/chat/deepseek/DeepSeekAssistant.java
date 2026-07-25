@@ -75,7 +75,6 @@ public final class DeepSeekAssistant {
     private static final String[] STYLE_LABELS = {"自然", "简短", "温暖", "轻松", "幽默", "直接", "正式"};
     private static final String[] STYLE_VALUES = {"natural", "short", "warm", "light", "humorous", "direct", "formal"};
     private static final String[] FLIRT_LABELS = {"关闭", "轻微", "明显"};
-    private static final String[] CONTEXT_LABELS = {"最近 50 条", "最近 100 条"};
 
     private DeepSeekAssistant() {}
 
@@ -380,7 +379,13 @@ public final class DeepSeekAssistant {
 
     public static void openAction(FragmentActivity activity, DeepSeekRequest request,
                                   ReplyCallback callback, StateCallback closeCallback) {
-        if (activity.getSupportFragmentManager().findFragmentByTag(TAG) != null) return;
+        if (activity == null || request == null
+                || activity.getSupportFragmentManager().findFragmentByTag(TAG) != null) return;
+        long remaining = DeepSeekUsageGuard.remainingMs(activity, request);
+        if (remaining > 0L) {
+            showCooldown(activity, remaining);
+            return;
+        }
         DeepSeekContactStore.apply(activity, request);
         DeepSeekAssistantDialog dialog = DeepSeekAssistantDialog.newAction(request);
         dialog.setReplyCallback(callback);
@@ -395,12 +400,23 @@ public final class DeepSeekAssistant {
             return false;
         }
         request.action = DeepSeekRequest.ACTION_TRANSLATE;
+        long remaining = DeepSeekUsageGuard.remainingMs(activity, request);
+        if (remaining > 0L) {
+            showCooldown(activity, remaining);
+            return false;
+        }
         DeepSeekContactStore.apply(activity, request);
         DeepSeekAssistantDialog dialog = DeepSeekAssistantDialog.newAction(request);
         dialog.setTranslationCallback(callback);
         dialog.setStateCallback(closeCallback);
         dialog.show(activity.getSupportFragmentManager(), TAG);
         return true;
+    }
+
+
+    private static void showCooldown(Context context, long remainingMs) {
+        long seconds = Math.max(1L, (remainingMs + 999L) / 1000L);
+        Toast.makeText(context, "操作太快，请 " + seconds + " 秒后再试", Toast.LENGTH_SHORT).show();
     }
 
     public static void showSettings(FragmentActivity activity, DeepSeekRequest request, StateCallback callback) {
@@ -435,10 +451,15 @@ public final class DeepSeekAssistant {
         checkLp.topMargin = dp(activity, 10);
         root.addView(contextEnabled, checkLp);
 
-        Spinner contextLimit = addSpinner(activity, root, activity.getString(R.string.wkdeepseek_context_limit), CONTEXT_LABELS,
-                request.contextLimit <= 50 ? 0 : 1);
-        contextLimit.setEnabled(request.contextEnabled);
-        contextEnabled.setOnCheckedChangeListener((buttonView, isChecked) -> contextLimit.setEnabled(isChecked));
+        TextView contextHint = new TextView(activity);
+        contextHint.setText("使用当前聊天页已加载的全部消息；复用同一 DeepSeek 会话时通常只提交新增消息。仅当 DeepSeek 明确提示内容过长时，才自动缩短并新建会话。");
+        contextHint.setTextColor(Color.rgb(95, 101, 112));
+        contextHint.setTextSize(12);
+        contextHint.setLineSpacing(0f, 1.15f);
+        LinearLayout.LayoutParams contextHintLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        contextHintLp.topMargin = dp(activity, 2);
+        root.addView(contextHint, contextHintLp);
 
         TextView record = new TextView(activity);
         record.setTextColor(Color.rgb(95, 101, 112));
@@ -467,7 +488,7 @@ public final class DeepSeekAssistant {
                 request.purpose = text(purpose);
                 request.background = text(background);
                 request.contextEnabled = contextEnabled.isChecked();
-                request.contextLimit = contextLimit.getSelectedItemPosition() == 0 ? 50 : 100;
+                request.contextLimit = 0;
                 if (request.contactProfile == null) request.contactProfile = new DeepSeekContactProfile();
                 DeepSeekContactStore.save(activity, request);
                 if (callback != null) callback.onChanged();

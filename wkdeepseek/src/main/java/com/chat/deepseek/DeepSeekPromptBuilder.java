@@ -63,18 +63,16 @@ final class DeepSeekPromptBuilder {
         if ("already_synced".equals(mode)) {
             return "已开启并复用同一 DeepSeek 会话；本次没有新增聊天记录，请结合目标消息和本会话已有上下文";
         }
-        if ("migration_checkpoint".equals(mode)
-                || "periodic_checkpoint".equals(mode)
-                || "realign_checkpoint".equals(mode)) {
-            return "已开启并复用同一 DeepSeek 会话；以下是最近消息校准片段，避免重复提交整段历史";
+        if ("realign_full".equals(mode) || "full_migration".equals(mode)) {
+            return "已开启；本地同步基线需要重新对齐，以下提交当前聊天页已加载的完整上下文";
+        }
+        if (mode.startsWith("overflow_")) {
+            return "DeepSeek 已明确提示上下文过长；本次已新建会话并仅保留较新的聊天内容";
         }
         if ("disabled_or_empty".equals(mode)) {
             return "已开启，但本次没有可附加的聊天快照；请结合目标消息和本会话已有上下文";
         }
-        if ("context_limit_expanded".equals(mode)) {
-            return "已开启；上下文数量上限已扩大，本次重新提交完整有效窗口，之后继续增量同步";
-        }
-        return "已开启；以下是本次完整有效聊天窗口";
+        return "已开启；以下是当前聊天页已加载的完整上下文，不做本地条数或字符截断";
     }
 
     private static String safe(String value, String fallback) {

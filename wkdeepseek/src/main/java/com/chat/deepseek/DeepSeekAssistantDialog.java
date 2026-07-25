@@ -48,6 +48,8 @@ import androidx.fragment.app.FragmentActivity;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 
@@ -83,6 +85,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private static final String DEEPSEEK_SEND_ICON_PATH =
             "M8.3125 0.981587C8.66767 1.0545 8.97902 1.20558 9.2627 1.43374C9.48724 1.61438 9.73029 1.85933 9.97949 2.10854L14.707 6.83608L13.293 8.25014L9 3.95717V15.0431H7V3.95717L2.70703 8.25014L1.29297 6.83608L6.02051 2.10854C6.26971 1.85933 6.51277 1.61438 6.7373 1.43374C6.97662 1.24126 7.28445 1.04542 7.6875 0.981587C7.8973 0.94841 8.1031 0.956564 8.3125 0.981587Z";
 
+    private static final int MAX_FILL_ATTEMPTS = 5;
+    private static final int MAX_SUBMIT_ATTEMPTS = 5;
+    private static final int MAX_SUBMIT_VERIFY_ATTEMPTS = 4;
+
     private WebView webView;
     private TextView statusView;
     private ProgressBar progressBar;
@@ -97,12 +103,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private boolean submitClickPending;
     private boolean fallbackCopied;
     private String pendingPrompt = "";
-    private String promptTransportToken = "";
-    private String promptVisibleText = "";
     private String promptVisibleLabel = "";
-    private boolean promptTransportPrepared;
-    private boolean promptTransportInFlight;
-    private boolean promptTransportEnabled;
     private DeepSeekRequest request;
     private DeepSeekAssistant.ReplyCallback replyCallback;
     private DeepSeekAssistant.TranslationCallback translationCallback;
@@ -148,6 +149,11 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     private int conversationRouteCorrections;
     private String fullContextSnapshot = "";
     private int fullContextSnapshotCount;
+    /** Snapshot whose hashes must become the next incremental-sync baseline after success. */
+    private String submittedContextBaselineSnapshot = "";
+    private int contextOverflowRecoveryLevel;
+    private boolean contextOverflowProbeInFlight;
+    private boolean contextOverflowRecoveryInProgress;
     private boolean contextPlanApplied;
     private boolean forceFullContextForFreshConversation;
     private int promptBuildGeneration;
@@ -216,8 +222,9 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             request = requestFrom(args);
             fullContextSnapshot = request.contextSnapshot;
             fullContextSnapshotCount = request.contextSnapshotCount;
+            submittedContextBaselineSnapshot = fullContextSnapshot;
             ensureHistoryLogStarted(args);
-            DeepSeekHistoryLog.log("NATIVE_REPLY_V11_INIT",
+            DeepSeekHistoryLog.log("NATIVE_RESULT_V12_INIT",
                     "action=" + request.action + " channel_type=" + request.channelType);
         }
         DeepSeekHistoryLog.log("DIALOG_ON_CREATE_VIEW", "loginMode=" + loginMode
@@ -410,7 +417,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         nativeReplyScroll.setBackgroundColor(Color.WHITE);
         nativeReplyList = new LinearLayout(context);
         nativeReplyList.setOrientation(LinearLayout.VERTICAL);
-        nativeReplyList.setPadding(dp(16), dp(14), dp(16), dp(24));
+        nativeReplyList.setPadding(dp(12), dp(10), dp(12), dp(16));
         nativeReplyScroll.addView(nativeReplyList, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         assistantHost.addView(nativeReplyScroll, new FrameLayout.LayoutParams(
@@ -757,6 +764,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         request.contextSnapshot = plan.snapshot;
         request.contextSnapshotCount = plan.count;
         request.contextSyncMode = plan.mode;
+        // A normal incremental/full plan represents the complete local snapshot after it succeeds.
+        submittedContextBaselineSnapshot = fullContextSnapshot;
         contextPlanApplied = true;
         forceFullContextForFreshConversation = false;
         DeepSeekHistoryLog.log("CONTEXT_REUSE_PLAN", "mode=" + plan.mode
@@ -788,12 +797,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         pendingPrompt = "";
         promptFilled = false;
         promptSubmitted = false;
-        promptTransportToken = "";
-        promptVisibleText = "";
         promptVisibleLabel = "";
-        promptTransportPrepared = false;
-        promptTransportInFlight = false;
-        promptTransportEnabled = false;
         fillAttempts = 0;
         submitAttempts = 0;
         submitVerifyAttempts = 0;
@@ -810,9 +814,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
     private void markContextSnapshotSubmitted() {
         Context context = getContext();
-        if (context == null || request == null || TextUtils.isEmpty(fullContextSnapshot)) return;
+        if (context == null || request == null
+                || TextUtils.isEmpty(submittedContextBaselineSnapshot)) return;
         DeepSeekConversationStore.markContextSubmitted(
-                context, request, fullContextSnapshot);
+                context, request, submittedContextBaselineSnapshot);
     }
 
     private void tryFillPrompt() {
@@ -956,10 +961,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if (!promptSubmitted) {
             // The transport hook lives in the page's JavaScript world and is destroyed by loadUrl.
             // Reinstall it before filling the composer on the newly loaded conversation route.
-            promptTransportPrepared = false;
-            promptTransportInFlight = false;
-            promptTransportEnabled = false;
-        }
+                    }
         DeepSeekHistoryLog.log("CONVERSATION_ROUTE_LOAD", "reason=" + reason
                 + " corrections=" + conversationRouteCorrections
                 + " url=" + safeUrl(url));
@@ -1134,18 +1136,15 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
     private void fillPromptNow() {
         if (promptFilled || webView == null || TextUtils.isEmpty(pendingPrompt)) return;
-        if (!promptTransportPrepared) {
-            prepareHiddenPromptTransport();
-            return;
-        }
-        String composerText = promptTransportEnabled && !TextUtils.isEmpty(promptVisibleText)
-                ? promptVisibleText : pendingPrompt;
-        String js = buildFillScript(composerText);
+        // Send the complete prompt through the normal DeepSeek composer. Do not intercept or
+        // rewrite webpage network request bodies. This is less fragile and easier to audit.
+        String js = buildFillScript(pendingPrompt);
         webView.evaluateJavascript(js, value -> {
             boolean success = "true".equals(value) || "\"true\"".equals(value);
             if (success) {
                 promptFilled = true;
                 statusView.setText(R.string.wkdeepseek_submitting);
+                captureNativeResultBaseline();
                 installReplyButtons();
                 // 给 DeepSeek 的 React 输入状态留出更充分的稳定时间。
                 // 每次都使用随机等待，避免填入后立即触发发送。
@@ -1153,10 +1152,9 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 return;
             }
             fillAttempts++;
-            // A saved DeepSeek conversation may have been deleted or may belong to a different
-            // DeepSeek login. If its composer never becomes available, discard only this mapping
-            // and retry on a clean new-chat route instead of trapping the user on a dead page.
-            if (!TextUtils.isEmpty(mappedConversationId) && fillAttempts >= 10) {
+            // A mapped conversation may have been deleted or may belong to another login. Retry
+            // that route only once, then use bounded exponential backoff instead of a retry storm.
+            if (!TextUtils.isEmpty(mappedConversationId) && fillAttempts == 3) {
                 DeepSeekHistoryLog.log("CONVERSATION_MAPPING_STALE",
                         "id=" + shortConversationId(mappedConversationId));
                 resetMappingAndPromptForFreshConversation("stale_mapping");
@@ -1165,13 +1163,11 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 loadConversationRoute(URL, "stale_mapping_home");
                 return;
             }
-            if (fillAttempts < 12) {
-                handler.postDelayed(this::tryFillPrompt, 420);
-            } else if (!fallbackCopied && isAdded()) {
-                fallbackCopied = true;
-                copyText(pendingPrompt);
-                statusView.setText(R.string.wkdeepseek_fill_failed);
-                notifyUser(getString(R.string.wkdeepseek_fill_failed));
+            if (fillAttempts < MAX_FILL_ATTEMPTS) {
+                handler.postDelayed(this::tryFillPrompt,
+                        retryDelay(fillAttempts, 500, 4_000));
+            } else {
+                failAutomation(R.string.wkdeepseek_fill_failed, "fill_prompt");
             }
         });
     }
@@ -1188,13 +1184,17 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 return;
             }
 
-            submitAttempts++;
-            if (submitAttempts < 12) {
-                handler.postDelayed(this::submitPromptAutomatically, randomDelay(300, 550));
-            } else {
-                statusView.setText(R.string.wkdeepseek_submit_failed);
-                notifyUser(getString(R.string.wkdeepseek_submit_failed));
-            }
+            probeAndRecoverContextOverflow(recovered -> {
+                if (recovered || !isAdded()) return;
+                submitAttempts++;
+                if (submitAttempts < MAX_SUBMIT_ATTEMPTS) {
+                    handler.postDelayed(this::submitPromptAutomatically,
+                            retryDelay(submitAttempts, 600, 5_000));
+                } else {
+                    failAutomation(R.string.wkdeepseek_submit_failed,
+                            "send_button_not_ready:" + result);
+                }
+            });
         });
     }
 
@@ -1216,14 +1216,19 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 return;
             }
 
-            // 随机等待期间按钮可能被 React 重绘。此时重新探测，绝不盲目连点。
-            submitAttempts++;
-            if (submitAttempts < 12) {
-                handler.postDelayed(this::submitPromptAutomatically, randomDelay(320, 600));
-            } else {
-                statusView.setText(R.string.wkdeepseek_submit_failed);
-                notifyUser(getString(R.string.wkdeepseek_submit_failed));
-            }
+            // The page may disable the send button because the actual server-side context is
+            // too long. Only an explicit webpage message is allowed to trigger context reduction.
+            probeAndRecoverContextOverflow(recovered -> {
+                if (recovered || !isAdded()) return;
+                submitAttempts++;
+                if (submitAttempts < MAX_SUBMIT_ATTEMPTS) {
+                    handler.postDelayed(this::submitPromptAutomatically,
+                            retryDelay(submitAttempts, 700, 5_000));
+                } else {
+                    failAutomation(R.string.wkdeepseek_submit_failed,
+                            "send_click_failed:" + result);
+                }
+            });
         });
     }
 
@@ -1234,6 +1239,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             if ("submitted".equals(result)) {
                 submitClickPending = false;
                 promptSubmitted = true;
+                DeepSeekUsageGuard.recordSubmitted(getContext(), request);
                 markContextSnapshotSubmitted();
                 captureConversationFromCurrentUrl();
                 handler.postDelayed(this::captureConversationFromCurrentUrl, 250);
@@ -1252,28 +1258,30 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             }
 
             submitVerifyAttempts++;
-            if (submitVerifyAttempts < 5) {
-                handler.postDelayed(this::verifyPromptSubmission, randomDelay(260, 500));
+            if (submitVerifyAttempts < MAX_SUBMIT_VERIFY_ATTEMPTS) {
+                handler.postDelayed(this::verifyPromptSubmission,
+                        retryDelay(submitVerifyAttempts, 500, 4_000));
                 return;
             }
 
-            // 点击后页面仍没有进入生成状态，允许重新探测一次发送图标。
-            // 只有同一个精确上箭头再次可见、可点击时才会再次 click。
+            // The click was not confirmed. Before a generic retry, check for an explicit
+            // context-length error. No local shortening happens without that visible signal.
             submitClickPending = false;
-            submitAttempts++;
-            if (submitAttempts < 12) {
-                handler.postDelayed(this::submitPromptAutomatically, randomDelay(380, 700));
-            } else {
-                statusView.setText(R.string.wkdeepseek_submit_failed);
-                notifyUser(getString(R.string.wkdeepseek_submit_failed));
-            }
+            probeAndRecoverContextOverflow(recovered -> {
+                if (recovered || !isAdded()) return;
+                submitAttempts++;
+                if (submitAttempts < MAX_SUBMIT_ATTEMPTS) {
+                    handler.postDelayed(this::submitPromptAutomatically,
+                            retryDelay(submitAttempts, 800, 5_000));
+                } else {
+                    failAutomation(R.string.wkdeepseek_submit_failed, "submit_not_confirmed");
+                }
+            });
         });
     }
 
 
     private void preparePromptTransportText() {
-        long nonce = Math.abs(System.nanoTime() ^ timingRandom.nextLong());
-        promptTransportToken = "<!--TALKAMI_PROMPT_" + Long.toHexString(nonce) + "-->";
         if (request == null) {
             promptVisibleLabel = "正在处理，请稍候…";
         } else if (request.action == DeepSeekRequest.ACTION_TRANSLATE) {
@@ -1283,86 +1291,14 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         } else {
             promptVisibleLabel = "正在分析聊天并生成回复…";
         }
-        // HTML 注释在 DeepSeek 的 Markdown 气泡中不可见，但仍会保留在请求正文里，
-        // 供页面主世界的 fetch/XHR 钩子精确替换为完整提示词。
-        promptVisibleText = promptVisibleLabel + "\n" + promptTransportToken;
-        promptTransportPrepared = false;
-        promptTransportInFlight = false;
-        promptTransportEnabled = false;
-    }
-
-    private void prepareHiddenPromptTransport() {
-        if (promptTransportPrepared || promptTransportInFlight || webView == null || !isAdded()) return;
-        if (TextUtils.isEmpty(promptTransportToken) || TextUtils.isEmpty(promptVisibleText)) {
-            promptTransportPrepared = true;
-            promptTransportEnabled = false;
-            fillPromptNow();
-            return;
-        }
-        promptTransportInFlight = true;
-        try {
-            webView.evaluateJavascript(buildPromptTransportInstallScript(), value -> {
-                promptTransportInFlight = false;
-                promptTransportPrepared = true;
-                promptTransportEnabled = "true".equals(value) || "\"true\"".equals(value);
-                fillPromptNow();
-            });
-        } catch (Exception ignored) {
-            promptTransportInFlight = false;
-            promptTransportPrepared = true;
-            promptTransportEnabled = false;
-            fillPromptNow();
-        }
     }
 
     /**
-     * 在页面主世界拦截本次 DeepSeek 请求：网页输入框只显示一行短提示，真正发送
-     * 给 DeepSeek 的仍是完整上下文提示词。只替换包含本次唯一 token 的字符串，
-     * 不扫描、不修改其他请求。
+     * The complete prompt is submitted through the normal composer. We intentionally do not hide
+     * or rewrite the submitted user bubble because doing so requires fragile DOM manipulation.
      */
-    private String buildPromptTransportInstallScript() {
-        String token = JSONObject.quote(promptTransportToken);
-        String fullPrompt = JSONObject.quote(pendingPrompt);
-        String pageCode = "(function(){try{" +
-                "var token=" + token + ",full=" + fullPrompt + ";" +
-                "window.__tsddPromptMap=window.__tsddPromptMap||{};window.__tsddPromptMap[token]=full;" +
-                "if(window.__tsddPromptHookInstalled)return;window.__tsddPromptHookInstalled=true;" +
-                "function patch(v,d){if(d>10||v==null)return v;if(typeof v==='string'){var map=window.__tsddPromptMap||{};for(var k in map){if(Object.prototype.hasOwnProperty.call(map,k)&&v.indexOf(k)>=0)return map[k];}return v;}" +
-                "if(Array.isArray(v)){for(var i=0;i<v.length;i++)v[i]=patch(v[i],d+1);return v;}" +
-                "if(Object.prototype.toString.call(v)==='[object Object]'){Object.keys(v).forEach(function(k){v[k]=patch(v[k],d+1);});}return v;}" +
-                "function body(b){if(typeof b!=='string')return b;var t=b.trim();if(!t||(t.charAt(0)!=='{'&&t.charAt(0)!=='['))return b;try{return JSON.stringify(patch(JSON.parse(b),0));}catch(e){return b;}}" +
-                "var oldFetch=window.fetch;if(typeof oldFetch==='function'){window.fetch=async function(input,init){try{if(init&&Object.prototype.hasOwnProperty.call(init,'body')){var ni=Object.assign({},init,{body:body(init.body)});return oldFetch.call(this,input,ni);}" +
-                "if(typeof Request!=='undefined'&&input instanceof Request&&!/GET|HEAD/i.test(input.method)){var ot=await input.clone().text(),nt=body(ot);if(nt!==ot)return oldFetch.call(this,new Request(input,{body:nt}),init);}}catch(e){}return oldFetch.apply(this,arguments);};}" +
-                "if(typeof XMLHttpRequest!=='undefined'){var oldSend=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(b){try{return oldSend.call(this,body(b));}catch(e){return oldSend.call(this,b);}};}" +
-                "}catch(e){}})();";
-        String quotedCode = JSONObject.quote(pageCode);
-        return "(function(){try{var s=document.createElement('script');s.textContent=" + quotedCode + ";" +
-                "(document.documentElement||document.head||document.body).appendChild(s);s.remove();" +
-                "return !!(window.__tsddPromptHookInstalled&&window.__tsddPromptMap&&window.__tsddPromptMap[" + token + "]);" +
-                "}catch(e){return false;}})();";
-    }
-
-    /** 隐藏本次短提示气泡，避免它占用回答空间。 */
     private void hideSubmittedPromptBubble() {
-        if (webView == null || TextUtils.isEmpty(promptVisibleLabel)) return;
-        String label = JSONObject.quote(promptVisibleLabel);
-        String js = "(function(){try{" +
-                "var label=" + label + ";window.__tsddPromptLabel=label;" +
-                "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;}" +
-                "function norm(v){return String(v||'').replace(/\\s+/g,' ').trim();}" +
-                // 只隐藏文字与短提示完全相同的紧凑消息气泡。旧逻辑允许向上爬到
-                // label+180 字，短回答时可能连同整个回答容器一起隐藏，表现为空白页。
-                "function hide(){var all=Array.from(document.querySelectorAll('div,article,p,span')).filter(function(el){return visible(el)&&norm(el.innerText||el.textContent)===label;});" +
-                "if(!all.length)return false;all.sort(function(a,b){return a.getBoundingClientRect().top-b.getBoundingClientRect().top;});var leaf=all[all.length-1],best=leaf,cur=leaf,n=0;" +
-                "while(cur&&cur.parentElement&&n++<4){var p=cur.parentElement,r=p.getBoundingClientRect(),t=norm(p.innerText||p.textContent);if(p===document.body||p===document.documentElement)break;if(p.querySelector('pre,textarea,[contenteditable=\\\"true\\\"],[role=\\\"textbox\\\"]'))break;if(r.height>0&&r.height<220&&r.width<window.innerWidth*0.98&&(t===label||t.length<=label.length+24&&t.indexOf(label)===0)){best=p;cur=p;}else break;}" +
-                "best.dataset.tsddPromptHidden='1';best.style.setProperty('display','none','important');best.style.setProperty('visibility','hidden','important');return true;}" +
-                "if(hide())return true;setTimeout(hide,120);setTimeout(hide,420);" +
-                "if(!window.__tsddPromptHideObserver){var obs=new MutationObserver(function(){if(hide()){try{obs.disconnect();}catch(e){}window.__tsddPromptHideObserver=null;}});window.__tsddPromptHideObserver=obs;obs.observe(document.documentElement,{childList:true,subtree:true});setTimeout(function(){try{obs.disconnect();}catch(e){}if(window.__tsddPromptHideObserver===obs)window.__tsddPromptHideObserver=null;},5000);}" +
-                "return true;}catch(e){return false;}})();";
-        try {
-            webView.evaluateJavascript(js, null);
-        } catch (Exception ignored) {
-        }
+        // No-op by design.
     }
 
     private String buildSendReadyProbeScript() {
@@ -1429,6 +1365,189 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         return result.replace("\\\"", "\"");
     }
 
+    private interface ContextOverflowCallback {
+        void onResult(boolean recovered);
+    }
+
+    /**
+     * Reads only visible DeepSeek error/status UI. Context is never shortened from a local estimate;
+     * recovery starts only after the webpage itself explicitly says the input/context is too long.
+     */
+    private void probeAndRecoverContextOverflow(ContextOverflowCallback callback) {
+        if (callback == null) return;
+        if (contextOverflowRecoveryInProgress) {
+            callback.onResult(true);
+            return;
+        }
+        if (contextOverflowProbeInFlight || webView == null || !isAdded()) {
+            callback.onResult(false);
+            return;
+        }
+        contextOverflowProbeInFlight = true;
+        String js = "(function(){try{" +
+                "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;}" +
+                "function text(el){return String((el&&(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')))||'').replace(/\\s+/g,' ').trim();}" +
+                "var q='[role=alert],[role=status],[aria-live],dialog,[class*=toast],[class*=error],[class*=notice],[class*=warning],[class*=message]';" +
+                "var nodes=Array.from(document.querySelectorAll(q)).filter(visible),parts=[];nodes.forEach(function(x){var t=text(x);if(t&&t.length<800)parts.push(t);});" +
+                "var joined=parts.join(' | ');if(!joined){var b=text(document.body);joined=b.slice(Math.max(0,b.length-4000));}" +
+                "var re=/(内容|输入|消息|文本|提示词|上下文).{0,18}(过长|太长|超出|超过|上限|限制)|(过长|太长|超出|超过).{0,18}(上下文|最大长度|token|令牌)|input.{0,12}too\\s*long|message.{0,12}too\\s*long|prompt.{0,12}too\\s*long|context.{0,18}(too\\s*long|length|limit|window|exceed)|maximum.{0,12}(context|token)|reduce.{0,18}(input|prompt|length)/i;" +
+                "var m=joined.match(re);return m?JSON.stringify({tooLong:true,text:(m[0]||'').slice(0,160)}):JSON.stringify({tooLong:false,text:''});" +
+                "}catch(e){return JSON.stringify({tooLong:false,text:''});}})();";
+        try {
+            webView.evaluateJavascript(js, value -> {
+                contextOverflowProbeInFlight = false;
+                boolean tooLong = false;
+                String message = "";
+                try {
+                    String decoded = decodeJavascriptString(value);
+                    JSONObject payload = new JSONObject(decoded);
+                    tooLong = payload.optBoolean("tooLong", false);
+                    message = payload.optString("text", "");
+                } catch (Exception ignored) {
+                }
+                if (tooLong) {
+                    callback.onResult(recoverFromExplicitContextOverflow(message));
+                } else {
+                    callback.onResult(false);
+                }
+            });
+        } catch (Exception ignored) {
+            contextOverflowProbeInFlight = false;
+            callback.onResult(false);
+        }
+    }
+
+    private boolean recoverFromExplicitContextOverflow(String webpageMessage) {
+        if (contextOverflowRecoveryInProgress || request == null || closing) return true;
+        if (TextUtils.isEmpty(fullContextSnapshot)) return false;
+        if (contextOverflowRecoveryLevel >= 2) {
+            String message = "DeepSeek 仍提示上下文过长，请关闭窗口后重新尝试";
+            if (statusView != null) statusView.setText(message);
+            notifyUser(message);
+            DeepSeekHistoryLog.log("CONTEXT_OVERFLOW_STOP",
+                    "level=" + contextOverflowRecoveryLevel + " page=" + safeLogText(webpageMessage));
+            return true;
+        }
+
+        contextOverflowRecoveryInProgress = true;
+        contextOverflowRecoveryLevel++;
+        int divisor = contextOverflowRecoveryLevel == 1 ? 2 : 4;
+        String reduced = reduceContextSnapshot(fullContextSnapshot, divisor);
+        if (TextUtils.isEmpty(reduced) || TextUtils.equals(reduced, request.contextSnapshot)) {
+            contextOverflowRecoveryInProgress = false;
+            return false;
+        }
+
+        stopNativeReplyPolling("context_overflow_recovery");
+        Context context = getContext();
+        if (context != null) DeepSeekConversationStore.clear(context, request);
+        mappedConversationId = "";
+        conversationRouteTarget = "";
+        conversationRouteLoading = false;
+        conversationRouteCorrections = 0;
+        forceFullContextForFreshConversation = false;
+        contextPlanApplied = true;
+        request.contextSnapshot = reduced;
+        request.contextSnapshotCount = countSnapshotLines(reduced);
+        request.contextSyncMode = contextOverflowRecoveryLevel == 1
+                ? "overflow_half" : "overflow_quarter";
+        submittedContextBaselineSnapshot = reduced;
+
+        promptBuildGeneration++;
+        pendingPrompt = "";
+        promptFilled = false;
+        promptSubmitted = false;
+        promptVisibleLabel = "";
+        fillAttempts = 0;
+        submitAttempts = 0;
+        submitVerifyAttempts = 0;
+        submitReadyPending = false;
+        submitClickPending = false;
+        fallbackCopied = false;
+        webUiPrepared = false;
+        webUiPrepareInFlight = false;
+        webUiPrepareAttempts = 0;
+        nativeReplyScanAttempts = 0;
+        nativeReplyStableCount = 0;
+        nativeReplyLastCandidate = "";
+        statusView.setText("DeepSeek 提示内容过长，正在缩短上下文后重试…");
+        DeepSeekHistoryLog.log("CONTEXT_OVERFLOW_RECOVERY",
+                "level=" + contextOverflowRecoveryLevel
+                        + " original_chars=" + fullContextSnapshot.length()
+                        + " reduced_chars=" + reduced.length()
+                        + " reduced_lines=" + request.contextSnapshotCount
+                        + " page=" + safeLogText(webpageMessage));
+
+        loadMessagesAndBuildPrompt();
+        loadConversationRoute(URL, "explicit_context_overflow_" + contextOverflowRecoveryLevel);
+        handler.postDelayed(() -> contextOverflowRecoveryInProgress = false, 600L);
+        return true;
+    }
+
+    private String reduceContextSnapshot(String source, int divisor) {
+        if (TextUtils.isEmpty(source) || divisor <= 1) return source == null ? "" : source;
+        String[] raw = source.split("\\r?\\n");
+        List<String> lines = new ArrayList<>();
+        for (String item : raw) {
+            String line = item == null ? "" : item.trim();
+            if (!TextUtils.isEmpty(line)) lines.add(line);
+        }
+        if (lines.isEmpty()) return "";
+
+        // Reduce by actual characters rather than only message count. This also handles a single
+        // unusually long message while preserving the newest conversation first.
+        int targetChars = Math.max(2_000, source.length() / divisor);
+        List<String> kept = new ArrayList<>();
+        int chars = 0;
+        for (int i = lines.size() - 1; i >= 0; i--) {
+            String line = lines.get(i);
+            int extra = line.length() + (kept.isEmpty() ? 0 : 1);
+            if (chars + extra > targetChars && !kept.isEmpty()) break;
+            if (line.length() > targetChars && kept.isEmpty()) {
+                line = line.substring(Math.max(0, line.length() - targetChars));
+            }
+            kept.add(0, line);
+            chars += line.length() + (kept.size() > 1 ? 1 : 0);
+        }
+        return TextUtils.join("\n", kept);
+    }
+
+    private int countSnapshotLines(String snapshot) {
+        if (TextUtils.isEmpty(snapshot)) return 0;
+        int count = 0;
+        for (String line : snapshot.split("\\r?\\n")) {
+            if (!TextUtils.isEmpty(line == null ? "" : line.trim())) count++;
+        }
+        return count;
+    }
+
+    private String safeLogText(String value) {
+        if (value == null) return "";
+        String clean = value.replace('\n', ' ').replace('\r', ' ').trim();
+        return clean.length() > 160 ? clean.substring(0, 160) : clean;
+    }
+
+    private long retryDelay(int attempt, int baseMs, int maxMs) {
+        int exponent = Math.max(0, Math.min(6, attempt - 1));
+        long raw = (long) Math.max(1, baseMs) << exponent;
+        long capped = Math.min(Math.max(baseMs, maxMs), raw);
+        // Small jitter prevents synchronized UI retries after a network stall; it is not intended
+        // to conceal automation or bypass platform controls.
+        return capped + randomDelay(0, 250);
+    }
+
+    private void failAutomation(int messageRes, String reason) {
+        long delay = DeepSeekUsageGuard.recordFailure(getContext(), reason);
+        String message = getString(messageRes);
+        if (delay > 0L) {
+            long seconds = Math.max(1L, (delay + 999L) / 1000L);
+            message = message + "，请 " + seconds + " 秒后重试";
+        }
+        if (statusView != null) statusView.setText(message);
+        notifyUser(message);
+        DeepSeekHistoryLog.log("AUTOMATION_STOPPED", "reason=" + reason + " backoff_ms=" + delay);
+    }
+
     private long randomDelay(int minMs, int maxMs) {
         int low = Math.max(0, minMs);
         int high = Math.max(low, maxMs);
@@ -1474,19 +1593,29 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     }
 
     private void installReplyButtons() {
-        if (webView == null) return;
-        String fallbackMode;
-        if (request != null && request.action == DeepSeekRequest.ACTION_TRANSLATE) {
-            fallbackMode = translationCallback != null ? "translate_use" : "copy";
-        } else {
-            fallbackMode = "use";
+        // V12: results are read from the completed DeepSeek answer and rendered entirely with
+        // Android native views. Do not inject buttons/cards into DeepSeek's React DOM.
+    }
+
+    private void captureNativeResultBaseline() {
+        if (webView == null || request == null) return;
+        String js = "(function(){try{" +
+                "var selectors=['.ds-assistant-message-main-content','[data-message-author-role=\"assistant\"]','[class*=\"assistant-message\"]'];var all=[];" +
+                "selectors.forEach(function(q){document.querySelectorAll(q).forEach(function(x){if(all.indexOf(x)<0)all.push(x);});});" +
+                "all.sort(function(a,b){if(a===b)return 0;return (a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING)?-1:1;});" +
+                "window.__tsddNativeBaselineCount=all.length;window.__tsddNativeBaselineText=all.length?String(all[all.length-1].innerText||all[all.length-1].textContent||'').trim():'';" +
+                "window.__tsddNativeBaselineReady=true;return String(all.length);" +
+                "}catch(e){window.__tsddNativeBaselineReady=false;return 'error';}})();";
+        try {
+            webView.evaluateJavascript(js, value -> DeepSeekHistoryLog.log(
+                    "NATIVE_RESULT_BASELINE", "count=" + cleanJsResult(value) + " ui=v12"));
+        } catch (Exception error) {
+            DeepSeekHistoryLog.log("NATIVE_RESULT_BASELINE_ERROR", error.getClass().getSimpleName());
         }
-        String js = "(function(){\n  function norm(v){return String(v||'').replace(/\\s+/g,' ').trim();}\n  function raw(v){return String(v||'').trim();}\n  function compact(v){return norm(v).replace(/\\s+/g,'').toLowerCase();}\n  function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;}\n  function restoreComposer(){document.querySelectorAll('[data-tsdd-composer-hidden]').forEach(function(root){root.removeAttribute('data-tsdd-composer-hidden');root.removeAttribute('aria-hidden');root.style.removeProperty('display');root.style.removeProperty('visibility');root.style.removeProperty('pointer-events');});document.documentElement.style.removeProperty('scroll-padding-bottom');}\n  function injectStyle(){\n    if(document.getElementById('tsdd-deepseek-result-style-v9'))return;\n    var s=document.createElement('style');\n    s.id='tsdd-deepseek-result-style-v9';\n    s.textContent='[data-tsdd-reply-card]{display:block!important;margin:8px 0 6px!important;padding:13px 14px!important;border-radius:13px!important;background:#f3f6ff!important;border:1px solid #cbd8ff!important;color:#1f2937!important;font-size:16px!important;line-height:1.65!important;white-space:pre-wrap!important;word-break:break-word!important;box-shadow:0 4px 14px rgba(20,35,70,.06)!important}[data-tsdd-back-translation]{display:block!important;margin:6px 0 8px!important;padding:10px 12px!important;border-radius:11px!important;background:#eefaf5!important;border:1px solid #bce6d5!important;color:#275b4b!important;font-size:14px!important;line-height:1.55!important;white-space:pre-wrap!important;word-break:break-word!important}[data-tsdd-translation-card]{display:block!important;margin:10px 0 8px!important;padding:12px 13px!important;border-radius:12px!important;background:#eefaf5!important;border:1px solid #bce6d5!important;color:#174f3e!important;font-size:15px!important;line-height:1.65!important;white-space:pre-wrap!important;word-break:break-word!important}[data-tsdd-reply-bar]{margin-bottom:10px!important}[data-tsdd-send-surface-v9]{position:relative!important;padding-bottom:64px!important;cursor:pointer!important;-webkit-tap-highlight-color:transparent!important}[data-tsdd-send-surface-v9]::after{content:\"发送\";display:block!important;position:absolute!important;left:0!important;right:0!important;bottom:4px!important;height:44px!important;line-height:44px!important;text-align:center!important;border-radius:22px!important;background:#0b8f68!important;color:#fff!important;font-size:15px!important;font-weight:700!important;box-shadow:0 3px 10px rgba(11,143,104,.18)!important;pointer-events:none!important}[data-tsdd-action]{box-shadow:none!important}';\n    (document.head||document.documentElement).appendChild(s);\n  }\n  function markBaseline(){if(window.__tsddAnswerPhase)return;document.querySelectorAll('.ds-assistant-message-main-content').forEach(function(root){root.dataset.tsddIgnoreAnswer='1';});document.querySelectorAll('pre code').forEach(function(code){code.dataset.tsddIgnore='1';var pre=code.closest('pre');if(pre)pre.dataset.tsddIgnore='1';});}\n  function ownerFor(el,prefix){if(!el.dataset.tsddPlainOwner){window.__tsddPlainSeq=(window.__tsddPlainSeq||0)+1;el.dataset.tsddPlainOwner=prefix+window.__tsddPlainSeq;}return el.dataset.tsddPlainOwner;}\n  function hideNativeCodeActions(pre){\n    if(!pre)return;var scopes=[pre];if(pre.parentElement)scopes.push(pre.parentElement);if(pre.parentElement&&pre.parentElement.parentElement)scopes.push(pre.parentElement.parentElement);\n    scopes.forEach(function(scope){\n      scope.querySelectorAll('button,a,[role=\"button\"],[role=\"menuitem\"]').forEach(function(el){if(el.dataset.tsddAction==='1')return;var label=compact((el.innerText||'')+' '+(el.getAttribute('aria-label')||'')+' '+(el.getAttribute('title')||''));if(/复制|copy|下载|download|savecode/.test(label))el.style.setProperty('display','none','important');});\n      scope.querySelectorAll('span,div').forEach(function(el){if(el.dataset.tsddAction==='1'||el.dataset.tsddReplyCard==='1')return;var label=compact(el.innerText||el.textContent);var r=el.getBoundingClientRect();if(label==='reply'&&r.width<180&&r.height<80)el.style.setProperty('display','none','important');});\n    });\n  }\n  function hideAllCodeActions(root){(root||document).querySelectorAll('pre').forEach(hideNativeCodeActions);}\n  restoreComposer();injectStyle();markBaseline();if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();hideAllCodeActions(document);\n  if(window.__tsddDeepSeekInstalledV9){if(window.__tsddDeepSeekAddV9)window.__tsddDeepSeekAddV9();return;}\n  window.__tsddDeepSeekInstalledV9=true;\n  var fallbackMode=" + JSONObject.quote(fallbackMode) + ";\n  function go(mode,text,local){if(!text)return;var u='tsdd-deepseek://result?mode='+mode+'&text='+encodeURIComponent(text);if(local)u+='&local='+encodeURIComponent(local);location.href=u;}\n  function button(label,mode,text,local,tone){var b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.tsddAction='1';var strong=tone==='primary'||tone==='success',bg=tone==='success'?'#0b8f68':(tone==='primary'?'#315fe9':'#edf3ff'),fg=strong?'#fff':'#295eea',border=strong?'0':'1px solid #cfdbff';b.style.cssText='display:inline-flex!important;visibility:visible!important;align-items:center;justify-content:center;border:'+border+';border-radius:18px;padding:9px 15px;background:'+bg+';color:'+fg+';font-size:14px;font-weight:650;margin-left:8px;min-height:36px;position:relative;z-index:8';b.onclick=function(e){e.preventDefault();e.stopPropagation();go(mode,text,local||'');};return b;}\n  function addBar(anchor,owner,buttons,signature){if(!anchor||!anchor.parentNode)return false;var old=document.querySelector('[data-tsdd-reply-bar][data-tsdd-owner=\"'+owner+'\"]');if(old&&old.dataset.tsddSignature===signature)return false;if(old)old.remove();var box=document.createElement('div');box.dataset.tsddReplyBar='1';box.dataset.tsddOwner=owner;box.dataset.tsddSignature=signature;box.style.cssText='display:flex!important;visibility:visible!important;justify-content:flex-end;align-items:center;flex-wrap:wrap;padding:7px 0 11px;position:relative;z-index:7';buttons.forEach(function(b){box.appendChild(b);});anchor.parentNode.insertBefore(box,anchor.nextSibling);return true;}\n  function nearLabel(pre){var n=pre?pre.previousElementSibling:null,steps=0;while(n&&steps++<5){if(n.tagName==='PRE')break;var t=norm(n.innerText||n.textContent);if(t&&t.length<100)return t;n=n.previousElementSibling;}return '';}\n  function codeKind(code,pre){var cls=compact(code.className||''),label=compact(nearLabel(pre));if(/profile/.test(cls))return 'profile';if(/translation|translate|译文|直译/.test(cls)||/译文|直译|translation/.test(label))return 'translation';if(/reply|response|回复/.test(cls)||/选项|建议|版本|回复|reply/.test(label))return 'reply';return (fallbackMode==='translate_use'||fallbackMode==='copy')?'translation':'reply';}\n  function codeText(code){return raw(code&&(code.innerText||code.textContent)||'');}\n  function currentBlocks(root){return Array.from(root.querySelectorAll('pre code')).filter(function(code){var pre=code.closest('pre');return pre&&pre.dataset.tsddIgnore!=='1'&&code.dataset.tsddIgnore!=='1'&&codeText(code);});}\n  function rows(root){return Array.from(root.querySelectorAll('p,li')).filter(function(el){return visible(el)&&!el.closest('pre')&&!el.closest('[data-tsdd-reply-bar]')&&!el.closest('[data-tsdd-synthetic]');});}\n  function after(a,b){return !!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);}\n  function findBackTranslation(root,pre,nextPre){var list=rows(root);for(var i=0;i<list.length;i++){var row=list[i];if(!after(pre,row))continue;if(nextPre&&after(nextPre,row))break;var t=norm(row.innerText||row.textContent),m=t.match(/^(?:回译|译文|我的母语译文|中文译文|本地显示)\\s*[：:]\\s*([\\s\\S]+)$/);if(m&&norm(m[1]))return {row:row,text:norm(m[1])};}return null;}\n  function styleBackTranslation(info){if(!info||!info.row)return;info.row.dataset.tsddBackTranslation='1';info.row.textContent='回译：'+info.text;}\n  function makeTranslationCard(text,anchor,key){var old=document.querySelector('[data-tsdd-translation-card][data-tsdd-owner=\"'+key+'\"]');if(old){old.textContent='译文：'+text;return old;}var card=document.createElement('div');card.dataset.tsddTranslationCard='1';card.dataset.tsddOwner=key;card.textContent='译文：'+text;anchor.parentNode.insertBefore(card,anchor.nextSibling);return card;}\n  function convertTranslationCode(pre,text,key){var card=makeTranslationCard(text,pre,key);hideNativeCodeActions(pre);pre.style.setProperty('display','none','important');return card;}\n  function makeReplyCard(pre,text,key){var card=document.querySelector('[data-tsdd-reply-card][data-tsdd-owner=\"'+key+'\"]');if(!card){card=document.createElement('div');card.dataset.tsddReplyCard='1';card.dataset.tsddOwner=key;pre.parentNode.insertBefore(card,pre);}var body=card.querySelector('[data-tsdd-reply-text]');if(!body){body=document.createElement('div');body.dataset.tsddReplyText='1';card.insertBefore(body,card.firstChild);}body.textContent=text;hideNativeCodeActions(pre);pre.style.setProperty('display','none','important');return card;}\n  function armSendSurface(anchor,text,local,signature){if(!anchor||!text)return false;anchor.dataset.tsddSendSurfaceV9='1';anchor.dataset.tsddSendSignature=signature;anchor.__tsddSendText=text;anchor.__tsddSendLocal=local||'';if(!anchor.__tsddSendListenerV9){anchor.__tsddSendListenerV9=true;anchor.addEventListener('click',function(e){var r=anchor.getBoundingClientRect();var y=(typeof e.clientY==='number'&&e.clientY>0)?e.clientY:r.bottom;if(y<r.bottom-58)return;e.preventDefault();e.stopPropagation();go('send',anchor.__tsddSendText||'',anchor.__tsddSendLocal||'');},true);}return true;}\n  function processCodes(root){\n    if(!root||root.dataset.tsddIgnoreAnswer==='1')return {added:false,last:null};\n    var blocks=currentBlocks(root),added=false,last=null;if(!blocks.length)return {added:false,last:null};\n    hideAllCodeActions(root);\n    if(fallbackMode==='translate_use'||fallbackMode==='copy'){\n      var first=blocks.find(function(c){return codeKind(c,c.closest('pre'))==='translation';})||blocks[0];\n      var pre=first.closest('pre'),translated=codeText(first),owner=ownerFor(pre,'t'),card=convertTranslationCode(pre,translated,owner),buttons=[];\n      if(fallbackMode==='translate_use')buttons.push(button('显示译文','translate_use',translated,'','success'));\n      buttons.push(button('复制译文','copy',translated,'',''));\n      if(addBar(card,owner,buttons,'translation:'+translated)){added=true;last=card;}\n      return {added:added,last:last};\n    }\n    var replies=blocks.filter(function(c){return codeKind(c,c.closest('pre'))==='reply';});\n    replies.forEach(function(replyCode,index){\n      var replyPre=replyCode.closest('pre'),original=codeText(replyCode),nextPre=index+1<replies.length?replies[index+1].closest('pre'):null;\n      var back=findBackTranslation(root,replyPre,nextPre),translated=back?back.text:'',actionAnchor=null;if(back){styleBackTranslation(back);actionAnchor=back.row;}\n      if(!translated){\n        for(var i=0;i<blocks.length;i++){var c=blocks[i],p=c.closest('pre');if(p===replyPre||!after(replyPre,p))continue;if(nextPre&&after(nextPre,p))break;if(codeKind(c,p)==='translation'){translated=codeText(c);var keyT=ownerFor(p,'bt'),cardT=convertTranslationCode(p,translated,keyT);cardT.dataset.tsddBackTranslation='1';cardT.removeAttribute('data-tsdd-translation-card');cardT.textContent='回译：'+translated;actionAnchor=cardT;break;}}\n      }\n      var owner=ownerFor(replyPre,'r'),card=makeReplyCard(replyPre,original,owner);\n      if(armSendSurface(card,original,translated,'reply:'+original+'|'+translated)){added=true;}last=card;\n    });\n    return {added:added,last:last};\n  }\n  function parsePlain(root){\n    if(!root||root.dataset.tsddIgnoreAnswer==='1'||currentBlocks(root).length)return {added:false,last:null};\n    var elements=rows(root),added=false,last=null;\n    if(fallbackMode==='translate_use'||fallbackMode==='copy'){\n      for(var i=0;i<elements.length;i++){var t=norm(elements[i].innerText||elements[i].textContent),m=t.match(/^(?:自然)?译文\\s*[：:]\\s*([\\s\\S]+)$/);if(!m||!norm(m[1]))continue;var translated=norm(m[1]),row=elements[i],key=ownerFor(row,'pt');row.dataset.tsddTranslationCard='1';var buttons=[];if(fallbackMode==='translate_use')buttons.push(button('显示译文','translate_use',translated,'','success'));buttons.push(button('复制译文','copy',translated,'',''));if(addBar(row,key,buttons,'plain-translation:'+translated)){added=true;last=row;}break;}\n      return {added:added,last:last};\n    }\n    for(var j=0;j<elements.length;j++){\n      var line=norm(elements[j].innerText||elements[j].textContent),match=line.match(/^(?:回复|原文|回复原文|对方语言|发送内容)\\s*[：:]\\s*([\\s\\S]+)$/);if(!match||!norm(match[1]))continue;\n      var original=norm(match[1]),back=null;\n      for(var k=j+1;k<elements.length&&k<=j+5;k++){var tt=norm(elements[k].innerText||elements[k].textContent),tm=tt.match(/^(?:回译|译文|我的母语译文|中文译文|本地显示)\\s*[：:]\\s*([\\s\\S]+)$/);if(tm&&norm(tm[1])){back={row:elements[k],text:norm(tm[1])};break;}if(/^(?:回复|原文|回复原文|对方语言|发送内容)\\s*[：:]/.test(tt))break;}\n      var key2=ownerFor(elements[j],'pr'),card=document.querySelector('[data-tsdd-reply-card][data-tsdd-owner=\"'+key2+'\"]');\n      if(!card){card=document.createElement('div');card.dataset.tsddReplyCard='1';card.dataset.tsddOwner=key2;elements[j].parentNode.insertBefore(card,elements[j].nextSibling);}var body2=card.querySelector('[data-tsdd-reply-text]');if(!body2){body2=document.createElement('div');body2.dataset.tsddReplyText='1';card.insertBefore(body2,card.firstChild);}body2.textContent=original;elements[j].style.setProperty('display','none','important');\n      if(back)styleBackTranslation(back);var local=back?back.text:'';\n      if(armSendSurface(card,original,local,'plain-reply:'+original+'|'+local)){added=true;}last=card;\n    }\n    return {added:added,last:last};\n  }\n  function cleanup(){restoreComposer();injectStyle();if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();hideAllCodeActions(document);document.querySelectorAll('[data-tsdd-send-host]').forEach(function(x){x.remove();});var seen={};document.querySelectorAll('[data-tsdd-reply-bar]').forEach(function(bar){var labels=compact(bar.innerText||bar.textContent);if(/填入聊天|直接发送|^发送$/.test(labels)){bar.remove();return;}var owner=bar.dataset.tsddOwner||'';if(!owner||seen[owner])bar.remove();else seen[owner]=true;});document.querySelectorAll('[data-tsdd-send-bar-v8]').forEach(function(bar){bar.remove();});}\n  function add(){cleanup();if(!window.__tsddAnswerPhase||!window.__tsddAnswerReady||Date.now()<(window.__tsddAnswerNotBefore||0))return;var added=false,last=null;Array.from(document.querySelectorAll('.ds-assistant-message-main-content')).forEach(function(root){var coded=processCodes(root);if(coded.added){added=true;last=coded.last;}var plain=parsePlain(root);if(plain.added){added=true;last=plain.last;}});if(added||window.__tsddResultReady){window.__tsddResultReady=true;restoreComposer();if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();hideAllCodeActions(document);if(last)setTimeout(function(){try{last.scrollIntoView({behavior:'smooth',block:'end'});}catch(e){last.scrollIntoView(false);}},120);}}\n  window.__tsddDeepSeekAddV9=add;window.__tsddDeepSeekAddV8=add;window.__tsddDeepSeekAddV6=add;window.__tsddDeepSeekAddV5=add;window.__tsddDeepSeekAddV4=add;window.__tsddDeepSeekAddV3=add;\n  var timer=null;if(!window.__tsddResultObserverV9){window.__tsddResultObserverV9=true;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(add,110);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class','style','disabled','aria-disabled','aria-label','title']});}\n  add();\n})();";
-        webView.evaluateJavascript(js, null);
     }
 
     /**
-     * Legacy entry point retained for source compatibility. V11 no longer injects a
+     * Legacy entry point retained for source compatibility. V12 no longer injects a
      * MutationObserver or navigates to a custom URL. Android polls the final assistant
      * answer directly through evaluateJavascript and receives the JSON in its callback.
      */
@@ -1495,8 +1624,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     }
 
     private void startNativeReplyPolling() {
-        if (webView == null || request == null || closing || loginMode
-                || request.action == DeepSeekRequest.ACTION_TRANSLATE) {
+        if (webView == null || request == null || closing || loginMode) {
             return;
         }
         nativeReplyPolling = true;
@@ -1510,7 +1638,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if (webView != null) webView.setVisibility(View.VISIBLE);
         handler.removeCallbacks(nativeReplyPollRunnable);
         handler.postDelayed(nativeReplyPollRunnable, 450);
-        DeepSeekHistoryLog.log("NATIVE_REPLY_POLL_START", "ui=v11 action=" + request.action);
+        DeepSeekHistoryLog.log("NATIVE_RESULT_POLL_START", "ui=v12 action=" + request.action);
     }
 
     private void scheduleNextNativeReplyPoll(long delayMs) {
@@ -1533,32 +1661,57 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 String decoded = decodeJavascriptString(value);
                 if (TextUtils.isEmpty(decoded)) {
                     logNativeReplyScanState("empty", 0, false, decoded);
-                    if (nativeReplyScanAttempts < 90) scheduleNextNativeReplyPoll(520);
-                    else stopNativeReplyPolling("empty_timeout");
+                    if (nativeReplyScanAttempts < 90) {
+                        if (nativeReplyScanAttempts >= 4 && nativeReplyScanAttempts % 4 == 0) {
+                            probeAndRecoverContextOverflow(recovered -> {
+                                if (!recovered) scheduleNextNativeReplyPoll(520);
+                            });
+                        } else {
+                            scheduleNextNativeReplyPoll(520);
+                        }
+                    } else stopNativeReplyPolling("empty_timeout");
                     return;
                 }
                 try {
                     JSONObject payload = new JSONObject(decoded);
                     String state = payload.optString("state", "unknown");
                     boolean generating = payload.optBoolean("generating", false);
+                    String translation = payload.optString("translation", "").trim();
+                    String analysis = limitCodePoints(payload.optString("analysis", "").trim(), 50);
                     JSONArray items = payload.optJSONArray("items");
-                    int count = items == null ? 0 : items.length();
+                    if (items == null) items = new JSONArray();
+                    int count = items.length();
                     logNativeReplyScanState(state, count, generating, decoded);
 
-                    if (count > 0) {
-                        String candidate = items.toString();
+                    JSONObject stablePayload = new JSONObject();
+                    stablePayload.put("translation", translation);
+                    stablePayload.put("analysis", analysis);
+                    stablePayload.put("items", items);
+                    String candidate = stablePayload.toString();
+
+                    boolean hasResult;
+                    if (request.action == DeepSeekRequest.ACTION_TRANSLATE) {
+                        hasResult = !TextUtils.isEmpty(translation);
+                    } else {
+                        // Reply suggestions are intentionally variable: DeepSeek may return 3-6
+                        // options according to the amount of useful context. Wait for at least three
+                        // completed choices, but still fall back after a while if the model disobeys.
+                        int minimum = 3;
+                        hasResult = count >= minimum
+                                || (count > 0 && !generating && nativeReplyScanAttempts >= 14);
+                    }
+
+                    if (hasResult) {
                         if (TextUtils.equals(candidate, nativeReplyLastCandidate)) {
                             nativeReplyStableCount++;
                         } else {
                             nativeReplyLastCandidate = candidate;
                             nativeReplyStableCount = 1;
                         }
-                        // Do not trust a single snapshot while DeepSeek is still streaming.
-                        // Two identical snapshots after generation is enough to render.
                         if (!generating && nativeReplyStableCount >= 2) {
                             nativeReplyPolling = false;
                             handler.removeCallbacks(nativeReplyPollRunnable);
-                            showNativeReplyOptions(candidate);
+                            showNativeAssistantResult(candidate);
                             return;
                         }
                     } else {
@@ -1566,20 +1719,26 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                         nativeReplyLastCandidate = "";
                     }
                 } catch (Exception parseError) {
-                    DeepSeekHistoryLog.log("NATIVE_REPLY_SCAN_PARSE_ERROR",
+                    DeepSeekHistoryLog.log("NATIVE_RESULT_SCAN_PARSE_ERROR",
                             parseError.getClass().getSimpleName()
                                     + " chars=" + decoded.length());
                 }
 
                 if (nativeReplyScanAttempts < 90) {
-                    scheduleNextNativeReplyPoll(520);
+                    if (nativeReplyScanAttempts >= 4 && nativeReplyScanAttempts % 4 == 0) {
+                        probeAndRecoverContextOverflow(recovered -> {
+                            if (!recovered) scheduleNextNativeReplyPoll(520);
+                        });
+                    } else {
+                        scheduleNextNativeReplyPoll(520);
+                    }
                 } else {
                     stopNativeReplyPolling("scan_timeout");
                 }
             });
         } catch (Exception error) {
             nativeReplyScanInFlight = false;
-            DeepSeekHistoryLog.log("NATIVE_REPLY_SCAN_EVAL_ERROR",
+            DeepSeekHistoryLog.log("NATIVE_RESULT_SCAN_EVAL_ERROR",
                     error.getClass().getSimpleName());
             if (nativeReplyScanAttempts < 90) scheduleNextNativeReplyPoll(650);
             else stopNativeReplyPolling("eval_timeout");
@@ -1593,14 +1752,14 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 || nativeReplyScanAttempts == 1
                 || nativeReplyScanAttempts % 8 == 0) {
             nativeReplyLastScanState = compactState;
-            DeepSeekHistoryLog.log("NATIVE_REPLY_SCAN",
+            DeepSeekHistoryLog.log("NATIVE_RESULT_SCAN",
                     "attempt=" + nativeReplyScanAttempts
                             + " state=" + state
                             + " count=" + count
                             + " generating=" + generating
                             + " stable=" + nativeReplyStableCount
                             + " chars=" + (rawResult == null ? 0 : rawResult.length())
-                            + " ui=v11");
+                            + " ui=v12");
         }
     }
 
@@ -1608,8 +1767,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         nativeReplyPolling = false;
         nativeReplyScanInFlight = false;
         handler.removeCallbacks(nativeReplyPollRunnable);
-        DeepSeekHistoryLog.log("NATIVE_REPLY_POLL_STOP",
-                "reason=" + reason + " attempts=" + nativeReplyScanAttempts + " ui=v11");
+        DeepSeekHistoryLog.log("NATIVE_RESULT_POLL_STOP",
+                "reason=" + reason + " attempts=" + nativeReplyScanAttempts + " ui=v12");
     }
 
     private String decodeJavascriptString(String value) {
@@ -1629,17 +1788,17 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "function norm(v){return String(v||'').replace(/\\s+/g,' ').trim();}" +
                 "function raw(v){return String(v||'').trim();}" +
                 "function after(a,b){return !!(a&&b&&(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING));}" +
-                "function roots(){var selectors=['.ds-assistant-message-main-content','[data-message-author-role=\\\"assistant\\\"]','[class*=\\\"assistant-message\\\"]'];var all=[];selectors.forEach(function(q){document.querySelectorAll(q).forEach(function(x){if(all.indexOf(x)<0)all.push(x);});});return all;}" +
+                "function roots(){var selectors=['.ds-assistant-message-main-content','[data-message-author-role=assistant]','[class*=assistant-message]'];var all=[];selectors.forEach(function(q){document.querySelectorAll(q).forEach(function(x){if(all.indexOf(x)<0)all.push(x);});});all.sort(function(a,b){if(a===b)return 0;return (a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING)?-1:1;});var base=Number(window.__tsddNativeBaselineCount||0);if(window.__tsddNativeBaselineReady&&all.length>base)return all.slice(base);if(window.__tsddNativeBaselineReady&&all.length){var last=all[all.length-1],now=raw(last.innerText||last.textContent),before=raw(window.__tsddNativeBaselineText||'');if(now&&now!==before)return [last];return [];}return all;}" +
                 "function generating(){return Array.from(document.querySelectorAll('button,[role=\\\"button\\\"]')).some(function(b){var t=norm((b.innerText||'')+' '+(b.getAttribute('aria-label')||'')+' '+(b.getAttribute('title')||'')).toLowerCase().replace(/\\s+/g,'');var s=getComputedStyle(b),r=b.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0&&/停止生成|停止|stopgenerating|stopgeneration/.test(t);});}" +
-                "function labelBefore(node,index){var n=node,steps=0;while(n&&steps++<8){n=n.previousElementSibling;if(!n)break;var t=norm(n.innerText||n.textContent);if(t&&t.length<140&&/选项|版本|建议|自然|轻松|直接|延续|话题|简短|口语/.test(t))return t;}return '选项 '+index;}" +
-                "function localAfter(root,anchor,nextAnchor){var list=Array.from(root.querySelectorAll('[data-tsdd-back-translation],p,li'));for(var i=0;i<list.length;i++){var row=list[i];if(!after(anchor,row))continue;if(nextAnchor&&after(nextAnchor,row))break;var t=norm(row.innerText||row.textContent),m=t.match(/^(?:回译|译文|我的母语译文|中文译文|本地显示)\\s*[：:]\\s*([\\s\\S]+)$/);if(m&&norm(m[1]))return norm(m[1]);}return '';}" +
-                "function add(out,seen,label,text,local){text=raw(text);local=norm(local);if(!text)return;var key=text+'\\n'+local;if(seen[key])return;seen[key]=1;out.push({label:norm(label)||('选项 '+(out.length+1)),text:text,local:local});}" +
-                "var rs=roots(),root=rs.length?rs[rs.length-1]:null,state='ok';if(!root){var anchors=Array.from(document.querySelectorAll('[data-tsdd-reply-card],pre'));var last=anchors.length?anchors[anchors.length-1]:null;if(last){root=last.closest('article,[data-message-author-role=\"assistant\"],main')||last.parentElement;state='fallback_root';}}if(!root)return JSON.stringify({state:'no_root',generating:generating(),items:[]});var out=[],seen={};" +
-                "var cards=Array.from(root.querySelectorAll('[data-tsdd-reply-card]'));cards.forEach(function(card,i){var body=card.querySelector('[data-tsdd-reply-text]'),text=raw(body?body.innerText||body.textContent:card.innerText||card.textContent),next=i+1<cards.length?cards[i+1]:null;add(out,seen,labelBefore(card,i+1),text,localAfter(root,card,next));});" +
-                "if(!out.length){var pres=Array.from(root.querySelectorAll('pre'));pres.forEach(function(pre,i){var code=pre.querySelector('code'),text=raw(code?code.innerText||code.textContent:pre.innerText||pre.textContent);text=text.replace(/^reply\\s*/i,'').trim();var next=i+1<pres.length?pres[i+1]:null;if(!text||/^(translation|translate|译文)$/i.test(text))return;add(out,seen,labelBefore(pre,i+1),text,localAfter(root,pre,next));});}" +
-                "if(!out.length){var rows=Array.from(root.querySelectorAll('p,li'));for(var j=0;j<rows.length;j++){var line=norm(rows[j].innerText||rows[j].textContent),m=line.match(/^(?:回复|原文|回复原文|对方语言|发送内容)\\s*[：:]\\s*([\\s\\S]+)$/);if(!m||!norm(m[1]))continue;add(out,seen,'选项 '+(out.length+1),norm(m[1]),localAfter(root,rows[j],null));}}" +
-                "return JSON.stringify({state:state,generating:generating(),items:out});" +
-                "}catch(e){return JSON.stringify({state:'error',generating:false,error:String(e&&e.message||e),items:[]});}})();";
+                "function localAfter(root,anchor,nextAnchor){var list=Array.from(root.querySelectorAll('[data-tsdd-back-translation],p,li'));for(var i=0;i<list.length;i++){var row=list[i];if(!after(anchor,row))continue;if(nextAnchor&&after(nextAnchor,row))break;var t=norm(row.innerText||row.textContent),m=t.match(/^(?:回译|我的母语译文|中文回译|本地显示)\\s*[：:]\\s*([\\s\\S]+)$/);if(m&&norm(m[1]))return norm(m[1]);}return '';}" +
+                "function meta(root){var out={translation:'',analysis:''},rows=Array.from(root.querySelectorAll('p,li,h1,h2,h3'));for(var i=0;i<rows.length;i++){if(rows[i].closest('pre'))continue;var t=norm(rows[i].innerText||rows[i].textContent),m;if(!out.translation&&(m=t.match(/^(?:对方(?:最新)?消息(?:的)?(?:翻译|译文)|对方原话(?:翻译|译文)|消息翻译|译文)\\s*[：:]\\s*([\\s\\S]+)$/))){out.translation=norm(m[1]);continue;}if(!out.analysis&&(m=t.match(/^(?:意图(?:与|和|\\/)?情绪(?:分析)?|意图分析|情绪分析|分析)\\s*[：:]\\s*([\\s\\S]+)$/))){out.analysis=norm(m[1]);}}return out;}" +
+                "function add(out,seen,text,local){text=raw(text);local=norm(local);if(!text)return;var key=text+'\\n'+local;if(seen[key])return;seen[key]=1;out.push({text:text,local:local});}" +
+                "var rs=roots(),root=rs.length?rs[rs.length-1]:null,state='ok';if(!root&&!window.__tsddNativeBaselineReady){var anchors=Array.from(document.querySelectorAll('[data-tsdd-reply-card],pre'));var last=anchors.length?anchors[anchors.length-1]:null;if(last){root=last.closest('article,[data-message-author-role=assistant],main')||last.parentElement;state='fallback_root';}}if(!root)return JSON.stringify({state:'no_root',generating:generating(),translation:'',analysis:'',items:[]});var info=meta(root),out=[],seen={};" +
+                "var cards=Array.from(root.querySelectorAll('[data-tsdd-reply-card]'));cards.forEach(function(card,i){var body=card.querySelector('[data-tsdd-reply-text]'),text=raw(body?body.innerText||body.textContent:card.innerText||card.textContent),next=i+1<cards.length?cards[i+1]:null;add(out,seen,text,localAfter(root,card,next));});" +
+                "if(!out.length){var pres=Array.from(root.querySelectorAll('pre'));pres.forEach(function(pre,i){var code=pre.querySelector('code'),text=raw(code?code.innerText||code.textContent:pre.innerText||pre.textContent);text=text.replace(/^reply\\s*/i,'').trim();var next=i+1<pres.length?pres[i+1]:null;if(!text||/^(translation|translate|译文)$/i.test(text))return;add(out,seen,text,localAfter(root,pre,next));});}" +
+                "if(!out.length){var rows=Array.from(root.querySelectorAll('p,li'));for(var j=0;j<rows.length;j++){var line=norm(rows[j].innerText||rows[j].textContent),m=line.match(/^(?:回复|原文|回复原文|对方语言|发送内容)\\s*[：:]\\s*([\\s\\S]+)$/);if(!m||!norm(m[1]))continue;add(out,seen,norm(m[1]),localAfter(root,rows[j],null));}}" +
+                "return JSON.stringify({state:state,generating:generating(),translation:info.translation,analysis:info.analysis,items:out});" +
+                "}catch(e){return JSON.stringify({state:'error',generating:false,error:String(e&&e.message||e),translation:'',analysis:'',items:[]});}})();";
     }
 
     private void handlePluginUrl(Uri uri) {
@@ -1679,90 +1838,157 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     }
 
     private void showNativeReplyOptions(String rawJson) {
-        if (TextUtils.isEmpty(rawJson) || rawJson.length() > 30000 || !isAdded()) return;
+        if (TextUtils.isEmpty(rawJson)) return;
         try {
             JSONArray array = new JSONArray(rawJson);
-            if (array.length() == 0) return;
-            String signature = array.toString();
+            JSONObject payload = new JSONObject();
+            payload.put("translation", "");
+            payload.put("analysis", "");
+            payload.put("items", array);
+            showNativeAssistantResult(payload.toString());
+        } catch (Exception e) {
+            DeepSeekHistoryLog.log("NATIVE_RESULT_PARSE_ERROR", e.getClass().getSimpleName());
+        }
+    }
+
+    private void showNativeAssistantResult(String rawJson) {
+        if (TextUtils.isEmpty(rawJson) || rawJson.length() > 40000 || !isAdded()) return;
+        try {
+            JSONObject payload = new JSONObject(rawJson);
+            String translation = payload.optString("translation", "").trim();
+            String analysis = limitCodePoints(payload.optString("analysis", "").trim(), 50);
+            JSONArray items = payload.optJSONArray("items");
+            if (items == null) items = new JSONArray();
+
+            String signature = payload.toString();
             if (TextUtils.equals(signature, nativeReplySignature)
                     && nativeReplyScroll != null
                     && nativeReplyScroll.getVisibility() == View.VISIBLE) {
                 return;
             }
             nativeReplySignature = signature;
-            renderNativeReplyOptions(array);
+
+            if (request != null && request.action == DeepSeekRequest.ACTION_TRANSLATE) {
+                if (TextUtils.isEmpty(translation)) return;
+                renderNativeTranslationResult(translation, analysis);
+            } else {
+                if (items.length() == 0) return;
+                renderNativeReplyOptions(items, translation, analysis);
+            }
         } catch (Exception e) {
-            DeepSeekHistoryLog.log("NATIVE_REPLY_PARSE_ERROR", e.getClass().getSimpleName());
+            DeepSeekHistoryLog.log("NATIVE_RESULT_PARSE_ERROR", e.getClass().getSimpleName());
         }
     }
 
-    private void renderNativeReplyOptions(JSONArray array) {
-        if (nativeReplyList == null || nativeReplyScroll == null || webView == null) return;
+    private void prepareNativeResultPage(String titleText) {
         nativeReplyList.removeAllViews();
-
         TextView title = new TextView(requireContext());
-        title.setText("聊天回复建议");
+        title.setText(titleText);
         title.setTextColor(Color.rgb(24, 31, 42));
-        title.setTextSize(20);
+        title.setTextSize(19);
         title.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        title.setPadding(dp(2), 0, 0, dp(4));
+        title.setPadding(dp(2), 0, 0, dp(7));
         title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
         nativeReplyList.addView(title, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    }
 
-        TextView subtitle = new TextView(requireContext());
-        subtitle.setText("选择一条直接发送，对方只会收到目标语言；回译仅在我方显示");
-        subtitle.setTextColor(Color.rgb(116, 124, 138));
-        subtitle.setTextSize(13);
-        subtitle.setPadding(dp(2), 0, 0, dp(10));
-        nativeReplyList.addView(subtitle, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    private void addNativeContextCard(String translation, String analysis) {
+        if (TextUtils.isEmpty(translation) && TextUtils.isEmpty(analysis)) return;
+        Context context = requireContext();
+        LinearLayout card = new LinearLayout(context);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(12), dp(10), dp(12), dp(10));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.rgb(239, 250, 246));
+        background.setCornerRadius(dp(12));
+        background.setStroke(dp(1), Color.rgb(190, 229, 214));
+        card.setBackground(background);
 
+        if (!TextUtils.isEmpty(translation)) {
+            TextView label = new TextView(context);
+            label.setText(request != null && request.action == DeepSeekRequest.ACTION_TRANSLATE
+                    ? "译文" : "对方消息译文");
+            label.setTextColor(Color.rgb(43, 113, 88));
+            label.setTextSize(12);
+            label.setTypeface(label.getTypeface(), android.graphics.Typeface.BOLD);
+            label.setPadding(0, 0, 0, dp(3));
+            card.addView(label, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            TextView value = new TextView(context);
+            value.setText(translation);
+            value.setTextColor(Color.rgb(28, 69, 55));
+            value.setTextSize(15);
+            value.setLineSpacing(dp(2), 1f);
+            value.setTextIsSelectable(true);
+            card.addView(value, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+
+        if (!TextUtils.isEmpty(analysis)) {
+            TextView insight = new TextView(context);
+            insight.setText("意图/情绪：" + analysis);
+            insight.setTextColor(Color.rgb(80, 99, 92));
+            insight.setTextSize(13);
+            insight.setLineSpacing(dp(1), 1f);
+            insight.setPadding(0, TextUtils.isEmpty(translation) ? 0 : dp(6), 0, 0);
+            card.addView(insight, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = dp(8);
+        nativeReplyList.addView(card, params);
+    }
+
+    private void renderNativeReplyOptions(JSONArray array, String translation, String analysis) {
+        if (nativeReplyList == null || nativeReplyScroll == null || webView == null) return;
+        String titleText = request != null && request.action == DeepSeekRequest.ACTION_POLISH
+                ? "润色建议" : "聊天回复建议";
+        prepareNativeResultPage(titleText);
+        if (request == null || request.action == DeepSeekRequest.ACTION_REPLY) {
+            addNativeContextCard(translation, analysis);
+        }
+
+        int maxCount = request != null && request.action == DeepSeekRequest.ACTION_REPLY ? 6 : 3;
         int rendered = 0;
-        for (int i = 0; i < array.length(); i++) {
+        for (int i = 0; i < array.length() && rendered < maxCount; i++) {
             JSONObject item = array.optJSONObject(i);
             if (item == null) continue;
-            String text = item.optString("text", "").trim();
+            String replyText = item.optString("text", "").trim();
             String local = item.optString("local", "").trim();
-            String label = item.optString("label", "").trim();
-            if (TextUtils.isEmpty(text)) continue;
+            if (TextUtils.isEmpty(replyText)) continue;
             rendered++;
-            addNativeReplyCard(rendered, label, text, local);
+            addNativeReplyCard(rendered, replyText, local);
         }
         if (rendered == 0) return;
 
         webView.setVisibility(View.GONE);
         nativeReplyScroll.setVisibility(View.VISIBLE);
         nativeReplyScroll.scrollTo(0, 0);
-        DeepSeekHistoryLog.log("NATIVE_REPLY_SHOWN", "count=" + rendered + " ui=v11");
+        DeepSeekHistoryLog.log("NATIVE_RESULT_SHOWN", "action="
+                + (request == null ? -1 : request.action)
+                + " count=" + rendered + " ui=v12");
     }
 
-    private void addNativeReplyCard(int index, String label, String text, String local) {
+    private void addNativeReplyCard(int index, String text, String local) {
         Context context = requireContext();
         LinearLayout card = new LinearLayout(context);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        card.setPadding(dp(12), dp(10), dp(12), dp(10));
         GradientDrawable cardBg = new GradientDrawable();
         cardBg.setColor(Color.rgb(247, 249, 255));
-        cardBg.setCornerRadius(dp(14));
+        cardBg.setCornerRadius(dp(12));
         cardBg.setStroke(dp(1), Color.rgb(215, 224, 249));
         card.setBackground(cardBg);
-
-        String safeLabel = TextUtils.isEmpty(label) ? "选项 " + index : label;
-        TextView labelView = new TextView(context);
-        labelView.setText(safeLabel);
-        labelView.setTextColor(Color.rgb(36, 45, 62));
-        labelView.setTextSize(16);
-        labelView.setTypeface(labelView.getTypeface(), android.graphics.Typeface.BOLD);
-        labelView.setPadding(0, 0, 0, dp(8));
-        card.addView(labelView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView replyView = new TextView(context);
         replyView.setText(text);
         replyView.setTextColor(Color.rgb(27, 34, 47));
-        replyView.setTextSize(17);
-        replyView.setLineSpacing(dp(3), 1f);
+        replyView.setTextSize(16);
+        replyView.setLineSpacing(dp(2), 1f);
         replyView.setTextIsSelectable(true);
         card.addView(replyView, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -1771,38 +1997,77 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             TextView localView = new TextView(context);
             localView.setText("回译：" + local);
             localView.setTextColor(Color.rgb(40, 91, 74));
-            localView.setTextSize(14);
-            localView.setLineSpacing(dp(2), 1f);
-            localView.setPadding(0, dp(10), 0, 0);
+            localView.setTextSize(13);
+            localView.setLineSpacing(dp(1), 1f);
+            localView.setPadding(0, dp(6), 0, 0);
             card.addView(localView, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
 
-        TextView send = new TextView(context);
-        send.setText("发送");
-        send.setTextColor(Color.WHITE);
-        send.setTextSize(15);
-        send.setGravity(Gravity.CENTER);
-        send.setTypeface(send.getTypeface(), android.graphics.Typeface.BOLD);
-        GradientDrawable sendBg = new GradientDrawable();
-        sendBg.setColor(Color.rgb(11, 143, 104));
-        sendBg.setCornerRadius(dp(22));
-        send.setBackground(sendBg);
+        TextView send = createNativePrimaryButton(context, "发送");
         send.setOnClickListener(v -> {
-            DeepSeekHistoryLog.log("NATIVE_REPLY_SEND", "ui=v11 index=" + index
+            DeepSeekHistoryLog.log("NATIVE_REPLY_SEND", "ui=v12 index=" + index
                     + " text_chars=" + text.length()
                     + " local_chars=" + local.length());
             deliverReply(text, local, true);
         });
         LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-        sendParams.topMargin = dp(12);
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(40));
+        sendParams.topMargin = dp(8);
         card.addView(send, sendParams);
 
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        cardParams.bottomMargin = dp(12);
+        cardParams.bottomMargin = dp(8);
         nativeReplyList.addView(card, cardParams);
+    }
+
+    private void renderNativeTranslationResult(String translation, String analysis) {
+        if (nativeReplyList == null || nativeReplyScroll == null || webView == null) return;
+        prepareNativeResultPage("消息翻译");
+        addNativeContextCard(translation, analysis);
+
+        TextView use = createNativePrimaryButton(requireContext(), "显示译文");
+        use.setOnClickListener(v -> deliverTranslation(translation));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(40));
+        params.bottomMargin = dp(8);
+        nativeReplyList.addView(use, params);
+
+        webView.setVisibility(View.GONE);
+        nativeReplyScroll.setVisibility(View.VISIBLE);
+        nativeReplyScroll.scrollTo(0, 0);
+        DeepSeekHistoryLog.log("NATIVE_RESULT_SHOWN", "action=2 count=1 ui=v12");
+    }
+
+    private TextView createNativePrimaryButton(Context context, String label) {
+        TextView button = new TextView(context);
+        button.setText(label);
+        button.setTextColor(Color.WHITE);
+        button.setTextSize(15);
+        button.setGravity(Gravity.CENTER);
+        button.setTypeface(button.getTypeface(), android.graphics.Typeface.BOLD);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.rgb(11, 143, 104));
+        background.setCornerRadius(dp(20));
+        button.setBackground(background);
+        return button;
+    }
+
+    private void deliverTranslation(String translation) {
+        if (TextUtils.isEmpty(translation)) return;
+        pendingTranslationText = translation.trim();
+        pendingTranslationDelivery = true;
+        dismissAssistant();
+    }
+
+    private String limitCodePoints(String value, int maxCodePoints) {
+        if (TextUtils.isEmpty(value) || maxCodePoints <= 0) return "";
+        String trimmed = value.trim();
+        int count = trimmed.codePointCount(0, trimmed.length());
+        if (count <= maxCodePoints) return trimmed;
+        int end = trimmed.offsetByCodePoints(0, maxCodePoints);
+        return trimmed.substring(0, end).trim();
     }
 
     private void deliverReply(String text, String localDisplayText, boolean sendNow) {
@@ -1948,7 +2213,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         out.preferredStyle = args.getString(ARG_PREFERRED_STYLE, "natural");
         out.flirtLevel = args.getInt(ARG_FLIRT_LEVEL, 0);
         out.contextEnabled = args.getBoolean(ARG_CONTEXT_ENABLED, true);
-        out.contextLimit = args.getInt(ARG_CONTEXT_LIMIT, 100);
+        out.contextLimit = 0;
         out.targetMessageId = args.getString(ARG_TARGET_MESSAGE_ID, "");
         out.targetMessageText = args.getString(ARG_TARGET_MESSAGE_TEXT, "");
         out.contextSnapshot = args.getString(ARG_CONTEXT_SNAPSHOT, "");
