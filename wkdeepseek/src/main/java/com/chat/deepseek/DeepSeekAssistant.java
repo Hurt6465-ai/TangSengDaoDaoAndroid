@@ -2,6 +2,7 @@ package com.chat.deepseek;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.text.InputFilter;
 import android.text.InputType;
@@ -17,9 +18,18 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.xinbida.wukongim.entity.WKMsg;
+
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentActivity;
+
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 
 public final class DeepSeekAssistant {
     public interface ReplyCallback {
@@ -42,12 +52,18 @@ public final class DeepSeekAssistant {
     private static final String PREF = "wk_deepseek_settings";
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_CONNECTED_ONCE = "connected_once";
-    private static final String KEY_COPIED_REPLY_CHANNEL_ID = "copied_reply_channel_id";
-    private static final String KEY_COPIED_REPLY_CHANNEL_TYPE = "copied_reply_channel_type";
-    private static final String KEY_COPIED_REPLY_TEXT = "copied_reply_text";
-    private static final String KEY_COPIED_REPLY_BACK_TRANSLATION = "copied_reply_back_translation";
-    private static final String KEY_COPIED_REPLY_AT = "copied_reply_at";
-    private static final long COPIED_REPLY_TTL_MS = 30L * 60L * 1000L;
+    private static final String LOCAL_REPLY_PREF = "wk_deepseek_local_reply_meta";
+    private static final String KEY_PENDING_CHANNEL_ID = "pending_channel_id";
+    private static final String KEY_PENDING_CHANNEL_TYPE = "pending_channel_type";
+    private static final String KEY_PENDING_TEXT = "pending_text";
+    private static final String KEY_PENDING_BACK_TRANSLATION = "pending_back_translation";
+    private static final String KEY_PENDING_AT = "pending_at";
+    private static final String KEY_LOCAL_REPLY_RECORDS = "reply_records";
+    public static final String LOCAL_BACK_TRANSLATION_KEY = "deepseek_back_translation";
+    private static final long PENDING_REPLY_TTL_MS = 5L * 60L * 1000L;
+    private static final long LOCAL_REPLY_RETENTION_MS = 90L * 24L * 60L * 60L * 1000L;
+    private static final int MAX_LOCAL_REPLY_RECORDS = 500;
+    private static final Object LOCAL_REPLY_LOCK = new Object();
     static final String TAG = "DeepSeekAssistantDialog";
 
     private static final String[] RELATIONSHIP_LABELS = {
@@ -72,63 +88,255 @@ public final class DeepSeekAssistant {
     }
 
     /**
-     * Remembers the back-translation for a reply copied from the embedded DeepSeek page. Only the
-     * peer-facing reply is placed on the clipboard; this metadata stays inside Talkami.
+     * Stores one pending AI reply immediately before the normal chat send pipeline runs. Only the
+     * peer-facing text is serialized into WKTextContent; the back-translation stays in Talkami.
      */
-    public static void rememberCopiedReply(Context context, DeepSeekRequest request,
-                                           String text, String backTranslation) {
-        if (context == null || request == null || TextUtils.isEmpty(text)) return;
-        context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
-                .putString(KEY_COPIED_REPLY_CHANNEL_ID, request.channelId == null ? "" : request.channelId)
-                .putInt(KEY_COPIED_REPLY_CHANNEL_TYPE, request.channelType)
-                .putString(KEY_COPIED_REPLY_TEXT, normalizeCopiedReplyText(text))
-                .putString(KEY_COPIED_REPLY_BACK_TRANSLATION,
-                        backTranslation == null ? "" : backTranslation.trim())
-                .putLong(KEY_COPIED_REPLY_AT, System.currentTimeMillis())
-                .commit();
+    public static void rememberReplyForNextSend(Context context, String channelId, byte channelType,
+                                                String text, String backTranslation) {
+        if (context == null || TextUtils.isEmpty(text) || TextUtils.isEmpty(backTranslation)) return;
+        String remote = normalizeReplyText(text);
+        String local = backTranslation.trim();
+        if (TextUtils.isEmpty(remote) || TextUtils.equals(remote, local)) return;
+        synchronized (LOCAL_REPLY_LOCK) {
+            localReplyPreferences(context).edit()
+                    .putString(KEY_PENDING_CHANNEL_ID, channelId == null ? "" : channelId)
+                    .putInt(KEY_PENDING_CHANNEL_TYPE, channelType)
+                    .putString(KEY_PENDING_TEXT, remote)
+                    .putString(KEY_PENDING_BACK_TRANSLATION, local)
+                    .putLong(KEY_PENDING_AT, System.currentTimeMillis())
+                    .commit();
+            DeepSeekHistoryLog.log("LOCAL_REPLY_PENDING_SET",
+                    "channel=" + shortLogId(channelId) + "/" + channelType
+                            + " has_back=true");
+        }
     }
 
     /**
-     * Returns null when the current composer text is not the copied AI reply. An empty string is a
-     * valid match with no back-translation and still means the text must bypass send translation.
+     * Binds the pending local back-translation to the actual outgoing message's clientMsgNO. This
+     * is called before the first sender bubble is built, so later send acknowledgements and list
+     * rebinds can recover the local-only text without changing the remote payload.
      */
-    @Nullable
-    public static String consumeCopiedReplyBackTranslation(Context context, String channelId,
-                                                            byte channelType, String text) {
-        if (context == null || TextUtils.isEmpty(text)) return null;
-        android.content.SharedPreferences preferences =
-                context.getSharedPreferences(PREF, Context.MODE_PRIVATE);
-        long copiedAt = preferences.getLong(KEY_COPIED_REPLY_AT, 0L);
-        if (copiedAt <= 0L || System.currentTimeMillis() - copiedAt > COPIED_REPLY_TTL_MS) {
-            clearCopiedReply(preferences);
-            return null;
+    public static void bindPendingReplyToMessage(Context context, WKMsg msg) {
+        if (context == null || msg == null || TextUtils.isEmpty(msg.clientMsgNO)) return;
+        synchronized (LOCAL_REPLY_LOCK) {
+            SharedPreferences preferences = localReplyPreferences(context);
+            long now = System.currentTimeMillis();
+            long pendingAt = preferences.getLong(KEY_PENDING_AT, 0L);
+            if (pendingAt <= 0L || now - pendingAt > PENDING_REPLY_TTL_MS) {
+                clearPendingReply(preferences);
+                return;
+            }
+            String pendingChannelId = preferences.getString(KEY_PENDING_CHANNEL_ID, "");
+            int pendingChannelType = preferences.getInt(KEY_PENDING_CHANNEL_TYPE, -1);
+            String pendingText = preferences.getString(KEY_PENDING_TEXT, "");
+            String pendingBackTranslation = preferences.getString(KEY_PENDING_BACK_TRANSLATION, "");
+            String messageText = readMessageText(msg);
+            boolean matches = TextUtils.equals(pendingChannelId, msg.channelID == null ? "" : msg.channelID)
+                    && pendingChannelType == msg.channelType
+                    && TextUtils.equals(pendingText, normalizeReplyText(messageText))
+                    && !TextUtils.isEmpty(pendingBackTranslation);
+            if (!matches) return;
+
+            try {
+                JSONObject records = readRecords(preferences);
+                cleanupRecords(records, now);
+                JSONObject record = new JSONObject();
+                record.put("client_msg_no", msg.clientMsgNO);
+                record.put("message_id", msg.messageID == null ? "" : msg.messageID);
+                record.put("channel_id", msg.channelID == null ? "" : msg.channelID);
+                record.put("channel_type", msg.channelType);
+                record.put("text", pendingText);
+                record.put("back_translation", pendingBackTranslation);
+                record.put("created_at", now);
+                records.put(msg.clientMsgNO, record);
+                trimRecords(records);
+                preferences.edit().putString(KEY_LOCAL_REPLY_RECORDS, records.toString()).commit();
+
+                if (msg.localExtraMap == null) msg.localExtraMap = new HashMap<>();
+                msg.localExtraMap.put(LOCAL_BACK_TRANSLATION_KEY, pendingBackTranslation);
+                DeepSeekHistoryLog.log("LOCAL_REPLY_BOUND",
+                        "client=" + shortLogId(msg.clientMsgNO)
+                                + " message=" + shortLogId(msg.messageID)
+                                + " channel=" + shortLogId(msg.channelID) + "/" + msg.channelType);
+            } catch (Exception ignored) {
+                // The chat message still sends normally; local display metadata is best effort.
+            } finally {
+                clearPendingReply(preferences);
+            }
         }
-        String storedChannelId = preferences.getString(KEY_COPIED_REPLY_CHANNEL_ID, "");
-        int storedChannelType = preferences.getInt(KEY_COPIED_REPLY_CHANNEL_TYPE, -1);
-        String storedText = preferences.getString(KEY_COPIED_REPLY_TEXT, "");
-        boolean matches = TextUtils.equals(storedChannelId, channelId == null ? "" : channelId)
-                && storedChannelType == channelType
-                && TextUtils.equals(storedText, normalizeCopiedReplyText(text));
-        String backTranslation = matches
-                ? preferences.getString(KEY_COPIED_REPLY_BACK_TRANSLATION, "") : null;
-        // A different message, an edited reply, or a different contact invalidates stale metadata.
-        clearCopiedReply(preferences);
-        return backTranslation;
     }
 
-    private static String normalizeCopiedReplyText(String value) {
+    /** Returns the sender-only back-translation for an outgoing message, or an empty string. */
+    @NonNull
+    public static String getLocalBackTranslation(Context context, WKMsg msg) {
+        if (context == null || msg == null) return "";
+        try {
+            if (msg.localExtraMap != null) {
+                Object value = msg.localExtraMap.get(LOCAL_BACK_TRANSLATION_KEY);
+                if (value != null && !TextUtils.isEmpty(value.toString())) {
+                    return value.toString().trim();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        // Some SDK paths render the local bubble before ChatActivity receives the insertion event.
+        // Binding here is safe because this method is only called for sender-side text bubbles.
+        bindPendingReplyToMessage(context, msg);
+        try {
+            if (msg.localExtraMap != null) {
+                Object value = msg.localExtraMap.get(LOCAL_BACK_TRANSLATION_KEY);
+                if (value != null && !TextUtils.isEmpty(value.toString())) {
+                    return value.toString().trim();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        synchronized (LOCAL_REPLY_LOCK) {
+            SharedPreferences preferences = localReplyPreferences(context);
+            try {
+                JSONObject records = readRecords(preferences);
+                long now = System.currentTimeMillis();
+                cleanupRecords(records, now);
+                JSONObject record = findReplyRecord(records, msg);
+                if (record == null) return "";
+
+                String storedChannel = record.optString("channel_id", "");
+                if (!TextUtils.equals(storedChannel, msg.channelID == null ? "" : msg.channelID)) {
+                    return "";
+                }
+                if (record.optInt("channel_type", -1) != msg.channelType) return "";
+
+                String storedText = record.optString("text", "");
+                String currentText = normalizeReplyText(readMessageText(msg));
+                if (!TextUtils.isEmpty(currentText) && !TextUtils.equals(storedText, currentText)) {
+                    return "";
+                }
+
+                String value = record.optString("back_translation", "").trim();
+                if (!TextUtils.isEmpty(value)) {
+                    if (msg.localExtraMap == null) msg.localExtraMap = new HashMap<>();
+                    msg.localExtraMap.put(LOCAL_BACK_TRANSLATION_KEY, value);
+                    DeepSeekHistoryLog.log("LOCAL_REPLY_RESTORED",
+                            "client=" + shortLogId(msg.clientMsgNO)
+                                    + " message=" + shortLogId(msg.messageID));
+                }
+                preferences.edit().putString(KEY_LOCAL_REPLY_RECORDS, records.toString()).apply();
+                return value;
+            } catch (Exception ignored) {
+                return "";
+            }
+        }
+    }
+
+    private static JSONObject findReplyRecord(JSONObject records, WKMsg msg) {
+        if (records == null || msg == null) return null;
+        if (!TextUtils.isEmpty(msg.clientMsgNO)) {
+            JSONObject direct = records.optJSONObject(msg.clientMsgNO);
+            if (direct != null) return direct;
+        }
+        if (TextUtils.isEmpty(msg.messageID)) return null;
+        Iterator<String> keys = records.keys();
+        while (keys.hasNext()) {
+            JSONObject item = records.optJSONObject(keys.next());
+            if (item == null) continue;
+            if (TextUtils.equals(item.optString("message_id", ""), msg.messageID)) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    private static SharedPreferences localReplyPreferences(Context context) {
+        return context.getApplicationContext()
+                .getSharedPreferences(LOCAL_REPLY_PREF, Context.MODE_PRIVATE);
+    }
+
+    private static JSONObject readRecords(SharedPreferences preferences) {
+        String raw = preferences.getString(KEY_LOCAL_REPLY_RECORDS, "{}");
+        try {
+            return new JSONObject(TextUtils.isEmpty(raw) ? "{}" : raw);
+        } catch (Exception ignored) {
+            return new JSONObject();
+        }
+    }
+
+    private static String readMessageText(WKMsg msg) {
+        if (msg == null) return "";
+        try {
+            if (!TextUtils.isEmpty(msg.content)) {
+                JSONObject payload = new JSONObject(msg.content);
+                String content = payload.optString("content", "");
+                if (!TextUtils.isEmpty(content)) return content;
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            if (msg.baseContentMsgModel != null) {
+                String display = msg.baseContentMsgModel.getDisplayContent();
+                if (!TextUtils.isEmpty(display)) return display;
+            }
+        } catch (Exception ignored) {
+        }
+        return "";
+    }
+
+    private static String normalizeReplyText(String value) {
         if (value == null) return "";
         return value.replace("\r\n", "\n").replace('\r', '\n').trim();
     }
 
-    private static void clearCopiedReply(android.content.SharedPreferences preferences) {
+    private static void clearPendingReply(SharedPreferences preferences) {
         preferences.edit()
-                .remove(KEY_COPIED_REPLY_CHANNEL_ID)
-                .remove(KEY_COPIED_REPLY_CHANNEL_TYPE)
-                .remove(KEY_COPIED_REPLY_TEXT)
-                .remove(KEY_COPIED_REPLY_BACK_TRANSLATION)
-                .remove(KEY_COPIED_REPLY_AT)
+                .remove(KEY_PENDING_CHANNEL_ID)
+                .remove(KEY_PENDING_CHANNEL_TYPE)
+                .remove(KEY_PENDING_TEXT)
+                .remove(KEY_PENDING_BACK_TRANSLATION)
+                .remove(KEY_PENDING_AT)
                 .apply();
+    }
+
+    private static void cleanupRecords(JSONObject records, long now) {
+        List<String> expired = new ArrayList<>();
+        Iterator<String> keys = records.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            JSONObject item = records.optJSONObject(key);
+            long createdAt = item == null ? 0L : item.optLong("created_at", 0L);
+            if (createdAt <= 0L || now - createdAt > LOCAL_REPLY_RETENTION_MS) expired.add(key);
+        }
+        for (String key : expired) records.remove(key);
+    }
+
+    private static void trimRecords(JSONObject records) {
+        if (records.length() <= MAX_LOCAL_REPLY_RECORDS) return;
+        List<JSONObject> entries = new ArrayList<>();
+        Iterator<String> keys = records.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            JSONObject item = records.optJSONObject(key);
+            if (item == null) continue;
+            try {
+                JSONObject entry = new JSONObject();
+                entry.put("key", key);
+                entry.put("created_at", item.optLong("created_at", 0L));
+                entries.add(entry);
+            } catch (Exception ignored) {
+            }
+        }
+        entries.sort(Comparator.comparingLong(o -> o.optLong("created_at", 0L)));
+        int removeCount = Math.max(0, entries.size() - MAX_LOCAL_REPLY_RECORDS);
+        for (int i = 0; i < removeCount; i++) {
+            records.remove(entries.get(i).optString("key", ""));
+        }
+    }
+
+    private static String shortLogId(String value) {
+        if (TextUtils.isEmpty(value)) return "empty";
+        String clean = value.trim();
+        if (clean.length() <= 10) return clean;
+        return clean.substring(0, 4) + "..." + clean.substring(clean.length() - 4);
     }
 
     static void markConnected(Context context) {
