@@ -232,29 +232,6 @@ class ChatPanelManager(
         }
     }
 
-    /**
-     * The serialized payload inherited from WKTextContent contains only remoteText, so the peer
-     * receives only the natural reply. The sender sees that reply plus a local back-translation.
-     */
-    private class DeepSeekReplyTextContent(
-        remoteText: String,
-        backTranslation: String
-    ) : WKTextContent(remoteText) {
-        private val localDisplayText: String = run {
-            val remote = remoteText.trim()
-            val back = backTranslation.trim()
-            if (back.isEmpty() || back == remote) remote else "$remote\n回译：$back"
-        }
-
-        override fun getDisplayContent(): String {
-            return localDisplayText
-        }
-
-        override fun getSearchableWord(): String {
-            return localDisplayText
-        }
-    }
-
     private data class PendingBeforeSendTranslate(
         val originalText: String,
         val mentionUids: ArrayList<String>?,
@@ -1554,30 +1531,15 @@ ${content}"""
         } else {
             ""
         }
-        val copiedDeepSeekBackTranslation: String? = if (!isDeepSeekReply) {
-            DeepSeekAssistant.consumeCopiedReplyBackTranslation(
-                iConversationContext.chatActivity,
-                iConversationContext.chatChannelInfo.channelID,
-                iConversationContext.chatChannelInfo.channelType,
-                content
-            )
-        } else {
-            null
-        }
         clearPendingDeepSeekReply()
-        if (isDeepSeekReply || copiedDeepSeekBackTranslation != null) {
-            // AI replies are already written in the peer-facing language. Only that text is sent
-            // remotely; the back-translation is attached to the sender's local display.
-            val localBackTranslation = if (isDeepSeekReply) {
-                deepSeekBackTranslation
-            } else {
-                copiedDeepSeekBackTranslation.orEmpty()
-            }
+        if (isDeepSeekReply) {
+            // AI already produced the peer-facing language. The remote payload contains only this
+            // text; the back-translation is stored locally and bound to the outgoing clientMsgNO.
             sendTextNow(
                 remoteContent = content,
                 localDisplayContent = null,
                 reply = buildReplySnapshot(iConversationContext.replyMsg),
-                deepSeekBackTranslation = localBackTranslation
+                deepSeekBackTranslation = deepSeekBackTranslation
             )
             return
         }
@@ -1713,15 +1675,24 @@ ${content}"""
         reply: WKReply? = null,
         deepSeekBackTranslation: String? = null
     ) {
-        val textMsgModel = when {
-            !TextUtils.isEmpty(deepSeekBackTranslation)
-                    && deepSeekBackTranslation != remoteContent -> {
-                DeepSeekReplyTextContent(remoteContent, deepSeekBackTranslation!!)
-            }
-            !TextUtils.isEmpty(localDisplayContent) && localDisplayContent != remoteContent -> {
-                LocalOriginalTextContent(remoteContent, localDisplayContent!!)
-            }
-            else -> WKTextContent(remoteContent)
+        if (!TextUtils.isEmpty(deepSeekBackTranslation)
+            && deepSeekBackTranslation != remoteContent
+        ) {
+            DeepSeekAssistant.rememberReplyForNextSend(
+                iConversationContext.chatActivity,
+                iConversationContext.chatChannelInfo.channelID,
+                iConversationContext.chatChannelInfo.channelType,
+                remoteContent,
+                deepSeekBackTranslation!!
+            )
+        }
+
+        val textMsgModel = if (!TextUtils.isEmpty(localDisplayContent)
+            && localDisplayContent != remoteContent
+        ) {
+            LocalOriginalTextContent(remoteContent, localDisplayContent!!)
+        } else {
+            WKTextContent(remoteContent)
         }
 
         val list = mentionUids ?: editText.allUIDs

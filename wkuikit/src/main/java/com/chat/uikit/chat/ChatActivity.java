@@ -3783,6 +3783,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private synchronized void sendMsgInserted(WKMsg msg) {
         if (handleRtcSignalIfNeeded(msg) || shouldHideFromChatList(msg)) return;
         if (msg.channelType == channelType && TextUtils.equals(msg.channelID, channelId)) {
+            DeepSeekAssistant.bindPendingReplyToMessage(this, msg);
             if (msg.orderSeq > maxMsgOrderSeq) {
                 maxMsgOrderSeq = msg.orderSeq;
             }
