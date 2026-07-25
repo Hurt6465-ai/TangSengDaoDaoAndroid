@@ -1470,6 +1470,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "';\n" +
                 "  function go(mode,text,local){if(!text)return;var u='tsdd-deepseek://result?mode='+mode+'&text='+encodeURIComponent(text);if(local)u+='&local='+encodeURIComponent(local);location.href=u;}\n" +
                 "  function button(label,mode,text,local,tone){var b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.tsddAction='1';var bg=tone==='primary'?'#315fe9':(tone==='success'?'#0b8f68':'#edf3ff'),fg=tone==='primary'||tone==='success'?'#fff':'#295eea',border=tone==='primary'||tone==='success'?'0':'1px solid #cfdbff';b.style.cssText='display:inline-flex!important;visibility:visible!important;align-items:center;justify-content:center;border:'+border+';border-radius:17px;padding:8px 13px;background:'+bg+';color:'+fg+';font-size:13px;font-weight:650;margin-left:8px;min-height:34px;position:relative;z-index:8';b.onclick=function(e){e.preventDefault();e.stopPropagation();go(mode,text,local||'');};return b;}\n" +
+                "  function bindNativeCopy(pre,text,local){if(!pre)return;var first=pre.parentElement||pre,scopes=[first];if(first.parentElement)scopes.push(first.parentElement);scopes.forEach(function(scope){scope.querySelectorAll('button,a,[role=\"button\"],[role=\"menuitem\"]').forEach(function(el){if(el.dataset.tsddAction==='1')return;var label=compact((el.innerText||'')+' '+(el.getAttribute('aria-label')||'')+' '+(el.getAttribute('title')||''));var isCopy=/(^|[^a-z])(复制|copy|copycode)([^a-z]|$)/.test(label)||label==='复制代码';var isDownload=/(下载|download|savecode)/.test(label);if(!isCopy||isDownload)return;el.__tsddCopyText=text;el.__tsddCopyLocal=local||'';if(el.dataset.tsddCopyBound==='1')return;el.dataset.tsddCopyBound='1';el.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();if(e.stopImmediatePropagation)e.stopImmediatePropagation();go('copy_reply',this.__tsddCopyText||'',this.__tsddCopyLocal||'');},true);});});}\n" +
                 "  function ownerFor(el,prefix){if(!el.dataset.tsddPlainOwner){window.__tsddPlainSeq=(window.__tsddPlainSeq||0)+1;el.dataset.tsddPlainOwner=prefix+window.__tsddPlainSeq;}return el.dataset.tsddPlainOwner;}\n" +
                 "  function addBar(anchor,owner,buttons,signature){if(!anchor||!anchor.parentNode)return false;var old=document.querySelector('[data-tsdd-reply-bar][data-tsdd-owner=\"'+owner+'\"]');if(old&&old.dataset.tsddSignature===signature)return false;if(old)old.remove();var box=document.createElement('div');box.dataset.tsddReplyBar='1';box.dataset.tsddOwner=owner;box.dataset.tsddSignature=signature;box.style.cssText='display:flex!important;visibility:visible!important;justify-content:flex-end;align-items:center;flex-wrap:wrap;padding:7px 0 11px;position:relative;z-index:7';buttons.forEach(function(b){box.appendChild(b);});anchor.parentNode.insertBefore(box,anchor.nextSibling);return true;}\n" +
                 "  function nearLabel(pre){var n=pre?pre.previousElementSibling:null,steps=0;while(n&&steps++<5){if(n.tagName==='PRE')break;var t=norm(n.innerText||n.textContent);if(t&&t.length<100)return t;n=n.previousElementSibling;}return '';}\n" +
@@ -1503,7 +1504,8 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "      if(!translated){\n" +
                 "        for(var i=0;i<blocks.length;i++){var c=blocks[i],p=c.closest('pre');if(p===replyPre||!after(replyPre,p))continue;if(nextPre&&after(nextPre,p))break;if(codeKind(c,p)==='translation'){translated=codeText(c);var keyT=ownerFor(p,'bt'),cardT=convertTranslationCode(p,translated,keyT);cardT.dataset.tsddBackTranslation='1';cardT.removeAttribute('data-tsdd-translation-card');cardT.textContent='回译：'+translated;break;}}\n" +
                 "      }\n" +
-                "      var owner=ownerFor(replyPre,'r'),anchor=back?back.row:replyPre,buttons=[button('填入聊天','use',original,translated,'primary'),button('直接发送','send',original,translated,'success')];\n" +
+                "      bindNativeCopy(replyPre,original,translated);\n" +
+                "      var owner=ownerFor(replyPre,'r'),anchor=back?back.row:replyPre,buttons=[button('填入聊天','use',original,translated,'primary'),button('直接发送','send',original,translated,'success'),button('复制','copy_reply',original,translated,'')];\n" +
                 "      if(addBar(anchor,owner,buttons,'reply:'+original+'|'+translated)){added=true;last=anchor;}\n" +
                 "    });\n" +
                 "    return {added:added,last:last};\n" +
@@ -1522,7 +1524,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "      var key2=ownerFor(elements[j],'pr'),wrap=document.querySelector('[data-tsdd-synth-key=\"'+key2+'\"]');\n" +
                 "      if(!wrap){wrap=document.createElement('div');wrap.dataset.tsddSynthetic='1';wrap.dataset.tsddSynthKey=key2;var badge=document.createElement('div');badge.setAttribute('data-tsdd-code-label','reply');badge.textContent='回复建议 · 可直接发送';var pre=document.createElement('pre');pre.dataset.tsddKind='reply';var code=document.createElement('code');code.className='language-reply';code.textContent=original;pre.appendChild(code);wrap.appendChild(badge);wrap.appendChild(pre);elements[j].parentNode.insertBefore(wrap,elements[j].nextSibling);}else{var codeOld=wrap.querySelector('code');if(codeOld)codeOld.textContent=original;}\n" +
                 "      elements[j].style.setProperty('display','none','important');if(back)styleBackTranslation(back);\n" +
-                "      var local=back?back.text:'',anchor=back?back.row:wrap,buttons2=[button('填入聊天','use',original,local,'primary'),button('直接发送','send',original,local,'success')];\n" +
+                "      var local=back?back.text:'',syntheticPre=wrap.querySelector('pre');bindNativeCopy(syntheticPre,original,local);var anchor=back?back.row:wrap,buttons2=[button('填入聊天','use',original,local,'primary'),button('直接发送','send',original,local,'success'),button('复制','copy_reply',original,local,'')];\n" +
                 "      if(addBar(anchor,key2,buttons2,'plain-reply:'+original+'|'+local)){added=true;last=anchor;}\n" +
                 "    }\n" +
                 "    return {added:added,last:last};\n" +
@@ -1548,6 +1550,13 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if ("copy".equals(mode)) {
             copyText(cleanText);
             Toast.makeText(requireContext(), "已复制", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if ("copy_reply".equals(mode)) {
+            copyText(cleanText);
+            DeepSeekAssistant.rememberCopiedReply(
+                    requireContext(), request, cleanText, cleanLocalDisplayText);
+            Toast.makeText(requireContext(), "已复制，发送后仅你可见回译", Toast.LENGTH_SHORT).show();
             return;
         }
         if ("profile".equals(mode)) {

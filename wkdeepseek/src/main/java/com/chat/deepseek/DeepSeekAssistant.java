@@ -18,6 +18,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentActivity;
 
 public final class DeepSeekAssistant {
@@ -41,6 +42,12 @@ public final class DeepSeekAssistant {
     private static final String PREF = "wk_deepseek_settings";
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_CONNECTED_ONCE = "connected_once";
+    private static final String KEY_COPIED_REPLY_CHANNEL_ID = "copied_reply_channel_id";
+    private static final String KEY_COPIED_REPLY_CHANNEL_TYPE = "copied_reply_channel_type";
+    private static final String KEY_COPIED_REPLY_TEXT = "copied_reply_text";
+    private static final String KEY_COPIED_REPLY_BACK_TRANSLATION = "copied_reply_back_translation";
+    private static final String KEY_COPIED_REPLY_AT = "copied_reply_at";
+    private static final long COPIED_REPLY_TTL_MS = 30L * 60L * 1000L;
     static final String TAG = "DeepSeekAssistantDialog";
 
     private static final String[] RELATIONSHIP_LABELS = {
@@ -62,6 +69,66 @@ public final class DeepSeekAssistant {
 
     public static void setEnabled(Context context, boolean enabled) {
         context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, enabled).apply();
+    }
+
+    /**
+     * Remembers the back-translation for a reply copied from the embedded DeepSeek page. Only the
+     * peer-facing reply is placed on the clipboard; this metadata stays inside Talkami.
+     */
+    public static void rememberCopiedReply(Context context, DeepSeekRequest request,
+                                           String text, String backTranslation) {
+        if (context == null || request == null || TextUtils.isEmpty(text)) return;
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE).edit()
+                .putString(KEY_COPIED_REPLY_CHANNEL_ID, request.channelId == null ? "" : request.channelId)
+                .putInt(KEY_COPIED_REPLY_CHANNEL_TYPE, request.channelType)
+                .putString(KEY_COPIED_REPLY_TEXT, normalizeCopiedReplyText(text))
+                .putString(KEY_COPIED_REPLY_BACK_TRANSLATION,
+                        backTranslation == null ? "" : backTranslation.trim())
+                .putLong(KEY_COPIED_REPLY_AT, System.currentTimeMillis())
+                .commit();
+    }
+
+    /**
+     * Returns null when the current composer text is not the copied AI reply. An empty string is a
+     * valid match with no back-translation and still means the text must bypass send translation.
+     */
+    @Nullable
+    public static String consumeCopiedReplyBackTranslation(Context context, String channelId,
+                                                            byte channelType, String text) {
+        if (context == null || TextUtils.isEmpty(text)) return null;
+        android.content.SharedPreferences preferences =
+                context.getSharedPreferences(PREF, Context.MODE_PRIVATE);
+        long copiedAt = preferences.getLong(KEY_COPIED_REPLY_AT, 0L);
+        if (copiedAt <= 0L || System.currentTimeMillis() - copiedAt > COPIED_REPLY_TTL_MS) {
+            clearCopiedReply(preferences);
+            return null;
+        }
+        String storedChannelId = preferences.getString(KEY_COPIED_REPLY_CHANNEL_ID, "");
+        int storedChannelType = preferences.getInt(KEY_COPIED_REPLY_CHANNEL_TYPE, -1);
+        String storedText = preferences.getString(KEY_COPIED_REPLY_TEXT, "");
+        boolean matches = TextUtils.equals(storedChannelId, channelId == null ? "" : channelId)
+                && storedChannelType == channelType
+                && TextUtils.equals(storedText, normalizeCopiedReplyText(text));
+        String backTranslation = matches
+                ? preferences.getString(KEY_COPIED_REPLY_BACK_TRANSLATION, "") : null;
+        // A different message, an edited reply, or a different contact invalidates stale metadata.
+        clearCopiedReply(preferences);
+        return backTranslation;
+    }
+
+    private static String normalizeCopiedReplyText(String value) {
+        if (value == null) return "";
+        return value.replace("\r\n", "\n").replace('\r', '\n').trim();
+    }
+
+    private static void clearCopiedReply(android.content.SharedPreferences preferences) {
+        preferences.edit()
+                .remove(KEY_COPIED_REPLY_CHANNEL_ID)
+                .remove(KEY_COPIED_REPLY_CHANNEL_TYPE)
+                .remove(KEY_COPIED_REPLY_TEXT)
+                .remove(KEY_COPIED_REPLY_BACK_TRANSLATION)
+                .remove(KEY_COPIED_REPLY_AT)
+                .apply();
     }
 
     static void markConnected(Context context) {
