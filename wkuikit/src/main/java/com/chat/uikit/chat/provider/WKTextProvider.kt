@@ -432,24 +432,18 @@ open class WKTextProvider : WKChatBaseProvider() {
                 .replace("```", "` ` `")
                 .trim()
             if (content.isEmpty() || isRtcSignalText(content)) continue
-            if (content.length > 1200) content = content.substring(0, 1200) + "…"
-
             val mine = TextUtils.equals(selfUid, msg.fromUID)
             lines.add((if (mine) "我：" else "对方：") + content)
         }
 
         val snapshot = StringBuilder()
-        var kept = 0
-        for (i in lines.size - 1 downTo 0) {
-            if (kept >= 50) break
-            val line = lines[i]
-            val nextLength = snapshot.length + line.length + if (snapshot.isEmpty()) 0 else 1
-            if (nextLength > 10000 && snapshot.isNotEmpty()) break
-            if (snapshot.isEmpty()) snapshot.insert(0, line) else snapshot.insert(0, line + "\n")
-            kept++
+        for (line in lines) {
+            if (snapshot.isNotEmpty()) snapshot.append('\n')
+            snapshot.append(line)
         }
         request.contextSnapshot = snapshot.toString()
-        request.contextSnapshotCount = kept
+        request.contextSnapshotCount = lines.size
+        request.contextLimit = 0
     }
 
     private fun openDeepSeekTranslation(
@@ -475,7 +469,7 @@ open class WKTextProvider : WKChatBaseProvider() {
                 else -> ""
             }
             contextEnabled = true
-            contextLimit = 50
+            contextLimit = 0
         }
         populateDeepSeekTranslationContext(request)
         var delivered = false
