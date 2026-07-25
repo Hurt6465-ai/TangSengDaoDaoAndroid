@@ -1181,11 +1181,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private void populateDeepSeekContextSnapshot(DeepSeekRequest request) {
         if (request == null || chatAdapter == null || WKReader.isEmpty(chatAdapter.getData())) return;
 
-        final int maxMessages = 120;
-        final int maxChars = 18000;
-        ArrayList<String> lines = new ArrayList<>();
+        StringBuilder snapshot = new StringBuilder();
         String latestPeerText = "";
         String latestPeerId = "";
+        int kept = 0;
 
         for (WKUIChatMsgItemEntity item : chatAdapter.getData()) {
             if (item == null || item.wkMsg == null) continue;
@@ -1208,32 +1207,26 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (TextUtils.isEmpty(content)) continue;
 
             boolean mine = TextUtils.equals(loginUID, msg.fromUID);
-            // Locally displayed back-translation is not part of the message delivered to the peer.
-            // Do not feed it back into later AI context as if the sender had typed both languages.
+            // Local back-translation is not part of the peer-visible message.
             if (mine) {
                 int backTranslationAt = content.lastIndexOf("\n回译：");
                 if (backTranslationAt > 0) {
                     content = content.substring(0, backTranslationAt).trim();
                 }
             }
-            lines.add((mine ? "我：" : "对方：") + content);
+            if (snapshot.length() > 0) snapshot.append('\n');
+            snapshot.append(mine ? "我：" : "对方：").append(content);
+            kept++;
+
             if (!mine && msg.type == WKContentType.WK_TEXT) {
                 latestPeerText = content;
                 latestPeerId = deepSeekMessageId(msg);
             }
         }
 
-        StringBuilder snapshot = new StringBuilder();
-        int kept = 0;
-        for (int i = lines.size() - 1; i >= 0 && kept < maxMessages; i--) {
-            String line = lines.get(i);
-            if (snapshot.length() + line.length() + 1 > maxChars && snapshot.length() > 0) break;
-            if (snapshot.length() == 0) snapshot.insert(0, line);
-            else snapshot.insert(0, line + "\n");
-            kept++;
-        }
         request.contextSnapshot = snapshot.toString();
         request.contextSnapshotCount = kept;
+        request.contextLimit = 0;
         if (TextUtils.isEmpty(request.targetMessageText) && !TextUtils.isEmpty(latestPeerText)) {
             request.targetMessageText = latestPeerText;
             request.targetMessageId = latestPeerId;
@@ -1247,7 +1240,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 || clean.startsWith("__cp_harmony_rtc__:")) {
             return "";
         }
-        if (clean.length() > 1200) clean = clean.substring(0, 1200) + "…";
+        // Basic local data minimisation before any chat text reaches the third-party webpage.
+        clean = clean.replaceAll("(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", "[邮箱已隐藏]");
+        clean = clean.replaceAll("(?<!\\d)(?:\\+?\\d[\\d\\s-]{6,}\\d)(?!\\d)", "[号码已隐藏]");
+        clean = clean.replaceAll("(?<!\\d)\\d{17}[0-9Xx](?!\\d)", "[证件号已隐藏]");
         return clean;
     }
 
