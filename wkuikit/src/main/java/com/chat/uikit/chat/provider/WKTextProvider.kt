@@ -19,6 +19,7 @@ import android.text.Spanned
 import android.text.TextUtils
 import android.text.method.LinkMovementMethod
 import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
 import android.text.style.SubscriptSpan
 import android.text.style.SuperscriptSpan
 import android.text.style.StyleSpan
@@ -146,7 +147,33 @@ open class WKTextProvider : WKChatBaseProvider() {
             textColor = ContextCompat.getColor(context, R.color.receive_text_color)
         }
         contentTv.setTextColor(textColor)
-        contentTv.text = uiChatMsgItemEntity.displaySpans
+        val displayedText = SpannableStringBuilder(uiChatMsgItemEntity.displaySpans ?: "")
+        if (from == WKChatIteMsgFromType.SEND) {
+            val backTranslation = DeepSeekAssistant.getLocalBackTranslation(
+                context,
+                uiChatMsgItemEntity.wkMsg
+            )
+            // Old test messages may already contain an inline back-translation from the previous
+            // transient WKTextContent subclass. Do not append it twice after upgrading.
+            val hasInlineBackTranslation = displayedText.toString().contains("\n回译：")
+            if (!TextUtils.isEmpty(backTranslation) && !hasInlineBackTranslation) {
+                val start = displayedText.length
+                displayedText.append("\n回译：").append(backTranslation)
+                displayedText.setSpan(
+                    ForegroundColorSpan(Color.rgb(70, 91, 84)),
+                    start,
+                    displayedText.length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                displayedText.setSpan(
+                    RelativeSizeSpan(0.88f),
+                    start,
+                    displayedText.length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+        }
+        contentTv.text = displayedText
         contentTv.movementMethod = LinkMovementMethod.getInstance()
 //        val preText =  PrecomputedTextCompat.create(
 //            uiChatMsgItemEntity.displaySpans,
