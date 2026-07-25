@@ -1068,7 +1068,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     private void initDeepSeekAssistantBar() {
         wkVBinding.deepSeekReplyBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_REPLY));
-        wkVBinding.deepSeekTranslateBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_TRANSLATE));
         wkVBinding.deepSeekPolishBtn.setOnClickListener(v -> openDeepSeekAction(DeepSeekRequest.ACTION_POLISH));
         wkVBinding.deepSeekSettingsBtn.setOnClickListener(v -> {
             DeepSeekRequest request = buildDeepSeekRequest(DeepSeekRequest.ACTION_REPLY);
@@ -1109,14 +1108,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             return;
         }
         DeepSeekRequest request = buildDeepSeekRequest(action);
-        DeepSeekAssistant.openAction(this, request, (text, localDisplayText, sendNow) -> runOnUiThread(() -> {
-            if (TextUtils.isEmpty(text) || wkVBinding == null || chatPanelManager == null || isFinishing()) return;
+        DeepSeekAssistant.openAction(this, request, (text, sendNow) -> runOnUiThread(() -> {
+            if (TextUtils.isEmpty(text) || wkVBinding == null || isFinishing()) return;
 
             restoreChatAfterDeepSeek();
-            // Only the peer-facing language is written into the composer and sent remotely. The
-            // back-translation remains local and is attached to the sender's displayed message.
-            chatPanelManager.setDeepSeekReplyDraft(text, localDisplayText);
             EditText editText = wkVBinding.editText;
+            editText.setText(text);
+            editText.setSelection(text.length());
             editText.requestFocus();
 
             if (chatAdapter != null && chatAdapter.getItemCount() > 0) {
@@ -1170,95 +1168,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         request.myLearningLanguages = getMyProfileLanguage("learning_languages", "learning_language", "");
         request.peerNativeLanguage = getChannelLanguage("native_languages", "native_language", "自动");
         request.peerLearningLanguages = getChannelLanguage("learning_languages", "learning_language", "");
-        populateDeepSeekContextSnapshot(request);
         return request;
-    }
-
-    /**
-     * Copies only messages already loaded by this ChatActivity. This is deliberately read-only:
-     * calling the IM history-sync API here can refresh the open adapter and make visible messages
-     * disappear while the DeepSeek WebView is open.
-     */
-    private void populateDeepSeekContextSnapshot(DeepSeekRequest request) {
-        if (request == null || chatAdapter == null || WKReader.isEmpty(chatAdapter.getData())) return;
-
-        final int maxMessages = 120;
-        final int maxChars = 18000;
-        ArrayList<String> lines = new ArrayList<>();
-        String latestPeerText = "";
-        String latestPeerId = "";
-
-        for (WKUIChatMsgItemEntity item : chatAdapter.getData()) {
-            if (item == null || item.wkMsg == null) continue;
-            WKMsg msg = item.wkMsg;
-            if (!shouldUseForMsgLinks(msg)) continue;
-            if (msg.remoteExtra != null
-                    && (msg.remoteExtra.revoke == 1 || msg.remoteExtra.isMutualDeleted == 1)) {
-                continue;
-            }
-
-            String content = "";
-            try {
-                if (msg.baseContentMsgModel != null) {
-                    content = msg.baseContentMsgModel.getDisplayContent();
-                }
-            } catch (Exception ignored) {
-            }
-            if (TextUtils.isEmpty(content)) content = msg.content;
-            content = sanitizeDeepSeekContextText(content);
-            if (TextUtils.isEmpty(content)) continue;
-
-            boolean mine = TextUtils.equals(loginUID, msg.fromUID);
-            // Locally displayed back-translation is not part of the message delivered to the peer.
-            // Do not feed it back into later AI context as if the sender had typed both languages.
-            if (mine) {
-                int backTranslationAt = content.lastIndexOf("\n回译：");
-                if (backTranslationAt > 0) {
-                    content = content.substring(0, backTranslationAt).trim();
-                }
-            }
-            lines.add((mine ? "我：" : "对方：") + content);
-            if (!mine && msg.type == WKContentType.WK_TEXT) {
-                latestPeerText = content;
-                latestPeerId = deepSeekMessageId(msg);
-            }
-        }
-
-        StringBuilder snapshot = new StringBuilder();
-        int kept = 0;
-        for (int i = lines.size() - 1; i >= 0 && kept < maxMessages; i--) {
-            String line = lines.get(i);
-            if (snapshot.length() + line.length() + 1 > maxChars && snapshot.length() > 0) break;
-            if (snapshot.length() == 0) snapshot.insert(0, line);
-            else snapshot.insert(0, line + "\n");
-            kept++;
-        }
-        request.contextSnapshot = snapshot.toString();
-        request.contextSnapshotCount = kept;
-        if (TextUtils.isEmpty(request.targetMessageText) && !TextUtils.isEmpty(latestPeerText)) {
-            request.targetMessageText = latestPeerText;
-            request.targetMessageId = latestPeerId;
-        }
-    }
-
-    private String sanitizeDeepSeekContextText(String value) {
-        if (TextUtils.isEmpty(value)) return "";
-        String clean = value.replace('\u0000', ' ').replace("```", "` ` `").trim();
-        if ((clean.startsWith("{") && clean.endsWith("}"))
-                || clean.startsWith("__cp_harmony_rtc__:")) {
-            return "";
-        }
-        if (clean.length() > 1200) clean = clean.substring(0, 1200) + "…";
-        return clean;
-    }
-
-    private String deepSeekMessageId(WKMsg msg) {
-        if (msg == null) return "";
-        if (!TextUtils.isEmpty(msg.messageID) && !"0".equals(msg.messageID)) return msg.messageID;
-        if (!TextUtils.isEmpty(msg.clientMsgNO)) return msg.clientMsgNO;
-        if (msg.messageSeq > 0) return String.valueOf(msg.messageSeq);
-        if (msg.orderSeq > 0) return String.valueOf(msg.orderSeq);
-        return "";
     }
 
     private String getMyProfileLanguage(String plural, String singular, String fallback) {
