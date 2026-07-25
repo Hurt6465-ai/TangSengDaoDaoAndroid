@@ -232,9 +232,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         window.setGravity(loginMode ? Gravity.CENTER : Gravity.BOTTOM);
 
-        // 登录页和普通助手页都必须允许 WebView 输入框调用系统输入法。
-        // FLAG_ALT_FOCUSABLE_IM 会让 Dialog 永远位于输入法之上，导致网页 textarea
-        // 即使已经获得焦点，也无法弹出软键盘。
         window.clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
 
         WindowManager.LayoutParams attributes = window.getAttributes();
@@ -270,7 +267,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         dialogRoot.setClickable(true);
         dialogRoot.setFocusable(true);
         if (!loginMode) {
-            // 面板以外的透明区域就是关闭热区。面板本身会消费点击，不会误关。
             dialogRoot.setOnClickListener(v -> dismissAssistant("outside_tap"));
         }
 
@@ -285,14 +281,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         contentPanel.setBackground(panelBackground);
         contentPanel.setClickable(true);
         contentPanel.setOnClickListener(v -> {
-            // 消费点击，防止冒泡到透明区域关闭监听。
         });
-        // 不对包含 WebView 的父容器启用 clipToOutline。部分 MIUI/Android WebView
-        // 在透明全屏 Dialog + 非统一圆角轮廓下会得到空裁剪区域，表现为整页白屏。
         contentPanel.setClipToOutline(false);
 
         int screenHeight = getResources().getDisplayMetrics().heightPixels;
-        // 登录页全屏；普通助手只让底部面板占 60%，透明上半区仍可看到并关闭聊天页。
         normalPanelHeight = loginMode ? screenHeight : Math.max(dp(360), Math.round(screenHeight * 0.60f));
         FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -309,8 +301,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         progressBar = new ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal);
         progressBar.setIndeterminate(true);
 
-        // 登录/注册页保留状态和“完成”按钮。正常聊天助手不再占用顶部 48dp：
-        // 直接让 DeepSeek 网页铺满固定面板，关闭使用系统返回键。
         if (loginMode) {
             LinearLayout toolbar = new LinearLayout(context);
             toolbar.setOrientation(LinearLayout.HORIZONTAL);
@@ -332,8 +322,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             contentPanel.addView(progressBar, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(2)));
         } else {
-            // 普通助手也把状态控件加入布局，但默认不占空间。这样主页面加载失败时
-            // 不会只剩一块白色区域，而能显示明确错误；加载期间保留一条细进度线。
             statusView.setVisibility(View.GONE);
             statusView.setPadding(dp(16), dp(10), dp(16), dp(10));
             contentPanel.addView(statusView, new LinearLayout.LayoutParams(
@@ -447,8 +435,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                     view.setAlpha(1f);
                     view.setVisibility(View.VISIBLE);
                 }
-                // DeepSeek 登录后经常使用 SPA 路由，页面不会再次触发 onPageFinished。
-                // 在页面主体基本可用时主动探测输入框，避免已经登录却一直无法开启。
                 if (loginMode && newProgress >= 80) {
                     scheduleLoginProbe(250);
                 } else if (!loginMode && newProgress >= 70 && !promptFilled) {
@@ -507,8 +493,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             @Override
             public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
                 super.doUpdateVisitedHistory(view, url, isReload);
-                // 登录成功后 DeepSeek 可能只通过 history.pushState 改地址，
-                // 这里负责捕获 /a/chat 等单页路由变化。
                 DeepSeekHistoryLog.log("WEB_HISTORY", "reload=" + isReload
                         + " url=" + safeUrl(url));
                 handleConversationNavigation(url);
@@ -579,7 +563,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             if (loggedIn) {
                 confirmLogin();
             } else {
-                // 登录页面由 React 动态渲染，持续轻量探测，直到用户登录或关闭。
                 scheduleLoginProbe(900);
             }
         });
@@ -690,8 +673,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             try {
                 pendingPrompt = DeepSeekPromptBuilder.build(requireContext(), request, result);
                 preparePromptTransportText();
-                // 提示词准备完成时重新校验一次网页模式，避免页面进度 70% 时过早
-                // 判定“稳定”，导致专家模式/思考/搜索尚未渲染就直接提交。
                 webUiPrepared = false;
                 webUiPrepareAttempts = 0;
                 tryFillPrompt();
@@ -720,11 +701,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 + " send_chars=" + plan.snapshot.length());
     }
 
-    /**
-     * A deleted/inaccessible mapped DeepSeek conversation must restart with the complete current
-     * Talkami snapshot. Reusing the previously built delta on a fresh conversation would omit
-     * essential history and produce an answer without enough context.
-     */
     private void resetMappingAndPromptForFreshConversation(String reason) {
         Context context = getContext();
         if (context != null && request != null) {
@@ -784,8 +760,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                         loginReminderShown = true;
                         notifyUser("DeepSeek 登录已过期，请完成登录后重试");
                     }
-                    // 登录页可能在当前 WebView 内显示。保持低频探测，用户完成登录后
-                    // 自动继续，不需要关闭窗口再重新点一次。
                     handler.postDelayed(this::tryFillPrompt, 1400);
                 }
                 return;
@@ -806,11 +780,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         });
     }
 
-    /**
-     * Makes sure an action starts in the conversation assigned to the current Talkami contact.
-     * DeepSeek often redirects to the last web conversation after login; without this gate the
-     * prompt for contact B could be appended to contact A's DeepSeek history.
-     */
     private boolean ensureConversationRouteReady() {
         if (loginMode || webView == null || request == null) return true;
         String currentUrl = webView.getUrl();
@@ -841,8 +810,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             return false;
         }
 
-        // No mapping yet: never reuse whichever old DeepSeek conversation the website opened by
-        // itself. The first successful prompt creates a fresh /a/chat/s/{id}, which is then bound.
         if (!TextUtils.isEmpty(currentId) && !promptSubmitted) {
             loadConversationRoute(NEW_CHAT_URL, "avoid_last_web_conversation");
             return false;
@@ -872,8 +839,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         webUiPrepareAttempts = 0;
         fillAttempts = 0;
         if (!promptSubmitted) {
-            // The transport hook lives in the page's JavaScript world and is destroyed by loadUrl.
-            // Reinstall it before filling the composer on the newly loaded conversation route.
             promptTransportPrepared = false;
             promptTransportInFlight = false;
             promptTransportEnabled = false;
@@ -892,7 +857,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if (!TextUtils.isEmpty(mappedConversationId)
                 && !TextUtils.equals(mappedConversationId, conversationId)
                 && !promptSubmitted) {
-            // A login redirect landed on another old conversation. Do not bind or submit there.
             handler.post(() -> loadConversationRoute(
                     DeepSeekConversationStore.conversationUrl(mappedConversationId),
                     "redirected_to_other_conversation"));
@@ -902,7 +866,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         if (promptSubmitted) {
             saveActiveConversation(conversationId, "navigation_after_submit");
         } else if (TextUtils.equals(mappedConversationId, conversationId)) {
-            // Touch the entry so frequently used contacts survive bounded-LRU cleanup.
             DeepSeekConversationStore.save(requireContext(), request, conversationId);
         }
     }
@@ -957,7 +920,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
     /**
      * 在填入提示词前整理 DeepSeek 网页状态：优先专家模式、关闭已开启的思考/搜索，
-     * 并持续隐藏“下载应用”入口。这里仅操作可见网页控件，不拦截私有接口。
+     * 并持续隐藏"下载应用"入口。这里仅操作可见网页控件，不拦截私有接口。
      */
     private void applyWebUiPreferences(boolean continueFill) {
         if (loginMode || webView == null || !isAdded() || promptFilled) return;
@@ -976,15 +939,14 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
                 if ("expert-ready".equals(result)) {
                     webUiPrepared = true;
+                    // ★ FIX: 只在确认专家模式之后，才执行一次页面按钮隐藏
+                    executeHidePageChrome();
                     if (continueFill || !TextUtils.isEmpty(pendingPrompt)) {
                         handler.postDelayed(this::tryFillPrompt, 40);
                     }
                     return;
                 }
 
-                // Never submit in an unconfirmed mode. DeepSeek renders the mode chip/menu late on
-                // some WebView builds, so keep retrying until the visible header explicitly says
-                // "专家模式"。模式切换脚本不再操作思考/搜索开关，也不会抢输入框焦点。
                 webUiPrepared = false;
                 if (statusView != null) {
                     statusView.setText("正在切换专家模式…");
@@ -996,7 +958,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
 
                 long delay;
                 if ("changed".equals(result)) {
-                    // 刚点击模式入口或专家选项，等待 React 完成重绘。
                     delay = randomDelay(180, 280);
                 } else if (webUiPrepareAttempts < 30) {
                     delay = randomDelay(260, 420);
@@ -1013,6 +974,17 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             webUiPrepared = false;
             DeepSeekHistoryLog.log("WEB_UI_PREF_ERROR", e.getClass().getSimpleName());
             handler.postDelayed(() -> applyWebUiPreferences(continueFill), 700L);
+        }
+    }
+
+    // ★ FIX: 单独执行隐藏页面按钮，只在专家模式确认后调用
+    private void executeHidePageChrome() {
+        if (webView == null || !isAdded()) return;
+        try {
+            webView.evaluateJavascript(
+                    "(function(){try{if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();}catch(e){}})();",
+                    null);
+        } catch (Exception ignored) {
         }
     }
 
@@ -1039,6 +1011,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "return r.width>=16&&r.height>=16&&r.width<=260&&r.height<=120;" +
                 "}" +
 
+                // ★ FIX: actionRoot 遇到专家模式容器(c03d486a)时立即返回 null，绝不作为隐藏目标
                 "function actionRoot(node){" +
                 "var cur=node,fallback=null,n=0;" +
                 "while(cur&&cur!==document.body&&cur!==document.documentElement&&n++<8){" +
@@ -1046,17 +1019,19 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "var tag=String(cur.tagName||'').toLowerCase();" +
                 "var role=String(cur.getAttribute&&cur.getAttribute('role')||'').toLowerCase();" +
                 "var cls=String(cur.className||'').toLowerCase();" +
+                // ★ FIX: 遇到专家模式入口容器，直接返回 null 保护它
+                "if(/c03d486a/.test(cls))return null;" +
                 "var ok=r.width>=16&&r.height>=16&&r.width<=280&&r.height<=130;" +
                 "if(ok&&(tag==='button'||tag==='a'||role==='button'||role==='menuitem'||role==='option'||" +
                 "(cur.hasAttribute&&cur.hasAttribute('tabindex'))))return cur;" +
-                "if(!fallback&&ok&&(/ds-button|button|toggle|mode|menu|option|c03d486a/.test(cls)||" +
+                // ★ FIX: fallback 正则中移除 mode 和 c03d486a，避免误匹配专家模式区域
+                "if(!fallback&&ok&&(/ds-button|button|toggle|menu|option/.test(cls)||" +
                 "getComputedStyle(cur).cursor==='pointer'||typeof cur.onclick==='function'))fallback=cur;" +
                 "cur=cur.parentElement;" +
                 "}" +
                 "return fallback;" +
                 "}" +
 
-                // 不再调用 focus()，避免模式检测脚本抢走 DeepSeek 输入框焦点。
                 "function click(el){" +
                 "if(!el||!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;" +
                 "try{el.click();return true;}catch(e){" +
@@ -1067,8 +1042,14 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "}" +
                 "}" +
 
+                // ★ FIX: hideElement 增加专家模式入口保护
                 "function hideElement(el){" +
                 "if(!el||el===document.body||el===document.documentElement)return false;" +
+                // ★ FIX: 永不隐藏专家模式入口或其祖先/后代
+                "if(el.closest&&el.closest('.the-header .c03d486a'))return false;" +
+                "if(el.querySelector&&el.querySelector('.c03d486a'))return false;" +
+                "var cls=String(el.className||'').toLowerCase();" +
+                "if(/c03d486a/.test(cls))return false;" +
                 "var r=el.getBoundingClientRect();" +
                 "if(r.height<=0||r.height>220||r.width>window.innerWidth*0.98)return false;" +
                 "el.style.setProperty('display','none','important');" +
@@ -1082,7 +1063,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "var selector='button,a,[role=\"button\"],[role=\"menuitem\"],[tabindex]:not([tabindex=\"-1\"])';" +
                 "Array.from(document.querySelectorAll(selector)).forEach(function(el){" +
                 "if(words.indexOf(norm(text(el)))<0)return;" +
-                "hideElement(actionRoot(el)||el);" +
+                // ★ FIX: 跳过专家模式入口区域内的元素
+                "if(el.closest&&el.closest('.c03d486a'))return;" +
+                "var root=actionRoot(el);" +
+                "if(root)hideElement(root);else hideElement(el);" +
                 "});" +
                 "}" +
 
@@ -1100,8 +1084,11 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "function hidePageChrome(){" +
                 "document.querySelectorAll('span.ds-button__content').forEach(function(el){" +
                 "var t=norm(text(el));" +
-                "if(t==='下载应用'||t==='下载app'||t==='downloadapp'||t==='getapp')" +
-                "hideElement(actionRoot(el)||el.parentElement);" +
+                "if(t==='下载应用'||t==='下载app'||t==='downloadapp'||t==='getapp'){" +
+                // ★ FIX: 不再用 el.parentElement 兜底，避免误隐藏包含专家模式的父容器
+                "var root=actionRoot(el);" +
+                "if(root)hideElement(root);" +
+                "}" +
                 "});" +
 
                 "hideExactButtons([" +
@@ -1113,14 +1100,12 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "document.querySelectorAll('svg path').forEach(function(path){" +
                 "var d=path.getAttribute('d')||'',target=null;" +
 
-                // 顶部新对话按钮。
                 "if(d.indexOf('M9.99994 1.22943')>=0&&" +
                 "d.indexOf('M9.21913 6.36949')>=0&&" +
                 "d.indexOf('M13.6304 9.22487')>=0){" +
                 "target=actionRoot(path);" +
                 "}" +
 
-                // 顶部分享按钮。
                 "else if(d.indexOf('M9.73047 1.98239')>=0&&" +
                 "d.indexOf('M18.3906 8.83005')>=0&&" +
                 "d.indexOf('M17.2881 9.73142')>=0){" +
@@ -1162,51 +1147,58 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "var el=nodes[i];" +
                 "if(!visible(el)||!isExpertText(text(el)))continue;" +
 
-                // 当前顶部标签不是菜单选项。
                 "if(el.closest&&el.closest('.the-header'))continue;" +
 
                 "var root=actionRoot(el);" +
                 "if(root&&compact(root))return root;" +
+                // ★ FIX: 如果 actionRoot 返回 null（被保护），直接用元素本身
+                "if(!root&&compact(el))return el;" +
                 "}" +
                 "return null;" +
                 "}" +
 
                 "function findModeTrigger(){" +
-                // 用户提供的 DOM 中，专家模式入口就在 .the-header .c03d486a。
                 "var nodes=Array.from(document.querySelectorAll('.the-header .c03d486a'));" +
                 "for(var i=0;i<nodes.length;i++){" +
                 "if(!visible(nodes[i])||!compact(nodes[i]))continue;" +
-                "return actionRoot(nodes[i])||nodes[i];" +
+                // ★ FIX: 不再通过 actionRoot 包装，直接使用 c03d486a 元素本身
+                "return nodes[i];" +
                 "}" +
 
                 "var labels=Array.from(document.querySelectorAll('.the-header span._46a12ab'));" +
                 "for(var j=0;j<labels.length;j++){" +
                 "if(!visible(labels[j]))continue;" +
-                "var root=actionRoot(labels[j])||labels[j].parentElement;" +
+                // ★ FIX: 直接使用 label 的 parentElement，不经过 actionRoot
+                "var root=labels[j].parentElement;" +
                 "if(root&&compact(root))return root;" +
                 "}" +
 
-                // 用顶部菱形模式图标作为最后的精确兜底。
                 "var paths=Array.from(document.querySelectorAll('.the-header svg path'));" +
                 "for(var k=0;k<paths.length;k++){" +
                 "var d=paths[k].getAttribute('d')||'';" +
                 "if(d.indexOf('M11.0289 2.0918')<0||d.indexOf('M3.41858 5.46484')<0)continue;" +
-                "var chip=paths[k].closest('.c03d486a')||actionRoot(paths[k]);" +
+                // ★ FIX: 直接使用 closest('.c03d486a')，不经过 actionRoot
+                "var chip=paths[k].closest('.c03d486a');" +
                 "if(chip&&visible(chip))return chip;" +
                 "}" +
 
                 "return null;" +
                 "}" +
 
-                // 观察器只负责隐藏页面按钮，绝不再切模式或抢输入框焦点。
+                // ★ FIX: 观察器只在专家模式确认后才隐藏页面按钮
                 "window.__tsddHidePageChrome=function(){" +
-                "try{hidePageChrome();}catch(e){}" +
+                "try{" +
+                "if(!window.__tsddExpertConfirmed)return;" +  // ★ FIX: 守卫
+                "hidePageChrome();" +
+                "}catch(e){}" +
                 "};" +
 
                 "if(!window.__tsddChromeObserverV4){" +
                 "window.__tsddChromeObserverV4=true;" +
                 "var chromeTimer=null;" +
                 "new MutationObserver(function(){" +
+                // ★ FIX: 只在专家模式确认后才执行隐藏
+                "if(!window.__tsddExpertConfirmed)return;" +
                 "clearTimeout(chromeTimer);" +
                 "chromeTimer=setTimeout(function(){" +
                 "try{hidePageChrome();}catch(e){}" +
@@ -1217,17 +1209,16 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "});" +
                 "}" +
 
-                // 已经是专家模式，不操作深度思考和搜索开关。
                 "if(expertReady()){" +
+                // ★ FIX: 设置全局标志，允许 observer 开始工作
+                "window.__tsddExpertConfirmed=true;" +
                 "hidePageChrome();" +
                 "return 'expert-ready';" +
                 "}" +
 
-                // 菜单已打开时，直接选择专家模式。
                 "var option=findExpertOption();" +
                 "if(option&&click(option))return 'changed';" +
 
-                // 菜单没有打开时，点击顶部模式入口。
                 "var now=Date.now();" +
                 "var trigger=findModeTrigger();" +
                 "if(trigger&&(!window.__tsddModeTriggerAt||now-window.__tsddModeTriggerAt>700)){" +
@@ -1235,8 +1226,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "if(click(trigger))return 'changed';" +
                 "}" +
 
-                // 不再隐藏“使用快速模式开始对话”整块区域，避免把专家模式入口一起隐藏。
-                "hidePageChrome();" +
+                // ★ FIX: retry 分支不再调用 hidePageChrome，避免在模式切换过程中隐藏入口
                 "return 'retry';" +
                 "}catch(e){return 'retry';}})();";
     }
@@ -1256,15 +1246,10 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 promptFilled = true;
                 statusView.setText(R.string.wkdeepseek_submitting);
                 installReplyButtons();
-                // 给 DeepSeek 的 React 输入状态留出更充分的稳定时间。
-                // 每次都使用随机等待，避免填入后立即触发发送。
                 handler.postDelayed(this::submitPromptAutomatically, randomDelay(300, 600));
                 return;
             }
             fillAttempts++;
-            // A saved DeepSeek conversation may have been deleted or may belong to a different
-            // DeepSeek login. If its composer never becomes available, discard only this mapping
-            // and retry on a clean new-chat route instead of trapping the user on a dead page.
             if (!TextUtils.isEmpty(mappedConversationId) && fillAttempts >= 10) {
                 DeepSeekHistoryLog.log("CONVERSATION_MAPPING_STALE",
                         "id=" + shortConversationId(mappedConversationId));
@@ -1290,8 +1275,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         webView.evaluateJavascript(buildSendReadyProbeScript(), value -> {
             String result = cleanJsResult(value);
             if ("ready".equals(result)) {
-                // 发送图标出现后也不立刻点击，再等待一段随机时间并重新确认。
-                // 这样既能避免 React 刚完成重绘时的误触，也让发送节奏不会过快。
                 submitReadyPending = true;
                 handler.postDelayed(this::clickPromptSendButton, randomDelay(180, 360));
                 return;
@@ -1316,8 +1299,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             submitReadyPending = false;
             String result = cleanJsResult(value);
             if ("clicked".equals(result)) {
-                // 不在 click() 返回后立刻当成成功。先确认输入框已经清空、发送图标消失
-                // 或页面进入生成状态，避免 React 尚未处理点击时误报“已发送”。
                 submitClickPending = true;
                 submitVerifyAttempts = 0;
                 statusView.setText(R.string.wkdeepseek_submitting);
@@ -1325,7 +1306,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 return;
             }
 
-            // 随机等待期间按钮可能被 React 重绘。此时重新探测，绝不盲目连点。
             submitAttempts++;
             if (submitAttempts < 12) {
                 handler.postDelayed(this::submitPromptAutomatically, randomDelay(320, 600));
@@ -1351,9 +1331,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 handler.postDelayed(this::captureConversationFromCurrentUrl, 3500);
                 statusView.setText(R.string.wkdeepseek_thinking);
                 hideSubmittedPromptBubble();
-                // Flip into answer phase before reinstalling the observer. DeepSeek may already have
-                // created the streaming assistant container at this point; installing first would
-                // incorrectly mark that new container as historical content.
                 beginAnswerObservation();
                 installReplyButtons();
                 return;
@@ -1365,8 +1342,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 return;
             }
 
-            // 点击后页面仍没有进入生成状态，允许重新探测一次发送图标。
-            // 只有同一个精确上箭头再次可见、可点击时才会再次 click。
             submitClickPending = false;
             submitAttempts++;
             if (submitAttempts < 12) {
@@ -1391,8 +1366,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         } else {
             promptVisibleLabel = "正在分析聊天并生成回复…";
         }
-        // HTML 注释在 DeepSeek 的 Markdown 气泡中不可见，但仍会保留在请求正文里，
-        // 供页面主世界的 fetch/XHR 钩子精确替换为完整提示词。
         promptVisibleText = promptVisibleLabel + "\n" + promptTransportToken;
         promptTransportPrepared = false;
         promptTransportInFlight = false;
@@ -1423,11 +1396,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         }
     }
 
-    /**
-     * 在页面主世界拦截本次 DeepSeek 请求：网页输入框只显示一行短提示，真正发送
-     * 给 DeepSeek 的仍是完整上下文提示词。只替换包含本次唯一 token 的字符串，
-     * 不扫描、不修改其他请求。
-     */
     private String buildPromptTransportInstallScript() {
         String token = JSONObject.quote(promptTransportToken);
         String fullPrompt = JSONObject.quote(pendingPrompt);
@@ -1450,7 +1418,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "}catch(e){return false;}})();";
     }
 
-    /** 隐藏本次短提示气泡，避免它占用回答空间。 */
     private void hideSubmittedPromptBubble() {
         if (webView == null || TextUtils.isEmpty(promptVisibleLabel)) return;
         String label = JSONObject.quote(promptVisibleLabel);
@@ -1458,8 +1425,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "var label=" + label + ";window.__tsddPromptLabel=label;" +
                 "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&r.width>0&&r.height>0;}" +
                 "function norm(v){return String(v||'').replace(/\\s+/g,' ').trim();}" +
-                // 只隐藏文字与短提示完全相同的紧凑消息气泡。旧逻辑允许向上爬到
-                // label+180 字，短回答时可能连同整个回答容器一起隐藏，表现为空白页。
                 "function hide(){var all=Array.from(document.querySelectorAll('div,article,p,span')).filter(function(el){return visible(el)&&norm(el.innerText||el.textContent)===label;});" +
                 "if(!all.length)return false;all.sort(function(a,b){return a.getBoundingClientRect().top-b.getBoundingClientRect().top;});var leaf=all[all.length-1],best=leaf,cur=leaf,n=0;" +
                 "while(cur&&cur.parentElement&&n++<4){var p=cur.parentElement,r=p.getBoundingClientRect(),t=norm(p.innerText||p.textContent);if(p===document.body||p===document.documentElement)break;if(p.querySelector('pre,textarea,[contenteditable=\\\"true\\\"],[role=\\\"textbox\\\"]'))break;if(r.height>0&&r.height<220&&r.width<window.innerWidth*0.98&&(t===label||t.length<=label.length+24&&t.indexOf(label)===0)){best=p;cur=p;}else break;}" +
@@ -1491,10 +1456,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "}catch(e){return 'error';}})();";
     }
 
-    /**
-     * 自动提交只操作 DeepSeek 页面中与用户给出的 SVG path 完全匹配的发送按钮。
-     * 不再使用“离输入框最近的按钮”、requestSubmit 或 Enter 兜底，避免误触。
-     */
     private String buildSubmitScript() {
         String expectedPath = JSONObject.quote(DEEPSEEK_SEND_ICON_PATH);
         return "(function(){try{" +
@@ -1561,16 +1522,9 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "}catch(e){return false;}})();";
     }
 
-    /**
-     * 提交完成后开启本轮回答观察。历史回答已在提交前标记，避免复用会话时给旧内容
-     * 重复添加“填入聊天/直接发送”按钮。
-     */
     private void beginAnswerObservation() {
         if (webView == null || !isAdded()) return;
         String js = "(function(){try{" +
-                // Existing messages are marked when the result observer is installed before submit.
-                // At this point a new assistant placeholder may already exist, so never mark current
-                // message roots here or the streaming answer would be ignored permanently.
                 "document.querySelectorAll('[data-tsdd-reply-bar]').forEach(function(x){x.remove();});" +
                 "window.__tsddAnswerPhase=true;window.__tsddAnswerReady=false;window.__tsddResultReady=false;window.__tsddAnswerNotBefore=Date.now()+120;" +
                 "setTimeout(function(){window.__tsddAnswerReady=true;if(window.__tsddDeepSeekAddV3)window.__tsddDeepSeekAddV3();},150);return 'ok';" +
@@ -1599,7 +1553,7 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 "if(window.__tsddDeepSeekInstalledV3){if(window.__tsddDeepSeekAddV3)window.__tsddDeepSeekAddV3();return;}" +
                 "window.__tsddDeepSeekInstalledV3=true;" +
                 "var fallbackMode='" + fallbackMode + "';" +
-"function go(mode,text,local){if(!text)return;var u='tsdd-deepseek://result?mode='+mode+'&text='+encodeURIComponent(text);if(local)u+='&local='+encodeURIComponent(local);location.href=u;}" +
+                "function go(mode,text,local){if(!text)return;var u='tsdd-deepseek://result?mode='+mode+'&text='+encodeURIComponent(text);if(local)u+='&local='+encodeURIComponent(local);location.href=u;}" +
                 "function actionRoot(node){var cur=node,fallback=null,n=0;while(cur&&cur!==document.body&&cur!==document.documentElement&&n++<8){var r=cur.getBoundingClientRect(),tag=String(cur.tagName||'').toLowerCase(),role=String(cur.getAttribute&&cur.getAttribute('role')||'').toLowerCase(),cls=String(cur.className||'').toLowerCase(),isCompact=r.width>=16&&r.height>=16&&r.width<=190&&r.height<=100;if(isCompact&&(tag==='button'||tag==='a'||role==='button'||role==='menuitem'||(cur.hasAttribute&&cur.hasAttribute('tabindex'))))return cur;if(!fallback&&isCompact&&(/ds-button|button|icon/.test(cls)||getComputedStyle(cur).cursor==='pointer'||typeof cur.onclick==='function'))fallback=cur;cur=cur.parentElement;}return fallback;}" +
                 "function hideNativeDownload(pre){var scope=pre&&pre.parentElement;if(!scope)return;Array.from(scope.querySelectorAll('button,a,[role=\"button\"],span,div')).forEach(function(el){var t=compact(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title'));if(t!=='下载'&&t!=='download')return;var root=actionRoot(el)||el;if(root&&root!==document.body)root.style.setProperty('display','none','important');});}" +
                 "function button(label,mode,text,local){var b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.tsddAction='1';b.style.cssText='display:inline-flex!important;visibility:visible!important;align-items:center;justify-content:center;border:0;border-radius:17px;padding:8px 13px;background:#edf3ff;color:#295eea;font-size:13px;font-weight:600;margin-left:8px;min-height:34px;position:relative;z-index:8';b.onclick=function(e){e.preventDefault();e.stopPropagation();go(mode,text,local||'');};return b;}" +
@@ -1645,7 +1599,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
             return;
         }
         if ("send".equals(mode)) {
-            // The user already reviewed the reply and explicitly tapped “直接发送”.
             deliverReply(cleanText, cleanLocalDisplayText, true);
             return;
         }
@@ -1709,7 +1662,6 @@ public class DeepSeekAssistantDialog extends DialogFragment {
                 + " " + viewState(contentPanel, "panel")
                 + " " + viewState(webView, "web"));
         hideWebKeyboard();
-        // 给输入法一个很短的时间从 Dialog Window 脱离，避免关闭后继续压缩聊天页。
         handler.postDelayed(() -> {
             DeepSeekHistoryLog.log("DIALOG_DISMISS_EXECUTE", "reason=" + dismissReason
                     + " added=" + isAdded());
