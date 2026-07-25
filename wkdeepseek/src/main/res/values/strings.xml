@@ -6,7 +6,7 @@
     <string name="wkdeepseek_settings">设置</string>
     <string name="wkdeepseek_close">关闭</string>
     <string name="wkdeepseek_first_title">开启 DeepSeek 社交助手</string>
-    <string name="wkdeepseek_first_message">DeepSeek 社交助手会将当前会话中的部分文字消息、双方语言资料、联系人背景和你的当前草稿发送到你登录的 DeepSeek 网页，用于翻译、润色和生成回复建议。\n\n助手不会自动发送消息。首次使用需要登录或注册 DeepSeek，请勿提交密码、验证码、银行卡、身份证和其他敏感内容。</string>
+    <string name="wkdeepseek_first_message">DeepSeek 社交助手会将当前会话中的部分文字消息、双方语言资料、联系人背景和你的当前草稿发送到你登录的 DeepSeek 网页，用于翻译、润色和生成回复建议。\n\n只有你点击回复卡片里的“发送”后才会发送消息。首次使用需要登录或注册 DeepSeek，请勿提交密码、验证码、银行卡、身份证和其他敏感内容。</string>
     <string name="wkdeepseek_login_register">登录或注册 DeepSeek</string>
     <string name="wkdeepseek_cancel">取消</string>
     <string name="wkdeepseek_done">完成</string>
@@ -15,8 +15,8 @@
     <string name="wkdeepseek_filled">内容已填入</string>
     <string name="wkdeepseek_submitting">正在自动提交给 DeepSeek…</string>
     <string name="wkdeepseek_thinking">DeepSeek 正在思考…</string>
-    <string name="wkdeepseek_submit_failed">自动提交失败，内容已填入，请点击网页发送按钮</string>
-    <string name="wkdeepseek_fill_failed">自动填入失败，完整内容已复制，请手动粘贴</string>
+    <string name="wkdeepseek_submit_failed">自动提交失败，请稍后重试或在网页中手动发送</string>
+    <string name="wkdeepseek_fill_failed">自动填入失败，请稍后重试</string>
     <string name="wkdeepseek_need_login">请先登录或注册 DeepSeek</string>
     <string name="wkdeepseek_no_network">需要网络才能使用 DeepSeek 助手</string>
     <string name="wkdeepseek_no_messages">没有可用于分析的文字消息</string>
