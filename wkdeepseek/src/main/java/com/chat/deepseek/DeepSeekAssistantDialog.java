@@ -987,36 +987,57 @@ public class DeepSeekAssistantDialog extends DialogFragment {
     }
 
     private void scheduleWebUiPreparation(long delayMs) {
-        if (loginMode || webView == null || promptFilled) return;
+        if (loginMode || webView == null || promptFilled || webUiPrepared) return;
         handler.removeCallbacks(webUiPrepareRunnable);
         handler.postDelayed(webUiPrepareRunnable, Math.max(0L, delayMs));
     }
 
     /**
-     * 在填入提示词前整理 DeepSeek 网页状态：优先专家模式、关闭已开启的思考/搜索，
-     * 并持续隐藏“下载应用”入口。这里仅操作可见网页控件，不拦截私有接口。
+     * 在填入提示词前整理 DeepSeek 网页状态：有限次数尝试切换专家模式、关闭思考/搜索，
+     * 并独立持续隐藏“下载应用”入口。模式控制绝不挂到 MutationObserver 上，避免反复
+     * 展开/关闭模式菜单，导致用户看不到专家模式或关闭页面后脚本仍持续运行。
      */
     private void applyWebUiPreferences(boolean continueFill) {
-        if (loginMode || webView == null || !isAdded() || promptFilled) return;
+        if (loginMode || webView == null || !isAdded() || promptFilled || webUiPrepared) return;
+
+        // 页面进度、SPA history 和 tryFillPrompt 可能同时触发准备流程。设置硬上限，
+        // 即使旧的延迟任务仍在队列里，也会在入口处停止，不再出现几十次重复执行。
+        if (webUiPrepareAttempts >= 6) {
+            webUiPrepared = true;
+            handler.removeCallbacks(webUiPrepareRunnable);
+            if (continueFill || !TextUtils.isEmpty(pendingPrompt)) {
+                handler.postDelayed(this::tryFillPrompt, 80);
+            }
+            return;
+        }
+
         if (webUiPrepareInFlight) {
-            if (continueFill) handler.postDelayed(this::tryFillPrompt, 180);
             return;
         }
         webUiPrepareInFlight = true;
         try {
             webView.evaluateJavascript(buildWebUiPreferenceScript(), value -> {
                 webUiPrepareInFlight = false;
+                if (!isAdded() || webView == null || promptFilled || webUiPrepared) return;
+
                 String result = cleanJsResult(value);
                 webUiPrepareAttempts++;
+                DeepSeekHistoryLog.log("WEB_UI_PREF_RESULT", "attempt=" + webUiPrepareAttempts
+                        + " result=" + result + " continue=" + continueFill);
 
-                // 专家模式可能比输入框晚渲染，或先要展开模式菜单。允许多轮复查，
-                // 但达到上限后仍继续提交，避免网页改版导致助手完全不可用。
-                if (("changed".equals(result) || "retry".equals(result))
-                        && webUiPrepareAttempts < 12) {
-                    handler.postDelayed(() -> applyWebUiPreferences(continueFill), randomDelay(280, 460));
+                boolean needsRetry = "changed".equals(result) || "retry".equals(result);
+                if (needsRetry && webUiPrepareAttempts < 6) {
+                    handler.removeCallbacks(webUiPrepareRunnable);
+                    handler.postDelayed(() -> {
+                        if (!webUiPrepared && isAdded() && webView != null && !promptFilled) {
+                            applyWebUiPreferences(continueFill);
+                        }
+                    }, randomDelay(320, 520));
                     return;
                 }
+
                 webUiPrepared = true;
+                handler.removeCallbacks(webUiPrepareRunnable);
                 if (continueFill || !TextUtils.isEmpty(pendingPrompt)) {
                     handler.postDelayed(this::tryFillPrompt, 80);
                 }
@@ -1024,30 +1045,44 @@ public class DeepSeekAssistantDialog extends DialogFragment {
         } catch (Exception ignored) {
             webUiPrepareInFlight = false;
             webUiPrepared = true;
+            handler.removeCallbacks(webUiPrepareRunnable);
             if (continueFill) fillPromptNow();
         }
     }
 
     private String buildWebUiPreferenceScript() {
-        return
-                "(function(){try{" +
+        return "(function(){try{" +
                 "function visible(el){if(!el)return false;var s=getComputedStyle(el),r=el.getBoundingClientRect();return s.display!=='none'&&s.visibility!=='hidden'&&s.opacity!=='0'&&r.width>0&&r.height>0;}" +
                 "function txt(el){return ((el&&(el.innerText||el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')))||'').replace(/\\s+/g,' ').trim();}" +
                 "function norm(el){return txt(el).replace(/\\s+/g,'').toLowerCase();}" +
-                "function selected(el){if(!el)return false;var cur=el,n=0;while(cur&&cur!==document.documentElement&&n++<4){var c=String(cur.className||'').toLowerCase();if(/(^|[ _-])(selected|active|checked|current)([ _-]|$)/.test(c))return true;if(cur.getAttribute('aria-checked')==='true'||cur.getAttribute('aria-pressed')==='true'||cur.getAttribute('aria-selected')==='true'||cur.getAttribute('aria-current')==='true')return true;var ds=String(cur.getAttribute('data-state')||'').toLowerCase();if(ds==='checked'||ds==='selected'||ds==='active'||ds==='on')return true;if(cur.getAttribute('data-selected')==='true'||cur.getAttribute('data-active')==='true')return true;cur=cur.parentElement;}return false;}" +
-                "function click(el){if(!el||!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;var r=el.getBoundingClientRect();if(r.width>window.innerWidth*0.98&&r.height>window.innerHeight*0.45)return false;try{el.focus({preventScroll:true});}catch(e){try{el.focus();}catch(e2){}}try{el.click();return true;}catch(e){try{el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}catch(e2){return false;}}}" +
-                "function actionRoot(node){var cur=node,n=0;while(cur&&cur!==document.body&&cur!==document.documentElement&&n++<7){var tag=String(cur.tagName||'').toLowerCase(),role=String(cur.getAttribute&&cur.getAttribute('role')||'').toLowerCase(),r=cur.getBoundingClientRect();if(r.width>0&&r.height>0&&r.height<150&&(tag==='button'||tag==='a'||role==='button'||role==='menuitem'||(cur.hasAttribute&&cur.hasAttribute('tabindex'))))return cur;cur=cur.parentElement;}return node;}" +
-                "function hideElement(el){if(!el||el===document.body||el===document.documentElement)return false;var r=el.getBoundingClientRect();if(r.height<=0||r.height>180||r.width>window.innerWidth*0.96)return false;el.style.setProperty('display','none','important');el.style.setProperty('visibility','hidden','important');el.style.setProperty('pointer-events','none','important');el.setAttribute('aria-hidden','true');return true;}" +
-                "function isAppDownloadText(value){var t=String(value||'').replace(/\\s+/g,'').toLowerCase();return /^(下载(deepseek)?(应用|app)|打开(deepseek)?(应用|app)|在(deepseek)?app中打开|download(the)?(deepseek)?app|get(the)?(deepseek)?app|openin(deepseek)?app)$/.test(t);}" +
-                "function hideDownloads(){var nodes=Array.from(document.querySelectorAll('button,a,[role=\"button\"],[role=\"menuitem\"],span.ds-button__content,div.ds-button__content,[aria-label],[title]'));nodes.forEach(function(el){var value=txt(el);if(!isAppDownloadText(value))return;hideElement(actionRoot(el)||el);});return true;}" +
-                "window.__tsddHidePageChrome=hideDownloads;" +
-                "function pool(){var q='button,a,label,[role=\"button\"],[role=\"radio\"],[role=\"switch\"],[role=\"checkbox\"],[role=\"menuitem\"],[role=\"option\"],[role=\"tab\"],[data-model-type],[tabindex]:not([tabindex=\"-1\"])';return Array.from(document.querySelectorAll(q)).filter(function(el){var t=txt(el);return visible(el)&&t.length>0&&t.length<80;});}" +
-                "function exactExpert(){var labels=Array.from(document.querySelectorAll('div.dfb78875>span._321831d,span._321831d')).filter(function(el){return norm(el)==='专家模式';}),rows=[];labels.forEach(function(label){var row=label.closest('div.dfb78875');if(!row||!visible(row))return;var r=row.getBoundingClientRect();if(r.width<36||r.height<22||r.height>96||r.width>window.innerWidth*0.96)return;if(rows.indexOf(row)<0)rows.push(row);});if(!rows.length)return null;var option=null;rows.some(function(row){var p=row.parentElement,depth=0;while(p&&p!==document.body&&depth++<4){var modeRows=Array.from(p.querySelectorAll('div.dfb78875')).filter(visible);var modeTexts=modeRows.map(norm),hasOtherMode=modeTexts.some(function(t){return t==='快速模式'||t==='快速'||t==='普通模式'||t==='标准模式'||t==='常规模式'||t==='思考模式'||t==='深度思考';});if(modeRows.length>=2&&modeTexts.indexOf('专家模式')>=0&&hasOtherMode){option=row;return true;}p=p.parentElement;}return false;});return {el:option||rows[0],isOption:!!option};}" +
-                "function enforce(allowMenu){var list=pool(),changed=false,retry=false,now=Date.now();hideDownloads();var exact=exactExpert(),expert=exact?exact.el:list.find(function(el){var d=String(el.getAttribute('data-model-type')||'').toLowerCase(),t=norm(el);return d==='expert'||t==='专家模式'||t==='专家'||t==='expert'||t==='expertmode';});if(expert&&!window.__tsddExpertDone){if(selected(expert)){window.__tsddExpertDone=true;}else if(!window.__tsddExpertClickAt||now-window.__tsddExpertClickAt>900){if(click(expert)){window.__tsddExpertClickAt=now;window.__tsddExpertClickCount=(window.__tsddExpertClickCount||0)+1;changed=true;if(exact&&exact.isOption)window.__tsddExpertDone=true;else retry=true;}}if(!window.__tsddExpertDone&&(window.__tsddExpertClickCount||0)<5)retry=true;}else if(!window.__tsddExpertDone&&allowMenu){retry=true;var trigger=list.find(function(el){var t=norm(el);return (el.getAttribute('aria-haspopup')||'')!==''&&(/快速模式|普通模式|标准模式|常规模式|quickmode|normalmode|standardmode|^模式$|^mode$/.test(t));});if(trigger&&(!window.__tsddModeMenuTryAt||now-window.__tsddModeMenuTryAt>1200)){window.__tsddModeMenuTryAt=now;if(click(trigger))changed=true;}}" +
+                "function selected(el){if(!el)return false;var cur=el,n=0;while(cur&&cur!==document.documentElement&&n++<4){var c=String(cur.className||'').toLowerCase();" +
+                "if(/(^|[ _-])(selected|active|checked|current)([ _-]|$)/.test(c))return true;" +
+                "if(cur.getAttribute('aria-checked')==='true'||cur.getAttribute('aria-pressed')==='true'||cur.getAttribute('aria-selected')==='true'||cur.getAttribute('aria-current')==='true')return true;" +
+                "var ds=String(cur.getAttribute('data-state')||'').toLowerCase();if(ds==='checked'||ds==='selected'||ds==='active'||ds==='on')return true;" +
+                "if(cur.getAttribute('data-selected')==='true'||cur.getAttribute('data-active')==='true')return true;cur=cur.parentElement;}return false;}" +
+                "function click(el){if(!el||!visible(el)||el.disabled||el.getAttribute('aria-disabled')==='true')return false;" +
+                "var r=el.getBoundingClientRect();if(r.width>window.innerWidth*0.98&&r.height>window.innerHeight*0.45)return false;" +
+                "try{el.focus({preventScroll:true});}catch(e){try{el.focus();}catch(e2){}}" +
+                "try{el.click();return true;}catch(e){try{el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return true;}catch(e2){return false;}}}" +
+                "function pool(){var q='button,a,label,[role=\\\"button\\\"],[role=\\\"radio\\\"],[role=\\\"switch\\\"],[role=\\\"checkbox\\\"],[role=\\\"menuitem\\\"],[role=\\\"option\\\"],[role=\\\"tab\\\"],[data-model-type],[tabindex]:not([tabindex=\\\"-1\\\"])';" +
+                "return Array.from(document.querySelectorAll(q)).filter(function(el){var t=txt(el);return visible(el)&&t.length>0&&t.length<80;});}" +
+                "function exactExpert(){var labels=Array.from(document.querySelectorAll('div.dfb78875>span._321831d,span._321831d')).filter(function(el){return norm(el)==='专家模式';}),rows=[];" +
+                "labels.forEach(function(label){var row=label.closest('div.dfb78875');if(!row||!visible(row))return;var r=row.getBoundingClientRect();if(r.width<36||r.height<22||r.height>96||r.width>window.innerWidth*0.96)return;if(rows.indexOf(row)<0)rows.push(row);});" +
+                "if(!rows.length)return null;var option=null;rows.some(function(row){var p=row.parentElement,depth=0;while(p&&p!==document.body&&depth++<4){var modeRows=Array.from(p.querySelectorAll('div.dfb78875')).filter(visible);var modeTexts=modeRows.map(norm),hasOtherMode=modeTexts.some(function(t){return t==='快速模式'||t==='快速'||t==='普通模式'||t==='标准模式'||t==='常规模式'||t==='思考模式'||t==='深度思考';});if(modeRows.length>=2&&modeTexts.indexOf('专家模式')>=0&&hasOtherMode){option=row;return true;}p=p.parentElement;}return false;});" +
+                "return {el:option||rows[0],isOption:!!option};}" +
+                "function actionRoot(node){var cur=node,n=0;while(cur&&cur!==document.body&&cur!==document.documentElement&&n++<6){var tag=String(cur.tagName||'').toLowerCase(),role=String(cur.getAttribute&&cur.getAttribute('role')||'').toLowerCase(),r=cur.getBoundingClientRect();if(r.height>0&&r.height<140&&(tag==='button'||tag==='a'||role==='button'||role==='menuitem'))return cur;cur=cur.parentElement;}return node;}" +
+                "function hideDownloads(list){var re=/(下载(\\s*deepseek)?(\\s*应用|\\s*app)|打开(\\s*deepseek)?(\\s*应用|\\s*app)|在\\s*app\\s*中打开|download\\s*(the\\s*)?app|get\\s*(the\\s*)?app|open\\s*in\\s*app)/i;" +
+                "list.forEach(function(el){if(!re.test(txt(el)))return;var root=actionRoot(el),r=root.getBoundingClientRect();if(root&&root!==document.body&&r.height>0&&r.height<140&&r.width<window.innerWidth*0.95){root.style.setProperty('display','none','important');root.style.setProperty('visibility','hidden','important');root.style.setProperty('pointer-events','none','important');root.setAttribute('aria-hidden','true');}});}" +
+                "function enforce(allowMenu){var list=pool(),changed=false,retry=false,now=Date.now();hideDownloads(list);" +
+                "var exact=exactExpert(),expert=exact?exact.el:list.find(function(el){var d=String(el.getAttribute('data-model-type')||'').toLowerCase(),t=norm(el);return d==='expert'||t==='专家模式'||t==='专家'||t==='expert'||t==='expertmode';});" +
+                "if(expert&&!window.__tsddExpertDone){if(selected(expert)){window.__tsddExpertDone=true;}else if(!window.__tsddExpertClickAt||now-window.__tsddExpertClickAt>900){if(click(expert)){window.__tsddExpertClickAt=now;window.__tsddExpertClickCount=(window.__tsddExpertClickCount||0)+1;changed=true;if(exact&&exact.isOption)window.__tsddExpertDone=true;else retry=true;}}if(!window.__tsddExpertDone&&(window.__tsddExpertClickCount||0)<3)retry=true;}" +
+                "else if(!window.__tsddExpertDone&&allowMenu){retry=true;var trigger=list.find(function(el){var t=norm(el);return (el.getAttribute('aria-haspopup')||'')!==''&&(/快速模式|普通模式|标准模式|常规模式|quickmode|normalmode|standardmode|^模式$|^mode$/.test(t));});if(trigger&&(!window.__tsddModeMenuTryAt||now-window.__tsddModeMenuTryAt>1200)){window.__tsddModeMenuTryAt=now;if(click(trigger))changed=true;}}" +
                 "function disable(re){var el=list.find(function(x){return re.test(txt(x))&&selected(x);});if(el&&click(el))changed=true;}" +
-                "disable(/(^|\\s)(深度思考|深度思索|思考|deepthink|deep\\s*think|thinking|reasoning)(\\s|$)/i);disable(/(^|\\s)(智能搜索|联网搜索|网络搜索|搜索|smart\\s*search|web\\s*search|search|browse)(\\s|$)/i);return changed?'changed':(retry?'retry':'stable');}" +
-                "window.__tsddEnforcePrefs=enforce;" +
-                "if(!window.__tsddPrefObserver){window.__tsddPrefObserver=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(function(){try{if(window.__tsddEnforcePrefs)window.__tsddEnforcePrefs(false);if(window.__tsddHidePageChrome)window.__tsddHidePageChrome();}catch(e){}},180);}).observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style','aria-checked','aria-pressed','aria-selected','data-state','data-selected','data-active']});}" +
+                "disable(/(^|\\s)(深度思考|深度思索|思考|deepthink|deep\\s*think|thinking|reasoning)(\\s|$)/i);" +
+                "disable(/(^|\\s)(智能搜索|联网搜索|网络搜索|搜索|smart\\s*search|web\\s*search|search|browse)(\\s|$)/i);" +
+                "return changed?'changed':(retry?'retry':'stable');}" +
+                "window.__tsddEnforcePrefs=enforce;window.__tsddHidePageChrome=function(){try{hideDownloads(pool());}catch(e){}};" +
+                "if(!window.__tsddDownloadObserver){window.__tsddDownloadObserver=true;var timer=null;new MutationObserver(function(){clearTimeout(timer);timer=setTimeout(function(){try{hideDownloads(pool());}catch(e){}},220);}).observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['aria-label','title']});}" +
                 "return enforce(true);" +
                 "}catch(e){return 'error';}})();";
     }
