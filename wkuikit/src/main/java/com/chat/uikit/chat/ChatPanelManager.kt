@@ -104,6 +104,7 @@ import com.chat.uikit.user.ProfileNavigator
 import com.chat.uikit.utils.mentionDisplay
 import com.chat.translate.api.ChatBeforeSendRequest
 import com.chat.translate.api.WkTranslateBridge
+import com.chat.deepseek.DeepSeekAssistant
 import com.effective.android.panel.PanelSwitchHelper
 import com.xinbida.wukongim.WKIM
 import com.xinbida.wukongim.entity.WKChannel
@@ -1553,15 +1554,30 @@ ${content}"""
         } else {
             ""
         }
+        val copiedDeepSeekBackTranslation: String? = if (!isDeepSeekReply) {
+            DeepSeekAssistant.consumeCopiedReplyBackTranslation(
+                iConversationContext.chatActivity,
+                iConversationContext.chatChannelInfo.channelID,
+                iConversationContext.chatChannelInfo.channelType,
+                content
+            )
+        } else {
+            null
+        }
         clearPendingDeepSeekReply()
-        if (isDeepSeekReply) {
-            // This text is already written in the peer-facing language. Do not run it through the
-            // API before-send translator. The back-translation is sender-only display content.
+        if (isDeepSeekReply || copiedDeepSeekBackTranslation != null) {
+            // AI replies are already written in the peer-facing language. Only that text is sent
+            // remotely; the back-translation is attached to the sender's local display.
+            val localBackTranslation = if (isDeepSeekReply) {
+                deepSeekBackTranslation
+            } else {
+                copiedDeepSeekBackTranslation.orEmpty()
+            }
             sendTextNow(
                 remoteContent = content,
                 localDisplayContent = null,
                 reply = buildReplySnapshot(iConversationContext.replyMsg),
-                deepSeekBackTranslation = deepSeekBackTranslation
+                deepSeekBackTranslation = localBackTranslation
             )
             return
         }
