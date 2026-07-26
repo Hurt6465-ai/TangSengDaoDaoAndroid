@@ -2,39 +2,53 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application>
         <activity
-            android:name=".LearningDirectoryActivity"
+            android:name="com.chat.learning.LearningDirectoryActivity"
+            android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".SpeakingDirectoryActivity"
+            android:name="com.chat.learning.SpeakingDirectoryActivity"
+            android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".SpeakingFullscreenActivity"
+            android:name="com.chat.learning.SpeakingPhraseListActivity"
+            android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".PinyinChartActivity"
+            android:name="com.chat.learning.SpeakingFullscreenActivity"
+            android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".LearningStudyActivity"
+            android:name="com.chat.learning.PinyinChartActivity"
+            android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".WordFullscreenActivity"
+            android:name="com.chat.learning.LearningStudyActivity"
+            android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
-            android:name=".WordStrokeActivity"
+            android:name="com.chat.learning.WordFullscreenActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        <activity
+            android:name="com.chat.learning.WordStrokeActivity"
             android:excludeFromRecents="true"
+            android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.WKLearning.Popup" />
         <activity
-            android:name=".WordPronunciationActivity"
+            android:name="com.chat.learning.WordPronunciationActivity"
             android:excludeFromRecents="true"
+            android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.WKLearning.Popup" />
     </application>
