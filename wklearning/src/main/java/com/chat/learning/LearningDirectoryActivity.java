@@ -43,6 +43,10 @@ public class LearningDirectoryActivity extends AppCompatActivity {
     private long lastClickTime;
 
     public static void open(Context context, String type, String title, String parentId) {
+        if ("speaking".equals(type)) {
+            SpeakingDirectoryActivity.open(context, title, parentId);
+            return;
+        }
         Intent intent = new Intent(context, LearningDirectoryActivity.class);
         intent.putExtra(EXTRA_TYPE, type);
         intent.putExtra(EXTRA_TITLE, title);
@@ -59,6 +63,13 @@ public class LearningDirectoryActivity extends AppCompatActivity {
 
         type = getIntent().getStringExtra(EXTRA_TYPE);
         if (type == null || type.length() == 0) type = "words";
+        if ("speaking".equals(type)) {
+            SpeakingDirectoryActivity.open(this,
+                    getIntent().getStringExtra(EXTRA_TITLE),
+                    getIntent().getStringExtra(EXTRA_PARENT_ID));
+            finish();
+            return;
+        }
         parentId = getIntent().getStringExtra(EXTRA_PARENT_ID);
         if (parentId == null) parentId = "";
         catalog = LearningCatalogRepository.load(this, type);

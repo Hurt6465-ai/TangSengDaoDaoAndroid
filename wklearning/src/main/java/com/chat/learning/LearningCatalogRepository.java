@@ -24,8 +24,8 @@ final class LearningCatalogRepository {
             catch (Throwable ignored) {}
         }
         Catalog catalog;
-        try { catalog = parse(type, json); }
-        catch (Throwable ignored) { catalog = fallback(type); }
+        try { catalog = parse(context, type, json); }
+        catch (Throwable ignored) { catalog = fallback(context, type); }
         refreshInBackground(context, type, cache);
         return catalog;
     }
@@ -39,19 +39,19 @@ final class LearningCatalogRepository {
         LearningRemoteContent.execute(() -> {
             try {
                 byte[] bytes = LearningRemoteContent.download(app, resolved, MAX_CATALOG_BYTES);
-                parse(type, new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
+                parse(app, type, new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
                 LearningRemoteContent.atomicWrite(cache, bytes);
             } catch (Throwable ignored) {}
         });
     }
 
-    private static Catalog parse(String type, String json) throws Exception {
+    private static Catalog parse(Context context, String type, String json) throws Exception {
         JSONObject root = new JSONObject(json);
         Catalog catalog = new Catalog();
         catalog.type = root.optString("type", type);
-        catalog.title = root.optString("title", defaultTitle(type));
-        catalog.subtitle = root.optString("subtitle", "");
-        catalog.items = parseItems(root.optJSONArray("items"));
+        catalog.title = localized(context, root, "title", defaultTitle(context, type));
+        catalog.subtitle = localized(context, root, "subtitle", "");
+        catalog.items = parseItems(context, root.optJSONArray("items"));
         return catalog;
     }
 
@@ -91,7 +91,7 @@ final class LearningCatalogRepository {
         return null;
     }
 
-    private static List<Node> parseItems(JSONArray array) {
+    private static List<Node> parseItems(Context context, JSONArray array) {
         ArrayList<Node> result = new ArrayList<>();
         if (array == null) return result;
         for (int i = 0; i < array.length(); i++) {
@@ -99,9 +99,9 @@ final class LearningCatalogRepository {
             if (object == null) continue;
             Node node = new Node();
             node.id = object.optString("id", "item_" + i);
-            node.title = object.optString("title", "");
-            node.subtitle = object.optString("subtitle", "");
-            node.badge = object.optString("badge", "");
+            node.title = localized(context, object, "title", "");
+            node.subtitle = localized(context, object, "subtitle", "");
+            node.badge = localized(context, object, "badge", "");
             node.preview = object.optString("preview", "");
             node.target = object.optString("target", "");
             node.level = object.optString("level", node.id);
@@ -112,17 +112,40 @@ final class LearningCatalogRepository {
             node.dataUrl = object.optString("data_url", "");
             node.dataVersion = object.optInt("data_version", 1);
             node.dataSha256 = object.optString("data_sha256", "");
-            node.children = parseItems(object.optJSONArray("children"));
+            node.children = parseItems(context, object.optJSONArray("children"));
             result.add(node);
         }
         return result;
     }
 
-    private static Catalog fallback(String type) {
+
+    private static String localized(Context context, JSONObject object, String key, String fallback) {
+        String suffix = localeSuffix(context);
+        String value = suffix.length() == 0 ? "" : object.optString(key + suffix, "").trim();
+        if (value.length() == 0) value = object.optString(key, fallback).trim();
+        return value.length() == 0 ? (fallback == null ? "" : fallback) : value;
+    }
+
+    private static String localeSuffix(Context context) {
+        java.util.Locale locale;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            locale = context.getResources().getConfiguration().getLocales().get(0);
+        } else {
+            locale = context.getResources().getConfiguration().locale;
+        }
+        String language = locale == null ? "" : locale.getLanguage();
+        if ("my".equalsIgnoreCase(language)) return "_my";
+        if ("en".equalsIgnoreCase(language)) return "_en";
+        return "";
+    }
+
+    private static Catalog fallback(Context context, String type) {
         Catalog catalog = new Catalog();
         catalog.type = type;
-        catalog.title = defaultTitle(type);
-        catalog.subtitle = "本地目录文件缺失";
+        catalog.title = defaultTitle(context, type);
+        catalog.subtitle = "speaking".equals(type)
+                ? context.getString(R.string.speaking_catalog_missing)
+                : "";
         catalog.items = new ArrayList<>();
         return catalog;
     }
@@ -131,9 +154,9 @@ final class LearningCatalogRepository {
         return value == null ? "catalog" : value.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
-    private static String defaultTitle(String type) {
+    private static String defaultTitle(Context context, String type) {
         if ("words".equals(type)) return "单词";
-        if ("speaking".equals(type)) return "口语";
+        if ("speaking".equals(type)) return context.getString(R.string.learning_home_speaking_title);
         if ("patterns".equals(type)) return "句型";
         if ("grammar".equals(type)) return "语法";
         if ("pinyin".equals(type)) return "拼音";
