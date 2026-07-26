@@ -40,8 +40,6 @@ public class PinyinChartActivity extends AppCompatActivity {
     private PinyinGridAdapter adapter;
     private PinyinAudioPlayer audioPlayer;
 
-    private TextView sectionTitle;
-    private TextView sectionSubtitle;
     private TextView selectedLetter;
     private TextView selectedHint;
     private TextView speedButton;
@@ -223,8 +221,6 @@ public class PinyinChartActivity extends AppCompatActivity {
         sectionIndex = resolved;
         currentSection = chart.sections.get(sectionIndex);
         selectedIndex = -1;
-        sectionTitle.setText(currentSection.title);
-        sectionSubtitle.setText(currentSection.subtitle);
         selectedLetter.setText("—");
         selectedHint.setText(R.string.pinyin_chart_tap_hint);
         adapter.submit(currentSection.items);
