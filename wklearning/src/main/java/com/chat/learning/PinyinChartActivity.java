@@ -44,7 +44,6 @@ public class PinyinChartActivity extends AppCompatActivity {
     private TextView sectionSubtitle;
     private TextView selectedLetter;
     private TextView selectedHint;
-    private TextView replayButton;
     private TextView speedButton;
     private TextView autoButton;
 
@@ -96,20 +95,9 @@ public class PinyinChartActivity extends AppCompatActivity {
         page.setPadding(dp(16), dp(8), dp(16), 0);
         root.addView(page, new FrameLayout.LayoutParams(-1, -1));
 
-        page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(52)));
 
-        sectionTitle = text(getString(R.string.pinyin_chart_title), 28, COLOR_TEXT, true);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-        titleLp.setMargins(dp(2), dp(8), dp(2), 0);
-        page.addView(sectionTitle, titleLp);
 
-        sectionSubtitle = text(getString(R.string.pinyin_chart_subtitle), 14, COLOR_SUB, false);
-        sectionSubtitle.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(-1, -2);
-        subtitleLp.setMargins(dp(2), dp(7), dp(2), dp(14));
-        page.addView(sectionSubtitle, subtitleLp);
-
-        page.addView(createTabs(), new LinearLayout.LayoutParams(-1, dp(44)));
+        page.addView(createTabs(), new LinearLayout.LayoutParams(-1, dp(52)));
 
         RecyclerView list = new RecyclerView(this);
         list.setOverScrollMode(View.OVER_SCROLL_NEVER);
@@ -183,7 +171,7 @@ public class PinyinChartActivity extends AppCompatActivity {
         LinearLayout dock = new LinearLayout(this);
         dock.setOrientation(LinearLayout.VERTICAL);
         dock.setPadding(dp(14), dp(12), dp(14), dp(12));
-        dock.setBackground(rounded(0xFAFFFFFF, dp(24), 0xBFFFFFFF, dp(1)));
+        dock.setBackground(rounded(0xFFF1EEFF, dp(24), 0xFFD8D0FF, dp(1)));
         dock.setElevation(dp(14));
 
         LinearLayout selectedRow = new LinearLayout(this);
@@ -200,9 +188,6 @@ public class PinyinChartActivity extends AppCompatActivity {
         selectedHint.setMaxLines(1);
         selectedHint.setPadding(dp(12), 0, dp(8), 0);
         selectedRow.addView(selectedHint, new LinearLayout.LayoutParams(0, -1, 1f));
-
-        replayButton = dockButton(getString(R.string.pinyin_chart_replay), v -> replaySelected());
-        selectedRow.addView(replayButton, new LinearLayout.LayoutParams(dp(72), dp(36)));
 
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
@@ -264,6 +249,7 @@ public class PinyinChartActivity extends AppCompatActivity {
             return;
         }
         selectedIndex = index;
+        getWindow().getDecorView().performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
         PinyinChartRepository.Item item = currentSection.items.get(index);
         selectedLetter.setText(item.letter);
         selectedHint.setText(item.hint == null || item.hint.isEmpty()
@@ -455,8 +441,8 @@ public class PinyinChartActivity extends AppCompatActivity {
                     : rounded(Color.WHITE, dp(17), COLOR_STROKE, dp(1)));
             holder.letter.setTextColor(isPlaying ? Color.WHITE : COLOR_TEXT);
             holder.hint.setTextColor(isPlaying ? 0xE6FFFFFF : COLOR_SUB);
-            holder.card.setScaleX(isPlaying ? 1.025f : 1f);
-            holder.card.setScaleY(isPlaying ? 1.025f : 1f);
+            holder.card.setScaleX(isPlaying ? 1.035f : 1f);
+            holder.card.setScaleY(isPlaying ? 1.035f : 1f);
             holder.card.setElevation(isPlaying ? dp(4) : 0f);
             holder.card.setContentDescription(item.letter + " " + item.hint);
             holder.card.setOnClickListener(v -> listener.onClick(item));
