@@ -39,4 +39,20 @@
     <string name="script_blocked_external">ပြင်ပစာမျက်နှာကို ပိတ်ထားသည်：%1$s</string>
     <string name="script_allowed_web_only">DeepSeek / Qwen HTTPS စာမျက်နှာများသာ ခွင့်ပြုသည်</string>
     <string name="script_toolbar_show_hint">toolbar ပြရန် ထိပ်ပိုင်းကိုနှိပ်ပါ</string>
+
+
+    <!-- AI web speech bridge and scene prompt -->
+    <string name="ai_web_title">AI ဝဘ်</string>
+    <string name="ai_speech_page_not_allowed">ဤစာမျက်နှာတွင် TangSeng အသံမှတ်မိစနစ်ကို အသုံးမပြုနိုင်ပါ</string>
+    <string name="ai_speech_permission_required">မိုက်ခရိုဖုန်း အသုံးပြုခွင့်ကို အရင်ပေးပါ</string>
+    <string name="ai_speech_service_unavailable">ဤစက်တွင် အသုံးပြုနိုင်သော စနစ်အသံမှတ်မိဝန်ဆောင်မှု မရှိပါ</string>
+    <string name="ai_speech_prompt">ပြောပါ</string>
+    <string name="ai_tts_page_not_allowed">ဤစာမျက်နှာတွင် TangSeng အသံဖတ်စနစ်ကို အသုံးမပြုနိုင်ပါ</string>
+    <string name="ai_tts_empty">ဖတ်ပြရန် စာသားမရှိပါ</string>
+    <string name="ai_tts_plugin_unavailable">အသံပလပ်အင် အသုံးမပြုနိုင်ပါ</string>
+    <string name="script_scene_prompt_button">အခြေအနေသုံးရန်</string>
+    <string name="script_scene_prompt_copied">အခြေအနေ prompt ကို ကူးပြီးပါပြီ။ စာရိုက်ကွက်ထဲ ထည့်ပါ။</string>
+
+    <string name="script_official_badge">တရားဝင်</string>
+
 </resources>
