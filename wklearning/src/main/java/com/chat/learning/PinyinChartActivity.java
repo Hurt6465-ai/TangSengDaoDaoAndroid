@@ -7,8 +7,11 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewConfiguration;
 import android.view.Window;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -39,6 +42,7 @@ public class PinyinChartActivity extends AppCompatActivity {
     private PinyinChartRepository.Section currentSection;
     private PinyinGridAdapter adapter;
     private PinyinAudioPlayer audioPlayer;
+    private RecyclerView list;
 
     private TextView selectedLetter;
     private TextView selectedHint;
@@ -84,7 +88,7 @@ public class PinyinChartActivity extends AppCompatActivity {
     }
 
     private void buildLayout() {
-        FrameLayout root = new FrameLayout(this);
+        SectionSwipeLayout root = new SectionSwipeLayout(this);
         root.setBackgroundColor(COLOR_BG);
         setContentView(root);
 
@@ -97,7 +101,7 @@ public class PinyinChartActivity extends AppCompatActivity {
 
         page.addView(createTabs(), new LinearLayout.LayoutParams(-1, dp(52)));
 
-        RecyclerView list = new RecyclerView(this);
+        list = new RecyclerView(this);
         list.setOverScrollMode(View.OVER_SCROLL_NEVER);
         list.setVerticalScrollBarEnabled(false);
         list.setClipToPadding(false);
@@ -214,9 +218,12 @@ public class PinyinChartActivity extends AppCompatActivity {
         return lp;
     }
 
-    private void switchSection(int requestedIndex, boolean scrollReset) {
+    private void switchSection(int requestedIndex, boolean userInitiated) {
         if (chart.sections.isEmpty()) return;
         int resolved = Math.max(0, Math.min(requestedIndex, chart.sections.size() - 1));
+        if (currentSection != null && resolved == sectionIndex) return;
+
+        int previousIndex = sectionIndex;
         stopAutoPlay();
         sectionIndex = resolved;
         currentSection = chart.sections.get(sectionIndex);
@@ -224,7 +231,30 @@ public class PinyinChartActivity extends AppCompatActivity {
         selectedLetter.setText("—");
         selectedHint.setText(R.string.pinyin_chart_tap_hint);
         adapter.submit(currentSection.items);
+        if (list != null) list.scrollToPosition(0);
         updateTabs();
+
+        if (userInitiated) {
+            performLightHaptic();
+            animateSectionChange(sectionIndex >= previousIndex ? 1 : -1);
+        }
+    }
+
+    private void animateSectionChange(int direction) {
+        if (list == null) return;
+        list.animate().cancel();
+        list.setAlpha(0.82f);
+        list.setTranslationX(direction * dp(18));
+        list.animate()
+                .alpha(1f)
+                .translationX(0f)
+                .setDuration(170L)
+                .start();
+    }
+
+    private void performLightHaptic() {
+        View decor = getWindow().getDecorView();
+        decor.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
     }
 
     private void updateTabs() {
@@ -245,7 +275,7 @@ public class PinyinChartActivity extends AppCompatActivity {
             return;
         }
         selectedIndex = index;
-        getWindow().getDecorView().performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
+        if (!fromAuto) performLightHaptic();
         PinyinChartRepository.Item item = currentSection.items.get(index);
         selectedLetter.setText(item.letter);
         selectedHint.setText(item.hint == null || item.hint.isEmpty()
@@ -361,6 +391,78 @@ public class PinyinChartActivity extends AppCompatActivity {
 
     private int dp(float value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    /**
+     * Intercepts only clear horizontal drags, so vertical RecyclerView scrolling and card taps
+     * keep their normal behavior. Swipe left for the next section and right for the previous one.
+     */
+    private final class SectionSwipeLayout extends FrameLayout {
+        private final int touchSlop;
+        private final int minimumSwipeDistance;
+        private float downX;
+        private float downY;
+        private float lastX;
+        private boolean horizontalSwipe;
+
+        SectionSwipeLayout(Context context) {
+            super(context);
+            touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+            minimumSwipeDistance = dp(64);
+        }
+
+        @Override
+        public boolean onInterceptTouchEvent(MotionEvent event) {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downX = event.getX();
+                    downY = event.getY();
+                    lastX = downX;
+                    horizontalSwipe = false;
+                    return false;
+                case MotionEvent.ACTION_MOVE:
+                    lastX = event.getX();
+                    float dx = lastX - downX;
+                    float dy = event.getY() - downY;
+                    if (Math.abs(dx) > touchSlop * 2f
+                            && Math.abs(dx) > Math.abs(dy) * 1.25f) {
+                        horizontalSwipe = true;
+                        return true;
+                    }
+                    return false;
+                case MotionEvent.ACTION_CANCEL:
+                case MotionEvent.ACTION_UP:
+                    horizontalSwipe = false;
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            lastX = event.getX();
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_MOVE:
+                    return horizontalSwipe;
+                case MotionEvent.ACTION_UP:
+                    if (!horizontalSwipe) return false;
+                    float distance = lastX - downX;
+                    horizontalSwipe = false;
+                    if (Math.abs(distance) < minimumSwipeDistance) return true;
+                    if (distance < 0f) {
+                        switchSection(sectionIndex + 1, true);
+                    } else {
+                        switchSection(sectionIndex - 1, true);
+                    }
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    horizontalSwipe = false;
+                    return true;
+                default:
+                    return true;
+            }
+        }
     }
 
     private final class PinyinGridAdapter extends RecyclerView.Adapter<PinyinHolder> {

@@ -37,6 +37,7 @@ final class PinyinChartRepository {
                             Item item = new Item();
                             item.letter = value.optString("letter", "");
                             item.hint = value.optString("hint", "");
+                            if ("tones".equals(section.id)) item.hint = stripToneNumber(item.hint);
                             item.audioAsset = value.optString("audio", "");
                             if (!item.letter.isEmpty()) section.items.add(item);
                         }
@@ -48,6 +49,11 @@ final class PinyinChartRepository {
         } catch (Throwable ignored) {
             return new Chart();
         }
+    }
+
+    private static String stripToneNumber(String value) {
+        if (value == null || value.isEmpty()) return "";
+        return value.replaceFirst("\\s*[·•]?\\s*[①②③④1-4１-４]\\s*$", "").trim();
     }
 
     static int findSectionIndex(Chart chart, String requested) {
