@@ -227,32 +227,42 @@
     <string name="learning_home_more">ပိုမို</string>
 
     <string name="learning_home_open_drawer">လေ့လာရေး ဘေးမီနူးကို ဖွင့်ရန်</string>
+    <string name="learning_home_drawer_kicker">LEARNING SPACE</string>
+    <string name="learning_home_drawer_title">အခြားဝန်ဆောင်မှုများ</string>
+    <string name="learning_home_drawer_subtitle">AI၊ အသံနှင့် တိုးချဲ့ကိရိယာများ</string>
+    <string name="learning_home_drawer_focus_title">အာရုံစိုက် လေ့လာရေးနေရာ</string>
+    <string name="learning_home_drawer_focus_subtitle">အဓိက လေ့လာရေးကိရိယာများကို တစ်နေရာတည်းတွင် စုထားသည်</string>
     <string name="learning_home_drawer_ai_group">AI အကူအညီများ</string>
     <string name="learning_home_drawer_deepseek">DeepSeek ဘာသာပြန်</string>
     <string name="learning_home_drawer_deepseek_desc">တရုတ်-မြန်မာ ဘာသာပြန်နှင့် သဒ္ဒါရှင်းလင်းချက်</string>
+    <string name="learning_home_drawer_886_desc">တရုတ်ပြည်တွင်း အသုံးပြုသူများအတွက် AI လေ့လာရေးဝင်ပေါက်</string>
     <string name="learning_home_drawer_qianwen">Qianwen တရုတ်ဗားရှင်း</string>
     <string name="learning_home_drawer_qwen">Qwen နိုင်ငံတကာဗားရှင်း</string>
     <string name="learning_home_drawer_tools_group">လေ့လာရေးကိရိယာများ</string>
     <string name="learning_home_drawer_speech_settings">အသံဆက်တင်</string>
     <string name="learning_home_drawer_speech_desc">WKSpeech အင်ဂျင်ကို ပြင်ဆင်ရန်</string>
+    <string name="learning_home_drawer_prompt">စကားပြော Prompt</string>
+    <string name="learning_home_drawer_prompt_desc">နေ့စဉ်အခြေအနေများအတွက် စကားပြောညွှန်ကြားချက်</string>
+    <string name="learning_home_drawer_extensions">တိုးချဲ့လုပ်ဆောင်ချက်များ</string>
     <string name="learning_home_drawer_scripts">စခရစ် စင်တာ</string>
     <string name="learning_home_drawer_scripts_desc">စိတ်ကြိုက် တိုးချဲ့လုပ်ဆောင်ချက်များ</string>
     <string name="learning_home_coming_soon">%1$s ကို ဖန်တီးနေဆဲဖြစ်သည်</string>
     <string name="learning_home_speech_plugin_missing">အသံပလပ်အင် မတပ်ဆင်ရသေးပါ</string>
 
-    <string name="learning_home_drawer_header_subtitle">လေ့လာရေးနှင့် အသုံးများသော လုပ်ဆောင်ချက်များ</string>
-    <string name="learning_home_drawer_close">ဘေးမီနူးကို ပိတ်ရန်</string>
-    <string name="learning_home_drawer_common_group">အသုံးများသော လုပ်ဆောင်ချက်များ</string>
-    <string name="learning_home_drawer_learning_settings_group">လေ့လာရေး ဆက်တင်များ</string>
-    <string name="learning_home_drawer_contacts">အဆက်အသွယ်များ</string>
-    <string name="learning_home_drawer_contacts_desc">သူငယ်ချင်းများနှင့် အဆက်အသွယ်များကို ကြည့်ရန်</string>
-    <string name="learning_home_drawer_new_friends">သူငယ်ချင်းအသစ်များ</string>
-    <string name="learning_home_drawer_new_friends_desc">သူငယ်ချင်းတောင်းဆိုမှုများကို ကြည့်ရန်</string>
-    <string name="learning_home_drawer_add_friend">သူငယ်ချင်းထည့်ရန်</string>
-    <string name="learning_home_drawer_add_friend_desc">အကောင့်ကို ရှာဖွေပြီး ထည့်ရန်</string>
-    <string name="learning_home_drawer_system_settings">စနစ်ဆက်တင်များ</string>
-    <string name="learning_home_drawer_system_settings_desc">အသိပေးချက်၊ ကိုယ်ရေးလုံခြုံမှုနှင့် အသွင်အပြင်</string>
-    <string name="learning_home_contacts_unavailable">အဆက်အသွယ် ဝင်ပေါက်ကို ယခုအသုံးမပြုနိုင်သေးပါ</string>
-    <string name="learning_home_feature_unavailable">%1$s ကို ယခုအသုံးမပြုနိုင်သေးပါ</string>
+    <!-- Native pinyin chart -->
+    <string name="pinyin_chart_title">ပင်ယင် အသံနားထောင်ခြင်း</string>
+    <string name="pinyin_chart_subtitle">ကတ်ကိုနှိပ်၍ ဖုန်းထဲရှိ အသံကို နားထောင်နိုင်ပြီး အမြန်နှုန်းပြောင်းခြင်းနှင့် ဆက်တိုက်ဖွင့်ခြင်း ပြုလုပ်နိုင်သည်။</string>
+    <string name="pinyin_chart_back">နောက်သို့</string>
+    <string name="pinyin_chart_tap_hint">စတင်ရန် ပင်ယင်ကတ်တစ်ခုကို နှိပ်ပါ</string>
+    <string name="pinyin_chart_replay">🔊 ပြန်ဖွင့်</string>
+    <string name="pinyin_chart_speed">%1$s× အမြန်နှုန်း</string>
+    <string name="pinyin_chart_follow">🎙 လိုက်ဖတ်</string>
+    <string name="pinyin_chart_auto_play">▶ ဆက်တိုက်ဖွင့်</string>
+    <string name="pinyin_chart_stop_auto">■ ရပ်ရန်</string>
+    <string name="pinyin_chart_local_audio">ဖုန်းထဲရှိ အသံ</string>
+    <string name="pinyin_chart_audio_placeholder">ယခုဖွင့်နေသောအသံသည် ယာယီထည့်ထားသော ဖိုင်ဖြစ်သည်။ chart.json လမ်းကြောင်းအတိုင်း MP3 ဖိုင်များကို အစားထိုးပါ။</string>
+    <string name="pinyin_chart_follow_placeholder">လိုက်ဖတ်ရန် ဝင်ပေါက်ကို ထည့်ထားပြီး အသံဖိုင်အစစ်များထည့်ပြီးနောက် အမှတ်ပေးစနစ်ကို ဖွင့်မည်။</string>
+    <string name="pinyin_chart_play_failed">ဖုန်းထဲရှိ အသံဖိုင်ကို ဖွင့်၍မရပါ</string>
+    <string name="pinyin_chart_data_missing">ပင်ယင်ဇယားကို ဖတ်၍မရပါ။ chart.json ကို စစ်ဆေးပါ။</string>
 
 </resources>
