@@ -4,10 +4,10 @@
   "subtitle": "先学拼音分类，再进入点读、跟读、声调练习。",
   "items": [
     { "id": "pinyin_basic", "title": "拼音基础", "subtitle": "声母、韵母、整体认读、声调", "badge": "入门", "children": [
-      { "id": "initials", "title": "声母", "subtitle": "b p m f d t n l 等发音", "target": "study", "asset": "assets/learning/pinyin/initials.json" },
-      { "id": "finals", "title": "韵母", "subtitle": "a o e i u ü 与复韵母", "target": "study", "asset": "assets/learning/pinyin/finals.json" },
-      { "id": "whole", "title": "整体认读", "subtitle": "zhi chi shi ri zi ci si 等", "target": "study", "asset": "assets/learning/pinyin/whole.json" },
-      { "id": "tone", "title": "声调", "subtitle": "一二三四声、轻声、变调", "target": "study", "asset": "assets/learning/pinyin/tone.json" }
+      { "id": "initials", "title": "声母", "subtitle": "b p m f d t n l 等发音", "target": "pinyin_chart", "asset": "learning/pinyin/chart.json" },
+      { "id": "finals", "title": "韵母", "subtitle": "a o e i u ü 与复韵母", "target": "pinyin_chart", "asset": "learning/pinyin/chart.json" },
+      { "id": "whole", "title": "整体认读", "subtitle": "zhi chi shi ri zi ci si 等", "target": "pinyin_chart", "asset": "learning/pinyin/chart.json" },
+      { "id": "tone", "title": "声调", "subtitle": "一二三四声、轻声、变调", "target": "pinyin_chart", "asset": "learning/pinyin/chart.json" }
     ] },
     { "id": "pinyin_practice", "title": "拼音练习", "subtitle": "听音选择、跟读打分、拼读训练", "badge": "练习", "children": [
       { "id": "pinyin_listen", "title": "听音选拼音", "subtitle": "后续接练习题数据", "target": "study", "asset": "assets/learning/pinyin/listen.json" },
