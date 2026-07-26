@@ -840,6 +840,47 @@ public class LearningFragment extends Fragment {
         }
     }
 
+
+    private void onSmallCardClick(CardSpec spec) {
+        if (spec == null || spec.id == null) return;
+        String type = typeForCardId(spec.id);
+        if (type == null) {
+            Toast.makeText(requireContext(), getString(R.string.learning_home_coming_soon, spec.title), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        openDirectory(type, spec.title, spec.id);
+    }
+
+    private String typeForCardId(String id) {
+        if (id == null) return null;
+        if (id.startsWith("hsk") || "daily".equals(id) || "job".equals(id)
+                || "love".equals(id) || "greeting".equals(id)) return "words";
+        if (id.startsWith("speak")) return "speaking";
+        if (id.startsWith("pattern")) return "patterns";
+        if (id.startsWith("grammar")) return "grammar";
+        if ("initials".equals(id) || "finals".equals(id)
+                || "whole".equals(id) || "tone".equals(id)) return "pinyin";
+        return null;
+    }
+
+    private void openDirectory(String type, String title, String parentId) {
+        LearningDirectoryActivity.open(
+                requireContext(),
+                type,
+                title,
+                parentId == null ? "" : parentId
+        );
+    }
+
+    private void openSpeechSettings() {
+        try {
+            Class<?> clazz = Class.forName("com.chat.speech.ui.SpeechSettingsActivity");
+            startActivity(new Intent(requireContext(), clazz));
+        } catch (Throwable e) {
+            Toast.makeText(requireContext(), getString(R.string.learning_home_speech_plugin_missing), Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void refreshLocalWordProgress() {
         if (drawerLayout == null || hskProgressViews.isEmpty() || !isAdded()) return;
         final int token = ++progressLoadToken;
