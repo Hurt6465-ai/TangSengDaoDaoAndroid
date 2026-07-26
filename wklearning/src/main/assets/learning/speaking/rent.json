@@ -1,0 +1,279 @@
+{
+  "pack_id": "speak_rent",
+  "title": "租房",
+  "subtitle": "看房、租金、押金、水电和维修",
+  "phrases": [
+    {
+      "id": "rent_001",
+      "text": "我想租房。",
+      "pinyin": "wǒ xiǎng zū fáng",
+      "tts_pinyin": "wǒ xiǎng zū fáng",
+      "meaning_my": "အိမ်ငှားချင်ပါတယ်။",
+      "scene": "联系房东或中介说明需求时使用。",
+      "scene_my": "အိမ်ရှင် သို့မဟုတ် အကျိုးဆောင်ကို အိမ်ငှားလိုကြောင်း ပြောရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我想租一个房间。",
+          "pinyin": "wǒ xiǎng zū yí ge fáng jiān",
+          "tts_pinyin": "wǒ xiǎng zū yí ge fáng jiān",
+          "meaning_my": "အခန်းတစ်ခန်း ငှားချင်ပါတယ်။"
+        },
+        {
+          "text": "我想租一套房子。",
+          "pinyin": "wǒ xiǎng zū yí tào fáng zi",
+          "tts_pinyin": "wǒ xiǎng zū yí tào fáng zi",
+          "meaning_my": "အိမ်တစ်ခန်းလုံး ငှားချင်ပါတယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "我在找房子。",
+          "pinyin": "wǒ zài zhǎo fáng zi",
+          "tts_pinyin": "wǒ zài zhǎo fáng zi",
+          "meaning_my": "အိမ်ရှာနေပါတယ်။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Use it when contacting a landlord or agent to explain that you want to rent a home."
+    },
+    {
+      "id": "rent_002",
+      "text": "一个月多少钱？",
+      "pinyin": "yí ge yuè duō shao qián",
+      "tts_pinyin": "yí ge yuè duō shao qián",
+      "meaning_my": "တစ်လ ဘယ်လောက်လဲ။",
+      "scene": "询问每月房租。",
+      "scene_my": "လစဉ်အိမ်ငှားခ မေးရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "一年多少钱？",
+          "pinyin": "yì nián duō shao qián",
+          "tts_pinyin": "yì nián duō shao qián",
+          "meaning_my": "တစ်နှစ် ဘယ်လောက်လဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "房租一个月多少？",
+          "pinyin": "fáng zū yí ge yuè duō shao",
+          "tts_pinyin": "fáng zū yí ge yuè duō shao",
+          "meaning_my": "အိမ်ငှားခ တစ်လဘယ်လောက်လဲ။",
+          "label": "具体",
+          "label_en": "Specific",
+          "label_my": "တိကျ"
+        }
+      ],
+      "scene_en": "Ask the monthly rent."
+    },
+    {
+      "id": "rent_003",
+      "text": "押金是多少？",
+      "pinyin": "yā jīn shì duō shao",
+      "tts_pinyin": "yā jīn shì duō shao",
+      "meaning_my": "အာမခံငွေ ဘယ်လောက်လဲ။",
+      "scene": "签合同前询问押金金额。",
+      "scene_my": "စာချုပ်မချုပ်မီ အာမခံငွေပမာဏ မေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "需要交几个月押金？",
+          "pinyin": "xū yào jiāo jǐ ge yuè yā jīn",
+          "tts_pinyin": "xū yào jiāo jǐ ge yuè yā jīn",
+          "meaning_my": "အာမခံငွေ လဘယ်နှလပေးရမလဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "要交多少押金？",
+          "pinyin": "yào jiāo duō shao yā jīn",
+          "tts_pinyin": "yào jiāo duō shao yā jīn",
+          "meaning_my": "အာမခံငွေ ဘယ်လောက်ပေးရမလဲ။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Ask about the deposit before signing a contract."
+    },
+    {
+      "id": "rent_004",
+      "text": "水电费怎么算？",
+      "pinyin": "shuǐ diàn fèi zěn me suàn",
+      "tts_pinyin": "shuǐ diàn fèi zěn me suàn",
+      "meaning_my": "ရေမီးခ ဘယ်လိုတွက်လဲ။",
+      "scene": "询问水费和电费的计算方式。",
+      "scene_my": "ရေဖိုး မီးဖိုး ဘယ်လိုတွက်သလဲ မေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "网费怎么算？",
+          "pinyin": "wǎng fèi zěn me suàn",
+          "tts_pinyin": "wǎng fèi zěn me suàn",
+          "meaning_my": "အင်တာနက်ခ ဘယ်လိုတွက်လဲ။"
+        },
+        {
+          "text": "管理费怎么算？",
+          "pinyin": "guǎn lǐ fèi zěn me suàn",
+          "tts_pinyin": "guǎn lǐ fèi zěn me suàn",
+          "meaning_my": "စီမံခန့်ခွဲခ ဘယ်လိုတွက်လဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "水电费包括在房租里吗？",
+          "pinyin": "shuǐ diàn fèi bāo kuò zài fáng zū lǐ ma",
+          "tts_pinyin": "shuǐ diàn fèi bāo kuò zài fáng zū lǐ ma",
+          "meaning_my": "ရေမီးခ အိမ်ငှားခထဲ ပါလား။",
+          "label": "询问",
+          "label_en": "Question",
+          "label_my": "မေးမြန်း"
+        }
+      ],
+      "scene_en": "Ask how the water and electricity fees are calculated."
+    },
+    {
+      "id": "rent_005",
+      "text": "可以看一下房子吗？",
+      "pinyin": "kě yǐ kàn yí xià fáng zi ma",
+      "tts_pinyin": "kě yǐ kàn yí xià fáng zi ma",
+      "meaning_my": "အခန်းကို ကြည့်လို့ရမလား။",
+      "scene": "预约看房时使用。",
+      "scene_my": "အခန်းကြည့်ရန် ချိန်းဆိုရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "今天可以看房吗？",
+          "pinyin": "jīn tiān kě yǐ kàn fáng ma",
+          "tts_pinyin": "jīn tiān kě yǐ kàn fáng ma",
+          "meaning_my": "ဒီနေ့ အခန်းကြည့်လို့ရမလား။"
+        },
+        {
+          "text": "明天可以看房吗？",
+          "pinyin": "míng tiān kě yǐ kàn fáng ma",
+          "tts_pinyin": "míng tiān kě yǐ kàn fáng ma",
+          "meaning_my": "မနက်ဖြန် အခန်းကြည့်လို့ရမလား။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "什么时候方便看房？",
+          "pinyin": "shén me shí hou fāng biàn kàn fáng",
+          "tts_pinyin": "shén me shí hou fāng biàn kàn fáng",
+          "meaning_my": "ဘယ်အချိန် အခန်းကြည့်ဖို့ အဆင်ပြေလဲ။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Use it to arrange a viewing."
+    },
+    {
+      "id": "rent_006",
+      "text": "这里有网络吗？",
+      "pinyin": "zhè lǐ yǒu wǎng luò ma",
+      "tts_pinyin": "zhè lǐ yǒu wǎng luò ma",
+      "meaning_my": "ဒီမှာ အင်တာနက်ရှိလား။",
+      "scene": "看房时确认是否提供网络。",
+      "scene_my": "အခန်းကြည့်ရာတွင် အင်တာနက်ရှိမရှိ မေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "这里有空调吗？",
+          "pinyin": "zhè lǐ yǒu kōng tiáo ma",
+          "tts_pinyin": "zhè lǐ yǒu kōng tiáo ma",
+          "meaning_my": "ဒီမှာ အဲယားကွန်းရှိလား။"
+        },
+        {
+          "text": "这里有热水吗？",
+          "pinyin": "zhè lǐ yǒu rè shuǐ ma",
+          "tts_pinyin": "zhè lǐ yǒu rè shuǐ ma",
+          "meaning_my": "ဒီမှာ ရေနွေးရှိလား။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "房间里有网络吗？",
+          "pinyin": "fáng jiān lǐ yǒu wǎng luò ma",
+          "tts_pinyin": "fáng jiān lǐ yǒu wǎng luò ma",
+          "meaning_my": "အခန်းထဲမှာ အင်တာနက်ရှိလား။",
+          "label": "具体",
+          "label_en": "Specific",
+          "label_my": "တိကျ"
+        }
+      ],
+      "scene_en": "Check whether internet service is available while viewing a home."
+    },
+    {
+      "id": "rent_007",
+      "text": "什么时候可以入住？",
+      "pinyin": "shén me shí hou kě yǐ rù zhù",
+      "tts_pinyin": "shén me shí hou kě yǐ rù zhù",
+      "meaning_my": "ဘယ်တော့ နေဝင်လို့ရမလဲ။",
+      "scene": "确定房子后询问入住时间。",
+      "scene_my": "အိမ်ကို သဘောကျပြီးနောက် နေဝင်နိုင်မည့်အချိန် မေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "今天可以入住吗？",
+          "pinyin": "jīn tiān kě yǐ rù zhù ma",
+          "tts_pinyin": "jīn tiān kě yǐ rù zhù ma",
+          "meaning_my": "ဒီနေ့ နေဝင်လို့ရမလား။"
+        },
+        {
+          "text": "下个月可以入住吗？",
+          "pinyin": "xià ge yuè kě yǐ rù zhù ma",
+          "tts_pinyin": "xià ge yuè kě yǐ rù zhù ma",
+          "meaning_my": "နောက်လ နေဝင်လို့ရမလား။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "最早什么时候能入住？",
+          "pinyin": "zuì zǎo shén me shí hou néng rù zhù",
+          "tts_pinyin": "zuì zǎo shén me shí hou néng rù zhù",
+          "meaning_my": "အစောဆုံး ဘယ်တော့ နေဝင်လို့ရမလဲ။",
+          "label": "具体",
+          "label_en": "Specific",
+          "label_my": "တိကျ"
+        }
+      ],
+      "scene_en": "Ask when you can move in after choosing the home."
+    },
+    {
+      "id": "rent_008",
+      "text": "这个坏了，请帮我修一下。",
+      "pinyin": "zhè ge huài le，qǐng bāng wǒ xiū yí xià",
+      "tts_pinyin": "zhè ge huài le，qǐng bāng wǒ xiū yí xià",
+      "meaning_my": "ဒီဟာပျက်နေပါတယ်၊ ပြင်ပေးပါ။",
+      "scene": "家具或设备损坏时联系房东。",
+      "scene_my": "ပရိဘောဂ သို့မဟုတ် စက်ပစ္စည်းပျက်သည့်အခါ အိမ်ရှင်ကို ဆက်သွယ်ရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "空调坏了，请帮我修一下。",
+          "pinyin": "kōng tiáo huài le，qǐng bāng wǒ xiū yí xià",
+          "tts_pinyin": "kōng tiáo huài le，qǐng bāng wǒ xiū yí xià",
+          "meaning_my": "အဲယားကွန်းပျက်နေပါတယ်၊ ပြင်ပေးပါ။"
+        },
+        {
+          "text": "水龙头坏了，请帮我修一下。",
+          "pinyin": "shuǐ lóng tóu huài le，qǐng bāng wǒ xiū yí xià",
+          "tts_pinyin": "shuǐ lóng tóu huài le，qǐng bāng wǒ xiū yí xià",
+          "meaning_my": "ရေပိုက်ခေါင်းပျက်နေပါတယ်၊ ပြင်ပေးပါ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "麻烦找人来修一下。",
+          "pinyin": "má fan zhǎo rén lái xiū yí xià",
+          "tts_pinyin": "má fan zhǎo rén lái xiū yí xià",
+          "meaning_my": "လူခေါ်ပြီး ပြင်ပေးပါ။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Contact the landlord when furniture or equipment is broken."
+    }
+  ],
+  "title_en": "Renting",
+  "title_my": "အိမ်ငှားခြင်း",
+  "subtitle_en": "Viewing, rent, deposits, utilities and repairs",
+  "subtitle_my": "အိမ်ကြည့်ခြင်း၊ အိမ်လခ၊ စပေါ်ငွေ၊ ရေမီးခနှင့် ပြုပြင်ခြင်း"
+}

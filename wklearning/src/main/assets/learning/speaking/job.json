@@ -1,0 +1,285 @@
+{
+  "pack_id": "speak_job",
+  "title": "求职面试",
+  "subtitle": "应聘、经验、语言、工资和入职",
+  "phrases": [
+    {
+      "id": "job_001",
+      "text": "我来应聘。",
+      "pinyin": "wǒ lái yìng pìn",
+      "tts_pinyin": "wǒ lái yìng pìn",
+      "meaning_my": "အလုပ်လျှောက်ဖို့ လာတာပါ။",
+      "scene": "到公司或店里说明来意时使用。",
+      "scene_my": "ကုမ္ပဏီ သို့မဟုတ် ဆိုင်သို့ရောက်ပြီး အလုပ်လျှောက်လာကြောင်း ပြောရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我来应聘服务员。",
+          "pinyin": "wǒ lái yìng pìn fú wù yuán",
+          "tts_pinyin": "wǒ lái yìng pìn fú wù yuán",
+          "meaning_my": "စားပွဲထိုးအလုပ် လျှောက်ဖို့ လာတာပါ။"
+        },
+        {
+          "text": "我来应聘销售。",
+          "pinyin": "wǒ lái yìng pìn xiāo shòu",
+          "tts_pinyin": "wǒ lái yìng pìn xiāo shòu",
+          "meaning_my": "အရောင်းအလုပ် လျှောက်ဖို့ လာတာပါ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "我是来面试的。",
+          "pinyin": "wǒ shì lái miàn shì de",
+          "tts_pinyin": "wǒ shì lái miàn shì de",
+          "meaning_my": "အင်တာဗျူးလာတာပါ။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Use it at a company or shop to explain that you are applying for a job."
+    },
+    {
+      "id": "job_002",
+      "text": "我有两年工作经验。",
+      "pinyin": "wǒ yǒu liǎng nián gōng zuò jīng yàn",
+      "tts_pinyin": "wǒ yǒu liǎng nián gōng zuò jīng yàn",
+      "meaning_my": "အလုပ်အတွေ့အကြုံ နှစ်နှစ်ရှိပါတယ်။",
+      "scene": "面试时介绍自己的工作经验。",
+      "scene_my": "အင်တာဗျူးတွင် မိမိအလုပ်အတွေ့အကြုံ မိတ်ဆက်ရာ၌ သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我有一年工作经验。",
+          "pinyin": "wǒ yǒu yì nián gōng zuò jīng yàn",
+          "tts_pinyin": "wǒ yǒu yì nián gōng zuò jīng yàn",
+          "meaning_my": "အလုပ်အတွေ့အကြုံ တစ်နှစ်ရှိပါတယ်။"
+        },
+        {
+          "text": "我有三年工作经验。",
+          "pinyin": "wǒ yǒu sān nián gōng zuò jīng yàn",
+          "tts_pinyin": "wǒ yǒu sān nián gōng zuò jīng yàn",
+          "meaning_my": "အလုပ်အတွေ့အကြုံ သုံးနှစ်ရှိပါတယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "我工作两年了。",
+          "pinyin": "wǒ gōng zuò liǎng nián le",
+          "tts_pinyin": "wǒ gōng zuò liǎng nián le",
+          "meaning_my": "အလုပ်လုပ်လာတာ နှစ်နှစ်ရှိပါပြီ။",
+          "label": "口语",
+          "label_en": "Colloquial",
+          "label_my": "စကားပြောသုံး"
+        }
+      ],
+      "scene_en": "Describe your work experience during an interview."
+    },
+    {
+      "id": "job_003",
+      "text": "我会说一点中文。",
+      "pinyin": "wǒ huì shuō yì diǎn zhōng wén",
+      "tts_pinyin": "wǒ huì shuō yì diǎn zhōng wén",
+      "meaning_my": "တရုတ်စကား နည်းနည်းပြောတတ်ပါတယ်။",
+      "scene": "介绍自己的中文能力。",
+      "scene_my": "မိမိတရုတ်စကားကျွမ်းကျင်မှု မိတ်ဆက်ရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我会说一点英语。",
+          "pinyin": "wǒ huì shuō yì diǎn yīng yǔ",
+          "tts_pinyin": "wǒ huì shuō yì diǎn yīng yǔ",
+          "meaning_my": "အင်္ဂလိပ်စကား နည်းနည်းပြောတတ်ပါတယ်။"
+        },
+        {
+          "text": "我的中文还可以。",
+          "pinyin": "wǒ de zhōng wén hái kě yǐ",
+          "tts_pinyin": "wǒ de zhōng wén hái kě yǐ",
+          "meaning_my": "ကျွန်တော့်/ကျွန်မ တရုတ်စကား အဆင်ပြေပါတယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "我能用中文简单交流。",
+          "pinyin": "wǒ néng yòng zhōng wén jiǎn dān jiāo liú",
+          "tts_pinyin": "wǒ néng yòng zhōng wén jiǎn dān jiāo liú",
+          "meaning_my": "တရုတ်စကားနဲ့ ရိုးရိုးဆက်သွယ်နိုင်ပါတယ်။",
+          "label": "完整",
+          "label_en": "Complete",
+          "label_my": "ပြည့်စုံ"
+        }
+      ],
+      "scene_en": "Describe your Chinese ability."
+    },
+    {
+      "id": "job_004",
+      "text": "我可以马上开始工作。",
+      "pinyin": "wǒ kě yǐ mǎ shàng kāi shǐ gōng zuò",
+      "tts_pinyin": "wǒ kě yǐ mǎ shàng kāi shǐ gōng zuò",
+      "meaning_my": "ချက်ချင်း အလုပ်စလုပ်နိုင်ပါတယ်။",
+      "scene": "回答什么时候能入职时使用。",
+      "scene_my": "ဘယ်တော့ အလုပ်စနိုင်သလဲ ဖြေရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我下周可以开始工作。",
+          "pinyin": "wǒ xià zhōu kě yǐ kāi shǐ gōng zuò",
+          "tts_pinyin": "wǒ xià zhōu kě yǐ kāi shǐ gōng zuò",
+          "meaning_my": "နောက်အပတ် အလုပ်စနိုင်ပါတယ်။"
+        },
+        {
+          "text": "我下个月可以开始工作。",
+          "pinyin": "wǒ xià ge yuè kě yǐ kāi shǐ gōng zuò",
+          "tts_pinyin": "wǒ xià ge yuè kě yǐ kāi shǐ gōng zuò",
+          "meaning_my": "နောက်လ အလုပ်စနိုင်ပါတယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "我随时可以入职。",
+          "pinyin": "wǒ suí shí kě yǐ rù zhí",
+          "tts_pinyin": "wǒ suí shí kě yǐ rù zhí",
+          "meaning_my": "အချိန်မရွေး အလုပ်ဝင်နိုင်ပါတယ်။",
+          "label": "正式",
+          "label_en": "Formal",
+          "label_my": "တရားဝင်"
+        }
+      ],
+      "scene_en": "Use it when answering when you can start work."
+    },
+    {
+      "id": "job_005",
+      "text": "工资是多少？",
+      "pinyin": "gōng zī shì duō shao",
+      "tts_pinyin": "gōng zī shì duō shao",
+      "meaning_my": "လစာ ဘယ်လောက်လဲ။",
+      "scene": "了解职位工资时使用。",
+      "scene_my": "အလုပ်လစာ မေးရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "一个月工资是多少？",
+          "pinyin": "yí ge yuè gōng zī shì duō shao",
+          "tts_pinyin": "yí ge yuè gōng zī shì duō shao",
+          "meaning_my": "တစ်လလစာ ဘယ်လောက်လဲ။"
+        },
+        {
+          "text": "试用期工资是多少？",
+          "pinyin": "shì yòng qī gōng zī shì duō shao",
+          "tts_pinyin": "shì yòng qī gōng zī shì duō shao",
+          "meaning_my": "အစမ်းခန့်ကာလ လစာ ဘယ်လောက်လဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "请问薪资是多少？",
+          "pinyin": "qǐng wèn xīn zī shì duō shao",
+          "tts_pinyin": "qǐng wèn xīn zī shì duō shao",
+          "meaning_my": "လစာ ဘယ်လောက်လဲခင်ဗျာ/ရှင်။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Use it to ask about the salary for a position."
+    },
+    {
+      "id": "job_006",
+      "text": "工作时间是几点？",
+      "pinyin": "gōng zuò shí jiān shì jǐ diǎn",
+      "tts_pinyin": "gōng zuò shí jiān shì jǐ diǎn",
+      "meaning_my": "အလုပ်ချိန် ဘယ်နှနာရီလဲ။",
+      "scene": "询问上班和下班时间。",
+      "scene_my": "အလုပ်စချိန်နှင့် ဆင်းချိန် မေးရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "几点上班？",
+          "pinyin": "jǐ diǎn shàng bān",
+          "tts_pinyin": "jǐ diǎn shàng bān",
+          "meaning_my": "ဘယ်နှနာရီ အလုပ်စလဲ။"
+        },
+        {
+          "text": "几点下班？",
+          "pinyin": "jǐ diǎn xià bān",
+          "tts_pinyin": "jǐ diǎn xià bān",
+          "meaning_my": "ဘယ်နှနာရီ အလုပ်ဆင်းလဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "每天工作几个小时？",
+          "pinyin": "měi tiān gōng zuò jǐ ge xiǎo shí",
+          "tts_pinyin": "měi tiān gōng zuò jǐ ge xiǎo shí",
+          "meaning_my": "နေ့တိုင်း အလုပ်ဘယ်နှနာရီလုပ်ရလဲ။",
+          "label": "具体",
+          "label_en": "Specific",
+          "label_my": "တိကျ"
+        }
+      ],
+      "scene_en": "Ask about starting and finishing times."
+    },
+    {
+      "id": "job_007",
+      "text": "我需要准备什么？",
+      "pinyin": "wǒ xū yào zhǔn bèi shén me",
+      "tts_pinyin": "wǒ xū yào zhǔn bèi shén me",
+      "meaning_my": "ဘာတွေ ပြင်ဆင်ရမလဲ။",
+      "scene": "询问面试、入职或工作前需要准备的东西。",
+      "scene_my": "အင်တာဗျူး၊ အလုပ်ဝင်ခြင်း သို့မဟုတ် အလုပ်မစမီ ပြင်ဆင်ရမည့်အရာ မေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我需要带什么？",
+          "pinyin": "wǒ xū yào dài shén me",
+          "tts_pinyin": "wǒ xū yào dài shén me",
+          "meaning_my": "ဘာတွေ ယူလာရမလဲ။"
+        },
+        {
+          "text": "我需要填写什么？",
+          "pinyin": "wǒ xū yào tián xiě shén me",
+          "tts_pinyin": "wǒ xū yào tián xiě shén me",
+          "meaning_my": "ဘာတွေ ဖြည့်ရမလဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "还需要准备其他材料吗？",
+          "pinyin": "hái xū yào zhǔn bèi qí tā cái liào ma",
+          "tts_pinyin": "hái xū yào zhǔn bèi qí tā cái liào ma",
+          "meaning_my": "တခြားစာရွက်စာတမ်းတွေ ပြင်ဆင်ရသေးလား။",
+          "label": "正式",
+          "label_en": "Formal",
+          "label_my": "တရားဝင်"
+        }
+      ],
+      "scene_en": "Ask what you need to prepare before an interview, onboarding or work."
+    },
+    {
+      "id": "job_008",
+      "text": "谢谢您的时间。",
+      "pinyin": "xiè xie nín de shí jiān",
+      "tts_pinyin": "xiè xie nín de shí jiān",
+      "meaning_my": "အချိန်ပေးတာ ကျေးဇူးတင်ပါတယ်။",
+      "scene": "面试结束时礼貌致谢。",
+      "scene_my": "အင်တာဗျူးပြီးဆုံးချိန်တွင် ယဉ်ကျေးစွာ ကျေးဇူးတင်ရာ၌ သုံးပါ။",
+      "replacements": [
+        {
+          "text": "谢谢您给我这次机会。",
+          "pinyin": "xiè xie nín gěi wǒ zhè cì jī huì",
+          "tts_pinyin": "xiè xie nín gěi wǒ zhè cì jī huì",
+          "meaning_my": "ဒီအခွင့်အရေးပေးတာ ကျေးဇူးတင်ပါတယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "感谢您的时间。",
+          "pinyin": "gǎn xiè nín de shí jiān",
+          "tts_pinyin": "gǎn xiè nín de shí jiān",
+          "meaning_my": "အချိန်ပေးတာ ကျေးဇူးတင်ပါတယ်။",
+          "label": "正式",
+          "label_en": "Formal",
+          "label_my": "တရားဝင်"
+        }
+      ],
+      "scene_en": "Thank the interviewer politely at the end of an interview."
+    }
+  ],
+  "title_en": "Job interview",
+  "title_my": "အလုပ်အင်တာဗျူး",
+  "subtitle_en": "Applying, experience, language ability, salary and starting work",
+  "subtitle_my": "အလုပ်လျှောက်ခြင်း၊ အတွေ့အကြုံ၊ ဘာသာစကားစွမ်းရည်၊ လစာနှင့် အလုပ်စခြင်း"
+}

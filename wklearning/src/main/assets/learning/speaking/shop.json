@@ -1,0 +1,279 @@
+{
+  "pack_id": "speak_shop",
+  "title": "购物",
+  "subtitle": "问价、试用、尺码、颜色和付款",
+  "phrases": [
+    {
+      "id": "shop_001",
+      "text": "这个多少钱？",
+      "pinyin": "zhè ge duō shao qián",
+      "tts_pinyin": "zhè ge duō shao qián",
+      "meaning_my": "ဒီဟာ ဘယ်လောက်လဲ။",
+      "scene": "在商店或市场询问商品价格。",
+      "scene_my": "ဆိုင် သို့မဟုတ် ဈေးတွင် ပစ္စည်းဈေးမေးရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "那个多少钱？",
+          "pinyin": "nà ge duō shao qián",
+          "tts_pinyin": "nà ge duō shao qián",
+          "meaning_my": "အဲဒီဟာ ဘယ်လောက်လဲ။"
+        },
+        {
+          "text": "一共多少钱？",
+          "pinyin": "yí gòng duō shao qián",
+          "tts_pinyin": "yí gòng duō shao qián",
+          "meaning_my": "စုစုပေါင်း ဘယ်လောက်လဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "这个怎么卖？",
+          "pinyin": "zhè ge zěn me mài",
+          "tts_pinyin": "zhè ge zěn me mài",
+          "meaning_my": "ဒီဟာ ဘယ်ဈေးနဲ့ရောင်းလဲ။",
+          "label": "日常",
+          "label_en": "Everyday",
+          "label_my": "နေ့စဉ်"
+        }
+      ],
+      "scene_en": "Ask the price of an item in a shop or market."
+    },
+    {
+      "id": "shop_002",
+      "text": "可以便宜一点吗？",
+      "pinyin": "kě yǐ pián yi yì diǎn ma",
+      "tts_pinyin": "kě yǐ pián yi yì diǎn ma",
+      "meaning_my": "နည်းနည်းဈေးလျှော့ပေးလို့ရမလား။",
+      "scene": "在市场或可以议价的商店询问优惠。",
+      "scene_my": "ဈေးဆစ်လို့ရသည့်နေရာတွင် ဈေးလျှော့မေးရာ၌ သုံးပါ။",
+      "replacements": [
+        {
+          "text": "可以再便宜一点吗？",
+          "pinyin": "kě yǐ zài pián yi yì diǎn ma",
+          "tts_pinyin": "kě yǐ zài pián yi yì diǎn ma",
+          "meaning_my": "နောက်ထပ်နည်းနည်း ဈေးလျှော့ပေးလို့ရမလား။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "能打折吗？",
+          "pinyin": "néng dǎ zhé ma",
+          "tts_pinyin": "néng dǎ zhé ma",
+          "meaning_my": "ဈေးလျှော့ရှိလား။",
+          "label": "简短",
+          "label_en": "Brief",
+          "label_my": "တိုတောင်း"
+        }
+      ],
+      "scene_en": "Ask for a discount in a market or shop where bargaining is possible."
+    },
+    {
+      "id": "shop_003",
+      "text": "我想试一下。",
+      "pinyin": "wǒ xiǎng shì yí xià",
+      "tts_pinyin": "wǒ xiǎng shì yí xià",
+      "meaning_my": "စမ်းကြည့်ချင်ပါတယ်။",
+      "scene": "想试穿衣服、鞋子或试用商品时使用。",
+      "scene_my": "အဝတ်အစား၊ ဖိနပ် သို့မဟုတ် ပစ္စည်းကို စမ်းကြည့်ရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我想试穿一下。",
+          "pinyin": "wǒ xiǎng shì chuān yí xià",
+          "tts_pinyin": "wǒ xiǎng shì chuān yí xià",
+          "meaning_my": "ဝတ်စမ်းကြည့်ချင်ပါတယ်။"
+        },
+        {
+          "text": "我想看一下。",
+          "pinyin": "wǒ xiǎng kàn yí xià",
+          "tts_pinyin": "wǒ xiǎng kàn yí xià",
+          "meaning_my": "ကြည့်ချင်ပါတယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "可以试一下吗？",
+          "pinyin": "kě yǐ shì yí xià ma",
+          "tts_pinyin": "kě yǐ shì yí xià ma",
+          "meaning_my": "စမ်းကြည့်လို့ရမလား။",
+          "label": "询问",
+          "label_en": "Question",
+          "label_my": "မေးမြန်း"
+        }
+      ],
+      "scene_en": "Use it when you want to try on clothes or shoes, or test a product."
+    },
+    {
+      "id": "shop_004",
+      "text": "有大一点的吗？",
+      "pinyin": "yǒu dà yì diǎn de ma",
+      "tts_pinyin": "yǒu dà yì diǎn de ma",
+      "meaning_my": "ဒီထက်ကြီးတာ ရှိပါသလား။",
+      "scene": "尺码或容量太小时询问更大的。",
+      "scene_my": "အရွယ်အစား သို့မဟုတ် ပမာဏသေးသည့်အခါ ပိုကြီးတာမေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "有小一点的吗？",
+          "pinyin": "yǒu xiǎo yì diǎn de ma",
+          "tts_pinyin": "yǒu xiǎo yì diǎn de ma",
+          "meaning_my": "ဒီထက်သေးတာ ရှိပါသလား။"
+        },
+        {
+          "text": "有长一点的吗？",
+          "pinyin": "yǒu cháng yì diǎn de ma",
+          "tts_pinyin": "yǒu cháng yì diǎn de ma",
+          "meaning_my": "ဒီထက်ရှည်တာ ရှိပါသလား။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "这个有大号吗？",
+          "pinyin": "zhè ge yǒu dà hào ma",
+          "tts_pinyin": "zhè ge yǒu dà hào ma",
+          "meaning_my": "ဒီဟာ အကြီးဆိုဒ် ရှိလား။",
+          "label": "具体",
+          "label_en": "Specific",
+          "label_my": "တိကျ"
+        }
+      ],
+      "scene_en": "Ask for a larger size or capacity when the current one is too small."
+    },
+    {
+      "id": "shop_005",
+      "text": "有别的颜色吗？",
+      "pinyin": "yǒu bié de yán sè ma",
+      "tts_pinyin": "yǒu bié de yán sè ma",
+      "meaning_my": "တခြားအရောင် ရှိပါသလား။",
+      "scene": "不喜欢当前颜色时询问其他颜色。",
+      "scene_my": "လက်ရှိအရောင်မကြိုက်သည့်အခါ အခြားအရောင်မေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "有黑色吗？",
+          "pinyin": "yǒu hēi sè ma",
+          "tts_pinyin": "yǒu hēi sè ma",
+          "meaning_my": "အနက်ရောင် ရှိလား။"
+        },
+        {
+          "text": "有白色吗？",
+          "pinyin": "yǒu bái sè ma",
+          "tts_pinyin": "yǒu bái sè ma",
+          "meaning_my": "အဖြူရောင် ရှိလား။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "还有其他颜色吗？",
+          "pinyin": "hái yǒu qí tā yán sè ma",
+          "tts_pinyin": "hái yǒu qí tā yán sè ma",
+          "meaning_my": "တခြားအရောင်တွေ ရှိသေးလား။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Ask for another color when you do not like the current one."
+    },
+    {
+      "id": "shop_006",
+      "text": "我要这个。",
+      "pinyin": "wǒ yào zhè ge",
+      "tts_pinyin": "wǒ yào zhè ge",
+      "meaning_my": "ဒီဟာယူမယ်။",
+      "scene": "决定购买某件商品时使用。",
+      "scene_my": "ပစ္စည်းတစ်ခု ဝယ်မည်ဟု ဆုံးဖြတ်ပြီး ပြောရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我要那个。",
+          "pinyin": "wǒ yào nà ge",
+          "tts_pinyin": "wǒ yào nà ge",
+          "meaning_my": "အဲဒီဟာယူမယ်။"
+        },
+        {
+          "text": "我要两个。",
+          "pinyin": "wǒ yào liǎng ge",
+          "tts_pinyin": "wǒ yào liǎng ge",
+          "meaning_my": "နှစ်ခုယူမယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "这个我要了。",
+          "pinyin": "zhè ge wǒ yào le",
+          "tts_pinyin": "zhè ge wǒ yào le",
+          "meaning_my": "ဒီဟာကို ယူလိုက်မယ်။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Use it when you decide to buy an item."
+    },
+    {
+      "id": "shop_007",
+      "text": "可以用现金吗？",
+      "pinyin": "kě yǐ yòng xiàn jīn ma",
+      "tts_pinyin": "kě yǐ yòng xiàn jīn ma",
+      "meaning_my": "ငွေသားနဲ့ ပေးလို့ရမလား။",
+      "scene": "结账时确认能否使用现金。",
+      "scene_my": "ငွေရှင်းရာတွင် ငွေသားသုံးလို့ရမရ မေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "可以用银行卡吗？",
+          "pinyin": "kě yǐ yòng yín háng kǎ ma",
+          "tts_pinyin": "kě yǐ yòng yín háng kǎ ma",
+          "meaning_my": "ဘဏ်ကတ်နဲ့ ပေးလို့ရမလား။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "收现金吗？",
+          "pinyin": "shōu xiàn jīn ma",
+          "tts_pinyin": "shōu xiàn jīn ma",
+          "meaning_my": "ငွေသားလက်ခံလား။",
+          "label": "简短",
+          "label_en": "Brief",
+          "label_my": "တိုတောင်း"
+        }
+      ],
+      "scene_en": "Check whether cash is accepted at checkout."
+    },
+    {
+      "id": "shop_008",
+      "text": "可以扫码吗？",
+      "pinyin": "kě yǐ sǎo mǎ ma",
+      "tts_pinyin": "kě yǐ sǎo mǎ ma",
+      "meaning_my": "QR နဲ့ ပေးလို့ရမလား။",
+      "scene": "想使用二维码或手机支付时使用。",
+      "scene_my": "QR သို့မဟုတ် ဖုန်းဖြင့် ငွေပေးချေလိုသည့်အခါ သုံးပါ။",
+      "replacements": [
+        {
+          "text": "可以用微信支付吗？",
+          "pinyin": "kě yǐ yòng wēi xìn zhī fù ma",
+          "tts_pinyin": "kě yǐ yòng wēi xìn zhī fù ma",
+          "meaning_my": "WeChat Pay နဲ့ ပေးလို့ရမလား။"
+        },
+        {
+          "text": "可以用支付宝吗？",
+          "pinyin": "kě yǐ yòng zhī fù bǎo ma",
+          "tts_pinyin": "kě yǐ yòng zhī fù bǎo ma",
+          "meaning_my": "Alipay နဲ့ ပေးလို့ရမလား။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "能手机支付吗？",
+          "pinyin": "néng shǒu jī zhī fù ma",
+          "tts_pinyin": "néng shǒu jī zhī fù ma",
+          "meaning_my": "ဖုန်းနဲ့ ငွေပေးလို့ရလား။",
+          "label": "相近",
+          "label_en": "Similar",
+          "label_my": "ဆင်တူ"
+        }
+      ],
+      "scene_en": "Ask whether QR-code or mobile payment is accepted."
+    }
+  ],
+  "title_en": "Shopping",
+  "title_my": "ဈေးဝယ်ခြင်း",
+  "subtitle_en": "Asking prices, trying items, sizes, colors and payment",
+  "subtitle_my": "ဈေးမေးခြင်း၊ စမ်းသုံးခြင်း၊ အရွယ်အစား၊ အရောင်နှင့် ငွေပေးချေခြင်း"
+}

@@ -1,0 +1,294 @@
+{
+  "pack_id": "speak_hello",
+  "title": "打招呼",
+  "subtitle": "认识新朋友、日常开场和简单寒暄",
+  "phrases": [
+    {
+      "id": "hello_001",
+      "text": "你好。",
+      "pinyin": "nǐ hǎo",
+      "tts_pinyin": "nǐ hǎo",
+      "meaning_my": "မင်္ဂလာပါ။",
+      "scene": "见面、进入商店或开始聊天时使用。",
+      "scene_my": "တွေ့ဆုံချိန်၊ ဆိုင်ဝင်ချိန် သို့မဟုတ် စကားစပြောချိန်တွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "你好，早上好。",
+          "pinyin": "nǐ hǎo，zǎo shang hǎo",
+          "tts_pinyin": "nǐ hǎo，zǎo shang hǎo",
+          "meaning_my": "မင်္ဂလာနံနက်ခင်းပါ။"
+        },
+        {
+          "text": "你好，晚上好。",
+          "pinyin": "nǐ hǎo，wǎn shang hǎo",
+          "tts_pinyin": "nǐ hǎo，wǎn shang hǎo",
+          "meaning_my": "မင်္ဂလာညနေခင်းပါ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "嗨。",
+          "pinyin": "hāi",
+          "tts_pinyin": "hāi",
+          "meaning_my": "ဟိုင်း။",
+          "label": "随意",
+          "label_en": "Casual",
+          "label_my": "ပေါ့ပေါ့ပါးပါး"
+        },
+        {
+          "text": "您好。",
+          "pinyin": "nín hǎo",
+          "tts_pinyin": "nín hǎo",
+          "meaning_my": "မင်္ဂလာပါ။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Use it when meeting someone, entering a shop or starting a chat."
+    },
+    {
+      "id": "hello_002",
+      "text": "你叫什么名字？",
+      "pinyin": "nǐ jiào shén me míng zi",
+      "tts_pinyin": "nǐ jiào shén me míng zi",
+      "meaning_my": "နာမည်ဘယ်လိုခေါ်လဲ။",
+      "scene": "第一次认识对方时询问姓名。",
+      "scene_my": "ပထမဆုံးတွေ့ဆုံချိန်တွင် နာမည်မေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "他叫什么名字？",
+          "pinyin": "tā jiào shén me míng zi",
+          "tts_pinyin": "tā jiào shén me míng zi",
+          "meaning_my": "သူ့နာမည် ဘယ်လိုခေါ်လဲ။"
+        },
+        {
+          "text": "她叫什么名字？",
+          "pinyin": "tā jiào shén me míng zi",
+          "tts_pinyin": "tā jiào shén me míng zi",
+          "meaning_my": "သူမနာမည် ဘယ်လိုခေါ်လဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "请问你怎么称呼？",
+          "pinyin": "qǐng wèn nǐ zěn me chēng hu",
+          "tts_pinyin": "qǐng wèn nǐ zěn me chēng hu",
+          "meaning_my": "ဘယ်လိုခေါ်ရမလဲခင်ဗျာ/ရှင်။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Ask someone’s name when meeting for the first time."
+    },
+    {
+      "id": "hello_003",
+      "text": "我叫小明。",
+      "pinyin": "wǒ jiào xiǎo míng",
+      "tts_pinyin": "wǒ jiào xiǎo míng",
+      "meaning_my": "ကျွန်တော့်နာမည် ရှောင်မင်ပါ။",
+      "scene": "自我介绍姓名时使用。",
+      "scene_my": "မိမိနာမည် မိတ်ဆက်ရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我叫小美。",
+          "pinyin": "wǒ jiào xiǎo měi",
+          "tts_pinyin": "wǒ jiào xiǎo měi",
+          "meaning_my": "ကျွန်မနာမည် ရှောင်မေပါ။"
+        },
+        {
+          "text": "我叫安安。",
+          "pinyin": "wǒ jiào ān ān",
+          "tts_pinyin": "wǒ jiào ān ān",
+          "meaning_my": "ကျွန်တော့်/ကျွန်မနာမည် အန်းအန်းပါ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "我的名字叫小明。",
+          "pinyin": "wǒ de míng zi jiào xiǎo míng",
+          "tts_pinyin": "wǒ de míng zi jiào xiǎo míng",
+          "meaning_my": "ကျွန်တော့်နာမည်က ရှောင်မင်ပါ။",
+          "label": "完整",
+          "label_en": "Complete",
+          "label_my": "ပြည့်စုံ"
+        }
+      ],
+      "scene_en": "Use it to introduce your name."
+    },
+    {
+      "id": "hello_004",
+      "text": "很高兴认识你。",
+      "pinyin": "hěn gāo xìng rèn shi nǐ",
+      "tts_pinyin": "hěn gāo xìng rèn shi nǐ",
+      "meaning_my": "တွေ့ရတာ ဝမ်းသာပါတယ်။",
+      "scene": "第一次见面并完成自我介绍后使用。",
+      "scene_my": "ပထမဆုံးတွေ့ဆုံပြီး မိတ်ဆက်ပြီးနောက် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "很高兴认识大家。",
+          "pinyin": "hěn gāo xìng rèn shi dà jiā",
+          "tts_pinyin": "hěn gāo xìng rèn shi dà jiā",
+          "meaning_my": "အားလုံးနဲ့ တွေ့ရတာ ဝမ်းသာပါတယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "认识你很高兴。",
+          "pinyin": "rèn shi nǐ hěn gāo xìng",
+          "tts_pinyin": "rèn shi nǐ hěn gāo xìng",
+          "meaning_my": "တွေ့ရတာ ဝမ်းသာပါတယ်။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Use it after introductions when meeting someone for the first time."
+    },
+    {
+      "id": "hello_005",
+      "text": "你是哪国人？",
+      "pinyin": "nǐ shì nǎ guó rén",
+      "tts_pinyin": "nǐ shì nǎ guó rén",
+      "meaning_my": "ဘယ်နိုင်ငံကလဲ။",
+      "scene": "询问对方来自哪个国家。",
+      "scene_my": "တစ်ဖက်လူ ဘယ်နိုင်ငံကလဲ မေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "他是哪国人？",
+          "pinyin": "tā shì nǎ guó rén",
+          "tts_pinyin": "tā shì nǎ guó rén",
+          "meaning_my": "သူ ဘယ်နိုင်ငံကလဲ။"
+        },
+        {
+          "text": "你来自哪里？",
+          "pinyin": "nǐ lái zì nǎ lǐ",
+          "tts_pinyin": "nǐ lái zì nǎ lǐ",
+          "meaning_my": "ဘယ်ကလာတာလဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "你是哪里人？",
+          "pinyin": "nǐ shì nǎ lǐ rén",
+          "tts_pinyin": "nǐ shì nǎ lǐ rén",
+          "meaning_my": "ဘယ်ဒေသကလဲ။",
+          "label": "日常",
+          "label_en": "Everyday",
+          "label_my": "နေ့စဉ်"
+        }
+      ],
+      "scene_en": "Ask which country the other person comes from."
+    },
+    {
+      "id": "hello_006",
+      "text": "我是缅甸人。",
+      "pinyin": "wǒ shì miǎn diàn rén",
+      "tts_pinyin": "wǒ shì miǎn diàn rén",
+      "meaning_my": "ကျွန်တော်/ကျွန်မ မြန်မာလူမျိုးပါ။",
+      "scene": "回答国籍或来自哪里时使用。",
+      "scene_my": "နိုင်ငံသား သို့မဟုတ် ဘယ်ကလာသလဲ ဖြေရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我是中国人。",
+          "pinyin": "wǒ shì zhōng guó rén",
+          "tts_pinyin": "wǒ shì zhōng guó rén",
+          "meaning_my": "ကျွန်တော်/ကျွန်မ တရုတ်လူမျိုးပါ။"
+        },
+        {
+          "text": "我是泰国人。",
+          "pinyin": "wǒ shì tài guó rén",
+          "tts_pinyin": "wǒ shì tài guó rén",
+          "meaning_my": "ကျွန်တော်/ကျွန်မ ထိုင်းလူမျိုးပါ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "我来自缅甸。",
+          "pinyin": "wǒ lái zì miǎn diàn",
+          "tts_pinyin": "wǒ lái zì miǎn diàn",
+          "meaning_my": "ကျွန်တော်/ကျွန်မ မြန်မာနိုင်ငံက လာတာပါ။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Use it to answer your nationality or where you come from."
+    },
+    {
+      "id": "hello_007",
+      "text": "你会说中文吗？",
+      "pinyin": "nǐ huì shuō zhōng wén ma",
+      "tts_pinyin": "nǐ huì shuō zhōng wén ma",
+      "meaning_my": "တရုတ်စကား ပြောတတ်လား။",
+      "scene": "想确认对方能否使用中文交流时使用。",
+      "scene_my": "တစ်ဖက်လူ တရုတ်စကားပြောတတ်မတတ် မေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "你会说缅甸语吗？",
+          "pinyin": "nǐ huì shuō miǎn diàn yǔ ma",
+          "tts_pinyin": "nǐ huì shuō miǎn diàn yǔ ma",
+          "meaning_my": "မြန်မာစကား ပြောတတ်လား။"
+        },
+        {
+          "text": "你会说英语吗？",
+          "pinyin": "nǐ huì shuō yīng yǔ ma",
+          "tts_pinyin": "nǐ huì shuō yīng yǔ ma",
+          "meaning_my": "အင်္ဂလိပ်စကား ပြောတတ်လား။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "你能说中文吗？",
+          "pinyin": "nǐ néng shuō zhōng wén ma",
+          "tts_pinyin": "nǐ néng shuō zhōng wén ma",
+          "meaning_my": "တရုတ်စကား ပြောနိုင်လား။",
+          "label": "相近",
+          "label_en": "Similar",
+          "label_my": "ဆင်တူ"
+        }
+      ],
+      "scene_en": "Use it to check whether the other person can communicate in Chinese."
+    },
+    {
+      "id": "hello_008",
+      "text": "请说慢一点。",
+      "pinyin": "qǐng shuō màn yì diǎn",
+      "tts_pinyin": "qǐng shuō màn yì diǎn",
+      "meaning_my": "ကျေးဇူးပြုပြီး ဖြည်းဖြည်းပြောပါ။",
+      "scene": "听不清或对方说得太快时使用。",
+      "scene_my": "မကြားရှင်းသည့်အခါ သို့မဟုတ် တစ်ဖက်လူပြောမြန်သည့်အခါ သုံးပါ။",
+      "replacements": [
+        {
+          "text": "请说大声一点。",
+          "pinyin": "qǐng shuō dà shēng yì diǎn",
+          "tts_pinyin": "qǐng shuō dà shēng yì diǎn",
+          "meaning_my": "ကျေးဇူးပြုပြီး အသံနည်းနည်းကျယ်ကျယ်ပြောပါ။"
+        },
+        {
+          "text": "请再说一遍。",
+          "pinyin": "qǐng zài shuō yí biàn",
+          "tts_pinyin": "qǐng zài shuō yí biàn",
+          "meaning_my": "ကျေးဇူးပြုပြီး ထပ်ပြောပါ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "可以说慢一点吗？",
+          "pinyin": "kě yǐ shuō màn yì diǎn ma",
+          "tts_pinyin": "kě yǐ shuō màn yì diǎn ma",
+          "meaning_my": "နည်းနည်းဖြည်းဖြည်း ပြောလို့ရမလား။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Use it when you cannot hear clearly or the other person is speaking too fast."
+    }
+  ],
+  "title_en": "Greetings",
+  "title_my": "နှုတ်ဆက်ခြင်း",
+  "subtitle_en": "Meet new people, open daily conversations and make simple small talk",
+  "subtitle_my": "မိတ်ဆွေအသစ်နှင့်တွေ့ဆုံခြင်း၊ နေ့စဉ်စကားစတင်ခြင်းနှင့် ရိုးရှင်းသောစကားပြောခြင်း"
+}

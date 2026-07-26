@@ -1,0 +1,300 @@
+{
+  "pack_id": "speak_food",
+  "title": "点餐",
+  "subtitle": "餐厅点菜、口味、饮料和买单",
+  "phrases": [
+    {
+      "id": "food_001",
+      "text": "我想要这个。",
+      "pinyin": "wǒ xiǎng yào zhè ge",
+      "tts_pinyin": "wǒ xiǎng yào zhè ge",
+      "meaning_my": "ဒီဟာကို လိုချင်ပါတယ်။",
+      "scene": "看着菜单或食物选择某样东西时使用。",
+      "scene_my": "မီနူး သို့မဟုတ် အစားအစာကို ကြည့်ပြီး ရွေးချယ်ရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我想要那个。",
+          "pinyin": "wǒ xiǎng yào nà ge",
+          "tts_pinyin": "wǒ xiǎng yào nà ge",
+          "meaning_my": "အဲဒီဟာကို လိုချင်ပါတယ်။"
+        },
+        {
+          "text": "我想要一杯咖啡。",
+          "pinyin": "wǒ xiǎng yào yì bēi kā fēi",
+          "tts_pinyin": "wǒ xiǎng yào yì bēi kā fēi",
+          "meaning_my": "ကော်ဖီတစ်ခွက် လိုချင်ပါတယ်။"
+        },
+        {
+          "text": "我想要一份炒饭。",
+          "pinyin": "wǒ xiǎng yào yí fèn chǎo fàn",
+          "tts_pinyin": "wǒ xiǎng yào yí fèn chǎo fàn",
+          "meaning_my": "ထမင်းကြော်တစ်ပွဲ လိုချင်ပါတယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "我要这个。",
+          "pinyin": "wǒ yào zhè ge",
+          "tts_pinyin": "wǒ yào zhè ge",
+          "meaning_my": "ဒီဟာယူမယ်။",
+          "label": "直接",
+          "label_en": "Direct",
+          "label_my": "တိုက်ရိုက်"
+        },
+        {
+          "text": "麻烦给我这个。",
+          "pinyin": "má fan gěi wǒ zhè ge",
+          "tts_pinyin": "má fan gěi wǒ zhè ge",
+          "meaning_my": "ဒီဟာပေးပါ။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Use it while looking at a menu or choosing a food item."
+    },
+    {
+      "id": "food_002",
+      "text": "我要一份炒饭。",
+      "pinyin": "wǒ yào yí fèn chǎo fàn",
+      "tts_pinyin": "wǒ yào yí fèn chǎo fàn",
+      "meaning_my": "ထမင်းကြော်တစ်ပွဲ လိုချင်ပါတယ်။",
+      "scene": "向服务员点一份主食时使用。",
+      "scene_my": "စားသောက်ဆိုင်ဝန်ထမ်းထံ အဓိကအစားအစာ မှာရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我要一碗面。",
+          "pinyin": "wǒ yào yì wǎn miàn",
+          "tts_pinyin": "wǒ yào yì wǎn miàn",
+          "meaning_my": "ခေါက်ဆွဲတစ်ပွဲ လိုချင်ပါတယ်။"
+        },
+        {
+          "text": "我要一份饺子。",
+          "pinyin": "wǒ yào yí fèn jiǎo zi",
+          "tts_pinyin": "wǒ yào yí fèn jiǎo zi",
+          "meaning_my": "ဖက်ထုပ်တစ်ပွဲ လိုချင်ပါတယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "请给我一份炒饭。",
+          "pinyin": "qǐng gěi wǒ yí fèn chǎo fàn",
+          "tts_pinyin": "qǐng gěi wǒ yí fèn chǎo fàn",
+          "meaning_my": "ထမင်းကြော်တစ်ပွဲ ပေးပါ။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Use it to order a main dish from a server."
+    },
+    {
+      "id": "food_003",
+      "text": "不要辣。",
+      "pinyin": "bú yào là",
+      "tts_pinyin": "bú yào là",
+      "meaning_my": "မစပ်ပါနဲ့။",
+      "scene": "告诉服务员不要放辣椒时使用。",
+      "scene_my": "ငရုတ်သီး မထည့်ရန် ပြောရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "不要香菜。",
+          "pinyin": "bú yào xiāng cài",
+          "tts_pinyin": "bú yào xiāng cài",
+          "meaning_my": "နံနံပင် မထည့်ပါနဲ့။"
+        },
+        {
+          "text": "不要糖。",
+          "pinyin": "bú yào táng",
+          "tts_pinyin": "bú yào táng",
+          "meaning_my": "သကြား မထည့်ပါနဲ့။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "我不吃辣。",
+          "pinyin": "wǒ bù chī là",
+          "tts_pinyin": "wǒ bù chī là",
+          "meaning_my": "အစပ်မစားပါဘူး။",
+          "label": "说明",
+          "label_en": "Explanatory",
+          "label_my": "ရှင်းပြ"
+        }
+      ],
+      "scene_en": "Use it to tell the server not to add chili."
+    },
+    {
+      "id": "food_004",
+      "text": "少放一点辣。",
+      "pinyin": "shǎo fàng yì diǎn là",
+      "tts_pinyin": "shǎo fàng yì diǎn là",
+      "meaning_my": "ငရုတ်သီး နည်းနည်းပဲ ထည့်ပါ။",
+      "scene": "可以吃一点辣，但不想太辣时使用。",
+      "scene_my": "အစပ်နည်းနည်းစားနိုင်ပေမယ့် မစပ်လွန်းစေချင်သည့်အခါ သုံးပါ။",
+      "replacements": [
+        {
+          "text": "少放一点盐。",
+          "pinyin": "shǎo fàng yì diǎn yán",
+          "tts_pinyin": "shǎo fàng yì diǎn yán",
+          "meaning_my": "ဆားနည်းနည်းပဲ ထည့်ပါ။"
+        },
+        {
+          "text": "少放一点油。",
+          "pinyin": "shǎo fàng yì diǎn yóu",
+          "tts_pinyin": "shǎo fàng yì diǎn yóu",
+          "meaning_my": "ဆီနည်းနည်းပဲ ထည့်ပါ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "微辣就可以。",
+          "pinyin": "wēi là jiù kě yǐ",
+          "tts_pinyin": "wēi là jiù kě yǐ",
+          "meaning_my": "အစပ်နည်းနည်းဆို ရပါပြီ။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Use it when you can eat some spice but do not want it too spicy."
+    },
+    {
+      "id": "food_005",
+      "text": "有菜单吗？",
+      "pinyin": "yǒu cài dān ma",
+      "tts_pinyin": "yǒu cài dān ma",
+      "meaning_my": "မီနူးရှိပါသလား။",
+      "scene": "进入餐厅后询问菜单时使用。",
+      "scene_my": "စားသောက်ဆိုင်ဝင်ပြီး မီနူးမေးရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "有中文菜单吗？",
+          "pinyin": "yǒu zhōng wén cài dān ma",
+          "tts_pinyin": "yǒu zhōng wén cài dān ma",
+          "meaning_my": "တရုတ်စာမီနူး ရှိပါသလား။"
+        },
+        {
+          "text": "有图片菜单吗？",
+          "pinyin": "yǒu tú piàn cài dān ma",
+          "tts_pinyin": "yǒu tú piàn cài dān ma",
+          "meaning_my": "ပုံပါတဲ့မီနူး ရှိပါသလား။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "请给我看一下菜单。",
+          "pinyin": "qǐng gěi wǒ kàn yí xià cài dān",
+          "tts_pinyin": "qǐng gěi wǒ kàn yí xià cài dān",
+          "meaning_my": "မီနူးလေး ပြပေးပါ။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Use it to ask for a menu after entering a restaurant."
+    },
+    {
+      "id": "food_006",
+      "text": "这个多少钱？",
+      "pinyin": "zhè ge duō shao qián",
+      "tts_pinyin": "zhè ge duō shao qián",
+      "meaning_my": "ဒီဟာ ဘယ်လောက်လဲ။",
+      "scene": "询问一道菜或一种饮料的价格。",
+      "scene_my": "အစားအစာ သို့မဟုတ် သောက်စရာဈေး မေးရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "这杯多少钱？",
+          "pinyin": "zhè bēi duō shao qián",
+          "tts_pinyin": "zhè bēi duō shao qián",
+          "meaning_my": "ဒီတစ်ခွက် ဘယ်လောက်လဲ။"
+        },
+        {
+          "text": "一共多少钱？",
+          "pinyin": "yí gòng duō shao qián",
+          "tts_pinyin": "yí gòng duō shao qián",
+          "meaning_my": "စုစုပေါင်း ဘယ်လောက်လဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "这个怎么卖？",
+          "pinyin": "zhè ge zěn me mài",
+          "tts_pinyin": "zhè ge zěn me mài",
+          "meaning_my": "ဒီဟာ ဘယ်ဈေးနဲ့ရောင်းလဲ။",
+          "label": "日常",
+          "label_en": "Everyday",
+          "label_my": "နေ့စဉ်"
+        }
+      ],
+      "scene_en": "Ask the price of a dish or drink."
+    },
+    {
+      "id": "food_007",
+      "text": "请给我一杯水。",
+      "pinyin": "qǐng gěi wǒ yì bēi shuǐ",
+      "tts_pinyin": "qǐng gěi wǒ yì bēi shuǐ",
+      "meaning_my": "ရေတစ်ခွက် ပေးပါ။",
+      "scene": "在餐厅向服务员要饮用水。",
+      "scene_my": "စားသောက်ဆိုင်တွင် သောက်ရေတောင်းရာ၌ သုံးပါ။",
+      "replacements": [
+        {
+          "text": "请给我一杯茶。",
+          "pinyin": "qǐng gěi wǒ yì bēi chá",
+          "tts_pinyin": "qǐng gěi wǒ yì bēi chá",
+          "meaning_my": "လက်ဖက်ရည်တစ်ခွက် ပေးပါ။"
+        },
+        {
+          "text": "请给我一杯咖啡。",
+          "pinyin": "qǐng gěi wǒ yì bēi kā fēi",
+          "tts_pinyin": "qǐng gěi wǒ yì bēi kā fēi",
+          "meaning_my": "ကော်ဖီတစ်ခွက် ပေးပါ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "麻烦给我一杯水。",
+          "pinyin": "má fan gěi wǒ yì bēi shuǐ",
+          "tts_pinyin": "má fan gěi wǒ yì bēi shuǐ",
+          "meaning_my": "ရေတစ်ခွက်လောက် ပေးပါ။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Ask a server for drinking water in a restaurant."
+    },
+    {
+      "id": "food_008",
+      "text": "买单，谢谢。",
+      "pinyin": "mǎi dān，xiè xie",
+      "tts_pinyin": "mǎi dān，xiè xie",
+      "meaning_my": "ငွေရှင်းမယ်၊ ကျေးဇူးတင်ပါတယ်။",
+      "scene": "吃完后请服务员结账时使用。",
+      "scene_my": "စားပြီးနောက် ငွေရှင်းရန် ဝန်ထမ်းကို ပြောရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我们买单。",
+          "pinyin": "wǒ men mǎi dān",
+          "tts_pinyin": "wǒ men mǎi dān",
+          "meaning_my": "ကျွန်တော်တို့ ငွေရှင်းမယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "麻烦结一下账。",
+          "pinyin": "má fan jié yí xià zhàng",
+          "tts_pinyin": "má fan jié yí xià zhàng",
+          "meaning_my": "ငွေရှင်းပေးပါ။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Use it to ask the server for the bill after eating."
+    }
+  ],
+  "title_en": "Dining",
+  "title_my": "အစားအသောက်မှာခြင်း",
+  "subtitle_en": "Ordering food, taste, drinks and paying",
+  "subtitle_my": "အစားအသောက်မှာခြင်း၊ အရသာ၊ သောက်စရာနှင့် ငွေရှင်းခြင်း"
+}

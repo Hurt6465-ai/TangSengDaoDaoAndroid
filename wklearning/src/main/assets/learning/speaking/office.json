@@ -1,0 +1,291 @@
+{
+  "pack_id": "speak_office",
+  "title": "办公室沟通",
+  "subtitle": "任务、询问、完成、时间和请假",
+  "phrases": [
+    {
+      "id": "office_001",
+      "text": "今天要做什么？",
+      "pinyin": "jīn tiān yào zuò shén me",
+      "tts_pinyin": "jīn tiān yào zuò shén me",
+      "meaning_my": "ဒီနေ့ ဘာလုပ်ရမလဲ။",
+      "scene": "上班后询问今天的任务。",
+      "scene_my": "အလုပ်ရောက်ပြီး ဒီနေ့လုပ်ရမည့်တာဝန် မေးရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "明天要做什么？",
+          "pinyin": "míng tiān yào zuò shén me",
+          "tts_pinyin": "míng tiān yào zuò shén me",
+          "meaning_my": "မနက်ဖြန် ဘာလုပ်ရမလဲ။"
+        },
+        {
+          "text": "现在要做什么？",
+          "pinyin": "xiàn zài yào zuò shén me",
+          "tts_pinyin": "xiàn zài yào zuò shén me",
+          "meaning_my": "အခု ဘာလုပ်ရမလဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "今天有什么工作？",
+          "pinyin": "jīn tiān yǒu shén me gōng zuò",
+          "tts_pinyin": "jīn tiān yǒu shén me gōng zuò",
+          "meaning_my": "ဒီနေ့ ဘာအလုပ်ရှိလဲ။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Ask about today’s tasks after arriving at work."
+    },
+    {
+      "id": "office_002",
+      "text": "这个怎么做？",
+      "pinyin": "zhè ge zěn me zuò",
+      "tts_pinyin": "zhè ge zěn me zuò",
+      "meaning_my": "ဒီဟာ ဘယ်လိုလုပ်ရမလဲ။",
+      "scene": "不知道任务步骤时询问同事或主管。",
+      "scene_my": "အလုပ်လုပ်ပုံမသိသည့်အခါ လုပ်ဖော်ကိုင်ဖက် သို့မဟုတ် အုပ်ချုပ်သူကို မေးရန် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "这个怎么用？",
+          "pinyin": "zhè ge zěn me yòng",
+          "tts_pinyin": "zhè ge zěn me yòng",
+          "meaning_my": "ဒီဟာ ဘယ်လိုသုံးရမလဲ။"
+        },
+        {
+          "text": "这个怎么填写？",
+          "pinyin": "zhè ge zěn me tián xiě",
+          "tts_pinyin": "zhè ge zěn me tián xiě",
+          "meaning_my": "ဒီဟာ ဘယ်လိုဖြည့်ရမလဲ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "可以教我一下吗？",
+          "pinyin": "kě yǐ jiāo wǒ yí xià ma",
+          "tts_pinyin": "kě yǐ jiāo wǒ yí xià ma",
+          "meaning_my": "သင်ပေးလို့ရမလား။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Ask a coworker or supervisor when you do not know the steps for a task."
+    },
+    {
+      "id": "office_003",
+      "text": "请再说一遍。",
+      "pinyin": "qǐng zài shuō yí biàn",
+      "tts_pinyin": "qǐng zài shuō yí biàn",
+      "meaning_my": "ကျေးဇူးပြုပြီး ထပ်ပြောပါ။",
+      "scene": "没有听清工作要求时使用。",
+      "scene_my": "အလုပ်ညွှန်ကြားချက် မကြားရှင်းသည့်အခါ သုံးပါ။",
+      "replacements": [
+        {
+          "text": "请说慢一点。",
+          "pinyin": "qǐng shuō màn yì diǎn",
+          "tts_pinyin": "qǐng shuō màn yì diǎn",
+          "meaning_my": "ကျေးဇူးပြုပြီး ဖြည်းဖြည်းပြောပါ။"
+        },
+        {
+          "text": "请再解释一下。",
+          "pinyin": "qǐng zài jiě shì yí xià",
+          "tts_pinyin": "qǐng zài jiě shì yí xià",
+          "meaning_my": "ကျေးဇူးပြုပြီး ထပ်ရှင်းပြပါ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "可以再说一遍吗？",
+          "pinyin": "kě yǐ zài shuō yí biàn ma",
+          "tts_pinyin": "kě yǐ zài shuō yí biàn ma",
+          "meaning_my": "ထပ်ပြောလို့ရမလား။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Use it when you did not hear a work instruction clearly."
+    },
+    {
+      "id": "office_004",
+      "text": "我听不懂。",
+      "pinyin": "wǒ tīng bù dǒng",
+      "tts_pinyin": "wǒ tīng bù dǒng",
+      "meaning_my": "နားမလည်ပါဘူး။",
+      "scene": "确实无法理解对方的话时使用。",
+      "scene_my": "တစ်ဖက်လူပြောတာ မနားလည်သည့်အခါ သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我看不懂。",
+          "pinyin": "wǒ kàn bù dǒng",
+          "tts_pinyin": "wǒ kàn bù dǒng",
+          "meaning_my": "ဖတ်လို့ နားမလည်ပါဘူး။"
+        },
+        {
+          "text": "我不明白。",
+          "pinyin": "wǒ bù míng bai",
+          "tts_pinyin": "wǒ bù míng bai",
+          "meaning_my": "နားမလည်ပါဘူး။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "我没听明白。",
+          "pinyin": "wǒ méi tīng míng bai",
+          "tts_pinyin": "wǒ méi tīng míng bai",
+          "meaning_my": "ကြားပေမယ့် နားမလည်ပါဘူး။",
+          "label": "自然",
+          "label_en": "Natural",
+          "label_my": "သဘာဝကျ"
+        }
+      ],
+      "scene_en": "Use it when you genuinely cannot understand what the other person said."
+    },
+    {
+      "id": "office_005",
+      "text": "我已经做完了。",
+      "pinyin": "wǒ yǐ jīng zuò wán le",
+      "tts_pinyin": "wǒ yǐ jīng zuò wán le",
+      "meaning_my": "လုပ်ပြီးပါပြီ။",
+      "scene": "向主管报告任务已经完成。",
+      "scene_my": "အလုပ်ပြီးဆုံးကြောင်း အုပ်ချုပ်သူကို အစီရင်ခံရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我已经写完了。",
+          "pinyin": "wǒ yǐ jīng xiě wán le",
+          "tts_pinyin": "wǒ yǐ jīng xiě wán le",
+          "meaning_my": "ရေးပြီးပါပြီ။"
+        },
+        {
+          "text": "我已经检查完了。",
+          "pinyin": "wǒ yǐ jīng jiǎn chá wán le",
+          "tts_pinyin": "wǒ yǐ jīng jiǎn chá wán le",
+          "meaning_my": "စစ်ဆေးပြီးပါပြီ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "这个工作完成了。",
+          "pinyin": "zhè ge gōng zuò wán chéng le",
+          "tts_pinyin": "zhè ge gōng zuò wán chéng le",
+          "meaning_my": "ဒီအလုပ် ပြီးပါပြီ။",
+          "label": "正式",
+          "label_en": "Formal",
+          "label_my": "တရားဝင်"
+        }
+      ],
+      "scene_en": "Report to a supervisor that a task is complete."
+    },
+    {
+      "id": "office_006",
+      "text": "我还需要一点时间。",
+      "pinyin": "wǒ hái xū yào yì diǎn shí jiān",
+      "tts_pinyin": "wǒ hái xū yào yì diǎn shí jiān",
+      "meaning_my": "အချိန်နည်းနည်း ထပ်လိုပါတယ်။",
+      "scene": "任务还没完成，需要延长时间时使用。",
+      "scene_my": "အလုပ်မပြီးသေး၍ အချိန်ထပ်လိုသည့်အခါ သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我还需要十分钟。",
+          "pinyin": "wǒ hái xū yào shí fēn zhōng",
+          "tts_pinyin": "wǒ hái xū yào shí fēn zhōng",
+          "meaning_my": "ဆယ်မိနစ်လောက် ထပ်လိုပါတယ်။"
+        },
+        {
+          "text": "我还需要一天。",
+          "pinyin": "wǒ hái xū yào yì tiān",
+          "tts_pinyin": "wǒ hái xū yào yì tiān",
+          "meaning_my": "တစ်ရက်လောက် ထပ်လိုပါတယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "可以再给我一点时间吗？",
+          "pinyin": "kě yǐ zài gěi wǒ yì diǎn shí jiān ma",
+          "tts_pinyin": "kě yǐ zài gěi wǒ yì diǎn shí jiān ma",
+          "meaning_my": "အချိန်နည်းနည်း ထပ်ပေးလို့ရမလား။",
+          "label": "礼貌",
+          "label_en": "Polite",
+          "label_my": "ယဉ်ကျေး"
+        }
+      ],
+      "scene_en": "Use it when a task is unfinished and you need more time."
+    },
+    {
+      "id": "office_007",
+      "text": "我明天想请假。",
+      "pinyin": "wǒ míng tiān xiǎng qǐng jià",
+      "tts_pinyin": "wǒ míng tiān xiǎng qǐng jià",
+      "meaning_my": "မနက်ဖြန် ခွင့်ယူချင်ပါတယ်။",
+      "scene": "提前向主管提出请假。",
+      "scene_my": "အုပ်ချုပ်သူထံ ကြိုတင်ခွင့်တောင်းရာတွင် သုံးပါ။",
+      "replacements": [
+        {
+          "text": "我今天想请假。",
+          "pinyin": "wǒ jīn tiān xiǎng qǐng jià",
+          "tts_pinyin": "wǒ jīn tiān xiǎng qǐng jià",
+          "meaning_my": "ဒီနေ့ ခွင့်ယူချင်ပါတယ်။"
+        },
+        {
+          "text": "我想请两天假。",
+          "pinyin": "wǒ xiǎng qǐng liǎng tiān jià",
+          "tts_pinyin": "wǒ xiǎng qǐng liǎng tiān jià",
+          "meaning_my": "နှစ်ရက် ခွင့်ယူချင်ပါတယ်။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "我明天可以请假吗？",
+          "pinyin": "wǒ míng tiān kě yǐ qǐng jià ma",
+          "tts_pinyin": "wǒ míng tiān kě yǐ qǐng jià ma",
+          "meaning_my": "မနက်ဖြန် ခွင့်ယူလို့ရမလား။",
+          "label": "询问",
+          "label_en": "Question",
+          "label_my": "မေးမြန်း"
+        }
+      ],
+      "scene_en": "Ask a supervisor for leave in advance."
+    },
+    {
+      "id": "office_008",
+      "text": "有什么问题请告诉我。",
+      "pinyin": "yǒu shén me wèn tí qǐng gào su wǒ",
+      "tts_pinyin": "yǒu shén me wèn tí qǐng gào su wǒ",
+      "meaning_my": "ပြဿနာရှိရင် ပြောပေးပါ။",
+      "scene": "完成交接或协作时请对方及时反馈。",
+      "scene_my": "အလုပ်လွှဲပြောင်းခြင်း သို့မဟုတ် ပူးပေါင်းလုပ်ဆောင်ရာတွင် တုံ့ပြန်ရန် ပြောရာ၌ သုံးပါ။",
+      "replacements": [
+        {
+          "text": "有变化请告诉我。",
+          "pinyin": "yǒu biàn huà qǐng gào su wǒ",
+          "tts_pinyin": "yǒu biàn huà qǐng gào su wǒ",
+          "meaning_my": "အပြောင်းအလဲရှိရင် ပြောပေးပါ။"
+        },
+        {
+          "text": "有消息请告诉我。",
+          "pinyin": "yǒu xiāo xi qǐng gào su wǒ",
+          "tts_pinyin": "yǒu xiāo xi qǐng gào su wǒ",
+          "meaning_my": "သတင်းရှိရင် ပြောပေးပါ။"
+        }
+      ],
+      "alternatives": [
+        {
+          "text": "如果有问题，随时联系我。",
+          "pinyin": "rú guǒ yǒu wèn tí，suí shí lián xì wǒ",
+          "tts_pinyin": "rú guǒ yǒu wèn tí，suí shí lián xì wǒ",
+          "meaning_my": "ပြဿနာရှိရင် အချိန်မရွေး ဆက်သွယ်ပါ။",
+          "label": "正式",
+          "label_en": "Formal",
+          "label_my": "တရားဝင်"
+        }
+      ],
+      "scene_en": "Ask the other person to give timely feedback during a handover or collaboration."
+    }
+  ],
+  "title_en": "Workplace communication",
+  "title_my": "ရုံးဆက်သွယ်မှု",
+  "subtitle_en": "Tasks, questions, completion, timing and leave",
+  "subtitle_my": "တာဝန်များ၊ မေးမြန်းခြင်း၊ ပြီးစီးမှု၊ အချိန်နှင့် ခွင့်ယူခြင်း"
+}

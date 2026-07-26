@@ -1,17 +1,105 @@
 {
   "type": "speaking",
   "title": "口语",
-  "subtitle": "按真实场景分级，先选场景，再进入短句、对话和 AI 对练。",
+  "subtitle": "按真实场景展开中文、缅文高频短句，点击句子进入拼读、替换、跟读和 FSRS 复习。",
   "items": [
-    { "id": "speaking_daily", "title": "日常生活", "subtitle": "打招呼、点餐、购物、租房", "badge": "高频", "children": [
-      { "id": "speak_hello", "title": "打招呼", "subtitle": "认识新朋友、日常开场", "target": "study", "asset": "assets/learning/speaking/hello.json" },
-      { "id": "speak_food", "title": "点餐", "subtitle": "餐厅点菜、口味、买单", "target": "study", "asset": "assets/learning/speaking/food.json" },
-      { "id": "speak_shop", "title": "购物", "subtitle": "价格、尺码、砍价、付款", "target": "study", "asset": "assets/learning/speaking/shop.json" },
-      { "id": "speak_rent", "title": "租房", "subtitle": "看房、押金、水电、维修", "target": "study", "asset": "assets/learning/speaking/rent.json" }
-    ] },
-    { "id": "speaking_work", "title": "工作求职", "subtitle": "面试、同事沟通、请假、工资", "badge": "求职", "children": [
-      { "id": "speak_job", "title": "求职面试", "subtitle": "自我介绍、经验、期望薪资", "target": "study", "asset": "assets/learning/speaking/job.json" },
-      { "id": "speak_office", "title": "办公室沟通", "subtitle": "工作安排、反馈、请假", "target": "study", "asset": "assets/learning/speaking/office.json" }
-    ] }
-  ]
+    {
+      "id": "speaking_daily",
+      "title": "日常生活",
+      "subtitle": "打招呼、点餐、购物、租房",
+      "badge": "高频",
+      "children": [
+        {
+          "id": "speak_hello",
+          "title": "打招呼",
+          "subtitle": "认识新朋友、日常开场",
+          "target": "study",
+          "asset": "assets/learning/speaking/hello.json",
+          "title_en": "Greetings",
+          "title_my": "နှုတ်ဆက်ခြင်း",
+          "subtitle_en": "Meet new people and start daily conversations",
+          "subtitle_my": "မိတ်ဆွေအသစ်နှင့်တွေ့ဆုံခြင်း၊ နေ့စဉ်စကားစတင်ခြင်း"
+        },
+        {
+          "id": "speak_food",
+          "title": "点餐",
+          "subtitle": "餐厅点菜、口味、买单",
+          "target": "study",
+          "asset": "assets/learning/speaking/food.json",
+          "title_en": "Dining",
+          "title_my": "အစားအသောက်မှာခြင်း",
+          "subtitle_en": "Ordering, taste and paying",
+          "subtitle_my": "အစားအသောက်မှာခြင်း၊ အရသာနှင့် ငွေရှင်းခြင်း"
+        },
+        {
+          "id": "speak_shop",
+          "title": "购物",
+          "subtitle": "价格、尺码、砍价、付款",
+          "target": "study",
+          "asset": "assets/learning/speaking/shop.json",
+          "title_en": "Shopping",
+          "title_my": "ဈေးဝယ်ခြင်း",
+          "subtitle_en": "Prices, sizes, bargaining and payment",
+          "subtitle_my": "ဈေးနှုန်း၊ အရွယ်အစား၊ ဈေးဆစ်ခြင်းနှင့် ငွေပေးချေခြင်း"
+        },
+        {
+          "id": "speak_rent",
+          "title": "租房",
+          "subtitle": "看房、押金、水电、维修",
+          "target": "study",
+          "asset": "assets/learning/speaking/rent.json",
+          "title_en": "Renting",
+          "title_my": "အိမ်ငှားခြင်း",
+          "subtitle_en": "Viewing, deposits, utilities and repairs",
+          "subtitle_my": "အိမ်ကြည့်ခြင်း၊ စပေါ်ငွေ၊ ရေမီးခနှင့် ပြုပြင်ခြင်း"
+        }
+      ],
+      "title_en": "Daily life",
+      "title_my": "နေ့စဉ်ဘဝ",
+      "subtitle_en": "Greetings, dining, shopping and renting",
+      "subtitle_my": "နှုတ်ဆက်ခြင်း၊ စားသောက်ခြင်း၊ ဈေးဝယ်ခြင်းနှင့် အိမ်ငှားခြင်း",
+      "badge_en": "High frequency",
+      "badge_my": "အသုံးများ"
+    },
+    {
+      "id": "speaking_work",
+      "title": "工作求职",
+      "subtitle": "面试、同事沟通、请假、工资",
+      "badge": "求职",
+      "children": [
+        {
+          "id": "speak_job",
+          "title": "求职面试",
+          "subtitle": "自我介绍、经验、期望薪资",
+          "target": "study",
+          "asset": "assets/learning/speaking/job.json",
+          "title_en": "Job interview",
+          "title_my": "အလုပ်အင်တာဗျူး",
+          "subtitle_en": "Self-introduction, experience and expected salary",
+          "subtitle_my": "ကိုယ်ရေးမိတ်ဆက်ခြင်း၊ အတွေ့အကြုံနှင့် မျှော်မှန်းလစာ"
+        },
+        {
+          "id": "speak_office",
+          "title": "办公室沟通",
+          "subtitle": "工作安排、反馈、请假",
+          "target": "study",
+          "asset": "assets/learning/speaking/office.json",
+          "title_en": "Workplace communication",
+          "title_my": "ရုံးဆက်သွယ်မှု",
+          "subtitle_en": "Work arrangements, feedback and leave",
+          "subtitle_my": "အလုပ်စီစဉ်မှု၊ တုံ့ပြန်ချက်နှင့် ခွင့်ယူခြင်း"
+        }
+      ],
+      "title_en": "Work and jobs",
+      "title_my": "အလုပ်နှင့် အလုပ်ရှာဖွေခြင်း",
+      "subtitle_en": "Interviews, workplace communication, leave and salary",
+      "subtitle_my": "အင်တာဗျူး၊ လုပ်ဖော်ကိုင်ဖက်ဆက်သွယ်မှု၊ ခွင့်ယူခြင်းနှင့် လစာ",
+      "badge_en": "Jobs",
+      "badge_my": "အလုပ်"
+    }
+  ],
+  "title_en": "Speaking",
+  "title_my": "စကားပြော",
+  "subtitle_en": "Expand practical Chinese and Burmese high-frequency phrases by real-life scene. Tap a phrase for spelling, substitutions, pronunciation, and FSRS review.",
+  "subtitle_my": "လက်တွေ့အခြေအနေအလိုက် တရုတ်နှင့် မြန်မာ အသုံးများသော ဝါကျတိုများကို ဖြန့်ကြည့်ပါ။ ဝါကျကို နှိပ်၍ ပင်ယင်ဖတ်ခြင်း၊ အစားထိုးပြောပုံ၊ လိုက်ဖတ်ခြင်းနှင့် FSRS ပြန်လေ့လာခြင်း ပြုလုပ်နိုင်သည်။"
 }
