@@ -1,7 +1,7 @@
 {
   "type": "speaking",
   "title": "口语",
-  "subtitle": "按真实场景展开中文、缅文高频短句，点击句子进入拼读、替换、跟读和 FSRS 复习。",
+  "subtitle": "按真实场景浏览中文、缅文高频短句，进入分类后点击句子学习拼读、替换、跟读和 FSRS 复习。",
   "items": [
     {
       "id": "speaking_daily",
@@ -100,6 +100,6 @@
   ],
   "title_en": "Speaking",
   "title_my": "စကားပြော",
-  "subtitle_en": "Expand practical Chinese and Burmese high-frequency phrases by real-life scene. Tap a phrase for spelling, substitutions, pronunciation, and FSRS review.",
-  "subtitle_my": "လက်တွေ့အခြေအနေအလိုက် တရုတ်နှင့် မြန်မာ အသုံးများသော ဝါကျတိုများကို ဖြန့်ကြည့်ပါ။ ဝါကျကို နှိပ်၍ ပင်ယင်ဖတ်ခြင်း၊ အစားထိုးပြောပုံ၊ လိုက်ဖတ်ခြင်းနှင့် FSRS ပြန်လေ့လာခြင်း ပြုလုပ်နိုင်သည်။"
+  "subtitle_en": "Browse practical Chinese and Burmese high-frequency phrases by scene. Open a category, then tap a phrase for spelling, substitutions, pronunciation, and FSRS review.",
+  "subtitle_my": "လက်တွေ့အခြေအနေအလိုက် တရုတ်နှင့် မြန်မာ အသုံးများသော ဝါကျတိုများကို ကြည့်ပါ။ အမျိုးအစားထဲဝင်ပြီး ဝါကျကို နှိပ်၍ ပင်ယင်၊ အစားထိုးပြောပုံ၊ လိုက်ဖတ်ခြင်းနှင့် FSRS ပြန်လေ့လာခြင်း ပြုလုပ်နိုင်သည်။"
 }
