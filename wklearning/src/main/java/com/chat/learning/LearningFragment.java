@@ -68,7 +68,6 @@ public class LearningFragment extends Fragment {
     private static final float RADIUS_SHEET = 32f;
     private static final float RADIUS_PANEL = 24f;
     private static final float RADIUS_CARD = 20f;
-    private static final float RADIUS_PILL = 16f;
 
     private WideEdgeDrawerLayout drawerLayout;
     private View sideDrawerView;
@@ -186,13 +185,6 @@ public class LearningFragment extends Fragment {
         content.setPadding(dp(20), getTopInset() + dp(48), dp(20), dp(92));
         hero.addView(content, new FrameLayout.LayoutParams(-1, -1));
 
-        TextView tag = text(getString(R.string.learning_home_course_recommendation),
-                11, 0xEFFFFFFF, true);
-        tag.setGravity(Gravity.CENTER);
-        tag.setPadding(dp(12), dp(6), dp(12), dp(6));
-        tag.setBackground(rounded(0x2EFFFFFF, dp(RADIUS_PILL), 0x55FFFFFF, dp(1)));
-        content.addView(tag, new LinearLayout.LayoutParams(-2, -2));
-
         priceFlipper = new ViewFlipper(requireContext());
         priceFlipper.setFlipInterval(4800);
         priceFlipper.setAutoStart(false);
@@ -213,18 +205,18 @@ public class LearningFragment extends Fragment {
                 Math.min(prices.length, notes.length));
         for (int i = 0; i < count; i++) {
             priceFlipper.addView(createPriceSlide(
-                    titles[i], subtitles[i], prices[i], notes[i], i, count
+                    titles[i], subtitles[i], prices[i], notes[i], i
             ), new FrameLayout.LayoutParams(-1, -1));
         }
 
         LinearLayout.LayoutParams flipperLp = new LinearLayout.LayoutParams(-1, dp(142));
-        flipperLp.setMargins(0, dp(10), 0, 0);
+        flipperLp.setMargins(0, 0, 0, 0);
         content.addView(priceFlipper, flipperLp);
         return hero;
     }
 
     private View createPriceSlide(String title, String subtitle, String price,
-                                  String note, int index, int total) {
+                                  String note, int index) {
         LinearLayout slide = new LinearLayout(requireContext());
         slide.setOrientation(LinearLayout.VERTICAL);
         slide.setGravity(Gravity.CENTER_VERTICAL);
@@ -238,13 +230,6 @@ public class LearningFragment extends Fragment {
         titleView.setSingleLine(true);
         titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
         top.addView(titleView, new LinearLayout.LayoutParams(0, -2, 1f));
-
-        TextView position = text(getString(R.string.learning_home_slide_position,
-                index + 1, total), 11, 0xD9FFFFFF, true);
-        position.setGravity(Gravity.CENTER);
-        position.setPadding(dp(9), dp(5), dp(9), dp(5));
-        position.setBackground(rounded(0x26000000, dp(14), 0x44FFFFFF, dp(1)));
-        top.addView(position, new LinearLayout.LayoutParams(-2, -2));
 
         TextView subtitleView = text(subtitle, 13, 0xE8FFFFFF, false);
         subtitleView.setSingleLine(true);
@@ -553,13 +538,13 @@ public class LearningFragment extends Fragment {
         card.setPadding(dp(16), dp(14), dp(14), dp(14));
         card.setClipToOutline(true);
         card.setBackground(ripple(
-                gradientRounded(start, end, dp(RADIUS_CARD), withAlpha(accent, 72), dp(1)),
-                withAlpha(accent, 32),
+                gradientRounded(start, end, dp(RADIUS_CARD), Color.TRANSPARENT, 0),
+                withAlpha(accent, 30),
                 RADIUS_CARD
         ));
         bindClick(card, () -> onSmallCardClick(spec));
-        applyColoredShadow(card, accent, 4f);
-        attachNativePressAnimator(card, 4f, -2f);
+        applyColoredShadow(card, accent, 3f);
+        attachNativePressAnimator(card, 3f, -2f);
 
         if (spec.iconRes != 0) {
             addSceneCardContent(card, spec, accent);
@@ -590,14 +575,10 @@ public class LearningFragment extends Fragment {
         copy.setGravity(Gravity.CENTER_VERTICAL);
         card.addView(copy, new FrameLayout.LayoutParams(-1, -1));
 
-        View marker = new View(requireContext());
-        marker.setBackground(rounded(accent, dp(3), Color.TRANSPARENT, 0));
-        copy.addView(marker, new LinearLayout.LayoutParams(dp(20), dp(5)));
-
         TextView title = text(spec.title, 15, COLOR_TEXT, true);
         title.setMaxLines(2);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-        titleLp.setMargins(0, dp(9), dp(44), 0);
+        titleLp.setMargins(0, 0, dp(44), 0);
         copy.addView(title, titleLp);
 
         TextView desc = text(spec.desc, 12, COLOR_SUB, false);
@@ -608,35 +589,16 @@ public class LearningFragment extends Fragment {
     }
 
     private void addHskCardContent(FrameLayout card, CardSpec spec, int accent) {
-        TextView ghost = text(String.valueOf(spec.level), 54,
-                withAlpha(accent, 42), true);
-        ghost.setGravity(Gravity.CENTER);
-        ghost.setIncludeFontPadding(false);
-        ghost.setTranslationX(dp(12));
-        ghost.setTranslationY(dp(10));
-        ghost.setRotation(-8f);
-        FrameLayout.LayoutParams ghostLp = new FrameLayout.LayoutParams(
-                dp(78), dp(82), Gravity.END | Gravity.BOTTOM
-        );
-        ghostLp.setMargins(0, 0, -dp(7), -dp(8));
-        card.addView(ghost, ghostLp);
-
         LinearLayout copy = new LinearLayout(requireContext());
         copy.setOrientation(LinearLayout.VERTICAL);
         copy.setGravity(Gravity.CENTER_VERTICAL);
-        FrameLayout.LayoutParams copyLp = new FrameLayout.LayoutParams(-1, -1);
-        copyLp.setMargins(0, 0, dp(40), 0);
-        card.addView(copy, copyLp);
-
-        View marker = new View(requireContext());
-        marker.setBackground(rounded(accent, dp(3), Color.TRANSPARENT, 0));
-        copy.addView(marker, new LinearLayout.LayoutParams(dp(24), dp(5)));
+        card.addView(copy, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout titleRow = new LinearLayout(requireContext());
         titleRow.setOrientation(LinearLayout.HORIZONTAL);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams titleRowLp = new LinearLayout.LayoutParams(-1, -2);
-        titleRowLp.setMargins(0, dp(8), 0, 0);
+        titleRowLp.setMargins(0, 0, 0, 0);
         copy.addView(titleRow, titleRowLp);
 
         TextView title = text(spec.title, 16, COLOR_TEXT, true);
@@ -981,7 +943,7 @@ public class LearningFragment extends Fragment {
             case "initials": return "b";
             case "finals": return "a";
             case "whole": return "zhi";
-            case "tone": return "ˇ";
+            case "tone": return "ài";
             case "pattern_want": return "想";
             case "pattern_can": return "可";
             case "pattern_how": return "怎";
@@ -1363,14 +1325,8 @@ public class LearningFragment extends Fragment {
     private static class HeroImageScrimView extends View {
         private final Paint topScrim = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint bottomScrim = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final RectF ring = new RectF();
-
         HeroImageScrimView(Context context) {
             super(context);
-            ringPaint.setStyle(Paint.Style.STROKE);
-            ringPaint.setStrokeWidth(context.getResources().getDisplayMetrics().density);
-            ringPaint.setColor(0x20FFFFFF);
         }
 
         @Override
@@ -1394,11 +1350,6 @@ public class LearningFragment extends Fragment {
         protected void onDraw(Canvas canvas) {
             canvas.drawRect(0, 0, getWidth(), getHeight(), topScrim);
             canvas.drawRect(0, 0, getWidth(), getHeight(), bottomScrim);
-
-            float size = Math.min(getWidth(), getHeight()) * 0.30f;
-            ring.set(getWidth() - size * 1.05f, -size * 0.28f,
-                    getWidth() + size * 0.16f, size * 0.93f);
-            canvas.drawOval(ring, ringPaint);
         }
     }
 }
