@@ -1,22 +1,47 @@
 [
   {
+    "file": "speaking_coach.user.js",
+    "title": "AI 口语教练",
+    "description": "围绕当前短句自动练习对话，调用唐僧 TTS 朗读和原生语音识别继续回答。",
+    "title_en": "AI Speaking Coach",
+    "title_my": "AI စကားပြောနည်းပြ",
+    "description_en": "Practice conversations around the current phrase, read AI replies with TangSeng TTS, and continue with native speech recognition.",
+    "description_my": "လက်ရှိဝါကျကို အခြေခံ၍ စကားပြောလေ့ကျင့်ပြီး TangSeng TTS ဖြင့် ဖတ်ပြကာ မူရင်းအသံမှတ်မိစနစ်ဖြင့် ဆက်လက်ဖြေဆိုနိုင်သည်။"
+  },
+  {
     "file": "ai_prompt_panel.user.js",
     "title": "学习提示词面板",
-    "description": "在 DeepSeek / 千问页面加入口语场景、题目解析、翻译等快捷 prompt。"
+    "description": "在 DeepSeek / 千问页面加入口语场景、题目解析、翻译等快捷 prompt。",
+    "title_en": "Learning Prompt Panel",
+    "title_my": "သင်ယူမှု Prompt ဘောင်",
+    "description_en": "Adds quick prompts for speaking scenes, question analysis, translation and more on DeepSeek and Qwen pages.",
+    "description_my": "DeepSeek နှင့် Qwen စာမျက်နှာများတွင် စကားပြောအခြေအနေ၊ မေးခွန်းရှင်းလင်းမှု၊ ဘာသာပြန်နှင့် အခြား prompt အမြန်ခလုတ်များ ထည့်ပေးသည်။"
   },
   {
     "file": "ai_read_aloud.user.js",
     "title": "自动朗读 AI 回复",
-    "description": "使用网页 speechSynthesis 朗读最后一条 AI 回复，可手动朗读或开启自动朗读。"
+    "description": "使用网页 speechSynthesis 朗读最后一条 AI 回复，可手动朗读或开启自动朗读。",
+    "title_en": "Read AI Replies Aloud",
+    "title_my": "AI ပြန်စာကို ဖတ်ပြခြင်း",
+    "description_en": "Reads the latest AI reply with browser speech synthesis, manually or automatically.",
+    "description_my": "နောက်ဆုံး AI ပြန်စာကို ဝဘ်အသံဖတ်စနစ်ဖြင့် ကိုယ်တိုင် သို့မဟုတ် အလိုအလျောက် ဖတ်ပြသည်။"
   },
   {
     "file": "ai_copy_last_answer.user.js",
     "title": "一键复制最后回答",
-    "description": "右下角增加复制按钮，复制最后一条 AI 回复。"
+    "description": "右下角增加复制按钮，复制最后一条 AI 回复。",
+    "title_en": "Copy Latest Answer",
+    "title_my": "နောက်ဆုံးပြန်စာကို ကူးရန်",
+    "description_en": "Adds a button to copy the latest AI reply.",
+    "description_my": "နောက်ဆုံး AI ပြန်စာကို ကူးယူရန် ခလုတ်တစ်ခု ထည့်ပေးသည်။"
   },
   {
     "file": "ai_clean_style.user.js",
     "title": "学习样式美化",
-    "description": "放大文字、优化行距、隐藏少量干扰元素，适合平板学习。"
+    "description": "放大文字、优化行距、隐藏少量干扰元素，适合平板学习。",
+    "title_en": "Learning Style Enhancement",
+    "title_my": "သင်ယူမှုအပြင်အဆင် မြှင့်တင်ခြင်း",
+    "description_en": "Enlarges text, improves spacing and hides minor distractions for tablet learning.",
+    "description_my": "တက်ဘလက်ဖြင့် လေ့လာရန် စာလုံးအရွယ်ကို ကြီးစေပြီး အကွာအဝေးကို ပြင်ဆင်ကာ အနှောင့်အယှက်အချို့ကို ဖျောက်ပေးသည်။"
   }
 ]
