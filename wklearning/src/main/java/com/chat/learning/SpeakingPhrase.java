@@ -15,6 +15,7 @@ final class SpeakingPhrase {
     final String scene;
     final String sceneMy;
     final String sceneEn;
+    final List<Breakdown> breakdown;
     final List<Variant> replacements;
     final List<Variant> alternatives;
 
@@ -28,6 +29,7 @@ final class SpeakingPhrase {
             String scene,
             String sceneMy,
             String sceneEn,
+            List<Breakdown> breakdown,
             List<Variant> replacements,
             List<Variant> alternatives
     ) {
@@ -40,21 +42,39 @@ final class SpeakingPhrase {
         this.scene = safe(scene);
         this.sceneMy = safe(sceneMy);
         this.sceneEn = safe(sceneEn);
-        this.replacements = immutable(replacements);
-        this.alternatives = immutable(alternatives);
+        this.breakdown = immutableBreakdown(breakdown);
+        this.replacements = immutableVariants(replacements);
+        this.alternatives = immutableVariants(alternatives);
     }
 
     String progressKey() {
         return id.length() > 0 ? id : text;
     }
 
-    private static List<Variant> immutable(List<Variant> values) {
+    private static List<Variant> immutableVariants(List<Variant> values) {
+        if (values == null || values.isEmpty()) return Collections.emptyList();
+        return Collections.unmodifiableList(new ArrayList<>(values));
+    }
+
+    private static List<Breakdown> immutableBreakdown(List<Breakdown> values) {
         if (values == null || values.isEmpty()) return Collections.emptyList();
         return Collections.unmodifiableList(new ArrayList<>(values));
     }
 
     private static String safe(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    static final class Breakdown {
+        final String text;
+        final String pinyin;
+        final String meaningMy;
+
+        Breakdown(String text, String pinyin, String meaningMy) {
+            this.text = safe(text);
+            this.pinyin = safe(pinyin);
+            this.meaningMy = safe(meaningMy);
+        }
     }
 
     static final class Variant {

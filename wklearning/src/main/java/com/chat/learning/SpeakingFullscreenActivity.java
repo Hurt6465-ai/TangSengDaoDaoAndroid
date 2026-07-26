@@ -2,10 +2,15 @@ package com.chat.learning;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -64,11 +69,33 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
     private TextView myanmarView;
     private TextView sceneView;
     private TextView sceneMyView;
+    private TextView sceneTabView;
+    private TextView replacementsTabView;
+    private TextView alternativesTabView;
+    private FrameLayout detailPageHost;
+    private View scenePage;
+    private View replacementsPage;
+    private View alternativesPage;
+    private LinearLayout breakdownBox;
     private LinearLayout replacementsBox;
     private LinearLayout alternativesBox;
+    private int detailTabIndex;
+    private FrameLayout decisionHost;
     private LinearLayout ratingRow;
+    private LinearLayout actionRow;
+    private ActionIconView loopIconView;
+    private TextView loopLabelView;
     private FrameLayout bodyHost;
     private View studyBody;
+    private FrameLayout faceHost;
+    private View frontFaceView;
+    private View backFaceView;
+    private TextView frontStateView;
+    private TextView frontSceneView;
+    private TextView frontSceneSecondaryView;
+    private TextView frontMeaningView;
+    private boolean frontFace = true;
+    private boolean flipAnimating;
     private View completionBody;
     private final EnumMap<WordFsrsScheduler.Rating, TextView> ratingButtons =
             new EnumMap<>(WordFsrsScheduler.Rating.class);
@@ -79,6 +106,9 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
     private String displayMeaningMy = "";
     private float touchDownX;
     private float touchDownY;
+    private final Handler autoPlayHandler = new Handler(Looper.getMainLooper());
+    private boolean autoPlayEnabled;
+    private int autoPlayGeneration;
 
     public static void open(Context context, String packId, String title, String asset,
                             String startId) {
@@ -111,7 +141,14 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onPause() {
+        stopAutoPlay();
+        super.onPause();
+    }
+
+    @Override
     protected void onDestroy() {
+        stopAutoPlay();
         if (progressStore != null) progressStore.close();
         super.onDestroy();
     }
@@ -178,10 +215,17 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
         studyBody = buildStudyBody();
         bodyHost.addView(studyBody, new FrameLayout.LayoutParams(-1, -1));
 
+        decisionHost = new FrameLayout(this);
         ratingRow = buildRatingRow();
-        LinearLayout.LayoutParams ratingLp = new LinearLayout.LayoutParams(-1, dp(64));
-        ratingLp.setMargins(0, dp(10), 0, 0);
-        page.addView(ratingRow, ratingLp);
+        decisionHost.addView(ratingRow, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout.LayoutParams decisionLp = new LinearLayout.LayoutParams(-1, dp(60));
+        decisionLp.setMargins(0, dp(8), 0, 0);
+        page.addView(decisionHost, decisionLp);
+
+        actionRow = buildActionRow();
+        LinearLayout.LayoutParams actionLp = new LinearLayout.LayoutParams(-1, dp(80));
+        actionLp.setMargins(0, dp(5), 0, 0);
+        page.addView(actionRow, actionLp);
     }
 
     private View topBar() {
@@ -211,6 +255,75 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
     }
 
     private View buildStudyBody() {
+        faceHost = new FrameLayout(this);
+        faceHost.setBackground(rounded(COLOR_CARD, dp(27), COLOR_STROKE, dp(1)));
+        faceHost.setElevation(dp(3));
+        faceHost.setCameraDistance(dp(9000));
+
+        frontFaceView = buildFrontFace();
+        backFaceView = buildBackFace();
+        faceHost.addView(frontFaceView, new FrameLayout.LayoutParams(-1, -1));
+        faceHost.addView(backFaceView, new FrameLayout.LayoutParams(-1, -1));
+        backFaceView.setVisibility(View.GONE);
+        return faceHost;
+    }
+
+    private View buildFrontFace() {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setGravity(Gravity.CENTER_HORIZONTAL);
+        page.setPadding(dp(24), dp(20), dp(24), dp(18));
+        page.setOnTouchListener(this::handleCardTouch);
+        page.setOnClickListener(v -> revealAnswer());
+
+        frontStateView = text("", 12, COLOR_BRAND, true);
+        frontStateView.setGravity(Gravity.CENTER);
+        frontStateView.setPadding(dp(10), dp(4), dp(10), dp(4));
+        frontStateView.setBackground(rounded(COLOR_BRAND_SOFT, dp(12), 0, 0));
+        page.addView(frontStateView, new LinearLayout.LayoutParams(-2, -2));
+
+        page.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 0.38f));
+
+        frontSceneView = text("", 13, COLOR_BRAND, true);
+        frontSceneView.setGravity(Gravity.CENTER);
+        frontSceneView.setSingleLine(false);
+        frontSceneView.setPadding(dp(13), dp(6), dp(13), dp(6));
+        frontSceneView.setBackground(rounded(COLOR_BRAND_SOFT, dp(15), 0, 0));
+        page.addView(frontSceneView, new LinearLayout.LayoutParams(-2, -2));
+
+        // Kept for compatibility with the existing field structure. The front side intentionally
+        // shows no translation or secondary-language hint, so the learner reads Chinese first.
+        frontSceneSecondaryView = text("", 1, Color.TRANSPARENT, false);
+        frontSceneSecondaryView.setVisibility(View.GONE);
+        page.addView(frontSceneSecondaryView, new LinearLayout.LayoutParams(1, 1));
+
+        frontMeaningView = text("", 38, COLOR_TEXT, true);
+        frontMeaningView.setGravity(Gravity.CENTER);
+        frontMeaningView.setIncludeFontPadding(false);
+        frontMeaningView.setLineSpacing(dp(7), 1.03f);
+        LinearLayout.LayoutParams sentenceLp = new LinearLayout.LayoutParams(-1, -2);
+        sentenceLp.setMargins(0, dp(25), 0, 0);
+        page.addView(frontMeaningView, sentenceLp);
+
+        TextView prompt = text(getString(R.string.speaking_front_prompt), 13.5f,
+                COLOR_SUB, false);
+        prompt.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams promptLp = new LinearLayout.LayoutParams(-1, -2);
+        promptLp.setMargins(0, dp(18), 0, 0);
+        page.addView(prompt, promptLp);
+
+        TextView tapHint = text(getString(R.string.speaking_front_tap), 12.5f,
+                0xFF9AA1B2, false);
+        tapHint.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams tapLp = new LinearLayout.LayoutParams(-1, -2);
+        tapLp.setMargins(0, dp(11), 0, 0);
+        page.addView(tapHint, tapLp);
+
+        page.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 0.62f));
+        return page;
+    }
+
+    private View buildBackFace() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setVerticalScrollBarEnabled(false);
@@ -218,22 +331,21 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(2), 0, dp(2), dp(18));
+        content.setPadding(dp(18), dp(20), dp(18), dp(18));
         scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
 
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER_HORIZONTAL);
-        card.setPadding(dp(18), dp(22), dp(18), dp(18));
-        card.setBackground(rounded(COLOR_CARD, dp(27), COLOR_STROKE, dp(1)));
-        card.setOnTouchListener(this::handleCardTouch);
-        content.addView(card, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout answer = new LinearLayout(this);
+        answer.setOrientation(LinearLayout.VERTICAL);
+        answer.setGravity(Gravity.CENTER_HORIZONTAL);
+        answer.setPadding(0, 0, 0, dp(8));
+        answer.setOnClickListener(v -> showFrontFace());
+        content.addView(answer, new LinearLayout.LayoutParams(-1, -2));
 
         stateView = text("", 12, COLOR_BRAND, true);
         stateView.setGravity(Gravity.CENTER);
         stateView.setPadding(dp(10), dp(4), dp(10), dp(4));
         stateView.setBackground(rounded(COLOR_BRAND_SOFT, dp(12), 0, 0));
-        card.addView(stateView, new LinearLayout.LayoutParams(-2, -2));
+        answer.addView(stateView, new LinearLayout.LayoutParams(-2, -2));
 
         chineseView = text("", 37, COLOR_TEXT, true);
         chineseView.setGravity(Gravity.CENTER);
@@ -241,8 +353,8 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
         chineseView.setLineSpacing(dp(5), 1f);
         chineseView.setOnClickListener(v -> speakSentence());
         LinearLayout.LayoutParams zhLp = new LinearLayout.LayoutParams(-1, -2);
-        zhLp.setMargins(0, dp(20), 0, 0);
-        card.addView(chineseView, zhLp);
+        zhLp.setMargins(0, dp(18), 0, 0);
+        answer.addView(chineseView, zhLp);
 
         pinyinView = text("", 19, COLOR_BRAND, false);
         pinyinView.setGravity(Gravity.CENTER);
@@ -250,7 +362,7 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
         pinyinView.setOnClickListener(v -> speakSpelling());
         LinearLayout.LayoutParams pyLp = new LinearLayout.LayoutParams(-1, -2);
         pyLp.setMargins(0, dp(10), 0, 0);
-        card.addView(pinyinView, pyLp);
+        answer.addView(pinyinView, pyLp);
 
         myanmarView = text("", 19, COLOR_MY, false);
         myanmarView.setGravity(Gravity.CENTER);
@@ -258,85 +370,217 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
         myanmarView.setLineSpacing(dp(4), 1.12f);
         myanmarView.setOnClickListener(v -> speakMyanmar());
         LinearLayout.LayoutParams myLp = new LinearLayout.LayoutParams(-1, -2);
-        myLp.setMargins(0, dp(14), 0, dp(18));
-        card.addView(myanmarView, myLp);
+        myLp.setMargins(0, dp(13), 0, 0);
+        answer.addView(myanmarView, myLp);
 
-        card.addView(toolRow(), new LinearLayout.LayoutParams(-1, dp(62)));
+        TextView backHint = text(getString(R.string.speaking_back_tap), 11.5f,
+                0xFF9AA1B2, false);
+        backHint.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+        hintLp.setMargins(0, dp(11), 0, 0);
+        answer.addView(backHint, hintLp);
 
         content.addView(detailCard(), detailLp());
         return scroll;
     }
 
-    private View toolRow() {
+    private void revealAnswer() {
+        if (!frontFace || flipAnimating || phrases.isEmpty()) return;
+        stopAutoPlay();
+        flipTo(false);
+    }
+
+    private void showFrontFace() {
+        if (frontFace || flipAnimating || phrases.isEmpty()) return;
+        stopAutoPlay();
+        flipTo(true);
+    }
+
+    private void flipTo(boolean showFront) {
+        if (faceHost == null || flipAnimating || frontFace == showFront) return;
+        flipAnimating = true;
+        View hide = showFront ? backFaceView : frontFaceView;
+        View show = showFront ? frontFaceView : backFaceView;
+        faceHost.animate()
+                .rotationY(86f)
+                .setDuration(105)
+                .withEndAction(() -> {
+                    hide.setVisibility(View.GONE);
+                    show.setVisibility(View.VISIBLE);
+                    frontFace = showFront;
+                    decisionHost.setVisibility(showFront ? View.INVISIBLE : View.VISIBLE);
+                    ratingRow.setVisibility(showFront ? View.GONE : View.VISIBLE);
+                    faceHost.setRotationY(-86f);
+                    faceHost.animate()
+                            .rotationY(0f)
+                            .setDuration(115)
+                            .withEndAction(() -> flipAnimating = false)
+                            .start();
+                })
+                .start();
+    }
+
+    private void revealForAction(Runnable action) {
+        if (frontFace) revealAnswer();
+        if (action != null) action.run();
+    }
+
+    private LinearLayout buildActionRow() {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER);
-        row.setBackground(rounded(0xFFF5F5FA, dp(21), 0, 0));
-        row.setPadding(dp(5), dp(5), dp(5), dp(5));
-        row.addView(tool("◖))", getString(R.string.speaking_action_read),
-                v -> speakSentence()), toolLp());
-        row.addView(tool("ā", getString(R.string.speaking_action_spelling),
-                v -> speakSpelling()), toolLp());
-        row.addView(tool("●", getString(R.string.speaking_action_pronunciation),
-                v -> openPronunciation()), toolLp());
-        row.addView(tool("AI", getString(R.string.speaking_action_coach),
-                v -> openAiCoach()), toolLp());
+        row.setPadding(dp(2), dp(2), dp(2), 0);
+        row.setBackground(rounded(Color.WHITE, dp(22), COLOR_STROKE, dp(1)));
+
+        row.addView(actionButton(ActionIconView.TYPE_SPEAKER,
+                getString(R.string.speaking_action_read),
+                v -> speakSentence()), actionLp());
+        row.addView(actionButton(ActionIconView.TYPE_SPELLING,
+                getString(R.string.speaking_action_spelling),
+                v -> revealForAction(this::speakSpelling)), actionLp());
+
+        LinearLayout loopButton = actionButton(ActionIconView.TYPE_LOOP,
+                getString(R.string.speaking_action_loop),
+                v -> revealForAction(this::toggleAutoPlay));
+        loopIconView = (ActionIconView) ((LinearLayout) loopButton).getChildAt(0);
+        loopLabelView = (TextView) ((LinearLayout) loopButton).getChildAt(1);
+        row.addView(loopButton, actionLp());
+
+        row.addView(actionButton(ActionIconView.TYPE_MICROPHONE,
+                getString(R.string.speaking_action_pronunciation),
+                v -> openPronunciation()), actionLp());
+        row.addView(actionButton(ActionIconView.TYPE_AI,
+                getString(R.string.speaking_action_coach),
+                v -> openAiCoach()), actionLp());
         return row;
     }
 
-    private LinearLayout.LayoutParams toolLp() {
+    private LinearLayout.LayoutParams actionLp() {
         return new LinearLayout.LayoutParams(0, -1, 1f);
     }
 
-    private View tool(String icon, String label, View.OnClickListener click) {
+    private LinearLayout actionButton(int type, String label, View.OnClickListener click) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER);
+        box.setClickable(true);
         box.setOnClickListener(click);
 
-        TextView iconView = text(icon, "AI".equals(icon) ? 14 : 21, COLOR_TEXT, true);
-        iconView.setGravity(Gravity.CENTER);
-        box.addView(iconView, new LinearLayout.LayoutParams(-1, dp(31)));
+        ActionIconView icon = new ActionIconView(this, type);
+        icon.setBackground(rounded(0xFFF1F2F6, dp(24), 0, 0));
+        box.addView(icon, new LinearLayout.LayoutParams(dp(46), dp(46)));
 
         TextView labelView = text(label, 11.5f, COLOR_SUB, false);
         labelView.setGravity(Gravity.CENTER);
-        box.addView(labelView, new LinearLayout.LayoutParams(-1, dp(21)));
+        labelView.setSingleLine(true);
+        LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, dp(23));
+        labelLp.setMargins(0, dp(2), 0, 0);
+        box.addView(labelView, labelLp);
         return box;
     }
 
     private View detailCard() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(17), dp(16), dp(17), dp(17));
+        box.setPadding(dp(10), dp(10), dp(10), dp(14));
         box.setBackground(rounded(Color.WHITE, dp(24), COLOR_STROKE, dp(1)));
 
-        box.addView(sectionLabel(getString(R.string.speaking_section_scene)),
-                new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        tabs.setGravity(Gravity.CENTER);
+        tabs.setPadding(dp(4), dp(4), dp(4), dp(4));
+        tabs.setBackground(rounded(0xFFF4F4F9, dp(18), 0, 0));
+
+        sceneTabView = detailTab(getString(R.string.speaking_section_scene), 0);
+        replacementsTabView = detailTab(getString(R.string.speaking_section_replacements), 1);
+        alternativesTabView = detailTab(getString(R.string.speaking_section_alternatives), 2);
+        tabs.addView(sceneTabView, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        tabs.addView(replacementsTabView, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        tabs.addView(alternativesTabView, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        box.addView(tabs, new LinearLayout.LayoutParams(-1, -2));
+
+        detailPageHost = new DetailSwipeHost(this);
+        LinearLayout.LayoutParams hostLp = new LinearLayout.LayoutParams(-1, -2);
+        hostLp.setMargins(dp(7), dp(8), dp(7), 0);
+        box.addView(detailPageHost, hostLp);
+
+        scenePage = buildScenePage();
+        replacementsPage = buildVariantsPage(true);
+        alternativesPage = buildVariantsPage(false);
+        detailPageHost.addView(scenePage, new FrameLayout.LayoutParams(-1, -2));
+        detailPageHost.addView(replacementsPage, new FrameLayout.LayoutParams(-1, -2));
+        detailPageHost.addView(alternativesPage, new FrameLayout.LayoutParams(-1, -2));
+        showDetailTab(0);
+        return box;
+    }
+
+    private TextView detailTab(String label, int index) {
+        TextView tab = text(label, 13, COLOR_SUB, false);
+        tab.setGravity(Gravity.CENTER);
+        tab.setSingleLine(true);
+        tab.setOnClickListener(v -> showDetailTab(index));
+        return tab;
+    }
+
+    private View buildScenePage() {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(4), dp(8), dp(4), dp(4));
+
         sceneView = text("", 15.5f, COLOR_TEXT, false);
         sceneView.setLineSpacing(dp(3), 1f);
-        LinearLayout.LayoutParams sceneLp = new LinearLayout.LayoutParams(-1, -2);
-        sceneLp.setMargins(0, dp(9), 0, 0);
-        box.addView(sceneView, sceneLp);
+        page.addView(sceneView, new LinearLayout.LayoutParams(-1, -2));
 
         sceneMyView = text("", 13.5f, COLOR_MY, false);
         sceneMyView.setIncludeFontPadding(true);
         sceneMyView.setLineSpacing(dp(2), 1.08f);
         LinearLayout.LayoutParams sceneMyLp = new LinearLayout.LayoutParams(-1, -2);
         sceneMyLp.setMargins(0, dp(5), 0, 0);
-        box.addView(sceneMyView, sceneMyLp);
+        page.addView(sceneMyView, sceneMyLp);
 
-        box.addView(sectionLabelWithMargin(getString(R.string.speaking_section_replacements)),
-                new LinearLayout.LayoutParams(-1, -2));
-        replacementsBox = new LinearLayout(this);
-        replacementsBox.setOrientation(LinearLayout.VERTICAL);
-        box.addView(replacementsBox, new LinearLayout.LayoutParams(-1, -2));
+        TextView breakdownTitle = sectionLabelWithMargin(
+                getString(R.string.speaking_section_breakdown));
+        page.addView(breakdownTitle, new LinearLayout.LayoutParams(-1, -2));
 
-        box.addView(sectionLabelWithMargin(getString(R.string.speaking_section_alternatives)),
-                new LinearLayout.LayoutParams(-1, -2));
-        alternativesBox = new LinearLayout(this);
-        alternativesBox.setOrientation(LinearLayout.VERTICAL);
-        box.addView(alternativesBox, new LinearLayout.LayoutParams(-1, -2));
-        return box;
+        breakdownBox = new LinearLayout(this);
+        breakdownBox.setOrientation(LinearLayout.VERTICAL);
+        page.addView(breakdownBox, new LinearLayout.LayoutParams(-1, -2));
+        return page;
+    }
+
+    private View buildVariantsPage(boolean replacements) {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(4), 0, dp(4), dp(4));
+        if (replacements) {
+            replacementsBox = page;
+        } else {
+            alternativesBox = page;
+        }
+        return page;
+    }
+
+    private void showDetailTab(int index) {
+        detailTabIndex = Math.max(0, Math.min(2, index));
+        if (scenePage != null) scenePage.setVisibility(detailTabIndex == 0 ? View.VISIBLE : View.GONE);
+        if (replacementsPage != null) {
+            replacementsPage.setVisibility(detailTabIndex == 1 ? View.VISIBLE : View.GONE);
+        }
+        if (alternativesPage != null) {
+            alternativesPage.setVisibility(detailTabIndex == 2 ? View.VISIBLE : View.GONE);
+        }
+        styleDetailTab(sceneTabView, detailTabIndex == 0);
+        styleDetailTab(replacementsTabView, detailTabIndex == 1);
+        styleDetailTab(alternativesTabView, detailTabIndex == 2);
+    }
+
+    private void styleDetailTab(TextView tab, boolean selected) {
+        if (tab == null) return;
+        tab.setTextColor(selected ? COLOR_BRAND : COLOR_SUB);
+        tab.setTypeface(selected ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        tab.setBackground(selected
+                ? rounded(Color.WHITE, dp(15), COLOR_STROKE, dp(1))
+                : rounded(Color.TRANSPARENT, dp(15), 0, 0));
     }
 
     private LinearLayout.LayoutParams detailLp() {
@@ -398,7 +642,14 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
         if (phrases.isEmpty()) return;
         if (completionBody != null) completionBody.setVisibility(View.GONE);
         studyBody.setVisibility(View.VISIBLE);
-        ratingRow.setVisibility(View.VISIBLE);
+        actionRow.setVisibility(View.VISIBLE);
+        frontFace = true;
+        flipAnimating = false;
+        if (frontFaceView != null) frontFaceView.setVisibility(View.VISIBLE);
+        if (backFaceView != null) backFaceView.setVisibility(View.GONE);
+        if (faceHost != null) faceHost.setRotationY(0f);
+        decisionHost.setVisibility(View.INVISIBLE);
+        ratingRow.setVisibility(View.GONE);
 
         SpeakingPhrase phrase = current();
         displayBase(phrase);
@@ -406,16 +657,29 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
                 currentIndex + 1, phrases.size(), ratedThisSession.size()));
 
         WordFsrsScheduler.CardState state = progressStore.load(packId, phrase.progressKey());
-        stateView.setText(state.reviewCount <= 0
+        String stateText = state.reviewCount <= 0
                 ? getString(R.string.speaking_state_new)
                 : (state.dueAt <= System.currentTimeMillis()
                 ? getString(R.string.speaking_state_due)
-                : getString(R.string.speaking_state_learning)));
+                : getString(R.string.speaking_state_learning));
+        stateView.setText(stateText);
+        frontStateView.setText(stateText);
+        bindFrontPrompt(phrase);
         favoriteView.setText(progressStore.isFavorite(packId, phrase.progressKey()) ? "★" : "☆");
         favoriteView.setTextColor(progressStore.isFavorite(packId, phrase.progressKey())
                 ? 0xFFE89A32 : COLOR_SUB);
         renderDetails(phrase);
         renderIntervals(state);
+    }
+
+    private void bindFrontPrompt(SpeakingPhrase phrase) {
+        String scene = primaryScene(phrase);
+        if (scene.length() == 0) scene = getString(R.string.speaking_scene_default);
+        frontSceneView.setText(scene);
+        frontSceneSecondaryView.setText("");
+        frontSceneSecondaryView.setVisibility(View.GONE);
+        frontMeaningView.setText(phrase.text);
+        frontMeaningView.setVisibility(phrase.text.length() == 0 ? View.GONE : View.VISIBLE);
     }
 
     private void displayBase(SpeakingPhrase phrase) {
@@ -432,7 +696,8 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
         displayTtsPinyin = variant.ttsPinyin;
         displayMeaningMy = variant.meaningMy;
         applyDisplay();
-        speakSentence();
+        restartAutoPlayIfNeeded();
+        if (!autoPlayEnabled) speakSentence();
     }
 
     private void applyDisplay() {
@@ -450,10 +715,56 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
                 ? primaryScene : getString(R.string.speaking_scene_default));
         sceneMyView.setText(secondaryScene);
         sceneMyView.setVisibility(secondaryScene.length() == 0 ? View.GONE : View.VISIBLE);
+        fillBreakdown(breakdownBox, phrase.breakdown);
         fillVariants(replacementsBox, phrase.replacements,
                 getString(R.string.speaking_no_replacements));
         fillVariants(alternativesBox, phrase.alternatives,
                 getString(R.string.speaking_no_alternatives));
+        showDetailTab(detailTabIndex);
+    }
+
+    private void fillBreakdown(LinearLayout parent, List<SpeakingPhrase.Breakdown> parts) {
+        parent.removeAllViews();
+        if (parts == null || parts.isEmpty()) {
+            TextView empty = text(getString(R.string.speaking_no_breakdown),
+                    13, COLOR_SUB, false);
+            empty.setPadding(0, dp(8), 0, 0);
+            parent.addView(empty, new LinearLayout.LayoutParams(-1, -2));
+            return;
+        }
+        for (SpeakingPhrase.Breakdown part : parts) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(dp(12), dp(9), dp(12), dp(9));
+            row.setBackground(rounded(0xFFF6F6FA, dp(15), 0, 0));
+            row.setOnClickListener(v -> LearningTtsBridge.speak(
+                    this, part.text, part.pinyin,
+                    LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_EXAMPLE));
+
+            LinearLayout head = new LinearLayout(this);
+            head.setOrientation(LinearLayout.HORIZONTAL);
+            head.setGravity(Gravity.CENTER_VERTICAL);
+            row.addView(head, new LinearLayout.LayoutParams(-1, -2));
+
+            TextView zh = text(part.text, 15, COLOR_TEXT, true);
+            head.addView(zh, new LinearLayout.LayoutParams(-2, -2));
+
+            TextView py = text(part.pinyin, 13, COLOR_BRAND, false);
+            LinearLayout.LayoutParams pyLp = new LinearLayout.LayoutParams(0, -2, 1f);
+            pyLp.setMargins(dp(10), 0, 0, 0);
+            head.addView(py, pyLp);
+
+            if (part.meaningMy.length() > 0) {
+                TextView my = text(part.meaningMy, 12.5f, COLOR_MY, false);
+                my.setIncludeFontPadding(true);
+                LinearLayout.LayoutParams myLp = new LinearLayout.LayoutParams(-1, -2);
+                myLp.setMargins(0, dp(4), 0, 0);
+                row.addView(my, myLp);
+            }
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+            rowLp.setMargins(0, dp(8), 0, 0);
+            parent.addView(row, rowLp);
+        }
     }
 
     private void fillVariants(LinearLayout parent, List<SpeakingPhrase.Variant> variants,
@@ -521,6 +832,11 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
     }
 
     private void rate(WordFsrsScheduler.Rating rating) {
+        if (frontFace || flipAnimating) {
+            revealAnswer();
+            return;
+        }
+        stopAutoPlay();
         SpeakingPhrase phrase = current();
         if (phrase == null) return;
         WordFsrsScheduler.CardState oldState = progressStore.load(packId, phrase.progressKey());
@@ -548,8 +864,11 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
     }
 
     private void showCompletion() {
+        stopAutoPlay();
         studyBody.setVisibility(View.GONE);
+        decisionHost.setVisibility(View.GONE);
         ratingRow.setVisibility(View.GONE);
+        actionRow.setVisibility(View.GONE);
         progressView.setText(getString(R.string.speaking_group_complete));
         if (completionBody == null) {
             completionBody = buildCompletion();
@@ -611,8 +930,11 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
     }
 
     private void showEmpty() {
+        stopAutoPlay();
         studyBody.setVisibility(View.GONE);
+        decisionHost.setVisibility(View.GONE);
         ratingRow.setVisibility(View.GONE);
+        actionRow.setVisibility(View.GONE);
         TextView empty = text(getString(R.string.speaking_pack_empty, asset),
                 15, COLOR_SUB, false);
         empty.setGravity(Gravity.CENTER);
@@ -633,6 +955,71 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
         progressStore.increment(packId, current().progressKey(), "spelling_count");
         LearningTtsBridge.speak(this, displayText, displayTtsPinyin,
                 LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_SPELLING);
+    }
+
+    private void toggleAutoPlay() {
+        if (autoPlayEnabled) {
+            stopAutoPlay();
+            return;
+        }
+        autoPlayEnabled = true;
+        updateAutoPlayUi();
+        playAutoSequence(++autoPlayGeneration);
+    }
+
+    private void playAutoSequence(int generation) {
+        if (!autoPlayEnabled || generation != autoPlayGeneration || isFinishing()) return;
+        speakSentence();
+        long sentenceDelay = estimateSentenceDuration(displayText);
+        autoPlayHandler.postDelayed(() -> {
+            if (!autoPlayEnabled || generation != autoPlayGeneration || isFinishing()) return;
+            speakSpelling();
+            long spellingDelay = estimateSpellingDuration(displayTtsPinyin);
+            autoPlayHandler.postDelayed(() -> {
+                if (!autoPlayEnabled || generation != autoPlayGeneration || isFinishing()) return;
+                speakSentence();
+                autoPlayHandler.postDelayed(() -> playAutoSequence(generation),
+                        estimateSentenceDuration(displayText) + 850L);
+            }, spellingDelay);
+        }, sentenceDelay + 450L);
+    }
+
+    private long estimateSentenceDuration(String value) {
+        String clean = value == null ? "" : value.replaceAll("[\\s，。！？、,.!?]", "");
+        int count = clean.codePointCount(0, clean.length());
+        return Math.max(1800L, count * 620L);
+    }
+
+    private long estimateSpellingDuration(String value) {
+        String clean = value == null ? "" : value.trim();
+        int syllables = clean.length() == 0 ? 1 : clean.split("\\s+").length;
+        return Math.max(2500L, syllables * 820L);
+    }
+
+    private void stopAutoPlay() {
+        autoPlayEnabled = false;
+        autoPlayGeneration++;
+        autoPlayHandler.removeCallbacksAndMessages(null);
+        updateAutoPlayUi();
+    }
+
+    private void restartAutoPlayIfNeeded() {
+        if (!autoPlayEnabled) return;
+        autoPlayGeneration++;
+        autoPlayHandler.removeCallbacksAndMessages(null);
+        playAutoSequence(autoPlayGeneration);
+    }
+
+    private void updateAutoPlayUi() {
+        if (loopIconView != null) {
+            loopIconView.setIconColor(autoPlayEnabled ? COLOR_BRAND : COLOR_TEXT);
+            loopIconView.setBackground(rounded(autoPlayEnabled ? COLOR_BRAND_SOFT : 0xFFF1F2F6,
+                    dp(24), 0, 0));
+        }
+        if (loopLabelView != null) {
+            loopLabelView.setTextColor(autoPlayEnabled ? COLOR_BRAND : COLOR_SUB);
+            loopLabelView.setTypeface(autoPlayEnabled ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        }
     }
 
     private void speakMyanmar() {
@@ -765,8 +1152,8 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
             float dy = event.getY() - touchDownY;
             if (Math.abs(dx) > dp(72) && Math.abs(dx) > Math.abs(dy) * 1.4f) {
                 if (dx < 0) moveNext(); else movePrevious();
-            } else {
-                view.performClick();
+            } else if (Math.hypot(dx, dy) < dp(18)) {
+                revealAnswer();
             }
             return true;
         }
@@ -775,12 +1162,14 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
 
     private void moveNext() {
         if (phrases.isEmpty()) return;
+        stopAutoPlay();
         currentIndex = (currentIndex + 1) % phrases.size();
         renderCurrent();
     }
 
     private void movePrevious() {
         if (phrases.isEmpty()) return;
+        stopAutoPlay();
         currentIndex = (currentIndex - 1 + phrases.size()) % phrases.size();
         renderCurrent();
     }
@@ -788,6 +1177,172 @@ public class SpeakingFullscreenActivity extends AppCompatActivity {
     private SpeakingPhrase current() {
         return phrases.isEmpty() ? null : phrases.get(Math.max(0,
                 Math.min(currentIndex, phrases.size() - 1)));
+    }
+
+    private static final class ActionIconView extends View {
+        static final int TYPE_SPEAKER = 1;
+        static final int TYPE_SPELLING = 2;
+        static final int TYPE_LOOP = 3;
+        static final int TYPE_MICROPHONE = 4;
+        static final int TYPE_AI = 5;
+
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF rect = new RectF();
+        private final int type;
+        private int iconColor = COLOR_TEXT;
+
+        ActionIconView(Context context, int type) {
+            super(context);
+            this.type = type;
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            setClickable(false);
+        }
+
+        void setIconColor(int color) {
+            iconColor = color;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float d = getResources().getDisplayMetrics().density;
+            float cx = getWidth() / 2f;
+            float cy = getHeight() / 2f;
+            paint.setColor(iconColor);
+            paint.setStrokeWidth(1.9f * d);
+            paint.setStyle(Paint.Style.STROKE);
+
+            if (type == TYPE_SPEAKER) {
+                drawSpeaker(canvas, cx, cy, d);
+            } else if (type == TYPE_SPELLING) {
+                drawSpelling(canvas, cx, cy, d);
+            } else if (type == TYPE_LOOP) {
+                drawLoop(canvas, cx, cy, d);
+            } else if (type == TYPE_MICROPHONE) {
+                drawMicrophone(canvas, cx, cy, d);
+            } else {
+                drawAi(canvas, cx, cy, d);
+            }
+        }
+
+        private void drawSpeaker(Canvas canvas, float cx, float cy, float d) {
+            paint.setStyle(Paint.Style.FILL);
+            rect.set(cx - 9f * d, cy - 4f * d, cx - 5f * d, cy + 4f * d);
+            canvas.drawRoundRect(rect, 1.2f * d, 1.2f * d, paint);
+            android.graphics.Path cone = new android.graphics.Path();
+            cone.moveTo(cx - 5f * d, cy - 4f * d);
+            cone.lineTo(cx + 0.5f * d, cy - 8f * d);
+            cone.lineTo(cx + 0.5f * d, cy + 8f * d);
+            cone.lineTo(cx - 5f * d, cy + 4f * d);
+            cone.close();
+            canvas.drawPath(cone, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            rect.set(cx - 1f * d, cy - 6f * d, cx + 9f * d, cy + 6f * d);
+            canvas.drawArc(rect, -48f, 96f, false, paint);
+            rect.set(cx, cy - 8.5f * d, cx + 13f * d, cy + 8.5f * d);
+            canvas.drawArc(rect, -45f, 90f, false, paint);
+        }
+
+        private void drawSpelling(Canvas canvas, float cx, float cy, float d) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(21f * d);
+            Paint.FontMetrics fm = paint.getFontMetrics();
+            float baseline = cy - (fm.ascent + fm.descent) / 2f;
+            canvas.drawText("ā", cx, baseline, paint);
+        }
+
+        private void drawLoop(Canvas canvas, float cx, float cy, float d) {
+            paint.setStyle(Paint.Style.STROKE);
+            rect.set(cx - 9f * d, cy - 7f * d, cx + 9f * d, cy + 7f * d);
+            canvas.drawArc(rect, 205f, 215f, false, paint);
+            canvas.drawArc(rect, 25f, 215f, false, paint);
+            paint.setStyle(Paint.Style.FILL);
+            android.graphics.Path top = new android.graphics.Path();
+            top.moveTo(cx + 8.5f * d, cy - 7f * d);
+            top.lineTo(cx + 3.5f * d, cy - 8.5f * d);
+            top.lineTo(cx + 6.5f * d, cy - 3.5f * d);
+            top.close();
+            canvas.drawPath(top, paint);
+            android.graphics.Path bottom = new android.graphics.Path();
+            bottom.moveTo(cx - 8.5f * d, cy + 7f * d);
+            bottom.lineTo(cx - 3.5f * d, cy + 8.5f * d);
+            bottom.lineTo(cx - 6.5f * d, cy + 3.5f * d);
+            bottom.close();
+            canvas.drawPath(bottom, paint);
+        }
+
+        private void drawMicrophone(Canvas canvas, float cx, float cy, float d) {
+            paint.setStyle(Paint.Style.STROKE);
+            rect.set(cx - 4.5f * d, cy - 9f * d, cx + 4.5f * d, cy + 3f * d);
+            canvas.drawRoundRect(rect, 4.5f * d, 4.5f * d, paint);
+            android.graphics.Path cradle = new android.graphics.Path();
+            cradle.moveTo(cx - 8f * d, cy + 0.5f * d);
+            cradle.cubicTo(cx - 8f * d, cy + 7f * d,
+                    cx + 8f * d, cy + 7f * d, cx + 8f * d, cy + 0.5f * d);
+            canvas.drawPath(cradle, paint);
+            canvas.drawLine(cx, cy + 7f * d, cx, cy + 11f * d, paint);
+            canvas.drawLine(cx - 4f * d, cy + 11f * d, cx + 4f * d, cy + 11f * d, paint);
+        }
+
+        private void drawAi(Canvas canvas, float cx, float cy, float d) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(13.5f * d);
+            Paint.FontMetrics fm = paint.getFontMetrics();
+            float baseline = cy - (fm.ascent + fm.descent) / 2f;
+            canvas.drawText("AI", cx, baseline, paint);
+        }
+    }
+
+    private final class DetailSwipeHost extends FrameLayout {
+        private float downX;
+        private float downY;
+        private boolean horizontalSwipe;
+
+        DetailSwipeHost(Context context) {
+            super(context);
+        }
+
+        @Override
+        public boolean onInterceptTouchEvent(MotionEvent event) {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                downX = event.getX();
+                downY = event.getY();
+                horizontalSwipe = false;
+                return false;
+            }
+            if (event.getActionMasked() == MotionEvent.ACTION_MOVE) {
+                float dx = event.getX() - downX;
+                float dy = event.getY() - downY;
+                if (Math.abs(dx) > dp(18) && Math.abs(dx) > Math.abs(dy) * 1.25f) {
+                    horizontalSwipe = true;
+                    return true;
+                }
+            }
+            return horizontalSwipe;
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                float dx = event.getX() - downX;
+                if (horizontalSwipe && Math.abs(dx) > dp(52)) {
+                    showDetailTab(detailTabIndex + (dx < 0 ? 1 : -1));
+                }
+                horizontalSwipe = false;
+                return true;
+            }
+            if (event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                horizontalSwipe = false;
+                return true;
+            }
+            return true;
+        }
     }
 
     private TextView text(String value, float size, int color, boolean bold) {

@@ -16,12 +16,10 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-/** Expandable speaking category browser: category -> Chinese/Myanmar phrase -> card. */
+/** Speaking category browser. Categories open a dedicated phrase list page. */
 public class SpeakingDirectoryActivity extends AppCompatActivity {
     public static final String EXTRA_TITLE = "title";
     public static final String EXTRA_PARENT_ID = "parent_id";
@@ -31,7 +29,6 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
     private static final int COLOR_SUB = 0xFF747C8E;
     private static final int COLOR_BRAND = 0xFF5E5CE6;
     private static final int COLOR_STROKE = 0xFFE7E9F0;
-    private static final int COLOR_MY = 0xFF4D596F;
 
     private final Map<String, CategoryBinding> bindings = new HashMap<>();
     private LearningCatalogRepository.Catalog catalog;
@@ -89,7 +86,8 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
         titleLp.setMargins(0, dp(8), 0, dp(6));
         page.addView(title, titleLp);
 
-        TextView subtitle = text(getString(R.string.speaking_directory_subtitle), 14, COLOR_SUB, false);
+        TextView subtitle = text(getString(R.string.speaking_directory_subtitle),
+                14, COLOR_SUB, false);
         subtitle.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
         subLp.setMargins(0, 0, 0, dp(16));
@@ -111,39 +109,29 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
             return;
         }
 
-        boolean expandedOne = false;
         for (LearningCatalogRepository.Node rootNode : catalog.items) {
             if (rootNode == null) continue;
             if (rootNode.hasChildren()) {
                 content.addView(groupTitle(rootNode), groupTitleLp());
                 for (LearningCatalogRepository.Node child : rootNode.children) {
-                    expandedOne = addNode(content, child,
-                            !expandedOne && shouldExpand(rootNode, child)) || expandedOne;
+                    addNode(content, child);
                 }
             } else {
-                expandedOne = addNode(content, rootNode,
-                        !expandedOne && shouldExpand(null, rootNode)) || expandedOne;
+                addNode(content, rootNode);
             }
         }
     }
 
-    private boolean addNode(LinearLayout parent, LearningCatalogRepository.Node node,
-                            boolean expand) {
-        if (node == null) return false;
+    private void addNode(LinearLayout parent, LearningCatalogRepository.Node node) {
+        if (node == null) return;
         if (node.hasChildren()) {
             parent.addView(groupTitle(node), groupTitleLp());
-            boolean expanded = false;
-            for (LearningCatalogRepository.Node child : node.children) {
-                expanded = addNode(parent, child, !expanded && (expand || shouldExpand(node, child)))
-                        || expanded;
-            }
-            return expanded;
+            for (LearningCatalogRepository.Node child : node.children) addNode(parent, child);
+            return;
         }
-
         SpeakingPhraseRepository.Pack pack = SpeakingPhraseRepository.load(
                 this, node.asset, node.id, node.title);
-        parent.addView(categoryCard(node, pack, expand), categoryCardLp());
-        return expand;
+        parent.addView(categoryCard(node, pack), categoryCardLp());
     }
 
     private View topBar() {
@@ -157,7 +145,8 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
         close.setOnClickListener(v -> finish());
         bar.addView(close, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
-        TextView crumb = text(getString(R.string.speaking_directory_breadcrumb), 14, COLOR_SUB, false);
+        TextView crumb = text(getString(R.string.speaking_directory_breadcrumb),
+                14, COLOR_SUB, false);
         crumb.setGravity(Gravity.CENTER_VERTICAL);
         crumb.setPadding(dp(12), 0, 0, 0);
         bar.addView(crumb, new LinearLayout.LayoutParams(0, -1, 1f));
@@ -188,29 +177,25 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
     }
 
     private View categoryCard(LearningCatalogRepository.Node node,
-                              SpeakingPhraseRepository.Pack pack,
-                              boolean expanded) {
+                              SpeakingPhraseRepository.Pack pack) {
         LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(16), dp(15), dp(12), dp(15));
         card.setBackground(rounded(Color.WHITE, dp(22), COLOR_STROKE, dp(1)));
-        card.setClipToOutline(true);
-
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(16), dp(15), dp(14), dp(15));
-        card.addView(header, new LinearLayout.LayoutParams(-1, -2));
+        card.setOnClickListener(v -> SpeakingPhraseListActivity.open(
+                this, pack.id, pack.title, pack.subtitle, node.asset));
 
         TextView index = text(categoryMark(node), 17, Color.WHITE, true);
         index.setGravity(Gravity.CENTER);
         index.setBackground(rounded(accentFor(node), dp(19), 0, 0));
-        header.addView(index, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        card.addView(index, new LinearLayout.LayoutParams(dp(38), dp(38)));
 
         LinearLayout textBox = new LinearLayout(this);
         textBox.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams textBoxLp = new LinearLayout.LayoutParams(0, -2, 1f);
         textBoxLp.setMargins(dp(12), 0, dp(8), 0);
-        header.addView(textBox, textBoxLp);
+        card.addView(textBox, textBoxLp);
 
         TextView title = text(node.title, 17, COLOR_TEXT, true);
         title.setIncludeFontPadding(false);
@@ -221,93 +206,13 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
         progressLp.setMargins(0, dp(5), 0, 0);
         textBox.addView(progress, progressLp);
 
-        TextView arrow = text(expanded ? "⌃" : "⌄", 20, COLOR_BRAND, true);
+        TextView arrow = text("›", 27, COLOR_BRAND, false);
         arrow.setGravity(Gravity.CENTER);
-        header.addView(arrow, new LinearLayout.LayoutParams(dp(34), dp(38)));
+        card.addView(arrow, new LinearLayout.LayoutParams(dp(34), dp(38)));
 
-        View divider = new View(this);
-        divider.setBackgroundColor(COLOR_STROKE);
-        card.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
-
-        LinearLayout phrases = new LinearLayout(this);
-        phrases.setOrientation(LinearLayout.VERTICAL);
-        phrases.setVisibility(expanded ? View.VISIBLE : View.GONE);
-        card.addView(phrases, new LinearLayout.LayoutParams(-1, -2));
-
-        Map<String, WordFsrsScheduler.CardState> states = progressStore.loadPack(pack.id);
-        ArrayList<PhraseBinding> phraseBindings = new ArrayList<>();
-        if (pack.phrases.isEmpty()) {
-            TextView empty = text(getString(R.string.speaking_category_empty), 14, COLOR_SUB, false);
-            empty.setGravity(Gravity.CENTER);
-            empty.setPadding(dp(16), dp(24), dp(16), dp(24));
-            phrases.addView(empty, new LinearLayout.LayoutParams(-1, -2));
-        } else {
-            for (int i = 0; i < pack.phrases.size(); i++) {
-                SpeakingPhrase phrase = pack.phrases.get(i);
-                PhraseBinding phraseBinding = phraseRow(node, pack, phrase, states.get(phrase.progressKey()));
-                phrases.addView(phraseBinding.row, new LinearLayout.LayoutParams(-1, -2));
-                phraseBindings.add(phraseBinding);
-                if (i < pack.phrases.size() - 1) {
-                    View line = new View(this);
-                    line.setBackgroundColor(0xFFF0F1F5);
-                    LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(-1, dp(1));
-                    lineLp.setMargins(dp(66), 0, dp(14), 0);
-                    phrases.addView(line, lineLp);
-                }
-            }
-        }
-
-        header.setOnClickListener(v -> {
-            boolean show = phrases.getVisibility() != View.VISIBLE;
-            phrases.setVisibility(show ? View.VISIBLE : View.GONE);
-            arrow.setText(show ? "⌃" : "⌄");
-        });
-
-        bindings.put(pack.id, new CategoryBinding(pack, progress, phraseBindings));
+        bindings.put(pack.id, new CategoryBinding(pack, progress));
         updateCategory(bindings.get(pack.id));
         return card;
-    }
-
-    private PhraseBinding phraseRow(LearningCatalogRepository.Node node,
-                                    SpeakingPhraseRepository.Pack pack,
-                                    SpeakingPhrase phrase,
-                                    WordFsrsScheduler.CardState state) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(15), dp(13), dp(12), dp(13));
-        row.setBackgroundColor(Color.TRANSPARENT);
-        row.setOnClickListener(v -> SpeakingFullscreenActivity.open(
-                this, pack.id, pack.title, node.asset, phrase.progressKey()));
-
-        TextView status = text(stateMark(state), 12, stateColor(state), true);
-        status.setGravity(Gravity.CENTER);
-        status.setBackground(rounded(0xFFF2F3F8, dp(18), 0, 0));
-        row.addView(status, new LinearLayout.LayoutParams(dp(36), dp(36)));
-
-        LinearLayout textBox = new LinearLayout(this);
-        textBox.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(0, -2, 1f);
-        textLp.setMargins(dp(13), 0, dp(8), 0);
-        row.addView(textBox, textLp);
-
-        TextView zh = text(phrase.text, 16.5f, COLOR_TEXT, true);
-        zh.setIncludeFontPadding(false);
-        zh.setMaxLines(2);
-        textBox.addView(zh, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView my = text(phrase.meaningMy, 13.5f, COLOR_MY, false);
-        my.setIncludeFontPadding(true);
-        my.setLineSpacing(dp(2), 1.08f);
-        my.setMaxLines(2);
-        LinearLayout.LayoutParams myLp = new LinearLayout.LayoutParams(-1, -2);
-        myLp.setMargins(0, dp(5), 0, 0);
-        textBox.addView(my, myLp);
-
-        TextView arrow = text("›", 24, 0xFFADB2BF, false);
-        arrow.setGravity(Gravity.CENTER);
-        row.addView(arrow, new LinearLayout.LayoutParams(dp(28), -1));
-        return new PhraseBinding(phrase, row, status);
     }
 
     private void refreshProgress() {
@@ -321,40 +226,8 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
         SpeakingProgressStore.PackStats stats = progressStore.stats(
                 binding.pack.id, binding.pack.phrases.size(), now);
         String value = getString(R.string.speaking_progress_learned, stats.learned, stats.total);
-        if (stats.due > 0) {
-            value += "  ·  " + getString(R.string.speaking_progress_due, stats.due);
-        }
+        if (stats.due > 0) value += "  ·  " + getString(R.string.speaking_progress_due, stats.due);
         binding.progress.setText(value);
-
-        Map<String, WordFsrsScheduler.CardState> states = progressStore.loadPack(binding.pack.id);
-        for (PhraseBinding phraseBinding : binding.phrases) {
-            WordFsrsScheduler.CardState state = states.get(phraseBinding.phrase.progressKey());
-            phraseBinding.status.setText(stateMark(state));
-            phraseBinding.status.setTextColor(stateColor(state));
-        }
-    }
-
-    private boolean shouldExpand(LearningCatalogRepository.Node parent,
-                                 LearningCatalogRepository.Node node) {
-        if (requestedParentId.length() == 0) return false;
-        return requestedParentId.equals(safe(node == null ? "" : node.id))
-                || requestedParentId.equals(safe(parent == null ? "" : parent.id));
-    }
-
-    private String stateMark(WordFsrsScheduler.CardState state) {
-        if (state == null || state.reviewCount <= 0) {
-            return getString(R.string.speaking_status_new_short);
-        }
-        if (state.dueAt <= System.currentTimeMillis()) {
-            return getString(R.string.speaking_status_due_short);
-        }
-        return "✓";
-    }
-
-    private int stateColor(WordFsrsScheduler.CardState state) {
-        if (state == null || state.reviewCount <= 0) return COLOR_BRAND;
-        if (state.dueAt <= System.currentTimeMillis()) return 0xFFE07835;
-        return 0xFF138A63;
     }
 
     private String categoryMark(LearningCatalogRepository.Node node) {
@@ -365,7 +238,8 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
     }
 
     private int accentFor(LearningCatalogRepository.Node node) {
-        int[] colors = {0xFF6865E8, 0xFFEE8A51, 0xFF2D9C8B, 0xFFDF6380, 0xFF4B8CE8, 0xFF9162CC};
+        int[] colors = {0xFF6865E8, 0xFFEE8A51, 0xFF2D9C8B,
+                0xFFDF6380, 0xFF4B8CE8, 0xFF9162CC};
         String seed = safe(node == null ? "" : node.id);
         return colors[(seed.hashCode() & 0x7fffffff) % colors.length];
     }
@@ -379,8 +253,8 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
     }
 
     private View emptyView() {
-        TextView view = text(getString(R.string.speaking_directory_empty), 14,
-                COLOR_SUB, false);
+        TextView view = text(getString(R.string.speaking_directory_empty),
+                14, COLOR_SUB, false);
         view.setGravity(Gravity.CENTER);
         view.setPadding(dp(20), dp(30), dp(20), dp(30));
         view.setBackground(rounded(Color.WHITE, dp(20), COLOR_STROKE, dp(1)));
@@ -421,25 +295,10 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
     private static final class CategoryBinding {
         final SpeakingPhraseRepository.Pack pack;
         final TextView progress;
-        final List<PhraseBinding> phrases;
 
-        CategoryBinding(SpeakingPhraseRepository.Pack pack, TextView progress,
-                        List<PhraseBinding> phrases) {
+        CategoryBinding(SpeakingPhraseRepository.Pack pack, TextView progress) {
             this.pack = pack;
             this.progress = progress;
-            this.phrases = phrases;
-        }
-    }
-
-    private static final class PhraseBinding {
-        final SpeakingPhrase phrase;
-        final View row;
-        final TextView status;
-
-        PhraseBinding(SpeakingPhrase phrase, View row, TextView status) {
-            this.phrase = phrase;
-            this.row = row;
-            this.status = status;
         }
     }
 }

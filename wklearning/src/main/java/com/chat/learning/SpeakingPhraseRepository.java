@@ -48,6 +48,7 @@ final class SpeakingPhraseRepository {
                         item.optString("scene", ""),
                         item.optString("scene_my", ""),
                         item.optString("scene_en", ""),
+                        parseBreakdown(item, text, item.optString("pinyin", "")),
                         parseVariants(context, item.optJSONArray("replacements")),
                         parseVariants(context, item.optJSONArray("alternatives"))
                 ));
@@ -55,6 +56,74 @@ final class SpeakingPhraseRepository {
         }
         return new Pack(safe(packId), safe(title), safe(subtitle), assetPath,
                 Collections.unmodifiableList(phrases));
+    }
+
+
+    private static List<SpeakingPhrase.Breakdown> parseBreakdown(
+            JSONObject item, String sentence, String pinyin) {
+        JSONArray array = item.optJSONArray("breakdown");
+        ArrayList<SpeakingPhrase.Breakdown> result = new ArrayList<>();
+        if (array != null) {
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject part = array.optJSONObject(i);
+                if (part == null) continue;
+                String text = part.optString("text", "").trim();
+                if (text.length() == 0) continue;
+                result.add(new SpeakingPhrase.Breakdown(
+                        text,
+                        part.optString("pinyin", ""),
+                        part.optString("meaning_my", "")
+                ));
+            }
+        }
+        if (!result.isEmpty()) return result;
+        return fallbackBreakdown(sentence, pinyin);
+    }
+
+    private static final String[] BREAKDOWN_WORDS = new String[]{
+            "有什么问题", "工作经验", "工作时间", "什么时候", "请告诉我", "很高兴",
+            "便宜一点", "再说一遍", "听不懂", "已经", "做完了", "还需要", "一个月",
+            "水电费", "看一下", "修一下", "慢一点", "开始工作", "请给我", "少放一点",
+            "想租房", "想要", "多少钱", "多少", "一点", "这个", "那个", "一份", "一杯",
+            "买单", "谢谢", "叫什么", "名字", "认识", "哪国人", "缅甸人", "中文", "请说",
+            "应聘", "两年", "工作", "马上", "开始", "工资", "几点", "需要", "准备", "今天",
+            "什么", "怎么", "明天", "请假", "押金", "怎么算", "房子", "这里", "网络", "入住",
+            "坏了", "帮我", "试一下", "大一点", "别的", "颜色", "现金", "扫码", "不要",
+            "少放", "菜单", "可以", "告诉我"
+    };
+
+    private static List<SpeakingPhrase.Breakdown> fallbackBreakdown(
+            String sentence, String pinyin) {
+        ArrayList<SpeakingPhrase.Breakdown> result = new ArrayList<>();
+        String clean = safe(sentence).replaceAll("[\\p{Punct}，。！？、；：…]", "");
+        String pyClean = safe(pinyin).replace('，', ' ').replace('。', ' ')
+                .replace('？', ' ').replace('！', ' ').trim();
+        String[] syllables = pyClean.length() == 0 ? new String[0] : pyClean.split("\\s+");
+        int syllableIndex = 0;
+        int offset = 0;
+        while (offset < clean.length()) {
+            String token = matchBreakdownWord(clean, offset);
+            if (token.length() == 0) {
+                int codePoint = clean.codePointAt(offset);
+                token = new String(Character.toChars(codePoint));
+            }
+            int charCount = token.codePointCount(0, token.length());
+            StringBuilder py = new StringBuilder();
+            for (int i = 0; i < charCount && syllableIndex < syllables.length; i++) {
+                if (py.length() > 0) py.append(' ');
+                py.append(syllables[syllableIndex++]);
+            }
+            result.add(new SpeakingPhrase.Breakdown(token, py.toString(), ""));
+            offset += token.length();
+        }
+        return result;
+    }
+
+    private static String matchBreakdownWord(String sentence, int offset) {
+        for (String word : BREAKDOWN_WORDS) {
+            if (sentence.startsWith(word, offset)) return word;
+        }
+        return "";
     }
 
     private static List<SpeakingPhrase.Variant> parseVariants(Context context, JSONArray array) {
