@@ -47,6 +47,7 @@ import com.chat.learning.LearningFragment;
 import com.chat.uikit.contacts.service.FriendModel;
 import com.chat.uikit.databinding.ActTabMainBinding;
 import com.chat.uikit.fragment.ChatFragment;
+import com.chat.uikit.fragment.ContactsFragment;
 import com.chat.uikit.fragment.PlaceholderTabFragment;
 import com.chat.uikit.fragment.WebTabFragment;
 import com.chat.uikit.user.service.UserModel;
@@ -67,6 +68,8 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private static final int TAB_CHAT = 2;
     private static final int TAB_DISCOVER = 3;
     private static final int TAB_COMMUNITY = 4;
+    // 联系人原本是一级页面；底部入口隐藏后，仍保留为侧栏可打开的隐藏页。
+    private static final int TAB_CONTACTS = 5;
 
     private static final String ICON_CHAT = "faw-comments";
     private static final String ICON_PARTNER = "faw-user-friends";
@@ -83,7 +86,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private TextView chatTV, partnerTV, discoverTV, communityTV, studyTV;
     private long lastClickChatTabTime = 0L;
     private final boolean isShowTabText = true;
-    private final List<Fragment> fragments = new ArrayList<>(5);
+    private final List<Fragment> fragments = new ArrayList<>(6);
 
     @Override
     protected ActTabMainBinding getViewBinding() {
@@ -223,6 +226,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         fragments.add(new ChatFragment());
         fragments.add(PlaceholderTabFragment.newInstance("发现", "发现列表模块加载失败，请重新安装或检查 wkfeedlist 模块"));
         fragments.add(createCommunityFragment());
+        fragments.add(new ContactsFragment());
         wkVBinding.vp.setAdapter(new WKFragmentStateAdapter(this, fragments));
         // 底部一级导航只允许点击切换。聊天、交友和发现内部都有自己的手势，避免横滑冲突。
         wkVBinding.vp.setUserInputEnabled(false);
@@ -261,7 +265,9 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
                 playAnimation(position);
-                wkVBinding.bottomNavigation.setSelectedItemId(getMenuIdByIndex(position));
+                if (position != TAB_CONTACTS) {
+                    wkVBinding.bottomNavigation.setSelectedItemId(getMenuIdByIndex(position));
+                }
                 syncBottomNavigationForCurrentTab();
             }
         });
@@ -335,7 +341,17 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         syncBottomNavigationForCurrentTab();
     }
 
+    /** 从学习页侧栏打开原来被隐藏的一级联系人页面。 */
+    public void openContactsFromLearning() {
+        switchToTab(TAB_CONTACTS);
+    }
+
     private void syncBottomNavigationForCurrentTab() {
+        if (wkVBinding != null && wkVBinding.vp != null
+                && wkVBinding.vp.getCurrentItem() == TAB_CONTACTS) {
+            setBottomNavigationVisible(false);
+            return;
+        }
         Fragment fragment = getCurrentFragment();
         if (fragment instanceof WebTabFragment) {
             ((WebTabFragment) fragment).syncBottomNavigationWithCurrentUrl();
@@ -414,7 +430,10 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         if (pendingMenuId != 0 && wkVBinding != null && wkVBinding.getRoot() != null) {
             wkVBinding.getRoot().post(() -> handleExternalMenu(pendingMenuId));
         } else if (wkVBinding != null && wkVBinding.vp != null) {
-            wkVBinding.bottomNavigation.setSelectedItemId(getMenuIdByIndex(wkVBinding.vp.getCurrentItem()));
+            int currentTab = wkVBinding.vp.getCurrentItem();
+            if (currentTab != TAB_CONTACTS) {
+                wkVBinding.bottomNavigation.setSelectedItemId(getMenuIdByIndex(currentTab));
+            }
         }
         syncBottomNavigationForCurrentTab();
         disableBottomNavigationSelectedBackground();
@@ -469,6 +488,11 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     }
 
     private boolean handleBackPress() {
+        if (wkVBinding != null && wkVBinding.vp != null
+                && wkVBinding.vp.getCurrentItem() == TAB_CONTACTS) {
+            switchToTab(TAB_STUDY);
+            return true;
+        }
         Fragment fragment = getCurrentFragment();
         if (fragment instanceof ChatFragment && ((ChatFragment) fragment).closeSideMenuIfOpen()) {
             return true;
