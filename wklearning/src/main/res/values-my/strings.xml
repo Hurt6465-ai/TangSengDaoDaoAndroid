@@ -265,4 +265,62 @@
     <string name="pinyin_chart_play_failed">ဖုန်းထဲရှိ အသံဖိုင်ကို ဖွင့်၍မရပါ</string>
     <string name="pinyin_chart_data_missing">ပင်ယင်ဇယားကို ဖတ်၍မရပါ။ chart.json ကို စစ်ဆေးပါ။</string>
 
+
+
+    <!-- Speaking phrases: directory, cards, FSRS and AI coach -->
+    <string name="speaking_directory_title">စကားပြောဝါကျတိုများ</string>
+    <string name="speaking_directory_subtitle">အမျိုးအစားကို ဖြန့်ကြည့်ပြီး တရုတ်နှင့် မြန်မာ ဝါကျတိုများကို ကြည့်ပါ။ ကတ်ဖြင့်လေ့လာရန် ဝါကျတစ်ကြောင်းကို နှိပ်ပါ။</string>
+    <string name="speaking_directory_breadcrumb">သင်ယူမှု · စကားပြော</string>
+    <string name="speaking_category_empty">ဤအမျိုးအစားတွင် ဝါကျတိုဒေတာ မရှိသေးပါ</string>
+    <string name="speaking_progress_learned">လေ့လာပြီး %1$d/%2$d</string>
+    <string name="speaking_progress_due">ပြန်လေ့လာရန် %1$d</string>
+    <string name="speaking_status_new_short">သစ်</string>
+    <string name="speaking_status_due_short">ပြန်</string>
+    <string name="speaking_category_mark_default">စ</string>
+    <string name="speaking_directory_empty">စကားပြောအကြောင်းအရာစာရင်း မရှိပါ။ assets/learning/speaking/catalog.json ကို စစ်ဆေးပါ။</string>
+    <string name="speaking_catalog_missing">ဖုန်းထဲရှိ စကားပြောအကြောင်းအရာစာရင်း မရှိပါ</string>
+    <string name="speaking_title_default">စကားပြော</string>
+    <string name="speaking_action_read">ဖတ်ပြ</string>
+    <string name="speaking_action_spelling">ပင်ယင်ဖတ်</string>
+    <string name="speaking_action_pronunciation">လိုက်ဖတ်</string>
+    <string name="speaking_action_coach">နည်းပြ</string>
+    <string name="speaking_section_scene">အသုံးပြုမည့်အခြေအနေ</string>
+    <string name="speaking_section_replacements">စကားလုံးအစားထိုး</string>
+    <string name="speaking_section_alternatives">တခြားပြောပုံ</string>
+    <string name="speaking_rating_again">မမှတ်မိ</string>
+    <string name="speaking_rating_hard">ခက်</string>
+    <string name="speaking_rating_good">ကောင်း</string>
+    <string name="speaking_rating_easy">လွယ်</string>
+    <string name="speaking_session_progress">%1$d / %2$d  ·  ဒီတစ်ကြိမ် ပြီး %3$d</string>
+    <string name="speaking_state_new">ဝါကျအသစ်</string>
+    <string name="speaking_state_due">ယနေ့ပြန်လေ့လာ</string>
+    <string name="speaking_state_learning">ဆက်လက်လေ့ကျင့်</string>
+    <string name="speaking_scene_default">လက်ရှိအမျိုးအစား၏ လက်တွေ့စကားပြောအခြေအနေတွင် အသုံးပြုပါ။</string>
+    <string name="speaking_no_replacements">အစားထိုးပြောပုံ မရှိသေးပါ</string>
+    <string name="speaking_no_alternatives">တခြားပြောပုံ မရှိသေးပါ</string>
+    <string name="speaking_interval_minutes">%1$d မိနစ်</string>
+    <string name="speaking_interval_hours">%1$d နာရီ</string>
+    <string name="speaking_interval_days">%1$d ရက်</string>
+    <string name="speaking_interval_months">%1$d လ</string>
+    <string name="speaking_interval_years">%1$.1f နှစ်</string>
+    <string name="speaking_group_complete">ဒီအုပ်စု လေ့လာပြီးပါပြီ</string>
+    <string name="speaking_complete_title">စကားပြောလေ့လာမှု ပြီးပါပြီ</string>
+    <string name="speaking_complete_subtitle">FSRS က နောက်တစ်ကြိမ် ပြန်လေ့လာမည့်အချိန်ကို စီစဉ်ပြီးပါပြီ။ အမျိုးအစားများသို့ ပြန်သွားနိုင်သလို ထပ်လေ့ကျင့်နိုင်ပါသည်။</string>
+    <string name="speaking_restart">ပြန်လေ့ကျင့်</string>
+    <string name="speaking_back_to_categories">အမျိုးအစားသို့ ပြန်သွား</string>
+    <string name="speaking_pack_empty">ဤအမျိုးအစားတွင် ဝါကျတို မရှိပါ။ စစ်ဆေးရန်：\n%1$s</string>
+    <string name="speaking_choose_coach">AI စကားပြောနည်းပြကို ရွေးပါ</string>
+    <string name="speaking_provider_qwen">Qwen နိုင်ငံတကာ</string>
+    <string name="speaking_deepseek_coach_title">DeepSeek စကားပြောနည်းပြ</string>
+    <string name="speaking_qwen_coach_title">Qwen စကားပြောနည်းပြ</string>
+    <string name="speaking_coach_prompt_intro">သင်သည် ကျွန်ုပ်၏ တရုတ်စကားပြော လေ့ကျင့်ပေးသူ ဖြစ်သည်။</string>
+    <string name="speaking_coach_prompt_sentence">လက်ရှိဝါကျ：%1$s</string>
+    <string name="speaking_coach_prompt_pinyin">ပင်ယင်：%1$s</string>
+    <string name="speaking_coach_prompt_meaning">မြန်မာအဓိပ္ပာယ်：%1$s</string>
+    <string name="speaking_coach_prompt_scene">အသုံးပြုမည့်အခြေအနေ：%1$s</string>
+    <string name="speaking_coach_prompt_replacements">အစားထိုးပြောပုံများ：%1$s</string>
+    <string name="speaking_coach_prompt_alternatives">အဓိပ္ပာယ်တူပြောပုံများ：%1$s</string>
+    <string name="speaking_coach_prompt_hint_language">အရိပ်အမြွက်နှင့် တိုတောင်းသောပြင်ဆင်ချက်များကို မြန်မာလိုပေးပါ။ စကားပြောလေ့ကျင့်မှုကို တရုတ်လိုသာ ဆက်ပါ။</string>
+    <string name="speaking_coach_prompt_rules">လက်ရှိဝါကျနှင့် အခြေအနေကို အခြေခံ၍ ကျွန်ုပ်နှင့် လက်တွေ့စကားပြော လေ့ကျင့်ပါ။ သင်က ထိုအခြေအနေရှိ တစ်ဖက်လူအဖြစ် သရုပ်ဆောင်ပါ။ တစ်ကြိမ်လျှင် တရုတ်လို တိုတောင်းသော ဝါကျတစ်ကြောင်း သို့မဟုတ် နှစ်ကြောင်းသာ ပြောပါ။ လက်ရှိဝါကျနှင့် အစားထိုးပြောပုံများကို အသုံးပြုနိုင်အောင် ဦးစားပေး လမ်းညွှန်ပါ။ ကျွန်ုပ်၏ ပြောပုံ မသဘာဝဖြစ်ပါက ပိုသဘာဝကျသော ပြောပုံတစ်ကြောင်းသာ ပြင်ပေးပြီး စကားဆက်ပါ။ မဖြေနိုင်ပါက တိုတောင်းသော အရိပ်အမြွက်ပေးပါ။ ရှည်လျားသော သဒ္ဒါရှင်းလင်းချက် မပေးပါနှင့်၊ Markdown ဇယား မသုံးပါနှင့်။ အခြေအနေ၏ ပထမဝါကျမှ တိုက်ရိုက်စတင်ပါ။</string>
+
 </resources>
