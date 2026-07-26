@@ -39,4 +39,20 @@
     <string name="script_blocked_external">已阻止外部网页：%1$s</string>
     <string name="script_allowed_web_only">只允许打开 DeepSeek / 千问相关 HTTPS 网页</string>
     <string name="script_toolbar_show_hint">点顶部可显示工具栏</string>
+
+
+    <!-- AI web speech bridge and scene prompt -->
+    <string name="ai_web_title">AI 网页</string>
+    <string name="ai_speech_page_not_allowed">当前网页不允许调用唐僧语音识别</string>
+    <string name="ai_speech_permission_required">请先允许麦克风权限</string>
+    <string name="ai_speech_service_unavailable">当前设备没有可用的系统语音识别</string>
+    <string name="ai_speech_prompt">请讲话</string>
+    <string name="ai_tts_page_not_allowed">当前网页不允许调用唐僧语音</string>
+    <string name="ai_tts_empty">没有可朗读的文字</string>
+    <string name="ai_tts_plugin_unavailable">语音插件不可用</string>
+    <string name="script_scene_prompt_button">使用场景</string>
+    <string name="script_scene_prompt_copied">已复制场景 prompt，请粘贴到输入框</string>
+
+    <string name="script_official_badge">官方</string>
+
 </resources>
