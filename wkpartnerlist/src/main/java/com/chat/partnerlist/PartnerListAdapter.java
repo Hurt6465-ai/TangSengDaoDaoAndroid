@@ -11,7 +11,6 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
-import android.view.animation.OvershootInterpolator;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
@@ -367,14 +366,14 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
 
     private void setGreetingHi(TextView textView) {
         textView.setText(R.string.partnerlist_greet);
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
         textView.setTypeface(MEDIUM);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0.015f);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0f);
     }
 
     private void setCompactButtonText(TextView textView, int textRes) {
         textView.setText(textRes);
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f);
         textView.setTypeface(MEDIUM);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0f);
     }
@@ -420,10 +419,10 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
                 case MotionEvent.ACTION_DOWN:
                     v.animate().cancel();
                     v.animate()
-                            .scaleX(0.96f)
-                            .scaleY(0.96f)
-                            .alpha(0.96f)
-                            .setDuration(90L)
+                            .scaleX(0.97f)
+                            .scaleY(0.97f)
+                            .alpha(0.92f)
+                            .setDuration(80L)
                             .setInterpolator(new DecelerateInterpolator())
                             .start();
                     break;
@@ -446,10 +445,8 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
                 .scaleX(1f)
                 .scaleY(1f)
                 .alpha(view.isEnabled() ? 1f : 0.72f)
-                .setDuration(spring ? 180L : 130L)
-                .setInterpolator(spring
-                        ? new OvershootInterpolator(1.25f)
-                        : new DecelerateInterpolator())
+                .setDuration(spring ? 120L : 100L)
+                .setInterpolator(new DecelerateInterpolator())
                 .start();
     }
 
