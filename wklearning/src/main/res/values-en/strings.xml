@@ -265,4 +265,62 @@ Time %5$d min</string>
     <string name="pinyin_chart_play_failed">Unable to play local audio</string>
     <string name="pinyin_chart_data_missing">Unable to load the pinyin chart. Check chart.json.</string>
 
+
+
+    <!-- Speaking phrases: directory, cards, FSRS and AI coach -->
+    <string name="speaking_directory_title">Speaking phrases</string>
+    <string name="speaking_directory_subtitle">Expand a category to view Chinese and Burmese phrases. Tap any phrase to study it as a card.</string>
+    <string name="speaking_directory_breadcrumb">Learn · Speaking</string>
+    <string name="speaking_category_empty">No phrases in this category yet</string>
+    <string name="speaking_progress_learned">Learned %1$d/%2$d</string>
+    <string name="speaking_progress_due">Due %1$d</string>
+    <string name="speaking_status_new_short">N</string>
+    <string name="speaking_status_due_short">R</string>
+    <string name="speaking_category_mark_default">S</string>
+    <string name="speaking_directory_empty">The speaking catalog is empty. Check assets/learning/speaking/catalog.json</string>
+    <string name="speaking_catalog_missing">Local speaking catalog is missing</string>
+    <string name="speaking_title_default">Speaking</string>
+    <string name="speaking_action_read">Listen</string>
+    <string name="speaking_action_spelling">Spell</string>
+    <string name="speaking_action_pronunciation">Repeat</string>
+    <string name="speaking_action_coach">Coach</string>
+    <string name="speaking_section_scene">Use in this scene</string>
+    <string name="speaking_section_replacements">Word replacements</string>
+    <string name="speaking_section_alternatives">Other ways to say it</string>
+    <string name="speaking_rating_again">Again</string>
+    <string name="speaking_rating_hard">Hard</string>
+    <string name="speaking_rating_good">Good</string>
+    <string name="speaking_rating_easy">Easy</string>
+    <string name="speaking_session_progress">%1$d / %2$d  ·  Completed %3$d</string>
+    <string name="speaking_state_new">New phrase</string>
+    <string name="speaking_state_due">Review today</string>
+    <string name="speaking_state_learning">Keep practicing</string>
+    <string name="speaking_scene_default">Use it in a real conversation from this category.</string>
+    <string name="speaking_no_replacements">No replacements yet</string>
+    <string name="speaking_no_alternatives">No alternative phrases yet</string>
+    <string name="speaking_interval_minutes">%1$d min</string>
+    <string name="speaking_interval_hours">%1$d hr</string>
+    <string name="speaking_interval_days">%1$d d</string>
+    <string name="speaking_interval_months">%1$d mo</string>
+    <string name="speaking_interval_years">%1$.1f yr</string>
+    <string name="speaking_group_complete">Group completed</string>
+    <string name="speaking_complete_title">Speaking practice complete</string>
+    <string name="speaking_complete_subtitle">FSRS scheduled the next review. Return to the categories or practice again.</string>
+    <string name="speaking_restart">Practice again</string>
+    <string name="speaking_back_to_categories">Back to categories</string>
+    <string name="speaking_pack_empty">This category has no phrases. Check:\n%1$s</string>
+    <string name="speaking_choose_coach">Choose an AI speaking coach</string>
+    <string name="speaking_provider_qwen">Qwen International</string>
+    <string name="speaking_deepseek_coach_title">DeepSeek Speaking Coach</string>
+    <string name="speaking_qwen_coach_title">Qwen Speaking Coach</string>
+    <string name="speaking_coach_prompt_intro">You are my Chinese speaking coach.</string>
+    <string name="speaking_coach_prompt_sentence">Current phrase: %1$s</string>
+    <string name="speaking_coach_prompt_pinyin">Pinyin: %1$s</string>
+    <string name="speaking_coach_prompt_meaning">Burmese meaning: %1$s</string>
+    <string name="speaking_coach_prompt_scene">Scene: %1$s</string>
+    <string name="speaking_coach_prompt_replacements">Replacement phrases: %1$s</string>
+    <string name="speaking_coach_prompt_alternatives">Similar phrases: %1$s</string>
+    <string name="speaking_coach_prompt_hint_language">Use English for brief hints and corrections, but keep the speaking practice in Chinese.</string>
+    <string name="speaking_coach_prompt_rules">Practice a realistic conversation with me using the current phrase and scene. Play the other person in the scene. Say only one or two short Chinese sentences at a time and guide me to use the current phrase and its replacements. When my wording is unnatural, give only one more natural version and continue. Give a short hint when I cannot answer. Do not give long grammar explanations or use Markdown tables. Start directly with the first line in the scene.</string>
+
 </resources>
