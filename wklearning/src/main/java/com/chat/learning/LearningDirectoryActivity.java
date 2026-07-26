@@ -332,6 +332,11 @@ public class LearningDirectoryActivity extends AppCompatActivity {
             return;
         }
 
+        if ("pinyin_chart".equals(node.target)) {
+            PinyinChartActivity.open(this, node.id);
+            return;
+        }
+
         if ("word".equals(node.target)) {
             Intent intent = new Intent(this, WordFullscreenActivity.class);
             intent.putExtra(WordFullscreenActivity.EXTRA_LEVEL, node.level != null && node.level.length() > 0 ? node.level : node.id);
@@ -365,6 +370,7 @@ public class LearningDirectoryActivity extends AppCompatActivity {
     private String targetLabel(LearningCatalogRepository.Node node) {
         if ("word".equals(node.target)) return "背词";
         if ("prompt".equals(node.target)) return "复制";
+        if ("pinyin_chart".equals(node.target)) return "点读";
         return "学习";
     }
 
