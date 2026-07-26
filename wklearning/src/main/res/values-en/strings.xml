@@ -269,7 +269,7 @@ Time %5$d min</string>
 
     <!-- Speaking phrases: directory, cards, FSRS and AI coach -->
     <string name="speaking_directory_title">Speaking phrases</string>
-    <string name="speaking_directory_subtitle">Expand a category to view Chinese and Burmese phrases. Tap any phrase to study it as a card.</string>
+    <string name="speaking_directory_subtitle">Choose a category to browse its full phrase list, then tap a Chinese–Burmese phrase to study.</string>
     <string name="speaking_directory_breadcrumb">Learn · Speaking</string>
     <string name="speaking_category_empty">No phrases in this category yet</string>
     <string name="speaking_progress_learned">Learned %1$d/%2$d</string>
@@ -284,9 +284,9 @@ Time %5$d min</string>
     <string name="speaking_action_spelling">Spell</string>
     <string name="speaking_action_pronunciation">Repeat</string>
     <string name="speaking_action_coach">Coach</string>
-    <string name="speaking_section_scene">Use in this scene</string>
-    <string name="speaking_section_replacements">Word replacements</string>
-    <string name="speaking_section_alternatives">Other ways to say it</string>
+    <string name="speaking_section_scene">Scene</string>
+    <string name="speaking_section_replacements">Replace</string>
+    <string name="speaking_section_alternatives">Other ways</string>
     <string name="speaking_rating_again">Again</string>
     <string name="speaking_rating_hard">Hard</string>
     <string name="speaking_rating_good">Good</string>
@@ -323,4 +323,12 @@ Time %5$d min</string>
     <string name="speaking_coach_prompt_hint_language">Use English for brief hints and corrections, but keep the speaking practice in Chinese.</string>
     <string name="speaking_coach_prompt_rules">Practice a realistic conversation with me using the current phrase and scene. Play the other person in the scene. Say only one or two short Chinese sentences at a time and guide me to use the current phrase and its replacements. When my wording is unnatural, give only one more natural version and continue. Give a short hint when I cannot answer. Do not give long grammar explanations or use Markdown tables. Start directly with the first line in the scene.</string>
 
+    <string name="speaking_phrase_list_breadcrumb">Speaking · Phrases</string>
+    <string name="speaking_phrase_list_summary">%1$d phrases · %2$d learned</string>
+    <string name="speaking_section_breakdown">Phrase breakdown</string>
+    <string name="speaking_no_breakdown">No phrase breakdown yet</string>
+    <string name="speaking_action_loop">Auto</string>
+    <string name="speaking_front_prompt">Read it aloud and recall the meaning</string>
+    <string name="speaking_front_tap">Tap for pinyin, Burmese, and details</string>
+    <string name="speaking_back_tap">Tap the answer area to return to the front</string>
 </resources>
