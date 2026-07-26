@@ -270,4 +270,62 @@
     <string name="pinyin_chart_play_failed">本地音频播放失败</string>
     <string name="pinyin_chart_data_missing">拼音表数据加载失败，请检查 chart.json。</string>
 
+
+
+    <!-- Speaking phrases: directory, cards, FSRS and AI coach -->
+    <string name="speaking_directory_title">口语短句</string>
+    <string name="speaking_directory_subtitle">展开分类查看中文、缅文短句，点击任意一句进入卡片学习。</string>
+    <string name="speaking_directory_breadcrumb">学习 · 口语</string>
+    <string name="speaking_category_empty">这个分类还没有短句数据</string>
+    <string name="speaking_progress_learned">已学 %1$d/%2$d</string>
+    <string name="speaking_progress_due">待复习 %1$d</string>
+    <string name="speaking_status_new_short">新</string>
+    <string name="speaking_status_due_short">复</string>
+    <string name="speaking_category_mark_default">口</string>
+    <string name="speaking_directory_empty">口语目录为空，请检查 assets/learning/speaking/catalog.json</string>
+    <string name="speaking_catalog_missing">本地口语目录文件缺失</string>
+    <string name="speaking_title_default">口语</string>
+    <string name="speaking_action_read">朗读</string>
+    <string name="speaking_action_spelling">拼读</string>
+    <string name="speaking_action_pronunciation">跟读</string>
+    <string name="speaking_action_coach">教练</string>
+    <string name="speaking_section_scene">使用场景</string>
+    <string name="speaking_section_replacements">单词替换</string>
+    <string name="speaking_section_alternatives">换种说法</string>
+    <string name="speaking_rating_again">忘记</string>
+    <string name="speaking_rating_hard">困难</string>
+    <string name="speaking_rating_good">良好</string>
+    <string name="speaking_rating_easy">简单</string>
+    <string name="speaking_session_progress">%1$d / %2$d  ·  本次已完成 %3$d</string>
+    <string name="speaking_state_new">新句</string>
+    <string name="speaking_state_due">今日复习</string>
+    <string name="speaking_state_learning">继续巩固</string>
+    <string name="speaking_scene_default">在当前分类的真实交流场景中使用。</string>
+    <string name="speaking_no_replacements">暂无可替换词</string>
+    <string name="speaking_no_alternatives">暂无其他说法</string>
+    <string name="speaking_interval_minutes">%1$d 分钟</string>
+    <string name="speaking_interval_hours">%1$d 小时</string>
+    <string name="speaking_interval_days">%1$d 天</string>
+    <string name="speaking_interval_months">%1$d 个月</string>
+    <string name="speaking_interval_years">%1$.1f 年</string>
+    <string name="speaking_group_complete">本组学习完成</string>
+    <string name="speaking_complete_title">口语学习完成</string>
+    <string name="speaking_complete_subtitle">FSRS 已安排下一次复习，可以返回分类或重新练习。</string>
+    <string name="speaking_restart">重新练习</string>
+    <string name="speaking_back_to_categories">返回分类</string>
+    <string name="speaking_pack_empty">这个分类还没有短句，请检查：\n%1$s</string>
+    <string name="speaking_choose_coach">选择 AI 口语教练</string>
+    <string name="speaking_provider_qwen">千问国际</string>
+    <string name="speaking_deepseek_coach_title">DeepSeek 口语教练</string>
+    <string name="speaking_qwen_coach_title">千问口语教练</string>
+    <string name="speaking_coach_prompt_intro">你是我的中文口语教练。</string>
+    <string name="speaking_coach_prompt_sentence">当前句子：%1$s</string>
+    <string name="speaking_coach_prompt_pinyin">拼音：%1$s</string>
+    <string name="speaking_coach_prompt_meaning">缅文意思：%1$s</string>
+    <string name="speaking_coach_prompt_scene">使用场景：%1$s</string>
+    <string name="speaking_coach_prompt_replacements">可替换表达：%1$s</string>
+    <string name="speaking_coach_prompt_alternatives">相近说法：%1$s</string>
+    <string name="speaking_coach_prompt_hint_language">提示和简短纠错使用中文，对话练习始终使用中文。</string>
+    <string name="speaking_coach_prompt_rules">请围绕当前句子和场景与我练习真实对话。你扮演场景中的对话对象，一次只说一到两句简短中文，优先引导我使用当前句子和替换表达。我表达不自然时，只给一句更自然的说法，然后继续对话；我不会回答时给简短提示。不要输出长篇语法解释，不要使用 Markdown 表格。请直接从场景中的第一句话开始。</string>
+
 </resources>
