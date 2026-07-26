@@ -21,6 +21,9 @@ import com.chat.userscript.model.UserScript;
 
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
@@ -186,6 +189,10 @@ public class UserScriptController {
     private void inject(String url, String runAt) {
         if (webView == null || url == null || !AiWebPolicy.isScriptHostAllowed(url)) return;
         String mode = effectiveScriptMode(url);
+        if ("speaking-coach".equals(mode)
+                && ("document-end".equals(runAt) || "document-idle".equals(runAt))) {
+            injectBundledSpeakingCoach();
+        }
         List<UserScript> scripts = store.getRunnableScripts(url, runAt);
         for (UserScript script : scripts) {
             if (!shouldInjectScriptForMode(url, script, mode)) continue;
@@ -356,19 +363,34 @@ public class UserScriptController {
     }
 
     private void injectStartupPromptButton() {
+        if ("speaking-coach".equals(effectiveScriptMode(webView == null ? "" : webView.getUrl()))) return;
         if (startupPrompt == null || startupPrompt.length() == 0 || startupPromptInjected) return;
         startupPromptInjected = true;
         String prompt = JSONObject.quote(startupPrompt);
+        String buttonText = JSONObject.quote(activity.getString(R.string.script_scene_prompt_button));
+        String copiedText = JSONObject.quote(activity.getString(R.string.script_scene_prompt_copied));
         String js = "(function(){" +
                 "window.__TS_DD_START_PROMPT__=" + prompt + ";" +
                 "if(document.getElementById('tsdd-start-prompt-btn'))return;" +
                 "var st=document.createElement('style');st.textContent='#tsdd-start-prompt-btn{position:fixed;right:16px;bottom:156px;z-index:2147483647;border:0;border-radius:999px;padding:10px 14px;background:#16a34a;color:#fff;font-weight:700;box-shadow:0 8px 24px rgba(22,163,74,.25)}';document.documentElement.appendChild(st);" +
                 "function fill(t){var el=document.querySelector('textarea, input[type=text], [contenteditable=true], [role=textbox]');if(!el)return false;el.focus();if('value'in el){el.value=t;}else{el.textContent=t;}el.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:t}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;}" +
-                "var b=document.createElement('button');b.id='tsdd-start-prompt-btn';b.textContent='使用场景';b.onclick=function(){if(!fill(window.__TS_DD_START_PROMPT__||'')){navigator.clipboard&&navigator.clipboard.writeText(window.__TS_DD_START_PROMPT__||'');alert('已复制场景 prompt，请粘贴到输入框');}};document.documentElement.appendChild(b);" +
+                "var b=document.createElement('button');b.id='tsdd-start-prompt-btn';b.textContent=" + buttonText + ";b.onclick=function(){if(!fill(window.__TS_DD_START_PROMPT__||'')){navigator.clipboard&&navigator.clipboard.writeText(window.__TS_DD_START_PROMPT__||'');alert(" + copiedText + ");}};document.documentElement.appendChild(b);" +
                 "})();";
         try {
             webView.evaluateJavascript(js, null);
         } catch (Exception ignored) {
+        }
+    }
+
+    private void injectBundledSpeakingCoach() {
+        try (InputStream in = activity.getAssets().open("official_scripts/speaking_coach.user.js");
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) >= 0) out.write(buffer, 0, read);
+            String code = out.toString(StandardCharsets.UTF_8.name());
+            webView.evaluateJavascript(code + "\n//# sourceURL=tsdd-speaking-coach.user.js", null);
+        } catch (Throwable ignored) {
         }
     }
 

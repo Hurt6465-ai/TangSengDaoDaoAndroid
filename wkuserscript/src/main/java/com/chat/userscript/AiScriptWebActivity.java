@@ -79,7 +79,7 @@ public class AiScriptWebActivity extends Activity {
         String startPrompt = getIntent().getStringExtra(EXTRA_START_PROMPT);
         String scriptMode = normalizeScriptModeValue(getIntent().getStringExtra(EXTRA_SCRIPT_MODE));
         currentScriptMode = scriptMode;
-        if (title == null || title.length() == 0) title = "AI 网页";
+        if (title == null || title.length() == 0) title = getString(R.string.ai_web_title);
         if (url == null || url.length() == 0) url = "https://chat.qwen.ai/";
         url = appendTsddMode(url, scriptMode);
 
@@ -144,7 +144,8 @@ public class AiScriptWebActivity extends Activity {
     }
 
     private boolean isQuestionMode() {
-        return "question".equals(currentScriptMode);
+        return "question".equals(currentScriptMode)
+                || "speaking-coach".equals(currentScriptMode);
     }
 
     @Override
@@ -222,7 +223,7 @@ public class AiScriptWebActivity extends Activity {
         if (!isSpeechHostAllowed()) {
             emitNativeSpeechEvent("error", "", "not-allowed");
             emitNativeSpeechEvent("end", "", "");
-            Toast.makeText(this, "当前网页不允许调用唐僧语音识别", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.ai_speech_page_not_allowed, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -252,7 +253,7 @@ public class AiScriptWebActivity extends Activity {
             } else if (!startSystemSpeechIntent(pendingNativeSpeechLang)) {
                 emitNativeSpeechEvent("error", "", "not-allowed");
                 emitNativeSpeechEvent("end", "", "");
-                Toast.makeText(this, "请先允许麦克风权限", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.ai_speech_permission_required, Toast.LENGTH_SHORT).show();
             }
         }
         return true;
@@ -279,7 +280,7 @@ public class AiScriptWebActivity extends Activity {
 
         emitNativeSpeechEvent("error", "", "no-service");
         finishNativeSpeech(true);
-        Toast.makeText(this, "当前设备没有可用的系统语音识别", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, R.string.ai_speech_service_unavailable, Toast.LENGTH_SHORT).show();
     }
 
     private boolean startSystemSpeechIntent(String lang) {
@@ -292,7 +293,7 @@ public class AiScriptWebActivity extends Activity {
         putSpeechLanguageExtrasIfNeeded(intent, lang);
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
-        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "请讲话");
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.ai_speech_prompt));
 
         try {
             nativeSystemFallbackTried = true;
@@ -553,25 +554,25 @@ public class AiScriptWebActivity extends Activity {
 
     private void speakTextFromWeb(String text) {
         if (!isSpeechHostAllowed()) {
-            Toast.makeText(this, "Current page cannot use Tsdd speech", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.ai_tts_page_not_allowed, Toast.LENGTH_SHORT).show();
             return;
         }
 
         text = safeSpeechText(text);
         if (text.length() == 0) {
-            Toast.makeText(this, "No text to speak", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.ai_tts_empty, Toast.LENGTH_SHORT).show();
             return;
         }
 
         if (callSpeechManager("speak", new Class[]{Context.class, String.class}, new Object[]{this, text})) {
             return;
         }
-        Toast.makeText(this, "wkspeech is not available", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, R.string.ai_tts_plugin_unavailable, Toast.LENGTH_SHORT).show();
     }
 
     private void speakJsonFromWeb(String json, String mode) {
         if (!isSpeechHostAllowed()) {
-            Toast.makeText(this, "Current page cannot use Tsdd speech", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.ai_tts_page_not_allowed, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -684,11 +685,32 @@ public class AiScriptWebActivity extends Activity {
         }
     }
 
+
+    private String uiLanguageCode() {
+        java.util.Locale locale;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            locale = getResources().getConfiguration().getLocales().get(0);
+        } else {
+            locale = getResources().getConfiguration().locale;
+        }
+        String language = locale == null ? "" : locale.getLanguage();
+        if ("my".equalsIgnoreCase(language)) return "my";
+        if ("en".equalsIgnoreCase(language)) return "en";
+        return "zh";
+    }
+
     private static final class TsddSpeechBridge {
         private final WeakReference<AiScriptWebActivity> activityRef;
 
         TsddSpeechBridge(AiScriptWebActivity activity) {
             this.activityRef = new WeakReference<>(activity);
+        }
+
+
+        @JavascriptInterface
+        public String uiLanguage() {
+            AiScriptWebActivity activity = activityRef.get();
+            return activity == null ? "zh" : activity.uiLanguageCode();
         }
 
         @JavascriptInterface
@@ -743,6 +765,13 @@ public class AiScriptWebActivity extends Activity {
 
         TsddNativeSpeechBridge(AiScriptWebActivity activity) {
             this.activityRef = new WeakReference<>(activity);
+        }
+
+
+        @JavascriptInterface
+        public String uiLanguage() {
+            AiScriptWebActivity activity = activityRef.get();
+            return activity == null ? "zh" : activity.uiLanguageCode();
         }
 
         @JavascriptInterface

@@ -132,7 +132,8 @@ public class ScriptManagerActivity extends Activity {
 
         TextView name = new TextView(this);
         String prefix = script.enabled ? "● " : "○ ";
-        String suffix = script.official ? "  官方" : "";
+        String suffix = script.official
+                ? "  " + getString(R.string.script_official_badge) : "";
         name.setText(prefix + script.name + suffix);
         name.setTextSize(17);
         name.setTypeface(Typeface.DEFAULT_BOLD);
@@ -271,8 +272,8 @@ public class ScriptManagerActivity extends Activity {
                 if (object == null) continue;
                 OfficialScript item = new OfficialScript();
                 item.file = object.optString("file", "");
-                item.title = object.optString("title", item.file);
-                item.description = object.optString("description", "");
+                item.title = localizedOfficialField(object, "title", item.file);
+                item.description = localizedOfficialField(object, "description", "");
                 if (item.file.length() > 0) list.add(item);
             }
         } catch (Exception e) {
@@ -281,11 +282,29 @@ public class ScriptManagerActivity extends Activity {
         return list;
     }
 
+
+    private String localizedOfficialField(JSONObject object, String key, String fallback) {
+        java.util.Locale locale;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            locale = getResources().getConfiguration().getLocales().get(0);
+        } else {
+            locale = getResources().getConfiguration().locale;
+        }
+        String language = locale == null ? "" : locale.getLanguage();
+        String suffix = "my".equalsIgnoreCase(language) ? "_my"
+                : ("en".equalsIgnoreCase(language) ? "_en" : "");
+        String value = suffix.length() == 0 ? "" : object.optString(key + suffix, "").trim();
+        if (value.length() == 0) value = object.optString(key, fallback).trim();
+        return value.length() == 0 ? fallback : value;
+    }
+
     private void installOfficial(OfficialScript item) {
         try (InputStream in = getAssets().open("official_scripts/" + item.file)) {
             UserScript script = UserScriptParser.parse(readAll(in));
             script.official = true;
             script.officialAsset = item.file;
+            script.name = item.title;
+            script.description = item.description;
             saveWithRiskPrompt(script, getString(R.string.script_official_installed, script.name));
         } catch (Exception e) {
             Toast.makeText(this, getString(R.string.script_download_failed, e.getMessage()), Toast.LENGTH_SHORT).show();
