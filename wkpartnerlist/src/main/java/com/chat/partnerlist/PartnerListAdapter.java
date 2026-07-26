@@ -2,6 +2,7 @@ package com.chat.partnerlist;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.text.TextUtils;
@@ -334,22 +335,26 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
             b.greetingBtn.setEnabled(false);
             b.greetingBtn.setAlpha(0.72f);
             setCompactButtonText(b.greetingBtn, R.string.partnerlist_sending);
-            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_disabled);
+            b.greetingBtn.setTextColor(Color.parseColor("#9B8792"));
+            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_capsule);
         } else if (contacted) {
             b.greetingBtn.setEnabled(true);
             b.greetingBtn.setAlpha(1f);
             setCompactButtonText(b.greetingBtn, R.string.partnerlist_go_chat);
-            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting);
+            b.greetingBtn.setTextColor(Color.WHITE);
+            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_capsule);
         } else if (greetingRemaining <= 0) {
             b.greetingBtn.setEnabled(false);
             b.greetingBtn.setAlpha(0.72f);
             setCompactButtonText(b.greetingBtn, R.string.partnerlist_limit_reached_short);
-            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_disabled);
+            b.greetingBtn.setTextColor(Color.parseColor("#9B8792"));
+            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_capsule);
         } else {
             b.greetingBtn.setEnabled(true);
             b.greetingBtn.setAlpha(1f);
             setGreetingHi(b.greetingBtn);
-            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting);
+            b.greetingBtn.setTextColor(Color.WHITE);
+            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_capsule);
         }
 
         installGreetingPressEffect(b.greetingBtn);
@@ -419,10 +424,10 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
                 case MotionEvent.ACTION_DOWN:
                     v.animate().cancel();
                     v.animate()
-                            .scaleX(0.97f)
-                            .scaleY(0.97f)
-                            .alpha(0.92f)
-                            .setDuration(80L)
+                            .scaleX(0.96f)
+                            .scaleY(0.96f)
+                            .alpha(0.90f)
+                            .setDuration(75L)
                             .setInterpolator(new DecelerateInterpolator())
                             .start();
                     break;
@@ -445,7 +450,7 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
                 .scaleX(1f)
                 .scaleY(1f)
                 .alpha(view.isEnabled() ? 1f : 0.72f)
-                .setDuration(spring ? 120L : 100L)
+                .setDuration(spring ? 115L : 95L)
                 .setInterpolator(new DecelerateInterpolator())
                 .start();
     }
