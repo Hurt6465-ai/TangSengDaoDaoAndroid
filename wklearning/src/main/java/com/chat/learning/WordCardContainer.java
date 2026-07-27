@@ -21,6 +21,7 @@ final class WordCardContainer extends FrameLayout {
 
     interface Listener {
         boolean isFrontFace();
+        boolean isInteractionLocked();
         void onDrag(Direction direction, float progress, boolean thresholdCrossed);
         boolean onCommit(Direction direction);
         void onClickCard();
@@ -40,6 +41,7 @@ final class WordCardContainer extends FrameLayout {
     private Axis axis = Axis.UNDECIDED;
     private Direction direction;
     private VelocityTracker velocityTracker;
+    private boolean blockedTouchSequence;
 
     WordCardContainer(Context context) {
         this(context, null);
@@ -62,6 +64,7 @@ final class WordCardContainer extends FrameLayout {
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
         if (listener == null) return super.onInterceptTouchEvent(event);
+        if (consumeLockedTouch(event)) return true;
 
         final int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
@@ -82,6 +85,7 @@ final class WordCardContainer extends FrameLayout {
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (listener == null) return super.onTouchEvent(event);
+        if (consumeLockedTouch(event)) return true;
         addMovement(event);
 
         switch (event.getActionMasked()) {
@@ -117,6 +121,25 @@ final class WordCardContainer extends FrameLayout {
             default:
                 return true;
         }
+    }
+
+    /**
+     * A running flip or card-transition animation owns the card until its end callback resets the
+     * state. Starting another touch sequence used to call animate().cancel(), which skipped that
+     * callback and left the activity permanently locked. Consume the whole sequence instead.
+     */
+    private boolean consumeLockedTouch(MotionEvent event) {
+        int action = event.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN) {
+            blockedTouchSequence = listener != null && listener.isInteractionLocked();
+            if (blockedTouchSequence) clearGesture(false);
+        }
+        if (!blockedTouchSequence) return false;
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            blockedTouchSequence = false;
+            clearGesture(false);
+        }
+        return true;
     }
 
     private void beginGesture(MotionEvent event) {

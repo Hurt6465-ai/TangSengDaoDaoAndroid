@@ -325,6 +325,9 @@ public class WordFullscreenActivity extends AppCompatActivity {
         card.setElevation(dp(5));
         card.setGestureListener(new WordCardContainer.Listener() {
             @Override public boolean isFrontFace() { return frontFace; }
+            @Override public boolean isInteractionLocked() {
+                return flipAnimating || ratingLocked || sessionFinished || queue.isEmpty();
+            }
             @Override public void onDrag(WordCardContainer.Direction direction, float progress, boolean crossed) {
                 showDrag(direction, progress, crossed);
             }
