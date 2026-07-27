@@ -26,16 +26,23 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+
+import okhttp3.Dns;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 /** Process-wide sherpa-onnx recognizer and offline-model manager. */
 final class SherpaOnnxRecognizer {
@@ -90,16 +97,16 @@ final class SherpaOnnxRecognizer {
     private static final class ModelSpec {
         final ModelType type;
         final String folder;
-        final String baseUrl;
+        final String[] baseUrls;
         final long minModelBytes;
         final long maxModelBytes;
         final long requiredFreeBytes;
 
-        ModelSpec(ModelType type, String folder, String baseUrl,
+        ModelSpec(ModelType type, String folder, String[] baseUrls,
                   long minModelBytes, long maxModelBytes, long requiredFreeBytes) {
             this.type = type;
             this.folder = folder;
-            this.baseUrl = baseUrl;
+            this.baseUrls = baseUrls;
             this.minModelBytes = minModelBytes;
             this.maxModelBytes = maxModelBytes;
             this.requiredFreeBytes = requiredFreeBytes;
@@ -121,9 +128,14 @@ final class SherpaOnnxRecognizer {
     private static final ModelSpec ZIPFORMER_SPEC = new ModelSpec(
             ModelType.ZIPFORMER,
             "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01",
-            "https://huggingface.co/csukuangfj/"
-                    + "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01"
-                    + "/resolve/main/",
+            new String[] {
+                    "https://huggingface.co/csukuangfj/"
+                            + "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01"
+                            + "/resolve/main/",
+                    "https://hf-mirror.com/csukuangfj/"
+                            + "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01"
+                            + "/resolve/main/"
+            },
             20L * 1024L * 1024L,
             120L * 1024L * 1024L,
             70L * 1024L * 1024L
@@ -132,9 +144,14 @@ final class SherpaOnnxRecognizer {
     private static final ModelSpec SENSE_VOICE_SPEC = new ModelSpec(
             ModelType.SENSE_VOICE,
             "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
-            "https://huggingface.co/csukuangfj/"
-                    + "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"
-                    + "/resolve/main/",
+            new String[] {
+                    "https://huggingface.co/csukuangfj/"
+                            + "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"
+                            + "/resolve/main/",
+                    "https://hf-mirror.com/csukuangfj/"
+                            + "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"
+                            + "/resolve/main/"
+            },
             150L * 1024L * 1024L,
             420L * 1024L * 1024L,
             520L * 1024L * 1024L
@@ -147,6 +164,23 @@ final class SherpaOnnxRecognizer {
         thread.setPriority(Thread.NORM_PRIORITY - 1);
         return thread;
     });
+    private static final Dns IPV4_FIRST_DNS = hostname -> {
+        List<InetAddress> resolved = Dns.SYSTEM.lookup(hostname);
+        List<InetAddress> ipv4 = new ArrayList<>();
+        for (InetAddress address : resolved) {
+            if (address instanceof Inet4Address) ipv4.add(address);
+        }
+        return ipv4.isEmpty() ? resolved : ipv4;
+    };
+    private static final OkHttpClient DOWNLOAD_CLIENT = new OkHttpClient.Builder()
+            .dns(IPV4_FIRST_DNS)
+            .connectTimeout(18, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.MINUTES)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build();
     private static final List<ModelListener> LISTENERS = new ArrayList<>();
 
     private static volatile ModelState state = ModelState.NOT_INSTALLED;
@@ -251,9 +285,9 @@ final class SherpaOnnxRecognizer {
             try {
                 ensureStorage(targetDir.getParentFile(), spec.requiredFreeBytes);
                 recreateDirectory(staging);
-                downloadFile(spec.baseUrl + MODEL_FILE + "?download=true",
+                downloadFile(downloadUrls(spec, MODEL_FILE),
                         new File(staging, MODEL_FILE), spec.minModelBytes, spec.maxModelBytes);
-                downloadFile(spec.baseUrl + TOKENS_FILE + "?download=true",
+                downloadFile(downloadUrls(spec, TOKENS_FILE),
                         new File(staging, TOKENS_FILE), 1024L, 16L * 1024L * 1024L);
                 if (!validateModelFiles(staging, spec, true)) {
                     throw new IOException("模型文件校验失败");
@@ -559,28 +593,64 @@ final class SherpaOnnxRecognizer {
         return total;
     }
 
-    private static void downloadFile(String sourceUrl, File target, long minBytes, long maxBytes)
-            throws IOException {
-        HttpURLConnection connection = null;
-        try {
-            connection = (HttpURLConnection) new URL(sourceUrl).openConnection();
-            connection.setInstanceFollowRedirects(true);
-            connection.setConnectTimeout(20_000);
-            connection.setReadTimeout(90_000);
-            connection.setRequestProperty("User-Agent", "TangSengDaoDao-Android");
-            connection.setRequestProperty("Accept", "application/octet-stream,*/*");
-            int status = connection.getResponseCode();
-            if (status < 200 || status >= 300) {
-                throw new IOException("下载失败，HTTP " + status);
+    private static List<String> downloadUrls(ModelSpec spec, String fileName) {
+        List<String> urls = new ArrayList<>(spec.baseUrls.length);
+        for (String baseUrl : spec.baseUrls) {
+            urls.add(baseUrl + fileName + "?download=true");
+        }
+        return urls;
+    }
+
+    private static void downloadFile(List<String> sourceUrls, File target,
+                                     long minBytes, long maxBytes) throws IOException {
+        IOException lastError = null;
+        for (String sourceUrl : sourceUrls) {
+            if (target.exists() && !target.delete()) {
+                throw new IOException("无法清理未完成的下载文件");
             }
-            long expected = connection.getContentLengthLong();
+            try {
+                downloadFileOnce(sourceUrl, target, minBytes, maxBytes);
+                return;
+            } catch (IOException error) {
+                lastError = error;
+                //noinspection ResultOfMethodCallIgnored
+                target.delete();
+                Log.w(TAG, "Model download route failed: " + routeName(sourceUrl), error);
+            }
+        }
+        String reason = lastError == null ? "网络不可用" : safeMessage(lastError);
+        throw new IOException("所有下载线路均失败：" + reason + "。请切换网络后重试，或使用本地导入",
+                lastError);
+    }
+
+    private static void downloadFileOnce(String sourceUrl, File target,
+                                         long minBytes, long maxBytes) throws IOException {
+        Request request = new Request.Builder()
+                .url(sourceUrl)
+                .header("User-Agent", "TangSengDaoDao-Android")
+                .header("Accept", "application/octet-stream,*/*")
+                .get()
+                .build();
+        try (Response response = DOWNLOAD_CLIENT.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("下载失败，HTTP " + response.code());
+            }
+            ResponseBody body = response.body();
+            if (body == null) throw new IOException("服务器没有返回模型文件");
+            long expected = body.contentLength();
             if (expected > maxBytes) throw new IOException("服务器模型文件大小异常");
-            try (BufferedInputStream input = new BufferedInputStream(connection.getInputStream())) {
+            try (BufferedInputStream input = new BufferedInputStream(body.byteStream())) {
                 long copied = copyLimited(input, target, maxBytes);
                 if (copied < minBytes) throw new IOException("下载的模型文件不完整");
             }
-        } finally {
-            if (connection != null) connection.disconnect();
+        }
+    }
+
+    private static String routeName(String sourceUrl) {
+        try {
+            return new java.net.URI(sourceUrl).getHost();
+        } catch (Exception ignored) {
+            return "unknown";
         }
     }
 
