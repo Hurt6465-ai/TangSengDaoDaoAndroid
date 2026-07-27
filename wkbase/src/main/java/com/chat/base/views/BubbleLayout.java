@@ -8,6 +8,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
@@ -15,6 +16,7 @@ import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
+import android.graphics.Shader;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.util.AttributeSet;
@@ -23,6 +25,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.ColorUtils;
 
 import com.chat.base.R;
 import com.chat.base.msgitem.WKChatIteMsgFromType;
@@ -72,6 +75,29 @@ public class BubbleLayout extends LinearLayout {
     private int mBubbleBorderSize = 0;
     // 气泡边框画笔
     private final Paint mBubbleBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+
+    // Lightweight liquid-glass rendering. This deliberately avoids real-time backdrop blur:
+    // every chat cell is recycled and a blur layer per message would make long conversations stutter.
+    // Translucent gradients, a specular highlight and a soft edge create the same visual depth
+    // while keeping drawing to a few inexpensive Canvas operations.
+    private boolean mLiquidGlassEnabled = false;
+    private boolean mLiquidGlassSent = false;
+    private final Paint mGlassFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+    private final Paint mGlassHighlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+    private final Paint mGlassShadePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+    private final Paint mGlassBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+    private final Paint mGlassShadowPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+    private final Paint mGlassGlintPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.DITHER_FLAG);
+    private final RectF mGlassBounds = new RectF();
+    private final RectF mGlassGlintBounds = new RectF();
+    private float mGlassShaderLeft = Float.NaN;
+    private float mGlassShaderTop = Float.NaN;
+    private float mGlassShaderRight = Float.NaN;
+    private float mGlassShaderBottom = Float.NaN;
+    private int mGlassShaderColor = Integer.MIN_VALUE;
+    private boolean mGlassShaderSelected = false;
+    private boolean mGlassShaderSent = false;
+    private boolean mGlassShaderDark = false;
 
     /**
      * 箭头指向
@@ -354,10 +380,17 @@ public class BubbleLayout extends LinearLayout {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        if (!isSelected) {
-            mPaint.setColor(ContextCompat.getColor(getContext(), mBubbleNormalColor));
-        } else mPaint.setColor(ContextCompat.getColor(getContext(), mBubbleSelectedColor));
+        if (mLiquidGlassEnabled) {
+            drawLiquidGlass(canvas);
+            return;
+        }
 
+        int color = resolveConfiguredColor(
+                isSelected ? mBubbleSelectedColor : mBubbleNormalColor,
+                mBubbleColor
+        );
+        mPaint.setColor(color);
+        mPaint.setShader(null);
         canvas.drawPath(mPath, mPaint);
         if (mBubbleImageBg != null) {
             mPath.computeBounds(mBubbleImageBgDstRectF, true);
@@ -382,6 +415,165 @@ public class BubbleLayout extends LinearLayout {
         if (mBubbleBorderSize != 0) {
             canvas.drawPath(mPath, mBubbleBorderPaint);
         }
+    }
+
+    private void drawLiquidGlass(Canvas canvas) {
+        mPath.computeBounds(mGlassBounds, true);
+        if (mGlassBounds.isEmpty()) return;
+
+        int configured = resolveConfiguredColor(
+                isSelected ? mBubbleSelectedColor : mBubbleNormalColor,
+                mBubbleColor
+        );
+        boolean darkSurface = ColorUtils.calculateLuminance(configured) < 0.42d;
+        ensureLiquidGlassPaints(configured, darkSurface);
+
+        // A one-pixel offset gives separation from bright wallpapers without the cost of blur masks.
+        canvas.save();
+        canvas.translate(0f, dp(1f));
+        canvas.drawPath(mPath, mGlassShadowPaint);
+        canvas.restore();
+
+        canvas.drawPath(mPath, mGlassFillPaint);
+        canvas.drawPath(mPath, mGlassHighlightPaint);
+        canvas.drawPath(mPath, mGlassShadePaint);
+
+        // Short top reflection: enough to look liquid, subtle enough not to resemble a button.
+        if (!mGlassGlintBounds.isEmpty()) {
+            canvas.save();
+            canvas.clipPath(mPath);
+            canvas.drawRoundRect(mGlassGlintBounds, dp(1f), dp(1f), mGlassGlintPaint);
+            canvas.restore();
+        }
+
+        canvas.drawPath(mPath, mGlassBorderPaint);
+    }
+
+    private void ensureLiquidGlassPaints(int configured, boolean darkSurface) {
+        boolean unchanged = Float.compare(mGlassShaderLeft, mGlassBounds.left) == 0
+                && Float.compare(mGlassShaderTop, mGlassBounds.top) == 0
+                && Float.compare(mGlassShaderRight, mGlassBounds.right) == 0
+                && Float.compare(mGlassShaderBottom, mGlassBounds.bottom) == 0
+                && mGlassShaderColor == configured
+                && mGlassShaderSelected == isSelected
+                && mGlassShaderSent == mLiquidGlassSent
+                && mGlassShaderDark == darkSurface;
+        if (unchanged) return;
+
+        mGlassShaderLeft = mGlassBounds.left;
+        mGlassShaderTop = mGlassBounds.top;
+        mGlassShaderRight = mGlassBounds.right;
+        mGlassShaderBottom = mGlassBounds.bottom;
+        mGlassShaderColor = configured;
+        mGlassShaderSelected = isSelected;
+        mGlassShaderSent = mLiquidGlassSent;
+        mGlassShaderDark = darkSurface;
+
+        int topColor;
+        int bottomColor;
+        int borderStart;
+        int borderEnd;
+        int highlightStart;
+        int shadeEnd;
+
+        if (darkSurface) {
+            topColor = ColorUtils.setAlphaComponent(
+                    ColorUtils.blendARGB(configured, Color.WHITE, mLiquidGlassSent ? 0.16f : 0.10f),
+                    isSelected ? 235 : 208
+            );
+            bottomColor = ColorUtils.setAlphaComponent(
+                    ColorUtils.blendARGB(configured, Color.BLACK, 0.16f),
+                    isSelected ? 226 : 188
+            );
+            borderStart = Color.argb(isSelected ? 125 : 92, 255, 255, 255);
+            borderEnd = Color.argb(44, 255, 255, 255);
+            highlightStart = Color.argb(isSelected ? 62 : 45, 255, 255, 255);
+            shadeEnd = Color.argb(34, 0, 0, 0);
+        } else {
+            topColor = ColorUtils.setAlphaComponent(
+                    ColorUtils.blendARGB(configured, Color.WHITE, mLiquidGlassSent ? 0.34f : 0.48f),
+                    isSelected ? 236 : 215
+            );
+            bottomColor = ColorUtils.setAlphaComponent(
+                    ColorUtils.blendARGB(configured, mLiquidGlassSent ? 0xFFD1C5EE : 0xFFE2E8EC, 0.24f),
+                    isSelected ? 225 : 174
+            );
+            borderStart = Color.argb(isSelected ? 245 : 214, 255, 255, 255);
+            borderEnd = mLiquidGlassSent
+                    ? Color.argb(86, 119, 103, 171)
+                    : Color.argb(68, 116, 130, 143);
+            highlightStart = Color.argb(isSelected ? 150 : 112, 255, 255, 255);
+            shadeEnd = mLiquidGlassSent
+                    ? Color.argb(28, 91, 69, 146)
+                    : Color.argb(22, 65, 77, 88);
+        }
+
+        mGlassShadowPaint.setShader(null);
+        mGlassShadowPaint.setStyle(Paint.Style.FILL);
+        mGlassShadowPaint.setColor(darkSurface ? Color.argb(34, 0, 0, 0) : Color.argb(22, 32, 38, 48));
+
+        mGlassFillPaint.setStyle(Paint.Style.FILL);
+        mGlassFillPaint.setShader(new LinearGradient(
+                mGlassBounds.left, mGlassBounds.top,
+                mGlassBounds.right, mGlassBounds.bottom,
+                topColor, bottomColor, Shader.TileMode.CLAMP
+        ));
+
+        mGlassHighlightPaint.setStyle(Paint.Style.FILL);
+        mGlassHighlightPaint.setShader(new LinearGradient(
+                0f, mGlassBounds.top,
+                0f, mGlassBounds.top + Math.max(dp(18f), mGlassBounds.height() * 0.62f),
+                highlightStart, Color.TRANSPARENT, Shader.TileMode.CLAMP
+        ));
+
+        mGlassShadePaint.setStyle(Paint.Style.FILL);
+        mGlassShadePaint.setShader(new LinearGradient(
+                0f, mGlassBounds.top + mGlassBounds.height() * 0.45f,
+                0f, mGlassBounds.bottom,
+                Color.TRANSPARENT, shadeEnd, Shader.TileMode.CLAMP
+        ));
+
+        if (mGlassBounds.width() > dp(50f) && mGlassBounds.height() > dp(28f)) {
+            float left = mGlassBounds.left + dp(12f);
+            float top = mGlassBounds.top + dp(2.2f);
+            float width = Math.min(mGlassBounds.width() * 0.38f, dp(62f));
+            mGlassGlintBounds.set(left, top, left + width, top + dp(1.15f));
+            mGlassGlintPaint.setShader(new LinearGradient(
+                    mGlassGlintBounds.left, 0f, mGlassGlintBounds.right, 0f,
+                    Color.argb(darkSurface ? 48 : 105, 255, 255, 255),
+                    Color.TRANSPARENT,
+                    Shader.TileMode.CLAMP
+            ));
+        } else {
+            mGlassGlintBounds.setEmpty();
+            mGlassGlintPaint.setShader(null);
+        }
+
+        mGlassBorderPaint.setStyle(Paint.Style.STROKE);
+        mGlassBorderPaint.setStrokeWidth(dp(0.85f));
+        mGlassBorderPaint.setShader(new LinearGradient(
+                mGlassBounds.left, mGlassBounds.top,
+                mGlassBounds.right, mGlassBounds.bottom,
+                borderStart, borderEnd, Shader.TileMode.CLAMP
+        ));
+    }
+
+    private void invalidateLiquidGlassShaders() {
+        mGlassShaderColor = Integer.MIN_VALUE;
+        mGlassShaderLeft = Float.NaN;
+    }
+
+    private int resolveConfiguredColor(int configuredColor, int fallbackColor) {
+        if (configuredColor == 0) return fallbackColor;
+        try {
+            return ContextCompat.getColor(getContext(), configuredColor);
+        } catch (Exception ignored) {
+            return configuredColor;
+        }
+    }
+
+    private float dp(float value) {
+        return value * getResources().getDisplayMetrics().density;
     }
 
     @Override
@@ -452,14 +644,31 @@ public class BubbleLayout extends LinearLayout {
 
     public void setBubbleSelectedColor(int color) {
         this.mBubbleSelectedColor = color;
+        invalidateLiquidGlassShaders();
     }
 
     public void setBubbleNormalColor(int color) {
         this.mBubbleNormalColor = color;
+        invalidateLiquidGlassShaders();
     }
 
     public void setBubbleColor(int mBubbleColor) {
         this.mBubbleColor = mBubbleColor;
+        invalidateLiquidGlassShaders();
+    }
+
+    public void setLiquidGlassEnabled(boolean enabled) {
+        if (this.mLiquidGlassEnabled != enabled) {
+            this.mLiquidGlassEnabled = enabled;
+            invalidateLiquidGlassShaders();
+        }
+    }
+
+    public void setLiquidGlassSent(boolean sent) {
+        if (this.mLiquidGlassSent != sent) {
+            this.mLiquidGlassSent = sent;
+            invalidateLiquidGlassShaders();
+        }
     }
 
     public void setLook(Look mLook) {
@@ -695,6 +904,7 @@ public class BubbleLayout extends LinearLayout {
     }
 
     public void setAll(WKMsgBgType bgType, WKChatIteMsgFromType msgFrom, int normalColor, int selectedColor) {
+        setLiquidGlassEnabled(false);
         setBackgroundColor(ContextCompat.getColor(getContext(), R.color.transparent));
         setBubbleBorderSize(1);
         setShadowRadius(1f);
@@ -812,29 +1022,39 @@ public class BubbleLayout extends LinearLayout {
     }
 
     public void setAll(WKMsgBgType bgType, WKChatIteMsgFromType msgFrom, int msgType) {
+        boolean liquidGlass = msgType == WKContentType.WK_TEXT
+                || msgType == WKContentType.WK_VOICE
+                || msgType == WKContentType.typing;
+        setLiquidGlassEnabled(liquidGlass);
+        setLiquidGlassSent(msgFrom == WKChatIteMsgFromType.SEND);
         setBackgroundColor(ContextCompat.getColor(getContext(), R.color.transparent));
-        setBubbleBorderSize(1);
-        setShadowRadius(1f);
+        setBubbleBorderSize(liquidGlass ? 0 : 1);
+        setShadowRadius(liquidGlass ? dp(1f) : 1f);
         setShadowX(0);
         setShadowY(0);
         ViewGroup.LayoutParams layoutParams = getLayoutParams();
         if (layoutParams instanceof LayoutParams linearLayout) {
             if (bgType == WKMsgBgType.center || bgType == WKMsgBgType.top) {
+                int groupInset = liquidGlass ? 0 : AndroidUtilities.dp(10);
                 if (msgFrom == WKChatIteMsgFromType.RECEIVED)
-                    linearLayout.leftMargin = AndroidUtilities.dp(10);
-                else linearLayout.rightMargin = AndroidUtilities.dp(10);
+                    linearLayout.leftMargin = groupInset;
+                else linearLayout.rightMargin = groupInset;
             } else {
                 linearLayout.rightMargin = 0;
                 linearLayout.leftMargin = 0;
             }
         }
 
-        int lookWidth = 10;
-        int normalRadius = 20;
-        int smallRadius = 5;
+        int lookWidth = liquidGlass ? 6 : 10;
+        int normalRadius = liquidGlass ? 18 : 20;
+        int smallRadius = liquidGlass ? 8 : 5;
+        int tailLength = AndroidUtilities.dp(liquidGlass ? 5 : lookWidth);
         if (msgFrom == WKChatIteMsgFromType.SEND) {
             setBubbleBorderColor(ContextCompat.getColor(getContext(), R.color.transparent));
-            if (msgType == WKContentType.WK_FILE
+            if (liquidGlass) {
+                setBubbleNormalColor(R.color.chat_liquid_send_bg_normal);
+                setBubbleSelectedColor(R.color.chat_liquid_send_bg_selected);
+            } else if (msgType == WKContentType.WK_FILE
                     || msgType == WKContentType.WK_MULTIPLE_FORWARD
                     || msgType == WKContentType.WK_LOCATION
                     || msgType == WKContentType.WK_CARD) {
@@ -853,7 +1073,7 @@ public class BubbleLayout extends LinearLayout {
                 setLTR(normalRadius);
                 setLDR(normalRadius);
                 setRDR(normalRadius);
-                setLookLength(AndroidUtilities.dp(lookWidth));
+                setLookLength(tailLength);
             } else if (bgType == WKMsgBgType.center) {
                 setLook(Look.TOP);
                 setLookWidth(normalRadius * 2);
@@ -886,18 +1106,23 @@ public class BubbleLayout extends LinearLayout {
                 setArrowDownLeftRadius(AndroidUtilities.dp(lookWidth * 2));
                 setLookWidth(0);
                 setArrowTopLeftRadius(0);
-                setLookLength(AndroidUtilities.dp(lookWidth));
+                setLookLength(tailLength);
             }
         } else {
             setBubbleBorderColor(ContextCompat.getColor(getContext(), R.color.transparent));
-            setBubbleNormalColor(R.color.chat_received_bg_normal);
-            setBubbleSelectedColor(R.color.chat_received_bg_selected);
+            if (liquidGlass) {
+                setBubbleNormalColor(R.color.chat_liquid_received_bg_normal);
+                setBubbleSelectedColor(R.color.chat_liquid_received_bg_selected);
+            } else {
+                setBubbleNormalColor(R.color.chat_received_bg_normal);
+                setBubbleSelectedColor(R.color.chat_received_bg_selected);
+            }
             if (bgType == WKMsgBgType.bottom) {
                 setLook(Look.LEFT);
                 setArrowDownRightRadius(AndroidUtilities.dp(lookWidth * 2));
                 setLookWidth(0);
                 setArrowTopRightRadius(0);
-                setLookLength(AndroidUtilities.dp(lookWidth));
+                setLookLength(tailLength);
                 setRDR(normalRadius);
                 setRTR(normalRadius);
                 setLDR(normalRadius);
@@ -926,7 +1151,7 @@ public class BubbleLayout extends LinearLayout {
                 setArrowDownRightRadius(AndroidUtilities.dp(lookWidth * 2));
                 setLookWidth(0);
                 setArrowTopRightRadius(0);
-                setLookLength(AndroidUtilities.dp(lookWidth));
+                setLookLength(tailLength);
                 setLTR(normalRadius);
                 setLDR(normalRadius);
                 setRTR(normalRadius);
