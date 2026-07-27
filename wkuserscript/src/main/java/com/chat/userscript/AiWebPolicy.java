@@ -36,6 +36,7 @@ public final class AiWebPolicy {
             "alibaba.com",
             "alicdn.com",
             "aliyuncs.com",
+            "z-library.im",
             "886.best"
     ));
 
