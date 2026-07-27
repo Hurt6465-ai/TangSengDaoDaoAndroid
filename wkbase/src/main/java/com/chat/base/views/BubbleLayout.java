@@ -491,18 +491,18 @@ public class BubbleLayout extends LinearLayout {
             shadeEnd = Color.argb(34, 0, 0, 0);
         } else {
             topColor = ColorUtils.setAlphaComponent(
-                    ColorUtils.blendARGB(configured, Color.WHITE, mLiquidGlassSent ? 0.34f : 0.48f),
-                    isSelected ? 236 : 215
+                    ColorUtils.blendARGB(configured, Color.WHITE, mLiquidGlassSent ? 0.22f : 0.32f),
+                    isSelected ? 240 : 228
             );
             bottomColor = ColorUtils.setAlphaComponent(
                     ColorUtils.blendARGB(configured, mLiquidGlassSent ? 0xFFD1C5EE : 0xFFE2E8EC, 0.24f),
-                    isSelected ? 225 : 174
+                    isSelected ? 232 : 206
             );
-            borderStart = Color.argb(isSelected ? 245 : 214, 255, 255, 255);
+            borderStart = Color.argb(isSelected ? 232 : 192, 255, 255, 255);
             borderEnd = mLiquidGlassSent
                     ? Color.argb(86, 119, 103, 171)
                     : Color.argb(68, 116, 130, 143);
-            highlightStart = Color.argb(isSelected ? 150 : 112, 255, 255, 255);
+            highlightStart = Color.argb(isSelected ? 132 : 92, 255, 255, 255);
             shadeEnd = mLiquidGlassSent
                     ? Color.argb(28, 91, 69, 146)
                     : Color.argb(22, 65, 77, 88);
@@ -510,7 +510,7 @@ public class BubbleLayout extends LinearLayout {
 
         mGlassShadowPaint.setShader(null);
         mGlassShadowPaint.setStyle(Paint.Style.FILL);
-        mGlassShadowPaint.setColor(darkSurface ? Color.argb(34, 0, 0, 0) : Color.argb(22, 32, 38, 48));
+        mGlassShadowPaint.setColor(darkSurface ? Color.argb(38, 0, 0, 0) : Color.argb(30, 32, 38, 48));
 
         mGlassFillPaint.setStyle(Paint.Style.FILL);
         mGlassFillPaint.setShader(new LinearGradient(
