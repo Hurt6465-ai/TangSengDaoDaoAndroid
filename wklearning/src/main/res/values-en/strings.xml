@@ -80,6 +80,14 @@ Tap Hard: review tomorrow</string>
     <string name="word_tone_3">third tone</string>
     <string name="word_tone_4">fourth tone</string>
     <string name="pronunciation_title">Pronunciation practice</string>
+    <string name="pronunciation_title_compare">Recording comparison</string>
+    <string name="pronunciation_compare_start_hint">Play the original at 0.5×, then record your pronunciation</string>
+    <string name="pronunciation_start_record_compare">Start recording</string>
+    <string name="pronunciation_status_recording_compare">Recording. Pause when finished to stop automatically.</string>
+    <string name="pronunciation_status_processing_compare">Saving recording…</string>
+    <string name="pronunciation_compare_result_title">Pronunciation comparison</string>
+    <string name="pronunciation_original_speed">Original %1$s×</string>
+    <string name="pronunciation_status_original_speed">Playing original audio at %1$s×</string>
     <string name="stroke_title">Stroke order</string>
     <string name="stroke_subtitle">Tap a character to switch. The correct stroke order plays automatically. A character needs internet the first time and is cached afterward.</string>
     <string name="stroke_chars_title">Choose a character</string>
@@ -259,12 +267,13 @@ Time %5$d min</string>
     <string name="pinyin_chart_tap_hint">Tap a pinyin card to begin</string>
     <string name="pinyin_chart_replay">🔊 Replay</string>
     <string name="pinyin_chart_speed">%1$s× Speed</string>
-    <string name="pinyin_chart_follow">🎙 Repeat</string>
+    <string name="pinyin_chart_follow">🎙 Compare</string>
     <string name="pinyin_chart_auto_play">▶ Auto</string>
     <string name="pinyin_chart_stop_auto">■ Stop</string>
     <string name="pinyin_chart_local_audio">Local pronunciation</string>
     <string name="pinyin_chart_audio_placeholder">This is bundled placeholder audio. Replace the MP3 files at the paths in chart.json.</string>
     <string name="pinyin_chart_follow_placeholder">The repeat-after-me entry is reserved and will be enabled after real audio is added.</string>
+    <string name="pinyin_chart_select_before_compare">Select a pinyin card first</string>
     <string name="pinyin_chart_play_failed">Unable to play local audio</string>
     <string name="pinyin_chart_data_missing">Unable to load the pinyin chart. Check chart.json.</string>
 
