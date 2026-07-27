@@ -23,6 +23,7 @@ import com.chat.base.utils.WKReader;
 import com.chat.base.utils.WKTimeUtils;
 import com.chat.uikit.enity.BlacklistUser;
 import com.chat.uikit.enity.Device;
+import com.chat.uikit.enity.FriendOnline;
 import com.chat.uikit.enity.MailListEntity;
 import com.chat.uikit.enity.OnlineUser;
 import com.chat.uikit.enity.OnlineUserAndDevice;
@@ -272,7 +273,7 @@ public class UserModel extends WKBaseModel {
                 StringBuilder remoteSample = new StringBuilder();
                 if (WKReader.isNotEmpty(result.friends)) {
                     for (int i = 0; i < result.friends.size(); i++) {
-                        OnlineUser user = result.friends.get(i);
+                        FriendOnline user = result.friends.get(i);
                         if (user.online == 1) remoteOnlineCount++;
                         if (i < 30) {
                             if (remoteSample.length() > 0) remoteSample.append(';');
