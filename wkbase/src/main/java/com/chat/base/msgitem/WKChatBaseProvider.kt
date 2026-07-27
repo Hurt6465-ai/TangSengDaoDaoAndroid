@@ -876,25 +876,27 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
             String.format("%s", time)
         }
 
-        val isShowNormalColor: Boolean
-        if (mMsg.type == WKContentType.WK_IMAGE
+        val showStatusOnMedia = mMsg.type == WKContentType.WK_IMAGE
             || mMsg.type == WKContentType.WK_GIF
             || mMsg.type == WKContentType.WK_VIDEO
             || mMsg.type == WKContentType.WK_VECTOR_STICKER
             || mMsg.type == WKContentType.WK_EMOJI_STICKER
             || mMsg.type == WKContentType.WK_LOCATION
-        ) {
-            isShowNormalColor = false
-            msgTimeTv.setTextColor(ContextCompat.getColor(context, R.color.white))
+        val statusColor = if (showStatusOnMedia) {
+            ContextCompat.getColor(context, R.color.white)
         } else {
-            isShowNormalColor = true
-            msgTimeTv.setTextColor(ContextCompat.getColor(context, R.color.color999))
+            ContextCompat.getColor(
+                context,
+                if (fromType == WKChatIteMsgFromType.SEND) {
+                    R.color.chat_msg_time_sent
+                } else {
+                    R.color.chat_msg_time_received
+                }
+            )
         }
-
-        pinIV.colorFilter = PorterDuffColorFilter(
-            ContextCompat.getColor(context, if (isShowNormalColor) R.color.color999 else R.color.white),
-            PorterDuff.Mode.MULTIPLY
-        )
+        msgTimeTv.setTextColor(statusColor)
+        editedTv.setTextColor(statusColor)
+        pinIV.colorFilter = PorterDuffColorFilter(statusColor, PorterDuff.Mode.MULTIPLY)
 
         if (mMsg.remoteExtra != null && mMsg.remoteExtra.needUpload == 1) {
             mMsg.status = WKSendMsgResult.send_loading
@@ -928,9 +930,11 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
         }
 
         val tintColor = if (mMsg.status <= WKSendMsgResult.send_success) {
-            ContextCompat.getColor(context, if (isShowNormalColor) R.color.color999 else R.color.white)
-        } else {
+            statusColor
+        } else if (showStatusOnMedia) {
             ContextCompat.getColor(context, R.color.white)
+        } else {
+            ContextCompat.getColor(context, R.color.reminderColor)
         }
         Theme.setColorFilter(statusIV, tintColor)
         statusIV.setAutoRepeat(autoRepeat)
