@@ -22,4 +22,8 @@
     <color name="titleBarIcon">#FFFFFF</color>
     <color name="dialogText">#fbf9fe</color>
     <color name="tip_message_cell_bg">#CC49494A</color>
+    <color name="chat_liquid_received_bg_normal">#2E3A47</color>
+    <color name="chat_liquid_received_bg_selected">#3A4857</color>
+    <color name="chat_liquid_send_bg_normal">#5E609B</color>
+    <color name="chat_liquid_send_bg_selected">#696CAF</color>
 </resources>
