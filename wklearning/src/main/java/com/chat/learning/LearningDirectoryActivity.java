@@ -93,11 +93,14 @@ public class LearningDirectoryActivity extends AppCompatActivity {
 
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(dp(18), dp(12), dp(18), 0);
+        page.setPadding(dp(18), dp(10), dp(18), 0);
         root.addView(page, new FrameLayout.LayoutParams(-1, -1));
 
-        // 返回按钮固定；标题和介绍放进 ScrollView，向上滚动时自然隐藏。
-        page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(52)));
+        final boolean wordDirectory = "words".equals(type);
+        if (!wordDirectory) {
+            page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(56)));
+            addDirectoryHeading(page, false);
+        }
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -107,10 +110,11 @@ public class LearningDirectoryActivity extends AppCompatActivity {
 
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
-        list.setPadding(0, dp(4), 0, dp(30));
+        list.setPadding(0, 0, 0, dp(30));
         scroll.addView(list, new ScrollView.LayoutParams(-1, -2));
 
-        addScrollableHeader(list);
+        // 单词页不再保留单独顶栏；标题和介绍随列表一起滚动并自然隐藏。
+        if (wordDirectory) addDirectoryHeading(list, true);
 
         List<LearningCatalogRepository.Node> children = LearningCatalogRepository.childrenOf(catalog, parentId);
         if (children == null || children.isEmpty()) {
@@ -118,7 +122,7 @@ public class LearningDirectoryActivity extends AppCompatActivity {
             return;
         }
 
-        if ("words".equals(type)) {
+        if (wordDirectory) {
             addWordCardGrid(list, children);
         } else {
             for (LearningCatalogRepository.Node node : children) {
@@ -127,7 +131,7 @@ public class LearningDirectoryActivity extends AppCompatActivity {
         }
     }
 
-    private void addScrollableHeader(LinearLayout parent) {
+    private void addDirectoryHeading(LinearLayout parent, boolean compactTop) {
         TextView title = new TextView(this);
         title.setText(resolveTitle());
         title.setTextSize(28);
@@ -135,7 +139,7 @@ public class LearningDirectoryActivity extends AppCompatActivity {
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setIncludeFontPadding(false);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-        titleLp.setMargins(0, dp(8), 0, dp(6));
+        titleLp.setMargins(0, compactTop ? dp(6) : dp(10), 0, dp(6));
         parent.addView(title, titleLp);
 
         TextView subtitle = new TextView(this);
@@ -144,9 +148,10 @@ public class LearningDirectoryActivity extends AppCompatActivity {
         subtitle.setTextColor(COLOR_SUB);
         subtitle.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
-        subLp.setMargins(0, 0, 0, dp(18));
+        subLp.setMargins(0, 0, 0, compactTop ? dp(14) : dp(18));
         parent.addView(subtitle, subLp);
     }
+
 
     /**
      * 单词目录专用：一排 2 个竖屏卡片。
@@ -165,13 +170,13 @@ public class LearningDirectoryActivity extends AppCompatActivity {
 
             for (int i = 0; i < 2; i++) {
                 if (index < nodes.size()) {
-                    row.addView(wordVerticalCard(nodes.get(index)), new LinearLayout.LayoutParams(0, dp(184), 1f));
+                    row.addView(wordVerticalCard(nodes.get(index)), new LinearLayout.LayoutParams(0, dp(176), 1f));
                     index++;
                 } else {
                     View empty = new View(this);
                     row.addView(empty, new LinearLayout.LayoutParams(0, dp(1), 1f));
                 }
-                if (i == 0) addHorizontalGap(row, 12);
+                if (i < 1) addHorizontalGap(row, 12);
             }
         }
     }
@@ -260,9 +265,14 @@ public class LearningDirectoryActivity extends AppCompatActivity {
         back.setOnClickListener(v -> finish());
         top.addView(back, new LinearLayout.LayoutParams(dp(42), dp(42)));
 
-        // 不再显示“学习首页”面包屑，减少顶部重复信息。
-        View spacer = new View(this);
-        top.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+        TextView crumb = new TextView(this);
+        crumb.setText(parentId.length() == 0 ? "学习首页" : catalog.title);
+        crumb.setTextSize(14);
+        crumb.setTextColor(COLOR_SUB);
+        crumb.setGravity(Gravity.CENTER_VERTICAL);
+        crumb.setPadding(dp(12), 0, 0, 0);
+        top.addView(crumb, new LinearLayout.LayoutParams(0, -1, 1f));
+
         return top;
     }
 
