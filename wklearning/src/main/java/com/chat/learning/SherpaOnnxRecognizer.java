@@ -133,7 +133,7 @@ final class SherpaOnnxRecognizer {
             ModelType.SENSE_VOICE,
             "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
             "https://huggingface.co/csukuangfj/"
-                    + "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
+                    + "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17"
                     + "/resolve/main/",
             150L * 1024L * 1024L,
             420L * 1024L * 1024L,
@@ -426,61 +426,58 @@ final class SherpaOnnxRecognizer {
     }
 
     private static OnlineRecognizer createZipformerRecognizer(File model, File tokens) {
-        OnlineZipformer2CtcModelConfig ctc = OnlineZipformer2CtcModelConfig.builder()
-                .setModel(model.getAbsolutePath())
-                .build();
-        OnlineModelConfig modelConfig = OnlineModelConfig.builder()
-                .setZipformer2Ctc(ctc)
-                .setTokens(tokens.getAbsolutePath())
-                .setNumThreads(2)
-                .setDebug(false)
-                .setProvider("cpu")
-                .setModelingUnit("cjkchar")
-                .build();
-        OnlineRecognizerConfig config = OnlineRecognizerConfig.builder()
-                .setOnlineModelConfig(modelConfig)
-                .setDecodingMethod("greedy_search")
-                .setEnableEndpoint(false)
-                .build();
-        return new OnlineRecognizer(config);
+        // The Android AAR exposes Kotlin data classes to Java through constructors
+        // and property setters. It does not provide the Builder API.
+        OnlineZipformer2CtcModelConfig ctc = new OnlineZipformer2CtcModelConfig();
+        ctc.setModel(model.getAbsolutePath());
+
+        OnlineModelConfig modelConfig = new OnlineModelConfig();
+        modelConfig.setZipformer2Ctc(ctc);
+        modelConfig.setTokens(tokens.getAbsolutePath());
+        modelConfig.setNumThreads(2);
+        modelConfig.setDebug(false);
+        modelConfig.setProvider("cpu");
+        modelConfig.setModelingUnit("cjkchar");
+
+        OnlineRecognizerConfig config = new OnlineRecognizerConfig();
+        config.setModelConfig(modelConfig);
+        config.setDecodingMethod("greedy_search");
+        config.setEnableEndpoint(false);
+        return new OnlineRecognizer(null, config);
     }
 
     private static OfflineRecognizer createSenseVoiceRecognizer(File model, File tokens) {
-        FeatureConfig feature = FeatureConfig.builder()
-                .setSampleRate(SAMPLE_RATE)
-                .setFeatureDim(80)
-                .setDither(0.0f)
-                .build();
+        FeatureConfig feature = new FeatureConfig();
+        feature.setSampleRate(SAMPLE_RATE);
+        feature.setFeatureDim(80);
+        feature.setDither(0.0f);
 
-        OfflineSenseVoiceModelConfig sense = OfflineSenseVoiceModelConfig.builder()
-                .setModel(model.getAbsolutePath())
-                .setLanguage("zh")
-                .setInverseTextNormalization(false)
-                .build();
+        OfflineSenseVoiceModelConfig sense = new OfflineSenseVoiceModelConfig();
+        sense.setModel(model.getAbsolutePath());
+        sense.setLanguage("zh");
+        sense.setUseInverseTextNormalization(false);
 
-        OfflineModelConfig modelConfig = OfflineModelConfig.builder()
-                .setSenseVoice(sense)
-                .setTokens(tokens.getAbsolutePath())
-                .setNumThreads(2)
-                .setDebug(false)
-                .setProvider("cpu")
-                .setModelType("sense_voice")
-                .setModelingUnit("cjkchar")
-                .build();
+        OfflineModelConfig modelConfig = new OfflineModelConfig();
+        modelConfig.setSenseVoice(sense);
+        modelConfig.setTokens(tokens.getAbsolutePath());
+        modelConfig.setNumThreads(2);
+        modelConfig.setDebug(false);
+        modelConfig.setProvider("cpu");
+        modelConfig.setModelType("sense_voice");
+        modelConfig.setModelingUnit("cjkchar");
 
-        OfflineRecognizerConfig config = OfflineRecognizerConfig.builder()
-                .setFeatureConfig(feature)
-                .setOfflineModelConfig(modelConfig)
-                .setDecodingMethod("greedy_search")
-                .setMaxActivePaths(4)
-                .build();
-        return new OfflineRecognizer(config);
+        OfflineRecognizerConfig config = new OfflineRecognizerConfig();
+        config.setFeatConfig(feature);
+        config.setModelConfig(modelConfig);
+        config.setDecodingMethod("greedy_search");
+        config.setMaxActivePaths(4);
+        return new OfflineRecognizer(null, config);
     }
 
     private static String decodeZipformer(float[] samples) {
         OnlineRecognizer current = onlineRecognizer;
         if (current == null) return "";
-        OnlineStream stream = current.createStream();
+        OnlineStream stream = current.createStream("");
         try {
             stream.acceptWaveform(samples, SAMPLE_RATE);
             stream.acceptWaveform(new float[SAMPLE_RATE * 3 / 10], SAMPLE_RATE);
