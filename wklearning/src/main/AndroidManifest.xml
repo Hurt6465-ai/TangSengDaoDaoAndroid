@@ -46,6 +46,11 @@
             android:screenOrientation="portrait"
             android:theme="@style/Theme.WKLearning.Popup" />
         <activity
+            android:name="com.chat.learning.SherpaModelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        <activity
             android:name="com.chat.learning.WordPronunciationActivity"
             android:excludeFromRecents="true"
             android:exported="false"
