@@ -83,6 +83,14 @@
     <string name="word_tone_3">三声</string>
     <string name="word_tone_4">四声</string>
     <string name="pronunciation_title">发音练习</string>
+    <string name="pronunciation_title_compare">录音对比</string>
+    <string name="pronunciation_compare_start_hint">先点原音听 0.5× 慢速发音，再点麦克风录下自己的发音</string>
+    <string name="pronunciation_start_record_compare">开始录音</string>
+    <string name="pronunciation_status_recording_compare">正在录音，读完停顿后自动结束</string>
+    <string name="pronunciation_status_processing_compare">正在保存录音…</string>
+    <string name="pronunciation_compare_result_title">发音对比</string>
+    <string name="pronunciation_original_speed">原音 %1$s×</string>
+    <string name="pronunciation_status_original_speed">正在播放原音（%1$s×）</string>
     <string name="stroke_title">笔顺动画</string>
     <string name="stroke_subtitle">点击汉字切换，按正确笔画顺序自动播放。某个汉字首次打开需要联网，之后可使用本地缓存。</string>
     <string name="stroke_chars_title">选择汉字</string>
@@ -264,12 +272,13 @@
     <string name="pinyin_chart_tap_hint">点击一个拼音开始点读</string>
     <string name="pinyin_chart_replay">🔊 重播</string>
     <string name="pinyin_chart_speed">%1$s× 语速</string>
-    <string name="pinyin_chart_follow">🎙 跟读</string>
+    <string name="pinyin_chart_follow">🎙 录音对比</string>
     <string name="pinyin_chart_auto_play">▶ 连播</string>
     <string name="pinyin_chart_stop_auto">■ 停止</string>
     <string name="pinyin_chart_local_audio">本地发音</string>
     <string name="pinyin_chart_audio_placeholder">当前播放的是本地占位音频，按 JSON 路径替换 MP3 即可。</string>
     <string name="pinyin_chart_follow_placeholder">跟读入口已保留，真实发音音频接入后再启用评分。</string>
+    <string name="pinyin_chart_select_before_compare">请先点击一个拼音</string>
     <string name="pinyin_chart_play_failed">本地音频播放失败</string>
     <string name="pinyin_chart_data_missing">拼音表数据加载失败，请检查 chart.json。</string>
 
