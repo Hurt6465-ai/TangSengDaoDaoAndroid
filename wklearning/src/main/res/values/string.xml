@@ -90,7 +90,7 @@
     <string name="stroke_speak_word">朗读词语</string>
     <string name="stroke_replay">重播笔顺</string>
     <string name="stroke_loading">正在加载笔顺…</string>
-    <string name="pronunciation_tip">先听标准音，再使用 Google 语音识别检查文字匹配；也可以录下自己的声音，与标准音反复对比。</string>
+    <string name="pronunciation_tip">先听标准音，再使用 sherpa-onnx 本地识别检查文字匹配；本地模型不可用时自动使用系统语音识别。</string>
     <string name="pronunciation_play_standard">播放标准音</string>
     <string name="pronunciation_play_spelling">播放拼读音</string>
     <string name="pronunciation_start_record">开始录音</string>
@@ -153,6 +153,9 @@
     <string name="pronunciation_mine_short">我的录音</string>
     <string name="pronunciation_try_again">再试一次</string>
     <string name="pronunciation_result_ready">录音和识别已完成</string>
+    <string name="pronunciation_result_ready_local">本地识别已完成</string>
+    <string name="pronunciation_sherpa_downloading">首次使用正在下载离线识别模型（约 27 MB），当前先使用系统识别</string>
+    <string name="pronunciation_sherpa_ready">离线语音识别已就绪</string>
 
 
     <!-- Learning home: fully localized hero carousel, tools, sections and drawer. -->
@@ -336,4 +339,34 @@
     <string name="speaking_front_prompt">先读一遍，想想它的意思</string>
     <string name="speaking_front_tap">点击卡片查看拼音、缅文和解析</string>
     <string name="speaking_back_tap">点击答案区域返回正面</string>
+
+    <string name="pronunciation_sherpa_importing">正在导入离线语音模型…</string>
+    <string name="pronunciation_sherpa_loading">正在加载离线语音模型…</string>
+    <string name="pronunciation_sherpa_not_installed">离线模型未安装，当前使用系统识别</string>
+    <string name="pronunciation_sensevoice_ready">SenseVoice 高精度离线识别已就绪</string>
+    <string name="asr_model_title">离线语音识别</string>
+    <string name="asr_model_intro">选择适合设备的模型。模型安装后完全离线运行；没有安装或本地识别失败时，仍会使用系统语音识别兜底。</string>
+    <string name="asr_model_zipformer_title">轻量 Zipformer</string>
+    <string name="asr_model_zipformer_desc">下载小、加载快，适合大多数手机和日常单词跟读。</string>
+    <string name="asr_model_zipformer_size">约 27 MB</string>
+    <string name="asr_model_sensevoice_title">高精度 SenseVoice</string>
+    <string name="asr_model_sensevoice_desc">中文短句和明显口音通常更稳，但模型较大、加载和耗电更高。</string>
+    <string name="asr_model_sensevoice_size">约 228 MB</string>
+    <string name="asr_model_selected">使用中</string>
+    <string name="asr_model_choose">选择</string>
+    <string name="asr_model_download">在线下载</string>
+    <string name="asr_model_redownload">重新下载</string>
+    <string name="asr_model_import">本地导入</string>
+    <string name="asr_model_delete">删除本地模型</string>
+    <string name="asr_model_status_downloading">正在下载并校验模型…</string>
+    <string name="asr_model_status_importing">正在导入并校验模型…</string>
+    <string name="asr_model_status_loading">模型已安装，正在加载…</string>
+    <string name="asr_model_status_failed">加载失败，可重新下载或导入</string>
+    <string name="asr_model_status_installed">已安装 · %1$s</string>
+    <string name="asr_model_status_not_installed">未安装 · %1$s</string>
+    <string name="asr_model_import_note">导入文件必须是 ZIP，并包含与所选模型匹配的 model.int8.onnx 和 tokens.txt。ZIP 内可以保留原模型文件夹。</string>
+    <string name="asr_model_download_confirm_title">下载离线模型</string>
+    <string name="asr_model_download_confirm_message">将在线下载“%1$s”（%2$s）。建议使用 Wi-Fi，并确保有足够存储空间。</string>
+    <string name="asr_model_delete_confirm_title">删除模型</string>
+    <string name="asr_model_delete_confirm_message">确定删除“%1$s”吗？删除后会自动改用系统识别，直到重新安装模型。</string>
 </resources>
