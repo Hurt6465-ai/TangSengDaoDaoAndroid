@@ -345,802 +345,802 @@
         {
           "letter": "ā",
           "hint": "အာ",
-          "audio": "learning/pinyin/audio/tones/a1.mp3"
+          "audio": "learning/pinyin/audio/tones/ā.mp3"
         },
         {
           "letter": "á",
           "hint": "အာ",
-          "audio": "learning/pinyin/audio/tones/a2.mp3"
+          "audio": "learning/pinyin/audio/tones/á.mp3"
         },
         {
           "letter": "ǎ",
           "hint": "အာ",
-          "audio": "learning/pinyin/audio/tones/a3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǎ.mp3"
         },
         {
           "letter": "à",
           "hint": "အာ",
-          "audio": "learning/pinyin/audio/tones/a4.mp3"
+          "audio": "learning/pinyin/audio/tones/à.mp3"
         },
         {
           "letter": "ō",
           "hint": "အော",
-          "audio": "learning/pinyin/audio/tones/o1.mp3"
+          "audio": "learning/pinyin/audio/tones/ō.mp3"
         },
         {
           "letter": "ó",
           "hint": "အော",
-          "audio": "learning/pinyin/audio/tones/o2.mp3"
+          "audio": "learning/pinyin/audio/tones/ó.mp3"
         },
         {
           "letter": "ǒ",
           "hint": "အော",
-          "audio": "learning/pinyin/audio/tones/o3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǒ.mp3"
         },
         {
           "letter": "ò",
           "hint": "အော",
-          "audio": "learning/pinyin/audio/tones/o4.mp3"
+          "audio": "learning/pinyin/audio/tones/ò.mp3"
         },
         {
           "letter": "ē",
           "hint": "အ",
-          "audio": "learning/pinyin/audio/tones/e1.mp3"
+          "audio": "learning/pinyin/audio/tones/ē.mp3"
         },
         {
           "letter": "é",
           "hint": "အ",
-          "audio": "learning/pinyin/audio/tones/e2.mp3"
+          "audio": "learning/pinyin/audio/tones/é.mp3"
         },
         {
           "letter": "ě",
           "hint": "အ",
-          "audio": "learning/pinyin/audio/tones/e3.mp3"
+          "audio": "learning/pinyin/audio/tones/ě.mp3"
         },
         {
           "letter": "è",
           "hint": "အ",
-          "audio": "learning/pinyin/audio/tones/e4.mp3"
+          "audio": "learning/pinyin/audio/tones/è.mp3"
         },
         {
           "letter": "ī",
           "hint": "အီ",
-          "audio": "learning/pinyin/audio/tones/i1.mp3"
+          "audio": "learning/pinyin/audio/tones/ī.mp3"
         },
         {
           "letter": "í",
           "hint": "အီ",
-          "audio": "learning/pinyin/audio/tones/i2.mp3"
+          "audio": "learning/pinyin/audio/tones/í.mp3"
         },
         {
           "letter": "ǐ",
           "hint": "အီ",
-          "audio": "learning/pinyin/audio/tones/i3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǐ.mp3"
         },
         {
           "letter": "ì",
           "hint": "အီ",
-          "audio": "learning/pinyin/audio/tones/i4.mp3"
+          "audio": "learning/pinyin/audio/tones/ì.mp3"
         },
         {
           "letter": "ū",
           "hint": "အူ",
-          "audio": "learning/pinyin/audio/tones/u1.mp3"
+          "audio": "learning/pinyin/audio/tones/ū.mp3"
         },
         {
           "letter": "ú",
           "hint": "အူ",
-          "audio": "learning/pinyin/audio/tones/u2.mp3"
+          "audio": "learning/pinyin/audio/tones/ú.mp3"
         },
         {
           "letter": "ǔ",
           "hint": "အူ",
-          "audio": "learning/pinyin/audio/tones/u3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǔ.mp3"
         },
         {
           "letter": "ù",
           "hint": "အူ",
-          "audio": "learning/pinyin/audio/tones/u4.mp3"
+          "audio": "learning/pinyin/audio/tones/ù.mp3"
         },
         {
           "letter": "ǖ",
           "hint": "အူ",
-          "audio": "learning/pinyin/audio/tones/u1.mp3"
+          "audio": "learning/pinyin/audio/tones/ǖ.mp3"
         },
         {
           "letter": "ǘ",
           "hint": "အူ",
-          "audio": "learning/pinyin/audio/tones/u2.mp3"
+          "audio": "learning/pinyin/audio/tones/ǘ.mp3"
         },
         {
           "letter": "ǚ",
           "hint": "အူ",
-          "audio": "learning/pinyin/audio/tones/u3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǚ.mp3"
         },
         {
           "letter": "ǜ",
           "hint": "အူ",
-          "audio": "learning/pinyin/audio/tones/u4.mp3"
+          "audio": "learning/pinyin/audio/tones/ǜ.mp3"
         },
         {
           "letter": "āi",
           "hint": "အိုင်",
-          "audio": "learning/pinyin/audio/tones/ai1.mp3"
+          "audio": "learning/pinyin/audio/tones/āi.mp3"
         },
         {
           "letter": "ái",
           "hint": "အိုင်",
-          "audio": "learning/pinyin/audio/tones/ai2.mp3"
+          "audio": "learning/pinyin/audio/tones/ái.mp3"
         },
         {
           "letter": "ǎi",
           "hint": "အိုင်",
-          "audio": "learning/pinyin/audio/tones/ai3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǎi.mp3"
         },
         {
           "letter": "ài",
           "hint": "အိုင်",
-          "audio": "learning/pinyin/audio/tones/ai4.mp3"
+          "audio": "learning/pinyin/audio/tones/ài.mp3"
         },
         {
           "letter": "ēi",
           "hint": "အေ",
-          "audio": "learning/pinyin/audio/tones/ei1.mp3"
+          "audio": "learning/pinyin/audio/tones/ēi.mp3"
         },
         {
           "letter": "éi",
           "hint": "အေ",
-          "audio": "learning/pinyin/audio/tones/ei2.mp3"
+          "audio": "learning/pinyin/audio/tones/éi.mp3"
         },
         {
           "letter": "ěi",
           "hint": "အေ",
-          "audio": "learning/pinyin/audio/tones/ei3.mp3"
+          "audio": "learning/pinyin/audio/tones/ěi.mp3"
         },
         {
           "letter": "èi",
           "hint": "အေ",
-          "audio": "learning/pinyin/audio/tones/ei4.mp3"
+          "audio": "learning/pinyin/audio/tones/èi.mp3"
         },
         {
           "letter": "uī",
           "hint": "ဝေ",
-          "audio": "learning/pinyin/audio/tones/ui1.mp3"
+          "audio": "learning/pinyin/audio/tones/uī.mp3"
         },
         {
           "letter": "uí",
           "hint": "ဝေ",
-          "audio": "learning/pinyin/audio/tones/ui2.mp3"
+          "audio": "learning/pinyin/audio/tones/uí.mp3"
         },
         {
           "letter": "uǐ",
           "hint": "ဝေ",
-          "audio": "learning/pinyin/audio/tones/ui3.mp3"
+          "audio": "learning/pinyin/audio/tones/uǐ.mp3"
         },
         {
           "letter": "uì",
           "hint": "ဝေ",
-          "audio": "learning/pinyin/audio/tones/ui4.mp3"
+          "audio": "learning/pinyin/audio/tones/uì.mp3"
         },
         {
           "letter": "āo",
           "hint": "အောက်",
-          "audio": "learning/pinyin/audio/tones/ao1.mp3"
+          "audio": "learning/pinyin/audio/tones/āo.mp3"
         },
         {
           "letter": "áo",
           "hint": "အောက်",
-          "audio": "learning/pinyin/audio/tones/ao2.mp3"
+          "audio": "learning/pinyin/audio/tones/áo.mp3"
         },
         {
           "letter": "ǎo",
           "hint": "အောက်",
-          "audio": "learning/pinyin/audio/tones/ao3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǎo.mp3"
         },
         {
           "letter": "ào",
           "hint": "အောက်",
-          "audio": "learning/pinyin/audio/tones/ao4.mp3"
+          "audio": "learning/pinyin/audio/tones/ào.mp3"
         },
         {
           "letter": "ōu",
           "hint": "အို",
-          "audio": "learning/pinyin/audio/tones/ou1.mp3"
+          "audio": "learning/pinyin/audio/tones/ōu.mp3"
         },
         {
           "letter": "óu",
           "hint": "အို",
-          "audio": "learning/pinyin/audio/tones/ou2.mp3"
+          "audio": "learning/pinyin/audio/tones/óu.mp3"
         },
         {
           "letter": "ǒu",
           "hint": "အို",
-          "audio": "learning/pinyin/audio/tones/ou3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǒu.mp3"
         },
         {
           "letter": "òu",
           "hint": "အို",
-          "audio": "learning/pinyin/audio/tones/ou4.mp3"
+          "audio": "learning/pinyin/audio/tones/òu.mp3"
         },
         {
           "letter": "iū",
           "hint": "ယူ",
-          "audio": "learning/pinyin/audio/tones/iu1.mp3"
+          "audio": "learning/pinyin/audio/tones/iū.mp3"
         },
         {
           "letter": "iú",
           "hint": "ယူ",
-          "audio": "learning/pinyin/audio/tones/iu2.mp3"
+          "audio": "learning/pinyin/audio/tones/iú.mp3"
         },
         {
           "letter": "iǔ",
           "hint": "ယူ",
-          "audio": "learning/pinyin/audio/tones/iu3.mp3"
+          "audio": "learning/pinyin/audio/tones/iǔ.mp3"
         },
         {
           "letter": "iù",
           "hint": "ယူ",
-          "audio": "learning/pinyin/audio/tones/iu4.mp3"
+          "audio": "learning/pinyin/audio/tones/iù.mp3"
         },
         {
           "letter": "iē",
           "hint": "ယဲ",
-          "audio": "learning/pinyin/audio/tones/ie1.mp3"
+          "audio": "learning/pinyin/audio/tones/iē.mp3"
         },
         {
           "letter": "ié",
           "hint": "ယဲ",
-          "audio": "learning/pinyin/audio/tones/ie2.mp3"
+          "audio": "learning/pinyin/audio/tones/ié.mp3"
         },
         {
           "letter": "iě",
           "hint": "ယဲ",
-          "audio": "learning/pinyin/audio/tones/ie3.mp3"
+          "audio": "learning/pinyin/audio/tones/iě.mp3"
         },
         {
           "letter": "iè",
           "hint": "ယဲ",
-          "audio": "learning/pinyin/audio/tones/ie4.mp3"
+          "audio": "learning/pinyin/audio/tones/iè.mp3"
         },
         {
           "letter": "üē",
           "hint": "",
-          "audio": "learning/pinyin/audio/tones/ue1.mp3"
+          "audio": "learning/pinyin/audio/tones/üē.mp3"
         },
         {
           "letter": "üé",
           "hint": "",
-          "audio": "learning/pinyin/audio/tones/ue2.mp3"
+          "audio": "learning/pinyin/audio/tones/üé.mp3"
         },
         {
           "letter": "üě",
           "hint": "",
-          "audio": "learning/pinyin/audio/tones/ue3.mp3"
+          "audio": "learning/pinyin/audio/tones/üě.mp3"
         },
         {
           "letter": "üè",
           "hint": "",
-          "audio": "learning/pinyin/audio/tones/ue4.mp3"
+          "audio": "learning/pinyin/audio/tones/üè.mp3"
         },
         {
           "letter": "ēr",
           "hint": "အာရ်",
-          "audio": "learning/pinyin/audio/tones/er1.mp3"
+          "audio": "learning/pinyin/audio/tones/ēr.mp3"
         },
         {
           "letter": "ér",
           "hint": "အာရ်",
-          "audio": "learning/pinyin/audio/tones/er2.mp3"
+          "audio": "learning/pinyin/audio/tones/ér.mp3"
         },
         {
           "letter": "ěr",
           "hint": "အာရ်",
-          "audio": "learning/pinyin/audio/tones/er3.mp3"
+          "audio": "learning/pinyin/audio/tones/ěr.mp3"
         },
         {
           "letter": "èr",
           "hint": "အာရ်",
-          "audio": "learning/pinyin/audio/tones/er4.mp3"
+          "audio": "learning/pinyin/audio/tones/èr.mp3"
         },
         {
           "letter": "ān",
           "hint": "အန်",
-          "audio": "learning/pinyin/audio/tones/an1.mp3"
+          "audio": "learning/pinyin/audio/tones/ān.mp3"
         },
         {
           "letter": "án",
           "hint": "အန်",
-          "audio": "learning/pinyin/audio/tones/an2.mp3"
+          "audio": "learning/pinyin/audio/tones/án.mp3"
         },
         {
           "letter": "ǎn",
           "hint": "အန်",
-          "audio": "learning/pinyin/audio/tones/an3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǎn.mp3"
         },
         {
           "letter": "àn",
           "hint": "အန်",
-          "audio": "learning/pinyin/audio/tones/an4.mp3"
+          "audio": "learning/pinyin/audio/tones/àn.mp3"
         },
         {
           "letter": "ēn",
           "hint": "အန် (en)",
-          "audio": "learning/pinyin/audio/tones/en1.mp3"
+          "audio": "learning/pinyin/audio/tones/ēn.mp3"
         },
         {
           "letter": "én",
           "hint": "အန် (en)",
-          "audio": "learning/pinyin/audio/tones/en2.mp3"
+          "audio": "learning/pinyin/audio/tones/én.mp3"
         },
         {
           "letter": "ěn",
           "hint": "အန် (en)",
-          "audio": "learning/pinyin/audio/tones/en3.mp3"
+          "audio": "learning/pinyin/audio/tones/ěn.mp3"
         },
         {
           "letter": "èn",
           "hint": "အန် (en)",
-          "audio": "learning/pinyin/audio/tones/en4.mp3"
+          "audio": "learning/pinyin/audio/tones/èn.mp3"
         },
         {
           "letter": "īn",
           "hint": "အင်",
-          "audio": "learning/pinyin/audio/tones/in1.mp3"
+          "audio": "learning/pinyin/audio/tones/īn.mp3"
         },
         {
           "letter": "ín",
           "hint": "အင်",
-          "audio": "learning/pinyin/audio/tones/in2.mp3"
+          "audio": "learning/pinyin/audio/tones/ín.mp3"
         },
         {
           "letter": "ǐn",
           "hint": "အင်",
-          "audio": "learning/pinyin/audio/tones/in3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǐn.mp3"
         },
         {
           "letter": "ìn",
           "hint": "အင်",
-          "audio": "learning/pinyin/audio/tones/in4.mp3"
+          "audio": "learning/pinyin/audio/tones/ìn.mp3"
         },
         {
           "letter": "ūn",
           "hint": "ဝန်း",
-          "audio": "learning/pinyin/audio/tones/un1.mp3"
+          "audio": "learning/pinyin/audio/tones/ūn.mp3"
         },
         {
           "letter": "ún",
           "hint": "ဝန်း",
-          "audio": "learning/pinyin/audio/tones/un2.mp3"
+          "audio": "learning/pinyin/audio/tones/ún.mp3"
         },
         {
           "letter": "ǔn",
           "hint": "ဝန်း",
-          "audio": "learning/pinyin/audio/tones/un3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǔn.mp3"
         },
         {
           "letter": "ùn",
           "hint": "ဝန်း",
-          "audio": "learning/pinyin/audio/tones/un4.mp3"
+          "audio": "learning/pinyin/audio/tones/ùn.mp3"
         },
         {
           "letter": "ǖn",
           "hint": "ဝန်း",
-          "audio": "learning/pinyin/audio/tones/un1.mp3"
+          "audio": "learning/pinyin/audio/tones/ǖn.mp3"
         },
         {
           "letter": "ǘn",
           "hint": "ဝန်း",
-          "audio": "learning/pinyin/audio/tones/un2.mp3"
+          "audio": "learning/pinyin/audio/tones/ǘn.mp3"
         },
         {
           "letter": "ǚn",
           "hint": "ဝန်း",
-          "audio": "learning/pinyin/audio/tones/un3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǚn.mp3"
         },
         {
           "letter": "ǜn",
           "hint": "ဝန်း",
-          "audio": "learning/pinyin/audio/tones/un4.mp3"
+          "audio": "learning/pinyin/audio/tones/ǜn.mp3"
         },
         {
           "letter": "āng",
           "hint": "အောင်",
-          "audio": "learning/pinyin/audio/tones/ang1.mp3"
+          "audio": "learning/pinyin/audio/tones/āng.mp3"
         },
         {
           "letter": "áng",
           "hint": "အောင်",
-          "audio": "learning/pinyin/audio/tones/ang2.mp3"
+          "audio": "learning/pinyin/audio/tones/áng.mp3"
         },
         {
           "letter": "ǎng",
           "hint": "အောင်",
-          "audio": "learning/pinyin/audio/tones/ang3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǎng.mp3"
         },
         {
           "letter": "àng",
           "hint": "အောင်",
-          "audio": "learning/pinyin/audio/tones/ang4.mp3"
+          "audio": "learning/pinyin/audio/tones/àng.mp3"
         },
         {
           "letter": "ēng",
           "hint": "အိုင် (eng)",
-          "audio": "learning/pinyin/audio/tones/eng1.mp3"
+          "audio": "learning/pinyin/audio/tones/ēng.mp3"
         },
         {
           "letter": "éng",
           "hint": "အိုင် (eng)",
-          "audio": "learning/pinyin/audio/tones/eng2.mp3"
+          "audio": "learning/pinyin/audio/tones/éng.mp3"
         },
         {
           "letter": "ěng",
           "hint": "အိုင် (eng)",
-          "audio": "learning/pinyin/audio/tones/eng3.mp3"
+          "audio": "learning/pinyin/audio/tones/ěng.mp3"
         },
         {
           "letter": "èng",
           "hint": "အိုင် (eng)",
-          "audio": "learning/pinyin/audio/tones/eng4.mp3"
+          "audio": "learning/pinyin/audio/tones/èng.mp3"
         },
         {
           "letter": "īng",
           "hint": "အိုင်",
-          "audio": "learning/pinyin/audio/tones/ing1.mp3"
+          "audio": "learning/pinyin/audio/tones/īng.mp3"
         },
         {
           "letter": "íng",
           "hint": "အိုင်",
-          "audio": "learning/pinyin/audio/tones/ing2.mp3"
+          "audio": "learning/pinyin/audio/tones/íng.mp3"
         },
         {
           "letter": "ǐng",
           "hint": "အိုင်",
-          "audio": "learning/pinyin/audio/tones/ing3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǐng.mp3"
         },
         {
           "letter": "ìng",
           "hint": "အိုင်",
-          "audio": "learning/pinyin/audio/tones/ing4.mp3"
+          "audio": "learning/pinyin/audio/tones/ìng.mp3"
         },
         {
           "letter": "ōng",
           "hint": "အုန်",
-          "audio": "learning/pinyin/audio/tones/ong1.mp3"
+          "audio": "learning/pinyin/audio/tones/ōng.mp3"
         },
         {
           "letter": "óng",
           "hint": "အုန်",
-          "audio": "learning/pinyin/audio/tones/ong2.mp3"
+          "audio": "learning/pinyin/audio/tones/óng.mp3"
         },
         {
           "letter": "ǒng",
           "hint": "အုန်",
-          "audio": "learning/pinyin/audio/tones/ong3.mp3"
+          "audio": "learning/pinyin/audio/tones/ǒng.mp3"
         },
         {
           "letter": "òng",
           "hint": "အုန်",
-          "audio": "learning/pinyin/audio/tones/ong4.mp3"
+          "audio": "learning/pinyin/audio/tones/òng.mp3"
         },
         {
           "letter": "zhī",
           "hint": "ကျ (zh)",
-          "audio": "learning/pinyin/audio/tones/zhi1.mp3"
+          "audio": "learning/pinyin/audio/tones/zhī.mp3"
         },
         {
           "letter": "zhí",
           "hint": "ကျ (zh)",
-          "audio": "learning/pinyin/audio/tones/zhi2.mp3"
+          "audio": "learning/pinyin/audio/tones/zhí.mp3"
         },
         {
           "letter": "zhǐ",
           "hint": "ကျ (zh)",
-          "audio": "learning/pinyin/audio/tones/zhi3.mp3"
+          "audio": "learning/pinyin/audio/tones/zhǐ.mp3"
         },
         {
           "letter": "zhì",
           "hint": "ကျ (zh)",
-          "audio": "learning/pinyin/audio/tones/zhi4.mp3"
+          "audio": "learning/pinyin/audio/tones/zhì.mp3"
         },
         {
           "letter": "chī",
           "hint": "ချ (ch)",
-          "audio": "learning/pinyin/audio/tones/chi1.mp3"
+          "audio": "learning/pinyin/audio/tones/chī.mp3"
         },
         {
           "letter": "chí",
           "hint": "ချ (ch)",
-          "audio": "learning/pinyin/audio/tones/chi2.mp3"
+          "audio": "learning/pinyin/audio/tones/chí.mp3"
         },
         {
           "letter": "chǐ",
           "hint": "ချ (ch)",
-          "audio": "learning/pinyin/audio/tones/chi3.mp3"
+          "audio": "learning/pinyin/audio/tones/chǐ.mp3"
         },
         {
           "letter": "chì",
           "hint": "ချ (ch)",
-          "audio": "learning/pinyin/audio/tones/chi4.mp3"
+          "audio": "learning/pinyin/audio/tones/chì.mp3"
         },
         {
           "letter": "shī",
           "hint": "ရှ (sh)",
-          "audio": "learning/pinyin/audio/tones/shi1.mp3"
+          "audio": "learning/pinyin/audio/tones/shī.mp3"
         },
         {
           "letter": "shí",
           "hint": "ရှ (sh)",
-          "audio": "learning/pinyin/audio/tones/shi2.mp3"
+          "audio": "learning/pinyin/audio/tones/shí.mp3"
         },
         {
           "letter": "shǐ",
           "hint": "ရှ (sh)",
-          "audio": "learning/pinyin/audio/tones/shi3.mp3"
+          "audio": "learning/pinyin/audio/tones/shǐ.mp3"
         },
         {
           "letter": "shì",
           "hint": "ရှ (sh)",
-          "audio": "learning/pinyin/audio/tones/shi4.mp3"
+          "audio": "learning/pinyin/audio/tones/shì.mp3"
         },
         {
           "letter": "rī",
           "hint": "ရ (r)",
-          "audio": "learning/pinyin/audio/tones/ri1.mp3"
+          "audio": "learning/pinyin/audio/tones/rī.mp3"
         },
         {
           "letter": "rí",
           "hint": "ရ (r)",
-          "audio": "learning/pinyin/audio/tones/ri2.mp3"
+          "audio": "learning/pinyin/audio/tones/rí.mp3"
         },
         {
           "letter": "rǐ",
           "hint": "ရ (r)",
-          "audio": "learning/pinyin/audio/tones/ri3.mp3"
+          "audio": "learning/pinyin/audio/tones/rǐ.mp3"
         },
         {
           "letter": "rì",
           "hint": "ရ (r)",
-          "audio": "learning/pinyin/audio/tones/ri4.mp3"
+          "audio": "learning/pinyin/audio/tones/rì.mp3"
         },
         {
           "letter": "zī",
           "hint": "ဇ",
-          "audio": "learning/pinyin/audio/tones/zi1.mp3"
+          "audio": "learning/pinyin/audio/tones/zī.mp3"
         },
         {
           "letter": "zí",
           "hint": "ဇ",
-          "audio": "learning/pinyin/audio/tones/zi2.mp3"
+          "audio": "learning/pinyin/audio/tones/zí.mp3"
         },
         {
           "letter": "zǐ",
           "hint": "ဇ",
-          "audio": "learning/pinyin/audio/tones/zi3.mp3"
+          "audio": "learning/pinyin/audio/tones/zǐ.mp3"
         },
         {
           "letter": "zì",
           "hint": "ဇ",
-          "audio": "learning/pinyin/audio/tones/zi4.mp3"
+          "audio": "learning/pinyin/audio/tones/zì.mp3"
         },
         {
           "letter": "cī",
           "hint": "ဆ",
-          "audio": "learning/pinyin/audio/tones/ci1.mp3"
+          "audio": "learning/pinyin/audio/tones/cī.mp3"
         },
         {
           "letter": "cí",
           "hint": "ဆ",
-          "audio": "learning/pinyin/audio/tones/ci2.mp3"
+          "audio": "learning/pinyin/audio/tones/cí.mp3"
         },
         {
           "letter": "cǐ",
           "hint": "ဆ",
-          "audio": "learning/pinyin/audio/tones/ci3.mp3"
+          "audio": "learning/pinyin/audio/tones/cǐ.mp3"
         },
         {
           "letter": "cì",
           "hint": "ဆ",
-          "audio": "learning/pinyin/audio/tones/ci4.mp3"
+          "audio": "learning/pinyin/audio/tones/cì.mp3"
         },
         {
           "letter": "sī",
           "hint": "ဆ(ွ)",
-          "audio": "learning/pinyin/audio/tones/si1.mp3"
+          "audio": "learning/pinyin/audio/tones/sī.mp3"
         },
         {
           "letter": "sí",
           "hint": "ဆ(ွ)",
-          "audio": "learning/pinyin/audio/tones/si2.mp3"
+          "audio": "learning/pinyin/audio/tones/sí.mp3"
         },
         {
           "letter": "sǐ",
           "hint": "ဆ(ွ)",
-          "audio": "learning/pinyin/audio/tones/si3.mp3"
+          "audio": "learning/pinyin/audio/tones/sǐ.mp3"
         },
         {
           "letter": "sì",
           "hint": "ဆ(ွ)",
-          "audio": "learning/pinyin/audio/tones/si4.mp3"
+          "audio": "learning/pinyin/audio/tones/sì.mp3"
         },
         {
           "letter": "yī",
           "hint": "ယီး",
-          "audio": "learning/pinyin/audio/tones/yi1.mp3"
+          "audio": "learning/pinyin/audio/tones/yī.mp3"
         },
         {
           "letter": "yí",
           "hint": "ယီး",
-          "audio": "learning/pinyin/audio/tones/yi2.mp3"
+          "audio": "learning/pinyin/audio/tones/yí.mp3"
         },
         {
           "letter": "yǐ",
           "hint": "ယီး",
-          "audio": "learning/pinyin/audio/tones/yi3.mp3"
+          "audio": "learning/pinyin/audio/tones/yǐ.mp3"
         },
         {
           "letter": "yì",
           "hint": "ယီး",
-          "audio": "learning/pinyin/audio/tones/yi4.mp3"
+          "audio": "learning/pinyin/audio/tones/yì.mp3"
         },
         {
           "letter": "wū",
           "hint": "ဝူး",
-          "audio": "learning/pinyin/audio/tones/wu1.mp3"
+          "audio": "learning/pinyin/audio/tones/wū.mp3"
         },
         {
           "letter": "wú",
           "hint": "ဝူး",
-          "audio": "learning/pinyin/audio/tones/wu2.mp3"
+          "audio": "learning/pinyin/audio/tones/wú.mp3"
         },
         {
           "letter": "wǔ",
           "hint": "ဝူး",
-          "audio": "learning/pinyin/audio/tones/wu3.mp3"
+          "audio": "learning/pinyin/audio/tones/wǔ.mp3"
         },
         {
           "letter": "wù",
           "hint": "ဝူး",
-          "audio": "learning/pinyin/audio/tones/wu4.mp3"
+          "audio": "learning/pinyin/audio/tones/wù.mp3"
         },
         {
           "letter": "yū",
           "hint": "ယွီး",
-          "audio": "learning/pinyin/audio/tones/yu1.mp3"
+          "audio": "learning/pinyin/audio/tones/yū.mp3"
         },
         {
           "letter": "yú",
           "hint": "ယွီး",
-          "audio": "learning/pinyin/audio/tones/yu2.mp3"
+          "audio": "learning/pinyin/audio/tones/yú.mp3"
         },
         {
           "letter": "yǔ",
           "hint": "ယွီး",
-          "audio": "learning/pinyin/audio/tones/yu3.mp3"
+          "audio": "learning/pinyin/audio/tones/yǔ.mp3"
         },
         {
           "letter": "yù",
           "hint": "ယွီး",
-          "audio": "learning/pinyin/audio/tones/yu4.mp3"
+          "audio": "learning/pinyin/audio/tones/yù.mp3"
         },
         {
           "letter": "yē",
           "hint": "ယဲ",
-          "audio": "learning/pinyin/audio/tones/ye1.mp3"
+          "audio": "learning/pinyin/audio/tones/yē.mp3"
         },
         {
           "letter": "yé",
           "hint": "ယဲ",
-          "audio": "learning/pinyin/audio/tones/ye2.mp3"
+          "audio": "learning/pinyin/audio/tones/yé.mp3"
         },
         {
           "letter": "yě",
           "hint": "ယဲ",
-          "audio": "learning/pinyin/audio/tones/ye3.mp3"
+          "audio": "learning/pinyin/audio/tones/yě.mp3"
         },
         {
           "letter": "yè",
           "hint": "ယဲ",
-          "audio": "learning/pinyin/audio/tones/ye4.mp3"
+          "audio": "learning/pinyin/audio/tones/yè.mp3"
         },
         {
           "letter": "yuē",
           "hint": "ရွဲ့",
-          "audio": "learning/pinyin/audio/tones/yue1.mp3"
+          "audio": "learning/pinyin/audio/tones/yuē.mp3"
         },
         {
           "letter": "yué",
           "hint": "ရွဲ့",
-          "audio": "learning/pinyin/audio/tones/yue2.mp3"
+          "audio": "learning/pinyin/audio/tones/yué.mp3"
         },
         {
           "letter": "yuě",
           "hint": "ရွဲ့",
-          "audio": "learning/pinyin/audio/tones/yue3.mp3"
+          "audio": "learning/pinyin/audio/tones/yuě.mp3"
         },
         {
           "letter": "yuè",
           "hint": "ရွဲ့",
-          "audio": "learning/pinyin/audio/tones/yue4.mp3"
+          "audio": "learning/pinyin/audio/tones/yuè.mp3"
         },
         {
           "letter": "yuān",
           "hint": "ယွမ်",
-          "audio": "learning/pinyin/audio/tones/yuan1.mp3"
+          "audio": "learning/pinyin/audio/tones/yuān.mp3"
         },
         {
           "letter": "yuán",
           "hint": "ယွမ်",
-          "audio": "learning/pinyin/audio/tones/yuan2.mp3"
+          "audio": "learning/pinyin/audio/tones/yuán.mp3"
         },
         {
           "letter": "yuǎn",
           "hint": "ယွမ်",
-          "audio": "learning/pinyin/audio/tones/yuan3.mp3"
+          "audio": "learning/pinyin/audio/tones/yuǎn.mp3"
         },
         {
           "letter": "yuàn",
           "hint": "ယွမ်",
-          "audio": "learning/pinyin/audio/tones/yuan4.mp3"
+          "audio": "learning/pinyin/audio/tones/yuàn.mp3"
         },
         {
           "letter": "yīn",
           "hint": "ယင်း",
-          "audio": "learning/pinyin/audio/tones/yin1.mp3"
+          "audio": "learning/pinyin/audio/tones/yīn.mp3"
         },
         {
           "letter": "yín",
           "hint": "ယင်း",
-          "audio": "learning/pinyin/audio/tones/yin2.mp3"
+          "audio": "learning/pinyin/audio/tones/yín.mp3"
         },
         {
           "letter": "yǐn",
           "hint": "ယင်း",
-          "audio": "learning/pinyin/audio/tones/yin3.mp3"
+          "audio": "learning/pinyin/audio/tones/yǐn.mp3"
         },
         {
           "letter": "yìn",
           "hint": "ယင်း",
-          "audio": "learning/pinyin/audio/tones/yin4.mp3"
+          "audio": "learning/pinyin/audio/tones/yìn.mp3"
         },
         {
           "letter": "yūn",
           "hint": "ယွန်း",
-          "audio": "learning/pinyin/audio/tones/yun1.mp3"
+          "audio": "learning/pinyin/audio/tones/yūn.mp3"
         },
         {
           "letter": "yún",
           "hint": "ယွန်း",
-          "audio": "learning/pinyin/audio/tones/yun2.mp3"
+          "audio": "learning/pinyin/audio/tones/yún.mp3"
         },
         {
           "letter": "yǔn",
           "hint": "ယွန်း",
-          "audio": "learning/pinyin/audio/tones/yun3.mp3"
+          "audio": "learning/pinyin/audio/tones/yǔn.mp3"
         },
         {
           "letter": "yùn",
           "hint": "ယွန်း",
-          "audio": "learning/pinyin/audio/tones/yun4.mp3"
+          "audio": "learning/pinyin/audio/tones/yùn.mp3"
         },
         {
           "letter": "yīng",
           "hint": "ယင်း (g)",
-          "audio": "learning/pinyin/audio/tones/ying1.mp3"
+          "audio": "learning/pinyin/audio/tones/yīng.mp3"
         },
         {
           "letter": "yíng",
           "hint": "ယင်း (g)",
-          "audio": "learning/pinyin/audio/tones/ying2.mp3"
+          "audio": "learning/pinyin/audio/tones/yíng.mp3"
         },
         {
           "letter": "yǐng",
           "hint": "ယင်း (g)",
-          "audio": "learning/pinyin/audio/tones/ying3.mp3"
+          "audio": "learning/pinyin/audio/tones/yǐng.mp3"
         },
         {
           "letter": "yìng",
           "hint": "ယင်း (g)",
-          "audio": "learning/pinyin/audio/tones/ying4.mp3"
+          "audio": "learning/pinyin/audio/tones/yìng.mp3"
         }
       ]
     }
