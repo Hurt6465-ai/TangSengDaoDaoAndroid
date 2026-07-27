@@ -15,4 +15,6 @@
     <color name="chat_inline_translate_idle">#3C4048</color>
     <color name="chat_inline_translate_active">#159E9A</color>
     <color name="chat_inline_translate_ripple">#24159E9A</color>
+    <color name="chat_translate_panel_text">#30343B</color>
+    <color name="chat_translate_panel_muted">#737B86</color>
 </resources>
