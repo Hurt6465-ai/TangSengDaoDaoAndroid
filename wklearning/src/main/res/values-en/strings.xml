@@ -87,7 +87,7 @@ Tap Hard: review tomorrow</string>
     <string name="stroke_speak_word">Speak word</string>
     <string name="stroke_replay">Replay strokes</string>
     <string name="stroke_loading">Loading stroke order…</string>
-    <string name="pronunciation_tip">Listen to the standard audio, use Google speech recognition to check the text match, and record yourself for playback comparison.</string>
+    <string name="pronunciation_tip">Listen to the standard audio and use local sherpa-onnx recognition to check the text match. System recognition is used as a fallback.</string>
     <string name="pronunciation_play_standard">Play standard audio</string>
     <string name="pronunciation_play_spelling">Play spelling audio</string>
     <string name="pronunciation_start_record">Start recording</string>
@@ -141,6 +141,9 @@ Time %5$d min</string>
     <string name="pronunciation_one_tap_hint">Tap the microphone to record and recognize at the same time</string>
     <string name="pronunciation_original_short">Original</string>
     <string name="pronunciation_result_ready">Recording and recognition complete</string>
+    <string name="pronunciation_result_ready_local">Local recognition complete</string>
+    <string name="pronunciation_sherpa_downloading">Downloading the offline recognition model for first use (about 27 MB). System recognition is available meanwhile.</string>
+    <string name="pronunciation_sherpa_ready">Offline speech recognition is ready</string>
     <string name="pronunciation_result_title">Recognition result</string>
     <string name="pronunciation_start_once">Start practice</string>
     <string name="pronunciation_status_preparing">Preparing the microphone…</string>
@@ -331,4 +334,34 @@ Time %5$d min</string>
     <string name="speaking_front_prompt">Read it aloud and recall the meaning</string>
     <string name="speaking_front_tap">Tap for pinyin, Burmese, and details</string>
     <string name="speaking_back_tap">Tap the answer area to return to the front</string>
+
+    <string name="pronunciation_sherpa_importing">Importing the offline speech model…</string>
+    <string name="pronunciation_sherpa_loading">Loading the offline speech model…</string>
+    <string name="pronunciation_sherpa_not_installed">Offline model is not installed; system recognition is being used</string>
+    <string name="pronunciation_sensevoice_ready">SenseVoice high-accuracy offline recognition is ready</string>
+    <string name="asr_model_title">Offline speech recognition</string>
+    <string name="asr_model_intro">Choose a model for this device. Installed models run fully offline. System speech recognition remains available when no model is installed or local recognition fails.</string>
+    <string name="asr_model_zipformer_title">Lightweight Zipformer</string>
+    <string name="asr_model_zipformer_desc">Small download and fast loading, suitable for most phones and everyday word practice.</string>
+    <string name="asr_model_zipformer_size">About 27 MB</string>
+    <string name="asr_model_sensevoice_title">High-accuracy SenseVoice</string>
+    <string name="asr_model_sensevoice_desc">Usually more robust for Chinese phrases and noticeable accents, but it is larger and uses more power.</string>
+    <string name="asr_model_sensevoice_size">About 228 MB</string>
+    <string name="asr_model_selected">Active</string>
+    <string name="asr_model_choose">Select</string>
+    <string name="asr_model_download">Download</string>
+    <string name="asr_model_redownload">Download again</string>
+    <string name="asr_model_import">Import ZIP</string>
+    <string name="asr_model_delete">Delete local model</string>
+    <string name="asr_model_status_downloading">Downloading and validating the model…</string>
+    <string name="asr_model_status_importing">Importing and validating the model…</string>
+    <string name="asr_model_status_loading">Installed; loading model…</string>
+    <string name="asr_model_status_failed">Loading failed. Download or import again.</string>
+    <string name="asr_model_status_installed">Installed · %1$s</string>
+    <string name="asr_model_status_not_installed">Not installed · %1$s</string>
+    <string name="asr_model_import_note">The imported ZIP must contain model.int8.onnx and tokens.txt for the selected model. The original model folder may remain inside the ZIP.</string>
+    <string name="asr_model_download_confirm_title">Download offline model</string>
+    <string name="asr_model_download_confirm_message">Download “%1$s” online (%2$s). Wi-Fi and sufficient storage are recommended.</string>
+    <string name="asr_model_delete_confirm_title">Delete model</string>
+    <string name="asr_model_delete_confirm_message">Delete “%1$s”? System recognition will be used until a model is installed again.</string>
 </resources>
