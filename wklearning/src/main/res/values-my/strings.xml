@@ -80,6 +80,14 @@
     <string name="word_tone_3">တတိယသံ</string>
     <string name="word_tone_4">စတုတ္ထသံ</string>
     <string name="pronunciation_title">အသံထွက် လေ့ကျင့်ရန်</string>
+    <string name="pronunciation_title_compare">အသံသွင်း နှိုင်းယှဉ်ခြင်း</string>
+    <string name="pronunciation_compare_start_hint">မူရင်းအသံကို 0.5× နှုန်းဖြင့် အရင်နားထောင်ပြီး မိမိအသံကို အသံသွင်းပါ</string>
+    <string name="pronunciation_start_record_compare">အသံသွင်းရန်</string>
+    <string name="pronunciation_status_recording_compare">အသံသွင်းနေသည်။ ဖတ်ပြီးနောက် ခဏရပ်လျှင် အလိုအလျောက်ပြီးမည်။</string>
+    <string name="pronunciation_status_processing_compare">အသံဖိုင် သိမ်းနေသည်…</string>
+    <string name="pronunciation_compare_result_title">အသံထွက် နှိုင်းယှဉ်ခြင်း</string>
+    <string name="pronunciation_original_speed">မူရင်းအသံ %1$s×</string>
+    <string name="pronunciation_status_original_speed">မူရင်းအသံကို %1$s× ဖြင့် ဖွင့်နေသည်</string>
     <string name="stroke_title">စာလုံးရေးစဉ် animation</string>
     <string name="stroke_subtitle">တရုတ်စာလုံးကို နှိပ်ပြီး ပြောင်းနိုင်သည်။ မှန်ကန်သော ရေးစဉ်ကို အလိုအလျောက် ပြမည်။ ပထမဆုံးဖွင့်ချိန်တွင် အင်တာနက်လိုပြီး နောက်ပိုင်း local cache ဖြင့် အသုံးပြုနိုင်သည်။</string>
     <string name="stroke_chars_title">တရုတ်စာလုံး ရွေးရန်</string>
@@ -259,12 +267,13 @@
     <string name="pinyin_chart_tap_hint">စတင်ရန် ပင်ယင်ကတ်တစ်ခုကို နှိပ်ပါ</string>
     <string name="pinyin_chart_replay">🔊 ပြန်ဖွင့်</string>
     <string name="pinyin_chart_speed">%1$s× အမြန်နှုန်း</string>
-    <string name="pinyin_chart_follow">🎙 လိုက်ဖတ်</string>
+    <string name="pinyin_chart_follow">🎙 အသံနှိုင်းယှဉ်</string>
     <string name="pinyin_chart_auto_play">▶ ဆက်တိုက်ဖွင့်</string>
     <string name="pinyin_chart_stop_auto">■ ရပ်ရန်</string>
     <string name="pinyin_chart_local_audio">ဖုန်းထဲရှိ အသံ</string>
     <string name="pinyin_chart_audio_placeholder">ယခုဖွင့်နေသောအသံသည် ယာယီထည့်ထားသော ဖိုင်ဖြစ်သည်။ chart.json လမ်းကြောင်းအတိုင်း MP3 ဖိုင်များကို အစားထိုးပါ။</string>
     <string name="pinyin_chart_follow_placeholder">လိုက်ဖတ်ရန် ဝင်ပေါက်ကို ထည့်ထားပြီး အသံဖိုင်အစစ်များထည့်ပြီးနောက် အမှတ်ပေးစနစ်ကို ဖွင့်မည်။</string>
+    <string name="pinyin_chart_select_before_compare">ပင်ယင်ကတ်တစ်ခုကို အရင်ရွေးပါ</string>
     <string name="pinyin_chart_play_failed">ဖုန်းထဲရှိ အသံဖိုင်ကို ဖွင့်၍မရပါ</string>
     <string name="pinyin_chart_data_missing">ပင်ယင်ဇယားကို ဖတ်၍မရပါ။ chart.json ကို စစ်ဆေးပါ။</string>
 
