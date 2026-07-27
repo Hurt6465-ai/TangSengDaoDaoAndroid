@@ -77,6 +77,7 @@ public final class SpeechSettingsActivity extends Activity {
         setContentView(scroll);
 
         addTitle();
+        addAsrSection();
         addEngineSection();
         addVoiceSection();
         addParameterSection();
@@ -102,6 +103,33 @@ public final class SpeechSettingsActivity extends Activity {
 
         root.addView(line);
         addSpace(12);
+    }
+
+    private void addAsrSection() {
+        LinearLayout card = baseCard();
+        card.addView(label("语音识别"));
+        card.addView(selectorRow(
+                "离线识别模型",
+                "轻量 / 高精度",
+                "管理",
+                this::openAsrModelSettings
+        ));
+        TextView hint = text("支持在线下载和本地 ZIP 导入；未安装时自动使用系统语音识别。",
+                12, Color.rgb(107, 114, 128), false);
+        hint.setLineSpacing(dp(2), 1.05f);
+        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+        hintLp.setMargins(0, dp(8), 0, 0);
+        card.addView(hint, hintLp);
+        root.addView(card);
+    }
+
+    private void openAsrModelSettings() {
+        try {
+            Class<?> clazz = Class.forName("com.chat.learning.SherpaModelSettingsActivity");
+            startActivity(new Intent(this, clazz));
+        } catch (Throwable error) {
+            toast("离线识别设置暂不可用");
+        }
     }
 
     private void addEngineSection() {
