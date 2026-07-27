@@ -1035,10 +1035,14 @@ public class BubbleLayout extends LinearLayout {
         ViewGroup.LayoutParams layoutParams = getLayoutParams();
         if (layoutParams instanceof LayoutParams linearLayout) {
             if (bgType == WKMsgBgType.center || bgType == WKMsgBgType.top) {
-                int groupInset = liquidGlass ? 0 : AndroidUtilities.dp(10);
-                if (msgFrom == WKChatIteMsgFromType.RECEIVED)
+                int groupInset = liquidGlass ? AndroidUtilities.dp(7) : AndroidUtilities.dp(10);
+                if (msgFrom == WKChatIteMsgFromType.RECEIVED) {
                     linearLayout.leftMargin = groupInset;
-                else linearLayout.rightMargin = groupInset;
+                    linearLayout.rightMargin = 0;
+                } else {
+                    linearLayout.rightMargin = groupInset;
+                    linearLayout.leftMargin = 0;
+                }
             } else {
                 linearLayout.rightMargin = 0;
                 linearLayout.leftMargin = 0;
