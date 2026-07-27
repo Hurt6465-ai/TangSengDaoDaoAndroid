@@ -69,6 +69,9 @@ public class LearningFragment extends Fragment {
     private static final float RADIUS_PANEL = 24f;
     private static final float RADIUS_CARD = 20f;
 
+    private static final String EBOOK_LIBRARY_URL =
+            "https://z-library.im/booklist/3798447/a73105/%E5%AD%A6%E4%B8%AD%E6%96%87%E4%B9%A6%E7%B1%8D.html";
+
     private WideEdgeDrawerLayout drawerLayout;
     private View sideDrawerView;
     private ViewFlipper priceFlipper;
@@ -406,7 +409,10 @@ public class LearningFragment extends Fragment {
                 R.drawable.ic_learning_book,
                 0xFF7D5CE8,
                 getString(R.string.learning_home_tool_books),
-                () -> openDirectory("books", getString(R.string.learning_home_tool_books), "")
+                () -> AiScriptWebActivity.open(
+                        requireContext(),
+                        getString(R.string.learning_home_tool_books),
+                        EBOOK_LIBRARY_URL)
         ), new LinearLayout.LayoutParams(0, -1, 1f));
         panel.addView(toolDivider(0xFF7D5CE8), new LinearLayout.LayoutParams(dp(1), dp(42)));
 

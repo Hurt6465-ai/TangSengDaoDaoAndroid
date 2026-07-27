@@ -16,7 +16,9 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Speaking category browser. Categories open a dedicated phrase list page. */
@@ -78,20 +80,8 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
         page.setPadding(dp(18), dp(12), dp(18), 0);
         root.addView(page, new FrameLayout.LayoutParams(-1, -1));
 
+        // 返回按钮固定；口语标题和介绍跟随内容滚动并隐藏。
         page.addView(topBar(), new LinearLayout.LayoutParams(-1, dp(52)));
-
-        TextView title = text(resolveTitle(), 29, COLOR_TEXT, true);
-        title.setIncludeFontPadding(false);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-        titleLp.setMargins(0, dp(8), 0, dp(6));
-        page.addView(title, titleLp);
-
-        TextView subtitle = text(getString(R.string.speaking_directory_subtitle),
-                14, COLOR_SUB, false);
-        subtitle.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
-        subLp.setMargins(0, 0, 0, dp(16));
-        page.addView(subtitle, subLp);
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -101,8 +91,10 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(0, 0, 0, dp(34));
+        content.setPadding(0, dp(4), 0, dp(34));
         scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+
+        addScrollableHeader(content);
 
         if (catalog == null || catalog.items == null || catalog.items.isEmpty()) {
             content.addView(emptyView(), new LinearLayout.LayoutParams(-1, -2));
@@ -113,26 +105,71 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
             if (rootNode == null) continue;
             if (rootNode.hasChildren()) {
                 content.addView(groupTitle(rootNode), groupTitleLp());
-                for (LearningCatalogRepository.Node child : rootNode.children) {
-                    addNode(content, child);
-                }
+                addCategoryGrid(content, collectLeaves(rootNode.children));
             } else {
-                addNode(content, rootNode);
+                List<LearningCatalogRepository.Node> single = new ArrayList<>();
+                single.add(rootNode);
+                addCategoryGrid(content, single);
             }
         }
     }
 
-    private void addNode(LinearLayout parent, LearningCatalogRepository.Node node) {
-        if (node == null) return;
-        if (node.hasChildren()) {
-            parent.addView(groupTitle(node), groupTitleLp());
-            for (LearningCatalogRepository.Node child : node.children) addNode(parent, child);
-            return;
-        }
-        SpeakingPhraseRepository.Pack pack = SpeakingPhraseRepository.load(
-                this, node.asset, node.id, node.title);
-        parent.addView(categoryCard(node, pack), categoryCardLp());
+    private void addScrollableHeader(LinearLayout parent) {
+        TextView title = text(resolveTitle(), 29, COLOR_TEXT, true);
+        title.setIncludeFontPadding(false);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLp.setMargins(0, dp(8), 0, dp(6));
+        parent.addView(title, titleLp);
+
+        TextView subtitle = text(getString(R.string.speaking_directory_subtitle),
+                14, COLOR_SUB, false);
+        subtitle.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
+        subLp.setMargins(0, 0, 0, dp(16));
+        parent.addView(subtitle, subLp);
     }
+
+    private List<LearningCatalogRepository.Node> collectLeaves(List<LearningCatalogRepository.Node> nodes) {
+        List<LearningCatalogRepository.Node> result = new ArrayList<>();
+        if (nodes == null) return result;
+        for (LearningCatalogRepository.Node node : nodes) {
+            if (node == null) continue;
+            if (node.hasChildren()) result.addAll(collectLeaves(node.children));
+            else result.add(node);
+        }
+        return result;
+    }
+
+    private void addCategoryGrid(LinearLayout parent, List<LearningCatalogRepository.Node> nodes) {
+        if (nodes == null || nodes.isEmpty()) return;
+        int index = 0;
+        while (index < nodes.size()) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.TOP);
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
+            rowLp.setMargins(0, 0, 0, dp(12));
+            parent.addView(row, rowLp);
+
+            for (int column = 0; column < 2; column++) {
+                if (index < nodes.size()) {
+                    LearningCatalogRepository.Node node = nodes.get(index++);
+                    SpeakingPhraseRepository.Pack pack = SpeakingPhraseRepository.load(
+                            this, node.asset, node.id, node.title);
+                    row.addView(categoryCard(node, pack),
+                            new LinearLayout.LayoutParams(0, dp(142), 1f));
+                } else {
+                    row.addView(new View(this), new LinearLayout.LayoutParams(0, dp(1), 1f));
+                }
+                if (column == 0) {
+                    View gap = new View(this);
+                    row.addView(gap, new LinearLayout.LayoutParams(dp(12), 1));
+                }
+            }
+        }
+    }
+
+
 
     private View topBar() {
         LinearLayout bar = new LinearLayout(this);
@@ -145,11 +182,8 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
         close.setOnClickListener(v -> finish());
         bar.addView(close, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
-        TextView crumb = text(getString(R.string.speaking_directory_breadcrumb),
-                14, COLOR_SUB, false);
-        crumb.setGravity(Gravity.CENTER_VERTICAL);
-        crumb.setPadding(dp(12), 0, 0, 0);
-        bar.addView(crumb, new LinearLayout.LayoutParams(0, -1, 1f));
+        // 顶部只保留返回按钮，不再重复显示“学习 · 口语”。
+        bar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
         return bar;
     }
 
@@ -179,36 +213,41 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
     private View categoryCard(LearningCatalogRepository.Node node,
                               SpeakingPhraseRepository.Pack pack) {
         LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(16), dp(15), dp(12), dp(15));
-        card.setBackground(rounded(Color.WHITE, dp(22), COLOR_STROKE, dp(1)));
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.TOP);
+        card.setPadding(dp(14), dp(13), dp(13), dp(12));
+        card.setBackground(rounded(Color.WHITE, dp(21), COLOR_STROKE, dp(1)));
         card.setOnClickListener(v -> SpeakingPhraseListActivity.open(
                 this, pack.id, pack.title, pack.subtitle, node.asset));
 
-        TextView index = text(categoryMark(node), 17, Color.WHITE, true);
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(top, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView index = text(categoryMark(node), 16, Color.WHITE, true);
         index.setGravity(Gravity.CENTER);
-        index.setBackground(rounded(accentFor(node), dp(19), 0, 0));
-        card.addView(index, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        index.setBackground(rounded(accentFor(node), dp(18), 0, 0));
+        top.addView(index, new LinearLayout.LayoutParams(dp(36), dp(36)));
 
-        LinearLayout textBox = new LinearLayout(this);
-        textBox.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams textBoxLp = new LinearLayout.LayoutParams(0, -2, 1f);
-        textBoxLp.setMargins(dp(12), 0, dp(8), 0);
-        card.addView(textBox, textBoxLp);
+        top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
 
-        TextView title = text(node.title, 17, COLOR_TEXT, true);
-        title.setIncludeFontPadding(false);
-        textBox.addView(title, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView progress = text("", 12.5f, COLOR_SUB, false);
-        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, -2);
-        progressLp.setMargins(0, dp(5), 0, 0);
-        textBox.addView(progress, progressLp);
-
-        TextView arrow = text("›", 27, COLOR_BRAND, false);
+        TextView arrow = text("›", 24, COLOR_BRAND, false);
         arrow.setGravity(Gravity.CENTER);
-        card.addView(arrow, new LinearLayout.LayoutParams(dp(34), dp(38)));
+        top.addView(arrow, new LinearLayout.LayoutParams(dp(26), dp(34)));
+
+        TextView title = text(node.title, 16, COLOR_TEXT, true);
+        title.setIncludeFontPadding(false);
+        title.setMaxLines(2);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLp.setMargins(0, dp(10), 0, 0);
+        card.addView(title, titleLp);
+
+        TextView progress = text("", 12, COLOR_SUB, false);
+        progress.setMaxLines(2);
+        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, -2);
+        progressLp.setMargins(0, dp(6), 0, 0);
+        card.addView(progress, progressLp);
 
         bindings.put(pack.id, new CategoryBinding(pack, progress));
         updateCategory(bindings.get(pack.id));
@@ -261,11 +300,6 @@ public class SpeakingDirectoryActivity extends AppCompatActivity {
         return view;
     }
 
-    private LinearLayout.LayoutParams categoryCardLp() {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.setMargins(0, 0, 0, dp(13));
-        return lp;
-    }
 
     private TextView text(String value, float size, int color, boolean bold) {
         TextView view = new TextView(this);
