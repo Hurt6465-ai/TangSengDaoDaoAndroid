@@ -1,4 +1,91 @@
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
+
 apply plugin: 'com.android.library'
+
+def sherpaVersion = '1.13.2'
+def sherpaAarDir = file("$projectDir/libs")
+def sherpaAarFile = file("$sherpaAarDir/sherpa-onnx-${sherpaVersion}.aar")
+def sherpaAarPartFile = file("${sherpaAarFile}.part")
+def sherpaAarUrl = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v${sherpaVersion}/sherpa-onnx-${sherpaVersion}.aar"
+def sherpaAarSha256 = 'aa5505c0ec4f8bdaee5f214a64ba3012be64f2aecc022e82a64f33392b8dd245'
+
+def sha256Of = { File source ->
+    MessageDigest digest = MessageDigest.getInstance('SHA-256')
+    source.withInputStream { input ->
+        byte[] buffer = new byte[1024 * 1024]
+        int count
+        while ((count = input.read(buffer)) != -1) {
+            digest.update(buffer, 0, count)
+        }
+    }
+    digest.digest().collect { byte value -> String.format('%02x', value & 0xff) }.join()
+}
+
+def prepareSherpaOnnxAar = tasks.register('prepareSherpaOnnxAar') {
+    group = 'build setup'
+    description = 'Downloads and verifies the official sherpa-onnx Android AAR.'
+    outputs.file(sherpaAarFile)
+
+    doLast {
+        if (sherpaAarFile.isFile()) {
+            String actual = sha256Of(sherpaAarFile)
+            if (actual == sherpaAarSha256) {
+                logger.lifecycle("Using verified sherpa-onnx AAR: ${sherpaAarFile}")
+                return
+            }
+            logger.warn("Removing invalid sherpa-onnx AAR. SHA-256 was ${actual}")
+            if (!sherpaAarFile.delete()) {
+                throw new GradleException("Cannot replace invalid AAR: ${sherpaAarFile}")
+            }
+        }
+
+        if (gradle.startParameter.offline) {
+            throw new GradleException(
+                    "Offline build requires ${sherpaAarFile}. Run once online or place the official AAR there.")
+        }
+
+        sherpaAarDir.mkdirs()
+        sherpaAarPartFile.delete()
+        logger.lifecycle("Downloading official sherpa-onnx ${sherpaVersion} AAR...")
+
+        URLConnection connection = new URL(sherpaAarUrl).openConnection()
+        connection.setConnectTimeout(30_000)
+        connection.setReadTimeout(180_000)
+        connection.setRequestProperty('User-Agent', 'TangSengDaoDao-Gradle/1.0')
+        connection.setRequestProperty('Accept', 'application/octet-stream')
+
+        try {
+            connection.getInputStream().withCloseable { input ->
+                sherpaAarPartFile.withOutputStream { output ->
+                    byte[] buffer = new byte[1024 * 1024]
+                    int count
+                    while ((count = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, count)
+                    }
+                }
+            }
+
+            String actual = sha256Of(sherpaAarPartFile)
+            if (actual != sherpaAarSha256) {
+                throw new GradleException(
+                        "sherpa-onnx AAR checksum mismatch. Expected ${sherpaAarSha256}, got ${actual}")
+            }
+
+            Files.move(
+                    sherpaAarPartFile.toPath(),
+                    sherpaAarFile.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING)
+            logger.lifecycle("Saved verified sherpa-onnx AAR to ${sherpaAarFile}")
+        } catch (Throwable error) {
+            sherpaAarPartFile.delete()
+            throw new GradleException(
+                    "Failed to download sherpa-onnx AAR from ${sherpaAarUrl}: ${error.message}",
+                    error)
+        }
+    }
+}
 
 android {
     namespace 'com.chat.learning'
@@ -24,12 +111,20 @@ android {
     }
 }
 
+tasks.named('preBuild').configure {
+    dependsOn(prepareSherpaOnnxAar)
+}
+
 dependencies {
     api 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.drawerlayout:drawerlayout:1.2.0'
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     implementation 'com.belerweb:pinyin4j:2.5.1'
-    implementation 'com.github.k2-fsa:sherpa-onnx:v1.13.2'
+
+    // Local file dependency: no JitPack request is made.
+    implementation files(sherpaAarFile)
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+
     api project(':wkuserscript')
     testImplementation 'junit:junit:4.13.2'
 }
