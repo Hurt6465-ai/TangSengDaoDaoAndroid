@@ -87,7 +87,7 @@
     <string name="stroke_speak_word">စကားလုံး အသံဖွင့်ရန်</string>
     <string name="stroke_replay">ရေးစဉ် ပြန်ဖွင့်ရန်</string>
     <string name="stroke_loading">ရေးစဉ်ဒေတာ တင်နေသည်…</string>
-    <string name="pronunciation_tip">စံအသံကို နားထောင်ပြီး Google အသံသိရှိမှုဖြင့် စာသားကိုက်ညီမှုကို စစ်ပါ။ မိမိအသံကိုလည်း မှတ်တမ်းတင်၍ ပြန်ဖွင့်နှိုင်းယှဉ်နိုင်သည်။</string>
+    <string name="pronunciation_tip">စံအသံကို နားထောင်ပြီး sherpa-onnx စက်တွင်းအသံသိရှိမှုဖြင့် စာသားကိုက်ညီမှုကို စစ်ပါ။ မရနိုင်ပါက စနစ်အသံသိရှိမှုကို အလိုအလျောက် သုံးမည်။</string>
     <string name="pronunciation_play_standard">စံအသံ ဖွင့်ရန်</string>
     <string name="pronunciation_play_spelling">ပင်ယင်ဖတ်ပြအသံ ဖွင့်ရန်</string>
     <string name="pronunciation_start_record">အသံသွင်းရန်</string>
@@ -141,6 +141,9 @@
     <string name="pronunciation_one_tap_hint">မိုက်ခရိုဖုန်းကို နှိပ်လျှင် အသံသွင်းခြင်းနှင့် အသံသိရှိခြင်းကို တစ်ပြိုင်နက် လုပ်မည်</string>
     <string name="pronunciation_original_short">မူရင်းအသံ</string>
     <string name="pronunciation_result_ready">အသံသွင်းခြင်းနှင့် သိရှိခြင်း ပြီးပါပြီ</string>
+    <string name="pronunciation_result_ready_local">စက်တွင်း အသံသိရှိမှု ပြီးပါပြီ</string>
+    <string name="pronunciation_sherpa_downloading">ပထမဆုံးအသုံးပြုရန် အော့ဖ်လိုင်းအသံသိရှိမှု မော်ဒယ်ကို ဒေါင်းလုဒ်လုပ်နေသည် (၂၇ MB ခန့်)။ ယခုအချိန်တွင် စနစ်အသံသိရှိမှုကို သုံးမည်။</string>
+    <string name="pronunciation_sherpa_ready">အော့ဖ်လိုင်း အသံသိရှိမှု အသင့်ဖြစ်ပါပြီ</string>
     <string name="pronunciation_result_title">အသံသိရှိမှု ရလဒ်</string>
     <string name="pronunciation_start_once">စတင်လေ့ကျင့်ရန်</string>
     <string name="pronunciation_status_preparing">မိုက်ခရိုဖုန်း ပြင်ဆင်နေသည်…</string>
@@ -331,4 +334,34 @@
     <string name="speaking_front_prompt">အသံထွက်ဖတ်ပြီး အဓိပ္ပာယ်ကို စဉ်းစားပါ</string>
     <string name="speaking_front_tap">ပင်ယင်၊ မြန်မာဘာသာနှင့် ရှင်းလင်းချက်ကြည့်ရန် ကတ်ကိုနှိပ်ပါ</string>
     <string name="speaking_back_tap">ရှေ့ဘက်သို့ပြန်ရန် အဖြေဧရိယာကိုနှိပ်ပါ</string>
+
+    <string name="pronunciation_sherpa_importing">အော့ဖ်လိုင်း အသံမော်ဒယ်ကို ထည့်သွင်းနေသည်…</string>
+    <string name="pronunciation_sherpa_loading">အော့ဖ်လိုင်း အသံမော်ဒယ်ကို ဖွင့်နေသည်…</string>
+    <string name="pronunciation_sherpa_not_installed">အော့ဖ်လိုင်းမော်ဒယ် မရှိသေးသောကြောင့် စနစ်အသံမှတ်သားမှုကို သုံးနေသည်</string>
+    <string name="pronunciation_sensevoice_ready">SenseVoice အရည်အသွေးမြင့် အော့ဖ်လိုင်းမှတ်သားမှု အသင့်ဖြစ်ပါပြီ</string>
+    <string name="asr_model_title">အော့ဖ်လိုင်း အသံမှတ်သားမှု</string>
+    <string name="asr_model_intro">စက်နှင့်သင့်တော်သော မော်ဒယ်ကို ရွေးပါ။ ထည့်သွင်းပြီးနောက် အင်တာနက်မလိုဘဲ အသုံးပြုနိုင်ပြီး၊ မော်ဒယ်မရှိပါက စနစ်အသံမှတ်သားမှုကို အစားထိုးသုံးမည်။</string>
+    <string name="asr_model_zipformer_title">ပေါ့ပါး Zipformer</string>
+    <string name="asr_model_zipformer_desc">ဒေါင်းလုဒ်သေးပြီး ဖွင့်မြန်သောကြောင့် ဖုန်းအများစုနှင့် စကားလုံးလေ့ကျင့်မှုအတွက် သင့်တော်သည်။</string>
+    <string name="asr_model_zipformer_size">၂၇ MB ခန့်</string>
+    <string name="asr_model_sensevoice_title">တိကျမှုမြင့် SenseVoice</string>
+    <string name="asr_model_sensevoice_desc">တရုတ်စာတိုများနှင့် အသံထွက်ကွဲပြားမှုအတွက် ပိုတည်ငြိမ်သော်လည်း မော်ဒယ်ကြီးပြီး စွမ်းအင်ပိုသုံးသည်။</string>
+    <string name="asr_model_sensevoice_size">၂၂၈ MB ခန့်</string>
+    <string name="asr_model_selected">အသုံးပြုနေသည်</string>
+    <string name="asr_model_choose">ရွေးမည်</string>
+    <string name="asr_model_download">အွန်လိုင်းဒေါင်းလုဒ်</string>
+    <string name="asr_model_redownload">ပြန်ဒေါင်းလုဒ်</string>
+    <string name="asr_model_import">ZIP ထည့်သွင်း</string>
+    <string name="asr_model_delete">မော်ဒယ်ဖျက်မည်</string>
+    <string name="asr_model_status_downloading">မော်ဒယ်ကို ဒေါင်းလုဒ်ပြီး စစ်ဆေးနေသည်…</string>
+    <string name="asr_model_status_importing">မော်ဒယ်ကို ထည့်သွင်းပြီး စစ်ဆေးနေသည်…</string>
+    <string name="asr_model_status_loading">ထည့်သွင်းပြီး၊ မော်ဒယ်ဖွင့်နေသည်…</string>
+    <string name="asr_model_status_failed">ဖွင့်မရပါ။ ပြန်ဒေါင်းလုဒ် သို့မဟုတ် ထည့်သွင်းပါ။</string>
+    <string name="asr_model_status_installed">ထည့်သွင်းပြီး · %1$s</string>
+    <string name="asr_model_status_not_installed">မထည့်သွင်းရသေး · %1$s</string>
+    <string name="asr_model_import_note">ZIP ထဲတွင် ရွေးထားသောမော်ဒယ်နှင့် ကိုက်ညီသည့် model.int8.onnx နှင့် tokens.txt ပါရမည်။ မူရင်းဖိုင်တွဲကို ZIP ထဲတွင် ထားနိုင်သည်။</string>
+    <string name="asr_model_download_confirm_title">အော့ဖ်လိုင်းမော်ဒယ် ဒေါင်းလုဒ်</string>
+    <string name="asr_model_download_confirm_message">“%1$s” (%2$s) ကို အွန်လိုင်းဒေါင်းလုဒ်မည်။ Wi-Fi နှင့် လုံလောက်သောသိုလှောင်ခန်းကို အကြံပြုသည်။</string>
+    <string name="asr_model_delete_confirm_title">မော်ဒယ်ဖျက်မည်</string>
+    <string name="asr_model_delete_confirm_message">“%1$s” ကို ဖျက်မလား။ ပြန်ထည့်သွင်းမချင်း စနစ်အသံမှတ်သားမှုကို သုံးမည်။</string>
 </resources>
