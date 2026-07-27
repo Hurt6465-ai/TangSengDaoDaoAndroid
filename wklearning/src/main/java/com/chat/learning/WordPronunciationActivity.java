@@ -25,7 +25,7 @@ import androidx.core.content.ContextCompat;
 import java.io.File;
 import java.util.Locale;
 
-/** One-tap native speech recognition and recording in a centered translucent popup. */
+/** One-tap sherpa-onnx/system speech recognition and recording popup. */
 public class WordPronunciationActivity extends AppCompatActivity {
     public static final String EXTRA_WORD = "word";
     public static final String EXTRA_PINYIN = "pinyin";
@@ -54,6 +54,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
     private TextView matchView;
     private TextView playMineButton;
     private boolean practicing;
+    private SherpaOnnxRecognizer.ModelListener sherpaModelListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,6 +63,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
         pinyin = safe(getIntent().getStringExtra(EXTRA_PINYIN), "");
         configureWindow();
         buildLayout();
+        prepareOfflineRecognizer();
         if (savedInstanceState == null) {
             panel.postDelayed(this::ensurePermissionAndStart, 180L);
         }
@@ -69,9 +71,35 @@ public class WordPronunciationActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        SherpaOnnxRecognizer.removeModelListener(sherpaModelListener);
+        sherpaModelListener = null;
         releaseCapture();
         releasePlayer();
         super.onDestroy();
+    }
+
+
+    private void prepareOfflineRecognizer() {
+        sherpaModelListener = (type, state) -> {
+            if (isFinishing() || isDestroyed() || practicing
+                    || resultGroup.getVisibility() == View.VISIBLE) return;
+            if (state == SherpaOnnxRecognizer.ModelState.DOWNLOADING) {
+                statusView.setText(R.string.pronunciation_sherpa_downloading);
+            } else if (state == SherpaOnnxRecognizer.ModelState.IMPORTING) {
+                statusView.setText(R.string.pronunciation_sherpa_importing);
+            } else if (state == SherpaOnnxRecognizer.ModelState.PREPARING) {
+                statusView.setText(R.string.pronunciation_sherpa_loading);
+            } else if (state == SherpaOnnxRecognizer.ModelState.READY) {
+                statusView.setText(type == SherpaOnnxRecognizer.ModelType.SENSE_VOICE
+                        ? R.string.pronunciation_sensevoice_ready
+                        : R.string.pronunciation_sherpa_ready);
+            } else if (state == SherpaOnnxRecognizer.ModelState.NOT_INSTALLED) {
+                statusView.setText(R.string.pronunciation_sherpa_not_installed);
+            } else {
+                statusView.setText(R.string.pronunciation_one_tap_hint);
+            }
+        };
+        SherpaOnnxRecognizer.prepare(this, sherpaModelListener);
     }
 
     private void configureWindow() {
@@ -314,9 +342,13 @@ public class WordPronunciationActivity extends AppCompatActivity {
         matchView.setTextColor(match >= 80 ? COLOR_SUCCESS : match >= 50 ? 0xFFD97706 : 0xFFCA3854);
         playMineButton.setEnabled(recordingFile != null);
         playMineButton.setAlpha(recordingFile == null ? 0.42f : 1f);
-        statusView.setText(recognized.isEmpty()
-                ? R.string.pronunciation_recognition_empty
-                : R.string.pronunciation_result_ready);
+        if (recognized.isEmpty()) {
+            statusView.setText(R.string.pronunciation_recognition_empty);
+        } else if (result != null && "sherpa-onnx".equals(result.recognitionEngine)) {
+            statusView.setText(R.string.pronunciation_result_ready_local);
+        } else {
+            statusView.setText(R.string.pronunciation_result_ready);
+        }
     }
 
     private void playStandard() {

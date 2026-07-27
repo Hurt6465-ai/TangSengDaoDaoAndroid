@@ -75,14 +75,16 @@ final class PronunciationCaptureSession {
         final File recordingFile;
         final int recognitionError;
         final boolean sharedPcmStream;
+        final String recognitionEngine;
 
         Result(String recognizedText, float recognizerConfidence, File recordingFile,
-               int recognitionError, boolean sharedPcmStream) {
+               int recognitionError, boolean sharedPcmStream, String recognitionEngine) {
             this.recognizedText = recognizedText == null ? "" : recognizedText;
             this.recognizerConfidence = recognizerConfidence;
             this.recordingFile = recordingFile;
             this.recognitionError = recognitionError;
             this.sharedPcmStream = sharedPcmStream;
+            this.recognitionEngine = recognitionEngine == null ? "system" : recognitionEngine;
         }
     }
 
@@ -105,6 +107,10 @@ final class PronunciationCaptureSession {
     private boolean recognitionDone;
     private boolean delivered;
     private boolean sharedPcmStream;
+    private boolean sherpaStarted;
+    private boolean sherpaDone;
+    private boolean sherpaUsed;
+    private String sherpaText = "";
     private String recognizedText = "";
     private String bestPartialText = "";
     private float recognizerConfidence = -1f;
@@ -127,6 +133,7 @@ final class PronunciationCaptureSession {
         this.context = context.getApplicationContext();
         this.targetWord = targetWord == null ? "" : targetWord.trim();
         this.listener = listener;
+        SherpaOnnxRecognizer.prepare(this.context, null);
     }
 
     void start() {
@@ -222,6 +229,10 @@ final class PronunciationCaptureSession {
         recordingDone = false;
         recognitionDone = false;
         delivered = false;
+        sherpaStarted = false;
+        sherpaDone = false;
+        sherpaUsed = false;
+        sherpaText = "";
         recognizedText = "";
         bestPartialText = "";
         recognizerConfidence = -1f;
@@ -398,23 +409,56 @@ final class PronunciationCaptureSession {
     }
 
     private void maybeDeliver() {
-        if (released || delivered || !recordingDone || !recognitionDone) return;
+        if (released || delivered || !recordingDone) return;
+        File output = wavFile != null && wavFile.isFile() && wavFile.length() > 44
+                ? wavFile : null;
+
+        if (!sherpaStarted) {
+            sherpaStarted = true;
+            if (output == null) {
+                sherpaDone = true;
+            } else {
+                SherpaOnnxRecognizer.recognize(context, output, (text, usedSherpa) -> {
+                    if (released || delivered) return;
+                    sherpaText = text == null ? "" : text.trim();
+                    sherpaUsed = usedSherpa && !sherpaText.isEmpty();
+                    sherpaDone = true;
+                    maybeDeliver();
+                });
+                return;
+            }
+        }
+
+        if (!sherpaDone) return;
+        // A valid local result is authoritative and does not need to wait for a
+        // network/system recognizer. When the local model is still downloading
+        // or returns nothing, preserve the existing system-recognizer fallback.
+        if (!sherpaUsed && !recognitionDone) return;
+
+        if (sherpaUsed) {
+            recognizedText = sherpaText;
+            recognizerConfidence = -1f;
+            recognitionError = 0;
+        }
+
         delivered = true;
         main.removeCallbacks(maxDurationStop);
         main.removeCallbacks(resultTimeout);
         closePipeRead();
         if (recognizer != null) {
-            try { recognizer.destroy(); } catch (Throwable ignored) { }
+            try {
+                if (sherpaUsed) recognizer.cancel();
+                recognizer.destroy();
+            } catch (Throwable ignored) { }
             recognizer = null;
         }
-        File output = wavFile != null && wavFile.isFile() && wavFile.length() > 44
-                ? wavFile : null;
         listener.onFinished(new Result(
                 recognizedText,
                 recognizerConfidence,
                 output,
                 recognitionError,
-                sharedPcmStream));
+                sharedPcmStream,
+                sherpaUsed ? "sherpa-onnx" : "system"));
     }
 
     private String firstNonEmpty(ArrayList<String> values) {
