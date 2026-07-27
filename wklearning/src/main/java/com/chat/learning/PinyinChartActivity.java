@@ -54,7 +54,7 @@ public class PinyinChartActivity extends AppCompatActivity {
     private int autoIndex = -1;
     private boolean autoPlaying;
     private boolean placeholderNoticeShown;
-    private float speed = 1f;
+    private float speed = 0.5f;
 
     public static void open(Context context, String tab) {
         Intent intent = new Intent(context, PinyinChartActivity.class);
@@ -198,12 +198,12 @@ public class PinyinChartActivity extends AppCompatActivity {
         controlsLp.setMargins(0, dp(7), 0, 0);
         dock.addView(controls, controlsLp);
 
-        speedButton = dockButton(getString(R.string.pinyin_chart_speed, "1.0"), v -> cycleSpeed());
+        speedButton = dockButton(getString(R.string.pinyin_chart_speed, "0.5"), v -> cycleSpeed());
         controls.addView(speedButton, new LinearLayout.LayoutParams(0, -1, 1f));
         addGap(controls, 8);
 
-        TextView followButton = dockButton(getString(R.string.pinyin_chart_follow), v ->
-                Toast.makeText(this, R.string.pinyin_chart_follow_placeholder, Toast.LENGTH_SHORT).show());
+        TextView followButton = dockButton(getString(R.string.pinyin_chart_follow),
+                v -> openPronunciationCompare());
         controls.addView(followButton, new LinearLayout.LayoutParams(0, -1, 1f));
         addGap(controls, 8);
 
@@ -313,11 +313,30 @@ public class PinyinChartActivity extends AppCompatActivity {
         selectAndPlay(index, false);
     }
 
+    private void openPronunciationCompare() {
+        if (currentSection == null || selectedIndex < 0
+                || selectedIndex >= currentSection.items.size()) {
+            Toast.makeText(this, R.string.pinyin_chart_select_before_compare,
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        stopAutoPlay();
+        PinyinChartRepository.Item item = currentSection.items.get(selectedIndex);
+        Intent intent = new Intent(this, WordPronunciationActivity.class);
+        intent.putExtra(WordPronunciationActivity.EXTRA_WORD, item.letter);
+        intent.putExtra(WordPronunciationActivity.EXTRA_PINYIN, item.hint);
+        intent.putExtra(WordPronunciationActivity.EXTRA_STANDARD_AUDIO_ASSET, item.audioAsset);
+        intent.putExtra(WordPronunciationActivity.EXTRA_STANDARD_AUDIO_SPEED, 0.5f);
+        intent.putExtra(WordPronunciationActivity.EXTRA_COMPARISON_ONLY, true);
+        intent.putExtra(WordPronunciationActivity.EXTRA_AUTO_START, false);
+        startActivity(intent);
+    }
+
     private void cycleSpeed() {
-        if (speed > 0.9f) speed = 0.7f;
-        else if (speed < 0.8f) speed = 0.85f;
-        else speed = 1f;
-        String label = speed == 1f ? "1.0" : speed == 0.85f ? "0.85" : "0.7";
+        if (speed < 0.6f) speed = 0.75f;
+        else if (speed < 0.9f) speed = 1f;
+        else speed = 0.5f;
+        String label = speed == 1f ? "1.0" : speed == 0.75f ? "0.75" : "0.5";
         speedButton.setText(getString(R.string.pinyin_chart_speed, label));
         if (selectedIndex >= 0) selectAndPlay(selectedIndex, autoPlaying);
     }

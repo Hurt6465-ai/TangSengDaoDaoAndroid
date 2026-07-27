@@ -30,6 +30,10 @@ public class WordPronunciationActivity extends AppCompatActivity {
     public static final String EXTRA_WORD = "word";
     public static final String EXTRA_PINYIN = "pinyin";
     public static final String EXTRA_SPELLING_TEXT = "spelling_text";
+    public static final String EXTRA_STANDARD_AUDIO_ASSET = "standard_audio_asset";
+    public static final String EXTRA_STANDARD_AUDIO_SPEED = "standard_audio_speed";
+    public static final String EXTRA_COMPARISON_ONLY = "comparison_only";
+    public static final String EXTRA_AUTO_START = "auto_start";
 
     private static final int REQ_RECORD_AUDIO = 3021;
     private static final int COLOR_TEXT = 0xFF151922;
@@ -40,8 +44,13 @@ public class WordPronunciationActivity extends AppCompatActivity {
 
     private String word;
     private String pinyin;
+    private String standardAudioAsset;
+    private float standardAudioSpeed = 1f;
+    private boolean comparisonOnly;
+    private boolean autoStart = true;
     private File recordingFile;
     private MediaPlayer player;
+    private PinyinAudioPlayer standardAudioPlayer;
     private PronunciationCaptureSession captureSession;
 
     private LinearLayout panel;
@@ -61,10 +70,16 @@ public class WordPronunciationActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         word = safe(getIntent().getStringExtra(EXTRA_WORD), getString(R.string.word_unknown));
         pinyin = safe(getIntent().getStringExtra(EXTRA_PINYIN), "");
+        standardAudioAsset = safe(getIntent().getStringExtra(EXTRA_STANDARD_AUDIO_ASSET), "");
+        standardAudioSpeed = Math.max(0.5f, Math.min(1.5f,
+                getIntent().getFloatExtra(EXTRA_STANDARD_AUDIO_SPEED, 1f)));
+        comparisonOnly = getIntent().getBooleanExtra(EXTRA_COMPARISON_ONLY, false);
+        autoStart = getIntent().getBooleanExtra(EXTRA_AUTO_START, true);
+        if (!standardAudioAsset.isEmpty()) standardAudioPlayer = new PinyinAudioPlayer(this);
         configureWindow();
         buildLayout();
-        prepareOfflineRecognizer();
-        if (savedInstanceState == null) {
+        if (!comparisonOnly) prepareOfflineRecognizer();
+        if (savedInstanceState == null && autoStart) {
             panel.postDelayed(this::ensurePermissionAndStart, 180L);
         }
     }
@@ -75,6 +90,8 @@ public class WordPronunciationActivity extends AppCompatActivity {
         sherpaModelListener = null;
         releaseCapture();
         releasePlayer();
+        if (standardAudioPlayer != null) standardAudioPlayer.release();
+        standardAudioPlayer = null;
         super.onDestroy();
     }
 
@@ -145,7 +162,9 @@ public class WordPronunciationActivity extends AppCompatActivity {
         FrameLayout header = new FrameLayout(this);
         panel.addView(header, new LinearLayout.LayoutParams(-1, dp(34)));
 
-        TextView title = text(getString(R.string.pronunciation_title), 17, COLOR_TEXT, true);
+        TextView title = text(getString(comparisonOnly
+                ? R.string.pronunciation_title_compare
+                : R.string.pronunciation_title), 17, COLOR_TEXT, true);
         title.setGravity(Gravity.CENTER);
         header.addView(title, new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
 
@@ -169,13 +188,15 @@ public class WordPronunciationActivity extends AppCompatActivity {
             panel.addView(pinyinView, pinyinLp);
         }
 
-        TextView original = compactButton("◖))  " + getString(R.string.pronunciation_play_standard),
+        TextView original = compactButton("◖))  " + originalButtonLabel(),
                 v -> playStandard());
         LinearLayout.LayoutParams originalLp = new LinearLayout.LayoutParams(-2, dp(38));
         originalLp.setMargins(0, dp(14), 0, 0);
         panel.addView(original, originalLp);
 
-        statusView = text(getString(R.string.pronunciation_one_tap_hint), 14, COLOR_SUB, false);
+        statusView = text(getString(comparisonOnly
+                ? R.string.pronunciation_compare_start_hint
+                : R.string.pronunciation_one_tap_hint), 14, COLOR_SUB, false);
         statusView.setGravity(Gravity.CENTER);
         statusView.setLineSpacing(dp(3), 1.05f);
         LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-1, -2);
@@ -192,7 +213,9 @@ public class WordPronunciationActivity extends AppCompatActivity {
         micButton = text("●", 28, Color.WHITE, true);
         micButton.setGravity(Gravity.CENTER);
         micButton.setBackground(rounded(COLOR_ACCENT, dp(34), 0, 0));
-        micButton.setContentDescription(getString(R.string.pronunciation_start_once));
+        micButton.setContentDescription(getString(comparisonOnly
+                ? R.string.pronunciation_start_record_compare
+                : R.string.pronunciation_start_once));
         micButton.setOnClickListener(v -> {
             if (!practicing) ensurePermissionAndStart();
         });
@@ -201,7 +224,9 @@ public class WordPronunciationActivity extends AppCompatActivity {
         micLp.setMargins(0, dp(16), 0, 0);
         panel.addView(micButton, micLp);
 
-        micCaption = text(getString(R.string.pronunciation_start_once), 13, COLOR_SUB, true);
+        micCaption = text(getString(comparisonOnly
+                ? R.string.pronunciation_start_record_compare
+                : R.string.pronunciation_start_once), 13, COLOR_SUB, true);
         micCaption.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams captionLp = new LinearLayout.LayoutParams(-1, -2);
         captionLp.setMargins(0, dp(7), 0, 0);
@@ -215,7 +240,9 @@ public class WordPronunciationActivity extends AppCompatActivity {
         resultLp.setMargins(0, dp(16), 0, 0);
         panel.addView(resultGroup, resultLp);
 
-        TextView resultTitle = text(getString(R.string.pronunciation_result_title), 13, COLOR_SUB, true);
+        TextView resultTitle = text(getString(comparisonOnly
+                ? R.string.pronunciation_compare_result_title
+                : R.string.pronunciation_result_title), 13, COLOR_SUB, true);
         resultTitle.setGravity(Gravity.CENTER);
         resultGroup.addView(resultTitle, new LinearLayout.LayoutParams(-1, -2));
 
@@ -224,12 +251,14 @@ public class WordPronunciationActivity extends AppCompatActivity {
         LinearLayout.LayoutParams recognizedLp = new LinearLayout.LayoutParams(-1, -2);
         recognizedLp.setMargins(0, dp(5), 0, 0);
         resultGroup.addView(recognizedView, recognizedLp);
+        if (comparisonOnly) recognizedView.setVisibility(View.GONE);
 
         matchView = text("", 29, COLOR_SUCCESS, true);
         matchView.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams matchLp = new LinearLayout.LayoutParams(-1, -2);
         matchLp.setMargins(0, dp(5), 0, 0);
         resultGroup.addView(matchView, matchLp);
+        if (comparisonOnly) matchView.setVisibility(View.GONE);
 
         TextView compareHint = text(getString(R.string.pronunciation_compare_hint), 12, COLOR_SUB, false);
         compareHint.setGravity(Gravity.CENTER);
@@ -242,7 +271,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
         compareRow.setGravity(Gravity.CENTER);
         resultGroup.addView(compareRow, new LinearLayout.LayoutParams(-1, dp(40)));
 
-        TextView playOriginal = compactButton("◖))  " + getString(R.string.pronunciation_original_short),
+        TextView playOriginal = compactButton("◖))  " + originalShortLabel(),
                 v -> playStandard());
         compareRow.addView(playOriginal, new LinearLayout.LayoutParams(0, dp(40), 1f));
         addHorizontalSpace(compareRow, 10);
@@ -284,17 +313,23 @@ public class WordPronunciationActivity extends AppCompatActivity {
         micButton.setAlpha(1f);
         micCaption.setText(R.string.pronunciation_status_preparing);
 
-        captureSession = new PronunciationCaptureSession(this, word,
+        captureSession = new PronunciationCaptureSession(this, word, comparisonOnly,
                 new PronunciationCaptureSession.Listener() {
                     @Override public void onStateChanged(PronunciationCaptureSession.State state) {
                         runOnUiThread(() -> {
                             if (isFinishing()) return;
                             if (state == PronunciationCaptureSession.State.LISTENING) {
-                                statusView.setText(R.string.pronunciation_status_recording_and_recognizing);
-                                micCaption.setText(R.string.pronunciation_status_recording_and_recognizing);
+                                int message = comparisonOnly
+                                        ? R.string.pronunciation_status_recording_compare
+                                        : R.string.pronunciation_status_recording_and_recognizing;
+                                statusView.setText(message);
+                                micCaption.setText(message);
                             } else if (state == PronunciationCaptureSession.State.PROCESSING) {
-                                statusView.setText(R.string.pronunciation_status_processing);
-                                micCaption.setText(R.string.pronunciation_status_processing);
+                                int message = comparisonOnly
+                                        ? R.string.pronunciation_status_processing_compare
+                                        : R.string.pronunciation_status_processing;
+                                statusView.setText(message);
+                                micCaption.setText(message);
                             }
                         });
                     }
@@ -311,7 +346,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
 
                     @Override public void onPartialResult(String text) {
                         runOnUiThread(() -> {
-                            if (text == null || text.isEmpty() || isFinishing()) return;
+                            if (comparisonOnly || text == null || text.isEmpty() || isFinishing()) return;
                             partialView.setText(text);
                             partialView.setVisibility(View.VISIBLE);
                         });
@@ -328,20 +363,30 @@ public class WordPronunciationActivity extends AppCompatActivity {
         practicing = false;
         micButton.setText("●");
         micButton.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(120).start();
-        micCaption.setText(R.string.pronunciation_start_once);
+        micCaption.setText(comparisonOnly
+                ? R.string.pronunciation_start_record_compare
+                : R.string.pronunciation_start_once);
         recordingFile = result == null ? null : result.recordingFile;
-        String recognized = result == null ? "" : safe(result.recognizedText, "");
-        int match = recognized.isEmpty() ? 0 : textMatchPercent(word, recognized);
 
         partialView.setVisibility(View.GONE);
         resultGroup.setVisibility(View.VISIBLE);
+        playMineButton.setEnabled(recordingFile != null);
+        playMineButton.setAlpha(recordingFile == null ? 0.42f : 1f);
+
+        if (comparisonOnly) {
+            statusView.setText(recordingFile == null
+                    ? R.string.pronunciation_record_failed
+                    : R.string.pronunciation_status_record_done);
+            return;
+        }
+
+        String recognized = result == null ? "" : safe(result.recognizedText, "");
+        int match = recognized.isEmpty() ? 0 : textMatchPercent(word, recognized);
         recognizedView.setText(recognized.isEmpty()
                 ? getString(R.string.pronunciation_unrecognized)
                 : recognized);
         matchView.setText(getString(R.string.pronunciation_match_value, match));
         matchView.setTextColor(match >= 80 ? COLOR_SUCCESS : match >= 50 ? 0xFFD97706 : 0xFFCA3854);
-        playMineButton.setEnabled(recordingFile != null);
-        playMineButton.setAlpha(recordingFile == null ? 0.42f : 1f);
         if (recognized.isEmpty()) {
             statusView.setText(R.string.pronunciation_recognition_empty);
         } else if (result != null && "sherpa-onnx".equals(result.recognitionEngine)) {
@@ -352,6 +397,26 @@ public class WordPronunciationActivity extends AppCompatActivity {
     }
 
     private void playStandard() {
+        if (!standardAudioAsset.isEmpty()) {
+            releasePlayer();
+            if (standardAudioPlayer == null) standardAudioPlayer = new PinyinAudioPlayer(this);
+            standardAudioPlayer.play(standardAudioAsset, standardAudioSpeed,
+                    new PinyinAudioPlayer.Callback() {
+                        @Override public void onStarted(boolean placeholder) {
+                            statusView.setText(getString(
+                                    R.string.pronunciation_status_original_speed,
+                                    formatSpeed(standardAudioSpeed)));
+                        }
+
+                        @Override public void onCompleted() { }
+
+                        @Override public void onError() {
+                            Toast.makeText(WordPronunciationActivity.this,
+                                    R.string.pronunciation_play_failed, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+            return;
+        }
         LearningTtsBridge.speak(this, word,
                 LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_WORD);
         statusView.setText(R.string.pronunciation_status_standard);
@@ -383,8 +448,32 @@ public class WordPronunciationActivity extends AppCompatActivity {
     }
 
     private void releasePlayer() {
+        if (standardAudioPlayer != null) standardAudioPlayer.stop();
         try { if (player != null) player.release(); } catch (Throwable ignored) { }
         player = null;
+    }
+
+    private String originalButtonLabel() {
+        if (!standardAudioAsset.isEmpty()) {
+            return getString(R.string.pronunciation_original_speed,
+                    formatSpeed(standardAudioSpeed));
+        }
+        return getString(R.string.pronunciation_play_standard);
+    }
+
+    private String originalShortLabel() {
+        if (!standardAudioAsset.isEmpty()) {
+            return getString(R.string.pronunciation_original_speed,
+                    formatSpeed(standardAudioSpeed));
+        }
+        return getString(R.string.pronunciation_original_short);
+    }
+
+    private String formatSpeed(float value) {
+        if (Math.abs(value - 1f) < 0.01f) return "1.0";
+        if (Math.abs(value - 0.75f) < 0.01f) return "0.75";
+        if (Math.abs(value - 0.5f) < 0.01f) return "0.5";
+        return String.format(Locale.ROOT, "%.2f", value);
     }
 
     @Override

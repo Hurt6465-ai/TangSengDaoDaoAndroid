@@ -91,6 +91,7 @@ final class PronunciationCaptureSession {
     private final Context context;
     private final String targetWord;
     private final Listener listener;
+    private final boolean comparisonOnly;
     private final Handler main = new Handler(Looper.getMainLooper());
 
     private SpeechRecognizer recognizer;
@@ -130,16 +131,30 @@ final class PronunciationCaptureSession {
     };
 
     PronunciationCaptureSession(Context context, String targetWord, Listener listener) {
+        this(context, targetWord, false, listener);
+    }
+
+    PronunciationCaptureSession(Context context, String targetWord, boolean comparisonOnly,
+                                Listener listener) {
         this.context = context.getApplicationContext();
         this.targetWord = targetWord == null ? "" : targetWord.trim();
+        this.comparisonOnly = comparisonOnly;
         this.listener = listener;
-        SherpaOnnxRecognizer.prepare(this.context, null);
+        if (!comparisonOnly) SherpaOnnxRecognizer.prepare(this.context, null);
     }
 
     void start() {
         if (released || captureRunning) return;
         resetResultState();
         listener.onStateChanged(State.PREPARING);
+
+        if (comparisonOnly) {
+            recognitionDone = true;
+            sherpaStarted = true;
+            sherpaDone = true;
+            startCapture(false);
+            return;
+        }
 
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             recognitionDone = true;
@@ -412,6 +427,15 @@ final class PronunciationCaptureSession {
         if (released || delivered || !recordingDone) return;
         File output = wavFile != null && wavFile.isFile() && wavFile.length() > 44
                 ? wavFile : null;
+
+        if (comparisonOnly) {
+            delivered = true;
+            main.removeCallbacks(maxDurationStop);
+            main.removeCallbacks(resultTimeout);
+            listener.onFinished(new Result(
+                    "", -1f, output, recognitionError, false, "recording"));
+            return;
+        }
 
         if (!sherpaStarted) {
             sherpaStarted = true;
