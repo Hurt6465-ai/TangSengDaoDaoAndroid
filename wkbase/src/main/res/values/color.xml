@@ -98,4 +98,10 @@
         <item>#2887C4</item>
         <item>#52A98B</item>
     </array>
+    <!-- Lightweight liquid-glass chat bubbles. RGB gives each side an identity;
+         BubbleLayout supplies the translucency, highlight and edge at draw time. -->
+    <color name="chat_liquid_received_bg_normal">#EEF2F5</color>
+    <color name="chat_liquid_received_bg_selected">#DCE3E8</color>
+    <color name="chat_liquid_send_bg_normal">#D9D0F4</color>
+    <color name="chat_liquid_send_bg_selected">#C8BCEB</color>
 </resources>
