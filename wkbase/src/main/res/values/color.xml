@@ -98,10 +98,12 @@
         <item>#2887C4</item>
         <item>#52A98B</item>
     </array>
+    <color name="chat_msg_time_received">#646C75</color>
+    <color name="chat_msg_time_sent">#6C647C</color>
     <!-- Lightweight liquid-glass chat bubbles. RGB gives each side an identity;
          BubbleLayout supplies the translucency, highlight and edge at draw time. -->
-    <color name="chat_liquid_received_bg_normal">#EEF2F5</color>
-    <color name="chat_liquid_received_bg_selected">#DCE3E8</color>
-    <color name="chat_liquid_send_bg_normal">#D9D0F4</color>
-    <color name="chat_liquid_send_bg_selected">#C8BCEB</color>
+    <color name="chat_liquid_received_bg_normal">#D5DFE6</color>
+    <color name="chat_liquid_received_bg_selected">#C5D2DA</color>
+    <color name="chat_liquid_send_bg_normal">#C1AFE4</color>
+    <color name="chat_liquid_send_bg_selected">#AE98D7</color>
 </resources>
