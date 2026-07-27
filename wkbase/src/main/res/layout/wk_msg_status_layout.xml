@@ -16,7 +16,7 @@
         android:layout_gravity="center_vertical"
         android:layout_marginEnd="3dp"
         android:src="@mipmap/msg_pin_mini"
-        android:tint="@color/color999"
+        android:tint="@color/chat_msg_time_received"
         android:visibility="visible" />
 
     <androidx.appcompat.widget.AppCompatTextView
@@ -26,7 +26,7 @@
         android:layout_gravity="center_vertical"
         android:layout_marginEnd="2dp"
         android:text="@string/edited"
-        android:textColor="@color/color999"
+        android:textColor="@color/chat_msg_time_received"
         android:textSize="11sp"
         android:visibility="gone"
         tools:ignore="SmallSp" />
@@ -37,7 +37,9 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
         android:text="10:10AM"
-        android:textColor="@color/color999"
+        android:textColor="@color/chat_msg_time_received"
+        android:fontFamily="sans-serif-medium"
+        android:includeFontPadding="false"
         android:textSize="10sp"
         tools:ignore="SmallSp" />
 
