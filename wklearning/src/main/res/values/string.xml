@@ -243,23 +243,13 @@
     <string name="learning_home_more">更多</string>
 
     <string name="learning_home_open_drawer">打开学习侧边栏</string>
-    <string name="learning_home_drawer_kicker">LEARNING SPACE</string>
-    <string name="learning_home_drawer_title">更多服务</string>
-    <string name="learning_home_drawer_subtitle">AI、语音与扩展工具</string>
-    <string name="learning_home_drawer_focus_title">沉浸学习空间</string>
-    <string name="learning_home_drawer_focus_subtitle">常用学习能力集中在这里</string>
     <string name="learning_home_drawer_ai_group">AI 助手</string>
     <string name="learning_home_drawer_deepseek">DeepSeek 翻译</string>
     <string name="learning_home_drawer_deepseek_desc">中缅互译、语法解释</string>
-    <string name="learning_home_drawer_886_desc">国内学习 AI 入口</string>
     <string name="learning_home_drawer_qianwen">千问国内版</string>
     <string name="learning_home_drawer_qwen">Qwen 国际版</string>
-    <string name="learning_home_drawer_tools_group">学习工具</string>
     <string name="learning_home_drawer_speech_settings">语音设置</string>
     <string name="learning_home_drawer_speech_desc">WKSpeech 引擎配置</string>
-    <string name="learning_home_drawer_prompt">口语 Prompt</string>
-    <string name="learning_home_drawer_prompt_desc">生活场景对话指令</string>
-    <string name="learning_home_drawer_extensions">扩展功能</string>
     <string name="learning_home_drawer_scripts">脚本中心</string>
     <string name="learning_home_drawer_scripts_desc">自定义扩展功能</string>
     <string name="learning_home_coming_soon">%1$s 正在开发中</string>
@@ -378,4 +368,20 @@
     <string name="asr_model_download_confirm_message">将在线下载“%1$s”（%2$s）。建议使用 Wi-Fi，并确保有足够存储空间。</string>
     <string name="asr_model_delete_confirm_title">删除模型</string>
     <string name="asr_model_delete_confirm_message">确定删除“%1$s”吗？删除后会自动改用系统识别，直到重新安装模型。</string>
+
+    <string name="learning_home_drawer_header_subtitle">学习与常用功能</string>
+    <string name="learning_home_drawer_close">关闭侧边栏</string>
+    <string name="learning_home_drawer_common_group">常用功能</string>
+    <string name="learning_home_drawer_learning_settings_group">学习设置</string>
+    <string name="learning_home_drawer_contacts">联系人</string>
+    <string name="learning_home_drawer_contacts_desc">查看好友与通讯录</string>
+    <string name="learning_home_drawer_new_friends">新的朋友</string>
+    <string name="learning_home_drawer_new_friends_desc">查看好友申请</string>
+    <string name="learning_home_drawer_add_friend">添加好友</string>
+    <string name="learning_home_drawer_add_friend_desc">搜索账号并添加</string>
+    <string name="learning_home_drawer_system_settings">系统设置</string>
+    <string name="learning_home_drawer_system_settings_desc">通知、隐私与外观</string>
+    <string name="learning_home_contacts_unavailable">联系人入口暂不可用</string>
+    <string name="learning_home_feature_unavailable">%1$s 暂不可用</string>
+
 </resources>
