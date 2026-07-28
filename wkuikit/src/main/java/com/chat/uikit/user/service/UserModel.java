@@ -17,12 +17,10 @@ import com.chat.base.net.ICommonListener;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.base.net.entity.CommonResponse;
 import com.chat.base.net.ud.WKUploader;
-import com.chat.base.utils.WKDeviceUtils;
-import com.chat.base.utils.OnlineStatusDebugLogger;
-import com.chat.base.utils.WKReader;
 import com.chat.base.utils.WKTimeUtils;
 import com.chat.uikit.enity.BlacklistUser;
 import com.chat.uikit.enity.Device;
+import com.chat.uikit.enity.FriendOnline;
 import com.chat.uikit.enity.MailListEntity;
 import com.chat.uikit.enity.OnlineUser;
 import com.chat.uikit.enity.OnlineUserAndDevice;
@@ -34,7 +32,11 @@ import com.xinbida.wukongim.entity.WKChannelMember;
 import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * 2020-06-30 12:37
@@ -58,12 +60,12 @@ public class UserModel extends WKBaseModel {
         request(createService(UserService.class).updateUserInfo(jsonObject), new IRequestResultListener<CommonResponse>() {
             @Override
             public void onSuccess(CommonResponse result) {
-                iCommonListener.onResult(result.status, result.msg);
+                if (iCommonListener != null) iCommonListener.onResult(result.status, result.msg);
             }
 
             @Override
             public void onFail(int code, String msg) {
-                iCommonListener.onResult(code, msg);
+                if (iCommonListener != null) iCommonListener.onResult(code, msg);
             }
         });
     }
@@ -74,12 +76,12 @@ public class UserModel extends WKBaseModel {
         request(createService(UserService.class).setting(jsonObject), new IRequestResultListener<CommonResponse>() {
             @Override
             public void onSuccess(CommonResponse result) {
-                iCommonListener.onResult(result.status, result.msg);
+                if (iCommonListener != null) iCommonListener.onResult(result.status, result.msg);
             }
 
             @Override
             public void onFail(int code, String msg) {
-                iCommonListener.onResult(code, msg);
+                if (iCommonListener != null) iCommonListener.onResult(code, msg);
             }
         });
     }
@@ -91,12 +93,12 @@ public class UserModel extends WKBaseModel {
         request(createService(UserService.class).updateFriendRemark(jsonObject), new IRequestResultListener<CommonResponse>() {
             @Override
             public void onSuccess(CommonResponse result) {
-                iCommonListener.onResult(result.status, result.msg);
+                if (iCommonListener != null) iCommonListener.onResult(result.status, result.msg);
             }
 
             @Override
             public void onFail(int code, String msg) {
-                iCommonListener.onResult(code, msg);
+                if (iCommonListener != null) iCommonListener.onResult(code, msg);
             }
         });
     }
@@ -105,12 +107,12 @@ public class UserModel extends WKBaseModel {
         request(createService(UserService.class).deleteFriend(uid), new IRequestResultListener<CommonResponse>() {
             @Override
             public void onSuccess(CommonResponse result) {
-                iCommonListener.onResult(result.status, result.msg);
+                if (iCommonListener != null) iCommonListener.onResult(result.status, result.msg);
             }
 
             @Override
             public void onFail(int code, String msg) {
-                iCommonListener.onResult(code, msg);
+                if (iCommonListener != null) iCommonListener.onResult(code, msg);
             }
         });
     }
@@ -120,12 +122,12 @@ public class UserModel extends WKBaseModel {
             @Override
             public void onSuccess(CommonResponse result) {
                 WKCommonModel.getInstance().getChannel(uid, WKChannelType.PERSONAL, null);
-                iCommonListener.onResult(result.status, result.msg);
+                if (iCommonListener != null) iCommonListener.onResult(result.status, result.msg);
             }
 
             @Override
             public void onFail(int code, String msg) {
-                iCommonListener.onResult(code, msg);
+                if (iCommonListener != null) iCommonListener.onResult(code, msg);
             }
         });
     }
@@ -135,12 +137,12 @@ public class UserModel extends WKBaseModel {
             @Override
             public void onSuccess(CommonResponse result) {
                 WKCommonModel.getInstance().getChannel(uid, WKChannelType.PERSONAL, null);
-                iCommonListener.onResult(result.status, result.msg);
+                if (iCommonListener != null) iCommonListener.onResult(result.status, result.msg);
             }
 
             @Override
             public void onFail(int code, String msg) {
-                iCommonListener.onResult(code, msg);
+                if (iCommonListener != null) iCommonListener.onResult(code, msg);
             }
         });
     }
@@ -198,12 +200,12 @@ public class UserModel extends WKBaseModel {
         WKUploader.getInstance().upload(url, filePath, new WKUploader.IUploadBack() {
             @Override
             public void onSuccess(String url) {
-                iUploadBack.onResult(HttpResponseCode.success);
+                if (iUploadBack != null) iUploadBack.onResult(HttpResponseCode.success);
             }
 
             @Override
             public void onError() {
-                iUploadBack.onResult(HttpResponseCode.error);
+                if (iUploadBack != null) iUploadBack.onResult(HttpResponseCode.error);
             }
         });
     }
@@ -214,7 +216,9 @@ public class UserModel extends WKBaseModel {
 
     public void getOnlineUsers(List<String> uids, @NonNull final IOnlineUser iOnlineUser) {
         JSONArray jsonArray = new JSONArray();
-        jsonArray.addAll(uids);
+        if (uids != null) {
+            jsonArray.addAll(uids);
+        }
         request(createService(UserService.class).getOnlineUsers(jsonArray), new IRequestResultListener<List<OnlineUser>>() {
             @Override
             public void onSuccess(List<OnlineUser> result) {
@@ -233,162 +237,88 @@ public class UserModel extends WKBaseModel {
     }
 
     public void getOnlineUsers() {
-        final long requestStart = System.currentTimeMillis();
-        List<WKChannel> localBefore = WKIM.getInstance().getChannelManager()
-                .getWithFollowAndStatus(WKChannelType.PERSONAL, 1, 1);
-        int cachedOnlineBefore = 0;
-        if (WKReader.isNotEmpty(localBefore)) {
-            for (WKChannel channel : localBefore) {
-                if (channel.online == 1) cachedOnlineBefore++;
-            }
-        }
-        OnlineStatusDebugLogger.log(
-                "API_START",
-                "url=" + WKApiConfig.baseUrl + "user/online"
-                        + ", localChannels=" + (localBefore == null ? -1 : localBefore.size())
-                        + ", cachedOnline=" + cachedOnlineBefore
-        );
         request(createService(UserService.class).onlineUsers(), new IRequestResultListener<OnlineUserAndDevice>() {
             @Override
             public void onSuccess(OnlineUserAndDevice result) {
                 if (result == null) {
-                    OnlineStatusDebugLogger.log(
-                            "API_SUCCESS_NULL",
-                            "costMs=" + (System.currentTimeMillis() - requestStart)
-                    );
                     return;
                 }
-                int online = 0;
-                int muteOfAPP = 0;
+
+                int pcOnline = 0;
+                int muteOfApp = 0;
                 if (result.pc != null) {
-                    online = result.pc.online;
-                    muteOfAPP = result.pc.mute_of_app;
+                    pcOnline = result.pc.online;
+                    muteOfApp = result.pc.mute_of_app;
                 }
-                WKSharedPreferencesUtil.getInstance().putInt(WKConfig.getInstance().getUid() + "_pc_online", online);
-                WKSharedPreferencesUtil.getInstance().putInt(WKConfig.getInstance().getUid() + "_mute_of_app", muteOfAPP);
-                List<WKChannel> tempList = WKIM.getInstance().getChannelManager().getWithFollowAndStatus(WKChannelType.PERSONAL, 1, 1);
-                List<WKChannel> list = new ArrayList<>();
-                int remoteOnlineCount = 0;
-                StringBuilder remoteSample = new StringBuilder();
-                if (WKReader.isNotEmpty(result.friends)) {
-                    for (int i = 0; i < result.friends.size(); i++) {
-                        OnlineUser user = result.friends.get(i);
-                        if (user.online == 1) remoteOnlineCount++;
-                        if (i < 30) {
-                            if (remoteSample.length() > 0) remoteSample.append(';');
-                            remoteSample.append(user.uid)
-                                    .append(':').append(user.online)
-                                    .append(':').append(user.last_offline);
-                        }
-                    }
-                }
-                OnlineStatusDebugLogger.log(
-                        "API_SUCCESS",
-                        "costMs=" + (System.currentTimeMillis() - requestStart)
-                                + ", remoteFriends=" + (result.friends == null ? -1 : result.friends.size())
-                                + ", remoteOnline=" + remoteOnlineCount
-                                + ", localChannels=" + (tempList == null ? -1 : tempList.size())
-                                + ", sample=" + remoteSample
-                );
-                if (WKReader.isNotEmpty(result.friends)) {
-                    if (WKReader.isNotEmpty(tempList)) {
-                        for (int i = 0, size = tempList.size(); i < size; i++) {
-                            boolean isReset = true;
-                            for (int j = 0, len = result.friends.size(); j < len; j++) {
-                                if (result.friends.get(j).uid.equals(tempList.get(i).channelID)) {
-                                    isReset = false;
-                                    tempList.get(i).online = result.friends.get(j).online;
-                                    tempList.get(i).lastOffline = result.friends.get(j).last_offline;
-                                    break;
-                                }
-                            }
-                            if (isReset) {
-                                tempList.get(i).online = 0;
-                                // tempList.get(i).lastOffline = 0;
-                            }
-                            list.add(tempList.get(i));
-                        }
+                String currentUid = WKConfig.getInstance().getUid();
+                WKSharedPreferencesUtil.getInstance().putInt(currentUid + "_pc_online", pcOnline);
+                WKSharedPreferencesUtil.getInstance().putInt(currentUid + "_mute_of_app", muteOfApp);
 
-                        for (int i = 0, size = result.friends.size(); i < size; i++) {
-                            boolean isAdd = true;
-                            for (int j = 0, len = tempList.size(); j < len; j++) {
-                                if (result.friends.get(i).uid.equals(tempList.get(j).channelID)) {
-                                    isAdd = false;
-                                    break;
-                                }
-                            }
-                            if (isAdd) {
-                                WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(result.friends.get(i).uid, WKChannelType.PERSONAL);
-                                if (channel != null) {
-                                    channel.lastOffline = result.friends.get(i).last_offline;
-                                    channel.online = result.friends.get(i).online;
-                                    list.add(channel);
-                                }
-                            }
+                Map<String, FriendOnline> remoteByUid = new HashMap<>();
+                if (result.friends != null) {
+                    for (FriendOnline friend : result.friends) {
+                        if (friend == null || TextUtils.isEmpty(friend.uid)) {
+                            continue;
                         }
-                    } else {
-                        for (int i = 0, size = result.friends.size(); i < size; i++) {
-                            WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(result.friends.get(i).uid, WKChannelType.PERSONAL);
-                            if (channel != null) {
-                                channel.lastOffline = result.friends.get(i).last_offline;
-                                channel.online = result.friends.get(i).online;
-                                list.add(channel);
-                            }
-                        }
-                    }
-                } else {
-                    for (int i = 0, size = tempList.size(); i < size; i++) {
-                        if (tempList.get(i).online == 1 || tempList.get(i).lastOffline > 0) {
-                            tempList.get(i).online = 0;
-                            // tempList.get(i).lastOffline = 0;
-                            list.add(tempList.get(i));
-                        }
+                        remoteByUid.put(friend.uid, friend);
                     }
                 }
 
-                if (WKReader.isNotEmpty(result.friends)) {
-                    if (WKReader.isNotEmpty(tempList)) {
-                        for (int i = 0, size = tempList.size(); i < size; i++) {
-                            for (int j = 0, len = result.friends.size(); j < len; j++) {
-                                if (result.friends.get(j).uid.equals(tempList.get(i).channelID)) {
-                                    tempList.get(i).online = result.friends.get(j).online;
-                                    tempList.get(i).lastOffline = result.friends.get(j).last_offline;
-                                    list.add(tempList.get(i));
-                                    break;
-                                }
-                            }
+                List<WKChannel> localChannels = WKIM.getInstance()
+                        .getChannelManager()
+                        .getWithFollowAndStatus(WKChannelType.PERSONAL, 1, 1);
+                List<WKChannel> changedChannels = new ArrayList<>();
+                Set<String> handledUids = new HashSet<>();
+
+                if (localChannels != null) {
+                    for (WKChannel channel : localChannels) {
+                        if (channel == null || TextUtils.isEmpty(channel.channelID)) {
+                            continue;
                         }
+
+                        FriendOnline remote = remoteByUid.get(channel.channelID);
+                        int newOnline = remote == null ? 0 : remote.online;
+                        long newLastOffline = remote == null ? channel.lastOffline : remote.last_offline;
+
+                        if (channel.online != newOnline
+                                || (remote != null && channel.lastOffline != newLastOffline)) {
+                            channel.online = newOnline;
+                            if (remote != null) {
+                                channel.lastOffline = newLastOffline;
+                            }
+                            changedChannels.add(channel);
+                        }
+                        handledUids.add(channel.channelID);
                     }
                 }
-                int savedOnlineCount = 0;
-                StringBuilder saveSample = new StringBuilder();
-                for (int i = 0; i < list.size(); i++) {
-                    WKChannel channel = list.get(i);
-                    if (channel.online == 1) savedOnlineCount++;
-                    if (i < 30) {
-                        if (saveSample.length() > 0) saveSample.append(';');
-                        saveSample.append(channel.channelID)
-                                .append(':').append(channel.online)
-                                .append(':').append(channel.lastOffline);
+
+                for (Map.Entry<String, FriendOnline> entry : remoteByUid.entrySet()) {
+                    if (handledUids.contains(entry.getKey())) {
+                        continue;
+                    }
+                    WKChannel channel = WKIM.getInstance()
+                            .getChannelManager()
+                            .getChannel(entry.getKey(), WKChannelType.PERSONAL);
+                    if (channel == null) {
+                        continue;
+                    }
+
+                    FriendOnline remote = entry.getValue();
+                    if (channel.online != remote.online || channel.lastOffline != remote.last_offline) {
+                        channel.online = remote.online;
+                        channel.lastOffline = remote.last_offline;
+                        changedChannels.add(channel);
                     }
                 }
-                OnlineStatusDebugLogger.log(
-                        "CHANNEL_SAVE",
-                        "count=" + list.size()
-                                + ", online=" + savedOnlineCount
-                                + ", sample=" + saveSample
-                );
-                WKIM.getInstance().getChannelManager().saveOrUpdateChannels(list);
+
+                if (!changedChannels.isEmpty()) {
+                    WKIM.getInstance().getChannelManager().saveOrUpdateChannels(changedChannels);
+                }
             }
 
             @Override
             public void onFail(int code, String msg) {
-                OnlineStatusDebugLogger.log(
-                        "API_FAIL",
-                        "costMs=" + (System.currentTimeMillis() - requestStart)
-                                + ", code=" + code
-                                + ", msg=" + msg
-                );
+                // 网络失败时保留本地状态，避免短暂断网导致所有联系人瞬间离线。
             }
         });
     }
@@ -398,12 +328,12 @@ public class UserModel extends WKBaseModel {
         request(createService(UserService.class).userQr(), new IRequestResultListener<UserQr>() {
             @Override
             public void onSuccess(UserQr result) {
-                iUserQr.onResult(HttpResponseCode.success, "", result);
+                if (iUserQr != null) iUserQr.onResult(HttpResponseCode.success, "", result);
             }
 
             @Override
             public void onFail(int code, String msg) {
-                iUserQr.onResult(code, msg, null);
+                if (iUserQr != null) iUserQr.onResult(code, msg, null);
             }
         });
     }
@@ -414,22 +344,31 @@ public class UserModel extends WKBaseModel {
 
     public void uploadContacts(List<MailListEntity> list, final ICommonListener iCommonListener) {
         JSONArray jsonArray = new JSONArray();
-        for (MailListEntity entity : list) {
-            JSONObject jsonObject = new JSONObject();
-            jsonObject.put("name", entity.name);
-            jsonObject.put("zone", entity.zone);
-            jsonObject.put("phone", entity.phone);
-            jsonArray.add(jsonObject);
+        if (list != null) {
+            for (MailListEntity entity : list) {
+                if (entity == null) {
+                    continue;
+                }
+                JSONObject jsonObject = new JSONObject();
+                jsonObject.put("name", entity.name);
+                jsonObject.put("zone", entity.zone);
+                jsonObject.put("phone", entity.phone);
+                jsonArray.add(jsonObject);
+            }
         }
         request(createService(UserService.class).uploadContacts(jsonArray), new IRequestResultListener<CommonResponse>() {
             @Override
             public void onSuccess(CommonResponse result) {
-                iCommonListener.onResult(HttpResponseCode.success, "");
+                if (iCommonListener != null) {
+                    iCommonListener.onResult(HttpResponseCode.success, "");
+                }
             }
 
             @Override
             public void onFail(int code, String msg) {
-                iCommonListener.onResult(code, msg);
+                if (iCommonListener != null) {
+                    iCommonListener.onResult(code, msg);
+                }
             }
         });
     }
@@ -438,12 +377,12 @@ public class UserModel extends WKBaseModel {
         request(createService(UserService.class).getContacts(), new IRequestResultListener<List<MailListEntity>>() {
             @Override
             public void onSuccess(List<MailListEntity> result) {
-                iGetContacts.onResult(HttpResponseCode.success, "", result);
+                if (iGetContacts != null) iGetContacts.onResult(HttpResponseCode.success, "", result);
             }
 
             @Override
             public void onFail(int code, String msg) {
-                iGetContacts.onResult(code, msg, null);
+                if (iGetContacts != null) iGetContacts.onResult(code, msg, null);
             }
         });
     }
@@ -460,7 +399,7 @@ public class UserModel extends WKBaseModel {
         request(createService(UserService.class).getUserInfo(uid, groupNo), new IRequestResultListener<>() {
             @Override
             public void onSuccess(UserInfo result) {
-                if (result.group_member != null) {
+                if (result != null && result.group_member != null) {
                     WKChannelMember member = new WKChannelMember();
                     member.memberUID = result.group_member.uid;
                     member.memberRemark = result.group_member.remark;
@@ -499,19 +438,21 @@ public class UserModel extends WKBaseModel {
         request(createService(UserService.class).quit(), new IRequestResultListener<CommonResponse>() {
             @Override
             public void onSuccess(CommonResponse result) {
-                if (iCommonListener != null)
+                if (iCommonListener != null) {
                     iCommonListener.onResult(HttpResponseCode.success, "");
+                }
             }
 
             @Override
             public void onFail(int code, String msg) {
-                if (iCommonListener != null)
+                if (iCommonListener != null) {
                     iCommonListener.onResult(code, msg);
+                }
             }
         });
     }
 
-    public void device(){
+    public void device() {
         String deviceId = WKConstants.getDeviceID();
         request(createService(UserService.class).device(deviceId), new IRequestResultListener<>() {
             @Override
