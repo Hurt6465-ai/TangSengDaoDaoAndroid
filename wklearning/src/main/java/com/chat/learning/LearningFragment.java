@@ -2,6 +2,7 @@ package com.chat.learning;
 
 import android.animation.ObjectAnimator;
 import android.animation.StateListAnimator;
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
@@ -81,8 +82,8 @@ public class LearningFragment extends Fragment {
         hskProgressViews.clear();
         drawerLayout = new WideEdgeDrawerLayout(requireContext());
         drawerLayout.setBackgroundColor(COLOR_PAGE);
-        drawerLayout.setScrimColor(0x4010182B);
-        drawerLayout.setDrawerElevation(dp(24));
+        drawerLayout.setScrimColor(0x2E10182B);
+        drawerLayout.setDrawerElevation(dp(12));
 
         View main = createMainPage();
         drawerLayout.addView(main, new DrawerLayout.LayoutParams(-1, -1));
@@ -94,7 +95,7 @@ public class LearningFragment extends Fragment {
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, sideDrawerView);
 
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
-        int edgeWidth = Math.min(dp(180), Math.max(dp(120), (int) (screenWidth * 0.30f)));
+        int edgeWidth = Math.min(dp(96), Math.max(dp(64), (int) (screenWidth * 0.18f)));
         drawerLayout.setEdgeSwipeWidth(edgeWidth);
         return drawerLayout;
     }
@@ -663,46 +664,56 @@ public class LearningFragment extends Fragment {
     private View createSideDrawer() {
         LinearLayout panel = new LinearLayout(requireContext());
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(20), getTopInset() + dp(24), dp(18), dp(20));
+        panel.setPadding(dp(18), getTopInset() + dp(18), dp(16), dp(18));
         panel.setBackground(drawerBackground());
         panel.setClickable(true);
 
-        TextView kicker = text(drawerString("learning_home_drawer_kicker", "学习中心"), 10, 0xFF7D72E6, true);
-        kicker.setLetterSpacing(0.12f);
-        panel.addView(kicker, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout header = new LinearLayout(requireContext());
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView title = text(drawerString("learning_home_drawer_title", "学习工具"), 25, COLOR_TEXT, true);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-        titleLp.setMargins(0, dp(8), 0, 0);
-        panel.addView(title, titleLp);
-
-        TextView sub = text(drawerString("learning_home_drawer_subtitle", "选择学习服务和常用工具"), 13, COLOR_SUB, false);
-        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
-        subLp.setMargins(0, dp(6), 0, dp(20));
-        panel.addView(sub, subLp);
-
-        LinearLayout focusCard = new LinearLayout(requireContext());
-        focusCard.setOrientation(LinearLayout.VERTICAL);
-        focusCard.setGravity(Gravity.CENTER_VERTICAL);
-        focusCard.setPadding(dp(14), dp(10), dp(14), dp(10));
-        focusCard.setBackground(gradientRounded(
-                0x6DDED9FF,
-                0x45D6EEFF,
-                dp(20),
-                0xB3FFFFFF,
-                dp(1)
+        TextView brand = text("T", 17, Color.WHITE, true);
+        brand.setGravity(Gravity.CENTER);
+        brand.setBackground(gradientRounded(
+                COLOR_BRAND,
+                COLOR_BRAND_END,
+                dp(15),
+                Color.TRANSPARENT,
+                0
         ));
-        TextView focusTitle = text(drawerString("learning_home_drawer_focus_title", "今日学习"), 13, COLOR_TEXT, true);
-        focusCard.addView(focusTitle, new LinearLayout.LayoutParams(-1, -2));
-        TextView focusSub = text(drawerString("learning_home_drawer_focus_subtitle", "每天坚持一点，进步看得见"), 11, 0xFF7E879A, false);
-        LinearLayout.LayoutParams focusSubLp = new LinearLayout.LayoutParams(-1, -2);
-        focusSubLp.setMargins(0, dp(4), 0, 0);
-        focusCard.addView(focusSub, focusSubLp);
-        LinearLayout.LayoutParams focusLp = new LinearLayout.LayoutParams(-1, dp(58));
-        focusLp.setMargins(0, 0, 0, dp(18));
-        panel.addView(focusCard, focusLp);
+        header.addView(brand, new LinearLayout.LayoutParams(dp(42), dp(42)));
+
+        LinearLayout headerCopy = new LinearLayout(requireContext());
+        headerCopy.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams headerCopyLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        headerCopyLp.setMargins(dp(12), 0, dp(8), 0);
+        header.addView(headerCopy, headerCopyLp);
+
+        TextView title = text("Talkami", 21, COLOR_TEXT, true);
+        headerCopy.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView subtitle = text(getString(R.string.learning_home_drawer_header_subtitle), 12, COLOR_SUB, false);
+        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(-1, -2);
+        subtitleLp.setMargins(0, dp(3), 0, 0);
+        headerCopy.addView(subtitle, subtitleLp);
+
+        TextView close = text("×", 27, 0xFF7F889A, false);
+        close.setGravity(Gravity.CENTER);
+        close.setContentDescription(getString(R.string.learning_home_drawer_close));
+        close.setBackground(ripple(
+                rounded(0x00FFFFFF, dp(18), Color.TRANSPARENT, 0),
+                0x14635BFF,
+                18
+        ));
+        close.setOnClickListener(v -> closeDrawer(true));
+        header.addView(close, new LinearLayout.LayoutParams(dp(40), dp(40)));
+
+        LinearLayout.LayoutParams headerLp = new LinearLayout.LayoutParams(-1, -2);
+        headerLp.setMargins(dp(2), 0, dp(2), dp(18));
+        panel.addView(header, headerLp);
 
         ScrollView scroll = new ScrollView(requireContext());
+        scroll.setFillViewport(true);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         scroll.setVerticalScrollBarEnabled(false);
 
@@ -710,24 +721,40 @@ public class LearningFragment extends Fragment {
         list.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(list, new ScrollView.LayoutParams(-1, -2));
 
-        drawerGroupTitle(list, drawerString("learning_home_drawer_ai_group", "AI 助手"));
-        list.addView(drawerCard(drawerString("learning_home_drawer_deepseek", "DeepSeek"), drawerString("learning_home_drawer_deepseek_desc", "打开 AI 学习助手"), 0xFF4D7CFE,
+        drawerGroupTitle(list, getString(R.string.learning_home_drawer_ai_group));
+        list.addView(drawerCard("译", getString(R.string.learning_home_drawer_deepseek),
+                getString(R.string.learning_home_drawer_deepseek_desc), 0xFF4D7CFE,
                 () -> AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")));
-        list.addView(drawerCard("886.best", drawerString("learning_home_drawer_886_desc", "打开学习网站"), 0xFF18AFC5,
-                () -> AiScriptWebActivity.open(requireContext(), "886.best", "https://886.best")));
-        list.addView(drawerCard(drawerString("learning_home_drawer_qianwen", "千问"), "qianwen.com", 0xFF8A5AF4,
-                () -> AiScriptWebActivity.open(requireContext(), drawerString("learning_home_drawer_qianwen", "千问"), "https://www.qianwen.com/")));
-        list.addView(drawerCard(drawerString("learning_home_drawer_qwen", "Qwen"), "chat.qwen.ai", 0xFF6366F1,
-                () -> AiScriptWebActivity.open(requireContext(), drawerString("learning_home_drawer_qwen", "Qwen"), "https://chat.qwen.ai/")));
+        list.addView(drawerCard("千", getString(R.string.learning_home_drawer_qianwen),
+                "qianwen.com", 0xFF8A5AF4,
+                () -> AiScriptWebActivity.open(requireContext(), getString(R.string.learning_home_drawer_qianwen), "https://www.qianwen.com/")));
+        list.addView(drawerCard("Q", getString(R.string.learning_home_drawer_qwen),
+                "chat.qwen.ai", 0xFF6366F1,
+                () -> AiScriptWebActivity.open(requireContext(), getString(R.string.learning_home_drawer_qwen), "https://chat.qwen.ai/")));
 
-        drawerGroupTitle(list, drawerString("learning_home_drawer_tools_group", "学习工具"));
-        list.addView(drawerCard(drawerString("learning_home_drawer_speech_settings", "语音设置"), drawerString("learning_home_drawer_speech_desc", "选择朗读引擎和发音参数"), 0xFF12A78E,
+        drawerGroupTitle(list, getString(R.string.learning_home_drawer_common_group));
+        list.addView(drawerCard("联", getString(R.string.learning_home_drawer_contacts),
+                getString(R.string.learning_home_drawer_contacts_desc), 0xFF3E7BFA,
+                this::openContactsPage));
+        list.addView(drawerCard("新", getString(R.string.learning_home_drawer_new_friends),
+                getString(R.string.learning_home_drawer_new_friends_desc), 0xFF12A78E,
+                () -> openOptionalActivity("com.chat.uikit.contacts.NewFriendsActivity",
+                        getString(R.string.learning_home_drawer_new_friends))));
+        list.addView(drawerCard("＋", getString(R.string.learning_home_drawer_add_friend),
+                getString(R.string.learning_home_drawer_add_friend_desc), 0xFFF09A45,
+                () -> openOptionalActivity("com.chat.uikit.search.AddFriendsActivity",
+                        getString(R.string.learning_home_drawer_add_friend))));
+        list.addView(drawerCard("设", getString(R.string.learning_home_drawer_system_settings),
+                getString(R.string.learning_home_drawer_system_settings_desc), 0xFF687386,
+                () -> openOptionalActivity("com.chat.uikit.setting.SettingActivity",
+                        getString(R.string.learning_home_drawer_system_settings))));
+
+        drawerGroupTitle(list, getString(R.string.learning_home_drawer_learning_settings_group));
+        list.addView(drawerCard("声", getString(R.string.learning_home_drawer_speech_settings),
+                getString(R.string.learning_home_drawer_speech_desc), 0xFF8C61D9,
                 this::openSpeechSettings));
-        list.addView(drawerCard(drawerString("learning_home_drawer_prompt", "口语提示词"), drawerString("learning_home_drawer_prompt_desc", "查看常用学习提示词"), 0xFFF39A4E,
-                () -> openDirectory("prompts", drawerString("learning_home_drawer_prompt", "口语提示词"), "")));
-
-        drawerGroupTitle(list, drawerString("learning_home_drawer_extensions", "扩展"));
-        list.addView(drawerCard(drawerString("learning_home_drawer_scripts", "脚本管理"), drawerString("learning_home_drawer_scripts_desc", "管理网页脚本"), 0xFFE45B85,
+        list.addView(drawerCard("脚", getString(R.string.learning_home_drawer_scripts),
+                getString(R.string.learning_home_drawer_scripts_desc), 0xFFE45B85,
                 () -> startActivity(new Intent(requireContext(), ScriptManagerActivity.class))));
 
         panel.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
@@ -735,61 +762,86 @@ public class LearningFragment extends Fragment {
     }
 
     private void drawerGroupTitle(LinearLayout list, String title) {
-        TextView view = text(title, 11, 0xFF9AA2B3, true);
+        TextView view = text(title, 12, 0xFF8C95A7, true);
         view.setGravity(Gravity.CENTER_VERTICAL);
-        view.setLetterSpacing(0.05f);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(32));
-        lp.setMargins(dp(2), dp(4), 0, dp(6));
+        view.setLetterSpacing(0.03f);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(34));
+        lp.setMargins(dp(4), dp(6), 0, dp(5));
         list.addView(view, lp);
     }
 
-    private View drawerCard(String title, String desc, int accent, Runnable click) {
+    private View drawerCard(String badge, String title, String desc, int accent, Runnable click) {
         LinearLayout card = new LinearLayout(requireContext());
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(14), dp(13), dp(12), dp(13));
+        card.setMinimumHeight(dp(64));
+        card.setPadding(dp(12), dp(10), dp(10), dp(10));
         card.setBackground(ripple(
-                gradientRounded(0xDFFFFFFF, 0xBFFFFFFF, dp(20), 0xD9FFFFFF, dp(1)),
-                withAlpha(accent, 28),
-                20
+                rounded(0xF3FFFFFF, dp(17), Color.TRANSPARENT, 0),
+                withAlpha(accent, 24),
+                17
         ));
         bindClick(card, () -> {
-            closeDrawer();
+            closeDrawer(false);
             if (click != null) click.run();
         });
-        applyColoredShadow(card, accent, 2f);
-        attachNativePressAnimator(card, 2f, -1f);
+        attachNativePressAnimator(card, 1.5f, -0.5f);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            card.setElevation(dp(1));
+        }
 
-        FrameLayout dotBox = new FrameLayout(requireContext());
-        dotBox.setBackground(radialGlow(accent));
-        LinearLayout.LayoutParams dotBoxLp = new LinearLayout.LayoutParams(dp(38), dp(38));
-        dotBoxLp.setMargins(0, 0, dp(12), 0);
-        card.addView(dotBox, dotBoxLp);
-
-        View dot = new View(requireContext());
-        dot.setBackground(rounded(accent, dp(5), Color.TRANSPARENT, 0));
-        dotBox.addView(dot, new FrameLayout.LayoutParams(dp(10), dp(10), Gravity.CENTER));
+        TextView badgeView = text(badge, 15, accent, true);
+        badgeView.setGravity(Gravity.CENTER);
+        badgeView.setBackground(rounded(withAlpha(accent, 22), dp(12), Color.TRANSPARENT, 0));
+        LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(dp(38), dp(38));
+        badgeLp.setMargins(0, 0, dp(12), 0);
+        card.addView(badgeView, badgeLp);
 
         LinearLayout textBox = new LinearLayout(requireContext());
         textBox.setOrientation(LinearLayout.VERTICAL);
         card.addView(textBox, new LinearLayout.LayoutParams(0, -2, 1f));
 
         TextView titleView = text(title, 14, COLOR_TEXT, true);
+        titleView.setSingleLine(true);
         textBox.addView(titleView, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView descView = text(desc, 12, COLOR_SUB, false);
+        TextView descView = text(desc, 11, COLOR_SUB, false);
+        descView.setSingleLine(true);
         LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(-1, -2);
-        descLp.setMargins(0, dp(4), 0, 0);
+        descLp.setMargins(0, dp(3), 0, 0);
         textBox.addView(descView, descLp);
 
-        TextView arrow = text("›", 24, 0xFFB0B6C4, false);
+        TextView arrow = text("›", 23, 0xFFAAB1BF, false);
         arrow.setGravity(Gravity.CENTER);
         card.addView(arrow, new LinearLayout.LayoutParams(dp(22), dp(34)));
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.setMargins(0, 0, 0, dp(10));
+        lp.setMargins(0, 0, 0, dp(8));
         card.setLayoutParams(lp);
         return card;
+    }
+
+    private void openContactsPage() {
+        Activity activity = getActivity();
+        if (activity == null) return;
+        try {
+            activity.getClass().getMethod("openContactsFromLearning").invoke(activity);
+        } catch (Throwable ignored) {
+            Toast.makeText(requireContext(),
+                    getString(R.string.learning_home_contacts_unavailable),
+                    Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void openOptionalActivity(String className, String label) {
+        try {
+            Class<?> clazz = Class.forName(className);
+            startActivity(new Intent(requireContext(), clazz));
+        } catch (Throwable ignored) {
+            Toast.makeText(requireContext(),
+                    getString(R.string.learning_home_feature_unavailable, label),
+                    Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void onSmallCardClick(CardSpec spec) {
@@ -873,45 +925,31 @@ public class LearningFragment extends Fragment {
     }
 
     private void openDrawer() {
-        if (drawerLayout == null || sideDrawerView == null) return;
+        if (drawerLayout == null || sideDrawerView == null
+                || drawerLayout.isDrawerVisible(sideDrawerView)) return;
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, sideDrawerView);
-        sideDrawerView.setVisibility(View.VISIBLE);
-        drawerLayout.openDrawer(sideDrawerView, true);
+        // 侧栏已随页面完成测量，立即显示，避免遮罩先出现、侧栏随后才滑出的延迟感。
+        drawerLayout.openDrawer(sideDrawerView, false);
     }
 
     private void closeDrawer() {
+        closeDrawer(true);
+    }
+
+    private void closeDrawer(boolean animate) {
         if (drawerLayout != null && sideDrawerView != null
-                && drawerLayout.isDrawerOpen(sideDrawerView)) {
-            drawerLayout.closeDrawer(sideDrawerView, true);
+                && drawerLayout.isDrawerVisible(sideDrawerView)) {
+            drawerLayout.closeDrawer(sideDrawerView, animate);
         }
     }
 
     public boolean closeSideMenuIfOpen() {
         if (drawerLayout != null && sideDrawerView != null
-                && drawerLayout.isDrawerOpen(sideDrawerView)) {
+                && drawerLayout.isDrawerVisible(sideDrawerView)) {
             drawerLayout.closeDrawer(sideDrawerView, true);
             return true;
         }
         return false;
-    }
-
-    /**
-     * Resolve optional drawer text by name instead of referencing R.string directly.
-     * This keeps LearningFragment compatible with older/newer resource bundles and
-     * prevents a partial changed-files package from breaking Java compilation.
-     */
-    private String drawerString(String resourceName, String fallback) {
-        if (resourceName == null || resourceName.length() == 0) return fallback;
-        try {
-            int id = getResources().getIdentifier(
-                    resourceName,
-                    "string",
-                    requireContext().getPackageName()
-            );
-            if (id != 0) return getString(id);
-        } catch (Throwable ignored) {
-        }
-        return fallback;
     }
 
     private TextView text(String value, float sizeSp, int color, boolean bold) {
@@ -1284,7 +1322,7 @@ public class LearningFragment extends Fragment {
                 if (dx > touchSlop * 2f && dx > Math.abs(dy) * 1.25f) {
                     fallbackTriggered = true;
                     fallbackTracking = false;
-                    openDrawer(GravityCompat.START, true);
+                    openDrawer(GravityCompat.START, false);
                 } else if (Math.abs(dy) > touchSlop * 1.5f
                         && Math.abs(dy) > Math.abs(dx)) {
                     fallbackTracking = false;
