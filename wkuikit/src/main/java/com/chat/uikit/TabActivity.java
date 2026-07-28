@@ -20,6 +20,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
@@ -342,6 +343,7 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     }
 
     /** 从学习页侧栏打开原来被隐藏的一级联系人页面。 */
+    @Keep
     public void openContactsFromLearning() {
         switchToTab(TAB_CONTACTS);
     }
