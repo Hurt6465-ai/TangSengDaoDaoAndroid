@@ -98,11 +98,20 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.Objects
-import kotlin.concurrent.thread
+import java.util.concurrent.Executors
 import kotlin.math.abs
 
 
 open class WKTextProvider : WKChatBaseProvider() {
+    companion object {
+        private const val PAYLOAD_TRANSLATION_CHANGED = "payload_translation_changed"
+        private const val MAX_TRANSLATION_MEMORY_ITEMS = 200
+        private val TRANSLATION_EXECUTOR = Executors.newFixedThreadPool(2)
+    }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val translationMemoryCache = LinkedHashMap<String, TranslationCache>(64, 0.75f, true)
+
     override fun getChatViewItem(parentView: ViewGroup, from: WKChatIteMsgFromType): View? {
         return LayoutInflater.from(context).inflate(R.layout.chat_item_text, parentView, false)
     }
@@ -155,7 +164,7 @@ open class WKTextProvider : WKChatBaseProvider() {
             )
             // Old test messages may already contain an inline back-translation from the previous
             // transient WKTextContent subclass. Do not append it twice after upgrading.
-            val hasInlineBackTranslation = displayedText.toString().contains("\n回译：")
+            val hasInlineBackTranslation = TextUtils.indexOf(displayedText, "\n回译：") >= 0
             if (!TextUtils.isEmpty(backTranslation) && !hasInlineBackTranslation) {
                 val start = displayedText.length
                 displayedText.append("\n回译：").append(backTranslation)
@@ -239,12 +248,12 @@ open class WKTextProvider : WKChatBaseProvider() {
         val cacheKey = translationCacheKey(currentMsg, content)
         val cached = readTranslationCache(cacheKey)
         if (cached != null && cached.expanded) {
-            addTranslationView(contentTvLayout, cacheKey, cached.text, cached.status)
+            addTranslationView(contentTvLayout, currentMsg, cacheKey, cached.text, cached.status)
         }
 
-        // 只给当前已加载列表里的“最后一条有效对方文本消息”显示快捷翻译按钮。
-        // 不再依赖 adapterPosition，也不允许异常时返回 true。
-        if (from == WKChatIteMsgFromType.RECEIVED && isLatestReceivedTextMessage(currentMsg)) {
+        // 使用基类的频道级缓存，避免每个文本气泡绑定时都从列表尾部重新扫描。
+        if (from == WKChatIteMsgFromType.RECEIVED
+            && shouldShowInlineTranslateButton(uiChatMsgItemEntity)) {
             addQuickTranslateButton(buttonParent, uiChatMsgItemEntity, content, cacheKey, cached)
         }
     }
@@ -264,37 +273,6 @@ open class WKTextProvider : WKChatBaseProvider() {
                 removeTaggedChildDeep(child, tag)
             }
         }
-    }
-
-    private fun isLatestReceivedTextMessage(currentMsg: WKMsg): Boolean {
-        return try {
-            if (!isValidReceivedTextForQuickTranslate(currentMsg)) return false
-            val chatAdapter = getAdapter() as? ChatAdapter ?: return false
-            var latest: WKMsg? = null
-            for (i in chatAdapter.data.size - 1 downTo 0) {
-                val msg = chatAdapter.data[i]?.wkMsg ?: continue
-                if (isValidReceivedTextForQuickTranslate(msg)) {
-                    latest = msg
-                    break
-                }
-            }
-            isSameMessage(currentMsg, latest)
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    private fun isValidReceivedTextForQuickTranslate(msg: WKMsg?): Boolean {
-        if (msg == null) return false
-        if (msg.type != WKContentType.WK_TEXT) return false
-        if (msg.isDeleted != 0) return false
-        if (msg.remoteExtra?.revoke == 1) return false
-        if (TextUtils.isEmpty(msg.fromUID)) return false
-        if (TextUtils.equals(msg.fromUID, WKConfig.getInstance().uid)) return false
-        val text = getMessageText(msg)
-        if (TextUtils.isEmpty(text)) return false
-        if (isRtcSignalText(text)) return false
-        return true
     }
 
     private fun isRtcSignalText(text: String?): Boolean {
@@ -339,13 +317,13 @@ open class WKTextProvider : WKChatBaseProvider() {
                 latest?.status == "error" -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
                 latest != null -> {
                     saveTranslationCache(cacheKey, latest.text, !latest.expanded, latest.status)
-                    notifyMessageChanged()
+                    notifyMessageChanged(uiChatMsgItemEntity.wkMsg)
                 }
                 cached?.status == "loading" -> return@setOnClickListener
                 cached?.status == "error" -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
                 cached != null -> {
                     saveTranslationCache(cacheKey, cached.text, !cached.expanded, cached.status)
-                    notifyMessageChanged()
+                    notifyMessageChanged(uiChatMsgItemEntity.wkMsg)
                 }
                 else -> translateMessageIntoBubble(uiChatMsgItemEntity, content, cacheKey, true)
             }
@@ -357,7 +335,13 @@ open class WKTextProvider : WKChatBaseProvider() {
         parent.addView(btn, lp)
     }
 
-    private fun addTranslationView(parent: ViewGroup, cacheKey: String, text: String, status: String = "ok") {
+    private fun addTranslationView(
+        parent: ViewGroup,
+        message: WKMsg,
+        cacheKey: String,
+        text: String,
+        status: String = "ok"
+    ) {
         val box = LinearLayout(context)
         box.tag = translationViewTag
         box.orientation = LinearLayout.VERTICAL
@@ -382,13 +366,13 @@ open class WKTextProvider : WKChatBaseProvider() {
         tv.setOnClickListener {
             if (status != "loading") {
                 saveTranslationCache(cacheKey, text, false, status)
-                notifyMessageChanged()
+                notifyMessageChanged(message)
             }
         }
         box.setOnClickListener {
             if (status != "loading") {
                 saveTranslationCache(cacheKey, text, false, status)
-                notifyMessageChanged()
+                notifyMessageChanged(message)
             }
         }
         box.addView(tv, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
@@ -403,7 +387,7 @@ open class WKTextProvider : WKChatBaseProvider() {
         val cached = readTranslationCache(cacheKey)
         if (cached != null && cached.status == "ok") {
             saveTranslationCache(cacheKey, cached.text, true, cached.status)
-            notifyMessageChanged()
+            notifyMessageChanged(uiChatMsgItemEntity.wkMsg)
             return
         }
         translateMessageIntoBubble(uiChatMsgItemEntity, text, cacheKey, false)
@@ -478,7 +462,7 @@ open class WKTextProvider : WKChatBaseProvider() {
             request,
             DeepSeekAssistant.TranslationCallback { translated: String ->
                 delivered = true
-                Handler(Looper.getMainLooper()).post {
+                mainHandler.post {
                     if (!TextUtils.isEmpty(translated)) {
                         saveTranslationCache(cacheKey, translated, true, "ok")
                     } else {
@@ -489,11 +473,11 @@ open class WKTextProvider : WKChatBaseProvider() {
                             "error"
                         )
                     }
-                    notifyMessageChanged()
+                    notifyMessageChanged(msg)
                 }
             },
             DeepSeekAssistant.StateCallback {
-                Handler(Looper.getMainLooper()).post {
+                mainHandler.post {
                     val latest = readTranslationCache(cacheKey)
                     if (!delivered && latest?.status == "loading") {
                         saveTranslationCache(
@@ -502,7 +486,7 @@ open class WKTextProvider : WKChatBaseProvider() {
                             true,
                             "error"
                         )
-                        notifyMessageChanged()
+                        notifyMessageChanged(msg)
                     }
                 }
             }
@@ -514,7 +498,7 @@ open class WKTextProvider : WKChatBaseProvider() {
                 true,
                 "loading"
             )
-            notifyMessageChanged()
+            notifyMessageChanged(msg)
             return true
         }
         WKToastUtils.getInstance().showToastNormal(
@@ -529,6 +513,7 @@ open class WKTextProvider : WKChatBaseProvider() {
         cacheKey: String,
         requestWingman: Boolean
     ) {
+        val msg = uiChatMsgItemEntity.wkMsg ?: return
         if (openDeepSeekTranslation(uiChatMsgItemEntity, text, cacheKey)) return
         val appContext = context.applicationContext
         val translateMode = TranslatePrefs.getMode(appContext)
@@ -539,8 +524,8 @@ open class WKTextProvider : WKChatBaseProvider() {
         }
 
         saveTranslationCache(cacheKey, context.getString(com.chat.translate.R.string.wktranslate_translating), true, "loading")
-        notifyMessageChanged()
-        thread {
+        notifyMessageChanged(msg)
+        TRANSLATION_EXECUTOR.execute {
             try {
                 val result = runBlocking {
                     WkTranslateBridge().translate(
@@ -554,31 +539,31 @@ open class WKTextProvider : WKChatBaseProvider() {
                         )
                     )
                 }
-                Handler(Looper.getMainLooper()).post {
+                mainHandler.post {
                     if (result.success && !TextUtils.isEmpty(result.translatedText)) {
                         saveTranslationCache(cacheKey, result.translatedText, true, "ok")
-                        notifyMessageChanged()
+                        notifyMessageChanged(msg)
                     } else if (result.errorCode == TranslateErrorCode.NEED_AI_CONFIG) {
                         if (TranslatePrefs.getMode(context.applicationContext) == TranslateMode.AI) {
                             WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_need_ai_config))
                             WkTranslateBridge().openSettings(context, "chat_bubble")
                         } else {
                             saveTranslationCache(cacheKey, context.getString(com.chat.translate.R.string.wktranslate_translate_failed), true, "error")
-                            notifyMessageChanged()
+                            notifyMessageChanged(msg)
                         }
                     } else {
                         saveTranslationCache(cacheKey, context.getString(com.chat.translate.R.string.wktranslate_translate_failed), true, "error")
-                            notifyMessageChanged()
+                            notifyMessageChanged(msg)
                     }
                 }
             } catch (_: Exception) {
-                Handler(Looper.getMainLooper()).post {
+                mainHandler.post {
                     if (TranslatePrefs.getMode(context.applicationContext) == TranslateMode.AI && !TranslatePrefs.hasUsableAi(context.applicationContext)) {
                         WKToastUtils.getInstance().showToastNormal(context.getString(com.chat.translate.R.string.wktranslate_need_ai_config))
                         WkTranslateBridge().openSettings(context, "chat_bubble")
                     } else {
                         saveTranslationCache(cacheKey, context.getString(com.chat.translate.R.string.wktranslate_translate_failed), true, "error")
-                            notifyMessageChanged()
+                            notifyMessageChanged(msg)
                     }
                 }
             }
@@ -631,7 +616,7 @@ open class WKTextProvider : WKChatBaseProvider() {
     }
 
     private fun requestWingmanSuggestions(endpoint: String, apiKey: String, model: String, original: String, translated: String) {
-        thread {
+        TRANSLATION_EXECUTOR.execute {
             try {
                 val myLang = readAiSetting("chat_ai_source_lang", "中文")
                 val prompt = """
@@ -645,7 +630,7 @@ open class WKTextProvider : WKChatBaseProvider() {
                 val content = requestAi(endpoint, apiKey, model, prompt, 0.35)
                 val replies = parseWingmanReplies(content)
                 if (replies.isNotEmpty()) {
-                    Handler(Looper.getMainLooper()).post {
+                    mainHandler.post {
                         EndpointManager.getInstance().invoke("chat_wingman_suggestions", replies)
                     }
                 }
@@ -729,28 +714,53 @@ open class WKTextProvider : WKChatBaseProvider() {
     }
 
     private fun readTranslationCache(key: String): TranslationCache? {
+        synchronized(translationMemoryCache) {
+            translationMemoryCache[key]?.let { return it }
+        }
         return try {
-            val raw = context.getSharedPreferences("chat_translate_cache", Context.MODE_PRIVATE).getString(key, "") ?: ""
+            val preferences = context.getSharedPreferences("chat_translate_cache", Context.MODE_PRIVATE)
+            val raw = preferences.getString(key, "") ?: ""
             if (raw.isBlank()) return null
             val obj = JSONObject(raw)
             val time = obj.optLong("time", 0L)
-            if (System.currentTimeMillis() - time > 7L * 24L * 60L * 60L * 1000L) return null
+            if (time > 0 && System.currentTimeMillis() - time > 7L * 24L * 60L * 60L * 1000L) {
+                preferences.edit().remove(key).apply()
+                return null
+            }
             val text = obj.optString("text", "")
             val status = obj.optString("status", "ok")
-            if (text.isBlank()) null else TranslationCache(text, obj.optBoolean("expanded", false), status)
+            if (text.isBlank()) null else TranslationCache(
+                text,
+                obj.optBoolean("expanded", false),
+                status
+            ).also { putTranslationMemoryCache(key, it) }
         } catch (_: Exception) {
             null
         }
     }
 
+    private fun putTranslationMemoryCache(key: String, value: TranslationCache) {
+        synchronized(translationMemoryCache) {
+            translationMemoryCache[key] = value
+            while (translationMemoryCache.size > MAX_TRANSLATION_MEMORY_ITEMS) {
+                val iterator = translationMemoryCache.entries.iterator()
+                if (!iterator.hasNext()) break
+                iterator.next()
+                iterator.remove()
+            }
+        }
+    }
+
     private fun saveTranslationCache(key: String, translated: String, expanded: Boolean, status: String = "ok") {
+        putTranslationMemoryCache(key, TranslationCache(translated, expanded, status))
         try {
             val obj = JSONObject()
                 .put("time", System.currentTimeMillis())
                 .put("text", translated)
                 .put("expanded", expanded)
                 .put("status", status)
-            context.getSharedPreferences("chat_translate_cache", Context.MODE_PRIVATE).edit().putString(key, obj.toString()).apply()
+            context.getSharedPreferences("chat_translate_cache", Context.MODE_PRIVATE)
+                .edit().putString(key, obj.toString()).apply()
         } catch (_: Exception) {
         }
     }
@@ -766,10 +776,27 @@ open class WKTextProvider : WKChatBaseProvider() {
         return value == "1" || value.equals("true", ignoreCase = true)
     }
 
-    private fun notifyMessageChanged() {
-        try {
-            getAdapter()?.notifyDataSetChanged()
-        } catch (_: Exception) {
+    private fun notifyMessageChanged(message: WKMsg?) {
+        if (message == null) return
+        val action = Runnable {
+            try {
+                val adapter = getAdapter() as? ChatAdapter ?: return@Runnable
+                val index = adapter.data.indexOfFirst { item ->
+                    isSameMessage(item?.wkMsg, message)
+                }
+                if (index >= 0) {
+                    adapter.notifyItemChanged(
+                        index + adapter.headerLayoutCount,
+                        PAYLOAD_TRANSLATION_CHANGED
+                    )
+                }
+            } catch (_: Exception) {
+            }
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            action.run()
+        } else {
+            mainHandler.post(action)
         }
     }
 
@@ -777,7 +804,6 @@ open class WKTextProvider : WKChatBaseProvider() {
         return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), context.resources.displayMetrics).toInt()
     }
 
-    private var mSelectableTextHelper: SelectTextHelper? = null
     var selectText: String? = null
     private fun selectText(
         textView: TextView,
@@ -787,10 +813,7 @@ open class WKTextProvider : WKChatBaseProvider() {
 //        textMsgBean = msgBean
         val menu = EndpointManager.getInstance()
             .invoke("favorite_item", uiChatMsgItemEntity.wkMsg)
-        var favoritePopupMenu: ChatItemPopupMenu? = null
-        if (menu != null) {
-            favoritePopupMenu = menu as ChatItemPopupMenu
-        }
+        val favoritePopupMenu = menu as? ChatItemPopupMenu
 
         val builder = SelectTextHelper.Builder(textView, fullLayout) // 放你的textView到这里！！
             .setCursorHandleColor(ContextCompat.getColor(context, R.color.colorAccent)) // 游标颜色
@@ -840,18 +863,18 @@ open class WKTextProvider : WKChatBaseProvider() {
                                                 mChannel, option
                                             )
                                         }
-                                        val viewGroup =
-                                            (context as Activity).findViewById<View>(android.R.id.content)
+                                        val activity = context as? Activity
+                                        if (activity != null) {
+                                            val viewGroup = activity.findViewById<View>(android.R.id.content)
                                                 .rootView as ViewGroup
-                                        Snackbar.make(
-                                            viewGroup,
-                                            context.getString(com.chat.base.R.string.str_forward),
-                                            1000
-                                        )
-                                            .setAction(
-                                                ""
-                                            ) { }
-                                            .show()
+                                            Snackbar.make(
+                                                viewGroup,
+                                                context.getString(com.chat.base.R.string.str_forward),
+                                                1000
+                                            )
+                                                .setAction("") { }
+                                                .show()
+                                        }
                                     }
                                 },
                                 textContent
@@ -861,10 +884,6 @@ open class WKTextProvider : WKChatBaseProvider() {
                     }
 
                 }).setPopSpanCount(3) // 设置操作弹窗每行个数 default 5
-        mSelectableTextHelper = builder.build()
-//            .setPopStyle(
-//                R.drawable.shape_color_4c4c4c_radius_8 /*操作弹窗背*/, R.mipmap.ic_arrow /*箭头图片*/
-//            ) // 设置操作弹窗背景色、箭头图片
         if (favoritePopupMenu != null) {
             builder.addItem(
                 favoritePopupMenu.imageResource,
@@ -880,11 +899,7 @@ open class WKTextProvider : WKChatBaseProvider() {
                             mMsg.from = uiChatMsgItemEntity.wkMsg.from
                             mMsg.channelID = uiChatMsgItemEntity.wkMsg.channelID
                             mMsg.channelType = uiChatMsgItemEntity.wkMsg.channelType
-                            if (uiChatMsgItemEntity.wkMsg.remoteExtra != null && uiChatMsgItemEntity.wkMsg.remoteExtra.contentEditMsgModel != null) {
-                                mMsg.remoteExtra.contentEditMsgModel = WKTextContent(selectText)
-                            }
-                            val chatAdapter = getAdapter() as ChatAdapter
-                            uiChatMsgItemEntity.wkMsg.baseContentMsgModel.content = selectText
+                            val chatAdapter = getAdapter() as? ChatAdapter ?: return
                             favoritePopupMenu.iPopupItemClick.onClick(
                                 mMsg,
                                 chatAdapter.conversationContext
@@ -894,7 +909,8 @@ open class WKTextProvider : WKChatBaseProvider() {
                 })
         }
 
-        mSelectableTextHelper!!.setSelectListener(object : SelectTextHelper.OnSelectListener {
+        val selectableTextHelper = builder.build()
+        selectableTextHelper.setSelectListener(object : SelectTextHelper.OnSelectListener {
             override fun onClick(v: View?, originalContent: String?) {
             }
 
@@ -914,7 +930,9 @@ open class WKTextProvider : WKChatBaseProvider() {
             /**
              * 弹窗关闭回调
              */
-            override fun onDismiss() {}
+            override fun onDismiss() {
+                selectText = null
+            }
             override fun onClickLink(clickableContent: NormalClickableSpan) {
                 if (clickableContent.clickableContent.type == NormalClickableContent.NormalClickableTypes.URL) {
                     val intent = Intent(
