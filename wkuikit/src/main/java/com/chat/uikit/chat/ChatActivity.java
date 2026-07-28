@@ -3643,8 +3643,17 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (next != null) {
             next.previousMsg = previous == null ? null : previous.wkMsg;
         }
-        notifyMessageAppearance(previousIndex);
-        notifyMessageAppearance(nextIndex);
+        // removeAt() 后 RecyclerView 的可见 ViewHolder 仍可能处于旧位置/旧消息类型。
+        // 此时直接 notifyBackground() 会拿“新位置的数据 Provider”操作“旧类型 View”，
+        // 例如语音 Provider 在文字 View 中查找 voiceLayout，最终触发空指针。
+        // 删除属于低频操作，仅重绑相邻两项既安全，也不会影响正常滚动性能。
+        notifyMessageRebindAfterRemoval(previousIndex);
+        notifyMessageRebindAfterRemoval(nextIndex);
+    }
+
+    private void notifyMessageRebindAfterRemoval(int index) {
+        if (chatAdapter == null || index < 0 || index >= chatAdapter.getData().size()) return;
+        chatAdapter.notifyItemChanged(index);
     }
 
     @Nullable
