@@ -18,12 +18,10 @@ import com.chat.base.net.IRequestResultListener;
 import com.chat.base.net.entity.CommonResponse;
 import com.chat.base.net.ud.WKUploader;
 import com.chat.base.utils.WKDeviceUtils;
-import com.chat.base.utils.OnlineStatusDebugLogger;
 import com.chat.base.utils.WKReader;
 import com.chat.base.utils.WKTimeUtils;
 import com.chat.uikit.enity.BlacklistUser;
 import com.chat.uikit.enity.Device;
-import com.chat.uikit.enity.FriendOnline;
 import com.chat.uikit.enity.MailListEntity;
 import com.chat.uikit.enity.OnlineUser;
 import com.chat.uikit.enity.OnlineUserAndDevice;
@@ -234,31 +232,9 @@ public class UserModel extends WKBaseModel {
     }
 
     public void getOnlineUsers() {
-        final long requestStart = System.currentTimeMillis();
-        List<WKChannel> localBefore = WKIM.getInstance().getChannelManager()
-                .getWithFollowAndStatus(WKChannelType.PERSONAL, 1, 1);
-        int cachedOnlineBefore = 0;
-        if (WKReader.isNotEmpty(localBefore)) {
-            for (WKChannel channel : localBefore) {
-                if (channel.online == 1) cachedOnlineBefore++;
-            }
-        }
-        OnlineStatusDebugLogger.log(
-                "API_START",
-                "url=" + WKApiConfig.baseUrl + "user/online"
-                        + ", localChannels=" + (localBefore == null ? -1 : localBefore.size())
-                        + ", cachedOnline=" + cachedOnlineBefore
-        );
         request(createService(UserService.class).onlineUsers(), new IRequestResultListener<OnlineUserAndDevice>() {
             @Override
             public void onSuccess(OnlineUserAndDevice result) {
-                if (result == null) {
-                    OnlineStatusDebugLogger.log(
-                            "API_SUCCESS_NULL",
-                            "costMs=" + (System.currentTimeMillis() - requestStart)
-                    );
-                    return;
-                }
                 int online = 0;
                 int muteOfAPP = 0;
                 if (result.pc != null) {
@@ -269,28 +245,6 @@ public class UserModel extends WKBaseModel {
                 WKSharedPreferencesUtil.getInstance().putInt(WKConfig.getInstance().getUid() + "_mute_of_app", muteOfAPP);
                 List<WKChannel> tempList = WKIM.getInstance().getChannelManager().getWithFollowAndStatus(WKChannelType.PERSONAL, 1, 1);
                 List<WKChannel> list = new ArrayList<>();
-                int remoteOnlineCount = 0;
-                StringBuilder remoteSample = new StringBuilder();
-                if (WKReader.isNotEmpty(result.friends)) {
-                    for (int i = 0; i < result.friends.size(); i++) {
-                        FriendOnline user = result.friends.get(i);
-                        if (user.online == 1) remoteOnlineCount++;
-                        if (i < 30) {
-                            if (remoteSample.length() > 0) remoteSample.append(';');
-                            remoteSample.append(user.uid)
-                                    .append(':').append(user.online)
-                                    .append(':').append(user.last_offline);
-                        }
-                    }
-                }
-                OnlineStatusDebugLogger.log(
-                        "API_SUCCESS",
-                        "costMs=" + (System.currentTimeMillis() - requestStart)
-                                + ", remoteFriends=" + (result.friends == null ? -1 : result.friends.size())
-                                + ", remoteOnline=" + remoteOnlineCount
-                                + ", localChannels=" + (tempList == null ? -1 : tempList.size())
-                                + ", sample=" + remoteSample
-                );
                 if (WKReader.isNotEmpty(result.friends)) {
                     if (WKReader.isNotEmpty(tempList)) {
                         for (int i = 0, size = tempList.size(); i < size; i++) {
@@ -361,35 +315,12 @@ public class UserModel extends WKBaseModel {
                         }
                     }
                 }
-                int savedOnlineCount = 0;
-                StringBuilder saveSample = new StringBuilder();
-                for (int i = 0; i < list.size(); i++) {
-                    WKChannel channel = list.get(i);
-                    if (channel.online == 1) savedOnlineCount++;
-                    if (i < 30) {
-                        if (saveSample.length() > 0) saveSample.append(';');
-                        saveSample.append(channel.channelID)
-                                .append(':').append(channel.online)
-                                .append(':').append(channel.lastOffline);
-                    }
-                }
-                OnlineStatusDebugLogger.log(
-                        "CHANNEL_SAVE",
-                        "count=" + list.size()
-                                + ", online=" + savedOnlineCount
-                                + ", sample=" + saveSample
-                );
                 WKIM.getInstance().getChannelManager().saveOrUpdateChannels(list);
             }
 
             @Override
             public void onFail(int code, String msg) {
-                OnlineStatusDebugLogger.log(
-                        "API_FAIL",
-                        "costMs=" + (System.currentTimeMillis() - requestStart)
-                                + ", code=" + code
-                                + ", msg=" + msg
-                );
+
             }
         });
     }
