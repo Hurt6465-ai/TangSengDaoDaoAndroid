@@ -384,4 +384,9 @@
     <string name="learning_home_contacts_unavailable">联系人入口暂不可用</string>
     <string name="learning_home_feature_unavailable">%1$s 暂不可用</string>
 
+
+    <string name="learning_home_drawer_profile_hint">查看个人主页</string>
+    <string name="learning_home_drawer_account_format">%1$s号：%2$s</string>
+    <string name="learning_home_drawer_default_name">Talkami 用户</string>
+    <string name="learning_home_drawer_chat_translate">聊天翻译</string>
 </resources>
