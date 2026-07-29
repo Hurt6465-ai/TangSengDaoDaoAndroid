@@ -414,6 +414,11 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             updateContactsBadge();
             return null;
         });
+        // 只在 Fragment 初始化时注册一次。若放在 onResume()，每次前后台切换都会累积同名 Endpoint。
+        EndpointManager.getInstance().setMethod("scroll_to_unread_channel", object -> {
+            scrollToUnreadChannel();
+            return null;
+        });
         wkVBinding.recyclerView.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
             @Override
             public boolean onInterceptTouchEvent(RecyclerView rv, MotionEvent event) {
@@ -502,6 +507,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
         //频道刷新监听 - 使用缓存快速查找
         WKIM.getInstance().getChannelManager().addOnRefreshChannelInfo("chat_fragment_refresh_channel", (channel, isEnd) -> {
             if (channel != null && !TextUtils.isEmpty(channel.channelID)) {
+                ChatConversationAdapter.markChannelInfoFetchSuccess(channel);
                 if (isExpiredTopicRoomChannel(channel)) {
                     deleteExpiredTopicRoomLocal(channel.channelID, channel.channelType, 0);
                     removeConversationIfExists(channel.channelID, channel.channelType);
@@ -705,72 +711,37 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                     uiList.add(new ChatConversationMsg(uiConversationMsg));
                 }
                 sortMsg(uiList);
-                setAllCount();
                 return;
             }
-            List<ChatConversationMsg> uiList = new ArrayList<>();
-            // 多条
+
+            // 批量同步时先建立索引，避免“每条新会话 × 全列表扫描”的 O(n²) 合并。
+            rebuildIndexCache();
+            HashMap<String, ChatConversationMsg> pendingNew = new HashMap<>();
             for (WKUIConversationMsg uiConversationMsg : list) {
+                if (uiConversationMsg == null || TextUtils.isEmpty(uiConversationMsg.channelID)) {
+                    continue;
+                }
                 if (isExpiredTopicRoomConversation(uiConversationMsg)) {
                     deleteExpiredTopicRoomLocal(uiConversationMsg);
                     removeConversationIfExists(uiConversationMsg.channelID, uiConversationMsg.channelType);
                     continue;
                 }
-                boolean isAdd = true;
-                for (int i = 0, size = chatConversationAdapter.getData().size(); i < size; i++) {
-                    if (!TextUtils.isEmpty(chatConversationAdapter.getData().get(i).uiConversationMsg.channelID) && !TextUtils.isEmpty(uiConversationMsg.channelID) && chatConversationAdapter.getData().get(i).uiConversationMsg.channelID.equals(uiConversationMsg.channelID) && chatConversationAdapter.getData().get(i).uiConversationMsg.channelType == uiConversationMsg.channelType) {
-//                            if (!isEnd) {
-//                                isAdd = false;
-//                                chatConversationAdapter.getData().get(i).uiConversationMsg = uiConversationMsg;
-//                                break;
-//                            }
-                        isAdd = false;
-                        if (chatConversationAdapter.getData().get(i).uiConversationMsg.lastMsgSeq != uiConversationMsg.lastMsgSeq || chatConversationAdapter.getData().get(i).uiConversationMsg.lastMsgTimestamp != uiConversationMsg.lastMsgTimestamp || (chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg() != null && uiConversationMsg.getWkMsg() != null && !chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().clientMsgNO.equals(uiConversationMsg.getWkMsg().clientMsgNO))) {
-                            chatConversationAdapter.getData().get(i).isResetTyping = true;
-                            chatConversationAdapter.getData().get(i).typingUserName = "";
-                            chatConversationAdapter.getData().get(i).typingStartTime = 0;
-                            chatConversationAdapter.getData().get(i).isRefreshStatus = true;
-                        }
-                        if (chatConversationAdapter.getData().get(i).uiConversationMsg.unreadCount != uiConversationMsg.unreadCount) {
-                            chatConversationAdapter.getData().get(i).isResetCounter = true;
-                        }
-                        if (chatConversationAdapter.getData().get(i).uiConversationMsg.lastMsgTimestamp != uiConversationMsg.lastMsgTimestamp) {
-                            chatConversationAdapter.getData().get(i).isResetTime = true;
-                        }
-                        chatConversationAdapter.getData().get(i).uiConversationMsg.setWkMsg(uiConversationMsg.getWkMsg());
-                        if (!chatConversationAdapter.getData().get(i).uiConversationMsg.clientMsgNo.equals(uiConversationMsg.clientMsgNo)) {
-                            chatConversationAdapter.getData().get(i).isResetContent = true;
-                        }
-                        WKIMUtils.getInstance().resetMsgProhibitWord(chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg());
-                        // todo 比较是否真的改过提醒内容
-                        chatConversationAdapter.getData().get(i).isResetReminders = true;
-                        chatConversationAdapter.getData().get(i).uiConversationMsg.lastMsgSeq = uiConversationMsg.lastMsgSeq;
-                        chatConversationAdapter.getData().get(i).uiConversationMsg.clientMsgNo = uiConversationMsg.clientMsgNo;
-                        chatConversationAdapter.getData().get(i).uiConversationMsg.unreadCount = uiConversationMsg.unreadCount;
-                        chatConversationAdapter.getData().get(i).uiConversationMsg.lastMsgTimestamp = uiConversationMsg.lastMsgTimestamp;
-                        chatConversationAdapter.getData().get(i).uiConversationMsg.setRemoteMsgExtra(uiConversationMsg.getRemoteMsgExtra());
 
-                        chatConversationAdapter.getData().get(i).uiConversationMsg.setReminderList(uiConversationMsg.getReminderList());
-                        chatConversationAdapter.getData().get(i).uiConversationMsg.localExtraMap = null;
-                        notifyRecycler(i, chatConversationAdapter.getData().get(i));
-                        setAllCount();
-                        break;
-                    }
-                }
-                if (isAdd) {
-                    uiList.add(new ChatConversationMsg(uiConversationMsg));
+                int index = findConversationIndex(uiConversationMsg.channelID, uiConversationMsg.channelType);
+                if (index >= 0) {
+                    updateExistingConversation(index, uiConversationMsg, false);
+                } else {
+                    // 同一批次可能重复推送同一频道，保留最后一份，避免生成重复会话。
+                    pendingNew.put(getChannelKey(uiConversationMsg.channelID, uiConversationMsg.channelType),
+                            new ChatConversationMsg(uiConversationMsg));
                 }
             }
-//            if (!uiList.isEmpty()) {
-//                uiList.addAll(chatConversationAdapter.getData());
-//                sortMsg(uiList);
-//                setAllCount();
-//            } else {
-//                resetData(list.get(0), true);
-//            }
-            uiList.addAll(chatConversationAdapter.getData());
-            sortMsg(uiList);
-            setAllCount();
+
+            List<ChatConversationMsg> merged = new ArrayList<>(
+                    pendingNew.size() + chatConversationAdapter.getData().size());
+            merged.addAll(pendingNew.values());
+            merged.addAll(chatConversationAdapter.getData());
+            sortMsg(merged);
         });
 //        WKIM.getInstance().getConversationManager().addOnRefreshMsgListener("chat_fragment", this::resetData);
         // 监听连接状态
@@ -814,7 +785,7 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                 stopConnectTimer();
             }
         });
-        EndpointManager.getInstance().setMethod("", EndpointCategory.wkExitChat, object -> {
+        EndpointManager.getInstance().setMethod("chat_fragment_exit_chat", EndpointCategory.wkExitChat, object -> {
             if (object != null) {
                 WKChannel channel = (WKChannel) object;
                 // 使用缓存快速查找
@@ -1020,10 +991,14 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
                 chatConversationMsg.childList.add(child);
                 if (!isEnd) {
                     chatConversationAdapter.addData(chatConversationMsg);
+                    conversationIndexMap.put(getChannelKey(msg.channelID, msg.channelType),
+                            chatConversationAdapter.getData().size() - 1);
                 } else {
                     int insertIndex = getInsertIndex(msg);
                     chatConversationAdapter.addData(insertIndex, chatConversationMsg);
+                    rebuildIndexCache();
                 }
+                markUnreadCountDirty();
             }
         }
     }
@@ -1209,6 +1184,61 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
 
     private int msgCount = 0;
 
+    private boolean updateExistingConversation(int index, WKUIConversationMsg incoming, boolean notify) {
+        if (index < 0 || index >= chatConversationAdapter.getData().size() || incoming == null) {
+            return false;
+        }
+        ChatConversationMsg item = chatConversationAdapter.getData().get(index);
+        if (item == null || item.uiConversationMsg == null) {
+            return false;
+        }
+        WKUIConversationMsg current = item.uiConversationMsg;
+        WKChannel existingChannel = current.getWkChannel();
+        if (incoming.getWkChannel() == null && existingChannel != null) {
+            // 会话重新排序时会使用 incoming 创建新包装对象，保留原频道资料，
+            // 避免头像、备注和在线状态短暂退回占位状态。
+            incoming.setWkChannel(existingChannel);
+        }
+        boolean lastMessageChanged = current.lastMsgSeq != incoming.lastMsgSeq
+                || current.lastMsgTimestamp != incoming.lastMsgTimestamp
+                || (current.getWkMsg() != null && incoming.getWkMsg() != null
+                && !TextUtils.equals(current.getWkMsg().clientMsgNO, incoming.getWkMsg().clientMsgNO));
+        if (lastMessageChanged) {
+            item.isResetTyping = true;
+            item.typingUserName = "";
+            item.typingStartTime = 0;
+            item.isRefreshStatus = true;
+        }
+
+        if (current.unreadCount != incoming.unreadCount) {
+            item.isResetCounter = true;
+            markUnreadCountDirty();
+        }
+        if (current.lastMsgTimestamp != incoming.lastMsgTimestamp) {
+            item.isResetTime = true;
+        }
+        current.setWkMsg(incoming.getWkMsg());
+        if (!TextUtils.equals(current.clientMsgNo, incoming.clientMsgNo)) {
+            item.isResetContent = true;
+        }
+        WKIMUtils.getInstance().resetMsgProhibitWord(current.getWkMsg());
+        item.isResetReminders = true;
+        current.lastMsgSeq = incoming.lastMsgSeq;
+        current.clientMsgNo = incoming.clientMsgNo;
+        current.unreadCount = incoming.unreadCount;
+        current.lastMsgTimestamp = incoming.lastMsgTimestamp;
+        current.setRemoteMsgExtra(incoming.getRemoteMsgExtra());
+        current.setReminderList(incoming.getReminderList());
+        current.localExtraMap = null;
+        if (incoming.getWkChannel() != null) {
+            current.setWkChannel(incoming.getWkChannel());
+        }
+        if (notify) {
+            notifyRecycler(index, item);
+        }
+        return lastMessageChanged;
+    }
+
     private void resetData(WKUIConversationMsg uiConversationMsg, boolean isEnd) {
         if (uiConversationMsg == null) {
             return;
@@ -1221,9 +1251,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             }
             return;
         }
-        // 话题聊天室已经是原生群会话：进入过的话题应该出现在消息列表里，
-        // 最后消息、未读、@提醒和排序都交给唐僧原生会话系统处理。
-        // || (uiConversationMsg.getWkChannel() != null && uiConversationMsg.getWkChannel().follow == 0 && uiConversationMsg.channelType == WKChannelType.PERSONAL)
         if (uiConversationMsg.isDeleted == 1 || TextUtils.equals(uiConversationMsg.channelID, "0")) {
             if (isEnd) {
                 sortMsg(chatConversationAdapter.getData());
@@ -1234,76 +1261,60 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             resetChildData(uiConversationMsg, isEnd);
             return;
         }
-        boolean isAdd = true;
-        int index = -1;
-        boolean isSort = false;
-        if (WKReader.isNotEmpty(chatConversationAdapter.getData())) {
-            for (int i = 0, size = chatConversationAdapter.getData().size(); i < size; i++) {
-                if (!TextUtils.isEmpty(chatConversationAdapter.getData().get(i).uiConversationMsg.channelID) && !TextUtils.isEmpty(uiConversationMsg.channelID) && chatConversationAdapter.getData().get(i).uiConversationMsg.channelID.equals(uiConversationMsg.channelID) && chatConversationAdapter.getData().get(i).uiConversationMsg.channelType == uiConversationMsg.channelType) {
-                    if (!isEnd) {
-                        isAdd = false;
-                        chatConversationAdapter.getData().get(i).uiConversationMsg = uiConversationMsg;
-                        break;
-                    }
-                    if (chatConversationAdapter.getData().get(i).uiConversationMsg.lastMsgSeq != uiConversationMsg.lastMsgSeq || chatConversationAdapter.getData().get(i).uiConversationMsg.lastMsgTimestamp != uiConversationMsg.lastMsgTimestamp || (chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg() != null && uiConversationMsg.getWkMsg() != null && !chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg().clientMsgNO.equals(uiConversationMsg.getWkMsg().clientMsgNO))) {
-                        isSort = true;
-                        chatConversationAdapter.getData().get(i).isResetTyping = true;
-                        chatConversationAdapter.getData().get(i).typingUserName = "";
-                        chatConversationAdapter.getData().get(i).typingStartTime = 0;
-                        chatConversationAdapter.getData().get(i).isRefreshStatus = true;
-                        index = i;
-                    }
-                    if (chatConversationAdapter.getData().get(i).uiConversationMsg.unreadCount != uiConversationMsg.unreadCount) {
-                        chatConversationAdapter.getData().get(i).isResetCounter = true;
-                    }
-                    if (chatConversationAdapter.getData().get(i).uiConversationMsg.lastMsgTimestamp != uiConversationMsg.lastMsgTimestamp) {
-                        chatConversationAdapter.getData().get(i).isResetTime = true;
-                    }
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.setWkMsg(uiConversationMsg.getWkMsg());
-                    if (!chatConversationAdapter.getData().get(i).uiConversationMsg.clientMsgNo.equals(uiConversationMsg.clientMsgNo)) {
-                        chatConversationAdapter.getData().get(i).isResetContent = true;
-                    }
-                    WKIMUtils.getInstance().resetMsgProhibitWord(chatConversationAdapter.getData().get(i).uiConversationMsg.getWkMsg());
-                    // todo 比较是否真的改过提醒内容
-                    chatConversationAdapter.getData().get(i).isResetReminders = true;
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.lastMsgSeq = uiConversationMsg.lastMsgSeq;
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.clientMsgNo = uiConversationMsg.clientMsgNo;
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.unreadCount = uiConversationMsg.unreadCount;
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.lastMsgTimestamp = uiConversationMsg.lastMsgTimestamp;
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.setRemoteMsgExtra(uiConversationMsg.getRemoteMsgExtra());
 
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.setReminderList(uiConversationMsg.getReminderList());
-                    chatConversationAdapter.getData().get(i).uiConversationMsg.localExtraMap = null;
-                    isAdd = false;
-                    notifyRecycler(i, chatConversationAdapter.getData().get(i));
-                    setAllCount();
-                    break;
+        int index = findConversationIndex(uiConversationMsg.channelID, uiConversationMsg.channelType);
+        boolean isAdd = index < 0;
+        boolean isSort = false;
+        if (!isAdd) {
+            if (!isEnd) {
+                ChatConversationMsg existingItem = chatConversationAdapter.getData().get(index);
+                WKUIConversationMsg old = existingItem.uiConversationMsg;
+                if (old != null) {
+                    if (old.unreadCount != uiConversationMsg.unreadCount) {
+                        markUnreadCountDirty();
+                    }
+                    if (uiConversationMsg.getWkChannel() == null && old.getWkChannel() != null) {
+                        // 分批同步的中间回调也要保留已加载频道资料，避免头像、备注和在线状态闪回占位。
+                        uiConversationMsg.setWkChannel(old.getWkChannel());
+                    }
                 }
+                existingItem.uiConversationMsg = uiConversationMsg;
+            } else {
+                isSort = updateExistingConversation(index, uiConversationMsg, true);
             }
         }
-        if (!isEnd) msgCount++;
+
+        if (!isEnd) {
+            msgCount++;
+        }
 
         if (isAdd) {
+            ChatConversationMsg newItem = new ChatConversationMsg(uiConversationMsg);
             if (!isEnd) {
-                chatConversationAdapter.addData(new ChatConversationMsg(uiConversationMsg));
+                chatConversationAdapter.addData(newItem);
+                conversationIndexMap.put(getChannelKey(uiConversationMsg.channelID, uiConversationMsg.channelType),
+                        chatConversationAdapter.getData().size() - 1);
             } else {
+                int insertIndex = getInsertIndex(uiConversationMsg);
+                chatConversationAdapter.addData(insertIndex, newItem);
+                rebuildIndexCache();
+                markUnreadCountDirty();
+                setAllCount();
+            }
+        }
+
+        if (isEnd) {
+            if (isSort && msgCount == 0 && index >= 0) {
+                chatConversationAdapter.removeAt(index);
                 int insertIndex = getInsertIndex(uiConversationMsg);
                 chatConversationAdapter.addData(insertIndex, new ChatConversationMsg(uiConversationMsg));
-            }
-            setAllCount();
-        }
-        if (isEnd) {
-            if (isSort && msgCount == 0) {
-                int insertIndex = getInsertIndex(uiConversationMsg);
-                if (insertIndex != index) {
-                    if (index != -1) chatConversationAdapter.removeAt(index);
-                    chatConversationAdapter.addData(insertIndex, new ChatConversationMsg(uiConversationMsg));
-                }
-            } else {
-                if (msgCount > 0) {
-                    msgCount = 0;
-                    sortMsg(chatConversationAdapter.getData());
-                }
+                rebuildIndexCache();
+                setAllCount();
+            } else if (msgCount > 0) {
+                msgCount = 0;
+                sortMsg(chatConversationAdapter.getData());
+            } else if (!isAdd) {
+                setAllCount();
             }
         }
     }
@@ -1556,12 +1567,11 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
     @Override
     public void onDestroy() {
         releaseHomeViewPager();
-        super.onDestroy();
+        stopConnectTimer();
         if (disposable != null) {
             disposable.dispose();
             disposable = null;
         }
-        // 取消排序任务
         if (sortDisposable != null) {
             sortDisposable.dispose();
             sortDisposable = null;
@@ -1570,16 +1580,27 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
             topicRoomExpireDisposable.dispose();
             topicRoomExpireDisposable = null;
         }
-        // 清理缓存
+        refreshIds.clear();
         conversationIndexMap.clear();
+        WKIM.getInstance().getChannelManager()
+                .removeRefreshChannelInfo("chat_fragment_refresh_channel");
         WKIM.getInstance().getConversationManager().removeOnRefreshMsgListListener("chat_fragment");
         WKIM.getInstance().getConversationManager().removeOnRefreshMsgListener("chat_fragment");
         WKIM.getInstance().getConversationManager().removeOnDeleteMsgListener("chat_fragment");
         WKIM.getInstance().getCMDManager().removeCmdListener("chat_fragment_cmd");
         WKIM.getInstance().getMsgManager().removeRefreshMsgListener("chat_fragment");
+        WKIM.getInstance().getMsgManager().removeClearMsg("chat_fragment");
         WKIM.getInstance().getConnectionManager().removeOnConnectionStatusListener("chat_fragment");
         WKIM.getInstance().getMsgManager().removeSendMsgAckListener("chat_fragment");
         WKIM.getInstance().getReminderManager().removeNewReminderListener("chat_fragment");
+        EndpointManager.getInstance().remove("peipe_show_topic_rooms");
+        EndpointManager.getInstance().remove("peipe_switch_home_page");
+        EndpointManager.getInstance().remove("chat_fragment_contacts_badge");
+        EndpointManager.getInstance().remove("chat_fragment_exit_chat");
+        EndpointManager.getInstance().remove("chat_cover");
+        EndpointManager.getInstance().remove("refresh_conversation_calling");
+        EndpointManager.getInstance().remove("scroll_to_unread_channel");
+        super.onDestroy();
     }
 
     @Override
@@ -1597,10 +1618,6 @@ public class ChatFragment extends WKBaseFragment<FragChatConversationLayoutBindi
 //        if (muteForApp == 1) {
 //            pcLoginTv.setText(String.format("%s %s", appLoginType, getString(R.string.wk_kit_phone_notice_close)));
 //        } else pcLoginTv.setText(appLoginType);
-        EndpointManager.getInstance().setMethod("scroll_to_unread_channel", object -> {
-            scrollToUnreadChannel();
-            return null;
-        });
     }
 
     private void startConnectTimer() {

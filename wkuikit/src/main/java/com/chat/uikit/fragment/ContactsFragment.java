@@ -48,17 +48,11 @@ import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannel;
 import com.xinbida.wukongim.entity.WKChannelType;
 
-import org.jetbrains.annotations.NotNull;
-
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
-
-import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
-import io.reactivex.rxjava3.core.Observable;
-import io.reactivex.rxjava3.core.ObservableOnSubscribe;
-import io.reactivex.rxjava3.core.Observer;
-import io.reactivex.rxjava3.disposables.Disposable;
-import io.reactivex.rxjava3.schedulers.Schedulers;
 
 /**
  * 2019-11-12 14:57
@@ -77,9 +71,19 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
         return fragment;
     }
 
+    private static final Object CONTACTS_REFRESH_ENDPOINT_LOCK = new Object();
+    private static final List<WeakReference<ContactsFragment>> ACTIVE_CONTACTS_FRAGMENTS = new ArrayList<>();
+    private static boolean contactsRefreshEndpointRegistered = false;
+
     private ContactsHeaderAdapter contactsHeaderAdapter;
     private FriendAdapter friendAdapter;
     private TextView allContactsCountTv;
+    private boolean firstResume = true;
+    private final HashMap<String, Integer> contactIndexMap = new HashMap<>();
+    // ChatFragment 内嵌联系人页与旧独立联系人页可能同时存在，监听 key 必须按实例隔离。
+    private final String instanceKey = Integer.toHexString(System.identityHashCode(this));
+    private final String channelRefreshListenerKey = "contacts_fragment_refresh_channel_" + instanceKey;
+    private final String mailListEndpointKey = "contacts_fragment_mail_list_" + instanceKey;
 
 
     @Override
@@ -162,50 +166,10 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
             List<PopupMenuItem> list = EndpointManager.getInstance().invokes(EndpointCategory.tabMenus, null);
             WKDialogUtils.getInstance().showScreenPopup(view, list);
         });
-        //成员刷新监听
-        WKIM.getInstance().getChannelManager().addOnRefreshChannelInfo("contacts_fragment_refresh_channel", (channel, isEnd) -> {
-            if (channel != null) {
-                Observable.create((ObservableOnSubscribe<Integer>) e -> {
-                    for (int i = 0, size = friendAdapter.getData().size(); i < size; i++) {
-                        if (friendAdapter.getData().get(i).channel != null
-                                && friendAdapter.getData().get(i).channel.channelID.equals(channel.channelID)
-                                && friendAdapter.getData().get(i).channel.channelType == channel.channelType) {
-                            friendAdapter.getData().get(i).channel.channelName = channel.channelName;
-                            friendAdapter.getData().get(i).channel.channelRemark = channel.channelRemark;
-                            friendAdapter.getData().get(i).channel.mute = channel.mute;
-                            friendAdapter.getData().get(i).channel.top = channel.top;
-                            friendAdapter.getData().get(i).channel.avatar = channel.avatar;
-                            friendAdapter.getData().get(i).channel.remoteExtraMap = channel.remoteExtraMap;
-                            friendAdapter.getData().get(i).channel.online = channel.online;
-                            friendAdapter.getData().get(i).channel.lastOffline = channel.lastOffline;
-                            friendAdapter.getData().get(i).channel.deviceFlag = channel.deviceFlag;
-                            e.onNext(i);
-                            break;
-                        }
-                    }
-                }).observeOn(AndroidSchedulers.mainThread()).subscribeOn(Schedulers.io()).subscribe(new Observer<>() {
-                    @Override
-                    public void onSubscribe(@NotNull Disposable d) {
-
-                    }
-
-                    @Override
-                    public void onNext(@NotNull Integer index) {
-                        friendAdapter.notifyItemChanged(index + friendAdapter.getHeaderLayoutCount());
-                    }
-
-                    @Override
-                    public void onError(@NotNull Throwable e) {
-
-                    }
-
-                    @Override
-                    public void onComplete() {
-
-                    }
-                });
-
-            }
+        // 成员刷新监听。主线程只做 O(1) 索引定位，避免大量在线状态更新时反复扫描完整联系人列表。
+        WKIM.getInstance().getChannelManager().addOnRefreshChannelInfo(channelRefreshListenerKey, (channel, isEnd) -> {
+            if (channel == null || TextUtils.isEmpty(channel.channelID)) return;
+            AndroidUtilities.runOnUIThread(() -> updateContactChannel(channel));
         });
         wkVBinding.searchIv.setOnClickListener(view -> {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -215,16 +179,12 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
                 startActivity(new Intent(getActivity(), GlobalActivity.class));
             }
         });
-        //监听刷新通讯录
-        EndpointManager.getInstance().setMethod("", EndpointCategory.wkRefreshMailList, object -> {
-            resetHeaderData();
+        // 该分类支持多监听者，内嵌页与旧独立页分别使用实例 key。
+        EndpointManager.getInstance().setMethod(mailListEndpointKey, EndpointCategory.wkRefreshMailList, object -> {
+            AndroidUtilities.runOnUIThread(this::resetHeaderData);
             return null;
         });
-
-        EndpointManager.getInstance().setMethod(WKConstants.refreshContacts, object -> {
-            getContacts();
-            return null;
-        });
+        registerContactsRefreshEndpoint();
     }
 
     @Override
@@ -238,7 +198,11 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
     public void onResume() {
         super.onResume();
         resetHeaderData();
-        getContacts();
+        if (firstResume) {
+            firstResume = false;
+        } else {
+            getContacts();
+        }
     }
 
     private void getContacts() {
@@ -291,8 +255,119 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
         tempList.addAll(numList);
         tempList.addAll(otherList);
         friendAdapter.setList(tempList);
+        rebuildContactIndex();
         if (isAdded())
             allContactsCountTv.setText(String.format(getString(R.string.contacts_num), tempList.size()));
+    }
+
+    private String getContactKey(String channelID, byte channelType) {
+        return channelID + "_" + channelType;
+    }
+
+    private void rebuildContactIndex() {
+        contactIndexMap.clear();
+        if (friendAdapter == null) return;
+        List<FriendUIEntity> data = friendAdapter.getData();
+        for (int i = 0, size = data.size(); i < size; i++) {
+            FriendUIEntity item = data.get(i);
+            if (item != null && item.channel != null && !TextUtils.isEmpty(item.channel.channelID)) {
+                contactIndexMap.put(getContactKey(item.channel.channelID, item.channel.channelType), i);
+            }
+        }
+    }
+
+    private int findContactIndex(String channelID, byte channelType) {
+        if (TextUtils.isEmpty(channelID) || friendAdapter == null) return -1;
+        String key = getContactKey(channelID, channelType);
+        Integer index = contactIndexMap.get(key);
+        List<FriendUIEntity> data = friendAdapter.getData();
+        if (index != null && index >= 0 && index < data.size()) {
+            FriendUIEntity item = data.get(index);
+            if (item != null && item.channel != null
+                    && TextUtils.equals(item.channel.channelID, channelID)
+                    && item.channel.channelType == channelType) {
+                return index;
+            }
+        }
+        // 索引若因外部 setList 失效，只降级扫描一次并立即修复。
+        for (int i = 0, size = data.size(); i < size; i++) {
+            FriendUIEntity item = data.get(i);
+            if (item != null && item.channel != null
+                    && TextUtils.equals(item.channel.channelID, channelID)
+                    && item.channel.channelType == channelType) {
+                contactIndexMap.put(key, i);
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void updateContactChannel(WKChannel channel) {
+        if (!isAdded() || friendAdapter == null || channel == null) return;
+        int index = findContactIndex(channel.channelID, channel.channelType);
+        if (index < 0) return;
+        List<FriendUIEntity> data = friendAdapter.getData();
+        if (index >= data.size()) return;
+        FriendUIEntity item = data.get(index);
+        if (item == null) return;
+        item.channel = channel;
+        friendAdapter.notifyItemChanged(index + friendAdapter.getHeaderLayoutCount());
+    }
+
+    private void registerContactsRefreshEndpoint() {
+        synchronized (CONTACTS_REFRESH_ENDPOINT_LOCK) {
+            removeInactiveContactsFragmentsLocked(this);
+            ACTIVE_CONTACTS_FRAGMENTS.add(new WeakReference<>(this));
+            if (!contactsRefreshEndpointRegistered) {
+                EndpointManager.getInstance().setMethod(WKConstants.refreshContacts, object -> {
+                    dispatchContactsRefresh();
+                    return null;
+                });
+                contactsRefreshEndpointRegistered = true;
+            }
+        }
+    }
+
+    private static void dispatchContactsRefresh() {
+        List<ContactsFragment> targets = new ArrayList<>();
+        synchronized (CONTACTS_REFRESH_ENDPOINT_LOCK) {
+            Iterator<WeakReference<ContactsFragment>> iterator = ACTIVE_CONTACTS_FRAGMENTS.iterator();
+            while (iterator.hasNext()) {
+                ContactsFragment fragment = iterator.next().get();
+                if (fragment == null) {
+                    iterator.remove();
+                } else {
+                    targets.add(fragment);
+                }
+            }
+        }
+        for (ContactsFragment fragment : targets) {
+            AndroidUtilities.runOnUIThread(() -> {
+                if (fragment.isAdded() && fragment.friendAdapter != null) {
+                    fragment.getContacts();
+                }
+            });
+        }
+    }
+
+    private void unregisterContactsRefreshEndpoint() {
+        synchronized (CONTACTS_REFRESH_ENDPOINT_LOCK) {
+            removeInactiveContactsFragmentsLocked(this);
+            if (ACTIVE_CONTACTS_FRAGMENTS.isEmpty() && contactsRefreshEndpointRegistered) {
+                EndpointManager.getInstance().remove(WKConstants.refreshContacts);
+                contactsRefreshEndpointRegistered = false;
+            }
+        }
+    }
+
+    private static void removeInactiveContactsFragmentsLocked(ContactsFragment target) {
+        Iterator<WeakReference<ContactsFragment>> iterator = ACTIVE_CONTACTS_FRAGMENTS.iterator();
+        while (iterator.hasNext()) {
+            ContactsFragment fragment = iterator.next().get();
+            if (fragment == null || fragment == target) {
+                iterator.remove();
+            }
+        }
     }
 
     private View getFooterView() {
@@ -343,6 +418,16 @@ public class ContactsFragment extends WKBaseFragment<FragContactsLayoutBinding> 
             }
             contactsHeaderAdapter.setList(list);
         }
+    }
+
+    @Override
+    public void onDestroy() {
+        WKIM.getInstance().getChannelManager()
+                .removeRefreshChannelInfo(channelRefreshListenerKey);
+        EndpointManager.getInstance().remove(mailListEndpointKey);
+        unregisterContactsRefreshEndpoint();
+        contactIndexMap.clear();
+        super.onDestroy();
     }
 
 }
