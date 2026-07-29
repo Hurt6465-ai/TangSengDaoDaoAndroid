@@ -31,6 +31,7 @@ import com.chat.base.msgitem.WKRevokeProvider;
 import com.chat.base.ui.Theme;
 import com.chat.base.ui.components.AvatarView;
 import com.chat.base.ui.components.CounterView;
+import com.chat.base.ui.components.RoundTextView;
 import com.chat.base.ui.components.TypingView;
 import com.chat.base.utils.AndroidUtilities;
 import com.chat.base.utils.LayoutHelper;
@@ -58,6 +59,7 @@ import org.telegram.ui.Components.RLottieImageView;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -66,10 +68,42 @@ import java.util.concurrent.ConcurrentHashMap;
  * 会话记录适配器
  */
 public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMsg, BaseViewHolder> {
-    private static final long CHANNEL_INFO_FETCH_INTERVAL_MS = 5L * 60L * 1000L;
-    private static final Map<String, Long> CHANNEL_INFO_FETCH_TIME_MAP = new ConcurrentHashMap<>();
+    private static final long CHANNEL_INFO_FETCH_SUCCESS_INTERVAL_MS = 5L * 60L * 1000L;
+    private static final long CHANNEL_INFO_FETCH_RETRY_INTERVAL_MS = 20L * 1000L;
+    private static final int CHANNEL_INFO_FETCH_CACHE_MAX_SIZE = 1000;
+    private static final Object CHANNEL_INFO_FETCH_CACHE_LOCK = new Object();
+    private static final Map<String, Long> CHANNEL_INFO_FETCH_ATTEMPT_MAP = new ConcurrentHashMap<>();
+    private static final Map<String, Long> CHANNEL_INFO_FETCH_SUCCESS_MAP = new ConcurrentHashMap<>();
+    private static final Set<String> CHANNEL_INFO_FETCHING_SET = ConcurrentHashMap.newKeySet();
 
     private IListener iListener;
+
+    private static final class ReminderViews {
+        final TextView mentionView;
+        final TextView draftView;
+        final TextView approveView;
+
+        ReminderViews(TextView mentionView, TextView draftView, TextView approveView) {
+            this.mentionView = mentionView;
+            this.draftView = draftView;
+            this.approveView = approveView;
+        }
+    }
+
+    private static final class CategoryViews {
+        final ImageView muteView;
+        final RoundTextView primaryView;
+        final RoundTextView communityView;
+        final RoundTextView robotView;
+
+        CategoryViews(ImageView muteView, RoundTextView primaryView,
+                      RoundTextView communityView, RoundTextView robotView) {
+            this.muteView = muteView;
+            this.primaryView = primaryView;
+            this.communityView = communityView;
+            this.robotView = robotView;
+        }
+    }
 
     public ChatConversationAdapter(@Nullable List<ChatConversationMsg> data) {
         super(R.layout.item_chat_conv_layout, data);
@@ -354,12 +388,12 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
         boolean mention = false;
         if (WKReader.isNotEmpty(item.getReminders())) {
             for (int i = 0, size = item.getReminders().size(); i < size; i++) {
-                if (!mention && item.getReminders().get(i).type == WKMentionType.WKReminderTypeMentionMe && item.getReminders().get(i).done == 0) {
-                    //存在@
+                if (!mention && item.getReminders().get(i).type == WKMentionType.WKReminderTypeMentionMe
+                        && item.getReminders().get(i).done == 0) {
                     mention = true;
-                    // break;
                 }
-                if (item.getReminders().get(i).type == WKMentionType.WKApplyJoinGroupApprove && item.getReminders().get(i).done == 0) {
+                if (item.getReminders().get(i).type == WKMentionType.WKApplyJoinGroupApprove
+                        && item.getReminders().get(i).done == 0) {
                     approveContent = getContext().getString(R.string.apply_join_group);
                 }
             }
@@ -367,41 +401,57 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
         if (item.uiConversationMsg.getRemoteMsgExtra() != null) {
             draft = item.uiConversationMsg.getRemoteMsgExtra().draft;
         }
-        boolean isSetChatPwd = isSetChatPwd(item.uiConversationMsg.getWkChannel());
-        // 聊天密码
-        if (isSetChatPwd) {
-            if (!TextUtils.isEmpty(draft))
-                draft = "❊❊❊❊❊❊❊❊❊❊❊❊❊";
+        if (isSetChatPwd(item.uiConversationMsg.getWkChannel()) && !TextUtils.isEmpty(draft)) {
+            draft = "❊❊❊❊❊❊❊❊❊❊❊❊❊";
         }
+
         LinearLayout remindLayout = helper.getView(R.id.remindLayout);
-        remindLayout.removeAllViews();
-        if (mention) {
-            TextView textView = new TextView(getContext());
-            textView.setTypeface(null, Typeface.BOLD);
-            textView.setText(R.string.last_msg_remind);
-            textView.setTextColor(ContextCompat.getColor(getContext(), R.color.reminderColor));
-            textView.setTextSize(13f);
-            remindLayout.addView(textView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 0, 0, 5, 0));
+        ReminderViews views = getOrCreateReminderViews(remindLayout);
+        views.mentionView.setVisibility(mention ? View.VISIBLE : View.GONE);
+        boolean hasDraft = !TextUtils.isEmpty(draft);
+        views.draftView.setVisibility(hasDraft ? View.VISIBLE : View.GONE);
+        boolean hasApprove = !TextUtils.isEmpty(approveContent);
+        views.approveView.setVisibility(hasApprove ? View.VISIBLE : View.GONE);
+        if (hasApprove) {
+            views.approveView.setText(approveContent);
         }
-        if (!TextUtils.isEmpty(draft)) {
-            TextView textView = new TextView(getContext());
-            textView.setText(R.string.last_msg_draft);
-            textView.setTypeface(null, Typeface.BOLD);
-            textView.setTextColor(ContextCompat.getColor(getContext(), R.color.reminderColor));
-            textView.setTextSize(13f);
-            remindLayout.addView(textView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 0, 0, 5, 0));
+
+        if (hasDraft) {
             MoonUtil.identifyFaceExpression(getContext(), contentTv, draft, MoonUtil.SMALL_SCALE);
         } else {
             showContent(helper, item.uiConversationMsg);
         }
-        if (!TextUtils.isEmpty(approveContent)) {
-            TextView textView = new TextView(getContext());
-            textView.setText(approveContent);
-            textView.setTypeface(null, Typeface.BOLD);
-            textView.setTextColor(ContextCompat.getColor(getContext(), R.color.reminderColor));
-            textView.setTextSize(13f);
-            remindLayout.addView(textView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 0, 0, 5, 0));
+    }
+
+    private ReminderViews getOrCreateReminderViews(LinearLayout remindLayout) {
+        Object tag = remindLayout.getTag();
+        if (tag instanceof ReminderViews) {
+            return (ReminderViews) tag;
         }
+        remindLayout.removeAllViews();
+        TextView mentionView = createReminderTextView();
+        mentionView.setText(R.string.last_msg_remind);
+        TextView draftView = createReminderTextView();
+        draftView.setText(R.string.last_msg_draft);
+        TextView approveView = createReminderTextView();
+        remindLayout.addView(mentionView, LayoutHelper.createLinear(
+                LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 0, 0, 5, 0));
+        remindLayout.addView(draftView, LayoutHelper.createLinear(
+                LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 0, 0, 5, 0));
+        remindLayout.addView(approveView, LayoutHelper.createLinear(
+                LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_VERTICAL, 0, 0, 5, 0));
+        ReminderViews views = new ReminderViews(mentionView, draftView, approveView);
+        remindLayout.setTag(views);
+        return views;
+    }
+
+    private TextView createReminderTextView() {
+        TextView textView = new TextView(getContext());
+        textView.setTypeface(null, Typeface.BOLD);
+        textView.setTextColor(ContextCompat.getColor(getContext(), R.color.reminderColor));
+        textView.setTextSize(13f);
+        textView.setVisibility(View.GONE);
+        return textView;
     }
 
     private void showChannel(@NotNull BaseViewHolder helper, WKUIConversationMsg item) {
@@ -446,40 +496,11 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
                 maybeFetchChannelInfo(item.channelID, item.channelType);
             }
             LinearLayout categoryLayout = helper.getView(R.id.categoryLayout);
-            categoryLayout.removeAllViews();
+            bindCategoryViews(categoryLayout, item.getWkChannel(), item.channelType);
             ImageView forbiddenIv = helper.getView(R.id.forbiddenIv);
             forbiddenIv.setColorFilter(new PorterDuffColorFilter(ContextCompat.getColor(getContext(), R.color.color999), PorterDuff.Mode.MULTIPLY));
             //设置是否置顶
             helper.setBackgroundResource(R.id.contentLayout, isTop ? R.drawable.home_bg : R.drawable.layout_bg);
-            if (item.getWkChannel().mute == 1) {
-                ImageView muteIV = new ImageView(getContext());
-                muteIV.setImageResource(R.mipmap.list_mute);
-                Theme.setColorFilter(muteIV, ContextCompat.getColor(getContext(), R.color.popupTextColor));
-                categoryLayout.addView(muteIV, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 3, 1, 0, 0));
-            }
-            if (!TextUtils.isEmpty(item.getWkChannel().category)) {
-
-                if (item.getWkChannel().category.equals(WKSystemAccount.accountCategorySystem)) {
-                    categoryLayout.addView(Theme.getChannelCategoryTV(getContext(), getContext().getString(R.string.official), ContextCompat.getColor(getContext(), R.color.transparent), ContextCompat.getColor(getContext(), R.color.reminderColor), ContextCompat.getColor(getContext(), R.color.reminderColor)), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 5, 1, 0, 0));
-                }
-                if (item.getWkChannel().category.equals(WKSystemAccount.accountCategoryCustomerService)) {
-                    categoryLayout.addView(Theme.getChannelCategoryTV(getContext(), getContext().getString(R.string.customer_service), Theme.colorAccount, ContextCompat.getColor(getContext(), R.color.white), Theme.colorAccount), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 5, 1, 0, 0));
-                }
-                if (item.getWkChannel().category.equals(WKSystemAccount.accountCategoryVisitor)) {
-                    categoryLayout.addView(Theme.getChannelCategoryTV(getContext(), getContext().getString(R.string.visitor), ContextCompat.getColor(getContext(), R.color.transparent), ContextCompat.getColor(getContext(), R.color.colorFFC107), ContextCompat.getColor(getContext(), R.color.colorFFC107)), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 5, 1, 0, 0));
-                }
-                if (item.getWkChannel().category.equals(WKSystemAccount.channelCategoryOrganization)) {
-                    categoryLayout.addView(Theme.getChannelCategoryTV(getContext(), getContext().getString(R.string.all_staff), ContextCompat.getColor(getContext(), R.color.category_org_bg), ContextCompat.getColor(getContext(), R.color.category_org_text), ContextCompat.getColor(getContext(), R.color.transparent)), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 5, 1, 0, 0));
-                }
-                if (item.getWkChannel().category.equals(WKSystemAccount.channelCategoryDepartment)) {
-                    categoryLayout.addView(Theme.getChannelCategoryTV(getContext(), getContext().getString(R.string.department), ContextCompat.getColor(getContext(), R.color.category_org_bg), ContextCompat.getColor(getContext(), R.color.category_org_text), ContextCompat.getColor(getContext(), R.color.transparent)), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 5, 1, 0, 0));
-                }
-            }
-            if (item.channelType == WKChannelType.COMMUNITY) {
-                categoryLayout.addView(Theme.getChannelCategoryTV(getContext(), getContext().getString(R.string.community), ContextCompat.getColor(getContext(), R.color.category_community_bg), ContextCompat.getColor(getContext(), R.color.category_community_text), ContextCompat.getColor(getContext(), R.color.transparent)), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 5, 1, 0, 0));
-            }
-            if (item.getWkChannel().robot == 1)
-                categoryLayout.addView(Theme.getChannelCategoryTV(getContext(), getContext().getString(R.string.bot), ContextCompat.getColor(getContext(), R.color.colorFFC107), ContextCompat.getColor(getContext(), R.color.white), ContextCompat.getColor(getContext(), R.color.colorFFC107)), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 5, 1, 0, 0));
             //判断是否禁言
             if (item.getWkChannel().forbidden == 1) {
                 WKChannelMember mChannelMember = WKIM.getInstance().getChannelMembersManager().getMember(item.channelID, item.channelType, WKConfig.getInstance().getUid());
@@ -494,6 +515,9 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
 //            GlideUtils.getInstance().showAvatarImg(getContext(), item.channelID, item.channelType, item.getWkChannel().avatar, helper.getView(R.id.avatarIv));
         } else {
             helper.getView(R.id.otherLayout).setVisibility(View.GONE);
+            bindCategoryViews(helper.getView(R.id.categoryLayout), null, item.channelType);
+            helper.setGone(R.id.forbiddenIv, true);
+            helper.setBackgroundResource(R.id.contentLayout, R.drawable.layout_bg);
             if (TextUtils.isEmpty(showName))
                 showName = getContext().getString(R.string.chat);
             if (isTopicRoom) {
@@ -507,16 +531,189 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
         helper.setText(R.id.nameTv, showName);
     }
 
+    private void bindCategoryViews(LinearLayout categoryLayout, WKChannel channel, byte channelType) {
+        CategoryViews views = getOrCreateCategoryViews(categoryLayout);
+        boolean muted = channel != null && channel.mute == 1;
+        views.muteView.setVisibility(muted ? View.VISIBLE : View.GONE);
+        views.primaryView.setVisibility(View.GONE);
+        views.communityView.setVisibility(View.GONE);
+        views.robotView.setVisibility(View.GONE);
+        if (channel == null) return;
+
+        String category = channel.category;
+        if (WKSystemAccount.accountCategorySystem.equals(category)) {
+            configureCategoryView(views.primaryView, getContext().getString(R.string.official),
+                    ContextCompat.getColor(getContext(), R.color.transparent),
+                    ContextCompat.getColor(getContext(), R.color.reminderColor),
+                    ContextCompat.getColor(getContext(), R.color.reminderColor));
+        } else if (WKSystemAccount.accountCategoryCustomerService.equals(category)) {
+            configureCategoryView(views.primaryView, getContext().getString(R.string.customer_service),
+                    Theme.colorAccount, ContextCompat.getColor(getContext(), R.color.white), Theme.colorAccount);
+        } else if (WKSystemAccount.accountCategoryVisitor.equals(category)) {
+            configureCategoryView(views.primaryView, getContext().getString(R.string.visitor),
+                    ContextCompat.getColor(getContext(), R.color.transparent),
+                    ContextCompat.getColor(getContext(), R.color.colorFFC107),
+                    ContextCompat.getColor(getContext(), R.color.colorFFC107));
+        } else if (WKSystemAccount.channelCategoryOrganization.equals(category)) {
+            configureCategoryView(views.primaryView, getContext().getString(R.string.all_staff),
+                    ContextCompat.getColor(getContext(), R.color.category_org_bg),
+                    ContextCompat.getColor(getContext(), R.color.category_org_text),
+                    ContextCompat.getColor(getContext(), R.color.transparent));
+        } else if (WKSystemAccount.channelCategoryDepartment.equals(category)) {
+            configureCategoryView(views.primaryView, getContext().getString(R.string.department),
+                    ContextCompat.getColor(getContext(), R.color.category_org_bg),
+                    ContextCompat.getColor(getContext(), R.color.category_org_text),
+                    ContextCompat.getColor(getContext(), R.color.transparent));
+        }
+
+        if (channelType == WKChannelType.COMMUNITY) {
+            configureCategoryView(views.communityView, getContext().getString(R.string.community),
+                    ContextCompat.getColor(getContext(), R.color.category_community_bg),
+                    ContextCompat.getColor(getContext(), R.color.category_community_text),
+                    ContextCompat.getColor(getContext(), R.color.transparent));
+        }
+        if (channel.robot == 1) {
+            configureCategoryView(views.robotView, getContext().getString(R.string.bot),
+                    ContextCompat.getColor(getContext(), R.color.colorFFC107),
+                    ContextCompat.getColor(getContext(), R.color.white),
+                    ContextCompat.getColor(getContext(), R.color.colorFFC107));
+        }
+    }
+
+    private CategoryViews getOrCreateCategoryViews(LinearLayout categoryLayout) {
+        Object tag = categoryLayout.getTag();
+        if (tag instanceof CategoryViews) {
+            return (CategoryViews) tag;
+        }
+        categoryLayout.removeAllViews();
+        ImageView muteView = new ImageView(getContext());
+        muteView.setImageResource(R.mipmap.list_mute);
+        Theme.setColorFilter(muteView, ContextCompat.getColor(getContext(), R.color.popupTextColor));
+        RoundTextView primaryView = Theme.getChannelCategoryTV(getContext(), "", 0, 0, 0);
+        RoundTextView communityView = Theme.getChannelCategoryTV(getContext(), "", 0, 0, 0);
+        RoundTextView robotView = Theme.getChannelCategoryTV(getContext(), "", 0, 0, 0);
+        categoryLayout.addView(muteView, LayoutHelper.createLinear(
+                LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 3, 1, 0, 0));
+        categoryLayout.addView(primaryView, LayoutHelper.createLinear(
+                LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 5, 1, 0, 0));
+        categoryLayout.addView(communityView, LayoutHelper.createLinear(
+                LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 5, 1, 0, 0));
+        categoryLayout.addView(robotView, LayoutHelper.createLinear(
+                LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER, 5, 1, 0, 0));
+        CategoryViews views = new CategoryViews(muteView, primaryView, communityView, robotView);
+        categoryLayout.setTag(views);
+        return views;
+    }
+
+    private void configureCategoryView(RoundTextView view, String text, int bgColor,
+                                       int textColor, int borderColor) {
+        view.setText(text);
+        view.setTextColor(textColor);
+        // RoundTextView.setBorderColor() 会重新 new GradientDrawable；直接复用已有背景，
+        // 避免会话快速滚动时标签绑定持续制造 Drawable 和 GC。
+        if (view.getBackground() instanceof GradientDrawable) {
+            GradientDrawable background = (GradientDrawable) view.getBackground();
+            background.setColor(bgColor);
+            background.setStroke(AndroidUtilities.dp(1), borderColor);
+        } else {
+            view.setBackGroundColor(bgColor);
+            view.setBorderColor(borderColor);
+        }
+        view.setVisibility(View.VISIBLE);
+    }
+
     private void maybeFetchChannelInfo(String channelID, byte channelType) {
-        if (TextUtils.isEmpty(channelID)) return;
-        String key = WKConfig.getInstance().getUid() + "_" + channelType + "_" + channelID;
+        if (TextUtils.isEmpty(channelID) || TextUtils.isEmpty(WKConfig.getInstance().getUid())) return;
+        String key = buildChannelInfoFetchKey(channelID, channelType);
         long now = System.currentTimeMillis();
-        Long lastFetchTime = CHANNEL_INFO_FETCH_TIME_MAP.get(key);
-        if (lastFetchTime != null && now - lastFetchTime < CHANNEL_INFO_FETCH_INTERVAL_MS) {
+        Long lastSuccess = CHANNEL_INFO_FETCH_SUCCESS_MAP.get(key);
+        if (lastSuccess != null && now - lastSuccess < CHANNEL_INFO_FETCH_SUCCESS_INTERVAL_MS) {
             return;
         }
-        CHANNEL_INFO_FETCH_TIME_MAP.put(key, now);
-        WKIM.getInstance().getChannelManager().fetchChannelInfo(channelID, channelType);
+        Long lastAttempt = CHANNEL_INFO_FETCH_ATTEMPT_MAP.get(key);
+        if (lastAttempt != null && now - lastAttempt < CHANNEL_INFO_FETCH_RETRY_INTERVAL_MS) {
+            return;
+        }
+        CHANNEL_INFO_FETCH_ATTEMPT_MAP.put(key, now);
+        CHANNEL_INFO_FETCHING_SET.add(key);
+        trimChannelInfoFetchCache();
+        try {
+            WKIM.getInstance().getChannelManager().fetchChannelInfo(channelID, channelType);
+        } catch (Exception ignored) {
+            CHANNEL_INFO_FETCHING_SET.remove(key);
+        }
+    }
+
+    public static void markChannelInfoFetchSuccess(WKChannel channel) {
+        if (channel == null || TextUtils.isEmpty(channel.channelID)
+                || TextUtils.isEmpty(WKConfig.getInstance().getUid())) {
+            return;
+        }
+        String key = buildChannelInfoFetchKey(channel.channelID, channel.channelType);
+        // 只确认由本适配器主动发起的补拉。在线状态、置顶、免打扰等普通频道刷新
+        // 不能误判为头像/名称补拉成功，否则空资料会进入 5 分钟冷却。
+        if (!CHANNEL_INFO_FETCHING_SET.remove(key)) {
+            return;
+        }
+        if (!hasUsableChannelInfo(channel)) {
+            CHANNEL_INFO_FETCH_SUCCESS_MAP.remove(key);
+            return;
+        }
+        long now = System.currentTimeMillis();
+        CHANNEL_INFO_FETCH_ATTEMPT_MAP.put(key, now);
+        CHANNEL_INFO_FETCH_SUCCESS_MAP.put(key, now);
+        trimChannelInfoFetchCache();
+    }
+
+    private static boolean hasUsableChannelInfo(WKChannel channel) {
+        if (channel == null) return false;
+        // 仅把真正可用于会话展示的资料视为补拉成功。
+        // online、last_offline、country 等普通扩展更新不能让空头像/空名称进入 5 分钟冷却。
+        return !TextUtils.isEmpty(channel.channelName)
+                || !TextUtils.isEmpty(channel.channelRemark)
+                || !TextUtils.isEmpty(channel.avatar)
+                || !TextUtils.isEmpty(channel.category)
+                || WKSystemAccount.system_file_helper.equals(channel.channelID)
+                || WKSystemAccount.system_team.equals(channel.channelID);
+    }
+
+    public static void clearChannelInfoFetchCache() {
+        CHANNEL_INFO_FETCH_ATTEMPT_MAP.clear();
+        CHANNEL_INFO_FETCH_SUCCESS_MAP.clear();
+        CHANNEL_INFO_FETCHING_SET.clear();
+    }
+
+    private static String buildChannelInfoFetchKey(String channelID, byte channelType) {
+        return WKConfig.getInstance().getUid() + "_" + channelType + "_" + channelID;
+    }
+
+    private static void trimChannelInfoFetchCache() {
+        if (CHANNEL_INFO_FETCH_ATTEMPT_MAP.size() <= CHANNEL_INFO_FETCH_CACHE_MAX_SIZE
+                && CHANNEL_INFO_FETCH_SUCCESS_MAP.size() <= CHANNEL_INFO_FETCH_CACHE_MAX_SIZE) {
+            return;
+        }
+        synchronized (CHANNEL_INFO_FETCH_CACHE_LOCK) {
+            trimOldestEntries(CHANNEL_INFO_FETCH_ATTEMPT_MAP);
+            trimOldestEntries(CHANNEL_INFO_FETCH_SUCCESS_MAP);
+            CHANNEL_INFO_FETCHING_SET.retainAll(CHANNEL_INFO_FETCH_ATTEMPT_MAP.keySet());
+        }
+    }
+
+    private static void trimOldestEntries(Map<String, Long> map) {
+        while (map.size() > CHANNEL_INFO_FETCH_CACHE_MAX_SIZE) {
+            String oldestKey = null;
+            long oldestTime = Long.MAX_VALUE;
+            for (Map.Entry<String, Long> entry : map.entrySet()) {
+                long value = entry.getValue() == null ? Long.MIN_VALUE : entry.getValue();
+                if (value < oldestTime) {
+                    oldestTime = value;
+                    oldestKey = entry.getKey();
+                }
+            }
+            if (oldestKey == null) break;
+            map.remove(oldestKey);
+            CHANNEL_INFO_FETCHING_SET.remove(oldestKey);
+        }
     }
 
     private void showTopicBadge(@NotNull BaseViewHolder helper, boolean isTopicRoom) {
@@ -526,11 +723,16 @@ public class ChatConversationAdapter extends BaseQuickAdapter<ChatConversationMs
             topicBadgeIv.setColorFilter(null);
             return;
         }
-        GradientDrawable bg = new GradientDrawable();
+        GradientDrawable bg;
+        if (topicBadgeIv.getBackground() instanceof GradientDrawable) {
+            bg = (GradientDrawable) topicBadgeIv.getBackground();
+        } else {
+            bg = new GradientDrawable();
+            topicBadgeIv.setBackground(bg);
+        }
         bg.setShape(GradientDrawable.OVAL);
         bg.setColor(ContextCompat.getColor(getContext(), R.color.colorAccent));
         bg.setStroke(AndroidUtilities.dp(1f), 0xFFFFFFFF);
-        topicBadgeIv.setBackground(bg);
         int padding = AndroidUtilities.dp(3f);
         topicBadgeIv.setPadding(padding, padding, padding, padding);
         topicBadgeIv.setColorFilter(new PorterDuffColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN));
