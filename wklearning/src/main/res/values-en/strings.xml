@@ -379,4 +379,9 @@ Time %5$d min</string>
     <string name="learning_home_contacts_unavailable">Contacts are currently unavailable</string>
     <string name="learning_home_feature_unavailable">%1$s is currently unavailable</string>
 
+
+    <string name="learning_home_drawer_profile_hint">View profile</string>
+    <string name="learning_home_drawer_account_format">%1$s ID: %2$s</string>
+    <string name="learning_home_drawer_default_name">Talkami user</string>
+    <string name="learning_home_drawer_chat_translate">Chat translation</string>
 </resources>
