@@ -6,7 +6,7 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:paddingStart="5dp"
-    android:animateLayoutChanges="true"
+    android:animateLayoutChanges="false"
     android:paddingEnd="5dp">
 
     <androidx.appcompat.widget.AppCompatImageView
