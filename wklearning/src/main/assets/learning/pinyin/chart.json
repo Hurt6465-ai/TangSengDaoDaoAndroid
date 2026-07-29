@@ -130,22 +130,22 @@
       "items": [
         {
           "letter": "a",
-          "hint": "အာ",
+          "hint": "အား",
           "audio": "learning/pinyin/audio/finals/a.mp3"
         },
         {
           "letter": "o",
-          "hint": "အော",
+          "hint": "အော(ဝ်)",
           "audio": "learning/pinyin/audio/finals/o.mp3"
         },
         {
           "letter": "e",
-          "hint": "အ",
+          "hint": "အဲ",
           "audio": "learning/pinyin/audio/finals/e.mp3"
         },
         {
           "letter": "i",
-          "hint": "အီ",
+          "hint": "ယီး",
           "audio": "learning/pinyin/audio/finals/i.mp3"
         },
         {
@@ -155,7 +155,7 @@
         },
         {
           "letter": "ü",
-          "hint": "ယူ",
+          "hint": "ယွီ",
           "audio": "learning/pinyin/audio/finals/ü.mp3"
         },
         {
