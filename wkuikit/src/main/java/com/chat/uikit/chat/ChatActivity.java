@@ -159,6 +159,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -205,6 +206,12 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private Disposable disposable;
     private final CompositeDisposable asyncDisposables = new CompositeDisposable();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private static final long TYPING_TIMEOUT_MS = 8_000L;
+    @Nullable
+    private Runnable typingExpiryRunnable;
+    @Nullable
+    private WeakReference<WKMsg> typingExpiryMessageRef;
+    private long typingExpiryVersion = 0L;
     // 每次切换聊天对象都递增。异步回调只允许更新发起请求时对应的会话。
     private long channelGeneration = 1L;
     // SDK 的 listener key 只是监听器标识，不是频道过滤条件。必须按 Activity + 会话代次唯一，
@@ -2833,6 +2840,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             return;
         }
         if (chatAdapter == null) return;
+        cancelTypingExpiry(null);
         chatAdapter.getData().clear();
         chatAdapter.notifyDataSetChanged();
         redDot = 0;
@@ -2924,6 +2932,25 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     private boolean isMainThread() {
         return Looper.myLooper() == Looper.getMainLooper();
+    }
+
+    /**
+     * Adapter notifications are illegal while RecyclerView is computing a layout. Defer only for
+     * that short critical section; a fling itself is not a reason to keep typing rows alive or to
+     * wake the main thread every 16 ms until scrolling stops.
+     */
+    private boolean deferAdapterMutationIfComputing(@NonNull Runnable action) {
+        RecyclerView recyclerView = wkVBinding == null ? null : wkVBinding.recyclerView;
+        if (recyclerView == null || !recyclerView.isComputingLayout()) return false;
+        final long requestGeneration = channelGeneration;
+        final String requestChannelId = channelId;
+        final byte requestChannelType = channelType;
+        mainHandler.post(() -> {
+            if (isCurrentSession(requestGeneration, requestChannelId, requestChannelType)) {
+                action.run();
+            }
+        });
+        return true;
     }
 
     private void postToMainForSession(long generation, String targetChannelId,
@@ -3073,6 +3100,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         flushReadReceipts(oldChannelId, oldChannelType);
         channelGeneration++;
         unregisterChannelListeners();
+        cancelTypingExpiry(null);
         mainHandler.removeCallbacksAndMessages(null);
 
         resetChannelSessionState();
@@ -3119,6 +3147,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         WKRobotModel.getInstance().syncRobotData(getChatChannelInfo());
         getChannelState();
 
+        cancelTypingExpiry(null);
         chatAdapter.setList(new ArrayList<>());
         if (WKSystemAccount.isSystemAccount(channelId) || channelType == WKChannelType.CUSTOMER_SERVICE) {
             CommonAnim.getInstance().showOrHide(callIV, false, false);
@@ -3643,29 +3672,43 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (next != null) {
             next.previousMsg = previous == null ? null : previous.wkMsg;
         }
-        // removeAt() 后 RecyclerView 的可见 ViewHolder 仍可能处于旧位置/旧消息类型。
-        // 此时直接 notifyBackground() 会拿“新位置的数据 Provider”操作“旧类型 View”，
-        // 例如语音 Provider 在文字 View 中查找 voiceLayout，最终触发空指针。
-        // 删除属于低频操作，仅重绑相邻两项既安全，也不会影响正常滚动性能。
-        notifyMessageRebindAfterRemoval(previousIndex);
-        notifyMessageRebindAfterRemoval(nextIndex);
-    }
-
-    private void notifyMessageRebindAfterRemoval(int index) {
-        if (chatAdapter == null || index < 0 || index >= chatAdapter.getData().size()) return;
-        chatAdapter.notifyItemChanged(index);
+        notifyMessageAppearance(previousIndex);
+        notifyMessageAppearance(nextIndex);
     }
 
     @Nullable
     private WKUIChatMsgItemEntity detachTrailingTypingItem() {
+        return removeTrailingTypingItem(false);
+    }
+
+    /**
+     * Removes the single temporary typing row without BRVAH removeAt(), whose 3.x implementation
+     * also refreshes the entire remaining range. The active expiry is preserved when the row is
+     * only being moved behind a newly inserted message.
+     */
+    @Nullable
+    private WKUIChatMsgItemEntity removeTrailingTypingItem(boolean cancelExpiry) {
         if (chatAdapter == null || WKReader.isEmpty(chatAdapter.getData())) return null;
-        int lastIndex = chatAdapter.getData().size() - 1;
-        WKUIChatMsgItemEntity last = chatAdapter.getData().get(lastIndex);
+        List<WKUIChatMsgItemEntity> data = chatAdapter.getData();
+        int lastIndex = data.size() - 1;
+        WKUIChatMsgItemEntity last = data.get(lastIndex);
         if (last == null || last.wkMsg == null || last.wkMsg.type != WKContentType.typing) {
             return null;
         }
-        chatAdapter.removeAt(lastIndex);
-        relinkAfterRemoval(lastIndex);
+        if (cancelExpiry) {
+            cancelTypingExpiry(last.wkMsg);
+        }
+        data.remove(lastIndex);
+        int previousIndex = lastIndex - 1;
+        WKUIChatMsgItemEntity previous = previousIndex >= 0 && previousIndex < data.size()
+                ? data.get(previousIndex) : null;
+        if (previous != null) previous.nextMsg = null;
+
+        int header = chatAdapter.getHeaderLayoutCount();
+        chatAdapter.notifyItemRemoved(lastIndex + header);
+        if (previousIndex >= 0 && previousIndex < data.size()) {
+            chatAdapter.notifyItemChanged(previousIndex + header);
+        }
         last.previousMsg = null;
         last.nextMsg = null;
         return last;
@@ -4719,6 +4762,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         flushReadReceipts(channelId, channelType);
         unregisterChannelListeners();
         unregisterGlobalEndpoints();
+        cancelTypingExpiry(null);
         mainHandler.removeCallbacksAndMessages(null);
         PartnerPendingStore.removeListener(partnerPendingListener);
         if (disposable != null) {
@@ -4893,6 +4937,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             return;
         }
         if (shouldHideFromChatList(msg)) return;
+        if (deferAdapterMutationIfComputing(() -> sendMsgInserted(msg))) return;
         if (msg.channelType == channelType && TextUtils.equals(msg.channelID, channelId)) {
             DeepSeekAssistant.bindPendingReplyToMessage(this, msg);
             if (msg.orderSeq > maxMsgOrderSeq) {
@@ -4936,6 +4981,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             return;
         }
         if (WKReader.isEmpty(list)) return;
+        RecyclerView recyclerView = wkVBinding == null ? null : wkVBinding.recyclerView;
+        if (recyclerView != null && recyclerView.isComputingLayout()) {
+            final List<WKMsg> deferredList = new ArrayList<>(list);
+            if (deferAdapterMutationIfComputing(() -> receivedMessages(deferredList))) return;
+        }
         for (WKMsg msg : list) {
             // RTC 已由 wkrtc 全局监听处理，本页只过滤，不重复派发。
             if (shouldHideFromChatList(msg)) {
@@ -4954,12 +5004,18 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 int oldLatestReceivedTextIndex = isReceivedTextMsgForInlineTranslate(msg)
                         ? findLatestReceivedTextMsgIndex() : -1;
 
-                if (chatAdapter.getItemCount() > 0) {
-                    WKUIChatMsgItemEntity last = chatAdapter.getData().get(chatAdapter.getItemCount() - 1);
+                WKUIChatMsgItemEntity trailingTyping = null;
+                if (!chatAdapter.getData().isEmpty()) {
+                    WKUIChatMsgItemEntity last = chatAdapter.getData().get(chatAdapter.getData().size() - 1);
                     if (last != null && last.wkMsg != null && last.wkMsg.type == WKContentType.typing) {
-                        int typingIndex = chatAdapter.getItemCount() - 1;
-                        chatAdapter.removeAt(typingIndex);
-                        relinkAfterRemoval(typingIndex);
+                        // In a group, a message from another member must not clear the person who is
+                        // still typing. Move that temporary row behind the real message and preserve
+                        // its original expiry. A real message from the same sender ends the state.
+                        if (TextUtils.equals(last.wkMsg.fromUID, msg.fromUID)) {
+                            removeTrailingTypingItem(true);
+                        } else {
+                            trailingTyping = detachTrailingTypingItem();
+                        }
                     }
                 }
 
@@ -4995,6 +5051,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
                 WKPlaySound.getInstance().playInMsg(R.raw.sound_in);
                 chatAdapter.addData(itemEntity);
+                restoreTrailingTypingItem(trailingTyping);
                 if (msg.messageSeq > maxMsgSeq) maxMsgSeq = msg.messageSeq;
                 if (msg.orderSeq > maxMsgOrderSeq) maxMsgOrderSeq = msg.orderSeq;
                 notifyMessageAppearance(previousMsgIndex);
@@ -5014,6 +5071,116 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         }
     }
 
+    /**
+     * The typing timeout belongs to the CMD receiver, not RecyclerView binding. Every real typing
+     * CMD resets the full timeout; ordinary rebinds never affect the deadline.
+     */
+    private void touchTypingExpiry(@NonNull WKMsg typingMsg) {
+        if (!isMainThread()) {
+            final long requestGeneration = channelGeneration;
+            final String requestChannelId = channelId;
+            final byte requestChannelType = channelType;
+            postToMainForSession(requestGeneration, requestChannelId, requestChannelType,
+                    () -> touchTypingExpiry(typingMsg));
+            return;
+        }
+
+        cancelTypingExpiry(null);
+        final long version = typingExpiryVersion;
+        final WeakReference<WKMsg> messageRef = new WeakReference<>(typingMsg);
+        typingExpiryMessageRef = messageRef;
+        typingExpiryRunnable = () -> runTypingExpiryWhenRecyclerSafe(messageRef, version);
+        mainHandler.postDelayed(typingExpiryRunnable, TYPING_TIMEOUT_MS);
+    }
+
+    /** Cancels the active timeout. If expectedMsg is non-null, only that exact typing row matches. */
+    private void cancelTypingExpiry(@Nullable WKMsg expectedMsg) {
+        if (!isMainThread()) {
+            mainHandler.post(() -> cancelTypingExpiry(expectedMsg));
+            return;
+        }
+        WKMsg active = typingExpiryMessageRef == null ? null : typingExpiryMessageRef.get();
+        if (expectedMsg != null && active != expectedMsg) return;
+        typingExpiryVersion++;
+        if (typingExpiryRunnable != null) {
+            mainHandler.removeCallbacks(typingExpiryRunnable);
+        }
+        typingExpiryRunnable = null;
+        typingExpiryMessageRef = null;
+    }
+
+    private void runTypingExpiryWhenRecyclerSafe(
+            @NonNull WeakReference<WKMsg> expectedMessageRef,
+            long expectedVersion
+    ) {
+        if (expectedVersion != typingExpiryVersion) return;
+        WKMsg expectedMessage = expectedMessageRef.get();
+        if (expectedMessage == null || chatAdapter == null || isFinishing()
+                || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed())) {
+            cancelTypingExpiry(expectedMessage);
+            return;
+        }
+
+        if (deferAdapterMutationIfComputing(
+                () -> runTypingExpiryWhenRecyclerSafe(expectedMessageRef, expectedVersion))) {
+            return;
+        }
+        removeTypingMessageNow(expectedMessage, expectedVersion);
+    }
+
+    /**
+     * Removes the exact trailing typing object and an optional date divider created only for it.
+     * Data is mutated directly so BRVAH does not dispatch its broad notifyItemRangeChanged fallback.
+     */
+    private void removeTypingMessageNow(@NonNull WKMsg expectedMessage, long expectedVersion) {
+        if (expectedVersion != typingExpiryVersion || chatAdapter == null) return;
+        List<WKUIChatMsgItemEntity> data = chatAdapter.getData();
+        int typingIndex = -1;
+        for (int i = data.size() - 1; i >= 0; i--) {
+            WKUIChatMsgItemEntity item = data.get(i);
+            if (item != null && item.wkMsg == expectedMessage
+                    && item.wkMsg.type == WKContentType.typing) {
+                typingIndex = i;
+                break;
+            }
+        }
+
+        cancelTypingExpiry(expectedMessage);
+        if (typingIndex < 0) return;
+
+        int precedingTimeIndex = typingIndex - 1;
+        WKUIChatMsgItemEntity preceding = precedingTimeIndex >= 0
+                ? data.get(precedingTimeIndex) : null;
+        boolean dropTimeDivider = typingIndex == data.size() - 1
+                && preceding != null
+                && preceding.wkMsg != null
+                && preceding.wkMsg.type == WKContentType.msgPromptTime;
+
+        int removeFrom = dropTimeDivider ? precedingTimeIndex : typingIndex;
+        int removeCount = dropTimeDivider ? 2 : 1;
+        for (int i = 0; i < removeCount; i++) {
+            data.remove(removeFrom);
+        }
+
+        int previousIndex = removeFrom - 1;
+        int nextIndex = removeFrom;
+        WKUIChatMsgItemEntity previous = previousIndex >= 0 && previousIndex < data.size()
+                ? data.get(previousIndex) : null;
+        WKUIChatMsgItemEntity next = nextIndex >= 0 && nextIndex < data.size()
+                ? data.get(nextIndex) : null;
+        if (previous != null) previous.nextMsg = next == null ? null : next.wkMsg;
+        if (next != null) next.previousMsg = previous == null ? null : previous.wkMsg;
+
+        int header = chatAdapter.getHeaderLayoutCount();
+        chatAdapter.notifyItemRangeRemoved(removeFrom + header, removeCount);
+        if (previousIndex >= 0 && previousIndex < data.size()) {
+            chatAdapter.notifyItemChanged(previousIndex + header);
+        }
+        if (nextIndex >= 0 && nextIndex < data.size()) {
+            chatAdapter.notifyItemChanged(nextIndex + header);
+        }
+    }
+
     private void typing(WKCMD wkCmd) {
         if (!isMainThread()) {
             final long requestGeneration = channelGeneration;
@@ -5023,11 +5190,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     () -> typing(wkCmd));
             return;
         }
-        if (wkCmd == null || wkCmd.paramJsonObject == null || redDot > 0) return;
+        if (wkCmd == null || wkCmd.paramJsonObject == null || redDot > 0 || chatAdapter == null) return;
+        if (deferAdapterMutationIfComputing(() -> typing(wkCmd))) return;
         String channel_id = wkCmd.paramJsonObject.optString("channel_id");
         byte channel_type = (byte) wkCmd.paramJsonObject.optInt("channel_type");
         String from_uid = wkCmd.paramJsonObject.optString("from_uid");
         String from_name = wkCmd.paramJsonObject.optString("from_name");
+        if (TextUtils.isEmpty(channel_id) || TextUtils.isEmpty(from_uid)) return;
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(from_uid, WKChannelType.PERSONAL);
         if (channel == null) {
             channel = new WKChannel(from_uid, WKChannelType.PERSONAL);
@@ -5046,13 +5215,15 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (memberOfFrom == null || memberOfFrom.isDeleted == 1) return;
         }
 
-        if (chatAdapter.getItemCount() > 0) {
-            WKUIChatMsgItemEntity last = chatAdapter.getData().get(chatAdapter.getItemCount() - 1);
+        if (!chatAdapter.getData().isEmpty()) {
+            WKUIChatMsgItemEntity last = chatAdapter.getData().get(chatAdapter.getData().size() - 1);
             if (last != null && last.wkMsg != null && last.wkMsg.type == WKContentType.typing) {
                 last.wkMsg.setFrom(channel);
                 last.wkMsg.fromUID = from_uid;
                 last.wkMsg.setMemberOfFrom(memberOfFrom);
-                chatAdapter.notifyItemChanged(chatAdapter.getItemCount() - 1);
+                int typingDataIndex = chatAdapter.getData().size() - 1;
+                chatAdapter.notifyItemChanged(typingDataIndex + chatAdapter.getHeaderLayoutCount());
+                touchTypingExpiry(last.wkMsg);
                 return;
             }
         }
@@ -5068,19 +5239,23 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         typingItem.wkMsg.type = WKContentType.typing;
         typingItem.wkMsg.setFrom(channel);
         typingItem.showNickName = showNickName;
-        typingItem.wkMsg.fromUID = channel.channelID;
-        WKChannelMember member = new WKChannelMember();
-        member.memberUID = channel.channelID;
-        member.channelID = channelId;
-        member.channelType = channelType;
-        member.memberName = channel.channelName;
-        member.memberRemark = channel.channelRemark;
-        typingItem.wkMsg.setMemberOfFrom(member);
+        typingItem.wkMsg.fromUID = from_uid;
+        WKChannelMember displayMember = memberOfFrom;
+        if (displayMember == null) {
+            displayMember = new WKChannelMember();
+            displayMember.memberUID = from_uid;
+            displayMember.channelID = channelId;
+            displayMember.channelType = channelType;
+            displayMember.memberName = channel.channelName;
+            displayMember.memberRemark = channel.channelRemark;
+        }
+        typingItem.wkMsg.setMemberOfFrom(displayMember);
         typingItem.previousMsg = chatAdapter.getLastMsg();
         chatAdapter.addData(typingItem);
         if (index >= 0 && index < chatAdapter.getData().size()) {
             chatAdapter.getData().get(index).nextMsg = typingItem.wkMsg;
         }
+        touchTypingExpiry(typingItem.wkMsg);
         notifyMessageAppearance(index);
 
         if (!isShowHistory && !isCanLoadMore) {
@@ -5098,6 +5273,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             return;
         }
         if (wkMsg == null) return;
+        if (deferAdapterMutationIfComputing(() -> refreshMsg(wkMsg))) return;
         if (shouldHideFromChatList(wkMsg)) {
             removeMsg(wkMsg);
             return;
