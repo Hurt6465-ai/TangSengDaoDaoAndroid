@@ -19,6 +19,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -39,6 +40,9 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.customview.widget.ViewDragHelper;
 import androidx.fragment.app.Fragment;
 
+import com.chat.base.config.WKConfig;
+import com.chat.base.entity.UserInfoEntity;
+import com.chat.base.ui.components.AvatarView;
 import com.chat.userscript.AiScriptWebActivity;
 import com.chat.userscript.ScriptManagerActivity;
 
@@ -72,6 +76,9 @@ public class LearningFragment extends Fragment {
 
     private WideEdgeDrawerLayout drawerLayout;
     private View sideDrawerView;
+    private AvatarView drawerAvatarView;
+    private TextView drawerNameTv;
+    private TextView drawerAccountTv;
     private ViewFlipper priceFlipper;
     private final Map<String, HskProgressBinding> hskProgressViews = new HashMap<>();
     private int progressLoadToken;
@@ -104,6 +111,7 @@ public class LearningFragment extends Fragment {
     public void onResume() {
         super.onResume();
         refreshLocalWordProgress();
+        refreshDrawerProfile();
         if (priceFlipper != null && priceFlipper.getChildCount() > 1) {
             priceFlipper.startFlipping();
         }
@@ -120,6 +128,9 @@ public class LearningFragment extends Fragment {
         progressLoadToken++;
         hskProgressViews.clear();
         sideDrawerView = null;
+        drawerAvatarView = null;
+        drawerNameTv = null;
+        drawerAccountTv = null;
         priceFlipper = null;
         drawerLayout = null;
         super.onDestroyView();
@@ -664,161 +675,250 @@ public class LearningFragment extends Fragment {
     private View createSideDrawer() {
         LinearLayout panel = new LinearLayout(requireContext());
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(18), getTopInset() + dp(18), dp(16), dp(18));
+        panel.setPadding(dp(16), getTopInset() + dp(14), dp(16), dp(16));
         panel.setBackground(drawerBackground());
         panel.setClickable(true);
 
-        LinearLayout header = new LinearLayout(requireContext());
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView brand = text("T", 17, Color.WHITE, true);
-        brand.setGravity(Gravity.CENTER);
-        brand.setBackground(gradientRounded(
-                COLOR_BRAND,
-                COLOR_BRAND_END,
-                dp(15),
-                Color.TRANSPARENT,
-                0
-        ));
-        header.addView(brand, new LinearLayout.LayoutParams(dp(42), dp(42)));
-
-        LinearLayout headerCopy = new LinearLayout(requireContext());
-        headerCopy.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams headerCopyLp = new LinearLayout.LayoutParams(0, -2, 1f);
-        headerCopyLp.setMargins(dp(12), 0, dp(8), 0);
-        header.addView(headerCopy, headerCopyLp);
-
-        TextView title = text("Talkami", 21, COLOR_TEXT, true);
-        headerCopy.addView(title, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView subtitle = text(getString(R.string.learning_home_drawer_header_subtitle), 12, COLOR_SUB, false);
-        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(-1, -2);
-        subtitleLp.setMargins(0, dp(3), 0, 0);
-        headerCopy.addView(subtitle, subtitleLp);
-
-        TextView close = text("×", 27, 0xFF7F889A, false);
-        close.setGravity(Gravity.CENTER);
-        close.setContentDescription(getString(R.string.learning_home_drawer_close));
-        close.setBackground(ripple(
-                rounded(0x00FFFFFF, dp(18), Color.TRANSPARENT, 0),
+        FrameLayout profileCard = new FrameLayout(requireContext());
+        profileCard.setMinimumHeight(dp(106));
+        profileCard.setPadding(dp(16), dp(16), dp(14), dp(16));
+        profileCard.setContentDescription(getString(R.string.learning_home_drawer_profile_hint));
+        profileCard.setBackground(ripple(
+                rounded(0xFAFFFFFF, dp(24), 0xFFE8EBF3, dp(1)),
                 0x14635BFF,
-                18
+                24
         ));
-        close.setOnClickListener(v -> closeDrawer(true));
-        header.addView(close, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        bindClick(profileCard, () -> {
+            closeDrawer(false);
+            openOwnProfile();
+        });
+        attachNativePressAnimator(profileCard, 1f, -0.35f);
 
-        LinearLayout.LayoutParams headerLp = new LinearLayout.LayoutParams(-1, -2);
-        headerLp.setMargins(dp(2), 0, dp(2), dp(18));
-        panel.addView(header, headerLp);
+        LinearLayout identityRow = new LinearLayout(requireContext());
+        identityRow.setOrientation(LinearLayout.HORIZONTAL);
+        identityRow.setGravity(Gravity.CENTER_VERTICAL);
+        identityRow.setPadding(0, 0, dp(48), 0);
 
-        ScrollView scroll = new ScrollView(requireContext());
-        scroll.setFillViewport(true);
-        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        scroll.setVerticalScrollBarEnabled(false);
+        drawerAvatarView = new AvatarView(requireContext());
+        drawerAvatarView.setSize(62);
+        identityRow.addView(drawerAvatarView, new LinearLayout.LayoutParams(dp(62), dp(62)));
 
-        LinearLayout list = new LinearLayout(requireContext());
-        list.setOrientation(LinearLayout.VERTICAL);
-        scroll.addView(list, new ScrollView.LayoutParams(-1, -2));
+        LinearLayout identityCopy = new LinearLayout(requireContext());
+        identityCopy.setOrientation(LinearLayout.VERTICAL);
+        identityCopy.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams identityCopyLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        identityCopyLp.setMargins(dp(13), 0, 0, 0);
+        identityRow.addView(identityCopy, identityCopyLp);
 
-        drawerGroupTitle(list, getString(R.string.learning_home_drawer_ai_group));
-        list.addView(drawerCard("译", getString(R.string.learning_home_drawer_deepseek),
-                getString(R.string.learning_home_drawer_deepseek_desc), 0xFF4D7CFE,
-                () -> AiScriptWebActivity.open(requireContext(), "DeepSeek", "https://chat.deepseek.com/")));
-        list.addView(drawerCard("千", getString(R.string.learning_home_drawer_qianwen),
-                "qianwen.com", 0xFF8A5AF4,
-                () -> AiScriptWebActivity.open(requireContext(), getString(R.string.learning_home_drawer_qianwen), "https://www.qianwen.com/")));
-        list.addView(drawerCard("Q", getString(R.string.learning_home_drawer_qwen),
-                "chat.qwen.ai", 0xFF6366F1,
-                () -> AiScriptWebActivity.open(requireContext(), getString(R.string.learning_home_drawer_qwen), "https://chat.qwen.ai/")));
+        drawerNameTv = text("", 17, COLOR_TEXT, true);
+        drawerNameTv.setSingleLine(true);
+        identityCopy.addView(drawerNameTv, new LinearLayout.LayoutParams(-1, -2));
 
-        drawerGroupTitle(list, getString(R.string.learning_home_drawer_common_group));
-        list.addView(drawerCard("联", getString(R.string.learning_home_drawer_contacts),
-                getString(R.string.learning_home_drawer_contacts_desc), 0xFF3E7BFA,
-                this::openContactsPage));
-        list.addView(drawerCard("新", getString(R.string.learning_home_drawer_new_friends),
-                getString(R.string.learning_home_drawer_new_friends_desc), 0xFF12A78E,
-                () -> openOptionalActivity("com.chat.uikit.contacts.NewFriendsActivity",
-                        getString(R.string.learning_home_drawer_new_friends))));
-        list.addView(drawerCard("＋", getString(R.string.learning_home_drawer_add_friend),
-                getString(R.string.learning_home_drawer_add_friend_desc), 0xFFF09A45,
-                () -> openOptionalActivity("com.chat.uikit.search.AddFriendsActivity",
-                        getString(R.string.learning_home_drawer_add_friend))));
-        list.addView(drawerCard("设", getString(R.string.learning_home_drawer_system_settings),
-                getString(R.string.learning_home_drawer_system_settings_desc), 0xFF687386,
-                () -> openOptionalActivity("com.chat.uikit.setting.SettingActivity",
-                        getString(R.string.learning_home_drawer_system_settings))));
+        drawerAccountTv = text("", 12, COLOR_SUB, false);
+        drawerAccountTv.setSingleLine(true);
+        LinearLayout.LayoutParams accountLp = new LinearLayout.LayoutParams(-1, -2);
+        accountLp.setMargins(0, dp(6), 0, 0);
+        identityCopy.addView(drawerAccountTv, accountLp);
 
-        drawerGroupTitle(list, getString(R.string.learning_home_drawer_learning_settings_group));
-        list.addView(drawerCard("声", getString(R.string.learning_home_drawer_speech_settings),
-                getString(R.string.learning_home_drawer_speech_desc), 0xFF8C61D9,
-                this::openSpeechSettings));
-        list.addView(drawerCard("脚", getString(R.string.learning_home_drawer_scripts),
-                getString(R.string.learning_home_drawer_scripts_desc), 0xFFE45B85,
-                () -> startActivity(new Intent(requireContext(), ScriptManagerActivity.class))));
+        TextView profileHint = text(getString(R.string.learning_home_drawer_profile_hint), 11, COLOR_BRAND, true);
+        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+        hintLp.setMargins(0, dp(7), 0, 0);
+        identityCopy.addView(profileHint, hintLp);
 
-        panel.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+        profileCard.addView(identityRow, new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL));
+
+        ImageView settings = new ImageView(requireContext());
+        settings.setImageResource(R.drawable.ic_learning_drawer_settings);
+        settings.setColorFilter(0xFF596174);
+        settings.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        settings.setPadding(dp(10), dp(10), dp(10), dp(10));
+        settings.setContentDescription(getString(R.string.learning_home_drawer_system_settings));
+        settings.setBackground(ripple(
+                rounded(0xFFF1F3F9, dp(14), Color.TRANSPARENT, 0),
+                0x1F635BFF,
+                14
+        ));
+        bindClick(settings, () -> {
+            closeDrawer(false);
+            openOptionalActivity("com.chat.uikit.setting.SettingActivity",
+                    getString(R.string.learning_home_drawer_system_settings));
+        });
+        FrameLayout.LayoutParams settingsLp = new FrameLayout.LayoutParams(dp(42), dp(42), Gravity.END | Gravity.TOP);
+        profileCard.addView(settings, settingsLp);
+
+        LinearLayout.LayoutParams profileLp = new LinearLayout.LayoutParams(-1, -2);
+        profileLp.setMargins(0, 0, 0, dp(16));
+        panel.addView(profileCard, profileLp);
+
+        LinearLayout menuGrid = new LinearLayout(requireContext());
+        menuGrid.setOrientation(LinearLayout.VERTICAL);
+
+        menuGrid.addView(drawerTileRow(
+                drawerTile(R.drawable.ic_learning_drawer_contacts,
+                        getString(R.string.learning_home_drawer_contacts), 0xFF4779E8,
+                        this::openContactsPage),
+                drawerTile(R.drawable.ic_learning_drawer_new_friends,
+                        getString(R.string.learning_home_drawer_new_friends), 0xFF1A9B83,
+                        () -> openOptionalActivity("com.chat.uikit.contacts.NewFriendsActivity",
+                                getString(R.string.learning_home_drawer_new_friends)))
+        ));
+
+        menuGrid.addView(drawerTileRow(
+                drawerTile(R.drawable.ic_learning_drawer_add_friend,
+                        getString(R.string.learning_home_drawer_add_friend), 0xFFE98A37,
+                        () -> openOptionalActivity("com.chat.uikit.search.AddFriendsActivity",
+                                getString(R.string.learning_home_drawer_add_friend))),
+                drawerTile(R.drawable.ic_learning_drawer_translate,
+                        getString(R.string.learning_home_drawer_chat_translate), 0xFF6A5CE4,
+                        this::openChatTranslateSettings)
+        ));
+
+        menuGrid.addView(drawerTileRow(
+                drawerTile(R.drawable.ic_learning_drawer_speech,
+                        getString(R.string.learning_home_drawer_speech_settings), 0xFF8B5AC8,
+                        this::openSpeechSettings),
+                drawerTile(R.drawable.ic_learning_drawer_script,
+                        getString(R.string.learning_home_drawer_scripts), 0xFFD85682,
+                        () -> startActivity(new Intent(requireContext(), ScriptManagerActivity.class)))
+        ));
+
+        ScrollView menuScroll = new ScrollView(requireContext());
+        menuScroll.setFillViewport(true);
+        menuScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        menuScroll.setVerticalScrollBarEnabled(false);
+        menuScroll.addView(menuGrid, new ScrollView.LayoutParams(-1, -2));
+        panel.addView(menuScroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        refreshDrawerProfile();
         return panel;
     }
 
-    private void drawerGroupTitle(LinearLayout list, String title) {
-        TextView view = text(title, 12, 0xFF8C95A7, true);
-        view.setGravity(Gravity.CENTER_VERTICAL);
-        view.setLetterSpacing(0.03f);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(34));
-        lp.setMargins(dp(4), dp(6), 0, dp(5));
-        list.addView(view, lp);
+    private View drawerTileRow(View left, View right) {
+        LinearLayout row = new LinearLayout(requireContext());
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.TOP);
+
+        LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        leftLp.setMargins(0, 0, dp(5), dp(10));
+        row.addView(left, leftLp);
+
+        LinearLayout.LayoutParams rightLp = new LinearLayout.LayoutParams(0, -2, 1f);
+        rightLp.setMargins(dp(5), 0, 0, dp(10));
+        row.addView(right, rightLp);
+        return row;
     }
 
-    private View drawerCard(String badge, String title, String desc, int accent, Runnable click) {
-        LinearLayout card = new LinearLayout(requireContext());
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setMinimumHeight(dp(64));
-        card.setPadding(dp(12), dp(10), dp(10), dp(10));
-        card.setBackground(ripple(
-                rounded(0xF3FFFFFF, dp(17), Color.TRANSPARENT, 0),
+    private View drawerTile(int iconRes, String label, int accent, Runnable click) {
+        LinearLayout tile = new LinearLayout(requireContext());
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.START);
+        tile.setMinimumHeight(dp(101));
+        tile.setPadding(dp(14), dp(13), dp(12), dp(12));
+        tile.setContentDescription(label);
+        tile.setBackground(ripple(
+                rounded(0xF9FFFFFF, dp(20), 0xFFE9ECF3, dp(1)),
                 withAlpha(accent, 24),
-                17
+                20
         ));
-        bindClick(card, () -> {
+        bindClick(tile, () -> {
             closeDrawer(false);
             if (click != null) click.run();
         });
-        attachNativePressAnimator(card, 1.5f, -0.5f);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            card.setElevation(dp(1));
+        attachNativePressAnimator(tile, 0.6f, -0.25f);
+
+        FrameLayout iconBox = new FrameLayout(requireContext());
+        iconBox.setBackground(rounded(withAlpha(accent, 20), dp(14), Color.TRANSPARENT, 0));
+        tile.addView(iconBox, new LinearLayout.LayoutParams(dp(42), dp(42)));
+
+        ImageView icon = new ImageView(requireContext());
+        icon.setImageResource(iconRes);
+        icon.setColorFilter(accent);
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        icon.setPadding(dp(9), dp(9), dp(9), dp(9));
+        iconBox.addView(icon, new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
+
+        TextView title = text(label, 13, COLOR_TEXT, true);
+        title.setMaxLines(2);
+        title.setGravity(Gravity.START);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLp.setMargins(0, dp(11), 0, 0);
+        tile.addView(title, titleLp);
+        return tile;
+    }
+
+    private void refreshDrawerProfile() {
+        if (!isAdded() || drawerAvatarView == null || drawerNameTv == null || drawerAccountTv == null) {
+            return;
+        }
+        UserInfoEntity user = WKConfig.getInstance().getUserInfo();
+        String uid = firstNonEmpty(user.uid, WKConfig.getInstance().getUid());
+        String displayName = firstNonEmpty(user.name, user.username,
+                WKConfig.getInstance().getUserName(),
+                getString(R.string.learning_home_drawer_default_name));
+        drawerNameTv.setText(displayName);
+
+        String shortNo = user.short_no == null ? "" : user.short_no.trim();
+        if (TextUtils.isEmpty(shortNo)) {
+            drawerAccountTv.setVisibility(View.GONE);
+            drawerAccountTv.setText("");
+        } else {
+            drawerAccountTv.setVisibility(View.VISIBLE);
+            drawerAccountTv.setText(getString(R.string.learning_home_drawer_account_format,
+                    getAppLabel(), shortNo));
         }
 
-        TextView badgeView = text(badge, 15, accent, true);
-        badgeView.setGravity(Gravity.CENTER);
-        badgeView.setBackground(rounded(withAlpha(accent, 22), dp(12), Color.TRANSPARENT, 0));
-        LinearLayout.LayoutParams badgeLp = new LinearLayout.LayoutParams(dp(38), dp(38));
-        badgeLp.setMargins(0, 0, dp(12), 0);
-        card.addView(badgeView, badgeLp);
+        String avatar = user.avatar;
+        if (TextUtils.isEmpty(avatar) && !TextUtils.isEmpty(uid)) {
+            avatar = "users/" + uid + "/avatar";
+        }
+        drawerAvatarView.showAvatarUrl(avatar, "", displayName, uid);
+    }
 
-        LinearLayout textBox = new LinearLayout(requireContext());
-        textBox.setOrientation(LinearLayout.VERTICAL);
-        card.addView(textBox, new LinearLayout.LayoutParams(0, -2, 1f));
+    private String getAppLabel() {
+        try {
+            CharSequence label = requireContext().getApplicationInfo()
+                    .loadLabel(requireContext().getPackageManager());
+            if (label != null && !TextUtils.isEmpty(label.toString().trim())) {
+                return label.toString().trim();
+            }
+        } catch (Throwable ignored) {
+        }
+        return "Talkami";
+    }
 
-        TextView titleView = text(title, 14, COLOR_TEXT, true);
-        titleView.setSingleLine(true);
-        textBox.addView(titleView, new LinearLayout.LayoutParams(-1, -2));
+    private String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (!TextUtils.isEmpty(value) && !"null".equalsIgnoreCase(value.trim())) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
 
-        TextView descView = text(desc, 11, COLOR_SUB, false);
-        descView.setSingleLine(true);
-        LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(-1, -2);
-        descLp.setMargins(0, dp(3), 0, 0);
-        textBox.addView(descView, descLp);
+    private void openOwnProfile() {
+        try {
+            Class<?> route = Class.forName("com.chat.partner.profile.PartnerProfileRoute");
+            route.getMethod("open", Context.class).invoke(null, requireContext());
+            return;
+        } catch (Throwable ignored) {
+        }
+        openOptionalActivity("com.chat.uikit.user.MyInfoActivity",
+                getString(R.string.learning_home_drawer_profile_hint));
+    }
 
-        TextView arrow = text("›", 23, 0xFFAAB1BF, false);
-        arrow.setGravity(Gravity.CENTER);
-        card.addView(arrow, new LinearLayout.LayoutParams(dp(22), dp(34)));
-
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.setMargins(0, 0, 0, dp(8));
-        card.setLayoutParams(lp);
-        return card;
+    private void openChatTranslateSettings() {
+        try {
+            Class<?> clazz = Class.forName("com.chat.translate.ui.TranslateSettingsActivity");
+            Intent intent = new Intent(requireContext(), clazz);
+            intent.putExtra("from", "learning_drawer");
+            startActivity(intent);
+        } catch (Throwable ignored) {
+            Toast.makeText(requireContext(),
+                    getString(R.string.learning_home_feature_unavailable,
+                            getString(R.string.learning_home_drawer_chat_translate)),
+                    Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void openContactsPage() {
@@ -1079,11 +1179,11 @@ public class LearningFragment extends Fragment {
 
     private GradientDrawable drawerBackground() {
         GradientDrawable drawable = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                new int[]{0xFFF8F7FF, 0xFFF1F8FF, 0xFFFBFCFF}
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{0xFFFAFBFE, 0xFFF7F8FC}
         );
         drawable.setCornerRadius(0f);
-        drawable.setStroke(dp(1), 0xFFFFFFFF);
+        drawable.setStroke(dp(1), 0xFFE9ECF3);
         return drawable;
     }
 
@@ -1139,7 +1239,8 @@ public class LearningFragment extends Fragment {
     }
 
     private int getDrawerWidth() {
-        return (int) (getResources().getDisplayMetrics().widthPixels * 0.82f);
+        int screen = getResources().getDisplayMetrics().widthPixels;
+        return Math.min(dp(336), (int) (screen * 0.86f));
     }
 
     private int dp(float value) {
