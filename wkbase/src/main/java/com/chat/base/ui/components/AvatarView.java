@@ -5,13 +5,16 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.AttributeSet;
 import android.view.Gravity;
 import android.view.View;
@@ -27,6 +30,7 @@ import com.bumptech.glide.load.engine.GlideException;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.target.Target;
 import com.chat.base.R;
+import com.chat.base.WKBaseApplication;
 import com.chat.base.common.WKCommonModel;
 import com.chat.base.config.WKApiConfig;
 import com.chat.base.config.WKConfig;
@@ -51,6 +55,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class AvatarView extends FrameLayout {
     public ShapeableImageView imageView;
@@ -94,6 +103,38 @@ public class AvatarView extends FrameLayout {
     };
 
     private static final Map<String, Integer> FLAG_RES_CACHE = new ConcurrentHashMap<>();
+
+    private static final String EMPTY_CACHE_VALUE = "\u0000";
+    private static final int AVATAR_LOCAL_MAX_PX = 160;
+    private static final int AVATAR_LOCAL_QUALITY = 88;
+    private static final int MAX_PENDING_AVATAR_SAVE_TASKS = 48;
+    private static final int SIMPLE_MEMORY_CACHE_MAX_SIZE = 4096;
+    private static final long LOCAL_AVATAR_MISS_RECHECK_MS = 5_000L;
+    private static final long COUNTRY_MISS_RECHECK_MS = 30_000L;
+    private static final Paint AVATAR_SNAPSHOT_PAINT = new Paint(
+            Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
+    private static final AtomicInteger AVATAR_IO_THREAD_ID = new AtomicInteger();
+    private static final ExecutorService AVATAR_IO_EXECUTOR = Executors.newSingleThreadExecutor(new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable runnable) {
+            Thread thread = new Thread(runnable, "avatar-cache-io-" + AVATAR_IO_THREAD_ID.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        }
+    });
+    private static final AtomicLong AVATAR_SAVE_SEQUENCE = new AtomicLong();
+    // Counts queued + running bitmap saves. A bounded count prevents a fast group-chat fling
+    // from retaining hundreds of 160px bitmaps in the single-thread executor queue.
+    private static final AtomicInteger PENDING_AVATAR_SAVE_TASK_COUNT = new AtomicInteger();
+    private static final Map<String, Long> LATEST_AVATAR_SAVE_VERSION = new ConcurrentHashMap<>();
+    private static final Map<String, String> PENDING_AVATAR_SAVE_KEYS = new ConcurrentHashMap<>();
+    private static final Object[] AVATAR_FILE_LOCKS = createAvatarFileLocks();
+    private static final Map<String, String> COUNTRY_MEMORY_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, Long> COUNTRY_MISS_TIME = new ConcurrentHashMap<>();
+    private static final Map<String, String> AVATAR_META_MEMORY_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, String> LOCAL_AVATAR_PATH_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, Long> LOCAL_AVATAR_MISS_TIME = new ConcurrentHashMap<>();
+    private static final Map<String, String> SAFE_FILE_ID_CACHE = new ConcurrentHashMap<>();
 
     // Reflection is used only because WKChannel/entity fields are not stable across versions.
     // Cache both hits and misses so RecyclerView scrolling does not repeatedly throw reflection exceptions.
@@ -182,9 +223,9 @@ public class AvatarView extends FrameLayout {
     }
 
     private void resetStatusViews() {
-        spotView.setVisibility(GONE);
-        onlineTv.setText("");
-        onlineTv.setVisibility(GONE);
+        if (spotView.getVisibility() != GONE) spotView.setVisibility(GONE);
+        if (onlineTv.length() > 0) onlineTv.setText("");
+        if (onlineTv.getVisibility() != GONE) onlineTv.setVisibility(GONE);
     }
 
     private void clearImageRequest(Context context) {
@@ -277,7 +318,7 @@ public class AvatarView extends FrameLayout {
             Glide.with(context)
                     .load(model)
                     .dontAnimate()
-                    .apply(GlideRequestOptions.getInstance().normalRequestOption())
+                    .apply(GlideRequestOptions.getInstance().normalRequestOption().disallowHardwareConfig())
                     .listener(new RequestListener<Drawable>() {
                         @Override
                         public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
@@ -478,9 +519,9 @@ public class AvatarView extends FrameLayout {
      * prevents RecyclerView rebinding from pressuring the server.
      */
     public void showCachedAvatar(String channelID, byte channelType, String fallbackName) {
-        bindChannelKey(channelID, channelType);
+        boolean channelChanged = bindChannelKey(channelID, channelType);
         resetStatusViews();
-        clearForcedFlagAndHide();
+        if (channelChanged) clearForcedFlagAndHide();
 
         if (isTopicRoomId(channelID, channelType)) {
             clearImageRequest(getContext());
@@ -491,12 +532,11 @@ public class AvatarView extends FrameLayout {
         String country = getLocalSavedCountry(channelID);
         updateFlagByCountry(country);
 
-        String localPath = getLocalAvatarPath(channelID, channelType);
-        File localFile = new File(localPath);
+        File localFile = getLocalAvatarFile(channelID, channelType);
         String safeFallbackName = firstNotEmpty(fallbackName, channelID);
-        if (localFile.exists() && localFile.length() > 0) {
+        if (localFile != null) {
             prepareImageAvatar();
-            showChannelAvatarImage(localPath, "", safeFallbackName, channelID, channelID, channelType, false);
+            showChannelAvatarImage(localFile.getAbsolutePath(), "", safeFallbackName, channelID, channelID, channelType, false);
             return;
         }
 
@@ -506,7 +546,7 @@ public class AvatarView extends FrameLayout {
     }
 
     public void showAvatar(String channelID, byte channelType, String avatarCacheKey) {
-        bindChannelKey(channelID, channelType);
+        boolean channelChanged = bindChannelKey(channelID, channelType);
         resetStatusViews();
 
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
@@ -521,7 +561,7 @@ public class AvatarView extends FrameLayout {
         }
 
         prepareImageAvatar();
-        clearForcedFlagAndHide();
+        if (channelChanged) clearForcedFlagAndHide();
         String country = channel != null ? getChannelCountry(channel) : getLocalSavedCountry(channelID);
         updateFlagByCountry(country);
         if (TextUtils.isEmpty(country)) {
@@ -532,9 +572,9 @@ public class AvatarView extends FrameLayout {
     }
 
     public void showAvatar(String channelID, byte channelType, boolean showOnlineStatus) {
-        bindChannelKey(channelID, channelType);
+        boolean channelChanged = bindChannelKey(channelID, channelType);
         resetStatusViews();
-        clearForcedFlagAndHide();
+        if (channelChanged) clearForcedFlagAndHide();
 
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
         if (channel != null) {
@@ -555,9 +595,9 @@ public class AvatarView extends FrameLayout {
     }
 
     public void showAvatar(String channelID, byte channelType) {
-        bindChannelKey(channelID, channelType);
+        boolean channelChanged = bindChannelKey(channelID, channelType);
         resetStatusViews();
-        clearForcedFlagAndHide();
+        if (channelChanged) clearForcedFlagAndHide();
 
         WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(channelID, channelType);
         if (channel != null) {
@@ -588,10 +628,10 @@ public class AvatarView extends FrameLayout {
             return;
         }
 
-        bindChannelKey(channel.channelID, channel.channelType);
+        boolean channelChanged = bindChannelKey(channel.channelID, channel.channelType);
         prepareImageAvatar();
         resetStatusViews();
-        clearForcedFlagAndHide();
+        if (channelChanged) clearForcedFlagAndHide();
 
         String avatarCacheKey = channel.avatarCacheKey;
         String remoteUrl;
@@ -661,13 +701,16 @@ public class AvatarView extends FrameLayout {
             Glide.with(context)
                     .load(model)
                     .dontAnimate()
-                    .apply(GlideRequestOptions.getInstance().normalRequestOption())
+                    .apply(GlideRequestOptions.getInstance().normalRequestOption().disallowHardwareConfig())
                     .listener(new RequestListener<Drawable>() {
                         @Override
                         public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
                             post(() -> {
                                 if (!TextUtils.equals(expectedDisplayKey, boundDisplayKey)) return;
                                 lastAvatarLoadKey = "";
+                                if (!remoteModel && !TextUtils.isEmpty(channelID)) {
+                                    invalidateLocalAvatarFile(channelID, channelType, url);
+                                }
                                 setDefaultAvatarInternal(fallbackName, fallbackSeed, true);
                             });
                             return true;
@@ -676,7 +719,7 @@ public class AvatarView extends FrameLayout {
                         @Override
                         public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
                             if (saveToLocal && remoteModel && !TextUtils.isEmpty(channelID)) {
-                                saveAvatarDrawableToLocal(resource, channelID, channelType, avatarCacheKey);
+                                scheduleAvatarSave(resource, channelID, channelType, avatarCacheKey, url);
                             }
                             return false;
                         }
@@ -698,16 +741,20 @@ public class AvatarView extends FrameLayout {
             hideFlag();
             return;
         }
+        boolean changed = false;
         if (currentFlagResId != flagResId || flagIv.getDrawable() == null) {
             flagIv.setImageResource(flagResId);
             currentFlagResId = flagResId;
-            flagIv.invalidate();
+            changed = true;
         }
         if (flagIv.getVisibility() != VISIBLE) {
             flagIv.setVisibility(VISIBLE);
+            changed = true;
         }
-        flagIv.bringToFront();
-        invalidate();
+        if (changed) {
+            flagIv.bringToFront();
+            invalidate();
+        }
     }
 
     public void showFlag(String countryOrFlag) {
@@ -728,16 +775,18 @@ public class AvatarView extends FrameLayout {
     }
 
     private void hideFlag() {
-        if (flagIv != null) {
-            if (currentFlagResId != 0) {
-                flagIv.setImageDrawable(null);
-                currentFlagResId = 0;
-            }
-            if (flagIv.getVisibility() != GONE) {
-                flagIv.setVisibility(GONE);
-            }
-            invalidate();
+        if (flagIv == null) return;
+        boolean changed = false;
+        if (currentFlagResId != 0 || flagIv.getDrawable() != null) {
+            flagIv.setImageDrawable(null);
+            currentFlagResId = 0;
+            changed = true;
         }
+        if (flagIv.getVisibility() != GONE) {
+            flagIv.setVisibility(GONE);
+            changed = true;
+        }
+        if (changed) invalidate();
     }
 
     private void clearForcedFlagAndHide() {
@@ -768,9 +817,25 @@ public class AvatarView extends FrameLayout {
         return country;
     }
 
+    private String countryMemoryKey(String channelID) {
+        return safeString(WKConfig.getInstance().getUid()) + ":" + safeString(channelID);
+    }
+
     private String getLocalSavedCountry(String channelID) {
         Context context = getContext();
         if (context == null || TextUtils.isEmpty(channelID)) return "";
+        String memoryKey = countryMemoryKey(channelID);
+        String cached = COUNTRY_MEMORY_CACHE.get(memoryKey);
+        if (cached != null) {
+            if (!EMPTY_CACHE_VALUE.equals(cached)) return cached;
+            Long missTime = COUNTRY_MISS_TIME.get(memoryKey);
+            if (missTime != null && System.currentTimeMillis() - missTime < COUNTRY_MISS_RECHECK_MS) {
+                return "";
+            }
+            COUNTRY_MEMORY_CACHE.remove(memoryKey, EMPTY_CACHE_VALUE);
+            COUNTRY_MISS_TIME.remove(memoryKey);
+        }
+
         SharedPreferences preferences = context.getSharedPreferences(PROFILE_EXTRA_PREF, Context.MODE_PRIVATE);
         String country = preferences.getString("avatar_country_" + channelID, "");
         String uid = WKConfig.getInstance().getUid();
@@ -780,16 +845,30 @@ public class AvatarView extends FrameLayout {
                 country = preferences.getString("current_country", "");
             }
         }
+        if (TextUtils.isEmpty(country)) {
+            putBoundedCache(COUNTRY_MEMORY_CACHE, memoryKey, EMPTY_CACHE_VALUE);
+            putBoundedCache(COUNTRY_MISS_TIME, memoryKey, System.currentTimeMillis());
+        } else {
+            putBoundedCache(COUNTRY_MEMORY_CACHE, memoryKey, country);
+            COUNTRY_MISS_TIME.remove(memoryKey);
+        }
         return country;
     }
 
     private void saveLocalCountry(String channelID, String country) {
         Context context = getContext();
         if (context == null || TextUtils.isEmpty(channelID) || TextUtils.isEmpty(country)) return;
-        context.getSharedPreferences(PROFILE_EXTRA_PREF, Context.MODE_PRIVATE)
-                .edit()
-                .putString("avatar_country_" + channelID, country)
-                .apply();
+        String memoryKey = countryMemoryKey(channelID);
+        String previous = COUNTRY_MEMORY_CACHE.get(memoryKey);
+        putBoundedCache(COUNTRY_MEMORY_CACHE, memoryKey, country);
+        COUNTRY_MISS_TIME.remove(memoryKey);
+        if (TextUtils.equals(previous, country)) return;
+
+        SharedPreferences preferences = context.getSharedPreferences(PROFILE_EXTRA_PREF, Context.MODE_PRIVATE);
+        String persisted = preferences.getString("avatar_country_" + channelID, "");
+        if (!TextUtils.equals(persisted, country)) {
+            preferences.edit().putString("avatar_country_" + channelID, country).apply();
+        }
     }
 
     private int countryToFlagRes(String country) {
@@ -809,12 +888,7 @@ public class AvatarView extends FrameLayout {
         if (TextUtils.isEmpty(value)) return 0;
 
         String flagCode = extractFirstEmojiFlagCountryCode(value);
-        if (!TextUtils.isEmpty(flagCode)) {
-            return countryCodeToFlagRes(flagCode);
-        }
-        if (value.startsWith("馃實") || value.startsWith("馃寧") || value.startsWith("馃審")) {
-            return R.drawable.ic_flag_other;
-        }
+        if (!TextUtils.isEmpty(flagCode)) return countryCodeToFlagRes(flagCode);
 
         String normalized = value.toLowerCase(Locale.US)
                 .replace("_", "")
@@ -822,59 +896,81 @@ public class AvatarView extends FrameLayout {
                 .replace(" ", "")
                 .replace("/", "");
 
-        if (isCountry(normalized, "cn", "chn", "china", "chinese", "prc") || value.contains("涓浗") || value.contains("涓湅") || value.contains("涓枃") || value.contains("醼愥�涐��愥��")) return R.drawable.ic_flag_cn;
-        if (isCountry(normalized, "us", "usa", "unitedstates", "unitedstatesofamerica", "america", "american", "english") || value.contains("缇庡浗") || value.contains("缇庡湅") || value.contains("鑻辫") || value.contains("鑻辫獮") || value.contains("醼♂�欋�贬�涐���醼斸��") || value.contains("醼♂�勧�横�贯�傖�溼��曖��")) return R.drawable.ic_flag_us;
-        if (isCountry(normalized, "jp", "jpn", "japan", "japanese") || value.contains("鏃ユ湰") || value.contains("醼傖�会�曖�斸��")) return R.drawable.ic_flag_jp;
-        if (isCountry(normalized, "kr", "kor", "korea", "southkorea", "republicofkorea", "korean") || value.contains("闊╁浗") || value.contains("闊撳湅") || value.contains("醼�醼��涐��羔�氠���")) return R.drawable.ic_flag_kr;
+        if (isCountry(normalized, "cn", "chn", "china", "chinese", "prc")
+                || containsAny(value, "中国", "中國", "中文", "တရုတ်", "တရုတ်နိုင်ငံ")) return R.drawable.ic_flag_cn;
+        if (isCountry(normalized, "us", "usa", "unitedstates", "unitedstatesofamerica", "america", "american", "english")
+                || containsAny(value, "美国", "美國", "英语", "英語", "အမေရိကန်", "အင်္ဂလိပ်")) return R.drawable.ic_flag_us;
+        if (isCountry(normalized, "jp", "jpn", "japan", "japanese")
+                || containsAny(value, "日本", "日语", "日語", "ဂျပန်")) return R.drawable.ic_flag_jp;
+        if (isCountry(normalized, "kr", "kor", "korea", "southkorea", "republicofkorea", "korean")
+                || containsAny(value, "韩国", "韓國", "韩语", "韓語", "ကိုရီးယား")) return R.drawable.ic_flag_kr;
+        if (isCountry(normalized, "mm", "mya", "myanmar", "burma", "burmese")
+                || containsAny(value, "缅甸", "緬甸", "缅语", "緬語", "မြန်မာ")) return R.drawable.ic_flag_mm;
+        if (isCountry(normalized, "th", "tha", "thailand", "thai")
+                || containsAny(value, "泰国", "泰國", "泰语", "泰語", "ထိုင်း")) return R.drawable.ic_flag_th;
+        if (isCountry(normalized, "vn", "vnm", "vietnam", "vietnamese")
+                || containsAny(value, "越南", "越南语", "越南語", "ဗီယက်နမ်")) return R.drawable.ic_flag_vn;
+        if (isCountry(normalized, "la", "lao", "laos")
+                || containsAny(value, "老挝", "老撾", "寮国", "寮國", "လာအို")) return R.drawable.ic_flag_la;
+        if (isCountry(normalized, "kh", "khm", "cambodia", "khmer")
+                || containsAny(value, "柬埔寨", "高棉", "ကမ္ဘောဒီးယား")) return R.drawable.ic_flag_kh;
+        if (isCountry(normalized, "my", "mys", "malaysia", "malay")
+                || containsAny(value, "马来西亚", "馬來西亞", "马来语", "馬來語", "မလေးရှား")) return R.drawable.ic_flag_my;
+        if (isCountry(normalized, "sg", "sgp", "singapore")
+                || containsAny(value, "新加坡", "စင်ကာပူ")) return R.drawable.ic_flag_sg;
+        if (isCountry(normalized, "id", "idn", "indonesia", "indonesian")
+                || containsAny(value, "印度尼西亚", "印度尼西亞", "印尼", "အင်ဒိုနီးရှား")) return R.drawable.ic_flag_id;
+        if (isCountry(normalized, "ph", "phl", "philippines", "filipino", "tagalog")
+                || containsAny(value, "菲律宾", "菲律賓", "他加禄", "ဖိလစ်ပိုင်")) return R.drawable.ic_flag_ph;
+        if (isCountry(normalized, "bn", "brn", "brunei", "bruneian")
+                || containsAny(value, "文莱", "汶萊")) return R.drawable.ic_flag_bn;
 
-        if (isCountry(normalized, "mm", "mya", "myanmar", "burma", "burmese") || value.contains("缂呯敻") || value.contains("绶敻") || value.contains("醼欋�坚�斸�横�欋��")) return R.drawable.ic_flag_mm;
-        if (isCountry(normalized, "th", "tha", "thailand", "thai") || value.contains("娉板浗") || value.contains("娉板湅") || value.contains("娉拌獮") || value.contains("娉拌") || value.contains("醼戓���勧�横��")) return R.drawable.ic_flag_th;
-        if (isCountry(normalized, "vn", "vnm", "vietnam", "vietnamese") || value.contains("瓒婂崡") || value.contains("醼椺��氠��醼横�斸�欋��")) return R.drawable.ic_flag_vn;
-        if (isCountry(normalized, "la", "lao", "laos") || value.contains("鑰佹対") || value.contains("鑰佹捑") || value.contains("瀵湅") || value.contains("醼溼��♂���")) return R.drawable.ic_flag_la;
-        if (isCountry(normalized, "kh", "khm", "cambodia", "khmer") || value.contains("鏌煍瀵�") || value.contains("楂樻") || value.contains("醼�醼欋�贯�樶�贬��掅��羔�氠���") || value.contains("醼佱�欋��")) return R.drawable.ic_flag_kh;
-        if (isCountry(normalized, "my", "mys", "malaysia", "malay") || value.contains("椹潵瑗夸簹") || value.contains("棣締瑗夸簽") || value.contains("椹潵璇�") || value.contains("棣締瑾�") || value.contains("醼欋�溼�贬��")) return R.drawable.ic_flag_my;
-        if (isCountry(normalized, "sg", "sgp", "singapore") || value.contains("鏂板姞鍧�") || value.contains("醼呩�勧�横��醼�曖��")) return R.drawable.ic_flag_sg;
-        if (isCountry(normalized, "id", "idn", "indonesia", "indonesian") || value.contains("鍗板害灏艰タ浜�") || value.contains("鍗板凹")) return R.drawable.ic_flag_id;
-        if (isCountry(normalized, "ph", "phl", "philippines", "filipino", "tagalog") || value.contains("鑿插緥瀹�") || value.contains("鑿插緥璩�") || value.contains("浠栧姞绂�")) return R.drawable.ic_flag_ph;
-        if (isCountry(normalized, "bn", "brn", "brunei", "bruneian") || value.contains("鏂囪幈") || value.contains("姹惰悐")) return R.drawable.ic_flag_bn;
+        if (isCountry(normalized, "gb", "gbr", "uk", "unitedkingdom", "greatbritain", "britain", "british", "england")
+                || containsAny(value, "英国", "英國", "不列颠", "不列顛")) return R.drawable.ic_flag_gb;
+        if (isCountry(normalized, "fr", "fra", "france", "french") || containsAny(value, "法国", "法國", "法语", "法語")) return R.drawable.ic_flag_fr;
+        if (isCountry(normalized, "de", "deu", "ger", "germany", "german", "deutschland") || containsAny(value, "德国", "德國", "德语", "德語")) return R.drawable.ic_flag_de;
+        if (isCountry(normalized, "it", "ita", "italy", "italian") || containsAny(value, "意大利", "义大利", "義大利", "意语", "意語")) return R.drawable.ic_flag_it;
+        if (isCountry(normalized, "es", "esp", "spain", "spanish") || containsAny(value, "西班牙", "西语", "西語")) return R.drawable.ic_flag_es;
+        if (isCountry(normalized, "ru", "rus", "russia", "russian") || containsAny(value, "俄罗斯", "俄羅斯", "俄语", "俄語")) return R.drawable.ic_flag_ru;
+        if (isCountry(normalized, "nl", "nld", "netherlands", "holland", "dutch") || containsAny(value, "荷兰", "荷蘭")) return R.drawable.ic_flag_nl;
+        if (isCountry(normalized, "ua", "ukr", "ukraine", "ukrainian") || containsAny(value, "乌克兰", "烏克蘭")) return R.drawable.ic_flag_ua;
+        if (isCountry(normalized, "tr", "tur", "turkey", "turkiye", "türkiye", "turkish") || containsAny(value, "土耳其")) return R.drawable.ic_flag_tr;
+        if (isCountry(normalized, "pl", "pol", "poland", "polish") || containsAny(value, "波兰", "波蘭")) return R.drawable.ic_flag_pl;
+        if (isCountry(normalized, "gr", "grc", "greece", "greek") || containsAny(value, "希腊", "希臘")) return R.drawable.ic_flag_gr;
 
-        if (isCountry(normalized, "gb", "gbr", "uk", "unitedkingdom", "greatbritain", "britain", "british", "england") || value.contains("鑻卞浗") || value.contains("鑻卞湅") || value.contains("涓嶅垪棰�")) return R.drawable.ic_flag_gb;
-        if (isCountry(normalized, "fr", "fra", "france", "french") || value.contains("娉曞浗") || value.contains("娉曞湅") || value.contains("娉曡") || value.contains("娉曡獮")) return R.drawable.ic_flag_fr;
-        if (isCountry(normalized, "de", "deu", "ger", "germany", "german", "deutschland") || value.contains("寰峰浗") || value.contains("寰峰湅") || value.contains("寰疯") || value.contains("寰疯獮")) return R.drawable.ic_flag_de;
-        if (isCountry(normalized, "it", "ita", "italy", "italian") || value.contains("鎰忓ぇ鍒�") || value.contains("缇╁ぇ鍒�") || value.contains("鎰忚") || value.contains("鎰忚獮")) return R.drawable.ic_flag_it;
-        if (isCountry(normalized, "es", "esp", "spain", "spanish") || value.contains("瑗跨彮鐗�") || value.contains("瑗胯") || value.contains("瑗胯獮")) return R.drawable.ic_flag_es;
-        if (isCountry(normalized, "ru", "rus", "russia", "russian") || value.contains("淇勭綏鏂�") || value.contains("淇勭緟鏂�") || value.contains("淇勮") || value.contains("淇勮獮")) return R.drawable.ic_flag_ru;
-        if (isCountry(normalized, "nl", "nld", "netherlands", "holland", "dutch") || value.contains("鑽峰叞") || value.contains("鑽疯槶")) return R.drawable.ic_flag_nl;
-        if (isCountry(normalized, "ua", "ukr", "ukraine", "ukrainian") || value.contains("涔屽厠鍏�") || value.contains("鐑忓厠铇�")) return R.drawable.ic_flag_ua;
-        if (isCountry(normalized, "tr", "tur", "turkey", "turkiye", "t眉rkiye", "turkish") || value.contains("鍦熻�冲叾")) return R.drawable.ic_flag_tr;
-        if (isCountry(normalized, "pl", "pol", "poland", "polish") || value.contains("娉㈠叞") || value.contains("娉㈣槶")) return R.drawable.ic_flag_pl;
-        if (isCountry(normalized, "gr", "grc", "greece", "greek") || value.contains("甯岃厞") || value.contains("甯岃嚇")) return R.drawable.ic_flag_gr;
+        if (isCountry(normalized, "ae", "are", "uae", "unitedarabemirates", "emirates") || containsAny(value, "阿联酋", "阿聯酋")) return R.drawable.ic_flag_ae;
+        if (isCountry(normalized, "sa", "sau", "saudi", "saudiarabia", "arabia") || containsAny(value, "沙特", "沙特阿拉伯")) return R.drawable.ic_flag_sa;
+        if (isCountry(normalized, "qa", "qat", "qatar", "qatari") || containsAny(value, "卡塔尔", "卡塔爾")) return R.drawable.ic_flag_qa;
+        if (isCountry(normalized, "ir", "irn", "iran", "iranian", "persian") || containsAny(value, "伊朗", "波斯")) return R.drawable.ic_flag_ir;
+        if (isCountry(normalized, "il", "isr", "israel", "israeli", "hebrew") || containsAny(value, "以色列", "希伯来", "希伯來")) return R.drawable.ic_flag_il;
+        if (isCountry(normalized, "kw", "kwt", "kuwait", "kuwaiti") || containsAny(value, "科威特")) return R.drawable.ic_flag_kw;
+        if (isCountry(normalized, "eg", "egy", "egypt", "egyptian") || containsAny(value, "埃及")) return R.drawable.ic_flag_eg;
+        if (isCountry(normalized, "jo", "jor", "jordan", "jordanian") || containsAny(value, "约旦", "約旦")) return R.drawable.ic_flag_jo;
 
-        if (isCountry(normalized, "ae", "are", "uae", "unitedarabemirates", "emirates") || value.contains("闃胯仈閰�") || value.contains("闃胯伅閰�")) return R.drawable.ic_flag_ae;
-        if (isCountry(normalized, "sa", "sau", "saudi", "saudiarabia", "arabia") || value.contains("娌欑壒")) return R.drawable.ic_flag_sa;
-        if (isCountry(normalized, "qa", "qat", "qatar", "qatari") || value.contains("鍗″灏�") || value.contains("鍗″鐖�")) return R.drawable.ic_flag_qa;
-        if (isCountry(normalized, "ir", "irn", "iran", "iranian", "persian") || value.contains("浼婃湕") || value.contains("娉㈡柉")) return R.drawable.ic_flag_ir;
-        if (isCountry(normalized, "il", "isr", "israel", "israeli", "hebrew") || value.contains("浠ヨ壊鍒�") || value.contains("甯屼集鏉�") || value.contains("甯屼集渚�")) return R.drawable.ic_flag_il;
-        if (isCountry(normalized, "kw", "kwt", "kuwait", "kuwaiti") || value.contains("绉戝▉鐗�")) return R.drawable.ic_flag_kw;
-        if (isCountry(normalized, "eg", "egy", "egypt", "egyptian") || value.contains("鍩冨強")) return R.drawable.ic_flag_eg;
-        if (isCountry(normalized, "jo", "jor", "jordan", "jordanian") || value.contains("绾︽棪") || value.contains("绱勬棪")) return R.drawable.ic_flag_jo;
+        if (isCountry(normalized, "br", "bra", "brazil", "brazilian", "portuguese") || containsAny(value, "巴西", "葡萄牙语", "葡萄牙語")) return R.drawable.ic_flag_br;
+        if (isCountry(normalized, "ar", "arg", "argentina", "argentine", "argentinian") || containsAny(value, "阿根廷")) return R.drawable.ic_flag_ar;
+        if (isCountry(normalized, "cl", "chl", "chile", "chilean") || containsAny(value, "智利")) return R.drawable.ic_flag_cl;
+        if (isCountry(normalized, "pe", "per", "peru", "peruvian") || containsAny(value, "秘鲁", "秘魯")) return R.drawable.ic_flag_pe;
+        if (isCountry(normalized, "co", "col", "colombia", "colombian") || containsAny(value, "哥伦比亚", "哥倫比亞")) return R.drawable.ic_flag_co;
+        if (isCountry(normalized, "ve", "ven", "venezuela", "venezuelan") || containsAny(value, "委内瑞拉", "委內瑞拉")) return R.drawable.ic_flag_ve;
+        if (isCountry(normalized, "mx", "mex", "mexico", "mexican") || containsAny(value, "墨西哥")) return R.drawable.ic_flag_mx;
+        if (isCountry(normalized, "uy", "ury", "uruguay", "uruguayan") || containsAny(value, "乌拉圭", "烏拉圭")) return R.drawable.ic_flag_uy;
 
-        if (isCountry(normalized, "br", "bra", "brazil", "brazilian", "portuguese") || value.contains("宸磋タ") || value.contains("钁¤悇鐗欒") || value.contains("钁¤悇鐗欒獮")) return R.drawable.ic_flag_br;
-        if (isCountry(normalized, "ar", "arg", "argentina", "argentine", "argentinian") || value.contains("闃挎牴寤�")) return R.drawable.ic_flag_ar;
-        if (isCountry(normalized, "cl", "chl", "chile", "chilean") || value.contains("鏅哄埄")) return R.drawable.ic_flag_cl;
-        if (isCountry(normalized, "pe", "per", "peru", "peruvian") || value.contains("绉橀瞾") || value.contains("绉橀")) return R.drawable.ic_flag_pe;
-        if (isCountry(normalized, "co", "col", "colombia", "colombian") || value.contains("鍝ヤ鸡姣斾簹") || value.contains("鍝ュ�瘮浜�")) return R.drawable.ic_flag_co;
-        if (isCountry(normalized, "ve", "ven", "venezuela", "venezuelan") || value.contains("濮斿唴鐟炴媺") || value.contains("濮斿収鐟炴媺")) return R.drawable.ic_flag_ve;
-        if (isCountry(normalized, "mx", "mex", "mexico", "mexican") || value.contains("澧ㄨタ鍝�")) return R.drawable.ic_flag_mx;
-        if (isCountry(normalized, "uy", "ury", "uruguay", "uruguayan") || value.contains("涔屾媺鍦�") || value.contains("鐑忔媺鍦�")) return R.drawable.ic_flag_uy;
+        if (isCountry(normalized, "other", "others") || containsAny(value, "其他", "其它")) return R.drawable.ic_flag_other;
 
-        if (isCountry(normalized, "other", "others") || value.contains("鍏朵粬") || value.contains("鍏跺畠") || value.contains("醼♂�佱�坚���")) return R.drawable.ic_flag_other;
-
-        if (normalized.length() == 2 || normalized.length() == 3) {
-            int flagRes = countryCodeToFlagRes(normalized.toUpperCase(Locale.US));
-            return flagRes == 0 ? R.drawable.ic_flag_other : flagRes;
+        // Only ASCII ISO-like codes may use the two/three-character fallback.
+        if (normalized.matches("^[a-z]{2,3}$")) {
+            return countryCodeToFlagRes(normalized.toUpperCase(Locale.US));
         }
         return 0;
+    }
+
+    private boolean containsAny(String value, String... candidates) {
+        if (TextUtils.isEmpty(value) || candidates == null) return false;
+        for (String candidate : candidates) {
+            if (!TextUtils.isEmpty(candidate) && value.contains(candidate)) return true;
+        }
+        return false;
     }
 
     private boolean isCountry(String normalized, String... values) {
@@ -1020,9 +1116,12 @@ public class AvatarView extends FrameLayout {
         return "";
     }
 
-    private void bindChannelKey(String channelID, byte channelType) {
-        boundChannelKey = buildChannelKey(channelID, channelType);
+    private boolean bindChannelKey(String channelID, byte channelType) {
+        String newKey = buildChannelKey(channelID, channelType);
+        boolean changed = !TextUtils.equals(boundChannelKey, newKey);
+        boundChannelKey = newKey;
         boundDisplayKey = "channel_" + boundChannelKey;
+        return changed;
     }
 
     private String bindStandaloneDisplayKey(String type, String value, String avatarCacheKey, String fallbackSeed) {
@@ -1183,8 +1282,7 @@ public class AvatarView extends FrameLayout {
         resetStatusViews();
         if (!showOnlineStatus || channel == null) return;
 
-        // 鍙繚鐣欏彸涓婅鍦ㄧ嚎缁跨偣锛屽交搴曢殣钘忓ご鍍忓彸涓嬭鈥滄渶鍚庡湪绾挎椂闂粹�濄��
-        // 杩欐牱鍗充娇澶栭儴璋冪敤 showAvatar(channel, true)锛岀绾跨姸鎬佷篃涓嶄細鍐嶆樉绀烘棫鏃堕棿銆�
+        // 只保留头像右上角的在线绿点，离线时不显示旧的“最后在线时间”。
         if (channel.online == 1) {
             spotView.setVisibility(VISIBLE);
             spotView.bringToFront();
@@ -1250,7 +1348,7 @@ public class AvatarView extends FrameLayout {
             return formatOnlineTimestamp(timestamp);
         }
 
-        // Do not display raw cached strings such as "鏄ㄥぉ", "3灏忔椂鍓�" or "online_text".
+        // Do not display raw cached strings such as "昨天", "3小时前" or "online_text".
         // Those strings have no reliable timestamp, so a cached channel can make them appear forever.
         return "";
     }
@@ -1302,11 +1400,11 @@ public class AvatarView extends FrameLayout {
         long hour = 60L * minute;
         long day = 24L * hour;
 
-        if (diff < minute) return "鍒氬垰";
-        if (diff < hour) return (diff / minute) + "鍒嗛挓鍓�";
-        if (diff < day) return (diff / hour) + "灏忔椂鍓�";
-        if (diff < 2L * day) return "鏄ㄥぉ";
-        if (diff < 7L * day) return (diff / day) + "澶╁墠";
+        if (diff < minute) return "刚刚";
+        if (diff < hour) return (diff / minute) + "分钟前";
+        if (diff < day) return (diff / hour) + "小时前";
+        if (diff < 2L * day) return "昨天";
+        if (diff < 7L * day) return (diff / day) + "天前";
         return "";
     }
 
@@ -1317,6 +1415,8 @@ public class AvatarView extends FrameLayout {
             FAILED_PERSONAL_COUNTRY_FETCH_TIME.clear();
         }
         FLAG_RES_CACHE.clear();
+        COUNTRY_MEMORY_CACHE.clear();
+        COUNTRY_MISS_TIME.clear();
     }
 
     private String getAvatarURL(String channelID, byte channelType) {
@@ -1328,19 +1428,124 @@ public class AvatarView extends FrameLayout {
     }
 
     private String getAvatarURL(String channelID, byte channelType, String avatarCacheKey, String remoteUrl) {
-        String filePath = getLocalAvatarPath(channelID, channelType);
-        File file = new File(filePath);
-        if (file.exists() && file.length() > 0) {
+        File localFile = getLocalAvatarFile(channelID, channelType);
+        if (localFile != null) {
             String savedKey = getSavedAvatarCacheKey(channelID, channelType);
-            if (TextUtils.isEmpty(avatarCacheKey) || TextUtils.equals(savedKey, avatarCacheKey)) {
-                return filePath;
+            String requestedKey = effectiveAvatarCacheKey(avatarCacheKey, remoteUrl);
+            if (!TextUtils.isEmpty(requestedKey) && TextUtils.equals(savedKey, requestedKey)) {
+                return localFile.getAbsolutePath();
             }
         }
         return TextUtils.isEmpty(remoteUrl) ? WKApiConfig.getShowAvatar(channelID, channelType) : remoteUrl;
     }
 
+    private static String localAvatarCacheId(String channelID, byte channelType) {
+        return channelType + ":" + safeStatic(channelID);
+    }
+
+    private static String sanitizeFileComponent(String value) {
+        String raw = safeStatic(value);
+        String cached = SAFE_FILE_ID_CACHE.get(raw);
+        if (cached != null) return cached;
+        String safe = raw.replaceAll("[^a-zA-Z0-9_-]", "_");
+        if (!TextUtils.equals(raw, safe)) safe = Integer.toHexString(raw.hashCode()) + "_" + safe;
+        if (safe.length() > 96) safe = Integer.toHexString(raw.hashCode()) + "_" + safe.substring(0, 72);
+        putBoundedCache(SAFE_FILE_ID_CACHE, raw, safe);
+        return safe;
+    }
+
+    private static <K, V> void putBoundedCache(Map<K, V> cache, K key, V value) {
+        if (cache == null || key == null || value == null) return;
+        if (cache.size() >= SIMPLE_MEMORY_CACHE_MAX_SIZE && !cache.containsKey(key)) {
+            cache.clear();
+        }
+        cache.put(key, value);
+    }
+
+    private static boolean isLegacyFileNameSafe(String channelID) {
+        return !TextUtils.isEmpty(channelID) && channelID.matches("^[a-zA-Z0-9_-]+$");
+    }
+
+    private static String safeStatic(String value) {
+        return value == null ? "" : value;
+    }
+
+    private static String effectiveAvatarCacheKey(String avatarCacheKey, String sourceUrl) {
+        if (!TextUtils.isEmpty(avatarCacheKey)) return avatarCacheKey;
+        return TextUtils.isEmpty(sourceUrl) ? "" : "url:" + Integer.toHexString(sourceUrl.hashCode());
+    }
+
+    private static String buildLocalAvatarPath(String channelID, byte channelType) {
+        return WKConstants.avatarCacheDir + channelType + "_" + sanitizeFileComponent(channelID);
+    }
+
+    private static String buildLegacyLocalAvatarPath(String channelID, byte channelType) {
+        return WKConstants.avatarCacheDir + channelType + "_" + safeStatic(channelID);
+    }
+
     private String getLocalAvatarPath(String channelID, byte channelType) {
-        return WKConstants.avatarCacheDir + channelType + "_" + safeString(channelID);
+        return buildLocalAvatarPath(channelID, channelType);
+    }
+
+    private File getLocalAvatarFile(String channelID, byte channelType) {
+        String cacheId = localAvatarCacheId(channelID, channelType);
+        String cached = LOCAL_AVATAR_PATH_CACHE.get(cacheId);
+        if (cached != null) {
+            if (!EMPTY_CACHE_VALUE.equals(cached)) return new File(cached);
+            Long missTime = LOCAL_AVATAR_MISS_TIME.get(cacheId);
+            if (missTime != null && System.currentTimeMillis() - missTime < LOCAL_AVATAR_MISS_RECHECK_MS) {
+                return null;
+            }
+            LOCAL_AVATAR_PATH_CACHE.remove(cacheId, EMPTY_CACHE_VALUE);
+            LOCAL_AVATAR_MISS_TIME.remove(cacheId);
+        }
+
+        File file = new File(buildLocalAvatarPath(channelID, channelType));
+        if (file.exists() && file.length() > 0) {
+            putBoundedCache(LOCAL_AVATAR_PATH_CACHE, cacheId, file.getAbsolutePath());
+            LOCAL_AVATAR_MISS_TIME.remove(cacheId);
+            return file;
+        }
+        File legacy = new File(buildLegacyLocalAvatarPath(channelID, channelType));
+        if (isLegacyFileNameSafe(channelID)
+                && !TextUtils.equals(file.getAbsolutePath(), legacy.getAbsolutePath())
+                && legacy.exists() && legacy.length() > 0) {
+            putBoundedCache(LOCAL_AVATAR_PATH_CACHE, cacheId, legacy.getAbsolutePath());
+            LOCAL_AVATAR_MISS_TIME.remove(cacheId);
+            return legacy;
+        }
+        putBoundedCache(LOCAL_AVATAR_PATH_CACHE, cacheId, EMPTY_CACHE_VALUE);
+        putBoundedCache(LOCAL_AVATAR_MISS_TIME, cacheId, System.currentTimeMillis());
+        return null;
+    }
+
+    private static void markLocalAvatarFile(String channelID, byte channelType, File file) {
+        String cacheId = localAvatarCacheId(channelID, channelType);
+        putBoundedCache(LOCAL_AVATAR_PATH_CACHE, cacheId, file == null ? EMPTY_CACHE_VALUE : file.getAbsolutePath());
+        if (file == null) {
+            putBoundedCache(LOCAL_AVATAR_MISS_TIME, cacheId, System.currentTimeMillis());
+        } else {
+            LOCAL_AVATAR_MISS_TIME.remove(cacheId);
+        }
+    }
+
+    private static void invalidateLocalAvatarFile(String channelID, byte channelType, String failedPath) {
+        String cacheId = localAvatarCacheId(channelID, channelType);
+        putBoundedCache(LOCAL_AVATAR_PATH_CACHE, cacheId, EMPTY_CACHE_VALUE);
+        putBoundedCache(LOCAL_AVATAR_MISS_TIME, cacheId, System.currentTimeMillis());
+        if (TextUtils.isEmpty(failedPath)) return;
+        try {
+            File file = new File(failedPath);
+            File cacheDir = new File(WKConstants.avatarCacheDir);
+            String filePath = file.getCanonicalPath();
+            String cachePath = cacheDir.getCanonicalPath();
+            if (!filePath.startsWith(cachePath + File.separator)) return;
+            if (file.exists() && file.isFile() && !file.delete()) {
+                Log.w("AvatarView", "delete broken avatar cache failed: " + file.getAbsolutePath());
+            }
+        } catch (Throwable error) {
+            Log.w("AvatarView", "invalidate broken avatar cache failed", error);
+        }
     }
 
     private void loadAvatarFromGlideDiskCacheOnly(String url, String fallbackName, String fallbackSeed) {
@@ -1355,7 +1560,7 @@ public class AvatarView extends FrameLayout {
                     .load(url)
                     .onlyRetrieveFromCache(true)
                     .dontAnimate()
-                    .apply(GlideRequestOptions.getInstance().normalRequestOption())
+                    .apply(GlideRequestOptions.getInstance().normalRequestOption().disallowHardwareConfig())
                     .listener(new RequestListener<Drawable>() {
                         @Override
                         public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
@@ -1383,80 +1588,297 @@ public class AvatarView extends FrameLayout {
         }
     }
 
-    private void saveAvatarDrawableToLocal(Drawable drawable, String channelID, byte channelType, String avatarCacheKey) {
+    private static Object[] createAvatarFileLocks() {
+        Object[] locks = new Object[32];
+        for (int i = 0; i < locks.length; i++) locks[i] = new Object();
+        return locks;
+    }
+
+    private static Object avatarFileLock(String fileKey) {
+        int index = (safeStatic(fileKey).hashCode() & 0x7fffffff) % AVATAR_FILE_LOCKS.length;
+        return AVATAR_FILE_LOCKS[index];
+    }
+
+    private void scheduleAvatarSave(Drawable drawable, String channelID, byte channelType,
+                                    String avatarCacheKey, String sourceUrl) {
         if (drawable == null || TextUtils.isEmpty(channelID)) return;
+        String effectiveKey = effectiveAvatarCacheKey(avatarCacheKey, sourceUrl);
+        File existing = getLocalAvatarFile(channelID, channelType);
+        if (existing != null && !TextUtils.isEmpty(effectiveKey)
+                && TextUtils.equals(getSavedAvatarCacheKey(channelID, channelType), effectiveKey)) {
+            return;
+        }
+
+        String fileKey = localAvatarCacheId(channelID, channelType);
+        Object stateLock = avatarFileLock(fileKey);
+        final long version;
+        synchronized (stateLock) {
+            if (TextUtils.equals(PENDING_AVATAR_SAVE_KEYS.get(fileKey), effectiveKey)) return;
+            if (!tryAcquireAvatarSaveSlot()) return;
+            PENDING_AVATAR_SAVE_KEYS.put(fileKey, effectiveKey);
+            version = AVATAR_SAVE_SEQUENCE.incrementAndGet();
+            LATEST_AVATAR_SAVE_VERSION.put(fileKey, version);
+        }
+
+        Bitmap snapshot = createAvatarSnapshot(drawable, AVATAR_LOCAL_MAX_PX);
+        if (snapshot == null || snapshot.isRecycled()) {
+            finishAvatarSaveAttempt(fileKey, effectiveKey, version);
+            releaseAvatarSaveSlot();
+            return;
+        }
+
+        Context viewContext = getContext();
+        Context appContext = viewContext == null ? null : viewContext.getApplicationContext();
+        if (appContext == null) appContext = WKBaseApplication.getInstance().getContext();
+        final Context finalAppContext = appContext;
         try {
-            File file = new File(getLocalAvatarPath(channelID, channelType));
-            File parent = file.getParentFile();
-            if (parent != null && !parent.exists()) {
-                //noinspection ResultOfMethodCallIgnored
-                parent.mkdirs();
-            }
-            Bitmap bitmap = drawableToBitmap(drawable);
-            if (bitmap == null || bitmap.isRecycled()) return;
-            File tmp = new File(file.getAbsolutePath() + ".tmp");
-            FileOutputStream out = new FileOutputStream(tmp);
-            try {
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
-                out.flush();
-            } finally {
+            AVATAR_IO_EXECUTOR.execute(() -> {
                 try {
-                    out.close();
-                } catch (Exception ignored) {
+                    Long latest = LATEST_AVATAR_SAVE_VERSION.get(fileKey);
+                    if (latest == null || latest.longValue() != version) return;
+                    saveAvatarBitmapToLocal(snapshot, channelID, channelType, effectiveKey, version, finalAppContext);
+                } finally {
+                    if (!snapshot.isRecycled()) snapshot.recycle();
+                    finishAvatarSaveAttempt(fileKey, effectiveKey, version);
+                    releaseAvatarSaveSlot();
                 }
-            }
-            if (tmp.exists()) {
-                if (file.exists()) {
-                    //noinspection ResultOfMethodCallIgnored
-                    file.delete();
-                }
-                //noinspection ResultOfMethodCallIgnored
-                tmp.renameTo(file);
-            }
-            saveAvatarCacheKey(channelID, channelType, avatarCacheKey);
-        } catch (Exception ignored) {
+            });
+        } catch (Throwable error) {
+            if (!snapshot.isRecycled()) snapshot.recycle();
+            finishAvatarSaveAttempt(fileKey, effectiveKey, version);
+            releaseAvatarSaveSlot();
+            Log.w("AvatarView", "enqueue avatar cache failed", error);
         }
     }
 
-    private Bitmap drawableToBitmap(Drawable drawable) {
-        if (drawable instanceof BitmapDrawable) {
-            Bitmap bitmap = ((BitmapDrawable) drawable).getBitmap();
-            if (bitmap != null && !bitmap.isRecycled()) return bitmap;
+    private static boolean tryAcquireAvatarSaveSlot() {
+        while (true) {
+            int current = PENDING_AVATAR_SAVE_TASK_COUNT.get();
+            if (current >= MAX_PENDING_AVATAR_SAVE_TASKS) return false;
+            if (PENDING_AVATAR_SAVE_TASK_COUNT.compareAndSet(current, current + 1)) return true;
         }
-        int width = Math.max(1, drawable.getIntrinsicWidth());
-        int height = Math.max(1, drawable.getIntrinsicHeight());
-        if (width <= 1 || height <= 1) {
-            width = Math.max(1, imageView == null ? AndroidUtilities.dp(48) : imageView.getWidth());
-            height = Math.max(1, imageView == null ? AndroidUtilities.dp(48) : imageView.getHeight());
+    }
+
+    private static void releaseAvatarSaveSlot() {
+        while (true) {
+            int current = PENDING_AVATAR_SAVE_TASK_COUNT.get();
+            if (current <= 0) return;
+            if (PENDING_AVATAR_SAVE_TASK_COUNT.compareAndSet(current, current - 1)) return;
         }
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
-        drawable.draw(canvas);
-        return bitmap;
+    }
+
+    private static void finishAvatarSaveAttempt(String fileKey, String effectiveKey, long version) {
+        Long latest = LATEST_AVATAR_SAVE_VERSION.get(fileKey);
+        if (latest == null || latest.longValue() != version) return;
+        PENDING_AVATAR_SAVE_KEYS.remove(fileKey, effectiveKey);
+        LATEST_AVATAR_SAVE_VERSION.remove(fileKey, version);
+    }
+
+    private Bitmap createAvatarSnapshot(Drawable drawable, int maxPx) {
+        if (drawable == null) return null;
+        try {
+            int sourceWidth = Math.max(1, drawable.getIntrinsicWidth());
+            int sourceHeight = Math.max(1, drawable.getIntrinsicHeight());
+            if (drawable instanceof BitmapDrawable) {
+                Bitmap source = ((BitmapDrawable) drawable).getBitmap();
+                if (source != null && !source.isRecycled()) {
+                    sourceWidth = Math.max(1, source.getWidth());
+                    sourceHeight = Math.max(1, source.getHeight());
+                    float scale = Math.min(1f, maxPx / (float) Math.max(sourceWidth, sourceHeight));
+                    int width = Math.max(1, Math.round(sourceWidth * scale));
+                    int height = Math.max(1, Math.round(sourceHeight * scale));
+                    Bitmap softwareSource = source;
+                    boolean recycleSoftwareSource = false;
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                            && source.getConfig() == Bitmap.Config.HARDWARE) {
+                        softwareSource = source.copy(Bitmap.Config.ARGB_8888, false);
+                        if (softwareSource == null) return null;
+                        recycleSoftwareSource = true;
+                    }
+                    try {
+                        Bitmap output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                        Canvas canvas = new Canvas(output);
+                        canvas.drawBitmap(softwareSource, null, new Rect(0, 0, width, height), AVATAR_SNAPSHOT_PAINT);
+                        return output;
+                    } finally {
+                        if (recycleSoftwareSource && softwareSource != null && !softwareSource.isRecycled()) {
+                            softwareSource.recycle();
+                        }
+                    }
+                }
+            }
+
+            if (sourceWidth <= 1 || sourceHeight <= 1) {
+                sourceWidth = Math.max(1, imageView == null ? AndroidUtilities.dp(48) : imageView.getWidth());
+                sourceHeight = Math.max(1, imageView == null ? AndroidUtilities.dp(48) : imageView.getHeight());
+            }
+            float scale = Math.min(1f, maxPx / (float) Math.max(sourceWidth, sourceHeight));
+            int width = Math.max(1, Math.round(sourceWidth * scale));
+            int height = Math.max(1, Math.round(sourceHeight * scale));
+            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            Drawable snapshotDrawable = drawable;
+            Drawable.ConstantState constantState = drawable.getConstantState();
+            if (constantState != null) {
+                Drawable copy = constantState.newDrawable(getResources());
+                if (copy != null) snapshotDrawable = copy.mutate();
+            }
+            Rect oldBounds = snapshotDrawable.copyBounds();
+            try {
+                snapshotDrawable.setBounds(0, 0, width, height);
+                snapshotDrawable.draw(canvas);
+            } finally {
+                snapshotDrawable.setBounds(oldBounds);
+            }
+            return bitmap;
+        } catch (Throwable error) {
+            Log.w("AvatarView", "create avatar snapshot failed", error);
+            return null;
+        }
+    }
+
+    private void saveAvatarBitmapToLocal(Bitmap bitmap, String channelID, byte channelType,
+                                         String avatarCacheKey, long version, Context appContext) {
+        if (bitmap == null || bitmap.isRecycled()) return;
+        String fileKey = localAvatarCacheId(channelID, channelType);
+        Object lock = avatarFileLock(fileKey);
+
+        synchronized (lock) {
+            Long latest = LATEST_AVATAR_SAVE_VERSION.get(fileKey);
+            if (latest == null || latest.longValue() != version) return;
+
+            File file = new File(buildLocalAvatarPath(channelID, channelType));
+            File parent = file.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.exists()) return;
+            File tmp = new File(file.getAbsolutePath() + ".tmp_" + version);
+            File backup = new File(file.getAbsolutePath() + ".bak");
+            try (FileOutputStream out = new FileOutputStream(tmp)) {
+                Bitmap.CompressFormat format = Build.VERSION.SDK_INT >= 30
+                        ? Bitmap.CompressFormat.WEBP_LOSSY
+                        : Bitmap.CompressFormat.WEBP;
+                if (!bitmap.compress(format, AVATAR_LOCAL_QUALITY, out)) {
+                    throw new IllegalStateException("avatar compress failed");
+                }
+                out.flush();
+            } catch (Throwable error) {
+                //noinspection ResultOfMethodCallIgnored
+                tmp.delete();
+                Log.w("AvatarView", "write avatar cache failed", error);
+                return;
+            }
+
+            latest = LATEST_AVATAR_SAVE_VERSION.get(fileKey);
+            if (latest == null || latest.longValue() != version) {
+                //noinspection ResultOfMethodCallIgnored
+                tmp.delete();
+                return;
+            }
+
+            try {
+                if (backup.exists() && !backup.delete()) throw new IllegalStateException("delete avatar backup failed");
+                boolean hadOld = file.exists();
+                if (hadOld && !file.renameTo(backup)) throw new IllegalStateException("backup avatar failed");
+                if (!tmp.renameTo(file)) {
+                    if (hadOld && backup.exists()) {
+                        //noinspection ResultOfMethodCallIgnored
+                        backup.renameTo(file);
+                    }
+                    throw new IllegalStateException("replace avatar failed");
+                }
+                if (backup.exists() && !backup.delete()) {
+                    Log.w("AvatarView", "delete avatar backup failed: " + backup.getAbsolutePath());
+                }
+                File legacy = new File(buildLegacyLocalAvatarPath(channelID, channelType));
+                if (isLegacyFileNameSafe(channelID)
+                        && !TextUtils.equals(file.getAbsolutePath(), legacy.getAbsolutePath())
+                        && legacy.exists() && !legacy.delete()) {
+                    Log.w("AvatarView", "delete legacy avatar cache failed: " + legacy.getAbsolutePath());
+                }
+                markLocalAvatarFile(channelID, channelType, file);
+                saveAvatarCacheKey(appContext, channelID, channelType, avatarCacheKey);
+            } catch (Throwable error) {
+                //noinspection ResultOfMethodCallIgnored
+                tmp.delete();
+                Log.w("AvatarView", "replace avatar cache failed", error);
+            }
+        }
+    }
+
+    private String avatarMetaKey(String channelID, byte channelType) {
+        return "avatar_key_" + channelType + "_" + safeString(channelID);
     }
 
     private String getSavedAvatarCacheKey(String channelID, byte channelType) {
         Context context = getContext();
         if (context == null || TextUtils.isEmpty(channelID)) return "";
-        return context.getSharedPreferences(AVATAR_CACHE_META_PREF, Context.MODE_PRIVATE)
-                .getString("avatar_key_" + channelType + "_" + channelID, "");
+        String key = avatarMetaKey(channelID, channelType);
+        String cached = AVATAR_META_MEMORY_CACHE.get(key);
+        if (cached != null) return EMPTY_CACHE_VALUE.equals(cached) ? "" : cached;
+        String value = context.getSharedPreferences(AVATAR_CACHE_META_PREF, Context.MODE_PRIVATE).getString(key, "");
+        putBoundedCache(AVATAR_META_MEMORY_CACHE, key, TextUtils.isEmpty(value) ? EMPTY_CACHE_VALUE : value);
+        return value;
     }
 
-    private void saveAvatarCacheKey(String channelID, byte channelType, String avatarCacheKey) {
-        Context context = getContext();
+    private static void saveAvatarCacheKey(Context context, String channelID, byte channelType, String avatarCacheKey) {
         if (context == null || TextUtils.isEmpty(channelID)) return;
-        context.getSharedPreferences(AVATAR_CACHE_META_PREF, Context.MODE_PRIVATE)
-                .edit()
-                .putString("avatar_key_" + channelType + "_" + channelID, safeString(avatarCacheKey))
-                .apply();
+        String key = "avatar_key_" + channelType + "_" + safeStatic(channelID);
+        String value = safeStatic(avatarCacheKey);
+        String normalizedValue = TextUtils.isEmpty(value) ? EMPTY_CACHE_VALUE : value;
+        String previous = AVATAR_META_MEMORY_CACHE.get(key);
+        putBoundedCache(AVATAR_META_MEMORY_CACHE, key, normalizedValue);
+        if (TextUtils.equals(previous, normalizedValue)) return;
+        String persisted = context.getSharedPreferences(AVATAR_CACHE_META_PREF, Context.MODE_PRIVATE).getString(key, "");
+        if (!TextUtils.equals(persisted, value)) {
+            context.getSharedPreferences(AVATAR_CACHE_META_PREF, Context.MODE_PRIVATE)
+                    .edit().putString(key, value).apply();
+        }
     }
 
     public static void clearCache(String channelID, byte channelType) {
-        String filePath = WKConstants.avatarCacheDir + channelType + "_" + channelID;
-        File file = new File(filePath);
-        if (file.exists()) {
-            file.delete();
+        String cacheId = localAvatarCacheId(channelID, channelType);
+        Object lock = avatarFileLock(cacheId);
+        synchronized (lock) {
+            long invalidationVersion = AVATAR_SAVE_SEQUENCE.incrementAndGet();
+            LATEST_AVATAR_SAVE_VERSION.put(cacheId, invalidationVersion);
+            PENDING_AVATAR_SAVE_KEYS.remove(cacheId);
+
+            File file = new File(buildLocalAvatarPath(channelID, channelType));
+            File legacy = new File(buildLegacyLocalAvatarPath(channelID, channelType));
+            File backup = new File(file.getAbsolutePath() + ".bak");
+            File parent = file.getParentFile();
+            if (file.exists() && !file.delete()) {
+                Log.w("AvatarView", "delete avatar cache failed: " + file.getAbsolutePath());
+            }
+            if (isLegacyFileNameSafe(channelID)
+                    && !TextUtils.equals(file.getAbsolutePath(), legacy.getAbsolutePath())
+                    && legacy.exists() && !legacy.delete()) {
+                Log.w("AvatarView", "delete legacy avatar cache failed: " + legacy.getAbsolutePath());
+            }
+            if (backup.exists() && !backup.delete()) {
+                Log.w("AvatarView", "delete avatar backup failed: " + backup.getAbsolutePath());
+            }
+            if (parent != null) {
+                File[] tempFiles = parent.listFiles((dir, name) -> name.startsWith(file.getName() + ".tmp_"));
+                if (tempFiles != null) {
+                    for (File temp : tempFiles) {
+                        if (temp != null && temp.exists() && !temp.delete()) {
+                            Log.w("AvatarView", "delete avatar temp failed: " + temp.getAbsolutePath());
+                        }
+                    }
+                }
+            }
+
+            putBoundedCache(LOCAL_AVATAR_PATH_CACHE, cacheId, EMPTY_CACHE_VALUE);
+            putBoundedCache(LOCAL_AVATAR_MISS_TIME, cacheId, System.currentTimeMillis());
+            String metaKey = "avatar_key_" + channelType + "_" + safeStatic(channelID);
+            AVATAR_META_MEMORY_CACHE.remove(metaKey);
+            Context appContext = WKBaseApplication.getInstance().getContext();
+            if (appContext != null) {
+                appContext.getSharedPreferences(AVATAR_CACHE_META_PREF, Context.MODE_PRIVATE)
+                        .edit().remove(metaKey).apply();
+            }
+            LATEST_AVATAR_SAVE_VERSION.remove(cacheId, invalidationVersion);
         }
     }
+
 }
