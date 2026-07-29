@@ -1,4 +1,7 @@
 <resources>
+    <string name="partner_profile_id_format">ID：%1$s</string>
+    <string name="partner_profile_id_copied">ID 已复制</string>
+    <string name="partner_profile_id_copy_description">ID：%1$s，点击复制</string>
     <string name="partner_profile">语伴主页</string>
     <string name="partner_edit_profile">编辑资料</string>
     <string name="partner_edit_profile_tips">国籍、语言、生日和注册完善资料共用同一套后端字段；图片从手机选择后压缩上传服务器。</string>
