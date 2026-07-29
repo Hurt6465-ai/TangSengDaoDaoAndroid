@@ -1,4 +1,7 @@
 <resources>
+    <string name="partner_profile_id_format">ID: %1$s</string>
+    <string name="partner_profile_id_copied">ID copied</string>
+    <string name="partner_profile_id_copy_description">ID: %1$s. Tap to copy</string>
     <string name="partner_profile">Partner Profile</string>
     <string name="partner_edit_profile">Edit Profile</string>
     <string name="partner_edit_profile_tips">This page reuses the same backend fields as registration. Country, languages and birthday use pickers; tags and images are saved to server fields.</string>
