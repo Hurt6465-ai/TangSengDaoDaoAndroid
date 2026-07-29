@@ -243,9 +243,9 @@ Time %5$d min</string>
     <string name="learning_home_drawer_deepseek_desc">Chinese-Burmese translation and grammar help</string>
     <string name="learning_home_drawer_qianwen">Qianwen China</string>
     <string name="learning_home_drawer_qwen">Qwen Global</string>
-    <string name="learning_home_drawer_speech_settings">Speech settings</string>
+    <string name="learning_home_drawer_speech_settings">အသံဆက်တင်များ</string>
     <string name="learning_home_drawer_speech_desc">Configure the WKSpeech engine</string>
-    <string name="learning_home_drawer_scripts">Script center</string>
+    <string name="learning_home_drawer_scripts">စခရစ်စင်တာ</string>
     <string name="learning_home_drawer_scripts_desc">Custom extension features</string>
     <string name="learning_home_coming_soon">%1$s is in development</string>
     <string name="learning_home_speech_plugin_missing">Speech plugin is not installed</string>
@@ -368,15 +368,20 @@ Time %5$d min</string>
     <string name="learning_home_drawer_close">Close side menu</string>
     <string name="learning_home_drawer_common_group">Common</string>
     <string name="learning_home_drawer_learning_settings_group">Learning settings</string>
-    <string name="learning_home_drawer_contacts">Contacts</string>
+    <string name="learning_home_drawer_contacts">အဆက်အသွယ်များ</string>
     <string name="learning_home_drawer_contacts_desc">View friends and contacts</string>
-    <string name="learning_home_drawer_new_friends">New friends</string>
+    <string name="learning_home_drawer_new_friends">မိတ်ဆွေသစ်များ</string>
     <string name="learning_home_drawer_new_friends_desc">Review friend requests</string>
-    <string name="learning_home_drawer_add_friend">Add friend</string>
+    <string name="learning_home_drawer_add_friend">မိတ်ဆွေထည့်ရန်</string>
     <string name="learning_home_drawer_add_friend_desc">Search for an account</string>
-    <string name="learning_home_drawer_system_settings">System settings</string>
+    <string name="learning_home_drawer_system_settings">စနစ်ဆက်တင်များ</string>
     <string name="learning_home_drawer_system_settings_desc">Notifications, privacy and appearance</string>
     <string name="learning_home_contacts_unavailable">Contacts are currently unavailable</string>
     <string name="learning_home_feature_unavailable">%1$s is currently unavailable</string>
 
+
+    <string name="learning_home_drawer_profile_hint">ပရိုဖိုင်ကို ကြည့်ရန်</string>
+    <string name="learning_home_drawer_account_format">%1$s အကောင့်နံပါတ် - %2$s</string>
+    <string name="learning_home_drawer_default_name">Talkami အသုံးပြုသူ</string>
+    <string name="learning_home_drawer_chat_translate">ချတ်ဘာသာပြန်</string>
 </resources>
