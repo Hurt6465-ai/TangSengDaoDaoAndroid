@@ -1,4 +1,7 @@
 <resources>
+    <string name="partner_profile_id_format">ID: %1$s</string>
+    <string name="partner_profile_id_copied">ID ကို ကူးယူပြီးပါပြီ</string>
+    <string name="partner_profile_id_copy_description">ID: %1$s၊ ကူးယူရန် နှိပ်ပါ</string>
     <string name="partner_profile">ဘာသာဖက် ပရိုဖိုင်</string>
     <string name="partner_edit_profile">ပရိုဖိုင်ပြင်ရန်</string>
     <string name="partner_edit_profile_tips">ဤစာမျက်နှာသည် register ဖြည့်သည့် backend field များကိုပဲ ပြန်သုံးသည်။ နိုင်ငံ၊ ဘာသာစကားနှင့် မွေးနေ့ကို ရွေးချယ်စနစ်ဖြင့် ပြင်နိုင်သည်။</string>
