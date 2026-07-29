@@ -77,6 +77,7 @@ import com.chat.base.utils.WKPermissions;
 import com.chat.base.utils.WKReader;
 import com.chat.base.utils.WKToastUtils;
 import com.chat.uikit.chat.ChooseChatActivity;
+import com.chat.uikit.chat.adapter.ChatConversationAdapter;
 import com.chat.uikit.chat.face.WKVoiceViewManager;
 import com.chat.uikit.chat.manager.FaceManger;
 import com.chat.uikit.chat.manager.WKIMUtils;
@@ -574,6 +575,8 @@ public class WKUIKitApplication {
         EndpointManager.getInstance().invoke("partnerlist_clear_account", null);
         EndpointManager.getInstance().invoke("feedlist_clear_account", null);
         WKConfig.getInstance().clearInfo();
+        // UID 清空后再释放频道补拉状态；此后迟到的频道回调会因无登录 UID 直接忽略。
+        ChatConversationAdapter.clearChannelInfoFetchCache();
         WKIM.getInstance().getConnectionManager().disconnect(true);
         ActManagerUtils.getInstance().clearAllActivity();
         EndpointManager.getInstance().invoke("main_show_home_view", from);
