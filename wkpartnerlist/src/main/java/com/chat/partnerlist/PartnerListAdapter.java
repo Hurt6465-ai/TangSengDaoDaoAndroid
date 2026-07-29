@@ -13,6 +13,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -54,6 +55,7 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     private final Set<String> greetingPending = new HashSet<>();
     private final Set<String> greeted = new HashSet<>();
     private final LruCache<String, List<String>> localizedTagCache = new LruCache<>(160);
+    private final LruCache<String, Long> registrationTimeCache = new LruCache<>(160);
     private Set<String> recentlyAdded = Collections.emptySet();
     private long serverTime;
     private int greetingRemaining = 10;
@@ -66,7 +68,9 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
 
     @Override public long getItemId(int position) {
         PartnerListUser user = getItem(position);
-        return fnv1a64(user == null ? "" : user.stableId());
+        String uid = user == null ? "" : user.stableId();
+        // Activity 会过滤空 UID；这里仍提供位置兜底，避免异常数据产生重复 stable id。
+        return TextUtils.isEmpty(uid) ? Long.MIN_VALUE + position : fnv1a64(uid);
     }
 
     public void setServerTime(long value) {
@@ -89,15 +93,27 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
 
     public void markGreetingPending(String uid, boolean pending) {
         if (TextUtils.isEmpty(uid)) return;
-        if (pending) greetingPending.add(uid); else greetingPending.remove(uid);
-        notifyUid(uid, PAYLOAD_GREETING);
+        boolean changed = pending ? greetingPending.add(uid) : greetingPending.remove(uid);
+        if (changed) notifyUid(uid, PAYLOAD_GREETING);
     }
 
     public void markGreeted(String uid) {
         if (TextUtils.isEmpty(uid)) return;
-        greetingPending.remove(uid);
-        greeted.add(uid);
+        boolean changed = greetingPending.remove(uid);
+        changed |= greeted.add(uid);
+        if (changed) notifyUid(uid, PAYLOAD_GREETING);
+    }
+
+
+    public void refreshGreeting(String uid) {
+        if (TextUtils.isEmpty(uid)) return;
         notifyUid(uid, PAYLOAD_GREETING);
+    }
+
+    public void refreshAllGreetings() {
+        if (getItemCount() > 0) {
+            notifyItemRangeChanged(0, getItemCount(), PAYLOAD_GREETING);
+        }
     }
 
     public void refreshVisible(int first, int last) {
@@ -150,8 +166,12 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     }
 
     private void bind(VH holder, PartnerListUser user) {
-        if (user == null) return;
         ItemPartnerListBinding b = holder.binding;
+        if (user == null) {
+            b.getRoot().setVisibility(View.GONE);
+            return;
+        }
+        b.getRoot().setVisibility(View.VISIBLE);
         Context context = b.getRoot().getContext();
         String uid = user.stableId();
         b.cardSurface.setBackgroundResource(cardBackground(uid));
@@ -213,11 +233,23 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     private void bindBadges(ItemPartnerListBinding b, PartnerListUser user) {
         boolean fresh = recentlyAdded.contains(user.stableId());
         String registeredAt = user.registrationTimeRaw();
-        boolean joinedRecently = PartnerListTime.isWithinDays(registeredAt, serverTime, NEW_USER_DAYS);
-        if (TextUtils.isEmpty(registeredAt)) joinedRecently = user.is_new == 1;
+        long registeredMillis = parsedRegistrationTime(registeredAt);
+        boolean joinedRecently = registeredMillis > 0
+                ? PartnerListTime.isWithinDays(registeredMillis, serverTime, NEW_USER_DAYS)
+                : user.is_new == 1;
         // 推荐刷新标签优先，避免两个小标签同时挤压名字。
         b.freshBadge.setVisibility(fresh ? View.VISIBLE : View.GONE);
         b.newBadge.setVisibility(!fresh && joinedRecently ? View.VISIBLE : View.GONE);
+    }
+
+
+    private long parsedRegistrationTime(String raw) {
+        if (TextUtils.isEmpty(raw)) return 0L;
+        Long cached = registrationTimeCache.get(raw);
+        if (cached != null) return cached;
+        long parsed = PartnerListTime.parseFlexibleTime(raw);
+        registrationTimeCache.put(raw, parsed);
+        return parsed;
     }
 
     private void bindTags(VH holder, PartnerListUser user) {
@@ -235,8 +267,14 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         int minVisible = Math.min(maxVisible, myanmar ? 2 : 3);
         int available = b.tagsRow.getWidth();
         if (available <= 0) {
-            int screen = context.getResources().getDisplayMetrics().widthPixels;
-            available = Math.max(dp(context, 150), screen - dp(context, 149));
+            ViewParent parent = b.getRoot().getParent();
+            int hostWidth = parent instanceof View ? ((View) parent).getWidth() : 0;
+            int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
+            // 语伴页在大屏会限制到约 760dp，首次绑定时父容器可能尚未测量，不能退回整块物理屏幕宽度。
+            int contentCap = Math.min(screenWidth, dp(context, 760));
+            if (hostWidth <= 0) hostWidth = contentCap;
+            else hostWidth = Math.min(hostWidth, contentCap);
+            available = Math.max(dp(context, 150), hostWidth - dp(context, 149));
         }
 
         int count = maxVisible;
@@ -359,8 +397,10 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
 
         installGreetingPressEffect(b.greetingBtn);
         b.greetingBtn.setOnClickListener(v -> {
-            if (listener == null) return;
-            if (contacted) {
+            if (listener == null || greetingPending.contains(uid)) return;
+            // Do not rely on the bind-time snapshot: the relationship may change before this click.
+            boolean currentlyContacted = greeted.contains(uid) || PartnerPendingStore.get(uid) != null;
+            if (currentlyContacted) {
                 listener.onOpenChat(user);
             } else {
                 int pos = holder.getBindingAdapterPosition();
@@ -460,6 +500,7 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     }
 
     @Override public void onViewRecycled(@NonNull VH holder) {
+        holder.binding.getRoot().setVisibility(View.VISIBLE);
         holder.binding.cardRoot.setOnClickListener(null);
         holder.binding.greetingBtn.setOnClickListener(null);
         holder.binding.greetingBtn.setOnTouchListener(null);
@@ -499,28 +540,36 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         }
     }
 
+    private static boolean sameProfileContent(PartnerListUser a, PartnerListUser b) {
+        if (a.profile_version > 0 && b.profile_version > 0 && a.profile_version != b.profile_version) return false;
+        return TextUtils.equals(a.displayName(), b.displayName())
+                && TextUtils.equals(a.displayAvatar(), b.displayAvatar())
+                && TextUtils.equals(a.intro, b.intro)
+                && TextUtils.equals(a.country_code, b.country_code)
+                && TextUtils.equals(a.country, b.country)
+                && Objects.equals(a.nativeLanguages(), b.nativeLanguages())
+                && Objects.equals(a.learningLanguages(), b.learningLanguages())
+                && Objects.equals(a.tags(), b.tags())
+                && Objects.equals(a.profile_images, b.profile_images)
+                && TextUtils.equals(a.profile_cover, b.profile_cover)
+                && TextUtils.equals(a.vercode, b.vercode)
+                && TextUtils.equals(a.registrationTimeRaw(), b.registrationTimeRaw());
+    }
+
     private static final DiffUtil.ItemCallback<PartnerListUser> DIFF = new DiffUtil.ItemCallback<>() {
         @Override public boolean areItemsTheSame(@NonNull PartnerListUser oldItem, @NonNull PartnerListUser newItem) {
             return TextUtils.equals(oldItem.stableId(), newItem.stableId());
         }
 
         @Override public boolean areContentsTheSame(@NonNull PartnerListUser a, @NonNull PartnerListUser b) {
-            if (a.profile_version > 0 && b.profile_version > 0 && a.profile_version != b.profile_version) return false;
-            return TextUtils.equals(a.displayName(), b.displayName())
-                    && TextUtils.equals(a.displayAvatar(), b.displayAvatar())
-                    && TextUtils.equals(a.intro, b.intro)
-                    && TextUtils.equals(a.country_code, b.country_code)
-                    && TextUtils.equals(a.country, b.country)
-                    && Objects.equals(a.nativeLanguages(), b.nativeLanguages())
-                    && Objects.equals(a.learningLanguages(), b.learningLanguages())
-                    && Objects.equals(a.tags(), b.tags())
-                    && Objects.equals(a.profile_images, b.profile_images)
-                    && TextUtils.equals(a.profile_cover, b.profile_cover)
-                    && TextUtils.equals(a.vercode, b.vercode)
-                    && TextUtils.equals(a.registrationTimeRaw(), b.registrationTimeRaw())
+            return sameProfileContent(a, b)
                     && a.online == b.online
                     && a.last_active_at == b.last_active_at
                     && a.is_new == b.is_new;
+        }
+
+        @Override public Object getChangePayload(@NonNull PartnerListUser oldItem, @NonNull PartnerListUser newItem) {
+            return sameProfileContent(oldItem, newItem) ? PAYLOAD_TIME : null;
         }
     };
 }

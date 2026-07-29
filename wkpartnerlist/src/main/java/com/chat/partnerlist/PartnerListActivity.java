@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.chat.base.base.WKBaseActivity;
+import com.chat.base.config.WKConfig;
 import com.chat.base.endpoint.EndpointManager;
 import com.chat.base.net.IRequestResultListener;
 import com.chat.partnerlist.databinding.ActivityPartnerListBinding;
@@ -39,6 +40,7 @@ import com.chat.uikit.partner.PartnerPendingStore;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +48,9 @@ import java.util.Set;
 
 public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBinding> implements PartnerListAdapter.Listener {
     private static final long ONLINE_REFRESH_INTERVAL_MS = 4L * 60L * 1000L;
+    // Scrolling to idle must not turn into an online-status API request on every finger release.
+    private static final long ONLINE_SCROLL_REFRESH_MIN_INTERVAL_MS = 30_000L;
+    private static final long RECOMMENDATION_RETRY_DELAY_MS = 60_000L;
     private static final long CLOCK_TICK_MS = 60_000L;
     private static final int REQ_PROFILE_EDIT = 7301;
 
@@ -56,38 +61,65 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     private boolean requesting;
     private boolean onlineRequesting;
     private int onlineRequestSequence;
+    private int activeOnlineRequest;
+    private int recommendationRequestSequence;
+    private int activeRecommendationRequest;
+    private boolean recommendationRefreshPending;
+    private boolean recommendationPendingExplicitRetry;
     private boolean hasRenderedData;
     private boolean resumed;
     private boolean refreshAfterProfileEdit;
     private long serverTimeBase;
     private long elapsedTimeBase;
     private boolean lastErrorProfileRequired;
+    private long lastOnlineRefreshElapsed;
+    private final Set<String> greetingRequests = new HashSet<>();
+    private Runnable bannerHideRunnable;
+    private String sessionUid = "";
+    private final PartnerPendingStore.Listener pendingStoreListener = peerUid -> postToMain(() -> {
+        if (!isCurrentAccount() || adapter == null || TextUtils.isEmpty(peerUid)) return;
+        adapter.refreshGreeting(peerUid);
+    });
 
     private final Runnable onlineRunnable = new Runnable() {
         @Override public void run() {
-            if (!resumed || isFinishing() || isDestroyed()) return;
-            refreshVisibleOnline();
-            handler.postDelayed(this, ONLINE_REFRESH_INTERVAL_MS);
+            if (!isCurrentAccount() || !resumed || isFinishing() || isDestroyed()) return;
+            boolean started = refreshVisibleOnline();
+            if (resumed) {
+                handler.postDelayed(this, started
+                        ? ONLINE_REFRESH_INTERVAL_MS
+                        : ONLINE_SCROLL_REFRESH_MIN_INTERVAL_MS);
+            }
         }
     };
 
     private final Runnable clockRunnable = new Runnable() {
         @Override public void run() {
-            if (!resumed || isFinishing() || isDestroyed()) return;
+            if (!isCurrentAccount() || !resumed || isFinishing() || isDestroyed()) return;
             if (currentResponse != null) updateHeader(currentResponse);
             refreshVisibleTimeLabels();
             handler.postDelayed(this, CLOCK_TICK_MS);
         }
     };
 
-    private final Runnable rotationRunnable = () -> {
-        if (resumed && !requesting && currentResponse != null && !currentResponse.rotation_done) {
+    private final Runnable rotationRunnable = new Runnable() {
+        @Override public void run() {
+            if (!isCurrentAccount() || !resumed || isFinishing() || isDestroyed()
+                    || currentResponse == null || currentResponse.rotation_done) {
+                return;
+            }
+            if (requesting) {
+                handler.postDelayed(this, 5_000L);
+                return;
+            }
             requestRecommendations(false);
         }
     };
 
     private final Runnable dayBoundaryRunnable = () -> {
-        if (!resumed) return;
+        if (!isCurrentAccount() || !resumed) return;
+        invalidateRecommendationRequest();
+        invalidateOnlineRequest();
         PartnerListCache.clearCurrentAccount(this);
         currentResponse = null;
         hasRenderedData = false;
@@ -127,6 +159,7 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
         }
         window.getDecorView().setSystemUiVisibility(flags);
+        sessionUid = currentAccountUid();
         super.onCreate(savedInstanceState);
         // WKBaseActivity 会在 super.onCreate() 内再次设置状态栏模式，这里恢复本页的完整布局标志。
         window.getDecorView().setSystemUiVisibility(flags);
@@ -134,6 +167,7 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
 
     @Override protected void initView() {
         adapter = new PartnerListAdapter(this);
+        PartnerPendingStore.addListener(pendingStoreListener);
         layoutManager = new LinearLayoutManager(this);
         layoutManager.setRecycleChildrenOnDetach(true);
         layoutManager.setInitialPrefetchItemCount(4);
@@ -154,10 +188,15 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         applyTabletContentWidth();
 
         showSkeleton(true);
-        PartnerListCache.loadAsync(this, cached -> {
-            if (isFinishing() || isDestroyed() || currentResponse != null || cached == null) return;
+        PartnerListCache.loadAsync(this, cached -> postToMain(() -> {
+            if (!isCurrentAccount() || isFinishing() || isDestroyed() || currentResponse != null || cached == null) return;
+            String today = PartnerListTime.currentDayKey();
+            if (!TextUtils.isEmpty(cached.day_key) && !TextUtils.equals(cached.day_key, today)) {
+                PartnerListCache.clearCurrentAccount(this);
+                return;
+            }
             render(cached, true);
-        });
+        }));
     }
 
     @Override protected void initListener() {
@@ -186,7 +225,7 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
                 // 快速滑动时不启动在线批量请求，减少主线程回调与图片绑定争用。
                 handler.removeCallbacks(onlineRunnable);
                 if (newState == RecyclerView.SCROLL_STATE_IDLE) {
-                    handler.postDelayed(onlineRunnable, 700L);
+                    scheduleOnlineRefresh(700L);
                 }
             }
         });
@@ -199,7 +238,14 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     @Override protected void onResume() {
         super.onResume();
         resumed = true;
-        if (currentResponse != null && !TextUtils.equals(currentResponse.day_key, PartnerListTime.currentDayKey())) {
+        if (!isCurrentAccount()) {
+            finish();
+            return;
+        }
+        if (adapter != null) adapter.refreshAllGreetings();
+        if (currentResponse != null && !TextUtils.equals(currentResponse.day_key, PartnerListTime.dayKey(nowServer()))) {
+            invalidateRecommendationRequest();
+            invalidateOnlineRequest();
             PartnerListCache.clearCurrentAccount(this);
             currentResponse = null;
             hasRenderedData = false;
@@ -207,6 +253,7 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             requestRecommendations(false);
         } else if (refreshAfterProfileEdit) {
             refreshAfterProfileEdit = false;
+            invalidateRecommendationRequest();
             requestRecommendations(false);
         }
         scheduleAll();
@@ -218,66 +265,156 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         handler.removeCallbacks(clockRunnable);
         handler.removeCallbacks(rotationRunnable);
         handler.removeCallbacks(dayBoundaryRunnable);
+        // 不主动把仍在网络中的在线请求标记为空闲，避免快速暂停/恢复时并发两次请求。
         super.onPause();
     }
 
     @Override protected void onDestroy() {
         resumed = false;
+        abandonRecommendationRequest();
+        invalidateOnlineRequest();
+        greetingRequests.clear();
+        PartnerPendingStore.removeListener(pendingStoreListener);
+        if (bannerHideRunnable != null) handler.removeCallbacks(bannerHideRunnable);
         handler.removeCallbacksAndMessages(null);
-        if (wkVBinding != null) wkVBinding.recyclerView.setAdapter(null);
+        if (wkVBinding != null) {
+            wkVBinding.updateBanner.animate().cancel();
+            wkVBinding.recyclerView.setAdapter(null);
+        }
         super.onDestroy();
     }
 
     @Override protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_PROFILE_EDIT) {
+            // 正常 startActivityForResult 路径只在真正保存成功时刷新；用户按返回键不浪费一次推荐请求。
+            // 反射兜底页面没有 result 回调，仍由 onResume 中的 refreshAfterProfileEdit 处理。
             refreshAfterProfileEdit = false;
-            requestRecommendations(false);
+            if (resultCode == RESULT_OK) {
+                invalidateRecommendationRequest();
+                requestRecommendations(false);
+            }
         }
     }
 
     private void requestRecommendations(boolean explicitRetry) {
-        if (requesting) return;
+        if (!isCurrentAccount() || isFinishing() || isDestroyed() || wkVBinding == null) return;
+        if (requesting) {
+            // PartnerListModel does not expose a cancellable Disposable. Keep the real HTTP request
+            // as the single in-flight request and run only the newest refresh after its callback.
+            recommendationRefreshPending = true;
+            recommendationPendingExplicitRetry |= explicitRetry;
+            return;
+        }
+
+        boolean requestExplicitRetry = explicitRetry || recommendationPendingExplicitRetry;
+        recommendationRefreshPending = false;
+        recommendationPendingExplicitRetry = false;
+        final int requestId = ++recommendationRequestSequence;
+        final String requestUid = sessionUid;
+        activeRecommendationRequest = requestId;
         requesting = true;
         if (!hasRenderedData && currentResponse == null) showSkeleton(true);
         wkVBinding.retryBtn.setEnabled(false);
-        PartnerListModel.getInstance().recommendations(new IRequestResultListener<>() {
-            @Override public void onSuccess(PartnerListResponse result) {
-                requesting = false;
-                if (isFinishing() || isDestroyed()) return;
-                wkVBinding.retryBtn.setEnabled(true);
-                lastErrorProfileRequired = false;
-                wkVBinding.retryBtn.setText(R.string.partnerlist_retry);
-                if (result == null) {
-                    showError(getString(R.string.partnerlist_load_failed), false);
-                    return;
+        try {
+            PartnerListModel.getInstance().recommendations(new IRequestResultListener<>() {
+                @Override public void onSuccess(PartnerListResponse result) {
+                    postToMain(() -> handleRecommendationSuccess(requestId, requestUid, requestExplicitRetry, result));
                 }
-                PartnerListCache.saveAsync(PartnerListActivity.this, result);
-                render(result, false);
-                if (result.updated_count > 0) {
-                    showUpdateBanner(getResources().getQuantityString(R.plurals.partnerlist_updated_count,
-                            result.updated_count, result.updated_count));
-                }
-            }
 
-            @Override public void onFail(int code, String msg) {
-                requesting = false;
-                if (isFinishing() || isDestroyed()) return;
-                wkVBinding.retryBtn.setEnabled(true);
-                if (currentResponse == null && !hasRenderedData) {
-                    boolean profileRequired = isProfileRequiredError(code, msg);
-                    showError(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg, profileRequired);
-                } else if (explicitRetry) {
-                    toast(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg);
+                @Override public void onFail(int code, String msg) {
+                    postToMain(() -> handleRecommendationFailure(
+                            requestId, requestUid, requestExplicitRetry, code, msg));
                 }
-            }
-        });
+            });
+        } catch (Throwable throwable) {
+            postToMain(() -> handleRecommendationFailure(
+                    requestId, requestUid, requestExplicitRetry, -1, throwable.getMessage()));
+        }
+    }
+
+    private void handleRecommendationSuccess(int requestId, String requestUid,
+                                             boolean explicitRetry, PartnerListResponse result) {
+        if (!finishRecommendationRequest(requestId)) return;
+        if (!isRequestAccount(requestUid)) return;
+        if (requestId != recommendationRequestSequence || recommendationRefreshPending) {
+            runPendingRecommendationRefresh();
+            return;
+        }
+        if (isFinishing() || isDestroyed() || wkVBinding == null) return;
+        wkVBinding.retryBtn.setEnabled(true);
+        lastErrorProfileRequired = false;
+        wkVBinding.retryBtn.setText(R.string.partnerlist_retry);
+        if (result == null) {
+            handleRecommendationEmptyResult(explicitRetry);
+            return;
+        }
+        render(result, false);
+        PartnerListCache.saveAsync(PartnerListActivity.this, result);
+        if (result.updated_count > 0) {
+            showUpdateBanner(getResources().getQuantityString(R.plurals.partnerlist_updated_count,
+                    result.updated_count, result.updated_count));
+        }
+    }
+
+    private void handleRecommendationFailure(int requestId, String requestUid,
+                                             boolean explicitRetry, int code, String msg) {
+        if (!finishRecommendationRequest(requestId)) return;
+        if (!isRequestAccount(requestUid)) return;
+        if (requestId != recommendationRequestSequence || recommendationRefreshPending) {
+            runPendingRecommendationRefresh();
+            return;
+        }
+        if (isFinishing() || isDestroyed() || wkVBinding == null) return;
+        wkVBinding.retryBtn.setEnabled(true);
+        String message = TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_load_failed) : msg;
+        if (currentResponse == null && !hasRenderedData) {
+            boolean profileRequired = isProfileRequiredError(code, msg);
+            showError(message, profileRequired);
+        } else {
+            if (explicitRetry) toast(message);
+            scheduleRecommendationRetry();
+        }
+    }
+
+    private boolean finishRecommendationRequest(int requestId) {
+        if (requestId != activeRecommendationRequest) return false;
+        activeRecommendationRequest = 0;
+        requesting = false;
+        return true;
+    }
+
+    private void runPendingRecommendationRefresh() {
+        if (!recommendationRefreshPending) return;
+        boolean explicitRetry = recommendationPendingExplicitRetry;
+        recommendationRefreshPending = false;
+        recommendationPendingExplicitRetry = false;
+        if (isFinishing() || isDestroyed() || wkVBinding == null) return;
+        handler.post(() -> requestRecommendations(explicitRetry));
+    }
+
+    private void handleRecommendationEmptyResult(boolean explicitRetry) {
+        if (currentResponse == null && !hasRenderedData) {
+            showError(getString(R.string.partnerlist_load_failed), false);
+        } else {
+            if (explicitRetry) toast(getString(R.string.partnerlist_load_failed));
+            scheduleRecommendationRetry();
+        }
+    }
+
+    private void scheduleRecommendationRetry() {
+        handler.removeCallbacks(rotationRunnable);
+        if (resumed && currentResponse != null && !currentResponse.rotation_done) {
+            handler.postDelayed(rotationRunnable, RECOMMENDATION_RETRY_DELAY_MS);
+        }
     }
 
     private void render(PartnerListResponse response, boolean fromCache) {
+        invalidateOnlineRequest();
         currentResponse = response;
         updateServerClock(response.server_time);
-        List<PartnerListUser> users = new ArrayList<>(response.usersSafe());
+        List<PartnerListUser> users = sanitizeUsers(response.usersSafe());
+        response.users = new ArrayList<>(users);
         hasRenderedData = !users.isEmpty();
         showSkeleton(false);
         wkVBinding.errorLayout.setVisibility(View.GONE);
@@ -303,7 +440,20 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         adapter.submitList(users, () -> restoreScrollAnchor(restoreUid, restoreOffset));
         updateHeader(response);
         scheduleAll();
-        if (!fromCache) handler.postDelayed(this::refreshVisibleOnline, 500L);
+        if (!fromCache) scheduleOnlineRefresh(500L);
+    }
+
+    private List<PartnerListUser> sanitizeUsers(List<PartnerListUser> source) {
+        ArrayList<PartnerListUser> result = new ArrayList<>();
+        if (source == null || source.isEmpty()) return result;
+        Set<String> seen = new LinkedHashSet<>();
+        for (PartnerListUser user : source) {
+            if (user == null) continue;
+            String uid = user.stableId();
+            if (TextUtils.isEmpty(uid) || !seen.add(uid)) continue;
+            result.add(user);
+        }
+        return result;
     }
 
     private void restoreScrollAnchor(String uid, int offset) {
@@ -378,13 +528,32 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     }
 
     private void showUpdateBanner(String text) {
+        if (wkVBinding == null || TextUtils.isEmpty(text) || isFinishing() || isDestroyed()) return;
+        if (bannerHideRunnable != null) handler.removeCallbacks(bannerHideRunnable);
+        wkVBinding.updateBanner.animate().cancel();
         wkVBinding.updateBanner.setText(text);
         wkVBinding.updateBanner.setAlpha(0f);
         wkVBinding.updateBanner.setTranslationY(-dp(8));
         wkVBinding.updateBanner.setVisibility(View.VISIBLE);
-        wkVBinding.updateBanner.animate().alpha(1f).translationY(0f).setDuration(180L).withEndAction(() ->
-                handler.postDelayed(() -> wkVBinding.updateBanner.animate().alpha(0f).translationY(-dp(8)).setDuration(180L)
-                        .withEndAction(() -> wkVBinding.updateBanner.setVisibility(View.GONE)).start(), 2200L)).start();
+
+        final Runnable hideTask = new Runnable() {
+            @Override public void run() {
+                if (bannerHideRunnable != this || wkVBinding == null
+                        || isFinishing() || isDestroyed()) return;
+                wkVBinding.updateBanner.animate().cancel();
+                wkVBinding.updateBanner.animate().alpha(0f).translationY(-dp(8)).setDuration(180L)
+                        .withEndAction(() -> {
+                            if (bannerHideRunnable != this) return;
+                            if (wkVBinding != null) wkVBinding.updateBanner.setVisibility(View.GONE);
+                            bannerHideRunnable = null;
+                        }).start();
+            }
+        };
+        bannerHideRunnable = hideTask;
+        wkVBinding.updateBanner.animate().alpha(1f).translationY(0f).setDuration(180L)
+                .withEndAction(() -> {
+                    if (bannerHideRunnable == hideTask) handler.postDelayed(hideTask, 2200L);
+                }).start();
     }
 
     private void scheduleAll() {
@@ -392,25 +561,39 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         handler.removeCallbacks(onlineRunnable);
         handler.removeCallbacks(clockRunnable);
         handler.removeCallbacks(dayBoundaryRunnable);
-        handler.postDelayed(onlineRunnable, 700L);
+        if (hasRenderedData) scheduleOnlineRefresh(700L);
         handler.postDelayed(clockRunnable, CLOCK_TICK_MS);
-        long dayDelay = Math.max(1_000L, PartnerListTime.nextDayBoundaryMillis() - System.currentTimeMillis());
-        handler.postDelayed(dayBoundaryRunnable, dayDelay);
+        scheduleDayBoundary();
         if (currentResponse != null) scheduleRotation(currentResponse);
+    }
+
+
+    private void scheduleDayBoundary() {
+        handler.removeCallbacks(dayBoundaryRunnable);
+        if (!resumed || isFinishing() || isDestroyed()) return;
+        long serverNow = nowServer();
+        long dayDelay = Math.max(1_000L,
+                PartnerListTime.nextDayBoundaryMillis(serverNow) - serverNow);
+        handler.postDelayed(dayBoundaryRunnable, dayDelay);
     }
 
     private void scheduleRotation(PartnerListResponse response) {
         handler.removeCallbacks(rotationRunnable);
         if (response == null || response.rotation_done) return;
         long dueAt = PartnerListTime.nextDueAt(response.rotate_at, response.rotation_retry_at);
-        if (dueAt <= 0) return;
+        if (dueAt <= 0) {
+            // 服务端尚未给出明确轮换时间时不能永久停在“准备中”。
+            handler.postDelayed(rotationRunnable, RECOMMENDATION_RETRY_DELAY_MS);
+            return;
+        }
         long delay = dueAt - nowServer();
         if (delay <= 0) delay = 1_000L;
         handler.postDelayed(rotationRunnable, Math.min(delay, 6L * 60L * 60L * 1000L));
     }
 
-    private void refreshVisibleOnline() {
-        if (!hasRenderedData || layoutManager == null || adapter == null || requesting || onlineRequesting) return;
+    private boolean refreshVisibleOnline() {
+        if (!isCurrentAccount() || !resumed || !hasRenderedData || layoutManager == null || adapter == null
+                || requesting || onlineRequesting || isFinishing() || isDestroyed()) return false;
         int first = layoutManager.findFirstVisibleItemPosition();
         int last = layoutManager.findLastVisibleItemPosition();
         if (first == RecyclerView.NO_POSITION) first = 0;
@@ -418,57 +601,145 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         int end = Math.min(adapter.getItemCount(), last + 11);
         Set<String> ids = new LinkedHashSet<>();
         List<PartnerListUser> current = adapter.getCurrentList();
-        for (int i = Math.max(0, first); i < end; i++) {
+        for (int i = Math.max(0, first); i < end && i < current.size(); i++) {
             PartnerListUser user = current.get(i);
             if (user != null && !TextUtils.isEmpty(user.stableId())) ids.add(user.stableId());
         }
-        if (ids.isEmpty()) return;
-        onlineRequesting = true;
-        int requestId = ++onlineRequestSequence;
-        final int visibleFirst = first;
-        final int visibleLast = last;
-        PartnerListModel.getInstance().onlineBatch(new ArrayList<>(ids), new IRequestResultListener<>() {
-            @Override public void onSuccess(PartnerOnlineBatchResponse result) {
-                if (requestId != onlineRequestSequence) return;
-                onlineRequesting = false;
-                if (result == null || isFinishing() || isDestroyed()) return;
-                updateServerClock(result.server_time);
-                Map<String, PartnerOnlineState> map = new HashMap<>();
-                for (PartnerOnlineState state : result.usersSafe()) {
-                    if (state != null && !TextUtils.isEmpty(state.uid)) map.put(state.uid, state);
-                }
-                ArrayList<PartnerListUser> updated = new ArrayList<>();
-                boolean changed = false;
-                for (PartnerListUser original : adapter.getCurrentList()) {
-                    PartnerListUser user = original == null ? null : original.copy();
-                    if (user != null) {
-                        PartnerOnlineState state = map.get(user.stableId());
-                        if (state != null) {
-                            changed |= user.online != state.online || user.last_active_at != state.last_active_at;
-                            user.online = state.online;
-                            user.last_active_at = state.last_active_at;
-                        }
-                    }
-                    updated.add(user);
-                }
-                adapter.setServerTime(nowServer());
-                if (changed) {
-                    if (currentResponse != null) {
-                        currentResponse.users = updated;
-                        currentResponse.server_time = nowServer();
-                        PartnerListCache.saveAsync(PartnerListActivity.this, currentResponse);
-                    }
-                    adapter.submitList(new ArrayList<>(updated),
-                            () -> adapter.refreshVisible(visibleFirst, visibleLast));
-                } else {
-                    adapter.refreshVisible(visibleFirst, visibleLast);
-                }
-            }
+        if (ids.isEmpty()) return false;
 
-            @Override public void onFail(int code, String msg) {
-                if (requestId == onlineRequestSequence) onlineRequesting = false;
+        onlineRequesting = true;
+        lastOnlineRefreshElapsed = SystemClock.elapsedRealtime();
+        final int requestId = ++onlineRequestSequence;
+        final String requestUid = sessionUid;
+        activeOnlineRequest = requestId;
+        try {
+            PartnerListModel.getInstance().onlineBatch(new ArrayList<>(ids), new IRequestResultListener<>() {
+                @Override public void onSuccess(PartnerOnlineBatchResponse result) {
+                    postToMain(() -> handleOnlineSuccess(requestId, requestUid, result));
+                }
+
+                @Override public void onFail(int code, String msg) {
+                    postToMain(() -> handleOnlineFailure(requestId, requestUid));
+                }
+            });
+        } catch (Throwable ignored) {
+            if (requestId == activeOnlineRequest) {
+                activeOnlineRequest = 0;
+                onlineRequesting = false;
             }
-        });
+            return false;
+        }
+        return true;
+    }
+
+    private void handleOnlineSuccess(int requestId, String requestUid, PartnerOnlineBatchResponse result) {
+        if (!finishOnlineRequest(requestId)) return;
+        if (!isRequestAccount(requestUid)) return;
+        // 名单在请求期间已经变化：丢弃旧结果，并在旧请求真实结束后为新名单补发。
+        if (requestId != onlineRequestSequence) {
+            if (resumed && hasRenderedData) scheduleOnlineRefresh(500L);
+            return;
+        }
+        if (result == null) {
+            if (resumed) scheduleOnlineRefresh(ONLINE_SCROLL_REFRESH_MIN_INTERVAL_MS);
+            return;
+        }
+        if (!resumed || isFinishing() || isDestroyed() || adapter == null) return;
+        updateServerClock(result.server_time);
+        if (currentResponse != null) {
+            currentResponse.server_time = nowServer();
+            updateHeader(currentResponse);
+            scheduleRotation(currentResponse);
+            scheduleDayBoundary();
+        }
+        Map<String, PartnerOnlineState> map = new HashMap<>();
+        for (PartnerOnlineState state : result.usersSafe()) {
+            if (state != null && !TextUtils.isEmpty(state.uid)) map.put(state.uid, state);
+        }
+
+        ArrayList<PartnerListUser> updated = new ArrayList<>(adapter.getItemCount());
+        boolean changed = false;
+        for (PartnerListUser original : adapter.getCurrentList()) {
+            PartnerListUser user = original == null ? null : original.copy();
+            if (user != null) {
+                PartnerOnlineState state = map.get(user.stableId());
+                if (state != null) {
+                    changed |= user.online != state.online || user.last_active_at != state.last_active_at;
+                    user.online = state.online;
+                    user.last_active_at = state.last_active_at;
+                }
+            }
+            if (user != null) updated.add(user);
+        }
+
+        adapter.setServerTime(nowServer());
+        if (changed) {
+            if (currentResponse != null) {
+                currentResponse.users = new ArrayList<>(updated);
+                currentResponse.server_time = nowServer();
+                PartnerListCache.saveAsync(PartnerListActivity.this, currentResponse);
+            }
+            adapter.submitList(new ArrayList<>(updated), this::refreshVisibleTimeLabels);
+        } else {
+            refreshVisibleTimeLabels();
+        }
+    }
+
+
+    private void handleOnlineFailure(int requestId, String requestUid) {
+        if (!finishOnlineRequest(requestId)) return;
+        if (!isRequestAccount(requestUid)) return;
+        if (requestId != onlineRequestSequence) {
+            if (resumed && hasRenderedData) scheduleOnlineRefresh(500L);
+            return;
+        }
+        if (resumed) scheduleOnlineRefresh(ONLINE_SCROLL_REFRESH_MIN_INTERVAL_MS);
+    }
+
+    /** Only the real callback of the active HTTP request may release the single-request lock. */
+    private boolean finishOnlineRequest(int requestId) {
+        if (requestId != activeOnlineRequest) return false;
+        activeOnlineRequest = 0;
+        onlineRequesting = false;
+        return true;
+    }
+
+    private void scheduleOnlineRefresh(long preferredDelayMs) {
+        if (!resumed || isFinishing() || isDestroyed()) return;
+        handler.removeCallbacks(onlineRunnable);
+        long throttleDelay = 0L;
+        if (lastOnlineRefreshElapsed > 0L) {
+            long elapsed = Math.max(0L, SystemClock.elapsedRealtime() - lastOnlineRefreshElapsed);
+            throttleDelay = Math.max(0L, ONLINE_SCROLL_REFRESH_MIN_INTERVAL_MS - elapsed);
+        }
+        handler.postDelayed(onlineRunnable, Math.max(Math.max(0L, preferredDelayMs), throttleDelay));
+    }
+
+    private void invalidateOnlineRequest() {
+        // 只让旧结果失效，不能假装取消仍在执行的 Retrofit 请求。
+        // onlineRequesting 由该请求的真实 success/fail 回调释放，避免新旧请求重叠。
+        onlineRequestSequence++;
+        lastOnlineRefreshElapsed = 0L;
+        handler.removeCallbacks(onlineRunnable);
+    }
+
+    private void invalidateRecommendationRequest() {
+        recommendationRequestSequence++;
+        handler.removeCallbacks(rotationRunnable);
+        if (requesting) {
+            recommendationRefreshPending = true;
+        } else {
+            activeRecommendationRequest = 0;
+        }
+    }
+
+    private void abandonRecommendationRequest() {
+        recommendationRequestSequence++;
+        activeRecommendationRequest = 0;
+        requesting = false;
+        recommendationRefreshPending = false;
+        recommendationPendingExplicitRetry = false;
+        handler.removeCallbacks(rotationRunnable);
     }
 
     private void refreshVisibleTimeLabels() {
@@ -490,55 +761,138 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
     }
 
     @Override public void onOpenProfile(PartnerListUser user) {
-        if (user != null) PartnerListHostBridge.openProfile(this, user.stableId(), user.vercode);
+        if (!isCurrentAccount() || user == null || TextUtils.isEmpty(user.stableId())) return;
+        PartnerListHostBridge.openProfile(this, user.stableId(), user.vercode);
     }
 
     @Override public void onOpenChat(PartnerListUser user) {
-        if (user != null) PartnerListHostBridge.openChat(this, user.stableId());
+        if (!isCurrentAccount() || user == null || TextUtils.isEmpty(user.stableId())) return;
+        PartnerListHostBridge.openChat(this, user.stableId());
     }
 
     @Override public void onGreeting(PartnerListUser user, int position) {
-        if (user == null || currentResponse == null) return;
-        if (currentResponse.greeting_remaining <= 0) {
+        if (!isCurrentAccount() || user == null || currentResponse == null || adapter == null) return;
+        String uid = user.stableId();
+        if (TextUtils.isEmpty(uid)) return;
+        if (PartnerPendingStore.get(uid) != null) {
+            PartnerListHostBridge.openChat(this, uid);
+            return;
+        }
+        if (currentResponse.greeting_remaining - greetingRequests.size() <= 0) {
             showUpdateBanner(getString(R.string.partnerlist_daily_limit_message));
             return;
         }
-        String uid = user.stableId();
-        adapter.markGreetingPending(uid, true);
-        PartnerListModel.getInstance().sendGreeting(uid, getString(R.string.partnerlist_default_greeting), new IRequestResultListener<>() {
-            @Override public void onSuccess(PartnerGreetingResponse result) {
-                adapter.markGreetingPending(uid, false);
-                if (result != null && result.success()) {
-                    String greetingText = getString(R.string.partnerlist_default_greeting);
-                    PartnerListHostBridge.saveOutgoingGreeting(uid, greetingText, result);
-                    int maxPending = result.max_greeting_count > 0 ? result.max_greeting_count : 3;
-                    int pendingCount = Math.max(1, result.requester_msg_count);
-                    if (result.contact_status == 1) PartnerPendingStore.markActive(uid);
-                    else PartnerPendingStore.markRequester(uid, pendingCount, maxPending);
-                    adapter.markGreeted(uid);
-                    if (result.greeting_day_limit > 0) {
-                        currentResponse.greeting_limit = result.greeting_day_limit;
-                        currentResponse.greeting_used = Math.max(0, result.greeting_day_used);
-                        currentResponse.greeting_remaining = Math.max(0, result.greeting_day_remaining);
-                    } else {
-                        currentResponse.greeting_used = Math.min(currentResponse.greeting_limit, currentResponse.greeting_used + 1);
-                        currentResponse.greeting_remaining = Math.max(0, currentResponse.greeting_limit - currentResponse.greeting_used);
-                    }
-                    adapter.setGreetingRemaining(currentResponse.greeting_remaining);
-                    updateHeader(currentResponse);
-                    PartnerListCache.saveAsync(PartnerListActivity.this, currentResponse);
-                    showUpdateBanner(getString(R.string.partnerlist_greeting_success));
-                } else {
-                    toast(result == null || TextUtils.isEmpty(result.messageSafe())
-                            ? getString(R.string.partnerlist_greeting_failed) : result.messageSafe());
-                }
-            }
+        if (!greetingRequests.add(uid)) return;
+        refreshGreetingAvailability();
 
-            @Override public void onFail(int code, String msg) {
-                adapter.markGreetingPending(uid, false);
-                toast(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_greeting_failed) : msg);
+        final String requestUid = sessionUid;
+        final String greetingDayKey = currentResponse.day_key;
+        final String greetingText = getString(R.string.partnerlist_default_greeting);
+        adapter.markGreetingPending(uid, true);
+        try {
+            PartnerListModel.getInstance().sendGreeting(uid, greetingText, new IRequestResultListener<>() {
+                @Override public void onSuccess(PartnerGreetingResponse result) {
+                    postToMain(() -> handleGreetingSuccess(
+                            requestUid, uid, greetingDayKey, greetingText, result));
+                }
+
+                @Override public void onFail(int code, String msg) {
+                    postToMain(() -> handleGreetingFailure(requestUid, uid, msg));
+                }
+            });
+        } catch (Throwable throwable) {
+            postToMain(() -> handleGreetingFailure(requestUid, uid, throwable.getMessage()));
+        }
+    }
+
+    private void handleGreetingSuccess(String requestUid, String uid, String greetingDayKey,
+                                       String greetingText, PartnerGreetingResponse result) {
+        greetingRequests.remove(uid);
+        if (!isRequestAccount(requestUid)) return;
+        boolean alive = !isFinishing() && !isDestroyed() && wkVBinding != null;
+        if (alive && adapter != null) adapter.markGreetingPending(uid, false);
+        refreshGreetingAvailability();
+
+        if (result == null || !result.success()) {
+            if (alive) {
+                toast(result == null || TextUtils.isEmpty(result.messageSafe())
+                        ? getString(R.string.partnerlist_greeting_failed) : result.messageSafe());
             }
-        });
+            return;
+        }
+
+        // 即使页面已经关闭，也要落地本地消息和关系状态，避免服务端成功但本地显示未联系。
+        PartnerListHostBridge.saveOutgoingGreeting(uid, greetingText, result);
+        int maxPending = result.max_greeting_count > 0 ? result.max_greeting_count : 3;
+        int pendingCount = Math.max(1, result.requester_msg_count);
+        if (result.contact_status == 1) PartnerPendingStore.markActive(uid);
+        else PartnerPendingStore.markRequester(uid, pendingCount, maxPending);
+
+        if (!alive) return;
+        if (adapter != null) adapter.markGreeted(uid);
+        if (currentResponse != null && TextUtils.equals(greetingDayKey, currentResponse.day_key)) {
+            if (result.greeting_day_limit > 0) {
+                // Multiple greetings may complete out of order. Quota usage must only move forward;
+                // an older response must never increase the displayed remaining count again.
+                int limit = Math.max(1, result.greeting_day_limit);
+                int used = Math.max(Math.max(0, currentResponse.greeting_used),
+                        Math.max(0, result.greeting_day_used));
+                used = Math.min(limit, used);
+                int remaining = Math.max(0, limit - used);
+                if (result.greeting_day_remaining > 0 || used >= limit) {
+                    remaining = Math.min(remaining, Math.max(0, result.greeting_day_remaining));
+                }
+                currentResponse.greeting_limit = limit;
+                currentResponse.greeting_used = used;
+                currentResponse.greeting_remaining = remaining;
+            } else {
+                currentResponse.greeting_used = Math.min(
+                        currentResponse.greeting_limit, currentResponse.greeting_used + 1);
+                currentResponse.greeting_remaining = Math.max(
+                        0, currentResponse.greeting_limit - currentResponse.greeting_used);
+            }
+            refreshGreetingAvailability();
+            updateHeader(currentResponse);
+            PartnerListCache.saveAsync(PartnerListActivity.this, currentResponse);
+        }
+        showUpdateBanner(getString(R.string.partnerlist_greeting_success));
+    }
+
+    private void handleGreetingFailure(String requestUid, String uid, String msg) {
+        greetingRequests.remove(uid);
+        if (!isRequestAccount(requestUid)) return;
+        if (isFinishing() || isDestroyed() || wkVBinding == null) return;
+        if (adapter != null) adapter.markGreetingPending(uid, false);
+        refreshGreetingAvailability();
+        toast(TextUtils.isEmpty(msg) ? getString(R.string.partnerlist_greeting_failed) : msg);
+    }
+
+
+    private void refreshGreetingAvailability() {
+        if (adapter == null || currentResponse == null) return;
+        int available = Math.max(0, currentResponse.greeting_remaining - greetingRequests.size());
+        adapter.setGreetingRemaining(available);
+    }
+
+    private String currentAccountUid() {
+        String uid = WKConfig.getInstance().getUid();
+        return uid == null ? "" : uid;
+    }
+
+    private boolean isCurrentAccount() {
+        return !TextUtils.isEmpty(sessionUid) && TextUtils.equals(sessionUid, currentAccountUid());
+    }
+
+    private boolean isRequestAccount(String requestUid) {
+        return !TextUtils.isEmpty(requestUid)
+                && TextUtils.equals(requestUid, sessionUid)
+                && TextUtils.equals(requestUid, currentAccountUid());
+    }
+
+    private void postToMain(Runnable action) {
+        if (action == null) return;
+        if (Looper.myLooper() == Looper.getMainLooper()) action.run();
+        else handler.post(action);
     }
 
     private void openDatingHome() {
@@ -648,7 +1002,6 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
         float density = getResources().getDisplayMetrics().density;
         float widthDp = getResources().getDisplayMetrics().widthPixels / Math.max(1f, density);
         if (widthDp < 800f || wkVBinding.contentContainer == null) return;
-        View parent = (View) wkVBinding.contentContainer.getParent();
         if (!(wkVBinding.contentContainer.getLayoutParams() instanceof FrameLayout.LayoutParams)) return;
         FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) wkVBinding.contentContainer.getLayoutParams();
         params.width = dp(760);
