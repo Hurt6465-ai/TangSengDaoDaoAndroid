@@ -447,7 +447,7 @@ abstract class WKChatBaseProvider : BaseItemProvider<WKUIChatMsgItemEntity>() {
     private fun isSameMessage(a: WKMsg?, b: WKMsg?): Boolean {
         if (a == null || b == null) return false
         if (a === b) return true
-        if (a.clientSeq != 0 && a.clientSeq == b.clientSeq) return true
+        if (a.clientSeq != 0L && a.clientSeq == b.clientSeq) return true
         val sameClient = !TextUtils.isEmpty(a.clientMsgNO) && a.clientMsgNO == b.clientMsgNO
         val sameServer = !TextUtils.isEmpty(a.messageID) && a.messageID != "0" && a.messageID == b.messageID
         return sameClient || sameServer
