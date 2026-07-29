@@ -5,6 +5,9 @@ import java.util.List;
 
 public class PartnerProfileEntity {
     public String uid;
+    // 唐僧叨叨原版公开账号号：后端 /v1/users/{uid} 返回的 short_no。
+    // 它不是内部 UID；页面显示名称由当前 app_name 动态组成，例如“Talkami号”。
+    public String short_no;
     public String name;
     public String username;
     public String avatar;

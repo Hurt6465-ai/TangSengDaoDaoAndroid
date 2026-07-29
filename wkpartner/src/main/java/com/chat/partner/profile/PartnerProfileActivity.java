@@ -21,6 +21,7 @@ import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import androidx.fragment.app.Fragment;
@@ -94,6 +95,8 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     private View feedWorksSection;
     private TextView feedWorksTitleTv;
     private ViewGroup feedWorksContainer;
+    // 原版账号号（short_no）展示控件。运行时创建，避免要求额外修改 XML。
+    private TextView appAccountNoTv;
 
     @Override
     protected ActPartnerProfileBinding getViewBinding() {
@@ -122,6 +125,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
     @Override
     protected void initView() {
         ensureFixedTopBarViews();
+        ensureAppAccountNoView();
         setupImmersiveStatusBar();
         wkVBinding.avatarView.setSize(96);
         wkVBinding.editBtn.setVisibility(View.VISIBLE);
@@ -188,6 +192,97 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         if (feedWorksSection == null) feedWorksSection = findViewById(R.id.feedWorksSection);
         if (feedWorksTitleTv == null) feedWorksTitleTv = findViewById(R.id.feedWorksTitleTv);
         if (feedWorksContainer == null) feedWorksContainer = findViewById(R.id.feedWorksContainer);
+    }
+
+    /**
+     * 原版 MyInfoActivity/UserDetailActivity 展示的是 short_no，并把字段名称格式化为
+     * “%s号”，其中 %s 为当前 app_name。这里运行时创建控件，因此只替换两个 Java
+     * 文件即可，不依赖新增 profileIdTv 或额外字符串资源。
+     */
+    private void ensureAppAccountNoView() {
+        if (appAccountNoTv != null || wkVBinding == null || wkVBinding.profileHeaderLayout == null) return;
+
+        appAccountNoTv = new TextView(this);
+        appAccountNoTv.setId(View.generateViewId());
+        appAccountNoTv.setGravity(Gravity.CENTER_VERTICAL);
+        appAccountNoTv.setMaxLines(1);
+        appAccountNoTv.setEllipsize(TextUtils.TruncateAt.END);
+        appAccountNoTv.setTextColor(0xFF8A8A96);
+        appAccountNoTv.setTextSize(12);
+        appAccountNoTv.setIncludeFontPadding(false);
+        appAccountNoTv.setVisibility(View.GONE);
+
+        RelativeLayout.LayoutParams accountLp = new RelativeLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(24));
+        accountLp.addRule(RelativeLayout.BELOW, R.id.nameRow);
+        accountLp.topMargin = dp(1);
+        wkVBinding.profileHeaderLayout.addView(appAccountNoTv, accountLp);
+        updateLanguageAnchor(false);
+    }
+
+    private void bindAppAccountNo(PartnerProfileEntity data) {
+        ensureAppAccountNoView();
+        if (appAccountNoTv == null) return;
+
+        String shortNo = cleanAccountNo(data == null ? null : data.short_no);
+        if (TextUtils.isEmpty(shortNo) && isSelf && WKConfig.getInstance().getUserInfo() != null) {
+            shortNo = cleanAccountNo(WKConfig.getInstance().getUserInfo().short_no);
+        }
+
+        boolean visible = !TextUtils.isEmpty(shortNo);
+        if (visible) {
+            appAccountNoTv.setText(buildAppAccountNoText(shortNo));
+            appAccountNoTv.setVisibility(View.VISIBLE);
+        } else {
+            appAccountNoTv.setText("");
+            appAccountNoTv.setVisibility(View.GONE);
+        }
+        updateLanguageAnchor(visible);
+    }
+
+    private String cleanAccountNo(String value) {
+        if (TextUtils.isEmpty(value)) return "";
+        String clean = value.trim();
+        return "null".equalsIgnoreCase(clean) ? "" : clean;
+    }
+
+    private String buildAppAccountNoText(String shortNo) {
+        String appName = resolveStringByName("app_name", "Talkami");
+        int labelRes = getResources().getIdentifier("app_idnum", "string", getPackageName());
+        if (labelRes != 0) {
+            try {
+                // 与唐僧叨叨原 UserDetailActivity 的“%s号：”文案保持一致。
+                return getString(labelRes, appName) + shortNo;
+            } catch (Exception ignored) {
+            }
+        }
+
+        String language = Locale.getDefault().getLanguage();
+        if ("zh".equalsIgnoreCase(language)) return appName + "号：" + shortNo;
+        if ("my".equalsIgnoreCase(language)) return appName + " အိုင်ဒီ：" + shortNo;
+        return appName + " ID: " + shortNo;
+    }
+
+    private String resolveStringByName(String name, String fallback) {
+        int resId = getResources().getIdentifier(name, "string", getPackageName());
+        if (resId == 0) return fallback;
+        try {
+            String value = getString(resId);
+            return TextUtils.isEmpty(value) ? fallback : value;
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private void updateLanguageAnchor(boolean belowAccountNo) {
+        if (wkVBinding == null || wkVBinding.langLayout == null) return;
+        ViewGroup.LayoutParams rawLp = wkVBinding.langLayout.getLayoutParams();
+        if (!(rawLp instanceof RelativeLayout.LayoutParams)) return;
+        RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams) rawLp;
+        lp.removeRule(RelativeLayout.BELOW);
+        lp.addRule(RelativeLayout.BELOW, belowAccountNo && appAccountNoTv != null
+                ? appAccountNoTv.getId() : R.id.nameRow);
+        wkVBinding.langLayout.setLayoutParams(lp);
     }
 
     private void setupImmersiveStatusBar() {
@@ -570,6 +665,7 @@ public class PartnerProfileActivity extends WKBaseActivity<ActPartnerProfileBind
         showCountryFlagIfSupported(firstNotEmpty(data.country_code, data.country));
         bindCover(data.profile_cover);
         bindSexAge(data);
+        bindAppAccountNo(data);
         bindLanguages(data);
         bindIntro(data);
         bindTags(data);
