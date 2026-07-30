@@ -1,49 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
-    <string name="dating_title">恋爱匹配</string>
-    <string name="dating_tab_recommend">推荐</string>
-    <string name="dating_tab_nearby">附近</string>
-    <string name="dating_filter">筛选</string>
     <string name="dating_loading">正在为你挑选合适的人…</string>
     <string name="dating_retry">重试</string>
     <string name="dating_empty">暂时没有新的推荐</string>
     <string name="dating_empty_tip">可以放宽筛选，或稍后再来看看。</string>
     <string name="dating_like">喜欢</string>
     <string name="dating_pass">跳过</string>
-    <string name="dating_like_stamp">LIKE</string>
-    <string name="dating_nope_stamp">NOPE</string>
-    <string name="dating_match_title">互相喜欢了</string>
-    <string name="dating_match_notice_ready">你们已经互相喜欢，可以开始聊天。</string>
-    <string name="dating_match_notice_named">你和 %1$s 互相喜欢了，可以开始聊天。</string>
     <string name="dating_keep_swiping">继续匹配</string>
     <string name="dating_ok">知道了</string>
     <string name="dating_cancel">取消</string>
-    <string name="dating_apply">应用</string>
-    <string name="dating_photo_indicator">%1$d/%2$d</string>
-    <string name="dating_goal_love">认真恋爱</string>
-    <string name="dating_goal_marriage">奔结婚</string>
-    <string name="dating_goal_chat">先聊天了解</string>
-    <string name="dating_goal_long_term">稳定长期</string>
     <string name="dating_cross_open">可异国恋</string>
     <string name="dating_cross_prefer_foreign">喜欢异国恋</string>
     <string name="dating_cross_same_country">只接受本国</string>
-    <string name="dating_distance_unknown">推荐</string>
-    <string name="dating_mock_tip">当前显示内置演示图片，用于预览 UI。</string>
-    <string name="dating_match_score">%1$d%% 匹配</string>
-    <string name="dating_tap_more">点中间看资料</string>
-    <string name="dating_profile_preview">资料预览</string>
-    <string name="dating_filter_title">筛选偏好</string>
-    <string name="dating_filter_tip">交友按恋爱资料推荐：如果你的资料选择“只接受本国”，不会推荐异国用户；如果对方拒绝异国恋，也不会被推荐给你。</string>
-    <string name="dating_filter_country_smart">国家：智能推荐（尊重双方异国恋设置）</string>
-    <string name="dating_filter_country_same">国家：只看本国恋</string>
-    <string name="dating_filter_country_foreign">国家：只看可异国恋</string>
-    <string name="dating_filter_gender_all">性别：不限</string>
-    <string name="dating_filter_gender_female">性别：女生</string>
-    <string name="dating_filter_gender_male">性别：男生</string>
-    <string name="dating_filter_age">年龄：%1$d-%2$d 岁</string>
-    <string name="dating_filter_goal_love">意向：认真恋爱</string>
-    <string name="dating_filter_goal_marriage">意向：奔结婚</string>
-    <string name="dating_filter_goal_all">意向：不限</string>
     <string name="dating_rewind">撤回</string>
     <string name="dating_mine_title">我的交友</string>
     <string name="dating_action_failed">操作失败</string>
@@ -73,34 +41,29 @@
     <string name="dating_edit_profile_title">编辑交友资料</string>
     <string name="dating_my_photos">我的照片</string>
     <string name="dating_shared_profile">共享资料</string>
-    <string name="dating_shared_profile_tip">年龄、性别、国籍等会从语伴资料自动同步</string>
-    <string name="dating_enable">开启交友</string>
-    <string name="dating_enable_tip">只有开启后，才能刷别人</string>
+    <string name="dating_shared_profile_tip">头像、姓名、生日、国家等与账号资料共用，可直接编辑</string>
     <string name="dating_edit_gender">想认识</string>
     <string name="dating_edit_age">年龄偏好</string>
     <string name="dating_edit_orientation">性取向</string>
     <string name="dating_edit_drinking">饮酒</string>
     <string name="dating_edit_smoking">吸烟</string>
     <string name="dating_edit_dealbreakers">我反感</string>
-    <string name="dating_edit_ideal">希望对方</string>
     <string name="dating_edit_tags">补充标签</string>
     <string name="dating_save_profile">保存资料</string>
     <string name="dating_empty_content">暂无内容</string>
     <string name="dating_daily_quota">今日免费额度</string>
-    <string name="dating_edit_profile_menu">编辑交友资料</string>
     <string name="dating_who_likes_me">谁喜欢我</string>
     <string name="dating_membership">会员</string>
     <string name="dating_my_matches">我的匹配</string>
     <string name="dating_quota_rules">额度与规则</string>
     <string name="dating_section_ideal">希望对方</string>
-    <string name="dating_section_dealbreakers">我反感</string>
     <string name="dating_section_interests">兴趣与性格</string>
     <string name="dating_block">屏蔽</string>
     <string name="dating_report">举报</string>
     <string name="dating_who_likes_title">看看谁对你心动</string>
     <string name="dating_who_likes_tip">免费用户只显示人数与模糊预览。开通会员后可查看完整列表；双方喜欢后才可以聊天。</string>
     <string name="dating_membership_benefits">了解会员权益</string>
-    <string name="dating_photo_count_tip">已上传 %1$d/5 · 第一张为主图 · 空位可继续添加</string>
+    <string name="dating_photo_count_tip">已上传 %1$d/5 张 · 第一张为封面 · 单张压缩至 150KB 以下</string>
     <string name="dating_select">请选择</string>
     <string name="dating_not_filled">未填写</string>
     <string name="dating_uploading_wait">图片正在上传，请稍候</string>
@@ -115,7 +78,6 @@
     <string name="dating_primary_photo">主图</string>
     <string name="dating_photo_number">照片 %1$d</string>
     <string name="dating_confirm">确定</string>
-    <string name="dating_location_failed">位置更新失败，请稍后重试</string>
     <string name="dating_profile_load_failed">资料加载失败，请重试</string>
     <string name="dating_enable_first">先开启交友，才能开始刷人</string>
     <string name="dating_go_enable">去开启</string>
@@ -126,7 +88,6 @@
     <string name="dating_rewind_synced_refresh">撤回已同步，推荐列表将刷新</string>
     <string name="dating_rewind_record_synced">撤回记录已同步，推荐列表已刷新</string>
     <string name="dating_refresh_after_profile">正在根据新资料刷新推荐…</string>
-    <string name="dating_demo_tip">当前为开发演示图片，正式版接口失败不会显示假用户</string>
     <string-array name="dating_gender_options">
         <item>不限</item>
         <item>女生</item>
@@ -181,7 +142,6 @@
     <string name="dating_ideal_hint">例如：真诚、情绪稳定、愿意沟通</string>
     <string name="dating_tags_hint">如：爱旅行、会做饭、喜欢音乐</string>
     <string name="dating_back">返回</string>
-    <string name="dating_enable_recommend">开启交友推荐</string>
     <string name="dating_section_love_expectation">恋爱期待</string>
     <string name="dating_chat_now">立即聊天</string>
     <string name="dating_view_more">查看更多资料</string>
@@ -194,8 +154,6 @@
     <string name="dating_shared_career">职业与学历：%1$s</string>
     <string name="dating_upload_prepare">正在准备图片</string>
     <string name="dating_upload_processing">正在处理第 %1$d 张图片</string>
-    <string name="dating_upload_master">正在上传高清图 %1$d/%2$d</string>
-    <string name="dating_upload_card">正在上传推荐图 %1$d/%2$d</string>
     <string name="dating_upload_failed">图片上传失败</string>
     <string name="dating_upload_timeout">图片上传超时</string>
     <string name="dating_upload_url_failed">获取上传地址失败</string>
@@ -237,25 +195,6 @@
 
 不喜欢不限次数，但服务端会做频率防刷。</string>
     <string name="dating_membership_pending">会员和支付接口接入后开放</string>
-    <string name="dating_filter_cross_tip">如果任意一方选择只接受本国，系统不会推荐异国用户。</string>
-    <string name="dating_filter_country_title">国家/地区</string>
-    <string name="dating_filter_country_smart_value">智能推荐</string>
-    <string name="dating_filter_country_same_value">只看本国恋</string>
-    <string name="dating_filter_country_foreign_value">只看可异国恋</string>
-    <string name="dating_filter_gender_title">性别</string>
-    <string name="dating_filter_gender_all_value">不限</string>
-    <string name="dating_filter_gender_female_value">女生</string>
-    <string name="dating_filter_gender_male_value">男生</string>
-    <string name="dating_filter_age_title">年龄</string>
-    <string name="dating_filter_goal_title">意向</string>
-    <string name="dating_filter_goal_serious_value">认真恋爱</string>
-    <string name="dating_filter_goal_marriage_value">奔结婚</string>
-    <string name="dating_filter_goal_all_value">不限</string>
-
-    <string name="dating_filter_country_format">国家：%1$s</string>
-    <string name="dating_filter_gender_format">性别：%1$s</string>
-    <string name="dating_filter_age_format">年龄：%1$d-%2$d 岁</string>
-    <string name="dating_filter_goal_format">意向：%1$s</string>
     <string name="dating_delete_photo_action">删除照片</string>
     <string name="dating_photo_cache_failed">无法创建图片缓存目录</string>
     <string name="dating_photo_cache_unavailable">图片缓存目录不可用</string>
@@ -267,11 +206,8 @@
     <string name="dating_photo_encode_failed">图片编码失败</string>
     <string name="dating_invalid_image_uri">图片地址无效</string>
     <string name="dating_location_denied">未开启定位，无法查看附近的人</string>
-    <string name="dating_location_explain_again">为了继续查看附近的人，请重新开启定位权限。</string>
-    <string name="dating_location_explain_first">开启定位后才能查看附近的人。授权成功后，后续默认静默定位，不会重复询问。</string>
     <string name="dating_location_title">开启定位</string>
     <string name="dating_location_not_now">暂不</string>
-    <string name="dating_location_go_enable">去开启</string>
     <string name="dating_location_back_recommend">未开启定位，已切回推荐</string>
     <string name="dating_location_device_unavailable">当前设备无法获取定位</string>
     <string name="dating_location_service_off">请先打开系统定位服务</string>
@@ -282,13 +218,6 @@
     <string name="dating_section_relationship">恋爱期待</string>
     <string name="dating_section_ideal_partner">希望对方</string>
     <string name="dating_section_dealbreakers_title">我反感</string>
-    <string name="dating_filter_age_18_28">18-28 岁</string>
-    <string name="dating_filter_age_18_35">18-35 岁</string>
-    <string name="dating_filter_age_22_35">22-35 岁</string>
-    <string name="dating_filter_age_25_40">25-40 岁</string>
-    <string name="dating_filter_age_30_50">30-50 岁</string>
-    <string name="dating_filter_age_18_60">18-60 岁</string>
-
     <string name="dating_shared_age_value">%1$d岁</string>
     <string name="dating_shared_gender_female">女</string>
     <string name="dating_shared_gender_male">男</string>
@@ -323,4 +252,27 @@
     <string name="dating_mode_partner">语伴</string>
     <string name="dating_mode_dating">交友</string>
     <string name="dating_partner_unavailable">语伴列表模块加载失败，请检查 wkpartnerlist 模块</string>
+
+    <string name="dating_upload_photo">正在上传第 %1$d/%2$d 张照片</string>
+    <string name="dating_edit_shared_profile">编辑</string>
+    <string name="dating_saved_and_enabled">资料已保存，已开始为你推荐</string>
+    <string name="dating_status_visible">展示中</string>
+    <string name="dating_status_paused">已暂停</string>
+    <string name="dating_status_title">交友展示状态</string>
+    <string name="dating_pause_message">暂停后，其他用户将暂时看不到你的交友资料。已有匹配和好友不受影响。</string>
+    <string name="dating_resume_message">继续展示后，你的资料会重新进入交友推荐。</string>
+    <string name="dating_pause">暂停展示</string>
+    <string name="dating_resume">继续展示</string>
+    <string name="dating_location_open_settings_tip">你已关闭定位权限。可前往系统设置开启；不开启也能继续使用全球推荐。</string>
+    <string name="dating_location_open_settings">去设置</string>
+    <string name="dating_match_friend_created">你和 %1$s 互相喜欢，已自动成为好友，可以开始聊天了</string>
+
+    <string name="dating_distance_under_1km">1公里内</string>
+    <string name="dating_distance_1_5km">1–5公里</string>
+    <string name="dating_distance_5_20km">5–20公里</string>
+    <string name="dating_distance_20_50km">20–50公里</string>
+    <string name="dating_distance_50_100km">50–100公里</string>
+    <string name="dating_distance_over_100km">100公里以上</string>
+    <string name="dating_swipe_stamp_like">喜欢</string>
+    <string name="dating_swipe_stamp_favorite">收藏</string>
 </resources>
