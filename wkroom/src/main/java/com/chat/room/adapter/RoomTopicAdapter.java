@@ -4,6 +4,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 
@@ -38,12 +39,18 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         holder.setText(R.id.tagTv, "# " + tag);
         holder.setText(R.id.titleTv, room == null ? getContext().getString(R.string.peipe_room_tab_title) : room.getShowTitle());
         holder.setText(R.id.creatorNameTv, creatorName(room));
-        holder.getView(R.id.tagTv).setBackground(makeTagBackground(room == null ? "闲谈" : room.getRawTag()));
+        View tagView = holder.getView(R.id.tagTv);
+        tagView.setBackground(obtainTagBackground(tagView, room == null ? "闲谈" : room.getRawTag()));
 
         ImageView bgIv = holder.getView(R.id.bgIv);
         bgIv.setImageResource(backgroundRes(room == null ? 1 : room.background_index));
 
-        bindCardAvatars(holder, room);
+        int sideParticipantCount = room == null ? 0 : Math.max(0, room.getParticipantCount() - 1);
+        int avatarLimit = sideParticipantCount > SIDE_AVATAR_IDS.length
+                ? SIDE_AVATAR_IDS.length - 1
+                : SIDE_AVATAR_IDS.length;
+        int shownAvatarCount = bindCardAvatars(holder, room, avatarLimit);
+        bindParticipantCount(holder, room, shownAvatarCount);
 
         View card = holder.getView(R.id.cardRoot);
         card.setContentDescription(room == null || TextUtils.isEmpty(room.title) ? getContext().getString(R.string.peipe_room_tab_title) : room.title);
@@ -57,9 +64,16 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         return getContext().getString(R.string.peipe_room_creator);
     }
 
-    private GradientDrawable makeTagBackground(String rawTag) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setCornerRadius(8f);
+    private GradientDrawable obtainTagBackground(View tagView, String rawTag) {
+        Object cached = tagView == null ? null : tagView.getTag();
+        GradientDrawable drawable;
+        if (cached instanceof GradientDrawable) {
+            drawable = (GradientDrawable) cached;
+        } else {
+            drawable = new GradientDrawable();
+            drawable.setCornerRadius(getContext().getResources().getDisplayMetrics().density * 8f);
+            if (tagView != null) tagView.setTag(drawable);
+        }
         drawable.setColor(tagColor(rawTag));
         return drawable;
     }
@@ -70,7 +84,7 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         if ("找搭子".equals(rawTag)) return 0xFFEC4899;
         if ("工作".equals(rawTag)) return 0xFFF97316;
         if ("影视".equals(rawTag)) return 0xFF8B5CF6;
-        if ("音乐".equals(rawTag)) return 0xFF06B6D4;
+        if ("游戏".equals(rawTag) || "音乐".equals(rawTag)) return 0xFF06B6D4;
         if ("学习".equals(rawTag)) return 0xFF3B82F6;
         if ("交友".equals(rawTag)) return 0xFFEF4444;
         return 0xFF64748B;
@@ -101,16 +115,44 @@ public class RoomTopicAdapter extends BaseQuickAdapter<RoomTopicEntity, BaseView
         }
     }
 
-    private void bindCardAvatars(@NonNull BaseViewHolder holder, RoomTopicEntity room) {
+    private int bindCardAvatars(@NonNull BaseViewHolder holder,
+                                RoomTopicEntity room,
+                                int maxVisible) {
         AvatarView creatorAvatar = holder.getView(R.id.creatorAvatar);
         bindMemberAvatar(creatorAvatar, room == null ? null : room.getCreatorMember(), 44f);
 
-        List<RoomTopicEntity.RoomMember> members = room == null ? Collections.emptyList() : room.getSideMembers();
+        List<RoomTopicEntity.RoomMember> members =
+                room == null ? Collections.emptyList() : room.getSideMembers();
+        int shown = Math.min(Math.max(0, maxVisible), members == null ? 0 : members.size());
         for (int i = 0; i < SIDE_AVATAR_IDS.length; i++) {
             AvatarView avatarView = holder.getView(SIDE_AVATAR_IDS[i]);
-            RoomTopicEntity.RoomMember member = members != null && i < members.size() ? members.get(i) : null;
+            RoomTopicEntity.RoomMember member =
+                    members != null && i < shown ? members.get(i) : null;
             bindMemberAvatar(avatarView, member, 32f);
         }
+        return shown;
+    }
+
+    private void bindParticipantCount(@NonNull BaseViewHolder holder,
+                                      RoomTopicEntity room,
+                                      int shown) {
+        TextView countView = holder.getView(R.id.participantCountTv);
+        if (room == null) {
+            countView.setVisibility(View.GONE);
+            countView.setText("");
+            return;
+        }
+        // 创建者在左侧单独显示；人数超过 6 时右侧最多显示 5 个头像，
+        // 把最后一个视觉槽位留给 +N，避免 6 个头像再叠加数量圆导致窄屏溢出。
+        int remaining = Math.max(0,
+                room.getParticipantCount() - 1 - Math.max(0, shown));
+        if (remaining <= 0) {
+            countView.setVisibility(View.GONE);
+            countView.setText("");
+            return;
+        }
+        countView.setVisibility(View.VISIBLE);
+        countView.setText(remaining > 99 ? "99+" : "+" + remaining);
     }
 
     private void bindMemberAvatar(AvatarView avatarView, RoomTopicEntity.RoomMember member, float size) {
