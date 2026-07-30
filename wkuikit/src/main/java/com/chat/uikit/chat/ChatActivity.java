@@ -51,6 +51,11 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatImageView;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.ItemTouchHelper;
@@ -101,7 +106,6 @@ import com.chat.base.utils.WKReader;
 import com.chat.base.utils.WKTimeUtils;
 import com.chat.base.utils.WKToastUtils;
 import com.chat.base.utils.singleclick.SingleClickUtil;
-import com.chat.base.utils.systembar.WKStatusBarUtils;
 import com.chat.base.views.CommonAnim;
 import com.chat.base.views.swipeback.SwipeBackActivity;
 import com.chat.base.views.swipeback.SwipeBackLayout;
@@ -259,6 +263,16 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     };
     private ActChatLayoutBinding wkVBinding;
     private int unfilledHeight = 0;
+    // 输入栏浮在消息列表上方；动态 padding 只在布局高度或系统栏 inset 变化时更新。
+    private int recyclerBasePaddingLeft;
+    private int recyclerBasePaddingTop;
+    private int recyclerBasePaddingRight;
+    private int recyclerBasePaddingBottom;
+    private int unreadBaseBottomMargin;
+    private int contentOverlayBaseBottomMargin;
+    private boolean floatingComposerLayoutInstalled = false;
+    @Nullable
+    private View.OnLayoutChangeListener floatingComposerLayoutChangeListener;
     private final String loginUID = WKConfig.getInstance().getUid();
     private final int callingViewHeight = AndroidUtilities.dp(40f);
     private final int pinnedViewHeight = AndroidUtilities.dp(50f);
@@ -1902,10 +1916,148 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private void toggleStatusBarMode() {
         Window window = getWindow();
         if (window == null) return;
-        WKStatusBarUtils.transparentStatusBar(window);
-        if (!Theme.getDarkModeStatus(this))
-            WKStatusBarUtils.setDarkMode(window);
-        else WKStatusBarUtils.setLightMode(window);
+
+        // 让聊天背景真正绘制到状态栏和导航栏后方。IME 位移仍交给 PanelSwitchLayout。
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        window.setStatusBarColor(Color.TRANSPARENT);
+        window.setNavigationBarColor(Color.TRANSPARENT);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            window.setAttributes(params);
+            window.setNavigationBarDividerColor(Color.TRANSPARENT);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.setNavigationBarContrastEnforced(false);
+            window.setStatusBarContrastEnforced(false);
+        }
+
+        boolean useDarkIcons = !Theme.getDarkModeStatus(this);
+        WindowInsetsControllerCompat controller =
+                WindowCompat.getInsetsController(window, window.getDecorView());
+        controller.setAppearanceLightStatusBars(useDarkIcons);
+        controller.setAppearanceLightNavigationBars(useDarkIcons);
+    }
+
+    private void applyChatSystemBarInsets() {
+        if (wkVBinding == null || wkVBinding.rootView == null || wkVBinding.bottomView == null) return;
+
+        final View statusBarSpacer = wkVBinding.topLayout.statusBarSpacer;
+        final View titleView = wkVBinding.topLayout.titleView;
+        final int titleBaseLeft = titleView.getPaddingLeft();
+        final int titleBaseTop = titleView.getPaddingTop();
+        final int titleBaseRight = titleView.getPaddingRight();
+        final int titleBaseBottom = titleView.getPaddingBottom();
+        final int bottomBaseLeft = wkVBinding.bottomView.getPaddingLeft();
+        final int bottomBaseTop = wkVBinding.bottomView.getPaddingTop();
+        final int bottomBaseRight = wkVBinding.bottomView.getPaddingRight();
+        final int bottomBaseBottom = wkVBinding.bottomView.getPaddingBottom();
+
+        ViewCompat.setOnApplyWindowInsetsListener(wkVBinding.rootView, (view, insets) -> {
+            Insets bars = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+
+            if (statusBarSpacer != null && statusBarSpacer.getLayoutParams() != null
+                    && statusBarSpacer.getLayoutParams().height != bars.top) {
+                ViewGroup.LayoutParams params = statusBarSpacer.getLayoutParams();
+                params.height = bars.top;
+                statusBarSpacer.setLayoutParams(params);
+            }
+
+            titleView.setPadding(
+                    titleBaseLeft + bars.left,
+                    titleBaseTop,
+                    titleBaseRight + bars.right,
+                    titleBaseBottom
+            );
+            wkVBinding.bottomView.setPadding(
+                    bottomBaseLeft + bars.left,
+                    bottomBaseTop,
+                    bottomBaseRight + bars.right,
+                    bottomBaseBottom + bars.bottom
+            );
+            updateFloatingComposerSpacing();
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(wkVBinding.rootView);
+    }
+
+    private void installFloatingComposerLayout() {
+        if (floatingComposerLayoutInstalled || wkVBinding == null || wkVBinding.recyclerView == null) return;
+        floatingComposerLayoutInstalled = true;
+
+        recyclerBasePaddingLeft = wkVBinding.recyclerView.getPaddingLeft();
+        recyclerBasePaddingTop = wkVBinding.recyclerView.getPaddingTop();
+        recyclerBasePaddingRight = wkVBinding.recyclerView.getPaddingRight();
+        recyclerBasePaddingBottom = wkVBinding.recyclerView.getPaddingBottom();
+        wkVBinding.recyclerView.setClipToPadding(false);
+
+        View unreadRoot = wkVBinding.chatUnreadLayout.getRoot();
+        if (unreadRoot != null && unreadRoot.getLayoutParams() instanceof RelativeLayout.LayoutParams) {
+            unreadBaseBottomMargin =
+                    ((RelativeLayout.LayoutParams) unreadRoot.getLayoutParams()).bottomMargin;
+        }
+        if (wkVBinding.recyclerViewContentLayout.getLayoutParams() instanceof RelativeLayout.LayoutParams) {
+            contentOverlayBaseBottomMargin =
+                    ((RelativeLayout.LayoutParams) wkVBinding.recyclerViewContentLayout.getLayoutParams()).bottomMargin;
+        }
+
+        floatingComposerLayoutChangeListener = (view, left, top, right, bottom,
+                                                 oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (bottom - top != oldBottom - oldTop) {
+                updateFloatingComposerSpacing();
+            }
+        };
+        wkVBinding.bottomView.addOnLayoutChangeListener(floatingComposerLayoutChangeListener);
+        wkVBinding.bottomView.post(this::updateFloatingComposerSpacing);
+    }
+
+    private void updateFloatingComposerSpacing() {
+        if (!floatingComposerLayoutInstalled || wkVBinding == null || wkVBinding.bottomView == null
+                || wkVBinding.recyclerView == null) return;
+        int composerHeight = wkVBinding.bottomView.getHeight();
+        if (composerHeight <= 0) return;
+
+        boolean wasAtBottom = !wkVBinding.recyclerView.canScrollVertically(1);
+        int visualGap = AndroidUtilities.dp(8f);
+        int targetPaddingBottom = Math.max(recyclerBasePaddingBottom, composerHeight + visualGap);
+        boolean paddingChanged = wkVBinding.recyclerView.getPaddingBottom() != targetPaddingBottom;
+        if (paddingChanged) {
+            wkVBinding.recyclerView.setPadding(
+                    recyclerBasePaddingLeft,
+                    recyclerBasePaddingTop,
+                    recyclerBasePaddingRight,
+                    targetPaddingBottom
+            );
+        }
+
+        View unreadRoot = wkVBinding.chatUnreadLayout.getRoot();
+        if (unreadRoot != null && unreadRoot.getLayoutParams() instanceof RelativeLayout.LayoutParams) {
+            RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) unreadRoot.getLayoutParams();
+            int margin = unreadBaseBottomMargin + composerHeight;
+            if (params.bottomMargin != margin) {
+                params.bottomMargin = margin;
+                unreadRoot.setLayoutParams(params);
+            }
+        }
+
+        if (wkVBinding.recyclerViewContentLayout.getLayoutParams() instanceof RelativeLayout.LayoutParams) {
+            RelativeLayout.LayoutParams params =
+                    (RelativeLayout.LayoutParams) wkVBinding.recyclerViewContentLayout.getLayoutParams();
+            int margin = contentOverlayBaseBottomMargin + composerHeight;
+            if (params.bottomMargin != margin) {
+                params.bottomMargin = margin;
+                wkVBinding.recyclerViewContentLayout.setLayoutParams(params);
+            }
+        }
+
+        // 只有 padding 实际变化时才校正到底部，避免每次 inset 分发都触发无意义滚动。
+        if (paddingChanged && wasAtBottom && chatAdapter != null && chatAdapter.getItemCount() > 0) {
+            wkVBinding.recyclerView.post(this::chatRecyclerViewScrollToEnd);
+        }
     }
 
     private boolean initParam() {
@@ -2078,16 +2230,6 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     }).addContentScrollMeasurer(new ContentScrollMeasurer() {
                         @Override
                         public int getScrollDistance(int i) {
-                            return 0;
-                        }
-
-                        @Override
-                        public int getScrollViewId() {
-                            return R.id.imageView;
-                        }
-                    }).addContentScrollMeasurer(new ContentScrollMeasurer() {
-                        @Override
-                        public int getScrollDistance(int i) {
                             return i - unfilledHeight;
                         }
 
@@ -2122,6 +2264,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     protected void initView() {
+        applyChatSystemBarInsets();
+        installFloatingComposerLayout();
         EndpointManager.getInstance().invoke("set_chat_bg", new SetChatBgMenu(channelId, channelType, wkVBinding.imageView, wkVBinding.rootView, wkVBinding.blurView));
         PartnerPendingStore.addListener(partnerPendingListener);
         updatePartnerPendingUi();
@@ -4320,6 +4464,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             AndroidUtilities.isPORTRAIT = true;
             chatAdapter.notifyItemRangeChanged(0, chatAdapter.getItemCount());
         }
+        toggleStatusBarMode();
+        if (wkVBinding != null && wkVBinding.rootView != null) {
+            ViewCompat.requestApplyInsets(wkVBinding.rootView);
+            wkVBinding.bottomView.post(this::updateFloatingComposerSpacing);
+        }
     }
 
     private void sendImageContentAsync(WKMessageContent messageContent) {
@@ -4824,6 +4973,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             disposable = null;
         }
         asyncDisposables.clear();
+        if (wkVBinding != null && wkVBinding.bottomView != null
+                && floatingComposerLayoutChangeListener != null) {
+            wkVBinding.bottomView.removeOnLayoutChangeListener(floatingComposerLayoutChangeListener);
+            floatingComposerLayoutChangeListener = null;
+        }
         if (chatPanelManager != null) chatPanelManager.onDestroy();
         ActManagerUtils.getInstance().removeActivity(this);
         MsgModel.getInstance().startCheckFlameMsgTimer();
