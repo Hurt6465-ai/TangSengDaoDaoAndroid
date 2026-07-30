@@ -134,12 +134,12 @@ public class DatingCardStackAdapter extends RecyclerView.Adapter<DatingCardStack
     private static String contentSignature(DatingProfile p) {
         if (p == null) return "";
         return Objects.toString(p.safeName(), "") + '|' + p.age + '|' + p.normalizedSex() + '|'
-                + Objects.toString(p.displayLocation(), "") + '|' + p.online + '|'
+                + Objects.toString(p.city, "") + '|' + Objects.toString(p.country, "") + '|' + p.distanceBucket() + '|' + p.online + '|'
                 + Objects.toString(p.safeIntro(), "") + '|' + Objects.toString(p.safeRelationshipGoal(), "") + '|'
                 + Objects.toString(p.job, "") + '|' + Objects.toString(p.education, "") + '|'
                 + Objects.toString(p.relationship_status, "") + '|' + Objects.toString(p.sexual_orientation, "") + '|'
                 + p.height_cm + '|' + p.weight_kg + '|' + p.profile_score + '|'
-                + p.safePhotos().toString() + '|' + p.safeCardPhotos().toString() + '|' + p.safeTags().toString();
+                + p.safeDatingPhotos().toString() + '|' + p.safeTags().toString();
     }
 
     public static class CardHolder extends RecyclerView.ViewHolder {

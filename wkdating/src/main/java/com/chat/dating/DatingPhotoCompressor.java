@@ -12,11 +12,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 
-/**
- * 一张原图生成两份文件：
- * 1. master：最长边 1440，详情页使用；
- * 2. card：720x1280 边界内，推荐页与预加载使用。
- */
+/** 一张原图只生成一份 720x1280 边界内、150KB 以下的 WebP。 */
 public final class DatingPhotoCompressor {
     private DatingPhotoCompressor() {}
 
@@ -35,47 +31,24 @@ public final class DatingPhotoCompressor {
     }
 
     public static final class Result {
-        public final File master;
-        public final File card;
-
-        Result(File master, File card) {
-            this.master = master;
-            this.card = card;
-        }
+        public final File photo;
+        Result(File photo) { this.photo = photo; }
     }
 
     public static Result compress(File input, File outputDir) throws Exception {
         validateInput(input, outputDir);
-        File master = null;
-        File card = null;
-        try {
-            master = compressVariant(input, outputDir, "master",
-                    DatingPhotoPolicy.MASTER_MAX_EDGE, DatingPhotoPolicy.MASTER_MAX_EDGE,
-                    DatingPhotoPolicy.MASTER_TARGET_MAX_BYTES);
-            card = compressVariant(input, outputDir, "card",
-                    DatingPhotoPolicy.CARD_MAX_WIDTH, DatingPhotoPolicy.CARD_MAX_HEIGHT,
-                    DatingPhotoPolicy.CARD_TARGET_MAX_BYTES);
-            return new Result(master, card);
-        } catch (Throwable error) {
-            deleteQuietly(master);
-            deleteQuietly(card);
-            if (error instanceof PhotoException) throw (PhotoException) error;
-            if (error instanceof Exception) throw (Exception) error;
-            throw new PhotoException(R.string.dating_photo_compress_failed, error);
-        }
+        return new Result(compressVariant(input, outputDir));
     }
 
-    /** 兼容旧调用：返回推荐卡派生图。 */
+    /** 兼容旧调用。 */
     public static File compressToWebp(File input, File outputDir) throws Exception {
         validateInput(input, outputDir);
-        return compressVariant(input, outputDir, "card",
-                DatingPhotoPolicy.CARD_MAX_WIDTH, DatingPhotoPolicy.CARD_MAX_HEIGHT,
-                DatingPhotoPolicy.CARD_TARGET_MAX_BYTES);
+        return compressVariant(input, outputDir);
     }
 
     private static void validateInput(File input, File outputDir) throws Exception {
         if (input == null || !input.isFile()) throw new PhotoException(R.string.dating_read_image_failed);
-        if (input.length() > 20L * 1024L * 1024L) throw new PhotoException(R.string.dating_photo_too_large);
+        if (input.length() > DatingPhotoPolicy.MAX_INPUT_BYTES) throw new PhotoException(R.string.dating_photo_too_large);
         if (outputDir == null) throw new PhotoException(R.string.dating_photo_cache_unavailable);
         if (!outputDir.exists() && !outputDir.mkdirs()) throw new PhotoException(R.string.dating_photo_cache_failed);
         if (!outputDir.isDirectory()) throw new PhotoException(R.string.dating_photo_cache_unavailable);
@@ -89,38 +62,45 @@ public final class DatingPhotoCompressor {
         }
     }
 
-    private static File compressVariant(File input, File outputDir, String suffix,
-                                        int maxWidth, int maxHeight, int targetBytes) throws Exception {
+    private static File compressVariant(File input, File outputDir) throws Exception {
         Bitmap bitmap = null;
         File out = null;
         boolean completed = false;
         try {
-            bitmap = decodeSampled(input, maxWidth, maxHeight);
+            bitmap = decodeSampled(input, DatingPhotoPolicy.PHOTO_MAX_WIDTH, DatingPhotoPolicy.PHOTO_MAX_HEIGHT);
             bitmap = applyExifOrientation(input, bitmap);
-            bitmap = scaleInside(bitmap, maxWidth, maxHeight);
+            bitmap = scaleInside(bitmap, DatingPhotoPolicy.PHOTO_MAX_WIDTH, DatingPhotoPolicy.PHOTO_MAX_HEIGHT);
             if (bitmap == null) throw new PhotoException(R.string.dating_photo_process_failed);
 
             int quality = DatingPhotoPolicy.WEBP_START_QUALITY;
             byte[] bytes = encode(bitmap, quality);
-            while (bytes.length > targetBytes && quality > DatingPhotoPolicy.WEBP_MIN_QUALITY) {
+            while (bytes.length > DatingPhotoPolicy.PHOTO_TARGET_MAX_BYTES
+                    && quality > DatingPhotoPolicy.WEBP_MIN_QUALITY) {
                 quality -= 4;
                 bytes = encode(bitmap, quality);
             }
-            // 极复杂照片在最低质量仍超限时小步缩放，最多循环 6 次，避免无限重编码。
+
             int resizeCount = 0;
-            while (bytes.length > targetBytes && resizeCount < 6
-                    && Math.min(bitmap.getWidth(), bitmap.getHeight()) > 480) {
+            while (bytes.length > DatingPhotoPolicy.PHOTO_TARGET_MAX_BYTES && resizeCount < 8) {
+                int minEdge = Math.min(bitmap.getWidth(), bitmap.getHeight());
+                if (minEdge <= DatingPhotoPolicy.UPLOAD_MIN_EDGE) break;
+                float scale = Math.max(0.90f, DatingPhotoPolicy.UPLOAD_MIN_EDGE / (float) minEdge);
+                if (scale >= 0.999f) break;
                 Bitmap scaled = Bitmap.createScaledBitmap(bitmap,
-                        Math.max(1, Math.round(bitmap.getWidth() * 0.90f)),
-                        Math.max(1, Math.round(bitmap.getHeight() * 0.90f)), true);
+                        Math.max(1, Math.round(bitmap.getWidth() * scale)),
+                        Math.max(1, Math.round(bitmap.getHeight() * scale)), true);
                 if (scaled != bitmap) bitmap.recycle();
                 bitmap = scaled;
                 bytes = encode(bitmap, DatingPhotoPolicy.WEBP_MIN_QUALITY);
                 resizeCount++;
             }
 
-            out = new File(outputDir, "dating_" + suffix + "_"
-                    + System.currentTimeMillis() + "_" + Math.abs(input.getName().hashCode()) + ".webp");
+            if (bytes.length > DatingPhotoPolicy.PHOTO_HARD_MAX_BYTES) {
+                throw new PhotoException(R.string.dating_photo_compress_failed);
+            }
+
+            out = new File(outputDir, "dating_" + System.currentTimeMillis() + "_"
+                    + Math.abs(input.getName().hashCode()) + ".webp");
             try (FileOutputStream output = new FileOutputStream(out)) {
                 output.write(bytes);
                 output.flush();
@@ -139,7 +119,6 @@ public final class DatingPhotoCompressor {
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(input.getAbsolutePath(), bounds);
         int sample = 1;
-        // 解码结果控制在目标约 2 倍内，之后再精确缩放，降低大图瞬时内存。
         while (bounds.outWidth / sample > maxWidth * 2 || bounds.outHeight / sample > maxHeight * 2) {
             sample *= 2;
         }
@@ -192,7 +171,7 @@ public final class DatingPhotoCompressor {
     }
 
     private static byte[] encode(Bitmap bitmap, int quality) throws PhotoException {
-        try (ByteArrayOutputStream output = new ByteArrayOutputStream(256 * 1024)) {
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream(192 * 1024)) {
             Bitmap.CompressFormat format;
             if (Build.VERSION.SDK_INT >= 30) {
                 try {

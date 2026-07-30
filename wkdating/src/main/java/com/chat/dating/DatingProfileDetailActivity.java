@@ -53,7 +53,7 @@ public class DatingProfileDetailActivity extends Activity {
         binding.reportBtn.setOnClickListener(v -> confirmReport());
 
         photoAdapter = new DatingPhotoPagerAdapter();
-        photoAdapter.setPhotos(profile.safePhotos());
+        photoAdapter.setPhotos(profile.safeDatingPhotos());
         binding.photoPager.setAdapter(photoAdapter);
         binding.photoPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
@@ -66,50 +66,26 @@ public class DatingProfileDetailActivity extends Activity {
     }
 
     private void bindProfile() {
+        binding.avatarView.setSize(64f);
+        binding.avatarView.showAvatarUrl(profile.safeAvatar(), profile.safeUid(), profile.safeName(), profile.safeUid());
+        binding.avatarView.showFlag(profile.safeCountryCode());
         binding.nameTv.setText(DatingUi.nameAgeFlag(profile));
-        String location = profile.displayLocation();
+        String location = DatingUi.displayLocation(this, profile);
         binding.locationTv.setText(location);
-        binding.locationTv.setVisibility(TextUtils.isEmpty(location) ? View.GONE : View.VISIBLE);
+        binding.locationRow.setVisibility(TextUtils.isEmpty(location) ? View.GONE : View.VISIBLE);
         bindSection(binding.aboutTitle, binding.aboutTv, R.string.dating_section_about, profile.safeIntro());
         bindSection(binding.loveTitle, binding.loveTv, R.string.dating_section_relationship, DatingUi.loveExpectation(this, profile));
         bindSection(binding.idealTitle, binding.idealTv, R.string.dating_section_ideal_partner, profile.ideal_partner);
-        bindSection(binding.dealbreakersTitle, binding.dealbreakersTv, R.string.dating_section_dealbreakers_title, TextUtils.join("、", profile.safeDealbreakers()));
+        bindSection(binding.dealbreakersTitle, binding.dealbreakersTv,
+                R.string.dating_section_dealbreakers_title,
+                TextUtils.join(getString(R.string.dating_list_separator),
+                        DatingValueFormatter.dealbreakerLabels(this, profile.safeDealbreakers())));
         bindSection(binding.basicTitle, binding.basicTv, R.string.dating_section_basic, basicLine());
-        bindTags(binding.tagsLayout, profile.safeTags());
+        bindTags(binding.tagsLayout, DatingValueFormatter.displayList(this, profile.safeTags()));
     }
 
     private String basicLine() {
-        StringBuilder out = new StringBuilder();
-        if (!TextUtils.isEmpty(profile.job)) out.append(profile.job);
-        if (!TextUtils.isEmpty(profile.education)) {
-            if (out.length() > 0) out.append(" · ");
-            out.append(profile.education);
-        }
-        if (profile.height_cm > 0) {
-            if (out.length() > 0) out.append(" · ");
-            out.append(profile.height_cm).append("cm");
-        }
-        if (profile.weight_kg > 0) {
-            if (out.length() > 0) out.append(" · ");
-            out.append(profile.weight_kg).append("kg");
-        }
-        if (!TextUtils.isEmpty(profile.relationship_status)) {
-            if (out.length() > 0) out.append(" · ");
-            out.append(profile.relationship_status);
-        }
-        if (!TextUtils.isEmpty(profile.sexual_orientation)) {
-            if (out.length() > 0) out.append(" · ");
-            out.append(profile.sexual_orientation);
-        }
-        if (!TextUtils.isEmpty(profile.drinking)) {
-            if (out.length() > 0) out.append(" · ");
-            out.append(getString(R.string.dating_drinking_value, profile.drinking));
-        }
-        if (!TextUtils.isEmpty(profile.smoking)) {
-            if (out.length() > 0) out.append(" · ");
-            out.append(getString(R.string.dating_smoking_value, profile.smoking));
-        }
-        return out.toString();
+        return DatingValueFormatter.basicLine(this, profile);
     }
 
     private void bindSection(TextView title, TextView body, int titleRes, String value) {

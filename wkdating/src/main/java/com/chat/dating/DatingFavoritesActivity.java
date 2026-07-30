@@ -115,7 +115,8 @@ public class DatingFavoritesActivity extends Activity {
             }
             refresh();
             if (result != null && result.isMatched()) {
-                DatingMatchDialog.show(this, myProfile, target, () -> DatingUi.openChat(this, target.safeUid()));
+                DatingMatchDialog.show(this, myProfile, target, result.isFriendCreated(),
+                        () -> DatingUi.openChat(this, target.safeUid()));
             }
         });
     }

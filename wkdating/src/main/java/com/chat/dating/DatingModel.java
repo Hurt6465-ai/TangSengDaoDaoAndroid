@@ -70,15 +70,22 @@ public class DatingModel extends WKBaseModel {
     }
 
     public void updateLocation(double lat, double lng, final Callback<Object> callback) {
-        updateLocation(lat, lng, "", "", callback);
+        updateLocation(lat, lng, 0f, "", "", callback);
     }
 
     public void updateLocation(double lat, double lng, String city, String countryCode, final Callback<Object> callback) {
+        updateLocation(lat, lng, 0f, city, countryCode, callback);
+    }
+
+    public void updateLocation(double lat, double lng, float accuracy, String city, String countryCode,
+                               final Callback<Object> callback) {
         Map<String, Object> body = new HashMap<>();
         body.put("lat", lat);
         body.put("lng", lng);
+        body.put("accuracy", Math.max(0f, accuracy));
         body.put("city", city == null ? "" : city);
         body.put("country_code", countryCode == null ? "" : countryCode);
+        body.put("expires_days", 7);
         body.put("source", "android");
         request(createService(DatingService.class).updateLocation(body), listener(callback));
     }
@@ -126,7 +133,7 @@ public class DatingModel extends WKBaseModel {
 
     public void cancelMatch(String matchId, final Callback<Object> callback) {
         if (TextUtils.isEmpty(matchId)) {
-            if (callback != null) callback.onResult(400, "匹配不存在", null);
+            if (callback != null) callback.onResult(400, "", null);
             return;
         }
         request(createService(DatingService.class).cancelMatch(matchId), listener(callback));

@@ -41,7 +41,7 @@ public class DatingCardView extends FrameLayout {
 
     public void bind(DatingProfile profile, int initialPhotoIndex) {
         this.profile = profile;
-        int max = profile == null ? 0 : Math.max(0, profile.safeCardPhotos().size() - 1);
+        int max = profile == null ? 0 : Math.max(0, profile.safeDatingPhotos().size() - 1);
         this.photoIndex = Math.max(0, Math.min(initialPhotoIndex, max));
         bindPhoto();
         resetDragProgress();
@@ -53,7 +53,7 @@ public class DatingCardView extends FrameLayout {
 
     public void showNextPhoto() {
         if (profile == null) return;
-        List<String> photos = profile.safeCardPhotos();
+        List<String> photos = profile.safeDatingPhotos();
         if (photoIndex < photos.size() - 1) {
             photoIndex++;
             bindPhoto();
@@ -91,6 +91,8 @@ public class DatingCardView extends FrameLayout {
     public void recycle() {
         Glide.with(this).clear(binding.photoIv);
         binding.photoIv.setImageDrawable(null);
+        binding.avatarView.showFlag("");
+        binding.avatarView.setVisibility(INVISIBLE);
         binding.tagRow.removeAllViews();
         binding.profileArrowBtn.setOnClickListener(null);
         binding.profileArrowBtn.setOnTouchListener(null);
@@ -102,7 +104,7 @@ public class DatingCardView extends FrameLayout {
 
     private void bindPhoto() {
         if (profile == null) return;
-        List<String> photos = profile.safeCardPhotos();
+        List<String> photos = profile.safeDatingPhotos();
         if (photos.isEmpty()) {
             Glide.with(this).clear(binding.photoIv);
             binding.photoIv.setImageDrawable(null);
@@ -110,25 +112,16 @@ public class DatingCardView extends FrameLayout {
             int index = Math.max(0, Math.min(photoIndex, photos.size() - 1));
             photoIndex = index;
             Object source = DatingImageSource.resolve(getContext(), photos.get(index));
-            String avatarPath = TextUtils.isEmpty(profile.avatar)
-                    ? "users/" + profile.safeUid() + "/avatar"
-                    : profile.avatar;
-            Object fallback = DatingImageSource.resolve(getContext(), avatarPath);
             ColorDrawable placeholder = new ColorDrawable(0xFF202124);
-            com.bumptech.glide.RequestBuilder<android.graphics.drawable.Drawable> fallbackRequest = Glide.with(this)
-                    .load(fallback)
-                    .override(CARD_WIDTH, CARD_HEIGHT)
-                    .centerCrop()
-                    .error(placeholder);
-            Glide.with(this)
+            com.bumptech.glide.RequestBuilder<android.graphics.drawable.Drawable> request = Glide.with(this)
                     .load(source)
                     .thumbnail(0.25f)
                     .override(CARD_WIDTH, CARD_HEIGHT)
                     .centerCrop()
                     .placeholder(placeholder)
-                    .error(fallbackRequest)
-                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                    .into(binding.photoIv);
+                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC);
+            // 交友照片加载失败时只显示占位色；账号头像不能冒充全屏交友照片。
+            request.error(placeholder).into(binding.photoIv);
         }
         bindIndicators(photos.size());
         bindTextForPhoto();
@@ -136,10 +129,14 @@ public class DatingCardView extends FrameLayout {
 
     private void bindTextForPhoto() {
         if (profile == null) return;
+        binding.avatarView.setVisibility(VISIBLE);
+        binding.avatarView.setSize(46f);
+        binding.avatarView.showAvatarUrl(profile.safeAvatar(), profile.safeUid(), profile.safeName(), profile.safeUid());
+        binding.avatarView.showFlag(profile.safeCountryCode());
         binding.nameTv.setText(DatingUi.nameAgeFlag(profile));
-        String meta = profile.displayLocation();
+        String meta = DatingUi.displayLocation(getContext(), profile);
         binding.metaTv.setText(meta);
-        binding.metaTv.setVisibility(TextUtils.isEmpty(meta) ? GONE : VISIBLE);
+        binding.locationRow.setVisibility(TextUtils.isEmpty(meta) ? GONE : VISIBLE);
 
         if (photoIndex == 0) {
             binding.jobTv.setVisibility(GONE);
@@ -161,15 +158,15 @@ public class DatingCardView extends FrameLayout {
             bindPlainTags(profile.safeTags(), 4);
         } else if (photoIndex == 2) {
             binding.jobTv.setText(R.string.dating_section_goal);
-            String line = joinText(DatingIntent.displayLabel(getContext(), profile.safeRelationshipGoal()), profile.relationship_status);
+            String line = DatingUi.loveExpectation(getContext(), profile);
             binding.introTv.setText(line);
             binding.introTv.setVisibility(TextUtils.isEmpty(line) ? GONE : VISIBLE);
             bindPlainTags(profile.love_tags, 4);
         } else if (photoIndex == 3) {
             binding.jobTv.setText(R.string.dating_section_lifestyle);
             String line = joinText(
-                    TextUtils.isEmpty(profile.drinking) ? "" : getResources().getString(R.string.dating_drinking_value, profile.drinking),
-                    TextUtils.isEmpty(profile.smoking) ? "" : getResources().getString(R.string.dating_smoking_value, profile.smoking));
+                    TextUtils.isEmpty(profile.drinking) ? "" : getResources().getString(R.string.dating_drinking_value, DatingValueFormatter.drinking(getContext(), profile.drinking)),
+                    TextUtils.isEmpty(profile.smoking) ? "" : getResources().getString(R.string.dating_smoking_value, DatingValueFormatter.smoking(getContext(), profile.smoking)));
             binding.introTv.setText(line);
             binding.introTv.setVisibility(TextUtils.isEmpty(line) ? GONE : VISIBLE);
             bindPlainTags(profile.lifestyle_tags, 4);
@@ -178,10 +175,10 @@ public class DatingCardView extends FrameLayout {
             ArrayList<String> basics = new ArrayList<>();
             if (profile.height_cm > 0) basics.add(profile.height_cm + "cm");
             if (profile.weight_kg > 0) basics.add(profile.weight_kg + "kg");
-            if (!TextUtils.isEmpty(profile.sexual_orientation)) basics.add(profile.sexual_orientation);
-            if (!TextUtils.isEmpty(profile.education)) basics.add(profile.education);
-            if (!TextUtils.isEmpty(profile.job)) basics.add(profile.job);
-            String line = TextUtils.join(" · ", basics);
+            if (!TextUtils.isEmpty(profile.sexual_orientation)) basics.add(DatingValueFormatter.orientation(getContext(), profile.sexual_orientation));
+            if (!TextUtils.isEmpty(profile.education)) basics.add(DatingSharedProfileFormatter.display(getContext(), profile.education));
+            if (!TextUtils.isEmpty(profile.job)) basics.add(DatingSharedProfileFormatter.display(getContext(), profile.job));
+            String line = TextUtils.join(getResources().getString(R.string.dating_meta_separator), basics);
             binding.introTv.setText(line);
             binding.introTv.setVisibility(TextUtils.isEmpty(line) ? GONE : VISIBLE);
             bindPlainTags(profile.safeTags(), 4);
@@ -191,7 +188,7 @@ public class DatingCardView extends FrameLayout {
     private String joinText(String first, String second) {
         if (TextUtils.isEmpty(first)) return second == null ? "" : second;
         if (TextUtils.isEmpty(second)) return first;
-        return first + " · " + second;
+        return first + getResources().getString(R.string.dating_meta_separator) + second;
     }
 
     private void bindIndicators(int count) {
@@ -232,7 +229,7 @@ public class DatingCardView extends FrameLayout {
         binding.tagRow.setVisibility(VISIBLE);
         for (int i = 0; i < Math.min(maxCount, list.size()); i++) {
             TextView tag = new TextView(getContext());
-            tag.setText("#" + list.get(i));
+            tag.setText("#" + DatingValueFormatter.display(getContext(), list.get(i)));
             tag.setTextColor(0xE8FFFFFF);
             tag.setTextSize(13);
             tag.setSingleLine(true);

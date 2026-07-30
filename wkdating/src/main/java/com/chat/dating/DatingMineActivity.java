@@ -9,7 +9,6 @@ import android.view.View;
 
 import androidx.annotation.Nullable;
 
-import com.bumptech.glide.Glide;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.dating.databinding.ActivityWkDatingMineBinding;
 import com.chat.dating.model.DatingProfile;
@@ -47,21 +46,7 @@ public class DatingMineActivity extends Activity {
         binding.whoLikesRow.setOnClickListener(v -> startActivity(new Intent(this, DatingWhoLikesActivity.class)));
         binding.matchesRow.setOnClickListener(v -> startActivity(new Intent(this, DatingMatchesActivity.class)));
         binding.quotaRow.setOnClickListener(v -> showQuota());
-        binding.enabledSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (!buttonView.isPressed()) return;
-            buttonView.setEnabled(false);
-            DatingModel.getInstance().enableProfile(isChecked, (code, msg, data) -> {
-                buttonView.setEnabled(true);
-                if (code == HttpResponseCode.success) {
-                    if (profile != null) profile.enabled = isChecked ? 1 : 0;
-                    changed = true;
-                    toast(getString(isChecked ? R.string.dating_enabled : R.string.dating_disabled));
-                } else {
-                    buttonView.setChecked(!isChecked);
-                    toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_action_failed) : msg);
-                }
-            });
-        });
+        binding.statusRow.setOnClickListener(v -> showStatusDialog());
     }
 
     private void loadProfile() {
@@ -77,11 +62,13 @@ public class DatingMineActivity extends Activity {
 
     private void bindProfile() {
         if (profile == null) return;
-        Glide.with(this).load(DatingImageSource.resolve(this, profile.firstPhoto())).centerCrop().into(binding.avatarIv);
+        binding.avatarView.setSize(74f);
+        binding.avatarView.showAvatarUrl(profile.safeAvatar(), profile.safeUid(), profile.safeName(), profile.safeUid());
+        binding.avatarView.showFlag(profile.safeCountryCode());
         binding.nameTv.setText(DatingUi.nameAgeFlag(profile));
-        String meta = profile.displayLocation();
+        String meta = DatingUi.displayLocation(this, profile);
         binding.metaTv.setText(TextUtils.isEmpty(meta) ? getString(R.string.dating_profile_complete_tip) : meta);
-        binding.enabledSwitch.setChecked(profile.enabled == 1);
+        binding.statusValueTv.setText(profile.enabled == 1 ? R.string.dating_status_visible : R.string.dating_status_paused);
         binding.likeQuotaTv.setText(getString(R.string.dating_like_quota_format,
                 DatingQuotaManager.remaining(this, profile, DatingSwipeAction.LIKE),
                 DatingQuotaManager.dailyLimit(profile, DatingSwipeAction.LIKE)));
@@ -90,6 +77,36 @@ public class DatingMineActivity extends Activity {
                 DatingQuotaManager.dailyLimit(profile, DatingSwipeAction.FAVORITE)));
         binding.rewindQuotaTv.setText(getString(R.string.dating_rewind_quota_format,
                 DatingQuotaManager.rewindRemaining(this)));
+    }
+
+    private void showStatusDialog() {
+        if (profile == null) return;
+        boolean enabled = profile.enabled == 1;
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.dating_status_title)
+                .setMessage(enabled ? R.string.dating_pause_message : R.string.dating_resume_message)
+                .setNegativeButton(R.string.dating_cancel, null)
+                .setPositiveButton(enabled ? R.string.dating_pause : R.string.dating_resume, (dialog, which) -> {
+                    if (!enabled && profile.safeDatingPhotos().isEmpty()) {
+                        toast(getString(R.string.dating_min_photo_enable));
+                        binding.editProfileRow.performClick();
+                        return;
+                    }
+                    binding.statusRow.setEnabled(false);
+                    DatingModel.getInstance().enableProfile(!enabled, (code, msg, data) -> {
+                        binding.statusRow.setEnabled(true);
+                        if (code == HttpResponseCode.success) {
+                            profile.enabled = enabled ? 0 : 1;
+                            DatingProfileState.setUserPaused(this, enabled);
+                            changed = true;
+                            bindProfile();
+                            toast(getString(enabled ? R.string.dating_disabled : R.string.dating_enabled));
+                        } else {
+                            toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_action_failed) : msg);
+                        }
+                    });
+                })
+                .show();
     }
 
     private void showQuota() {

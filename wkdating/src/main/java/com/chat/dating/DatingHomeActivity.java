@@ -1,6 +1,7 @@
 package com.chat.dating;
 
 import android.content.Intent;
+import android.location.Location;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -9,6 +10,7 @@ import android.view.animation.DecelerateInterpolator;
 import android.view.animation.LinearInterpolator;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -77,6 +79,8 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
     private DatingCardStackAdapter cardAdapter;
     private CardStackLayoutManager cardStackManager;
     private DatingActionController actionController;
+    private DatingLocationHelper locationHelper;
+    private boolean locationStarted;
 
     @Override
     protected ActivityWkDatingHomeBinding getViewBinding() {
@@ -104,6 +108,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         // 首页不再显示筛选/附近入口；请求只使用中性参数，实际偏好由交友资料控制。
         filter = DatingFilter.recommendationDefaults();
         actionController = new DatingActionController(this);
+        locationHelper = new DatingLocationHelper(this);
         pendingExposures.addAll(DatingExposureQueue.load(this));
         DatingUi.applyHomeInsets(wkVBinding.getRoot(), wkVBinding.topBar, wkVBinding.actionBar);
         GlobalBottomNavigationController.attach(this, wkVBinding.bottomNavigation, com.chat.uikit.R.id.i_partner);
@@ -289,6 +294,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                 wkVBinding.retryBtn.setText(R.string.dating_retry);
                 return;
             }
+            requestLocationOnce();
             if (myProfile.enabled != 1) {
                 profiles.clear();
                 loadedUids.clear();
@@ -301,6 +307,38 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             if (resetRecommendation) reload();
             else loadMore(true);
         });
+    }
+
+
+    private void requestLocationOnce() {
+        if (locationStarted || locationHelper == null) return;
+        locationStarted = true;
+        locationHelper.ensureLocation(new DatingLocationHelper.Callback() {
+            @Override
+            public void onSuccess(Location location, boolean needUpload) {
+                if (!needUpload || location == null || isFinishing() || isDestroyed()) return;
+                String city = myProfile == null || myProfile.city == null ? "" : myProfile.city;
+                String countryCode = myProfile == null ? "" : myProfile.safeCountryCode();
+                DatingModel.getInstance().updateLocation(location.getLatitude(), location.getLongitude(),
+                        location.getAccuracy(), city, countryCode, (code, msg, data) -> {
+                            if (code == HttpResponseCode.success && locationHelper != null) {
+                                locationHelper.markUploaded(location);
+                            }
+                        });
+            }
+
+            @Override
+            public void onDenied(String message) {
+                // 拒绝后当前页面不重复弹窗；下次重新进入交友会再次请求。
+            }
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (locationHelper != null) locationHelper.handlePermissionResult(requestCode, grantResults);
     }
 
     private void reload() {
@@ -341,7 +379,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                 if (items != null && !items.isEmpty()) {
                     cursor = data.cursor == null ? "" : data.cursor;
                     noMore = !data.hasMore();
-                    int appended = appendProfiles(items, firstPage, false);
+                    int appended = appendProfiles(items, firstPage);
                     if (appended > 0) {
                         consecutiveEmptyRounds = 0;
                         restartingRound = false;
@@ -364,7 +402,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         });
     }
 
-    private int appendProfiles(List<DatingProfile> data, boolean reset, boolean demo) {
+    private int appendProfiles(List<DatingProfile> data, boolean reset) {
         List<DatingProfile> clean = cleanProfiles(data);
         if (reset) {
             profiles.clear();
@@ -381,7 +419,6 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             cardAdapter.appendProfiles(clean);
         }
         if (!profiles.isEmpty()) showContent();
-        if (demo) showToast(getString(R.string.dating_demo_tip));
         return clean.size();
     }
 
@@ -390,7 +427,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         if (data == null) return clean;
         long thirtyDaysAgo = System.currentTimeMillis() - 30L * 24L * 60L * 60L * 1000L;
         for (DatingProfile profile : data) {
-            if (profile == null || TextUtils.isEmpty(profile.safeUid()) || profile.safePhotos().isEmpty()) continue;
+            if (profile == null || TextUtils.isEmpty(profile.safeUid()) || profile.safeDatingPhotos().isEmpty()) continue;
             if (loadedUids.contains(profile.safeUid())) continue;
             if (profile.last_active_at > 0 && profile.last_active_at < thirtyDaysAgo) continue;
             clean.add(profile);
@@ -495,6 +532,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             afterSwipeConfirmed();
             if (result != null && result.isMatched()) {
                 DatingMatchDialog.show(DatingHomeActivity.this, myProfile, profile,
+                        result.isFriendCreated(),
                         () -> DatingUi.openChat(DatingHomeActivity.this, profile.safeUid()));
             }
         });
@@ -730,6 +768,12 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
 
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (locationHelper != null) locationHelper.onHostResume();
+    }
+
+    @Override
     protected void onPause() {
         finishExposure(true);
         flushExposures();
@@ -742,6 +786,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
         flushExposures();
         persistExposureQueue();
         if (actionController != null) actionController.release();
+        if (locationHelper != null) locationHelper.release();
         super.onDestroy();
     }
 

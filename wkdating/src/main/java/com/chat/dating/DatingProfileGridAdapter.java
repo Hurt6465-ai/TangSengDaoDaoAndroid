@@ -55,16 +55,16 @@ public final class DatingProfileGridAdapter extends RecyclerView.Adapter<DatingP
     public void onBindViewHolder(@NonNull Holder holder, int position) {
         DatingProfile profile = items.get(position);
         Glide.with(holder.itemView)
-                .load(DatingImageSource.resolve(holder.itemView.getContext(), profile.safeCardPhotos().isEmpty() ? profile.firstPhoto() : profile.safeCardPhotos().get(0)))
+                .load(DatingImageSource.resolve(holder.itemView.getContext(), profile.firstPhoto()))
                 .thumbnail(0.25f)
                 .override(540, 720)
                 .centerCrop()
                 .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                 .into(holder.binding.photoIv);
         holder.binding.nameTv.setText(DatingUi.nameAgeFlag(profile));
-        String meta = profile.displayLocation();
+        String meta = DatingUi.displayLocation(holder.itemView.getContext(), profile);
         holder.binding.metaTv.setText(meta);
-        holder.binding.metaTv.setVisibility(TextUtils.isEmpty(meta) ? View.GONE : View.VISIBLE);
+        holder.binding.metaRow.setVisibility(TextUtils.isEmpty(meta) ? View.GONE : View.VISIBLE);
         holder.binding.onlineDot.setVisibility(profile.online == 1 ? View.VISIBLE : View.GONE);
         holder.itemView.setOnClickListener(v -> {
             int p = holder.getBindingAdapterPosition();

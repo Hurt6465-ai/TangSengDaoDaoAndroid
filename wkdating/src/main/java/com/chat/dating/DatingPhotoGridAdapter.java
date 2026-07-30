@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** 5 图编辑网格：主图与推荐卡派生图始终按同一索引移动、删除。 */
+/** 5 图编辑网格：所有页面只使用同一套照片 URL。 */
 public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPhotoGridAdapter.Holder> {
     public interface Listener {
         void onAddPhoto();
@@ -27,59 +27,63 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
     }
 
     private final ArrayList<String> photos = new ArrayList<>();
-    private final ArrayList<String> cardPhotos = new ArrayList<>();
     private Listener listener;
 
     public void setListener(Listener listener) {
         this.listener = listener;
     }
 
-    public void setPhotos(List<String> masters, List<String> cards) {
+    public void setPhotos(List<String> values) {
         photos.clear();
-        cardPhotos.clear();
-        if (masters != null) {
-            for (int i = 0; i < masters.size() && photos.size() < DatingPhotoPolicy.MAX_PHOTO_COUNT; i++) {
-                String master = masters.get(i);
-                if (TextUtils.isEmpty(master)) continue;
-                String cleanMaster = master.trim();
-                String card = cards != null && i < cards.size() ? cards.get(i) : "";
-                photos.add(cleanMaster);
-                cardPhotos.add(TextUtils.isEmpty(card) ? cleanMaster : card.trim());
+        if (values != null) {
+            for (String value : values) {
+                if (TextUtils.isEmpty(value)) continue;
+                String clean = value.trim();
+                if (!photos.contains(clean) && photos.size() < DatingPhotoPolicy.MAX_PHOTO_COUNT) {
+                    photos.add(clean);
+                }
             }
         }
         notifyDataSetChanged();
+    }
+
+    /** 兼容旧调用，cards 已停止使用。 */
+    public void setPhotos(List<String> values, List<String> ignoredCards) {
+        setPhotos(values);
     }
 
     public ArrayList<String> getPhotos() {
         return new ArrayList<>(photos);
     }
 
+    /** 兼容旧后端字段，返回与 photos 相同的 URL，不再上传第二份文件。 */
     public ArrayList<String> getCardPhotos() {
-        return new ArrayList<>(cardPhotos);
+        return new ArrayList<>(photos);
     }
 
     public int photoCount() {
         return photos.size();
     }
 
-    public void appendPhotos(List<String> masters, List<String> cards) {
-        if (masters == null || masters.isEmpty()) return;
+    public void appendPhotos(List<String> values) {
+        if (values == null || values.isEmpty()) return;
         int old = photos.size();
-        for (int i = 0; i < masters.size() && photos.size() < DatingPhotoPolicy.MAX_PHOTO_COUNT; i++) {
-            String master = masters.get(i);
-            if (TextUtils.isEmpty(master) || photos.contains(master.trim())) continue;
-            String cleanMaster = master.trim();
-            String card = cards != null && i < cards.size() ? cards.get(i) : "";
-            photos.add(cleanMaster);
-            cardPhotos.add(TextUtils.isEmpty(card) ? cleanMaster : card.trim());
+        for (String value : values) {
+            if (TextUtils.isEmpty(value)) continue;
+            String clean = value.trim();
+            if (!photos.contains(clean) && photos.size() < DatingPhotoPolicy.MAX_PHOTO_COUNT) photos.add(clean);
         }
         if (photos.size() != old) notifyDataSetChanged();
+    }
+
+    /** 兼容旧调用。 */
+    public void appendPhotos(List<String> values, List<String> ignoredCards) {
+        appendPhotos(values);
     }
 
     public void removePhoto(int position) {
         if (position < 0 || position >= photos.size()) return;
         photos.remove(position);
-        if (position < cardPhotos.size()) cardPhotos.remove(position);
         notifyDataSetChanged();
     }
 
@@ -87,7 +91,6 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
         if (from < 0 || to < 0 || from >= photos.size() || to >= photos.size()) return false;
         if (from == to) return true;
         Collections.swap(photos, from, to);
-        if (from < cardPhotos.size() && to < cardPhotos.size()) Collections.swap(cardPhotos, from, to);
         notifyItemMoved(from, to);
         return true;
     }
@@ -112,8 +115,7 @@ public final class DatingPhotoGridAdapter extends RecyclerView.Adapter<DatingPho
             holder.itemView.setLayoutParams(params);
         }
         boolean occupied = position < photos.size();
-        String master = occupied ? photos.get(position) : "";
-        String preview = occupied && position < cardPhotos.size() ? cardPhotos.get(position) : master;
+        String preview = occupied ? photos.get(position) : "";
         holder.binding.photoIv.setVisibility(occupied ? View.VISIBLE : View.GONE);
         holder.binding.addIcon.setVisibility(occupied ? View.GONE : View.VISIBLE);
         holder.binding.deleteBtn.setVisibility(occupied ? View.VISIBLE : View.GONE);

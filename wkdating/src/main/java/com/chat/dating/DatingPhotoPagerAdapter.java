@@ -13,7 +13,7 @@ import com.chat.dating.databinding.ItemWkDatingPhotoPageBinding;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 详情页使用主图，保留 1080/1440 清晰度，不复用推荐页 720 派生图。 */
+/** 详情页与推荐页复用同一份 720x1280 WebP，命中 Glide/CDN 缓存。 */
 public final class DatingPhotoPagerAdapter extends RecyclerView.Adapter<DatingPhotoPagerAdapter.Holder> {
     private final ArrayList<String> photos = new ArrayList<>();
 
@@ -32,7 +32,7 @@ public final class DatingPhotoPagerAdapter extends RecyclerView.Adapter<DatingPh
         Glide.with(holder.itemView)
                 .load(DatingImageSource.resolve(holder.itemView.getContext(), photos.get(position)))
                 .thumbnail(0.12f)
-                .override(1080, 1440)
+                .override(DatingPhotoPolicy.PHOTO_MAX_WIDTH, DatingPhotoPolicy.PHOTO_MAX_HEIGHT)
                 .centerCrop()
                 .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                 .into(holder.binding.photoIv);

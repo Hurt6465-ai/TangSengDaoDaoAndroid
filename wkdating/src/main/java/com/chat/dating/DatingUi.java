@@ -143,6 +143,33 @@ public final class DatingUi {
         return line.toString();
     }
 
+
+    public static String distanceLabel(Context context, DatingProfile profile) {
+        if (context == null || profile == null || profile.show_distance != 1) return "";
+        switch (profile.distanceBucket()) {
+            case 1: return context.getString(R.string.dating_distance_under_1km);
+            case 2: return context.getString(R.string.dating_distance_1_5km);
+            case 3: return context.getString(R.string.dating_distance_5_20km);
+            case 4: return context.getString(R.string.dating_distance_20_50km);
+            case 5: return context.getString(R.string.dating_distance_50_100km);
+            case 6: return context.getString(R.string.dating_distance_over_100km);
+            default: return "";
+        }
+    }
+
+    public static String displayLocation(Context context, DatingProfile profile) {
+        if (profile == null) return "";
+        StringBuilder out = new StringBuilder();
+        if (!TextUtils.isEmpty(profile.city)) out.append(profile.city.trim());
+        else if (!TextUtils.isEmpty(profile.country)) out.append(profile.country.trim());
+        String distance = distanceLabel(context, profile);
+        if (!TextUtils.isEmpty(distance)) {
+            if (out.length() > 0) out.append(context.getString(R.string.dating_meta_separator));
+            out.append(distance);
+        }
+        return out.toString();
+    }
+
     public static String loveExpectation(Context context, DatingProfile profile) {
         if (profile == null) return "";
         StringBuilder out = new StringBuilder();
@@ -150,13 +177,11 @@ public final class DatingUi {
                 ? profile.safeRelationshipGoal()
                 : DatingIntent.displayLabel(context, profile.safeRelationshipGoal());
         if (!TextUtils.isEmpty(goal)) out.append(goal);
-        if (!TextUtils.isEmpty(profile.safeCrossBorderPreference())) {
-            if (out.length() > 0) out.append(" · ");
-            out.append(profile.safeCrossBorderPreference());
-        }
-        if (!TextUtils.isEmpty(profile.relationship_status)) {
-            if (out.length() > 0) out.append(" · ");
-            out.append(profile.relationship_status);
+        String cross = context == null ? profile.safeCrossBorderPreference()
+                : DatingValueFormatter.crossBorder(context, profile.safeCrossBorderPreference());
+        if (!TextUtils.isEmpty(cross)) {
+            if (out.length() > 0) out.append(context == null ? " · " : context.getString(R.string.dating_meta_separator));
+            out.append(cross);
         }
         return out.toString();
     }

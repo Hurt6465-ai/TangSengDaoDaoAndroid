@@ -20,16 +20,18 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.dating.databinding.ActivityWkDatingEditProfileBinding;
 import com.chat.dating.model.DatingProfile;
+import com.chat.uikit.user.MyInfoActivity;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 编辑自己的交友资料。共享字段进入页面后自动从语伴资料同步。 */
+/** 编辑自己的交友资料。共享字段来自统一账号资料，可从本页入口直接编辑。 */
 public class DatingEditProfileActivity extends Activity {
     public static final String EXTRA_PROFILE = "dating_edit_profile";
     private static final int REQ_PICK_IMAGES = 701;
+    private static final int REQ_SHARED_PROFILE = 702;
 
     private String[] genderOptions;
     private String[] ageOptions;
@@ -44,6 +46,8 @@ public class DatingEditProfileActivity extends Activity {
     private ItemTouchHelper touchHelper;
     private DatingPhotoUploadManager uploadManager;
     private boolean uploading;
+    private boolean initiallyEnabled;
+    private boolean initiallyComplete;
 
     private String intentValue = DatingIntent.LONG_TERM;
     private int genderPreference = -1;
@@ -70,9 +74,9 @@ public class DatingEditProfileActivity extends Activity {
         drinkingOptions = getResources().getStringArray(R.array.dating_drinking_options);
         smokingOptions = getResources().getStringArray(R.array.dating_smoking_options);
         dealbreakerOptions = getResources().getStringArray(R.array.dating_dealbreaker_options);
-        sexualOrientationValue = sexualOrientationOptions[0];
-        drinkingValue = drinkingOptions[Math.min(1, drinkingOptions.length - 1)];
-        smokingValue = smokingOptions[0];
+        sexualOrientationValue = DatingValueFormatter.orientationCode(this, sexualOrientationOptions[0]);
+        drinkingValue = DatingValueFormatter.drinkingCode(this, drinkingOptions[Math.min(1, drinkingOptions.length - 1)]);
+        smokingValue = DatingValueFormatter.smokingCode(this, smokingOptions[0]);
         uploadManager = new DatingPhotoUploadManager(this);
         initPhotoGrid();
         initListeners();
@@ -120,48 +124,57 @@ public class DatingEditProfileActivity extends Activity {
                 binding.ageValue.setText(getString(R.string.dating_age_range_plain, ageMin, ageMax));
             }
         }));
-        binding.sexualOrientationRow.setOnClickListener(v -> pickSingle(getString(R.string.dating_edit_orientation), sexualOrientationOptions, sexualOrientationValue, value -> {
-            sexualOrientationValue = value;
-            binding.sexualOrientationValue.setText(value);
-        }));
-        binding.drinkingRow.setOnClickListener(v -> pickSingle(getString(R.string.dating_edit_drinking), drinkingOptions, drinkingValue, value -> {
-            drinkingValue = value;
-            binding.drinkingValue.setText(value);
-        }));
-        binding.smokingRow.setOnClickListener(v -> pickSingle(getString(R.string.dating_edit_smoking), smokingOptions, smokingValue, value -> {
-            smokingValue = value;
-            binding.smokingValue.setText(value);
-        }));
+        binding.sexualOrientationRow.setOnClickListener(v -> pickSingle(getString(R.string.dating_edit_orientation), sexualOrientationOptions,
+                DatingValueFormatter.orientation(this, sexualOrientationValue), value -> {
+                    sexualOrientationValue = DatingValueFormatter.orientationCode(this, value);
+                    binding.sexualOrientationValue.setText(DatingValueFormatter.orientation(this, sexualOrientationValue));
+                }));
+        binding.drinkingRow.setOnClickListener(v -> pickSingle(getString(R.string.dating_edit_drinking), drinkingOptions,
+                DatingValueFormatter.drinking(this, drinkingValue), value -> {
+                    drinkingValue = DatingValueFormatter.drinkingCode(this, value);
+                    binding.drinkingValue.setText(DatingValueFormatter.drinking(this, drinkingValue));
+                }));
+        binding.smokingRow.setOnClickListener(v -> pickSingle(getString(R.string.dating_edit_smoking), smokingOptions,
+                DatingValueFormatter.smoking(this, smokingValue), value -> {
+                    smokingValue = DatingValueFormatter.smokingCode(this, value);
+                    binding.smokingValue.setText(DatingValueFormatter.smoking(this, smokingValue));
+                }));
         binding.dealbreakersRow.setOnClickListener(v -> pickDealbreakers());
+        binding.sharedEditBtn.setOnClickListener(v ->
+                startActivityForResult(new Intent(this, MyInfoActivity.class), REQ_SHARED_PROFILE));
         binding.saveBtn.setOnClickListener(v -> saveProfile());
     }
 
     private void bindProfile() {
-        photoAdapter.setPhotos(profile.safeDatingPhotos(), profile.safeCardPhotos());
+        photoAdapter.setPhotos(profile.safeDatingPhotos());
         intentValue = normalizeIntent(profile.safeRelationshipGoal());
         genderPreference = profile.gender_preference;
         ageMin = profile.min_age > 0 ? profile.min_age : 18;
         ageMax = profile.max_age > ageMin ? profile.max_age : 28;
-        sexualOrientationValue = TextUtils.isEmpty(profile.sexual_orientation) ? sexualOrientationOptions[0] : profile.sexual_orientation;
-        drinkingValue = TextUtils.isEmpty(profile.drinking) ? drinkingOptions[1] : profile.drinking;
-        smokingValue = TextUtils.isEmpty(profile.smoking) ? smokingOptions[0] : profile.smoking;
+        sexualOrientationValue = DatingValueFormatter.orientationCode(this,
+                TextUtils.isEmpty(profile.sexual_orientation) ? sexualOrientationOptions[0] : profile.sexual_orientation);
+        drinkingValue = DatingValueFormatter.drinkingCode(this,
+                TextUtils.isEmpty(profile.drinking) ? drinkingOptions[Math.min(1, drinkingOptions.length - 1)] : profile.drinking);
+        smokingValue = DatingValueFormatter.smokingCode(this,
+                TextUtils.isEmpty(profile.smoking) ? smokingOptions[0] : profile.smoking);
         dealbreakers.clear();
-        dealbreakers.addAll(profile.safeDealbreakers());
+        dealbreakers.addAll(DatingValueFormatter.dealbreakerCodes(this, profile.safeDealbreakers()));
+        initiallyEnabled = profile.enabled == 1;
+        initiallyComplete = profile.complete || isCompleteEnough(profile.safeDatingPhotos(), intentValue);
 
         binding.intentValue.setText(DatingIntent.displayLabel(this, intentValue));
         binding.genderValue.setText(genderText());
         binding.ageValue.setText(getString(R.string.dating_age_range_plain, ageMin, ageMax));
-        binding.sexualOrientationValue.setText(sexualOrientationValue);
-        binding.drinkingValue.setText(drinkingValue);
-        binding.smokingValue.setText(smokingValue);
-        binding.dealbreakersValue.setText(dealbreakers.isEmpty() ? getString(R.string.dating_select) : TextUtils.join("、", dealbreakers));
+        binding.sexualOrientationValue.setText(DatingValueFormatter.orientation(this, sexualOrientationValue));
+        binding.drinkingValue.setText(DatingValueFormatter.drinking(this, drinkingValue));
+        binding.smokingValue.setText(DatingValueFormatter.smoking(this, smokingValue));
+        updateDealbreakersText();
         binding.cityEt.setText(profile.city);
         if (profile.height_cm > 0) binding.heightEt.setText(String.valueOf(profile.height_cm));
         if (profile.weight_kg > 0) binding.weightEt.setText(String.valueOf(profile.weight_kg));
         binding.bioEt.setText(profile.safeIntro());
         binding.idealPartnerEt.setText(profile.ideal_partner);
-        binding.tagsEt.setText(TextUtils.join("、", profile.tags == null ? new ArrayList<>() : profile.tags));
-        binding.enabledSwitch.setChecked(profile.enabled == 1);
+        binding.tagsEt.setText(TextUtils.join(getString(R.string.dating_list_separator), profile.tags == null ? new ArrayList<>() : profile.tags));
         bindSharedFields();
         updatePhotoTip();
     }
@@ -213,6 +226,10 @@ public class DatingEditProfileActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_SHARED_PROFILE) {
+            syncSharedProfile();
+            return;
+        }
         if (requestCode != REQ_PICK_IMAGES || resultCode != RESULT_OK || data == null) return;
         int remain = DatingPhotoPolicy.MAX_PHOTO_COUNT - photoAdapter.photoCount();
         ArrayList<Uri> uris = new ArrayList<>();
@@ -233,10 +250,10 @@ public class DatingEditProfileActivity extends Activity {
         setUploading(true, 0, getString(R.string.dating_upload_prepare));
         uploadManager.upload(uris, new DatingPhotoUploadManager.Callback() {
             @Override public void onProgress(int progress, String message) { setUploading(true, progress, message); }
-            @Override public void onSuccess(List<String> masterUrls, List<String> cardUrls) {
+            @Override public void onSuccess(List<String> photoUrls) {
                 uploading = false;
                 setUploading(false, 100, "");
-                photoAdapter.appendPhotos(masterUrls, cardUrls);
+                photoAdapter.appendPhotos(photoUrls);
                 updatePhotoTip();
                 toast(getString(R.string.dating_photo_upload_done));
             }
@@ -284,13 +301,14 @@ public class DatingEditProfileActivity extends Activity {
             return;
         }
         ArrayList<String> photos = photoAdapter.getPhotos();
-        if (binding.enabledSwitch.isChecked() && !DatingPhotoPolicy.canEnableDating(photos)) {
-            toast(getString(R.string.dating_min_photo_enable));
-            return;
-        }
+        boolean completeEnough = isCompleteEnough(photos, intentValue);
+        // 只有“原本未完成 -> 本次首次完成”才自动开启。已完整但处于暂停状态的账号，
+        // 即使换设备或清除本地数据，编辑资料也不会被误重新开启。
+        boolean autoEnable = completeEnough && (initiallyEnabled
+                || (!initiallyComplete && !DatingProfileState.isUserPaused(this)));
 
         Map<String, Object> body = new HashMap<>();
-        body.put("enabled", binding.enabledSwitch.isChecked() ? 1 : 0);
+        body.put("enabled", autoEnable ? 1 : 0);
         body.put("intent", intentValue);
         body.put("relationship_goal", intentValue);
         body.put("gender_preference", genderPreference);
@@ -308,7 +326,7 @@ public class DatingEditProfileActivity extends Activity {
         body.put("dealbreakers", new ArrayList<>(dealbreakers));
         body.put("tags", parseTags(text(binding.tagsEt)));
         body.put("photos", photos);
-        body.put("card_photos", photoAdapter.getCardPhotos());
+        body.put("card_photos", photos); // 兼容旧后端字段，不再上传第二套图片。
         body.put("profile_images", photos);
 
         // 同步字段继续随交友资料保存，保证详情页即时展示。
@@ -332,8 +350,9 @@ public class DatingEditProfileActivity extends Activity {
             binding.saveBtn.setEnabled(true);
             binding.saveBtn.setText(R.string.dating_save_profile);
             if (code == HttpResponseCode.success) {
+                if (autoEnable) DatingProfileState.setUserPaused(this, false);
                 setResult(RESULT_OK);
-                toast(getString(R.string.dating_saved));
+                toast(getString(autoEnable ? R.string.dating_saved_and_enabled : R.string.dating_saved));
                 finish();
             } else {
                 toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_save_failed) : msg);
@@ -343,17 +362,35 @@ public class DatingEditProfileActivity extends Activity {
 
     private void pickDealbreakers() {
         boolean[] checked = new boolean[dealbreakerOptions.length];
-        for (int i = 0; i < dealbreakerOptions.length; i++) checked[i] = dealbreakers.contains(dealbreakerOptions[i]);
+        for (int i = 0; i < dealbreakerOptions.length; i++) {
+            checked[i] = dealbreakers.contains(DatingValueFormatter.dealbreakerCode(this, dealbreakerOptions[i]));
+        }
         new AlertDialog.Builder(this)
                 .setTitle(R.string.dating_edit_dealbreakers)
                 .setMultiChoiceItems(dealbreakerOptions, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
                 .setNegativeButton(R.string.dating_cancel, null)
                 .setPositiveButton(R.string.dating_confirm, (dialog, which) -> {
                     dealbreakers.clear();
-                    for (int i = 0; i < checked.length; i++) if (checked[i]) dealbreakers.add(dealbreakerOptions[i]);
-                    binding.dealbreakersValue.setText(dealbreakers.isEmpty() ? getString(R.string.dating_select) : TextUtils.join("、", dealbreakers));
+                    for (int i = 0; i < checked.length; i++) {
+                        if (checked[i]) dealbreakers.add(DatingValueFormatter.dealbreakerCode(this, dealbreakerOptions[i]));
+                    }
+                    updateDealbreakersText();
                 })
                 .show();
+    }
+
+    private boolean isCompleteEnough(List<String> photos, String relationshipIntent) {
+        return DatingPhotoPolicy.canEnableDating(photos)
+                && !TextUtils.isEmpty(relationshipIntent)
+                && profile.age >= 18
+                && profile.hasKnownSex();
+    }
+
+    private void updateDealbreakersText() {
+        List<String> labels = DatingValueFormatter.dealbreakerLabels(this, dealbreakers);
+        binding.dealbreakersValue.setText(labels.isEmpty()
+                ? getString(R.string.dating_select)
+                : TextUtils.join(getString(R.string.dating_list_separator), labels));
     }
 
     private void pickSingle(String title, String[] items, String current, ValueCallback callback) {

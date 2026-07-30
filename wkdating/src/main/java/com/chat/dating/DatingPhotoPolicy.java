@@ -5,23 +5,22 @@ import android.text.TextUtils;
 import java.util.List;
 import java.util.Locale;
 
-/** 交友照片数量、尺寸与上传压缩策略。 */
+/** 交友照片数量、尺寸与上传压缩策略。所有页面只复用同一份 WebP。 */
 public final class DatingPhotoPolicy {
     public static final int MAX_PHOTO_COUNT = 5;
     public static final int MIN_PHOTO_COUNT_TO_ENABLE = 1;
 
-    /** 推荐卡派生图：真实上传一份 720x1280 边界内的 WebP。 */
-    public static final int CARD_MAX_WIDTH = 720;
-    public static final int CARD_MAX_HEIGHT = 1280;
-    public static final int CARD_TARGET_MAX_BYTES = 200 * 1024;
-
-    /** 详情主图：保留更高分辨率，最长边 1440。 */
-    public static final int MASTER_MAX_EDGE = 1440;
-    public static final int MASTER_TARGET_MAX_BYTES = 650 * 1024;
+    /** 单套交友图片：推荐卡、详情页和列表全部使用同一个 URL。 */
+    public static final int PHOTO_MAX_WIDTH = 720;
+    public static final int PHOTO_MAX_HEIGHT = 1280;
+    /** 给上传协议和文件头预留余量，目标小于服务端 150KB 硬限制。 */
+    public static final int PHOTO_TARGET_MAX_BYTES = 145 * 1024;
+    public static final int PHOTO_HARD_MAX_BYTES = 150 * 1024;
+    public static final long MAX_INPUT_BYTES = 20L * 1024L * 1024L;
 
     public static final int UPLOAD_MIN_EDGE = 480;
-    public static final int WEBP_START_QUALITY = 84;
-    public static final int WEBP_MIN_QUALITY = 62;
+    public static final int WEBP_START_QUALITY = 82;
+    public static final int WEBP_MIN_QUALITY = 54;
 
     private DatingPhotoPolicy() {}
 
@@ -43,7 +42,7 @@ public final class DatingPhotoPolicy {
         int maxEdge = Math.max(width, height);
         int minEdge = Math.min(width, height);
         if (minEdge < UPLOAD_MIN_EDGE) return "图片太小，请上传清晰真人照片";
-        if (maxEdge > 8000 || bytes > 20L * 1024L * 1024L) return "图片太大，请重新选择";
+        if (maxEdge > 8000 || bytes > MAX_INPUT_BYTES) return "图片太大，请重新选择";
         return null;
     }
 

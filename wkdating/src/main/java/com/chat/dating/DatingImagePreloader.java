@@ -11,7 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** 推荐页唯一的预加载入口：当前人最多两张，后两人各一张。 */
+/** 推荐页唯一的预加载入口：当前人最多两张，下一人一张。 */
 public final class DatingImagePreloader {
     private static final int CARD_WIDTH = 720;
     private static final int CARD_HEIGHT = 1280;
@@ -22,11 +22,11 @@ public final class DatingImagePreloader {
         if (context == null || profiles == null || profiles.isEmpty()) return;
         Set<String> queued = new HashSet<>();
         int start = Math.max(0, startIndex);
-        int end = Math.min(profiles.size(), start + 3);
+        int end = Math.min(profiles.size(), start + 2);
         for (int i = start; i < end; i++) {
             DatingProfile profile = profiles.get(i);
             if (profile == null) continue;
-            List<String> photos = profile.safeCardPhotos();
+            List<String> photos = profile.safeDatingPhotos();
             int count = Math.min(photos.size(), i == start ? 2 : 1);
             for (int j = 0; j < count; j++) {
                 String url = photos.get(j);
