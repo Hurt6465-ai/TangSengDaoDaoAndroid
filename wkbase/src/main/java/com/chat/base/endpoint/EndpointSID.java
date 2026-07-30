@@ -9,4 +9,6 @@ public class EndpointSID {
     public static final String appIsRunningBackground = "app_is_running_background";
     public static final String openChatPage = "open_chat_page";
     public static final String sendMessage = "send_message";
+    /** wkuikit -> wkroom：标记开放话题聊天室已读，避免模块循环依赖。 */
+    public static final String topicRoomMarkRead = "topic_room_mark_read";
 }
