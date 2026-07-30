@@ -40,7 +40,13 @@ import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import org.json.JSONObject;
 
 public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListBinding> {
     private static final String CHANNEL_CATEGORY_TOPIC_ROOM = "topic_room";
@@ -51,6 +57,14 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     private static final String EXTRA_CREATOR_UID = "creator_uid";
     private static final String EXTRA_CREATOR_COUNTRY_CODE = "creator_country_code";
     private static final String EXTRA_COUNTRY_CODE = "country_code";
+    private static final String EXTRA_ROOM_ID = "room_id";
+    private static final String EXTRA_TAG = "tag";
+    private static final String EXTRA_LANGUAGE = "language";
+    private static final String EXTRA_EXPIRE_AT = "expire_at";
+    private static final String EXTRA_CAN_DELETE = "can_delete";
+    private static final String EXTRA_CAN_PIN = "can_pin";
+    private static final String EXTRA_REPLY_COUNT = "reply_count";
+    private static final String EXTRA_PARTICIPANT_COUNT = "participant_count";
     private static final String DEFAULT_LANGUAGE = "中文";
     private static final String TAG_PREFIX = "# ";
     private static final int ROOM_LIST_LIMIT = 30;
@@ -76,6 +90,9 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     private boolean hasMoreRooms = false;
     private boolean loadingRooms = false;
     private int roomListRequestSeq = 0;
+    private final String roomCmdListenerKey = "room_topic_list_"
+            + Integer.toHexString(System.identityHashCode(this));
+    private final Set<String> deletedRoomKeys = new HashSet<>();
 
     public static RoomTopicListFragment newInstance() {
         return new RoomTopicListFragment();
@@ -128,6 +145,14 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
             }
             return true;
         });
+        WKIM.getInstance().getCMDManager().removeCmdListener(roomCmdListenerKey);
+        WKIM.getInstance().getCMDManager().addCmdListener(roomCmdListenerKey, wkCmd -> {
+            if (wkCmd == null || !"topicRoomDeleted".equals(wkCmd.cmdKey) || wkCmd.paramJsonObject == null) return;
+            Runnable action = () -> handleTopicRoomDeletedCmd(wkCmd.paramJsonObject);
+            FragmentActivity activity = getActivity();
+            if (activity != null) activity.runOnUiThread(action);
+        });
+
         recyclerView.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
             @Override
             public boolean onInterceptTouchEvent(RecyclerView rv, MotionEvent event) {
@@ -158,6 +183,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
     @Override
     public void onDestroyView() {
         dismissDialogs();
+        WKIM.getInstance().getCMDManager().removeCmdListener(roomCmdListenerKey);
         openingChannelId = null;
         roomListRequestSeq++;
         loadingRooms = false;
@@ -265,6 +291,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
 
                 List<RoomTopicEntity> rooms = result == null ? null : result.getRoomList();
                 if (rooms == null) rooms = new ArrayList<>();
+                rooms = filterVisibleRooms(rooms);
                 if (refresh) {
                     adapter.setList(rooms);
                 } else {
@@ -316,20 +343,22 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         normalizeRoomForOpen(room);
         String requestChannelId = room.getChannelId();
         if (TextUtils.isEmpty(requestChannelId)) {
-            toastRoomError("聊天室数据异常", "");
+            showToast(getString(R.string.peipe_room_data_error));
+            return;
+        }
+        if (room.isExpired(System.currentTimeMillis())) {
+            removeRoomByIds(room.getRoomId(), requestChannelId);
+            showToast(getString(R.string.peipe_room_ended));
             return;
         }
         if (TextUtils.equals(openingChannelId, requestChannelId)) {
-            showToast("正在进入聊天室，请稍候");
+            showToast(getString(R.string.peipe_room_entering));
             return;
         }
 
-        // 关键修复：打开聊天页不能被 /chatrooms/enter 的回调阻塞。
-        // enter 接口里会同步 IM 频道/订阅者，只要 IM 同步接口慢、失败或返回非 200，旧逻辑就不会打开聊天室。
-        // 这里先把本地 WKChannel 缓存好并打开原生聊天页，同时后台继续 enterRoom 补齐成员关系。
+        // 必须先让后端完成成员、已读和 IM 订阅，再打开聊天页。
+        // 这样 403/410 或订阅失败时不会进入一个无法发送消息的空页面。
         openingChannelId = requestChannelId;
-        openNativeChat(room);
-
         RoomTopicModel.getInstance().enterRoom(room, new IRequestResultListener<RoomTopicEntity>() {
             @Override
             public void onSuccess(RoomTopicEntity result) {
@@ -338,20 +367,20 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
                 RoomTopicEntity target = mergeRoomForOpen(room, result);
                 byte type = target.channel_type == 0 ? WKChannelType.GROUP : target.channel_type;
                 cacheTopicChannel(target, type);
-                if (canUpdateUi()) {
-                    addOrUpdateRoom(target);
-                }
+                if (canUpdateUi()) addOrUpdateRoom(target);
+                openNativeChat(target);
             }
 
             @Override
             public void onFail(int code, String msg) {
                 if (!TextUtils.equals(openingChannelId, requestChannelId)) return;
                 openingChannelId = null;
-                // 不再阻止打开聊天室。失败只提示，避免“点了没有反应”。
-                // 如果后续发消息仍一直发送中，再看后端 /v1/chatrooms/enter 或 IM 订阅者同步日志。
-                if (canUpdateUi() && !TextUtils.isEmpty(msg)) {
-                    showToast(msg);
+                if (code == 410 || code == 404) {
+                    deletedRoomKeys.add(roomKey(room.getRoomId()));
+                    deletedRoomKeys.add(roomKey(requestChannelId));
+                    removeRoomByIds(room.getRoomId(), requestChannelId);
                 }
+                showRoomRequestError(code, msg, R.string.peipe_room_enter_failed);
             }
         });
     }
@@ -361,12 +390,12 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         normalizeRoomForOpen(room);
         String channelId = room.getChannelId();
         if (TextUtils.isEmpty(channelId)) {
-            toastRoomError("聊天室数据异常", "");
+            showToast(getString(R.string.peipe_room_data_error));
             return;
         }
         FragmentActivity activity = getActivity();
         if (activity == null || !isAdded()) {
-            toastRoomError("页面未准备好，请重试", "");
+            showToast(getString(R.string.peipe_room_page_not_ready));
             return;
         }
         byte channelType = room.channel_type == 0 ? WKChannelType.GROUP : room.channel_type;
@@ -395,6 +424,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         if (room.channel_type == 0) {
             room.channel_type = WKChannelType.GROUP;
         }
+        if ("音乐".equals(room.tag)) room.tag = "游戏";
     }
 
     private RoomTopicEntity mergeRoomForOpen(RoomTopicEntity fallback, RoomTopicEntity result) {
@@ -428,13 +458,82 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         if (TextUtils.isEmpty(target.creator_name)) target.creator_name = fallback.creator_name;
         if (TextUtils.isEmpty(target.creator_avatar)) target.creator_avatar = fallback.creator_avatar;
         if (TextUtils.isEmpty(target.creator_avatar_cache_key)) target.creator_avatar_cache_key = fallback.creator_avatar_cache_key;
+        if (TextUtils.isEmpty(target.creator_country_code)) target.creator_country_code = fallback.creator_country_code;
+        if (TextUtils.isEmpty(target.creator_country)) target.creator_country = fallback.creator_country;
+        if (target.expire_at <= 0) target.expire_at = fallback.expire_at;
+        if (target.reply_count <= 0) target.reply_count = fallback.reply_count;
+        if (target.participant_count <= 0) target.participant_count = fallback.participant_count;
+        if (target.can_delete < 0) target.can_delete = fallback.can_delete;
+        if (target.can_pin < 0) target.can_pin = fallback.can_pin;
         if ((target.reply_users == null || target.reply_users.isEmpty()) && fallback.reply_users != null) target.reply_users = fallback.reply_users;
         if ((target.members == null || target.members.isEmpty()) && fallback.members != null) target.members = fallback.members;
     }
 
-    private void toastRoomError(String fallback, String msg) {
-        String text = TextUtils.isEmpty(msg) ? fallback : msg;
-        showToast(text);
+    private List<RoomTopicEntity> filterVisibleRooms(List<RoomTopicEntity> rooms) {
+        ArrayList<RoomTopicEntity> out = new ArrayList<>();
+        if (rooms == null) return out;
+        long now = System.currentTimeMillis();
+        for (RoomTopicEntity room : rooms) {
+            if (room == null) continue;
+            normalizeRoomForOpen(room);
+            if (room.isExpired(now)) continue;
+            if (deletedRoomKeys.contains(roomKey(room.getRoomId()))
+                    || deletedRoomKeys.contains(roomKey(room.getChannelId()))) continue;
+            out.add(room);
+        }
+        return out;
+    }
+
+    private void putRoomStateExtras(Map<String, Object> extras, RoomTopicEntity room) {
+        if (extras == null || room == null) return;
+        extras.put(EXTRA_ROOM_ID, room.getRoomId());
+        extras.put(EXTRA_TAG, room.getRawTag());
+        extras.put(EXTRA_LANGUAGE, room.language == null ? "" : room.language);
+        extras.put(EXTRA_EXPIRE_AT, room.expire_at);
+        extras.put(EXTRA_CAN_DELETE, room.can_delete);
+        extras.put(EXTRA_CAN_PIN, room.can_pin);
+        extras.put(EXTRA_REPLY_COUNT, room.reply_count);
+        extras.put(EXTRA_PARTICIPANT_COUNT, room.getParticipantCount());
+    }
+
+    private void handleTopicRoomDeletedCmd(JSONObject params) {
+        if (params == null) return;
+        String channelId = params.optString("channel_id");
+        String roomId = params.optString("room_id");
+        if (TextUtils.isEmpty(channelId)) channelId = roomId;
+        if (TextUtils.isEmpty(roomId)) roomId = channelId;
+        if (TextUtils.isEmpty(channelId) && TextUtils.isEmpty(roomId)) return;
+        deletedRoomKeys.add(roomKey(roomId));
+        deletedRoomKeys.add(roomKey(channelId));
+        if (TextUtils.equals(openingChannelId, channelId) || TextUtils.equals(openingChannelId, roomId)) {
+            openingChannelId = null;
+        }
+        removeRoomByIds(roomId, channelId);
+    }
+
+    private void removeRoomByIds(String roomId, String channelId) {
+        if (adapter == null) return;
+        int index = adapter.indexOfRoom(roomId, channelId);
+        if (index < 0 || index >= adapter.getData().size()) return;
+        adapter.getData().remove(index);
+        adapter.notifyItemRemoved(index);
+        updateEmpty();
+    }
+
+    private String roomKey(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private void showRoomRequestError(int code, String msg, int fallbackRes) {
+        if (code == 403) {
+            showToast(getString(R.string.peipe_room_no_permission));
+            return;
+        }
+        if (code == 410 || code == 404) {
+            showToast(getString(R.string.peipe_room_ended));
+            return;
+        }
+        showToast(TextUtils.isEmpty(msg) ? getString(fallbackRes) : msg);
     }
 
     private void showToast(String text) {
@@ -489,19 +588,30 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
             channel.localExtra.put(EXTRA_CREATOR_COUNTRY_CODE, creatorCountry);
             channel.localExtra.put(EXTRA_COUNTRY_CODE, creatorCountry);
         }
+        putRoomStateExtras(channel.remoteExtraMap, room);
+        putRoomStateExtras(channel.localExtra, room);
         WKIM.getInstance().getChannelManager().saveOrUpdateChannel(channel);
     }
 
     private void showCardMenu(RoomTopicEntity room) {
         Context context = getContext();
         if (room == null || context == null || !isAdded()) return;
+        ArrayList<String> labels = new ArrayList<>();
+        ArrayList<Runnable> actions = new ArrayList<>();
+        if (room.canPin()) {
+            labels.add(room.pinned == 1 ? getString(R.string.peipe_room_unpin) : getString(R.string.peipe_room_pin));
+            actions.add(() -> updatePin(room, room.pinned != 1));
+        }
+        if (room.canDelete()) {
+            labels.add(getString(R.string.peipe_room_delete));
+            actions.add(() -> confirmDeleteRoom(room));
+        }
+        if (labels.isEmpty()) return;
+
         dismissCardMenuDialog();
-        String pinText = room.pinned == 1 ? getString(R.string.peipe_room_unpin) : getString(R.string.peipe_room_pin);
-        String[] items = new String[]{pinText, getString(R.string.peipe_room_delete)};
         AlertDialog dialog = new AlertDialog.Builder(context)
-                .setItems(items, (dialogInterface, which) -> {
-                    if (which == 0) updatePin(room, room.pinned != 1);
-                    else confirmDeleteRoom(room);
+                .setItems(labels.toArray(new String[0]), (dialogInterface, which) -> {
+                    if (which >= 0 && which < actions.size()) actions.get(which).run();
                 })
                 .create();
         cardMenuDialog = dialog;
@@ -516,7 +626,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         if (room == null || context == null || !isAdded()) return;
         AlertDialog dialog = new AlertDialog.Builder(context)
                 .setTitle(R.string.peipe_room_delete)
-                .setMessage("确定删除这个聊天室吗？")
+                .setMessage(R.string.peipe_room_delete_confirm)
                 .setNegativeButton(R.string.peipe_room_cancel, null)
                 .setPositiveButton(R.string.peipe_room_delete, (dialogInterface, which) -> deleteRoom(room))
                 .create();
@@ -534,23 +644,37 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
             public void onSuccess(RoomTopicEntity result) {
                 if (!canUpdateUi()) return;
                 RoomTopicEntity target = mergeRoomForListUpdate(room, result, pinned);
+                cacheTopicChannel(target, target.channel_type == 0 ? WKChannelType.GROUP : target.channel_type);
                 int index = findRoomIndex(room, target);
-                if (index < 0) {
-                    loadRooms(false);
-                    return;
+                if (index >= 0 && index < adapter.getData().size()) {
+                    adapter.getData().set(index, target);
+                    RoomTopicStore.sortRooms(adapter.getData());
+                    adapter.notifyDataSetChanged();
+                    updateEmpty();
                 }
-                adapter.getData().set(index, target);
-                RoomTopicStore.sortRooms(adapter.getData());
-                adapter.notifyDataSetChanged();
-                updateEmpty();
+                // 全局置顶会改变服务端游标顺序。即使此时旧列表请求尚未结束，也要让旧回调失效并重拉第一页。
+                reloadFirstPageAfterMutation();
             }
 
             @Override
             public void onFail(int code, String msg) {
                 if (!canUpdateUi()) return;
-                showToast(msg);
+                showRoomRequestError(code, msg, R.string.peipe_room_operation_failed);
             }
         });
+    }
+
+    private void reloadFirstPageAfterMutation() {
+        roomListRequestSeq++;
+        loadingRooms = false;
+        nextCursor = "";
+        hasMoreRooms = false;
+        if (refreshLayout != null) {
+            refreshLayout.finishRefresh(false);
+            refreshLayout.finishLoadMore(false);
+            refreshLayout.setEnableLoadMore(false);
+        }
+        requestRooms(true, false);
     }
 
     private void deleteRoom(RoomTopicEntity room) {
@@ -559,20 +683,15 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
             @Override
             public void onSuccess(Object result) {
                 if (!canUpdateUi()) return;
-                int index = findRoomIndex(room, null);
-                if (index < 0) {
-                    loadRooms(false);
-                    return;
-                }
-                adapter.getData().remove(index);
-                adapter.notifyItemRemoved(index);
-                updateEmpty();
+                deletedRoomKeys.add(roomKey(room.getRoomId()));
+                deletedRoomKeys.add(roomKey(room.getChannelId()));
+                removeRoomByIds(room.getRoomId(), room.getChannelId());
             }
 
             @Override
             public void onFail(int code, String msg) {
                 if (!canUpdateUi()) return;
-                showToast(msg);
+                showRoomRequestError(code, msg, R.string.peipe_room_operation_failed);
             }
         });
     }
@@ -610,51 +729,8 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
         recyclerView.setVisibility(empty ? View.GONE : View.VISIBLE);
     }
 
-    private void recoverCreatedRoomAfterFailure(String title, String tag, AlertDialog dialog, TextView publish, String failMsg) {
-        RoomTopicModel.getInstance().listRooms(new IRequestResultListener<RoomTopicListResponse>() {
-            @Override
-            public void onSuccess(RoomTopicListResponse result) {
-                if (!canUpdateUi() || !isActiveCreateDialog(dialog)) return;
-                publish.setEnabled(true);
-                List<RoomTopicEntity> rooms = result == null ? null : result.getRoomList();
-                if (rooms == null) rooms = new ArrayList<>();
-                RoomTopicStore.sortRooms(rooms);
-                adapter.setList(rooms);
-                updateEmpty();
-
-                RoomTopicEntity created = findUniqueRoomByTitleTag(rooms, title, tag);
-                if (created != null) {
-                    dialog.dismiss();
-                    openTopic(created);
-                    return;
-                }
-                showToast(TextUtils.isEmpty(failMsg) ? "发布失败，请下拉刷新确认房间是否已创建" : failMsg);
-            }
-
-            @Override
-            public void onFail(int code, String msg) {
-                if (!canUpdateUi() || !isActiveCreateDialog(dialog)) return;
-                publish.setEnabled(true);
-                showToast(TextUtils.isEmpty(failMsg) ? "发布失败" : failMsg);
-            }
-        });
-    }
-
     private boolean isActiveCreateDialog(AlertDialog dialog) {
         return dialog != null && createDialog == dialog && dialog.isShowing();
-    }
-
-    private RoomTopicEntity findUniqueRoomByTitleTag(List<RoomTopicEntity> rooms, String title, String tag) {
-        if (rooms == null || TextUtils.isEmpty(title)) return null;
-        RoomTopicEntity matched = null;
-        for (RoomTopicEntity room : rooms) {
-            if (room == null) continue;
-            if (!TextUtils.equals(title, room.getShowTitle())) continue;
-            if (!TextUtils.isEmpty(tag) && !TextUtils.equals(tag, room.getRawTag())) continue;
-            if (matched != null) return null;
-            matched = room;
-        }
-        return matched;
     }
 
     private TextView createTagChip(Context context, String text) {
@@ -737,11 +813,13 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
                 new TagOption("找搭子", getString(R.string.peipe_room_tag_partner)),
                 new TagOption("工作", getString(R.string.peipe_room_tag_work)),
                 new TagOption("影视", getString(R.string.peipe_room_tag_movie)),
-                new TagOption("音乐", getString(R.string.peipe_room_tag_music)),
+                new TagOption("游戏", getString(R.string.peipe_room_tag_music)),
                 new TagOption("学习", getString(R.string.peipe_room_tag_study)),
                 new TagOption("闲谈", getString(R.string.peipe_room_tag_chat))
         };
         final String[] selectedTag = new String[]{tags[0].value};
+        // 对话框生命周期内保持不变；网络超时后再次点击发布仍命中同一个后端幂等请求。
+        final String createRequestNo = UUID.randomUUID().toString();
         LinearLayout tagWrap = new LinearLayout(context);
         tagWrap.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams tagWrapLp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -821,7 +899,7 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
                 return;
             }
             publish.setEnabled(false);
-            RoomTopicModel.getInstance().createRoom(text, selectedTag[0], DEFAULT_LANGUAGE, new IRequestResultListener<RoomTopicEntity>() {
+            RoomTopicModel.getInstance().createRoom(text, selectedTag[0], DEFAULT_LANGUAGE, createRequestNo, new IRequestResultListener<RoomTopicEntity>() {
                 @Override
                 public void onSuccess(RoomTopicEntity result) {
                     if (!canUpdateUi()) return;
@@ -839,7 +917,8 @@ public class RoomTopicListFragment extends WKBaseFragment<FragmentRoomTopicListB
                 @Override
                 public void onFail(int code, String msg) {
                     if (!canUpdateUi() || !isActiveCreateDialog(dialog)) return;
-                    recoverCreatedRoomAfterFailure(text, selectedTag[0], dialog, publish, msg);
+                    publish.setEnabled(true);
+                    showRoomRequestError(code, msg, R.string.peipe_room_publish_failed);
                 }
             });
         });
