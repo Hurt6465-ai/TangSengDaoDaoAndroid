@@ -310,4 +310,7 @@
     <string name="peipe_chat_tab_message">ချက်တင်</string>
     <string name="peipe_chat_tab_room">ခေါင်းစဉ်</string>
     <string name="peipe_chat_tab_contacts">မိတ်ဆွေ</string>
+    <string name="topic_room_ended">ဤခေါင်းစဉ် ပြီးဆုံးသွားပါပြီ။</string>
+    <string name="topic_room_expired">ဤခေါင်းစဉ် သက်တမ်းကုန်သွားပါပြီ။</string>
+    <string name="topic_room_leaving">စကားခန်းမှ ထွက်နေသည်…</string>
 </resources>
