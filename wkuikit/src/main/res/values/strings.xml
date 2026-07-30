@@ -362,5 +362,8 @@
     <string name="operation_failed">操作失败</string>
     <string name="partner_pending_remaining">对方未回复，还可以发送 %1$d 条</string>
     <string name="partner_pending_waiting">已发送 3 条，等待对方回复后可继续聊天</string>
+    <string name="topic_room_ended">该话题已结束</string>
+    <string name="topic_room_expired">该话题已过期</string>
+    <string name="topic_room_leaving">正在退出聊天室</string>
 </resources>
 
