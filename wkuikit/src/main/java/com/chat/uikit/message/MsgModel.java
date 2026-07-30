@@ -52,7 +52,9 @@ import com.xinbida.wukongim.message.type.WKSendMsgResult;
 import org.json.JSONException;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -64,8 +66,12 @@ public class MsgModel extends WKBaseModel {
     private MsgModel() {
 
     }
-   public List<WKChannelState> channelStatus;
+    public List<WKChannelState> channelStatus;
     private int last_message_seq;
+    private static final long CLEAR_UNREAD_DEDUP_MS = 800L;
+    private final Object clearUnreadLock = new Object();
+    private final Map<String, Integer> lastClearUnreadValue = new HashMap<>();
+    private final Map<String, Long> lastClearUnreadAt = new HashMap<>();
 
     private static class MsgModelBinder {
         final static MsgModel msgModel = new MsgModel();
@@ -216,12 +222,36 @@ public class MsgModel extends WKBaseModel {
      * @param channelType 频道类型
      */
     public void clearUnread(String channelId, byte channelType, int unreadCount, ICommonListener iCommonListener) {
+        if (TextUtils.isEmpty(channelId)) return;
         if (unreadCount < 0) unreadCount = 0;
         WKIM.getInstance().getConversationManager().updateRedDot(channelId, channelType, unreadCount);
+
+        final int finalUnreadCount = unreadCount;
+        final String requestKey = WKConfig.getInstance().getUid() + ":" + channelType + ":" + channelId;
+        final long now = android.os.SystemClock.elapsedRealtime();
+        synchronized (clearUnreadLock) {
+            // 防止长期使用、多账号和大量临时频道让去重表无限增长。
+            if (!lastClearUnreadValue.containsKey(requestKey) && lastClearUnreadValue.size() >= 512) {
+                lastClearUnreadValue.clear();
+                lastClearUnreadAt.clear();
+            }
+            Integer lastValue = lastClearUnreadValue.get(requestKey);
+            Long lastAt = lastClearUnreadAt.get(requestKey);
+            if (lastValue != null && lastValue == finalUnreadCount
+                    && lastAt != null && now - lastAt < CLEAR_UNREAD_DEDUP_MS
+                    && iCommonListener == null) {
+                // 只有“无需结果”的后台重复请求才可直接合并。带回调的调用会根据
+                // 真正的服务端成功结果更新 UI 状态，不能把尚在途的请求伪装成成功。
+                return;
+            }
+            lastClearUnreadValue.put(requestKey, finalUnreadCount);
+            lastClearUnreadAt.put(requestKey, now);
+        }
+
         com.alibaba.fastjson.JSONObject jsonObject = new com.alibaba.fastjson.JSONObject();
         jsonObject.put("channel_id", channelId);
         jsonObject.put("channel_type", channelType);
-        jsonObject.put("unread", unreadCount);
+        jsonObject.put("unread", finalUnreadCount);
         request(createService(MsgService.class).clearUnread(jsonObject), new IRequestResultListener<>() {
             @Override
             public void onSuccess(CommonResponse result) {
@@ -231,6 +261,16 @@ public class MsgModel extends WKBaseModel {
 
             @Override
             public void onFail(int code, String msg) {
+                synchronized (clearUnreadLock) {
+                    Integer value = lastClearUnreadValue.get(requestKey);
+                    Long requestAt = lastClearUnreadAt.get(requestKey);
+                    if (value != null && value == finalUnreadCount
+                            && requestAt != null && requestAt == now) {
+                        lastClearUnreadValue.remove(requestKey);
+                        lastClearUnreadAt.remove(requestKey);
+                    }
+                }
+                if (iCommonListener != null) iCommonListener.onResult(code, msg);
             }
         });
     }
@@ -627,23 +667,39 @@ public class MsgModel extends WKBaseModel {
     }
 
     public void updateCoverExtra(String channelID, byte channelType, long browseTo, long keepMsgSeq, int keepOffsetY, String draft) {
+        updateCoverExtraLocal(channelID, channelType, browseTo, keepMsgSeq, keepOffsetY, draft);
+        syncCoverExtraRemote(channelID, channelType, browseTo, keepMsgSeq, keepOffsetY, draft);
+    }
+
+    /**
+     * 只写本地会话扩展。onStop 使用该方法，确保系统后台杀进程时草稿和浏览位置不丢失，
+     * 同时避免每次被其它页面遮挡都产生网络请求。
+     */
+    public void updateCoverExtraLocal(String channelID, byte channelType, long browseTo,
+                                      long keepMsgSeq, int keepOffsetY, String draft) {
+        if (TextUtils.isEmpty(channelID)) return;
         WKConversationMsgExtra extra = new WKConversationMsgExtra();
-        extra.draft = draft;
+        extra.draft = draft == null ? "" : draft;
         extra.keepOffsetY = keepOffsetY;
         extra.keepMessageSeq = keepMsgSeq;
         extra.channelID = channelID;
         extra.channelType = channelType;
         extra.browseTo = browseTo;
-        if (!TextUtils.isEmpty(draft)) {
+        if (!TextUtils.isEmpty(extra.draft)) {
             extra.draftUpdatedAt = WKTimeUtils.getInstance().getCurrentSeconds();
         }
         WKIM.getInstance().getConversationManager().updateMsgExtra(extra);
+    }
 
+    /** 同步会话扩展到服务端，不重复写本地。 */
+    public void syncCoverExtraRemote(String channelID, byte channelType, long browseTo,
+                                     long keepMsgSeq, int keepOffsetY, String draft) {
+        if (TextUtils.isEmpty(channelID)) return;
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("browse_to", browseTo);
         jsonObject.put("keep_message_seq", keepMsgSeq);
         jsonObject.put("keep_offset_y", keepOffsetY);
-        jsonObject.put("draft", draft);
+        jsonObject.put("draft", draft == null ? "" : draft);
         request(createService(MsgService.class).updateCoverExtra(channelID, channelType, jsonObject), new IRequestResultListener<>() {
             @Override
             public void onSuccess(CommonResponse result) {
