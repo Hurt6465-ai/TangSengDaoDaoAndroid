@@ -17,7 +17,7 @@
     <string name="partnerlist_complete_profile">Complete my profile</string>
     <string name="partnerlist_retry">Try again</string>
     <string name="partnerlist_load_failed">Couldn’t load partners. Please try again later.</string>
-    <string name="partnerlist_greet">Hi</string>
+    <string name="partnerlist_greet">Say hi</string>
     <string name="partnerlist_greeted">Sent</string>
     <string name="partnerlist_sending">Sending</string>
     <string name="partnerlist_limit_reached_short">Limit</string>
