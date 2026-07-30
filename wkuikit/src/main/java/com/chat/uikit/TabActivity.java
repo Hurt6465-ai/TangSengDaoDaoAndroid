@@ -24,6 +24,9 @@ import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.ColorUtils;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.fragment.app.Fragment;
 import androidx.viewpager2.widget.ViewPager2;
 
@@ -78,9 +81,9 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     private static final String ICON_COMMUNITY = "faw-users";
     private static final String ICON_STUDY = "faw-graduation-cap";
 
-    // 参考 Messenger 的底部导航颜色：选中蓝色，未选中淡黑灰色。
-    private static final int COLOR_TAB_SELECTED = 0xFF1877F2;
-    private static final int COLOR_TAB_NORMAL = 0xFF65676B;
+    // 统一使用克制蓝紫主色，未选中项保持中性灰。
+    private static final int COLOR_TAB_SELECTED = 0xFF5B6FE8;
+    private static final int COLOR_TAB_NORMAL = 0xFF8D95A3;
 
     private CounterView msgCounterView;
     private ImageView chatIV, partnerIV, discoverIV, communityIV, studyIV;
@@ -111,6 +114,8 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         requestNotificationPermissionIfNeeded();
 
         initTabViews();
+        installBottomNavigationInsets();
+        syncSystemNavigationBarColor();
         initFragments();
         initBadgesAndCounters();
 
@@ -363,12 +368,47 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
     }
 
     public void setBottomNavigationVisible(boolean visible) {
-        if (wkVBinding == null || wkVBinding.bottomNavigation == null) {
+        if (wkVBinding == null || wkVBinding.bottomNavigationPanel == null) {
             return;
         }
         int targetVisibility = visible ? View.VISIBLE : View.GONE;
-        if (wkVBinding.bottomNavigation.getVisibility() != targetVisibility) {
-            wkVBinding.bottomNavigation.setVisibility(targetVisibility);
+        if (wkVBinding.bottomNavigationPanel.getVisibility() != targetVisibility) {
+            wkVBinding.bottomNavigationPanel.setVisibility(targetVisibility);
+        }
+    }
+
+    private void installBottomNavigationInsets() {
+        if (wkVBinding == null || wkVBinding.bottomNavigationPanel == null) return;
+        View panel = wkVBinding.bottomNavigationPanel;
+        final int initialLeft = panel.getPaddingLeft();
+        final int initialTop = panel.getPaddingTop();
+        final int initialRight = panel.getPaddingRight();
+        final int initialBottom = panel.getPaddingBottom();
+        ViewCompat.setOnApplyWindowInsetsListener(panel, (view, insets) -> {
+            int systemBottom = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom;
+            int gestureBottom = insets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures()).bottom;
+            int bottomInset = Math.max(systemBottom, gestureBottom);
+            view.setPadding(initialLeft, initialTop, initialRight, initialBottom + bottomInset);
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(panel);
+    }
+
+    private void syncSystemNavigationBarColor() {
+        int navigationColor = ContextCompat.getColor(this, R.color.tab_bg);
+        getWindow().setNavigationBarColor(navigationColor);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setNavigationBarContrastEnforced(false);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            View decorView = getWindow().getDecorView();
+            int flags = decorView.getSystemUiVisibility();
+            if (ColorUtils.calculateLuminance(navigationColor) > 0.5d) {
+                flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            } else {
+                flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            }
+            decorView.setSystemUiVisibility(flags);
         }
     }
 
@@ -619,6 +659,10 @@ public class TabActivity extends WKBaseActivity<ActTabMainBinding> {
         super.onConfigurationChanged(newConfig);
         WKMultiLanguageUtil.getInstance().setConfiguration();
         Theme.applyTheme();
+        syncSystemNavigationBarColor();
+        if (wkVBinding != null && wkVBinding.bottomNavigationPanel != null) {
+            ViewCompat.requestApplyInsets(wkVBinding.bottomNavigationPanel);
+        }
     }
 
     @Override
