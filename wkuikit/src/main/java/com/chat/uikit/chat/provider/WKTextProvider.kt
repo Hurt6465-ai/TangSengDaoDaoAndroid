@@ -331,6 +331,7 @@ open class WKTextProvider : WKChatBaseProvider() {
         val lp = LinearLayout.LayoutParams(dp(30), dp(30))
         lp.gravity = Gravity.BOTTOM
         lp.leftMargin = dp(6)
+        lp.rightMargin = dp(2)
         lp.bottomMargin = 0
         parent.addView(btn, lp)
     }
@@ -1375,7 +1376,16 @@ open class WKTextProvider : WKChatBaseProvider() {
         if (textContentLayout == null || msgTimeView == null) {
             return
         }
-        textContentLayout.layoutParams.width = getViewWidth(from, uiChatMsgItemEntity)
+        // 快捷翻译按钮位于接收气泡右侧。长消息使用最大宽度时必须为
+        // 30dp 点击区、6dp 左间距和2dp 右侧安全距离预留空间，否则按钮会被父布局裁掉。
+        val inlineTranslateReserve = if (
+            from == WKChatIteMsgFromType.RECEIVED
+            && shouldShowInlineTranslateButton(uiChatMsgItemEntity)
+        ) dp(38) else 0
+        textContentLayout.layoutParams.width = maxOf(
+            dp(40),
+            getViewWidth(from, uiChatMsgItemEntity) - inlineTranslateReserve
+        )
         val bgType = getMsgBgType(
             uiChatMsgItemEntity.previousMsg,
             uiChatMsgItemEntity.wkMsg,
