@@ -25,6 +25,9 @@ interface RoomTopicService {
     @POST("chatrooms/enter")
     Observable<RoomTopicEntity> enterRoom(@Body Map<String, Object> request);
 
+    @POST("chatrooms/read")
+    Observable<RoomTopicEntity> readRoom(@Body Map<String, Object> request);
+
     @POST("chatrooms/pin")
     Observable<RoomTopicEntity> pinRoom(@Body Map<String, Object> request);
 
