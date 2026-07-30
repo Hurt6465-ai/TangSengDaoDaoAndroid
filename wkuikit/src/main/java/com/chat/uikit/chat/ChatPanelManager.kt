@@ -120,15 +120,8 @@ import com.xinbida.wukongim.msgmodel.WKMsgEntity
 import com.xinbida.wukongim.msgmodel.WKTextContent
 import com.xinbida.wukongim.msgmodel.WKReply
 import org.json.JSONObject
-import org.json.JSONArray
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Locale
 import java.util.ArrayDeque
-import java.util.Objects
 import java.util.Timer
 import java.util.TimerTask
 import kotlin.math.min
@@ -181,8 +174,27 @@ class ChatPanelManager(
     val resetTitleViewListener: () -> Unit,
     val showNewImageListener: (path: String) -> Unit,
 ) {
-    private val eventKey = "InputPanel"
+    private class EmojiEndpointRegistration(var active: Boolean = true)
+
+    companion object {
+        private val EMOJI_ENDPOINT_LOCK = Any()
+        private val EMOJI_ENDPOINT_STACK = ArrayList<EmojiEndpointRegistration>()
+        private val DIRECT_VOICE_LOCK = Any()
+        private var directVoiceOwner: ChatPanelManager? = null
+    }
+
+    private var emojiEndpointRegistration: EmojiEndpointRegistration? = null
+    // SDK listener keys are global identifiers. A fixed "InputPanel" key makes two ChatActivity
+    // instances overwrite/remove each other, so every panel owns a unique key.
+    private val eventKey = "InputPanel@" + Integer.toHexString(System.identityHashCode(this))
+    private val robotListenerKey = "$eventKey@robot"
     private val loginUID = WKConfig.getInstance().uid
+    private var activeChannelId: String = iConversationContext.chatChannelInfo.channelID
+    private var activeChannelType: Byte = iConversationContext.chatChannelInfo.channelType
+    private var activeSessionGeneration: Long = 1L
+    private var refreshListenersRegistered = false
+    private var robotQueryToken = 0L
+    @Volatile private var destroyed = false
     private var isShowSendBtn: Boolean = false
     private var flame = 0
     private var lastInputTime: Long = 0
@@ -191,9 +203,6 @@ class ChatPanelManager(
     private var username: String = ""
     private val maxLength = 300
 
-    private val keyAiEndpoint = "chat_ai_endpoint"
-    private val keyAiKey = "chat_ai_key"
-    private val keyAiModel = "chat_ai_model"
     private val keyAiSourceLang = "chat_ai_source_lang"
     private val keyAiTargetLang = "chat_ai_target_lang"
     private val keyAiSendTranslate = "chat_ai_send_translate"
@@ -202,6 +211,9 @@ class ChatPanelManager(
     private var voiceDownX = 0f
     private var voiceCanceling = false
     private var voiceHolding = false
+    // WKVoiceViewManager 是全局单例，只能取消本面板自己启动的录音，
+    // 否则底层 ChatActivity 销毁时可能误停顶部页面正在录制的语音。
+    private var directVoiceStarted = false
     private var voiceForwardTarget: View? = null
     private var voiceLastMoveEvent: MotionEvent? = null
     private val voiceCancelDistance = AndroidUtilities.dp(70f).toFloat()
@@ -236,11 +248,19 @@ class ChatPanelManager(
         val originalText: String,
         val mentionUids: ArrayList<String>?,
         val entities: ArrayList<WKMsgEntity>?,
-        val reply: WKReply?
+        val reply: WKReply?,
+        val channelId: String,
+        val channelType: Byte,
+        val sessionGeneration: Long,
+        val loginUid: String,
+        val sourceLanguage: String,
+        val targetLanguage: String
     )
 
     private val beforeSendTranslateQueue = ArrayDeque<PendingBeforeSendTranslate>()
     private var beforeSendTranslateRunning = false
+    private var beforeSendTranslateRunToken = 0L
+    private var beforeSendTranslateThread: Thread? = null
     private var pendingDeepSeekReplyText = ""
     private var pendingDeepSeekBackTranslation = ""
     private var handlingKeyboardSend = false
@@ -443,11 +463,14 @@ class ChatPanelManager(
         isDisableToolBar(false)
     }
 
+    private fun safeEditSelectionStart(): Int {
+        val length = editText.text?.length ?: 0
+        return editText.selectionStart.coerceIn(0, length)
+    }
+
     fun setEditContent(text: String) {
-        val curPosition: Int = editText.selectionStart
-        val sb = StringBuilder(
-            Objects.requireNonNull(editText.text).toString()
-        )
+        val curPosition = safeEditSelectionStart()
+        val sb = StringBuilder(editText.text?.toString().orEmpty())
         sb.insert(curPosition, text)
         editText.setText(sb.toString())
         editText.setText(
@@ -532,12 +555,10 @@ class ChatPanelManager(
         val contentTv = chatTopView?.findViewWithTag<AppCompatTextView>("contentTv")
         topLeftIv?.setImageResource(R.mipmap.msg_panel_reply)
         topTitleTv?.text = if (TextUtils.isEmpty(showName)) "回复" else "回复 $showName"
-        val content =
-            if (mMsg.remoteExtra != null && mMsg.remoteExtra.contentEditMsgModel != null) {
-                mMsg.remoteExtra.contentEditMsgModel.displayContent
-            } else {
-                mMsg.baseContentMsgModel.displayContent
-            }
+        val content = mMsg.remoteExtra?.contentEditMsgModel?.displayContent
+            ?: mMsg.baseContentMsgModel?.displayContent
+            ?: mMsg.content
+            ?: ""
         contentTv?.text = content
 //        MoonUtil.identifyFaceExpression(
 //            iConversationContext!!.chatActivity,
@@ -550,11 +571,16 @@ class ChatPanelManager(
     }
 
     fun showEditLayout(mMsg: WKMsg) {
-        val textModel = mMsg.baseContentMsgModel as WKTextContent
-        var content = textModel.displayContent
-        if (!TextUtils.isEmpty(mMsg.remoteExtra.contentEdit)) {
-            val json = JSONObject(mMsg.remoteExtra.contentEdit)
-            content = json.optString("content")
+        val textModel = mMsg.baseContentMsgModel as? WKTextContent ?: return
+        var content = textModel.displayContent.orEmpty()
+        val contentEdit = mMsg.remoteExtra?.contentEdit.orEmpty()
+        if (!TextUtils.isEmpty(contentEdit)) {
+            try {
+                val json = JSONObject(contentEdit)
+                content = json.optString("content", content)
+            } catch (e: Exception) {
+                Log.w("ChatPanelManager", "parse edited message failed", e)
+            }
         }
 
         val topLeftIv = chatTopView?.findViewWithTag<AppCompatImageView>("topLeftIv")
@@ -569,6 +595,8 @@ class ChatPanelManager(
     }
 
     fun initRefreshListener() {
+        if (destroyed || refreshListenersRegistered) return
+        refreshListenersRegistered = true
         WKIM.getInstance().channelMembersManager.addOnAddChannelMemberListener(this.eventKey) { list ->
             for (channelMember in list) {
                 if (channelMember.memberUID == loginUID) {
@@ -613,11 +641,26 @@ class ChatPanelManager(
         }
     }
 
+    @Volatile
     private var timer: Timer? = null
+
+    @Synchronized
+    private fun cancelForbiddenTimer(expectedTimer: Timer? = null) {
+        if (expectedTimer != null && timer !== expectedTimer) return
+        val current = timer
+        timer = null
+        current?.cancel()
+        current?.purge()
+    }
+
     private fun showForbiddenTimer(totalTime: Long) {
-        if (timer != null)
-            return
-        timer = Timer()
+        val localTimer = synchronized(this) {
+            if (timer != null) return
+            Timer().also { timer = it }
+        }
+        val requestChannelId = activeChannelId
+        val requestChannelType = activeChannelType
+        val requestGeneration = activeSessionGeneration
         val timerTask: TimerTask = object : TimerTask() {
             override fun run() {
                 val nowTime = WKTimeUtils.getInstance().currentSeconds
@@ -627,6 +670,9 @@ class ChatPanelManager(
                 val second = (totalTime - nowTime) % 60
                 if (nowTime >= totalTime) {
                     AndroidUtilities.runOnUIThread {
+                        if (!isActiveSession(requestChannelId, requestChannelType, requestGeneration)) {
+                            return@runOnUIThread
+                        }
                         val channel = iConversationContext.chatChannelInfo
                         if (channel.forbidden == 1) {
                             showOrHideForbiddenView()
@@ -634,8 +680,8 @@ class ChatPanelManager(
                             hideForbiddenView()
                         }
                     }
-                    timer!!.cancel()
-                    timer = null
+                    cancel()
+                    cancelForbiddenTimer(localTimer)
                 } else {
                     var dayStr = "00"
                     if (day > 0) {
@@ -694,6 +740,9 @@ class ChatPanelManager(
                         }
                     }
                     AndroidUtilities.runOnUIThread {
+                        if (!isActiveSession(requestChannelId, requestChannelType, requestGeneration)) {
+                            return@runOnUIThread
+                        }
                         val forbiddenTV =
                             forbiddenView?.findViewWithTag<AppCompatTextView>("forbiddenTV")
                         forbiddenTV?.text = content
@@ -701,15 +750,12 @@ class ChatPanelManager(
                 }
             }
         }
-        timer!!.schedule(timerTask, 0, 1000)
+        localTimer.schedule(timerTask, 0, 1000)
 
     }
 
     fun showOrHideForbiddenView() {
-        if (timer != null) {
-            timer!!.cancel()
-            timer = null
-        }
+        cancelForbiddenTimer()
         if (iConversationContext.chatChannelInfo.channelType == WKChannelType.CUSTOMER_SERVICE) {
             hideBan()
             return
@@ -754,8 +800,15 @@ class ChatPanelManager(
 
 
     private fun showForbiddenWithMemberView(time: Long) {
-        showForbiddenView()
         val nowTime = WKTimeUtils.getInstance().currentSeconds
+        // 本地成员缓存可能短暂保留已经到期的禁言时间。继续为过去时间启动 Timer
+        // 会不断触发“到期 -> 重新检查 -> 再启动已到期 Timer”的循环。
+        if (time <= nowTime) {
+            cancelForbiddenTimer()
+            hideForbiddenView()
+            return
+        }
+        showForbiddenView()
         val day = (time - nowTime) / (3600 * 24)
         val hour = (time - nowTime) / 3600
         val min = (time - nowTime) / 60
@@ -783,8 +836,14 @@ class ChatPanelManager(
                 }
             }
         }
+        val requestChannelId = activeChannelId
+        val requestChannelType = activeChannelType
+        val requestGeneration = activeSessionGeneration
         showForbiddenTimer(time)
         AndroidUtilities.runOnUIThread {
+            if (!isActiveSession(requestChannelId, requestChannelType, requestGeneration)) {
+                return@runOnUIThread
+            }
             val forbiddenTV =
                 forbiddenView?.findViewWithTag<AppCompatTextView>("forbiddenTV")
             forbiddenTV?.text = showText
@@ -837,13 +896,104 @@ class ChatPanelManager(
         }
     }
 
-    fun onDestroy() {
-        if (timer != null) {
-            timer!!.cancel()
-            timer = null
+    fun onConversationChanged(
+        oldChannelId: String,
+        oldChannelType: Byte,
+        newChannelId: String,
+        newChannelType: Byte,
+        generation: Long
+    ) {
+        if (destroyed) return
+        // 先切换会话身份再清空输入框；ContactEditText 的 TextWatcher 会同步执行，
+        // 必须让它看到新频道及已经重新绑定的 @成员列表。
+        activeChannelId = newChannelId
+        activeChannelType = newChannelType
+        activeSessionGeneration = generation
+        rebindRemindForActiveConversation()
+
+        // 已经点击发送的翻译任务继续发送到任务捕获的原会话；这里只重置新会话 UI，
+        // 不能静默丢掉用户已经提交的消息。
+        resetVoiceState(cancelRecording = true)
+        cancelForbiddenTimer()
+        clearPendingDeepSeekReply()
+        closeChatReplyPanel()
+        editText.text = null
+        lastInputTime = 0L
+        inlineQueryOffset = ""
+        searchKey = ""
+        username = ""
+        robotQueryToken++
+        robotGIFAdapter?.setList(emptyList())
+        menuRecyclerView?.visibility = View.GONE
+        remindRecycleView?.visibility = View.GONE
+        robotGifRecyclerView?.visibility = View.GONE
+        banView?.visibility = View.GONE
+        forbiddenView?.visibility = View.GONE
+        chatView.visibility = View.VISIBLE
+        toolbarRecyclerView.visibility = View.GONE
+        resetMenuIv()
+
+        flame = iConversationContext.chatChannelInfo.flame
+        flameIV.visibility = if (flame == 1) View.VISIBLE else View.GONE
+        markdownIv.visibility = View.GONE
+        showFlame(iConversationContext.chatChannelInfo.flameSecond)
+        checkRobotMenu(iConversationContext)
+        showOrHideForbiddenView()
+        updateSendButtonMode()
+    }
+
+    private fun tryClaimDirectVoiceOwner(): Boolean {
+        synchronized(DIRECT_VOICE_LOCK) {
+            val owner = directVoiceOwner
+            if (owner != null && owner !== this) return false
+            directVoiceOwner = this
+            return true
         }
-        EndpointManager.getInstance().remove("emoji_click")
-        WKIM.getInstance().robotManager.removeRefreshRobotMenu(iConversationContext.chatChannelInfo.channelID)
+    }
+
+    private fun isDirectVoiceOwner(): Boolean = synchronized(DIRECT_VOICE_LOCK) {
+        directVoiceOwner === this
+    }
+
+    private fun releaseDirectVoiceOwner() {
+        synchronized(DIRECT_VOICE_LOCK) {
+            if (directVoiceOwner === this) directVoiceOwner = null
+        }
+    }
+
+    private fun resetVoiceState(cancelRecording: Boolean) {
+        if (cancelRecording && directVoiceStarted && isDirectVoiceOwner()) {
+            try {
+                WKVoiceViewManager.getInstance().finishDirectRecord(true)
+            } catch (e: Exception) {
+                Log.w("ChatPanelManager", "cancel direct record failed", e)
+            }
+        }
+        directVoiceStarted = false
+        releaseDirectVoiceOwner()
+        // 只移除录音 UI 自己的 runnable。该 Handler 也承载翻译完成回调，
+        // 切换会话时 removeCallbacksAndMessages(null) 会让已提交的翻译消息永远丢失。
+        stopVoiceUiTimer()
+        voiceHolding = false
+        voiceCanceling = false
+        voiceForwardTarget = null
+        voiceLastMoveEvent?.recycle()
+        voiceLastMoveEvent = null
+        hideVoiceRecordUi()
+    }
+
+    fun onDestroy() {
+        if (destroyed) return
+        destroyed = true
+        refreshListenersRegistered = false
+        robotQueryToken++
+        // 已经点击“发送”的翻译任务属于已提交消息。页面销毁后仍让队列完成并
+        // 发送到任务捕获的原频道；这里只停止本页面录音 UI，不能清空翻译回调。
+        resetVoiceState(cancelRecording = true)
+        cancelForbiddenTimer()
+        releaseRemindView()
+        unregisterEmojiEndpoint()
+        WKIM.getInstance().robotManager.removeRefreshRobotMenu(robotListenerKey)
         WKIM.getInstance().channelManager.removeRefreshChannelInfo(this.eventKey)
         WKIM.getInstance().channelMembersManager.removeRefreshChannelMemberInfo(this.eventKey)
         WKIM.getInstance().channelMembersManager.removeAddChannelMemberListener(this.eventKey)
@@ -973,19 +1123,26 @@ class ChatPanelManager(
             content
         )
         seekBarView?.setProgress(newProgress.toFloat() / 180, true)
-        if (iConversationContext.chatChannelInfo.channelType == WKChannelType.PERSONAL) {
+        val requestChannelId = activeChannelId
+        val requestChannelType = activeChannelType
+        val requestGeneration = activeSessionGeneration
+        if (requestChannelType == WKChannelType.PERSONAL) {
             FriendModel.getInstance().updateUserSetting(
-                iConversationContext.chatChannelInfo.channelID, "flame_second", newProgress
+                requestChannelId, "flame_second", newProgress
             ) { code: Int, msg: String? ->
-                if (code != HttpResponseCode.success.toInt()) {
+                if (isActiveSession(requestChannelId, requestChannelType, requestGeneration)
+                    && code != HttpResponseCode.success.toInt()
+                ) {
                     WKToastUtils.getInstance().showToast(msg)
                 }
             }
         } else {
             GroupModel.getInstance().updateGroupSetting(
-                iConversationContext.chatChannelInfo.channelID, "flame_second", newProgress
+                requestChannelId, "flame_second", newProgress
             ) { code: Int, msg: String? ->
-                if (code != HttpResponseCode.success.toInt()) {
+                if (isActiveSession(requestChannelId, requestChannelType, requestGeneration)
+                    && code != HttpResponseCode.success.toInt()
+                ) {
                     WKToastUtils.getInstance().showToastNormal(msg)
                 }
             }
@@ -1004,8 +1161,7 @@ class ChatPanelManager(
                 false
             )
         //去除刷新条目闪动动画
-        (Objects.requireNonNull(toolbarRecyclerView.itemAnimator) as DefaultItemAnimator).supportsChangeAnimations =
-            false
+        (toolbarRecyclerView.itemAnimator as? DefaultItemAnimator)?.supportsChangeAnimations = false
         val toolBarList = EndpointManager.getInstance()
             .invokes<ChatToolBarMenu>(EndpointCategory.wkChatToolBar, iConversationContext)
         val tempToolBarList: MutableList<ChatToolBarMenu> = ArrayList()
@@ -1039,14 +1195,10 @@ class ChatPanelManager(
                     if (mChatToolBarMenu.isDisable) return@determineTriggerSingleClick
                     // 如果点击的是@
                     if (mChatToolBarMenu.sid == "wk_chat_toolbar_remind") {
-                        val index = editText.selectionStart
-                        if (index != Objects.requireNonNull(editText.text)
-                                .toString().length
-                        ) {
-                            editText.text.insert(
-                                editText.selectionStart,
-                                "@"
-                            )
+                        val editable = editText.text
+                        val index = safeEditSelectionStart()
+                        if (index != editable.length) {
+                            editable.insert(index, "@")
                         } else {
                             editText.append("@")
                         }
@@ -1060,8 +1212,13 @@ class ChatPanelManager(
                         if (!TextUtils.isEmpty(path) && TextUtils.isEmpty(oldPath)
                             || !TextUtils.isEmpty(path) && !TextUtils.isEmpty(oldPath) && oldPath != path
                         ) {
-                            Handler(Looper.myLooper()!!).postDelayed({
-                                showNewImgDialog(path)
+                            val requestChannelId = activeChannelId
+                            val requestChannelType = activeChannelType
+                            val requestGeneration = activeSessionGeneration
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                if (isActiveSession(requestChannelId, requestChannelType, requestGeneration)) {
+                                    showNewImgDialog(path, requestChannelId, requestChannelType, requestGeneration)
+                                }
                             }, 300)
                         }
                     }
@@ -1162,33 +1319,35 @@ class ChatPanelManager(
                 WKSendMsgUtils.getInstance().sendMessage(wkMsg)
             }
         }
-        // 监听机器人刷新菜单
-        WKIM.getInstance().robotManager.addOnRefreshRobotMenu(iConversationContext.chatChannelInfo.channelID) {
-            checkRobotMenu(iConversationContext)
+        // 监听器 key 只用于标识注册项，不是频道过滤条件。使用实例唯一 key，
+        // 回调时再读取当前会话，避免多个聊天页互相覆盖。
+        WKIM.getInstance().robotManager.addOnRefreshRobotMenu(robotListenerKey) {
+            if (!destroyed) checkRobotMenu(iConversationContext)
         }
 
     }
 
     private fun checkRobotMenu(iConversationContext: IConversationContext) {
-        val robotMembers =
-            WKIM.getInstance().channelMembersManager.getRobotMembers(
-                iConversationContext.chatChannelInfo.channelID,
-                iConversationContext.chatChannelInfo.channelType
-            )
-        if ((iConversationContext.chatChannelInfo.robot == 1 || robotMembers != null) && robotMembers.isNotEmpty()) {
-            if (menuView.isGone) {
-                CommonAnim.getInstance().showLeft2Right(menuView)
-            }
-//            if (menuRecyclerView!!.visibility == visibility && robotMenuAdapter!!.data.size == 0) {
-            val menus = WKRobotModel.getInstance().getRobotMenus(
-                iConversationContext.chatChannelInfo.channelID,
-                iConversationContext.chatChannelInfo.channelType
-            )
-            robotMenuAdapter!!.setList(menus)
-            resetMenuHeader()
-//            }
+        val channel = iConversationContext.chatChannelInfo
+        val robotMembers = WKIM.getInstance().channelMembersManager.getRobotMembers(
+            channel.channelID,
+            channel.channelType
+        )
+        val hasRobot = channel.robot == 1 || !robotMembers.isNullOrEmpty()
+        val menus = if (hasRobot) {
+            WKRobotModel.getInstance().getRobotMenus(channel.channelID, channel.channelType)
+        } else {
+            emptyList<WKRobotMenuEntity>()
         }
-
+        robotMenuAdapter?.setList(menus)
+        if (menus.isNotEmpty()) {
+            if (menuView.isGone) CommonAnim.getInstance().showLeft2Right(menuView)
+            resetMenuHeader()
+        } else {
+            menuRecyclerView?.visibility = View.GONE
+            menuView.visibility = View.GONE
+            resetMenuIv()
+        }
     }
 
     private fun resetMenuHeader() {
@@ -1221,93 +1380,97 @@ class ChatPanelManager(
         )
     }
 
-    private fun initRemind() {
+    private fun releaseRemindView() {
+        // 不主动把旧 RecyclerView 的 adapter 设为 null：成员查询可能仍在回调，
+        // 让它完成到已经移出界面的旧列表比在 RemindMemberAdapter 内触发空引用更安全。
+        remindRecycleView?.let { recyclerView ->
+            if (recyclerView.parent === followScrollLayout) {
+                followScrollLayout.removeView(recyclerView)
+            }
+        }
+        remindRecycleView = null
+        remindHeaderView = null
+        remindMemberAdapter = null
+    }
 
-        if (iConversationContext.chatChannelInfo.channelType == WKChannelType.PERSONAL) return
-        this.remindRecycleView =
-            NoEventRecycleView(iConversationContext.chatActivity)
-        this.remindHeaderView = View(iConversationContext.chatActivity)
-        this.remindHeaderView!!.setBackgroundColor(
-            ContextCompat.getColor(
-                iConversationContext.chatActivity,
-                R.color.transparent
-            )
+    private fun rebindRemindForActiveConversation() {
+        releaseRemindView()
+        if (activeChannelType != WKChannelType.PERSONAL) {
+            initRemind()
+        }
+    }
+
+    private fun initRemind() {
+        val requestChannelId = activeChannelId
+        val requestChannelType = activeChannelType
+        if (requestChannelType == WKChannelType.PERSONAL) return
+
+        val recyclerView = NoEventRecycleView(iConversationContext.chatActivity)
+        val headerView = View(iConversationContext.chatActivity)
+        val memberAdapter = RemindMemberAdapter(requestChannelId, requestChannelType)
+        remindRecycleView = recyclerView
+        remindHeaderView = headerView
+        remindMemberAdapter = memberAdapter
+
+        headerView.setBackgroundColor(
+            ContextCompat.getColor(iConversationContext.chatActivity, R.color.transparent)
         )
-        remindRecycleView!!.layoutManager = LinearLayoutManager(
+        recyclerView.layoutManager = LinearLayoutManager(
             iConversationContext.chatActivity,
             LinearLayoutManager.VERTICAL,
             false
         )
-        remindRecycleView!!.setView(parentView, remindHeaderView)
-        remindRecycleView!!.addOnScrollListener(remindRecycleView!!.onScrollListener)
-        remindMemberAdapter = RemindMemberAdapter(
-            iConversationContext.chatChannelInfo.channelID,
-            iConversationContext.chatChannelInfo.channelType
-        )
-        remindRecycleView!!.adapter = remindMemberAdapter
-        remindMemberAdapter!!.addHeaderView(remindHeaderView!!)
-        remindMemberAdapter!!.onNormal()
-//        remindRecycleView!!.addIScrollListener { _, _ ->
-//            val layoutManager = remindRecycleView!!.layoutManager as LinearLayoutManager
-//            val lastCompletelyVisibleItemPosition =
-//                layoutManager.findLastCompletelyVisibleItemPosition()
-//            if (lastCompletelyVisibleItemPosition == layoutManager.itemCount - 1) {
-//                remindMemberAdapter!!.loadMore()
-//            }
-//        }
-        this.followScrollLayout.addView(this.remindRecycleView)
-        parentView.post {
-            var height = 40f
-            if (remindMemberAdapter!!.data.size > 3) height = 46f
-            remindHeaderView!!.layoutParams.height =
-                parentView.top - AndroidUtilities.dp(
-                    min(
-                        remindMemberAdapter!!.data.size,
-                        3
-                    ) * height
-                )
-//            if (lastPanelType != PanelType.NONE) {
-//                remindHeaderView!!.layoutParams.height -= WKConstant.getKeyboardHeight()
-//            }
-            this.remindRecycleView!!.setHeaderViewY(this.remindHeaderView!!.layoutParams.height.toFloat())
-        }
-        remindMemberAdapter!!.setOnItemClickListener { adapter, _, position ->
-            val entity = adapter.data[position] as GroupMemberEntity?
-            if (entity != null) {
-                var memberEntity = entity.member
-                if (memberEntity == null) {
-                    memberEntity = WKChannelMember()
-                    memberEntity.memberName =
-                        iConversationContext.chatActivity.getString(R.string.all)
-                    memberEntity.memberUID = "-1"
-                }
-                var showName = memberEntity.memberName
-                val mChannel = WKIM.getInstance().channelManager.getChannel(
-                    memberEntity.memberUID,
-                    WKChannelType.PERSONAL
-                )
-                if (mChannel != null) {
-                    showName = mChannel.channelName
-                }
-                var count = 1
-                if (!TextUtils.isEmpty(remindMemberAdapter!!.searchKey)) {
-                    count += remindMemberAdapter!!.searchKey.length
-                }
-                for (i in 0 until count) {
-                    //模拟一次键盘删除点击
-                    editText.dispatchKeyEvent(
-                        KeyEvent(
-                            KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL
-                        )
-                    )
-                }
-                //追加一个@提醒并弹出软键盘
-                editText.requestFocus()
-                addSpan(showName, memberEntity.memberUID)
-            }
-        }
-        this.remindRecycleView!!.visibility = View.GONE
+        recyclerView.setView(parentView, headerView)
+        recyclerView.addOnScrollListener(recyclerView.onScrollListener)
+        recyclerView.adapter = memberAdapter
+        memberAdapter.addHeaderView(headerView)
+        memberAdapter.onNormal()
+        followScrollLayout.addView(recyclerView)
 
+        parentView.post {
+            if (destroyed
+                || remindRecycleView !== recyclerView
+                || remindMemberAdapter !== memberAdapter
+                || activeChannelId != requestChannelId
+                || activeChannelType != requestChannelType
+            ) return@post
+            var height = 40f
+            if (memberAdapter.data.size > 3) height = 46f
+            headerView.layoutParams.height =
+                parentView.top - AndroidUtilities.dp(min(memberAdapter.data.size, 3) * height)
+            recyclerView.setHeaderViewY(headerView.layoutParams.height.toFloat())
+        }
+
+        memberAdapter.setOnItemClickListener { adapter, _, position ->
+            if (destroyed
+                || remindMemberAdapter !== memberAdapter
+                || activeChannelId != requestChannelId
+                || activeChannelType != requestChannelType
+            ) return@setOnItemClickListener
+            val entity = adapter.data.getOrNull(position) as? GroupMemberEntity
+                ?: return@setOnItemClickListener
+            val memberEntity = entity.member ?: WKChannelMember().apply {
+                memberName = iConversationContext.chatActivity.getString(R.string.all)
+                memberUID = "-1"
+            }
+            var showName = memberEntity.memberName
+            val channel = WKIM.getInstance().channelManager.getChannel(
+                memberEntity.memberUID,
+                WKChannelType.PERSONAL
+            )
+            if (channel != null) showName = channel.channelName
+
+            var deleteCount = 1
+            if (!TextUtils.isEmpty(memberAdapter.searchKey)) {
+                deleteCount += memberAdapter.searchKey.length
+            }
+            repeat(deleteCount) {
+                editText.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+            }
+            editText.requestFocus()
+            addSpan(showName, memberEntity.memberUID)
+        }
+        recyclerView.visibility = View.GONE
     }
 
     private fun initRobotGIF() {
@@ -1318,7 +1481,11 @@ class ChatPanelManager(
             val layoutManager = robotGifRecyclerView!!.layoutManager as LinearLayoutManager
             val lastCompletelyVisibleItemPosition =
                 layoutManager.findLastCompletelyVisibleItemPosition()
-            if (lastCompletelyVisibleItemPosition == layoutManager.itemCount - 1) {
+            if (lastCompletelyVisibleItemPosition == layoutManager.itemCount - 1
+                && inlineQueryOffset.isNotEmpty()
+                && searchKey.isNotEmpty()
+                && username.isNotEmpty()
+            ) {
                 searchRobotGif(searchKey, username)
             }
         }
@@ -1504,21 +1671,6 @@ class ChatPanelManager(
         aiSendStatusView.setOnClickListener { aiSendToggle.performClick() }
     }
 
-    private fun buildTranslatePrompt(content: String): String {
-        val source = getSetting(keyAiSourceLang, "မြန်မာစာ")
-        val target = getSetting(keyAiTargetLang, "中文")
-        return """将以下聊天消息从${source}翻译成${target}。
-
-要求：
-- 采用自然直译风格，保留原文结构、语气、表情符号和换行。
-- 如果原文有暧昧、调侃、冷淡、敷衍、撒娇、抱怨等语气，译文必须保留聊天感觉。
-- 保留链接、用户名、代码块、Markdown、列表和表情。
-- 只输出译文，不要添加解释、引号、前缀或额外文字。
-
-待翻译消息：
-${content}"""
-    }
-
     private fun sendInputText() {
         var content = StringUtils.replaceBlank(editText.text.toString())
         if (TextUtils.isEmpty(content)) return
@@ -1576,7 +1728,20 @@ ${content}"""
 
         val mentionUids = editText.allUIDs?.let { ArrayList(it) }
         val entities = editText.allEntity?.let { ArrayList(it) }
-        beforeSendTranslateQueue.offer(PendingBeforeSendTranslate(content, mentionUids, entities, replySnapshot))
+        beforeSendTranslateQueue.offer(
+            PendingBeforeSendTranslate(
+                originalText = content,
+                mentionUids = mentionUids,
+                entities = entities,
+                reply = replySnapshot,
+                channelId = activeChannelId,
+                channelType = activeChannelType,
+                sessionGeneration = activeSessionGeneration,
+                loginUid = loginUID,
+                sourceLanguage = getSetting(keyAiSourceLang, "မြန်မာစာ"),
+                targetLanguage = getSetting(keyAiTargetLang, "中文")
+            )
+        )
 
         editText.text = null
         lastInputTime = 0
@@ -1595,44 +1760,66 @@ ${content}"""
     private fun processBeforeSendTranslateQueue() {
         if (beforeSendTranslateRunning) return
         val task = beforeSendTranslateQueue.peek() ?: return
-        beforeSendTranslateRunning = true
 
-        Thread {
+        beforeSendTranslateRunning = true
+        val runToken = ++beforeSendTranslateRunToken
+        val worker = Thread({
             val result = try {
                 runBlocking {
                     WkTranslateBridge().translateBeforeSend(
                         ChatBeforeSendRequest(
-                            context = iConversationContext.chatActivity,
+                            context = iConversationContext.chatActivity.applicationContext,
                             text = task.originalText,
-                            sourceLang = getSetting(keyAiSourceLang, "မြန်မာစာ"),
-                            targetLang = getSetting(keyAiTargetLang, "中文")
+                            sourceLang = task.sourceLanguage,
+                            targetLang = task.targetLanguage
                         )
                     )
                 }
+            } catch (e: InterruptedException) {
+                null
             } catch (e: Exception) {
                 Log.e("ChatPanelManager", "before-send translation failed", e)
                 null
             }
 
-            Handler(Looper.getMainLooper()).post {
-                val finished = beforeSendTranslateQueue.poll()
+            voiceUiHandler.post {
+                if (runToken != beforeSendTranslateRunToken) return@post
+                beforeSendTranslateThread = null
                 beforeSendTranslateRunning = false
-                if (finished != null && result != null && result.success && !TextUtils.isEmpty(result.translatedText)) {
-                    sendTextNow(
-                        remoteContent = result.translatedText,
-                        localDisplayContent = finished.originalText,
-                        mentionUids = finished.mentionUids,
-                        entities = finished.entities,
-                        reply = finished.reply
-                    )
-                } else {
-                    WKToastUtils.getInstance().showToast(
-                        iConversationContext.chatActivity.getString(R.string.chat_ai_failed)
-                    )
+                val finished = beforeSendTranslateQueue.poll()
+                if (finished != null) {
+                    if (result != null && result.success && !TextUtils.isEmpty(result.translatedText)) {
+                        sendTextNow(
+                            remoteContent = result.translatedText,
+                            localDisplayContent = finished.originalText,
+                            mentionUids = finished.mentionUids,
+                            entities = finished.entities,
+                            reply = finished.reply,
+                            targetChannelId = finished.channelId,
+                            targetChannelType = finished.channelType,
+                            targetSessionGeneration = finished.sessionGeneration,
+                            targetLoginUid = finished.loginUid,
+                            explicitTarget = true
+                        )
+                    } else if (!destroyed) {
+                        // 即使用户已经切到其它会话，也必须提示这条已提交消息没有发出。
+                        WKToastUtils.getInstance().showToast(
+                            iConversationContext.chatActivity.getString(R.string.chat_ai_failed)
+                        )
+                    }
                 }
                 processBeforeSendTranslateQueue()
             }
-        }.start()
+        }, "chat-before-send-translate")
+        beforeSendTranslateThread = worker
+        worker.start()
+    }
+
+    private fun isActiveSession(channelId: String, channelType: Byte, generation: Long): Boolean {
+        return !destroyed
+            && generation == activeSessionGeneration
+            && channelId == activeChannelId
+            && channelType == activeChannelType
     }
 
     private fun buildReplySnapshot(replyMsg: WKMsg?): WKReply? {
@@ -1673,15 +1860,29 @@ ${content}"""
         mentionUids: List<String>? = null,
         entities: List<WKMsgEntity>? = null,
         reply: WKReply? = null,
-        deepSeekBackTranslation: String? = null
+        deepSeekBackTranslation: String? = null,
+        targetChannelId: String = activeChannelId,
+        targetChannelType: Byte = activeChannelType,
+        targetSessionGeneration: Long = activeSessionGeneration,
+        targetLoginUid: String = loginUID,
+        explicitTarget: Boolean = false
     ) {
+        if (targetChannelId.isEmpty() || WKConfig.getInstance().uid != targetLoginUid) return
+        val targetIsActive = !destroyed && isActiveSession(
+            targetChannelId,
+            targetChannelType,
+            targetSessionGeneration
+        )
+        // 普通发送必须属于当前会话；显式目标发送已经捕获频道，可以在切换会话后
+        // 安全地完成，但绝不能再清空或修改新会话的输入面板。
+        if (!explicitTarget && (destroyed || !targetIsActive)) return
         if (!TextUtils.isEmpty(deepSeekBackTranslation)
             && deepSeekBackTranslation != remoteContent
         ) {
             DeepSeekAssistant.rememberReplyForNextSend(
                 iConversationContext.chatActivity,
-                iConversationContext.chatChannelInfo.channelID,
-                iConversationContext.chatChannelInfo.channelType,
+                targetChannelId,
+                targetChannelType,
                 remoteContent,
                 deepSeekBackTranslation!!
             )
@@ -1695,7 +1896,9 @@ ${content}"""
             WKTextContent(remoteContent)
         }
 
-        val list = mentionUids ?: editText.allUIDs
+        // 显式目标发送（例如发送前翻译）必须只使用任务创建时捕获的 @ 信息。
+        // null 在这里表示“原消息没有 @”，不能回退读取切换后新会话的输入框。
+        val list = if (explicitTarget) mentionUids else mentionUids ?: editText.allUIDs
         if (list != null && list.isNotEmpty()) {
             val mMentionInfo = WKMentionInfo()
             val uidList: MutableList<String> = ArrayList()
@@ -1712,72 +1915,25 @@ ${content}"""
             mMentionInfo.uids = uidList
             textMsgModel.mentionInfo = mMentionInfo
         }
-        textMsgModel.entities = entities ?: editText.allEntity
+        // 同上，显式目标发送不能混入当前输入框的实体（@、链接等）。
+        textMsgModel.entities = if (explicitTarget) entities else entities ?: editText.allEntity
         if (reply != null) {
             textMsgModel.reply = reply
         }
 
-        iConversationContext.sendMessage(textMsgModel)
-        editText.text = null
-        updateSendButtonMode()
-        lastInputTime = 0
-        closeChatReplyPanel()
-    }
-
-    private fun requestAi(prompt: String, onSuccess: (String) -> Unit, onError: () -> Unit) {
-        val endpoint = getSetting(keyAiEndpoint, "https://api.deepseek.com/v1/chat/completions")
-        val apiKey = getSetting(keyAiKey, "")
-        val model = getSetting(keyAiModel, "deepseek-chat")
-        if (TextUtils.isEmpty(apiKey)) {
-            WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_key_empty))
-            onError()
-            return
+        if (explicitTarget) {
+            iConversationContext.sendMessageToChannel(textMsgModel, targetChannelId, targetChannelType)
+        } else {
+            iConversationContext.sendMessage(textMsgModel)
         }
-
-        Thread {
-            try {
-                val body = JSONObject()
-                body.put("model", model)
-                body.put("temperature", 0.25)
-                val messages = JSONArray()
-                val system = JSONObject()
-                system.put("role", "system")
-                system.put("content", "你是移动聊天应用内的翻译助手。")
-                val user = JSONObject()
-                user.put("role", "user")
-                user.put("content", prompt)
-                messages.put(system)
-                messages.put(user)
-                body.put("messages", messages)
-
-                val connection = URL(endpoint).openConnection() as HttpURLConnection
-                connection.requestMethod = "POST"
-                connection.connectTimeout = 20000
-                connection.readTimeout = 30000
-                connection.doOutput = true
-                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                connection.setRequestProperty("Accept", "application/json")
-                connection.setRequestProperty("Authorization", "Bearer $apiKey")
-
-                OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { it.write(body.toString()) }
-                val stream = if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream
-                val text = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
-                val json = JSONObject(text)
-                val result = json.optJSONArray("choices")
-                    ?.optJSONObject(0)
-                    ?.optJSONObject("message")
-                    ?.optString("content")
-                    ?.trim()
-                    ?: ""
-                Handler(Looper.getMainLooper()).post {
-                    if (result.isNotEmpty()) onSuccess(result) else onError()
-                }
-                connection.disconnect()
-            } catch (e: Exception) {
-                Log.e("ChatPanelManager", "AI request failed", e)
-                Handler(Looper.getMainLooper()).post { onError() }
-            }
-        }.start()
+        // 发送前翻译在入队时已经清空了当时那条输入。回调完成时用户可能已经
+        // 开始输入下一条，显式目标任务绝不能再次清空当前输入框。
+        if (targetIsActive && !explicitTarget) {
+            editText.text = null
+            updateSendButtonMode()
+            lastInputTime = 0
+            closeChatReplyPanel()
+        }
     }
 
     private fun triggerMediaPickerDirect() {
@@ -1824,8 +1980,14 @@ ${content}"""
         if (position < 0 || position >= adapter.data.size) return
         val menu = adapter.getItem(position) ?: return
         if (menu.isDisable) return
+        val requestChannelId = activeChannelId
+        val requestChannelType = activeChannelType
+        val requestGeneration = activeSessionGeneration
         toolBarClick(menu, position, adapter)
         parentView.postDelayed({
+            if (!isActiveSession(requestChannelId, requestChannelType, requestGeneration)) {
+                return@postDelayed
+            }
             if (!autoClickMediaAction(moreLayout)) {
                 WKToastUtils.getInstance().showToast(iConversationContext.chatActivity.getString(R.string.chat_ai_media_not_found))
             }
@@ -2034,11 +2196,29 @@ ${content}"""
                     iConversationContext.chatActivity.getString(R.string.microphone_permissions_des),
                     iConversationContext.chatActivity.getString(R.string.app_name)
                 )
+                val requestChannelId = activeChannelId
+                val requestChannelType = activeChannelType
+                val requestGeneration = activeSessionGeneration
                 WKPermissions.getInstance().checkPermissions(object : WKPermissions.IPermissionResult {
                     override fun onResult(result: Boolean) {
+                        if (!isActiveSession(requestChannelId, requestChannelType, requestGeneration)) return
                         if (result && voiceHolding) {
+                            if (!tryClaimDirectVoiceOwner()) {
+                                voiceHolding = false
+                                hideVoiceRecordUi()
+                                return
+                            }
                             showVoiceRecordUi()
-                            WKVoiceViewManager.getInstance().startDirectRecord(iConversationContext)
+                            try {
+                                WKVoiceViewManager.getInstance().startDirectRecord(iConversationContext)
+                                directVoiceStarted = true
+                            } catch (e: Exception) {
+                                directVoiceStarted = false
+                                releaseDirectVoiceOwner()
+                                voiceHolding = false
+                                hideVoiceRecordUi()
+                                Log.e("ChatPanelManager", "start direct record failed", e)
+                            }
                         } else if (!result) {
                             voiceHolding = false
                             hideVoiceRecordUi()
@@ -2046,6 +2226,7 @@ ${content}"""
                     }
 
                     override fun clickResult(isCancel: Boolean) {
+                        if (!isActiveSession(requestChannelId, requestChannelType, requestGeneration)) return
                         if (isCancel) {
                             voiceHolding = false
                             hideVoiceRecordUi()
@@ -2065,10 +2246,16 @@ ${content}"""
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (voiceHolding) {
+                if (voiceHolding && directVoiceStarted && isDirectVoiceOwner()) {
                     val shouldCancel = voiceCanceling || event.actionMasked == MotionEvent.ACTION_CANCEL
-                    WKVoiceViewManager.getInstance().finishDirectRecord(shouldCancel)
+                    try {
+                        WKVoiceViewManager.getInstance().finishDirectRecord(shouldCancel)
+                    } catch (e: Exception) {
+                        Log.e("ChatPanelManager", "finish direct record failed", e)
+                    }
                 }
+                directVoiceStarted = false
+                releaseDirectVoiceOwner()
                 voiceHolding = false
                 voiceForwardTarget = null
                 voiceLastMoveEvent?.recycle()
@@ -2158,40 +2345,61 @@ ${content}"""
         ev.recycle()
     }
 
+    private fun registerEmojiEndpoint() {
+        synchronized(EMOJI_ENDPOINT_LOCK) {
+            if (emojiEndpointRegistration != null) return
+            val registration = EmojiEndpointRegistration()
+            emojiEndpointRegistration = registration
+            EMOJI_ENDPOINT_STACK.add(registration)
+            EndpointManager.getInstance().setMethod("emoji_click") { value ->
+                handleEmojiClick(value)
+            }
+        }
+    }
+
+    private fun unregisterEmojiEndpoint() {
+        synchronized(EMOJI_ENDPOINT_LOCK) {
+            val registration = emojiEndpointRegistration ?: return
+            registration.active = false
+            emojiEndpointRegistration = null
+
+            // EndpointManager.remove(sid) 只删除最后注册的同名处理器。
+            // 底层 ChatActivity 先销毁时只能标记失效，等顶部页面销毁后再按栈顺序清理。
+            while (EMOJI_ENDPOINT_STACK.isNotEmpty()) {
+                val lastIndex = EMOJI_ENDPOINT_STACK.lastIndex
+                val last = EMOJI_ENDPOINT_STACK[lastIndex]
+                if (last.active) break
+                EndpointManager.getInstance().remove("emoji_click")
+                EMOJI_ENDPOINT_STACK.removeAt(lastIndex)
+            }
+        }
+    }
+
+    private fun handleEmojiClick(value: Any?): Any? {
+        if (destroyed) return null
+        val emojiName = value as? String ?: return null
+        if (TextUtils.isEmpty(emojiName)) {
+            editText.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+            return null
+        }
+
+        val safePosition = safeEditSelectionStart()
+        // EditText 未获得焦点或刚恢复布局时 selectionStart 可能为 -1。
+        // MoonUtil 内部会直接按当前 selectionStart 插入，必须先修正光标。
+        if (editText.selectionStart != safePosition) {
+            editText.setSelection(safePosition)
+        }
+        MoonUtil.addEmojiSpan(editText, emojiName, iConversationContext.chatActivity)
+        val maxPosition = editText.text?.length ?: 0
+        editText.setSelection((safePosition + emojiName.length).coerceAtMost(maxPosition))
+        return null
+    }
+
     private fun initListener() {
         panelView.setOnClickListener {
 
         }
-        EndpointManager.getInstance().setMethod(
-            "emoji_click"
-        ) { `object` ->
-            val emojiName = `object` as String
-            if (TextUtils.isEmpty(emojiName)) {
-                editText.dispatchKeyEvent(
-                    KeyEvent(
-                        KeyEvent.ACTION_DOWN,
-                        KeyEvent.KEYCODE_DEL
-                    )
-                )
-            } else {
-                val curPosition = editText.selectionStart
-                val sb = StringBuilder(
-                    Objects.requireNonNull(editText.text).toString()
-                )
-                sb.insert(curPosition, emojiName)
-                MoonUtil.addEmojiSpan(
-                    editText,
-                    emojiName,
-                    iConversationContext.chatActivity
-                )
-                // 将光标设置到新增完表情的右侧
-                val index = editText.text.toString().length
-                editText.setSelection(
-                    (curPosition + emojiName.length).coerceAtMost(index)
-                )
-            }
-            null
-        }
+        registerEmojiEndpoint()
         SingleClickUtil.onSingleClick(markdownIv) {
             // 富文本入口已隐藏。
         }
@@ -2493,26 +2701,27 @@ ${content}"""
             }
         }
         if (iConversationContext.chatChannelInfo.channelType == WKChannelType.GROUP && isSearchGroupMembers) {
+            val memberAdapter = remindMemberAdapter ?: return
+            val memberRecyclerView = remindRecycleView ?: return
+            val headerView = remindHeaderView ?: return
             var remindSearchKey: String = content
 
             remindSearchKey = remindSearchKey.replace("@".toRegex(), "")
 //            val keyword = mentionEnd(content)
-            if (!TextUtils.isEmpty(remindSearchKey) && (content == "@" || content.endsWith("@"))) remindMemberAdapter!!.onNormal() else remindMemberAdapter!!.onSearch(
-                remindSearchKey
-            )
-            remindRecycleView!!.scrollToPosition(0)
+            if (!TextUtils.isEmpty(remindSearchKey) && (content == "@" || content.endsWith("@"))) {
+                memberAdapter.onNormal()
+            } else {
+                memberAdapter.onSearch(remindSearchKey)
+            }
+            memberRecyclerView.scrollToPosition(0)
             val min =
-                (remindMemberAdapter!!.itemCount - remindMemberAdapter!!.headerLayoutCount).coerceAtMost(
-                    3
-                )
+                (memberAdapter.itemCount - memberAdapter.headerLayoutCount).coerceAtMost(3)
             var height = 40f
-            if (remindMemberAdapter!!.data.size > 3) height = 48f
+            if (memberAdapter.data.size > 3) height = 48f
 
-            remindHeaderView!!.layoutParams.height =
-                parentView.top - AndroidUtilities.dp((min * height))
-            remindRecycleView!!.setHeaderViewY(remindHeaderView!!.layoutParams.height.toFloat())
-            if (remindRecycleView!!.isGone) CommonAnim.getInstance()
-                .showBottom2Top(remindRecycleView)
+            headerView.layoutParams.height = parentView.top - AndroidUtilities.dp((min * height))
+            memberRecyclerView.setHeaderViewY(headerView.layoutParams.height.toFloat())
+            if (memberRecyclerView.isGone) CommonAnim.getInstance().showBottom2Top(memberRecyclerView)
         }
     }
 
@@ -2579,27 +2788,44 @@ ${content}"""
     private fun searchRobotGif(searchKey: String, username: String) {
         this.searchKey = searchKey
         this.username = username
+        val requestChannelId = activeChannelId
+        val requestChannelType = activeChannelType
+        val requestGeneration = activeSessionGeneration
+        val requestOffset = inlineQueryOffset
+        val requestToken = ++robotQueryToken
         WKRobotModel.getInstance().inlineQuery(
-            inlineQueryOffset,
+            requestOffset,
             username,
             searchKey,
-            iConversationContext.chatChannelInfo.channelID,
-            iConversationContext.chatChannelInfo.channelType
+            requestChannelId,
+            requestChannelType
         ) { _: Int, _: String?, result: WKRobotInlineQueryResult? ->
-            if (TextUtils.isEmpty(inlineQueryOffset)) {
-                robotGifRecyclerView!!.scrollToPosition(0)
-                robotGifHeaderView!!.layoutParams.height =
-                    parentView.top - AndroidUtilities.dp(100f)
-                this.robotGifRecyclerView!!.setHeaderViewY(robotGifHeaderView!!.layoutParams.height.toFloat())
+            if (requestToken != robotQueryToken
+                || !isActiveSession(requestChannelId, requestChannelType, requestGeneration)
+                || this.searchKey != searchKey
+                || this.username != username
+            ) return@inlineQuery
+
+            if (TextUtils.isEmpty(requestOffset)) {
+                robotGifRecyclerView?.scrollToPosition(0)
+                robotGifHeaderView?.layoutParams?.height = parentView.top - AndroidUtilities.dp(100f)
+                val headerHeight = robotGifHeaderView?.layoutParams?.height ?: 0
+                robotGifRecyclerView?.setHeaderViewY(headerHeight.toFloat())
             }
-            if (result?.results != null && result.results.isNotEmpty()) {
-                if (TextUtils.isEmpty(inlineQueryOffset)) robotGIFAdapter!!.setList(result.results) else robotGIFAdapter!!.addData(
-                    result.results
-                )
+            val results = result?.results.orEmpty()
+            // 即使最后一页为空也必须清空 next_offset，否则滚到底部会无限重试同一页。
+            inlineQueryOffset = result?.next_offset.orEmpty()
+            if (results.isNotEmpty()) {
+                if (TextUtils.isEmpty(requestOffset)) {
+                    robotGIFAdapter?.setList(results)
+                } else {
+                    robotGIFAdapter?.addData(results)
+                }
                 resetData()
-                inlineQueryOffset = result.next_offset
-                if (this.robotGifRecyclerView!!.visibility != View.VISIBLE) {
-                    CommonAnim.getInstance().showBottom2Top(this.robotGifRecyclerView)
+                robotGifRecyclerView?.let { recyclerView ->
+                    if (recyclerView.visibility != View.VISIBLE) {
+                        CommonAnim.getInstance().showBottom2Top(recyclerView)
+                    }
                 }
             }
         }
@@ -2607,26 +2833,29 @@ ${content}"""
 
 
     private fun resetData() {
-        for (index in robotGIFAdapter!!.data.indices) {
-            if (index < robotGIFAdapter!!.data.size && robotGIFAdapter!!.data[index].isNull) {
-                robotGIFAdapter!!.removeAt(index)
-            }
+        val adapter = robotGIFAdapter ?: return
+        // 占位项可能连续出现，正序 removeAt 会跳过后一个并让空占位逐页累积。
+        for (index in adapter.data.lastIndex downTo 0) {
+            if (adapter.data[index].isNull) adapter.removeAt(index)
         }
-        val num = robotGIFAdapter!!.data.size % 3
+        val num = adapter.data.size % 3
         if (num != 0) {
             var count = 3 - num
             while (count > 0) {
                 val sticker = WKRobotGIFEntity()
                 sticker.isNull = true
-                robotGIFAdapter!!.addData(sticker)
+                adapter.addData(sticker)
                 count--
             }
         }
     }
 
     fun hideRemindView() {
-        if (iConversationContext.chatChannelInfo.channelType == WKChannelType.GROUP && remindRecycleView!!.visibility != View.GONE) {
-            CommonAnim.getInstance().hideTop2Bottom(remindRecycleView!!)
+        val recyclerView = remindRecycleView ?: return
+        if (iConversationContext.chatChannelInfo.channelType == WKChannelType.GROUP
+            && recyclerView.visibility != View.GONE
+        ) {
+            CommonAnim.getInstance().hideTop2Bottom(recyclerView)
         }
     }
 
@@ -2678,14 +2907,15 @@ ${content}"""
         )
 
         emojiAdapter.setOnItemClickListener { adapter, _, position ->
-            val emojiEntry = adapter.getItem(position) as EmojiEntry
-            val curPosition: Int = editText.selectionStart
-            val sb = java.lang.StringBuilder(
-                Objects.requireNonNull(editText.text).toString()
-            )
-            sb.insert(curPosition, emojiEntry.text)
+            val emojiEntry = adapter.getItem(position) as? EmojiEntry
+                ?: return@setOnItemClickListener
+            val curPosition = safeEditSelectionStart()
+            if (editText.selectionStart != curPosition) {
+                editText.setSelection(curPosition)
+            }
             MoonUtil.addEmojiSpan(editText, emojiEntry.text, iConversationContext.chatActivity)
-            editText.setSelection(curPosition + emojiEntry.text.length)
+            val maxPosition = editText.text?.length ?: 0
+            editText.setSelection((curPosition + emojiEntry.text.length).coerceAtMost(maxPosition))
         }
         return emojiLayout
     }
@@ -2700,9 +2930,12 @@ ${content}"""
             activity.getString(R.string.microphone_permissions_des),
             activity.getString(R.string.app_name)
         )
+        val requestChannelId = activeChannelId
+        val requestChannelType = activeChannelType
+        val requestGeneration = activeSessionGeneration
         WKPermissions.getInstance().checkPermissions(object : WKPermissions.IPermissionResult {
             override fun onResult(result: Boolean) {
-                if (result) {
+                if (result && isActiveSession(requestChannelId, requestChannelType, requestGeneration)) {
                     toolBarClick(
                         mChatToolBarMenu,
                         position,
@@ -2775,11 +3008,18 @@ ${content}"""
     }
 
     //相册有新的图片
-    private fun showNewImgDialog(path: String) {
+    private fun showNewImgDialog(
+        path: String,
+        requestChannelId: String,
+        requestChannelType: Byte,
+        requestGeneration: Long
+    ) {
+        if (!isActiveSession(requestChannelId, requestChannelType, requestGeneration)) return
         WKSharedPreferencesUtil.getInstance().putSP("new_img_path", path)
         val imageView = newImageLayout?.findViewWithTag<AppCompatImageView>("imageView")
         GlideUtils.getInstance().showImg(iConversationContext.chatActivity, path, imageView)
         imageView?.setOnClickListener {
+            if (!isActiveSession(requestChannelId, requestChannelType, requestGeneration)) return@setOnClickListener
             showNewImageListener(path)
             newImageLayout?.visibility = View.GONE
         }
@@ -3572,38 +3812,40 @@ ${content}"""
             LayoutHelper.createLinear(45, 40, Gravity.CENTER, 0, 0, 0, 0)
         )
         switchView.setOnCheckedChangeListener { v, isChecked ->
-            run {
-                if (v.isPressed) {
-                    if (iConversationContext.chatChannelInfo.channelType == WKChannelType.PERSONAL) {
-                        FriendModel.getInstance().updateUserSetting(
-                            iConversationContext.chatChannelInfo.channelID,
-                            "flame",
-                            if (isChecked) 1 else 0
-                        ) { code: Int, msg: String? ->
-                            if (code != HttpResponseCode.success.toInt()) {
-                                switchView.isChecked = !isChecked
-                                WKToastUtils.getInstance().showToast(msg)
-                            } else {
-                                if (!isChecked) {
-                                    CommonAnim.getInstance().animateClose(flameLayout)
-                                }
-                            }
-                        }
-                    } else {
-                        GroupModel.getInstance().updateGroupSetting(
-                            iConversationContext.chatChannelInfo.channelID,
-                            "flame",
-                            if (isChecked) 1 else 0
-                        ) { code, msg ->
-                            if (code != HttpResponseCode.success.toInt()) {
-                                switchView.isChecked = !isChecked
-                                WKToastUtils.getInstance().showToast(msg)
-                            } else {
-                                if (!isChecked) {
-                                    CommonAnim.getInstance().animateClose(flameLayout)
-                                }
-                            }
-                        }
+            if (!v.isPressed) return@setOnCheckedChangeListener
+            val requestChannelId = activeChannelId
+            val requestChannelType = activeChannelType
+            val requestGeneration = activeSessionGeneration
+            if (requestChannelType == WKChannelType.PERSONAL) {
+                FriendModel.getInstance().updateUserSetting(
+                    requestChannelId,
+                    "flame",
+                    if (isChecked) 1 else 0
+                ) { code: Int, msg: String? ->
+                    if (!isActiveSession(requestChannelId, requestChannelType, requestGeneration)) {
+                        return@updateUserSetting
+                    }
+                    if (code != HttpResponseCode.success.toInt()) {
+                        switchView.isChecked = !isChecked
+                        WKToastUtils.getInstance().showToast(msg)
+                    } else if (!isChecked) {
+                        CommonAnim.getInstance().animateClose(flameLayout)
+                    }
+                }
+            } else {
+                GroupModel.getInstance().updateGroupSetting(
+                    requestChannelId,
+                    "flame",
+                    if (isChecked) 1 else 0
+                ) { code: Int, msg: String? ->
+                    if (!isActiveSession(requestChannelId, requestChannelType, requestGeneration)) {
+                        return@updateGroupSetting
+                    }
+                    if (code != HttpResponseCode.success.toInt()) {
+                        switchView.isChecked = !isChecked
+                        WKToastUtils.getInstance().showToast(msg)
+                    } else if (!isChecked) {
+                        CommonAnim.getInstance().animateClose(flameLayout)
                     }
                 }
             }

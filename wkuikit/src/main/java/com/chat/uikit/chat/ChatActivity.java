@@ -164,6 +164,8 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -202,7 +204,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private int count;
     private int groupType = WKGroupType.normalGroup;
     //已读消息ID
-    private final List<String> readMsgIds = new ArrayList<>();
+    private final Set<String> readMsgIds = new LinkedHashSet<>();
     private Disposable disposable;
     private final CompositeDisposable asyncDisposables = new CompositeDisposable();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -2861,7 +2863,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         isTipMessage = false;
         browseTo = 0;
         unfilledHeight = 0;
-        readMsgIds.clear();
+        clearReadReceiptIds();
         reminderList.clear();
         groupApproveList.clear();
         reminderIds.clear();
@@ -2983,10 +2985,33 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         });
     }
 
+    private boolean hasPendingReadReceipts() {
+        synchronized (readMsgIds) {
+            return !readMsgIds.isEmpty();
+        }
+    }
+
+    private void addReadReceiptId(String messageId) {
+        if (TextUtils.isEmpty(messageId)) return;
+        synchronized (readMsgIds) {
+            readMsgIds.add(messageId);
+        }
+    }
+
+    private void clearReadReceiptIds() {
+        synchronized (readMsgIds) {
+            readMsgIds.clear();
+        }
+    }
+
     private void flushReadReceipts(String targetChannelId, byte targetChannelType) {
-        if (TextUtils.isEmpty(targetChannelId) || WKReader.isEmpty(readMsgIds)) return;
-        List<String> ids = new ArrayList<>(readMsgIds);
-        readMsgIds.clear();
+        if (TextUtils.isEmpty(targetChannelId)) return;
+        final List<String> ids;
+        synchronized (readMsgIds) {
+            if (readMsgIds.isEmpty()) return;
+            ids = new ArrayList<>(readMsgIds);
+            readMsgIds.clear();
+        }
         EndpointManager.getInstance().invoke("read_msg", new ReadMsgMenu(targetChannelId, targetChannelType, ids));
     }
 
@@ -2994,7 +3019,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         reminderList.clear();
         groupApproveList.clear();
         reminderIds.clear();
-        readMsgIds.clear();
+        clearReadReceiptIds();
         replyWKMsg = null;
         editMsg = null;
         isViewingPicture = false;
@@ -3108,6 +3133,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (!initParam()) {
             finish();
             return;
+        }
+        if (chatPanelManager != null) {
+            chatPanelManager.onConversationChanged(
+                    oldChannelId, oldChannelType, channelId, channelType, channelGeneration);
         }
         registerChannelListeners();
         EndpointManager.getInstance().invoke(
@@ -3351,8 +3380,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             }
             boolean isAdd = true;
             for (int i = 0; i < MsgModel.getInstance().channelStatus.size(); i++) {
-                if (MsgModel.getInstance().channelStatus.get(i).channel_id.equals(channelId)) {
-                    MsgModel.getInstance().channelStatus.get(i).calling = isShowCallingView ? 1 : 0;
+                WKChannelState savedState = MsgModel.getInstance().channelStatus.get(i);
+                if (savedState.channel_id.equals(channelId) && savedState.channel_type == channelType) {
+                    savedState.calling = isShowCallingView ? 1 : 0;
                     isAdd = false;
                     break;
                 }
@@ -4258,7 +4288,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
             @Override
             public void onNext(@io.reactivex.rxjava3.annotations.NonNull Long value) {
-                if (WKReader.isEmpty(readMsgIds) || !isUploadReadMsg) {
+                if (!hasPendingReadReceipts() || !isUploadReadMsg) {
                     return;
                 }
                 flushReadReceipts(channelId, channelType);
@@ -4293,8 +4323,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private void sendImageContentAsync(WKMessageContent messageContent) {
-        final String targetChannelId = channelId;
-        final byte targetChannelType = channelType;
+        sendImageContentAsync(messageContent, channelId, channelType);
+    }
+
+    private void sendImageContentAsync(WKMessageContent messageContent,
+                                       String targetChannelId, byte targetChannelType) {
         Disposable task = Observable.fromCallable(() -> {
                     compressImageContentIfNeeded(messageContent);
                     return messageContent;
@@ -4365,6 +4398,18 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         sendMsg(messageContent);
     }
 
+    @Override
+    public void sendMessageToChannel(WKMessageContent messageContent, String targetChannelId, byte targetChannelType) {
+        if (messageContent == null || TextUtils.isEmpty(targetChannelId)) return;
+        // 该入口专供已经捕获目标会话的异步任务使用，不读取 replyWKMsg/editMsg，
+        // 避免回调回来时把旧会话状态附加到新会话。
+        if (messageContent instanceof WKImageContent) {
+            sendImageContentAsync(messageContent, targetChannelId, targetChannelType);
+        } else {
+            sendMsg(messageContent, targetChannelId, targetChannelType);
+        }
+    }
+
     private void attachReply(WKMessageContent messageContent, WKMsg sourceMsg) {
         if (messageContent == null || sourceMsg == null) return;
         WKReply wkReply = new WKReply();
@@ -4399,7 +4444,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     private void sendMsg(WKMessageContent messageContent, String targetChannelId, byte targetChannelType) {
         if (messageContent == null || TextUtils.isEmpty(targetChannelId)) return;
-        if (TextUtils.equals(channelId, targetChannelId) && channelType == targetChannelType && redDot > 0) {
+        boolean canTouchUi = !isFinishing()
+                && (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1 || !isDestroyed())
+                && wkVBinding != null;
+        if (canTouchUi && TextUtils.equals(channelId, targetChannelId)
+                && channelType == targetChannelType && redDot > 0) {
             wkVBinding.chatUnreadLayout.newMsgLayout.performClick();
         }
         WKMsg wkMsg = new WKMsg();
@@ -4470,7 +4519,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     @Override
     public void setTitleRightText(String text) {
-        int num = Integer.parseInt(text);
+        int num;
+        try {
+            num = Integer.parseInt(TextUtils.isEmpty(text) ? "0" : text);
+        } catch (NumberFormatException e) {
+            Log.w("ChatActivity", "invalid selected message count: " + text, e);
+            num = 0;
+        }
         chatPanelManager.updateForwardView(num);
         numberTextView.setNumber(num, true);
         CommonAnim.getInstance().showOrHide(numberTextView, true, true);
@@ -4528,7 +4583,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             return;
         }
         this.replyWKMsg = null;
-        if (wkMsg != null) {
+        this.editMsg = null;
+        if (wkMsg != null && wkMsg.baseContentMsgModel instanceof WKTextContent) {
             this.editMsg = wkMsg;
             chatPanelManager.showEditLayout(wkMsg);
         }
@@ -4591,7 +4647,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     @Override
     public void hideSoftKeyboard() {
-        mHelper.hookSystemBackByPanelSwitcher();
+        if (mHelper != null) {
+            mHelper.hookSystemBackByPanelSwitcher();
+        } else {
+            SoftKeyboardUtils.getInstance().hideSoftKeyboard(this);
+        }
     }
 
     @Override
@@ -4656,17 +4716,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             wkMsg.viewed = 1;
         }
 
-        if (wkMsg.remoteExtra != null && wkMsg.remoteExtra.readed == 0 && wkMsg.setting != null && wkMsg.setting.receipt == 1 && !TextUtils.isEmpty(wkMsg.fromUID) && !wkMsg.fromUID.equals(loginUID)) {
-            boolean isAdd = true;
-            for (int j = 0, size = readMsgIds.size(); j < size; j++) {
-                if (readMsgIds.get(j).equals(wkMsg.messageID)) {
-                    isAdd = false;
-                    break;
-                }
-            }
-            if (isAdd) {
-                readMsgIds.add(wkMsg.messageID);
-            }
+        if (wkMsg.remoteExtra != null && wkMsg.remoteExtra.readed == 0
+                && wkMsg.setting != null && wkMsg.setting.receipt == 1
+                && !TextUtils.isEmpty(wkMsg.messageID)
+                && !TextUtils.isEmpty(wkMsg.fromUID) && !wkMsg.fromUID.equals(loginUID)) {
+            addReadReceiptId(wkMsg.messageID);
         }
         boolean isResetRemind = false;
         if (WKReader.isNotEmpty(reminderList) && !TextUtils.isEmpty(wkMsg.messageID)) {
@@ -4819,13 +4873,19 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private void saveEditContent() {
+        saveEditContent(true);
+    }
+
+    private void saveEditContent(boolean syncRemote) {
         if (chatPanelManager == null || TextUtils.isEmpty(channelId)) return;
         long keepMsgSeq = 0;
         int offsetY = 0;
         if (chatAdapter != null && linearLayoutManager != null && WKReader.isNotEmpty(chatAdapter.getData())) {
             int firstItemPosition = linearLayoutManager.findFirstVisibleItemPosition();
             int endItemPosition = linearLayoutManager.findLastVisibleItemPosition();
-            if (endItemPosition != chatAdapter.getData().size() - 1) {
+            if (firstItemPosition != RecyclerView.NO_POSITION
+                    && endItemPosition != RecyclerView.NO_POSITION
+                    && endItemPosition != chatAdapter.getData().size() - 1) {
                 WKMsg msg = chatAdapter.getFirstVisibleItem(firstItemPosition);
                 if (msg != null) {
                     keepMsgSeq = msg.messageSeq;
@@ -4835,11 +4895,16 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 }
             }
         }
-        MsgModel.getInstance().clearUnread(channelId, channelType, redDot, null);
         CharSequence editable = chatPanelManager.getEditText() == null ? null : chatPanelManager.getEditText().getText();
         String content = editable == null ? "" : editable.toString();
-        MsgModel.getInstance().updateCoverExtra(channelId, channelType, browseTo, keepMsgSeq, offsetY, content);
-        MsgModel.getInstance().deleteFlameMsg();
+        MsgModel.getInstance().updateCoverExtraLocal(
+                channelId, channelType, browseTo, keepMsgSeq, offsetY, content);
+        if (syncRemote) {
+            MsgModel.getInstance().clearUnread(channelId, channelType, redDot, null);
+            MsgModel.getInstance().syncCoverExtraRemote(
+                    channelId, channelType, browseTo, keepMsgSeq, offsetY, content);
+            MsgModel.getInstance().deleteFlameMsg();
+        }
     }
 
     @Override
@@ -4852,6 +4917,8 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
 
     @Override
     protected void onStop() {
+        // 系统后台杀进程不保证回调 onDestroy，先把草稿和浏览位置落本地。
+        saveEditContent(false);
         super.onStop();
         isShowChatActivity = false;
         WKUIKitApplication.getInstance().chattingChannelID = "";
@@ -5065,7 +5132,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                 scrollToEnd();
                 if (msg.setting != null && msg.setting.receipt == 1
                         && !TextUtils.isEmpty(msg.messageID)) {
-                    readMsgIds.add(msg.messageID);
+                    addReadReceiptId(msg.messageID);
                 }
             }
         }
