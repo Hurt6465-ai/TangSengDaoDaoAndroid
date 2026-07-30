@@ -324,5 +324,8 @@
     <string name="destroy_account_success">Account deleted</string>
     <string name="resend_after_seconds">Resend in %1$d s</string>
     <string name="operation_failed">Operation failed</string>
+    <string name="topic_room_ended">This topic has ended.</string>
+    <string name="topic_room_expired">This topic has expired.</string>
+    <string name="topic_room_leaving">Leaving chatroom…</string>
 </resources>
 
