@@ -3,24 +3,49 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/rootView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@color/homeColor"
-        android:orientation="vertical">
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
-        <include
-            android:id="@+id/topLayout"
-            layout="@layout/chat_title_layout" />
-
-        <com.effective.android.panel.view.PanelSwitchLayout
-            android:id="@+id/panel_switch_layout"
+        <!-- 背景位于整页最底层，覆盖标题、输入区和系统导航栏。 -->
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/imageView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            app:android11KeyboardFeature="true"
-            app:animationSpeed="standard">
+            android:scaleType="centerCrop" />
+
+        <com.chat.base.views.blurview.ShapeBlurView
+            android:id="@+id/blurView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            app:blur_corner_radius="0dp"
+            app:blur_mode="rectangle"
+            app:blur_radius="3dp" />
+
+        <LinearLayout
+            android:id="@+id/chatForegroundLayout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/transparent"
+            android:orientation="vertical">
+
+            <include
+                android:id="@+id/topLayout"
+                layout="@layout/chat_title_layout" />
+
+            <com.effective.android.panel.view.PanelSwitchLayout
+                android:id="@+id/panel_switch_layout"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                app:android11KeyboardFeature="true"
+                app:animationSpeed="standard">
 
             <com.effective.android.panel.view.content.RelativeContentContainer
                 android:id="@+id/content_view"
@@ -29,32 +54,20 @@
                 android:orientation="vertical"
                 app:edit_view="@id/editText">
 
-                <androidx.appcompat.widget.AppCompatImageView
-                    android:id="@+id/imageView"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:scaleType="centerCrop" />
-
-                <com.chat.base.views.blurview.ShapeBlurView
-                    android:id="@+id/blurView"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:visibility="gone"
-                    app:blur_corner_radius="0dp"
-                    app:blur_mode="rectangle"
-                    app:blur_radius="3dp" />
 
                 <RelativeLayout
                     android:id="@+id/recyclerViewLayout"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_above="@id/bottomView">
+                    android:layout_height="match_parent">
 
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/recyclerView"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:background="@color/transparent"
+                        android:clipToPadding="false"
+                        android:paddingBottom="80dp"
+                        android:scrollbarStyle="outsideOverlay"
                         android:visibility="visible" />
 
                     <include
@@ -124,10 +137,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_alignParentBottom="true"
-                    android:background="@color/transparent"
+                    android:background="@drawable/chat_bottom_scrim_bg"
                     android:clipToPadding="false"
                     android:orientation="vertical"
                     android:paddingStart="10dp"
+                    android:paddingTop="8dp"
                     android:paddingEnd="10dp"
                     android:paddingBottom="8dp">
 
@@ -297,11 +311,13 @@
                         <LinearLayout
                             android:id="@+id/chatView"
                             android:layout_width="match_parent"
-                            android:layout_height="52dp"
-                            android:background="@drawable/chat_edit_bg"
-                            android:elevation="5dp"
+                            android:layout_height="54dp"
+                            android:background="@drawable/chat_input_glass_bg"
+                            android:clipToOutline="true"
+                            android:elevation="7dp"
                             android:gravity="center_vertical"
-                            android:minHeight="52dp"
+                            android:minHeight="54dp"
+                            android:outlineProvider="background"
                             android:orientation="horizontal"
                             android:paddingStart="8dp"
                             android:paddingTop="4dp"
@@ -431,6 +447,7 @@
                     app:panel_layout="@layout/chat_panel_emotion_layout"
                     app:panel_trigger="@id/emotionView" />
             </com.effective.android.panel.view.panel.PanelContainer>
-        </com.effective.android.panel.view.PanelSwitchLayout>
-    </LinearLayout>
+            </com.effective.android.panel.view.PanelSwitchLayout>
+        </LinearLayout>
+    </FrameLayout>
 </layout>

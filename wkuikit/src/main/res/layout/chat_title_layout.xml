@@ -6,19 +6,23 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:animateLayoutChanges="true"
-    android:background="@drawable/title_bg"
+    android:background="@drawable/chat_title_glass_bg"
+    android:clipToPadding="false"
+    android:elevation="5dp"
     android:orientation="vertical"
     tools:ignore="MissingDefaultResource">
 
     <View
+        android:id="@+id/statusBarSpacer"
         android:layout_width="match_parent"
-        android:layout_height="40dp" />
+        android:layout_height="0dp" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingBottom="5dp">
+        android:paddingBottom="2dp">
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/backIv"
@@ -56,7 +60,7 @@
 
         <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="match_parent"
             android:layout_marginStart="10dp"
             android:layout_weight="1"
             android:fadingEdgeLength="26dp"
