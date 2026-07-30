@@ -15,6 +15,10 @@ public interface IConversationContext {
     //发送消息到当前会话
     void sendMessage(WKMessageContent wkMessageContent);
 
+    //发送消息到明确指定的会话。异步翻译、图片压缩等任务必须使用此接口，
+    //不能在回调完成后再读取“当前会话”，否则快速切换聊天对象时可能串线。
+    void sendMessageToChannel(WKMessageContent wkMessageContent, String channelId, byte channelType);
+
     //获取当前会话到频道信息
     WKChannel getChatChannelInfo();
 

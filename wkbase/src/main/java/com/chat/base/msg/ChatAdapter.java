@@ -31,7 +31,9 @@ import com.xinbida.wukongim.entity.WKMsgReaction;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -41,6 +43,11 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ChatAdapter extends BaseProviderMultiAdapter<WKUIChatMsgItemEntity> {
     private final IConversationContext iConversationContext;
+    private final Map<String, Integer> clientMsgNoIndex = new HashMap<>();
+    private final Map<String, Integer> messageIdIndex = new HashMap<>();
+    private int indexedSize = -1;
+    private WKUIChatMsgItemEntity indexedFirstItem;
+    private WKUIChatMsgItemEntity indexedLastItem;
 
     public enum AdapterType {
         normalMessage, pinnedMessage
@@ -135,26 +142,126 @@ public class ChatAdapter extends BaseProviderMultiAdapter<WKUIChatMsgItemEntity>
         iConversationContext.setEditContent(content);
     }
 
-    //是否存在某条消息
+    //是否存在某条消息。尾部新增采用增量索引；旧位置命中后仍校验实体，
+    //避免状态更新或列表删改让过期索引产生错误结果。
     public boolean isExist(String clientMsgNo, String messageId) {
-        if (TextUtils.isEmpty(clientMsgNo)) return false;
-        boolean isExist = false;
-        for (int i = 0, size = getData().size(); i < size; i++) {
-            if (getData().get(i).wkMsg == null) {
-                continue;
-            }
-            if (!TextUtils.isEmpty(messageId) && !TextUtils.isEmpty(getData().get(i).wkMsg.messageID) && getData().get(i).wkMsg.messageID.equals(messageId)) {
-                isExist = true;
-                break;
-            }
+        return findMessagePosition(clientMsgNo, messageId) >= 0;
+    }
 
-            if (!TextUtils.isEmpty(getData().get(i).wkMsg.clientMsgNO) && getData().get(i).wkMsg.clientMsgNO.equals(clientMsgNo)) {
-                isExist = true;
-                break;
+    public int findMessagePosition(String clientMsgNo, String messageId) {
+        if (TextUtils.isEmpty(clientMsgNo) && TextUtils.isEmpty(messageId)) return -1;
+        ensureMessageIndex();
+
+        boolean staleIndexHit = false;
+        if (!TextUtils.isEmpty(messageId)) {
+            Integer position = messageIdIndex.get(messageId);
+            if (isIndexedMessageIdMatch(position, messageId)) return position;
+            staleIndexHit = position != null;
+        }
+        if (!TextUtils.isEmpty(clientMsgNo)) {
+            Integer position = clientMsgNoIndex.get(clientMsgNo);
+            if (isIndexedClientMsgNoMatch(position, clientMsgNo)) return position;
+            staleIndexHit = staleIndexHit || position != null;
+        }
+
+        // 命中旧位置但实体已变化时重建一次再确认。普通“收到一条新消息”的未命中
+        // 直接返回，避免每条新消息仍然全量扫描而退化回 O(n²)。
+        if (staleIndexHit) {
+            rebuildMessageIndex();
+            if (!TextUtils.isEmpty(messageId)) {
+                Integer position = messageIdIndex.get(messageId);
+                if (isIndexedMessageIdMatch(position, messageId)) return position;
+            }
+            if (!TextUtils.isEmpty(clientMsgNo)) {
+                Integer position = clientMsgNoIndex.get(clientMsgNo);
+                if (isIndexedClientMsgNoMatch(position, clientMsgNo)) return position;
             }
         }
-        return isExist;
+
+        // 少数旧消息或插件消息可能没有 clientMsgNO。仅在这种非常规情况下做一次
+        // 线性兜底，既保证 messageID 查重正确，也不让普通实时消息退化回 O(n²)。
+        if (TextUtils.isEmpty(clientMsgNo) && !TextUtils.isEmpty(messageId)) {
+            for (int i = 0, size = getData().size(); i < size; i++) {
+                WKUIChatMsgItemEntity entity = getData().get(i);
+                WKMsg msg = entity == null ? null : entity.wkMsg;
+                if (msg != null && TextUtils.equals(messageId, msg.messageID)) {
+                    rebuildMessageIndex();
+                    return i;
+                }
+            }
+        }
+        return -1;
     }
+
+    private void ensureMessageIndex() {
+        List<WKUIChatMsgItemEntity> data = getData();
+        int size = data.size();
+        WKUIChatMsgItemEntity first = size == 0 ? null : data.get(0);
+        WKUIChatMsgItemEntity last = size == 0 ? null : data.get(size - 1);
+
+        if (indexedSize < 0) {
+            rebuildMessageIndex();
+            return;
+        }
+        if (indexedSize == size) {
+            if (indexedFirstItem != first || indexedLastItem != last) rebuildMessageIndex();
+            return;
+        }
+
+        // 实时消息最常见的是尾部逐条追加。只索引新增区间，避免每收到一条消息
+        // 都重扫整份聊天记录，批量收消息时才能真正保持接近 O(n)。
+        if (size > indexedSize && indexedSize > 0
+                && indexedFirstItem == first
+                && data.get(indexedSize - 1) == indexedLastItem) {
+            indexMessageRange(data, indexedSize, size);
+            indexedSize = size;
+            indexedFirstItem = first;
+            indexedLastItem = last;
+            return;
+        }
+        rebuildMessageIndex();
+    }
+
+    private void indexMessageRange(List<WKUIChatMsgItemEntity> data, int start, int end) {
+        int safeStart = Math.max(0, start);
+        int safeEnd = Math.min(end, data.size());
+        for (int i = safeStart; i < safeEnd; i++) {
+            WKUIChatMsgItemEntity entity = data.get(i);
+            WKMsg msg = entity == null ? null : entity.wkMsg;
+            if (msg == null) continue;
+            if (!TextUtils.isEmpty(msg.clientMsgNO)) clientMsgNoIndex.put(msg.clientMsgNO, i);
+            if (!TextUtils.isEmpty(msg.messageID)) messageIdIndex.put(msg.messageID, i);
+        }
+    }
+
+    private void rebuildMessageIndex() {
+        clientMsgNoIndex.clear();
+        messageIdIndex.clear();
+        List<WKUIChatMsgItemEntity> data = getData();
+        indexMessageRange(data, 0, data.size());
+        indexedSize = data.size();
+        indexedFirstItem = indexedSize == 0 ? null : data.get(0);
+        indexedLastItem = indexedSize == 0 ? null : data.get(indexedSize - 1);
+    }
+
+    private WKMsg getIndexedMessage(Integer position) {
+        if (position == null || position < 0 || position >= getData().size()) return null;
+        WKUIChatMsgItemEntity entity = getData().get(position);
+        return entity == null ? null : entity.wkMsg;
+    }
+
+    private boolean isIndexedMessageIdMatch(Integer position, String messageId) {
+        WKMsg msg = getIndexedMessage(position);
+        return msg != null && !TextUtils.isEmpty(messageId)
+                && TextUtils.equals(messageId, msg.messageID);
+    }
+
+    private boolean isIndexedClientMsgNoMatch(Integer position, String clientMsgNo) {
+        WKMsg msg = getIndexedMessage(position);
+        return msg != null && !TextUtils.isEmpty(clientMsgNo)
+                && TextUtils.equals(clientMsgNo, msg.clientMsgNO);
+    }
+
 
     //获取最后一条消息
     public WKMsg getLastMsg() {
@@ -206,6 +313,11 @@ public class ChatAdapter extends BaseProviderMultiAdapter<WKUIChatMsgItemEntity>
     }
 
     public void resetData(List<WKUIChatMsgItemEntity> list) {
+        // resetData 紧接着通常会 setNewInstance/addData。先让索引失效，避免同尺寸
+        // 替换列表且首尾对象碰巧相同时保留旧位置。
+        indexedSize = -1;
+        indexedFirstItem = null;
+        indexedLastItem = null;
         if (WKReader.isEmpty(list)) return;
         for (int i = 0, size = list.size(); i < size; i++) {
             int previousIndex = i - 1;
@@ -221,7 +333,7 @@ public class ChatAdapter extends BaseProviderMultiAdapter<WKUIChatMsgItemEntity>
 
     public int getFirstVisibleItemIndex(int startIndex) {
         int index = startIndex;
-        if (startIndex <= getData().size() - 1) {
+        if (startIndex >= 0 && startIndex <= getData().size() - 1) {
             if (getData().get(startIndex).wkMsg == null || getData().get(startIndex).wkMsg.orderSeq == 0) {
                 for (int i = startIndex; i < getData().size(); i++) {
                     if (getData().get(i).wkMsg != null && getData().get(i).wkMsg.orderSeq != 0) {
@@ -236,7 +348,7 @@ public class ChatAdapter extends BaseProviderMultiAdapter<WKUIChatMsgItemEntity>
 
     public WKMsg getFirstVisibleItem(int startIndex) {
         WKMsg wkMsg = null;
-        if (startIndex <= getData().size() - 1) {
+        if (startIndex >= 0 && startIndex <= getData().size() - 1) {
             if (getData().get(startIndex).wkMsg == null || getData().get(startIndex).wkMsg.orderSeq == 0) {
                 for (int i = startIndex; i < getData().size(); i++) {
                     if (getData().get(i).wkMsg != null && getData().get(i).wkMsg.orderSeq != 0) {
