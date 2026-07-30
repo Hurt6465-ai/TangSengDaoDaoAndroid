@@ -24,4 +24,11 @@
     <string name="peipe_room_tag_study">လေ့လာ</string>
     <string name="peipe_room_tag_friend">မိတ်ဆွေရှာ</string>
     <string name="peipe_room_tag_chat">စကားပြော</string>
+    <string name="peipe_room_entering">စကားခန်းသို့ ဝင်နေသည်…</string>
+    <string name="peipe_room_no_permission">ဤလုပ်ဆောင်ချက်ကို ပြုလုပ်ခွင့်မရှိပါ။</string>
+    <string name="peipe_room_ended">ဤခေါင်းစဉ် ပြီးဆုံးသွားပါပြီ။</string>
+    <string name="peipe_room_delete_confirm">ဤစကားခန်းကို ဖျက်ရန် သေချာပါသလား။</string>
+    <string name="peipe_room_page_not_ready">စာမျက်နှာ မပြင်ဆင်ရသေးပါ။ ထပ်စမ်းကြည့်ပါ။</string>
+    <string name="peipe_room_data_error">စကားခန်းဒေတာ မမှန်ကန်ပါ။</string>
+    <string name="peipe_room_operation_failed">လုပ်ဆောင်မှု မအောင်မြင်ပါ။ ခဏစောင့်ပြီး ထပ်စမ်းကြည့်ပါ။</string>
 </resources>
