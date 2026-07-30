@@ -21,6 +21,8 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import java.util.List;
+
 import com.chat.base.config.WKConfig;
 
 
@@ -342,4 +344,3 @@ public final class DatingLocationHelper {
         listener = null;
     }
 }
-import java.util.List;
