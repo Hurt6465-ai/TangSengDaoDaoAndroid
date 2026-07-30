@@ -30,9 +30,11 @@ import com.xinbida.wukongim.entity.WKChannelType;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -42,8 +44,12 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     private static final String PAYLOAD_QUOTA = "quota";
     private static final String PAYLOAD_FRESH = "fresh";
     private static final String PAYLOAD_GREETING = "greeting";
+    private static final String PAYLOAD_PALETTE = "palette";
     private static final Typeface MEDIUM = Typeface.create("sans-serif-medium", Typeface.NORMAL);
     private static final int NEW_USER_DAYS = 5;
+    private static final int CARD_PALETTE_SIZE = 12;
+    // Same-family colors are deliberately separated for neighboring cards.
+    private static final int[] CARD_COLOR_FAMILY = {0, 1, 2, 3, 4, 5, 6, 4, 1, 0, 2, 3};
 
     public interface Listener {
         void onOpenProfile(PartnerListUser user);
@@ -56,6 +62,7 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
     private final Set<String> greeted = new HashSet<>();
     private final LruCache<String, List<String>> localizedTagCache = new LruCache<>(160);
     private final LruCache<String, Long> registrationTimeCache = new LruCache<>(160);
+    private final Map<String, Integer> cardPaletteByUid = new HashMap<>();
     private Set<String> recentlyAdded = Collections.emptySet();
     private long serverTime;
     private int greetingRemaining = 10;
@@ -71,6 +78,16 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         String uid = user == null ? "" : user.stableId();
         // Activity 会过滤空 UID；这里仍提供位置兜底，避免异常数据产生重复 stable id。
         return TextUtils.isEmpty(uid) ? Long.MIN_VALUE + position : fnv1a64(uid);
+    }
+
+    @Override
+    public void onCurrentListChanged(@NonNull List<PartnerListUser> previousList,
+                                     @NonNull List<PartnerListUser> currentList) {
+        super.onCurrentListChanged(previousList, currentList);
+        rebuildCardPalette(currentList);
+        // DiffUtil may move an unchanged row without rebinding it. Palette depends on neighbors,
+        // so explicitly refresh only the card backgrounds after list order changes.
+        if (!currentList.isEmpty()) notifyItemRangeChanged(0, currentList.size(), PAYLOAD_PALETTE);
     }
 
     public void setServerTime(long value) {
@@ -157,6 +174,8 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
                 bindGreeting(holder, user);
             } else if (PAYLOAD_FRESH.equals(payload)) {
                 bindBadges(holder.binding, user);
+            } else if (PAYLOAD_PALETTE.equals(payload)) {
+                holder.binding.cardSurface.setBackgroundResource(cardBackground(user.stableId()));
             } else {
                 handled = false;
                 break;
@@ -371,21 +390,21 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
 
         if (sending) {
             b.greetingBtn.setEnabled(false);
-            b.greetingBtn.setAlpha(0.72f);
+            b.greetingBtn.setAlpha(1f);
             setCompactButtonText(b.greetingBtn, R.string.partnerlist_sending);
-            b.greetingBtn.setTextColor(Color.parseColor("#9B8792"));
+            b.greetingBtn.setTextColor(Color.parseColor("#7F8797"));
             b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_capsule);
         } else if (contacted) {
             b.greetingBtn.setEnabled(true);
             b.greetingBtn.setAlpha(1f);
             setCompactButtonText(b.greetingBtn, R.string.partnerlist_go_chat);
-            b.greetingBtn.setTextColor(Color.WHITE);
-            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_capsule);
+            b.greetingBtn.setTextColor(Color.parseColor("#5B69D8"));
+            b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_contacted);
         } else if (greetingRemaining <= 0) {
             b.greetingBtn.setEnabled(false);
-            b.greetingBtn.setAlpha(0.72f);
+            b.greetingBtn.setAlpha(1f);
             setCompactButtonText(b.greetingBtn, R.string.partnerlist_limit_reached_short);
-            b.greetingBtn.setTextColor(Color.parseColor("#9B8792"));
+            b.greetingBtn.setTextColor(Color.parseColor("#8A92A1"));
             b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_capsule);
         } else {
             b.greetingBtn.setEnabled(true);
@@ -394,6 +413,7 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
             b.greetingBtn.setTextColor(Color.WHITE);
             b.greetingBtn.setBackgroundResource(R.drawable.bg_partnerlist_greeting_capsule);
         }
+        b.greetingBtn.setContentDescription(b.greetingBtn.getText());
 
         installGreetingPressEffect(b.greetingBtn);
         b.greetingBtn.setOnClickListener(v -> {
@@ -411,7 +431,7 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
 
     private void setGreetingHi(TextView textView) {
         textView.setText(R.string.partnerlist_greet);
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f);
         textView.setTypeface(MEDIUM);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0f);
     }
@@ -423,8 +443,39 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) textView.setLetterSpacing(0f);
     }
 
+    private void rebuildCardPalette(List<PartnerListUser> users) {
+        cardPaletteByUid.clear();
+        int previous = -1;
+        int beforePrevious = -1;
+        for (int position = 0; position < users.size(); position++) {
+            PartnerListUser user = users.get(position);
+            String uid = user == null ? "" : user.stableId();
+            String stableKey = TextUtils.isEmpty(uid) ? "position:" + position : uid;
+            int candidate = rawCardPaletteIndex(stableKey);
+            for (int attempt = 0; attempt < CARD_PALETTE_SIZE; attempt++) {
+                boolean sameAsPrevious = candidate == previous;
+                boolean sameFamilyAsPrevious = previous >= 0
+                        && CARD_COLOR_FAMILY[candidate] == CARD_COLOR_FAMILY[previous];
+                boolean repeatsTwoRowsBack = candidate == beforePrevious;
+                if (!sameAsPrevious && !sameFamilyAsPrevious && !repeatsTwoRowsBack) break;
+                // Five is coprime with twelve, so every palette entry is visited before repeating.
+                candidate = (candidate + 5) % CARD_PALETTE_SIZE;
+            }
+            cardPaletteByUid.put(stableKey, candidate);
+            beforePrevious = previous;
+            previous = candidate;
+        }
+    }
+
+    private int rawCardPaletteIndex(String key) {
+        long hash = fnv1a64(key);
+        return Math.floorMod((int) (hash ^ (hash >>> 32)), CARD_PALETTE_SIZE);
+    }
+
     private int cardBackground(String uid) {
-        switch (Math.floorMod(uid == null ? 0 : uid.hashCode(), 8)) {
+        Integer stored = cardPaletteByUid.get(uid);
+        int palette = stored == null ? rawCardPaletteIndex(uid == null ? "" : uid) : stored;
+        switch (palette) {
             case 1: return R.drawable.bg_partnerlist_card_lavender;
             case 2: return R.drawable.bg_partnerlist_card_peach;
             case 3: return R.drawable.bg_partnerlist_card_sky;
@@ -432,6 +483,10 @@ public class PartnerListAdapter extends ListAdapter<PartnerListUser, PartnerList
             case 5: return R.drawable.bg_partnerlist_card_aqua;
             case 6: return R.drawable.bg_partnerlist_card_lemon;
             case 7: return R.drawable.bg_partnerlist_card_coral;
+            case 8: return R.drawable.bg_partnerlist_card_lilac;
+            case 9: return R.drawable.bg_partnerlist_card_sage;
+            case 10: return R.drawable.bg_partnerlist_card_almond;
+            case 11: return R.drawable.bg_partnerlist_card_mist;
             default: return R.drawable.bg_partnerlist_card_mint;
         }
     }
