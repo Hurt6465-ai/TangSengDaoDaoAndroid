@@ -293,6 +293,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private static final String KEY_DEEPSEEK_OLD_SEND_TRANSLATE = "deepseek_old_send_translate";
     private static final String KEY_DEEPSEEK_OLD_WINGMAN = "deepseek_old_wingman";
     private static final String KEY_IMAGE_COMPRESS = "chat_image_compress";
+    private static final long TOPIC_ROOM_READ_THROTTLE_MS = 1_000L;
+    private boolean topicRoomClosing = false;
+    private long lastTopicRoomReadAt = 0L;
+    private String lastTopicRoomReadKey = "";
 
     private interface BooleanAction {
         void onChanged(boolean value);
@@ -2137,6 +2141,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         isShowChatActivity = true;
         WKUIKitApplication.getInstance().chattingChannelID = channelId;
         isUploadReadMsg = true;
+        if (closeCurrentTopicRoomIfExpired()) return;
         refreshDeepSeekAssistantBar();
         if (chatPanelManager != null) {
             chatPanelManager.initRefreshListener();
@@ -2610,6 +2615,10 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             if (channel.channelID.equals(channelId) && channel.channelType == channelType) {
                 showChannelName(channel);
                 showTopAvatar(channel);
+                if (isTopicRoomChannel(channel) && isTopicRoomExpired(channel)) {
+                    finishCurrentTopicRoom(getString(R.string.topic_room_expired));
+                    return;
+                }
                 if (channel.channelType == WKChannelType.PERSONAL) {
                     setOnlineView(channel);
                 } else {
@@ -2784,6 +2793,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                         }
                     }
                 }
+                case "topicRoomDeleted" -> handleTopicRoomDeletedCmd(wkCmd.paramJsonObject);
                 case "sync_channel_state" -> {
                     String sourceChannelId = wkCmd.paramJsonObject.optString("channel_id");
                     int sourceChannelType = wkCmd.paramJsonObject.optInt("channel_type");
@@ -3265,6 +3275,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         final byte oldChannelType = channelType;
 
         // 先保存旧会话，再立刻让旧代次的异步回调失效，然后释放监听器。
+        markTopicRoomRead(oldChannelId, oldChannelType);
         saveEditContent();
         flushReadReceipts(oldChannelId, oldChannelType);
         channelGeneration++;
@@ -3278,6 +3289,9 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             finish();
             return;
         }
+        topicRoomClosing = false;
+        lastTopicRoomReadKey = "";
+        lastTopicRoomReadAt = 0L;
         if (chatPanelManager != null) {
             chatPanelManager.onConversationChanged(
                     oldChannelId, oldChannelType, channelId, channelType, channelGeneration);
@@ -4085,6 +4099,89 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         if (value == null) return false;
         if (value instanceof Number) return ((Number) value).intValue() == 1;
         return "1".equals(String.valueOf(value)) || "true".equalsIgnoreCase(String.valueOf(value));
+    }
+
+    private boolean isCurrentTopicRoom() {
+        if (channelType != WKChannelType.GROUP || TextUtils.isEmpty(channelId)) return false;
+        if (channelId.startsWith("topic_")) return true;
+        return isTopicRoomChannel(getCurrentChatChannel());
+    }
+
+    private long getTopicRoomExpireAt(WKChannel channel) {
+        if (channel == null) return 0L;
+        long value = getLongExtra(channel.localExtra, "expire_at");
+        if (value <= 0) value = getLongExtra(channel.remoteExtraMap, "expire_at");
+        return value;
+    }
+
+    private long getLongExtra(Map<String, Object> extras, String key) {
+        if (extras == null || TextUtils.isEmpty(key)) return 0L;
+        Object value = extras.get(key);
+        if (value instanceof Number) return ((Number) value).longValue();
+        if (value == null) return 0L;
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (Exception ignored) {
+            return 0L;
+        }
+    }
+
+    private boolean isTopicRoomExpired(WKChannel channel) {
+        long expireAt = getTopicRoomExpireAt(channel);
+        return expireAt > 0 && expireAt <= System.currentTimeMillis();
+    }
+
+    private boolean closeCurrentTopicRoomIfExpired() {
+        if (!isCurrentTopicRoom()) return false;
+        WKChannel channel = getCurrentChatChannel();
+        if (!isTopicRoomExpired(channel)) return false;
+        finishCurrentTopicRoom(getString(R.string.topic_room_expired));
+        return true;
+    }
+
+    private void handleTopicRoomDeletedCmd(JSONObject params) {
+        if (params == null || topicRoomClosing) return;
+        String deletedChannelId = params.optString("channel_id");
+        if (TextUtils.isEmpty(deletedChannelId)) deletedChannelId = params.optString("room_id");
+        int deletedType = params.optInt("channel_type", WKChannelType.GROUP);
+        if (!TextUtils.equals(channelId, deletedChannelId) || channelType != (byte) deletedType) return;
+        if (!isCurrentTopicRoom()) return;
+        String reason = params.optString("reason");
+        finishCurrentTopicRoom("expired".equals(reason)
+                ? getString(R.string.topic_room_expired)
+                : getString(R.string.topic_room_ended));
+    }
+
+    private void finishCurrentTopicRoom(String message) {
+        if (topicRoomClosing) return;
+        topicRoomClosing = true;
+        if (wkVBinding != null && wkVBinding.panelView != null) {
+            wkVBinding.panelView.setEnabled(false);
+            wkVBinding.panelView.setAlpha(0.55f);
+        }
+        MsgModel.getInstance().clearUnread(channelId, channelType, 0, null);
+        WKIM.getInstance().getConversationManager().deleteWitchChannel(channelId, channelType);
+        if (!TextUtils.isEmpty(message)) WKToastUtils.getInstance().showToastNormal(message);
+        mainHandler.post(this::finish);
+    }
+
+    private void markCurrentTopicRoomRead() {
+        markTopicRoomRead(channelId, channelType);
+    }
+
+    private void markTopicRoomRead(String targetChannelId, byte targetChannelType) {
+        if (targetChannelType != WKChannelType.GROUP || TextUtils.isEmpty(targetChannelId)) return;
+        WKChannel channel = WKIM.getInstance().getChannelManager().getChannel(targetChannelId, targetChannelType);
+        boolean topic = targetChannelId.startsWith("topic_") || isTopicRoomChannel(channel);
+        if (!topic) return;
+        String key = targetChannelType + ":" + targetChannelId;
+        long now = System.currentTimeMillis();
+        if (TextUtils.equals(lastTopicRoomReadKey, key)
+                && now - lastTopicRoomReadAt < TOPIC_ROOM_READ_THROTTLE_MS) return;
+        lastTopicRoomReadKey = key;
+        lastTopicRoomReadAt = now;
+        WKChannel payload = channel == null ? new WKChannel(targetChannelId, targetChannelType) : channel;
+        EndpointManager.getInstance().invoke(EndpointSID.topicRoomMarkRead, payload);
     }
 
     private void showChannelName(WKChannel channel) {
@@ -4951,6 +5048,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         dismissCallPopup();
         SoftKeyboardUtils.getInstance().hideSoftKeyboard(this);
         flushReadReceipts(channelId, channelType);
+        if (!topicRoomClosing) markCurrentTopicRoomRead();
         unregisterChannelListeners();
         unregisterGlobalEndpoints();
         EndpointManager.getInstance().invoke("stop_screen_shot", this);
@@ -5077,6 +5175,7 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         isShowChatActivity = false;
         WKUIKitApplication.getInstance().chattingChannelID = "";
         isUploadReadMsg = false;
+        if (!topicRoomClosing) markCurrentTopicRoomRead();
         WKPlayVoiceUtils.getInstance().stopPlay();
         MsgModel.getInstance().doneReminder(reminderIds);
         EndpointManager.getInstance().invoke("stop_screen_shot", this);
