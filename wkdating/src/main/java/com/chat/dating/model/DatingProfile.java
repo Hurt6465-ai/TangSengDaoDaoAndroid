@@ -49,6 +49,9 @@ public class DatingProfile implements Serializable {
     public boolean complete;
     public boolean can_recommend;
     public String distance_label;
+    /** 后端可直接返回模糊距离档位；兼容 distance_bucket / distance_level 两种字段名。 */
+    public int distance_bucket;
+    public int distance_level;
     public double distance_km;
     public int distance_meters;
     public List<String> photos;
@@ -147,23 +150,24 @@ public class DatingProfile implements Serializable {
         ArrayList<String> list = new ArrayList<>();
         appendPhotos(list, photos);
         appendPhotos(list, profile_images);
+        // 只为旧数据兜底：新版本不再生成第二套 card_photos。
+        if (list.isEmpty()) appendPhotos(list, card_photos);
         if (list.size() > 5) return new ArrayList<>(list.subList(0, 5));
         return list;
     }
 
+    /** 交友大图与详情图只使用 dating photos；账号头像不再冒充交友照片。 */
     public List<String> safePhotos() {
-        ArrayList<String> list = new ArrayList<>(safeDatingPhotos());
-        if (list.isEmpty() && !TextUtils.isEmpty(avatar)) list.add(avatar.trim());
-        return list;
+        return safeDatingPhotos();
     }
+
+    /** 兼容旧调用，已停止使用 card_photos 派生图。 */
     public List<String> safeCardPhotos() {
-        List<String> master = safePhotos();
-        ArrayList<String> cards = new ArrayList<>();
-        for (int i = 0; i < master.size(); i++) {
-            String value = card_photos != null && i < card_photos.size() ? card_photos.get(i) : "";
-            cards.add(TextUtils.isEmpty(value) ? master.get(i) : value.trim());
-        }
-        return cards;
+        return safeDatingPhotos();
+    }
+
+    public String safeAvatar() {
+        return TextUtils.isEmpty(avatar) ? "" : avatar.trim();
     }
 
 
@@ -204,16 +208,51 @@ public class DatingProfile implements Serializable {
     public List<String> safeNativeLanguages() { return clean(native_languages); }
     public List<String> safeLearningLanguages() { return clean(learning_languages); }
 
-    public String safeDistanceLabel() {
-        if (!TextUtils.isEmpty(distance_label)) return distance_label;
-        if (distance_meters > 0) {
-            if (distance_meters < 1000) return distance_meters + "m";
-            return String.format(Locale.getDefault(), "%.1fkm", distance_meters / 1000f);
+    /** 返回模糊距离档位：0未知，1=<1km，2=1-5km，3=5-20km，4=20-50km，5=50-100km，6=>=100km。 */
+    public int distanceBucket() {
+        int serverBucket = distance_bucket > 0 ? distance_bucket : distance_level;
+        if (serverBucket >= 1 && serverBucket <= 6) return serverBucket;
+        double km = distance_km;
+        if (km <= 0d && distance_meters > 0) km = distance_meters / 1000d;
+        if (km <= 0d && !TextUtils.isEmpty(distance_label)) {
+            String raw = distance_label.trim().toLowerCase(Locale.US)
+                    .replace('–', '-').replace('—', '-').replace(" ", "");
+            if (raw.contains("1-5")) return 2;
+            if (raw.contains("5-20")) return 3;
+            if (raw.contains("20-50")) return 4;
+            if (raw.contains("50-100")) return 5;
+            if (raw.contains("100") && (raw.contains("以上") || raw.contains("over") || raw.contains("+"))) return 6;
+            if (raw.contains("1km") && (raw.contains("内") || raw.contains("以内") || raw.contains("under") || raw.contains("within"))) return 1;
+            try {
+                String number = raw.replaceAll("[^0-9.]", "");
+                if (!TextUtils.isEmpty(number)) km = Double.parseDouble(number);
+                if (raw.contains("m") && !raw.contains("km")) km /= 1000d;
+            } catch (Throwable ignored) {
+            }
         }
-        if (distance_km > 0) return String.format(Locale.getDefault(), "%.1fkm", distance_km);
-        return "";
+        if (km <= 0d) return 0;
+        if (km < 1d) return 1;
+        if (km < 5d) return 2;
+        if (km < 20d) return 3;
+        if (km < 50d) return 4;
+        if (km < 100d) return 5;
+        return 6;
     }
 
+    /** 兼容旧调用；正式页面通过 DatingUi.displayLocation(Context, profile) 本地化显示。 */
+    public String safeDistanceLabel() {
+        switch (distanceBucket()) {
+            case 1: return "<1km";
+            case 2: return "1-5km";
+            case 3: return "5-20km";
+            case 4: return "20-50km";
+            case 5: return "50-100km";
+            case 6: return "100km+";
+            default: return "";
+        }
+    }
+
+    /** 兼容旧调用。 */
     public String displayLocation() {
         StringBuilder out = new StringBuilder();
         if (!TextUtils.isEmpty(city)) out.append(city.trim());
