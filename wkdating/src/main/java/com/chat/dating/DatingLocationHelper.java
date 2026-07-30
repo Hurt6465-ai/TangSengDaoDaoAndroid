@@ -17,8 +17,6 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.text.TextUtils;
 
-import java.util.List;
-
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -344,3 +342,4 @@ public final class DatingLocationHelper {
         listener = null;
     }
 }
+import java.util.List;
