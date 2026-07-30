@@ -91,12 +91,15 @@
     <LinearLayout
         android:id="@+id/actionBar"
         android:layout_width="match_parent"
-        android:layout_height="90dp"
+        android:layout_height="86dp"
         android:layout_gravity="bottom"
-        android:layout_marginBottom="64dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="72dp"
+        android:background="@drawable/bg_dating_action_dock"
+        android:elevation="10dp"
         android:gravity="center"
-        android:orientation="horizontal"
-        android:paddingBottom="18dp">
+        android:orientation="horizontal">
 
         <ImageView
             android:id="@+id/rewindBtn"
@@ -110,48 +113,39 @@
 
         <Space android:layout_width="13dp" android:layout_height="1dp" />
 
-        <TextView
+        <ImageView
             android:id="@+id/passBtn"
             android:layout_width="64dp"
             android:layout_height="64dp"
             android:background="@drawable/bg_dating_action_pass"
+            android:contentDescription="@string/dating_pass"
             android:elevation="14dp"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:text="×"
-            android:textColor="#FFFF4F6A"
-            android:textSize="42sp"
-            android:textStyle="bold" />
+            android:padding="17dp"
+            android:src="@drawable/ic_dating_close" />
 
         <Space android:layout_width="13dp" android:layout_height="1dp" />
 
-        <TextView
+        <ImageView
             android:id="@+id/favoriteBtn"
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:background="@drawable/bg_dating_action_favorite"
+            android:contentDescription="@string/dating_favorites_title"
             android:elevation="14dp"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:text="★"
-            android:textColor="#FF68A2FF"
-            android:textSize="29sp"
-            android:textStyle="bold" />
+            android:padding="14dp"
+            android:src="@drawable/ic_dating_star" />
 
         <Space android:layout_width="13dp" android:layout_height="1dp" />
 
-        <TextView
+        <ImageView
             android:id="@+id/likeBtn"
             android:layout_width="70dp"
             android:layout_height="70dp"
             android:background="@drawable/bg_dating_action_like"
+            android:contentDescription="@string/dating_like"
             android:elevation="16dp"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:text="♥"
-            android:textColor="#FFFF426D"
-            android:textSize="41sp"
-            android:textStyle="bold" />
+            android:padding="17dp"
+            android:src="@drawable/ic_dating_heart" />
     </LinearLayout>
 
     <com.google.android.material.bottomnavigation.BottomNavigationView

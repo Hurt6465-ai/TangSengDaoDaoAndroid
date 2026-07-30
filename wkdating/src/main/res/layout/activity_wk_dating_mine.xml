@@ -7,13 +7,12 @@
         </FrameLayout>
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="16dp" android:layout_marginEnd="16dp" android:background="@drawable/bg_dating_detail_card" android:gravity="center_vertical" android:orientation="horizontal" android:padding="16dp">
             <FrameLayout android:layout_width="74dp" android:layout_height="74dp">
-                <ImageView android:id="@+id/avatarIv" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/bg_dating_avatar" android:clipToOutline="true" android:scaleType="centerCrop" />
+                <com.chat.base.ui.components.AvatarView android:id="@+id/avatarView" android:layout_width="74dp" android:layout_height="74dp" android:clipChildren="false" android:clipToPadding="false" />
             </FrameLayout>
             <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="14dp" android:layout_weight="1" android:orientation="vertical">
                 <TextView android:id="@+id/nameTv" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="1" android:textColor="#202026" android:textSize="20sp" android:textStyle="bold" />
                 <TextView android:id="@+id/metaTv" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="#777780" android:textSize="14sp" />
             </LinearLayout>
-            <androidx.appcompat.widget.SwitchCompat android:id="@+id/enabledSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" android:contentDescription="@string/dating_enable_recommend" />
         </LinearLayout>
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="16dp" android:layout_marginTop="14dp" android:layout_marginEnd="16dp" android:background="@drawable/bg_dating_detail_card" android:orientation="vertical" android:paddingStart="16dp" android:paddingTop="14dp" android:paddingEnd="16dp" android:paddingBottom="14dp">
             <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/dating_daily_quota" android:textColor="#202026" android:textSize="16sp" android:textStyle="bold" />
@@ -24,6 +23,13 @@
             </LinearLayout>
         </LinearLayout>
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginStart="16dp" android:layout_marginTop="14dp" android:layout_marginEnd="16dp" android:background="@drawable/bg_dating_detail_card" android:orientation="vertical">
+            <LinearLayout android:id="@+id/statusRow" style="@style/WkDatingMenuRow">
+                <TextView style="@style/WkDatingMenuIcon" android:text="◉" android:textColor="#FF4F6D" />
+                <TextView style="@style/WkDatingMenuTitle" android:text="@string/dating_status_title" />
+                <TextView android:id="@+id/statusValueTv" android:layout_width="wrap_content" android:layout_height="36dp" android:background="@drawable/bg_dating_status_pill" android:gravity="center" android:minWidth="72dp" android:paddingStart="11dp" android:paddingEnd="11dp" android:textColor="#FF4F6D" android:textSize="13sp" android:textStyle="bold" />
+                <TextView style="@style/WkDatingMenuArrow" />
+            </LinearLayout>
+            <View style="@style/WkDatingDivider" />
             <LinearLayout android:id="@+id/editProfileRow" style="@style/WkDatingMenuRow">
                 <TextView style="@style/WkDatingMenuIcon" android:text="✎" />
                 <TextView style="@style/WkDatingMenuTitle" android:text="@string/dating_edit_profile_title" />

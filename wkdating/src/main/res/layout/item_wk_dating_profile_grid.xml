@@ -39,15 +39,30 @@
         android:textColor="#222228"
         android:textSize="15sp"
         android:textStyle="bold" />
-    <TextView
-        android:id="@+id/metaTv"
+    <LinearLayout
+        android:id="@+id/metaRow"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="11dp"
         android:layout_marginTop="4dp"
         android:layout_marginEnd="11dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textColor="#85858D"
-        android:textSize="12sp" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="13dp"
+            android:layout_height="13dp"
+            android:src="@drawable/ic_dating_location_dark" />
+
+        <TextView
+            android:id="@+id/metaTv"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="3dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#85858D"
+            android:textSize="12sp" />
+    </LinearLayout>
 </LinearLayout>
