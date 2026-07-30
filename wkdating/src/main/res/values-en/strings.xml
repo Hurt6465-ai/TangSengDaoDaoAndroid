@@ -1,26 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
-    <string name="dating_title">Match</string>
-    <string name="dating_scope_global">Global first</string>
-    <string name="dating_scope_nearby">Nearby first</string>
     <string name="dating_loading">Loading matches…</string>
     <string name="dating_retry">Retry</string>
     <string name="dating_empty">No new recommendations</string>
     <string name="dating_empty_tip">Try loosening filters or come back later.</string>
     <string name="dating_like">Like</string>
     <string name="dating_pass">Pass</string>
-    <string name="dating_like_stamp">LIKE</string>
-    <string name="dating_nope_stamp">NOPE</string>
-    <string name="dating_match_title">It is a match</string>
-    <string name="dating_match_notice">A system notice was sent. Chat unlocks after the notice arrives.</string>
-    <string name="dating_match_notice_pending">Matched. Waiting for the system notice to unlock chat.</string>
     <string name="dating_ok">OK</string>
-    <string name="dating_photo_indicator">%1$d/%2$d</string>
-    <string name="dating_intent_study">Study partner</string>
-    <string name="dating_intent_friend">Friends</string>
-    <string name="dating_intent_love">Dating</string>
-    <string name="dating_distance_unknown">Global</string>
-    <string name="dating_mock_tip">Dating backend is not connected yet. Showing local demo data.</string>
     <string name="dating_rewind">Undo</string>
     <string name="dating_mine_title">My dating</string>
     <string name="dating_action_failed">Action failed</string>
@@ -50,34 +36,29 @@
     <string name="dating_edit_profile_title">Edit dating profile</string>
     <string name="dating_my_photos">My photos</string>
     <string name="dating_shared_profile">Shared profile</string>
-    <string name="dating_shared_profile_tip">Age, gender and country sync from your main profile</string>
-    <string name="dating_enable">Enable dating</string>
-    <string name="dating_enable_tip">Enable dating before browsing profiles</string>
+    <string name="dating_shared_profile_tip">Avatar, name, birthday, country and other details are shared with your account and can be edited here.</string>
     <string name="dating_edit_gender">Interested in</string>
     <string name="dating_edit_age">Age preference</string>
     <string name="dating_edit_orientation">Sexual orientation</string>
     <string name="dating_edit_drinking">Drinking</string>
     <string name="dating_edit_smoking">Smoking</string>
     <string name="dating_edit_dealbreakers">Dealbreakers</string>
-    <string name="dating_edit_ideal">Ideal partner</string>
     <string name="dating_edit_tags">Extra tags</string>
     <string name="dating_save_profile">Save profile</string>
     <string name="dating_empty_content">Nothing here yet</string>
     <string name="dating_daily_quota">Daily free quota</string>
-    <string name="dating_edit_profile_menu">Edit dating profile</string>
     <string name="dating_who_likes_me">Who likes me</string>
     <string name="dating_membership">Membership</string>
     <string name="dating_my_matches">My matches</string>
     <string name="dating_quota_rules">Quota and rules</string>
     <string name="dating_section_ideal">Ideal partner</string>
-    <string name="dating_section_dealbreakers">Dealbreakers</string>
     <string name="dating_section_interests">Interests and personality</string>
     <string name="dating_block">Block</string>
     <string name="dating_report">Report</string>
     <string name="dating_who_likes_title">See who likes you</string>
     <string name="dating_who_likes_tip">Free users see only the count and blurred previews. Upgrade to view the full list; chat unlocks only after a mutual like.</string>
     <string name="dating_membership_benefits">View membership benefits</string>
-    <string name="dating_photo_count_tip">Uploaded %1$d/5 · First photo is primary · Tap an empty slot to add</string>
+    <string name="dating_photo_count_tip">%1$d/5 uploaded · The first photo is the cover · Each photo is compressed below 150 KB</string>
     <string name="dating_select">Select</string>
     <string name="dating_not_filled">Not provided</string>
     <string name="dating_uploading_wait">Photos are uploading. Please wait.</string>
@@ -92,7 +73,6 @@
     <string name="dating_primary_photo">Primary photo</string>
     <string name="dating_photo_number">Photo %1$d</string>
     <string name="dating_confirm">Confirm</string>
-    <string name="dating_location_failed">Could not update location. Try again later.</string>
     <string name="dating_profile_load_failed">Could not load profile. Try again.</string>
     <string name="dating_enable_first">Enable dating before browsing profiles</string>
     <string name="dating_go_enable">Enable now</string>
@@ -103,7 +83,6 @@
     <string name="dating_rewind_synced_refresh">Undo synced. Recommendations will refresh.</string>
     <string name="dating_rewind_record_synced">Undo record synced and recommendations refreshed.</string>
     <string name="dating_refresh_after_profile">Refreshing recommendations from your new profile…</string>
-    <string name="dating_demo_tip">Showing development demo images. Production will not show fake users when the API fails.</string>
     <string-array name="dating_gender_options">
         <item>Any</item>
         <item>Women</item>
@@ -158,7 +137,6 @@
     <string name="dating_ideal_hint">For example: honest, emotionally steady and communicative</string>
     <string name="dating_tags_hint">For example: travel, cooking, music</string>
     <string name="dating_back">Back</string>
-    <string name="dating_enable_recommend">Enable dating recommendations</string>
     <string name="dating_section_love_expectation">Dating expectations</string>
     <string name="dating_chat_now">Chat now</string>
     <string name="dating_view_more">View full profile</string>
@@ -171,8 +149,6 @@
     <string name="dating_shared_career">Career and education: %1$s</string>
     <string name="dating_upload_prepare">Preparing photos</string>
     <string name="dating_upload_processing">Processing photo %1$d</string>
-    <string name="dating_upload_master">Uploading full photo %1$d/%2$d</string>
-    <string name="dating_upload_card">Uploading card photo %1$d/%2$d</string>
     <string name="dating_upload_failed">Photo upload failed</string>
     <string name="dating_upload_timeout">Photo upload timed out</string>
     <string name="dating_upload_url_failed">Could not get upload URL</string>
@@ -214,28 +190,7 @@
 
 Passes are unlimited, but the server rate-limits abuse.</string>
     <string name="dating_membership_pending">Membership and payments are not connected yet</string>
-    <string name="dating_filter_cross_tip">If either person accepts only the same country, cross-border profiles will not be recommended.</string>
-    <string name="dating_filter_country_title">Country/region</string>
-    <string name="dating_filter_country_smart_value">Smart recommendations</string>
-    <string name="dating_filter_country_same_value">Same country only</string>
-    <string name="dating_filter_country_foreign_value">Cross-border available</string>
-    <string name="dating_filter_gender_title">Gender</string>
-    <string name="dating_filter_gender_all_value">Any</string>
-    <string name="dating_filter_gender_female_value">Women</string>
-    <string name="dating_filter_gender_male_value">Men</string>
-    <string name="dating_filter_age_title">Age</string>
-    <string name="dating_filter_goal_title">Goal</string>
-    <string name="dating_filter_goal_serious_value">Serious relationship</string>
-    <string name="dating_filter_goal_marriage_value">Marriage</string>
-    <string name="dating_filter_goal_all_value">Any</string>
-
     <string name="dating_cancel">Cancel</string>
-    <string name="dating_apply">Apply</string>
-    <string name="dating_filter_title">Filter preferences</string>
-    <string name="dating_filter_country_format">Country: %1$s</string>
-    <string name="dating_filter_gender_format">Gender: %1$s</string>
-    <string name="dating_filter_age_format">Age: %1$d-%2$d</string>
-    <string name="dating_filter_goal_format">Goal: %1$s</string>
     <string name="dating_delete_photo_action">Delete photo</string>
     <string name="dating_photo_cache_failed">Could not create photo cache</string>
     <string name="dating_photo_cache_unavailable">Photo cache is unavailable</string>
@@ -247,11 +202,8 @@ Passes are unlimited, but the server rate-limits abuse.</string>
     <string name="dating_photo_encode_failed">Could not encode photo</string>
     <string name="dating_invalid_image_uri">Invalid photo address</string>
     <string name="dating_location_denied">Location is off, so nearby profiles are unavailable</string>
-    <string name="dating_location_explain_again">Turn location permission back on to continue viewing nearby profiles.</string>
-    <string name="dating_location_explain_first">Location is required for nearby profiles. After permission is granted, later updates run quietly without repeated prompts.</string>
     <string name="dating_location_title">Enable location</string>
     <string name="dating_location_not_now">Not now</string>
-    <string name="dating_location_go_enable">Enable</string>
     <string name="dating_location_back_recommend">Location was not enabled. Switched back to recommendations.</string>
     <string name="dating_location_device_unavailable">This device cannot provide a location</string>
     <string name="dating_location_service_off">Turn on system location services first</string>
@@ -262,41 +214,10 @@ Passes are unlimited, but the server rate-limits abuse.</string>
     <string name="dating_section_relationship">Dating expectations</string>
     <string name="dating_section_ideal_partner">Ideal partner</string>
     <string name="dating_section_dealbreakers_title">Dealbreakers</string>
-    <string name="dating_filter_age_18_28">18-28</string>
-    <string name="dating_filter_age_18_35">18-35</string>
-    <string name="dating_filter_age_22_35">22-35</string>
-    <string name="dating_filter_age_25_40">25-40</string>
-    <string name="dating_filter_age_30_50">30-50</string>
-    <string name="dating_filter_age_18_60">18-60</string>
-
-    <string name="dating_tab_recommend">Discover</string>
-    <string name="dating_tab_nearby">Nearby</string>
-    <string name="dating_filter">Filter</string>
-    <string name="dating_match_notice_ready">You like each other. Start chatting.</string>
-    <string name="dating_match_notice_named">You and %1$s like each other. Start chatting.</string>
     <string name="dating_keep_swiping">Keep discovering</string>
-    <string name="dating_goal_love">Serious relationship</string>
-    <string name="dating_goal_marriage">Marriage</string>
-    <string name="dating_goal_chat">Chat first</string>
-    <string name="dating_goal_long_term">Long-term relationship</string>
     <string name="dating_cross_open">Open to cross-border dating</string>
     <string name="dating_cross_prefer_foreign">Prefer cross-border dating</string>
     <string name="dating_cross_same_country">Same country only</string>
-    <string name="dating_match_score">%1$d%% match</string>
-    <string name="dating_tap_more">Tap the center for details</string>
-    <string name="dating_profile_preview">Profile preview</string>
-    <string name="dating_filter_tip">Recommendations use dating preferences. Same-country-only settings and the other person’s cross-border preference are both respected.</string>
-    <string name="dating_filter_country_smart">Country: smart recommendations</string>
-    <string name="dating_filter_country_same">Country: same country only</string>
-    <string name="dating_filter_country_foreign">Country: cross-border available</string>
-    <string name="dating_filter_gender_all">Gender: any</string>
-    <string name="dating_filter_gender_female">Gender: women</string>
-    <string name="dating_filter_gender_male">Gender: men</string>
-    <string name="dating_filter_age">Age: %1$d-%2$d</string>
-    <string name="dating_filter_goal_love">Goal: serious relationship</string>
-    <string name="dating_filter_goal_marriage">Goal: marriage</string>
-    <string name="dating_filter_goal_all">Goal: any</string>
-
     <string name="dating_shared_age_value">%1$d years old</string>
     <string name="dating_shared_gender_female">Woman</string>
     <string name="dating_shared_gender_male">Man</string>
@@ -331,4 +252,27 @@ Passes are unlimited, but the server rate-limits abuse.</string>
     <string name="dating_mode_partner">Partners</string>
     <string name="dating_mode_dating">Dating</string>
     <string name="dating_partner_unavailable">Partner list is unavailable. Please check wkpartnerlist.</string>
+
+    <string name="dating_upload_photo">Uploading photo %1$d of %2$d</string>
+    <string name="dating_edit_shared_profile">Edit</string>
+    <string name="dating_saved_and_enabled">Profile saved. You are now visible in recommendations.</string>
+    <string name="dating_status_visible">Visible</string>
+    <string name="dating_status_paused">Paused</string>
+    <string name="dating_status_title">Dating visibility</string>
+    <string name="dating_pause_message">While paused, other people will not see your dating profile. Existing matches and friends are unchanged.</string>
+    <string name="dating_resume_message">Resume to show your profile in dating recommendations again.</string>
+    <string name="dating_pause">Pause visibility</string>
+    <string name="dating_resume">Resume visibility</string>
+    <string name="dating_location_open_settings_tip">Location permission is disabled. You can enable it in system settings, or continue with global recommendations.</string>
+    <string name="dating_location_open_settings">Open settings</string>
+    <string name="dating_match_friend_created">You and %1$s liked each other and are now friends. Start chatting!</string>
+
+    <string name="dating_distance_under_1km">Within 1 km</string>
+    <string name="dating_distance_1_5km">1–5 km</string>
+    <string name="dating_distance_5_20km">5–20 km</string>
+    <string name="dating_distance_20_50km">20–50 km</string>
+    <string name="dating_distance_50_100km">50–100 km</string>
+    <string name="dating_distance_over_100km">Over 100 km</string>
+    <string name="dating_swipe_stamp_like">LIKE</string>
+    <string name="dating_swipe_stamp_favorite">FAV</string>
 </resources>
