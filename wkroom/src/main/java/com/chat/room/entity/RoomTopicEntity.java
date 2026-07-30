@@ -44,6 +44,9 @@ public class RoomTopicEntity implements Serializable {
     public int reply_count;
     /** 参与过该话题的人数：创建者 + 进入过或回复过的用户。 */
     public int participant_count;
+    /** 服务端权限字段；-1 表示旧缓存或响应未提供。 */
+    public int can_delete = -1;
+    public int can_pin = -1;
     public int pinned;
     public int hot;
     public long hot_until;
@@ -86,9 +89,24 @@ public class RoomTopicEntity implements Serializable {
     }
 
     public String getRawTag() {
-        if (!TextUtils.isEmpty(tag)) return tag;
+        if (!TextUtils.isEmpty(tag)) {
+            // 兼容升级前已经缓存或服务端尚未迁移的旧值。
+            return "音乐".equals(tag) ? "游戏" : tag;
+        }
         if (!TextUtils.isEmpty(type) && "language".equals(type)) return "练口语";
         return "闲谈";
+    }
+
+    public boolean canDelete() {
+        return can_delete == 1;
+    }
+
+    public boolean canPin() {
+        return can_pin == 1;
+    }
+
+    public boolean isExpired(long now) {
+        return expire_at > 0 && expire_at <= now;
     }
 
     public String getTagLabel(Context context) {
@@ -208,7 +226,7 @@ public class RoomTopicEntity implements Serializable {
         if (!TextUtils.isEmpty(next.room_id)) room_id = next.room_id;
         if (!TextUtils.isEmpty(next.title)) title = next.title;
         if (!TextUtils.isEmpty(next.desc)) desc = next.desc;
-        if (!TextUtils.isEmpty(next.tag)) tag = next.tag;
+        if (!TextUtils.isEmpty(next.tag)) tag = "音乐".equals(next.tag) ? "游戏" : next.tag;
         if (!TextUtils.isEmpty(next.language)) language = next.language;
         if (!TextUtils.isEmpty(next.background_url)) background_url = next.background_url;
         if (next.background_index > 0) background_index = next.background_index;
@@ -222,6 +240,8 @@ public class RoomTopicEntity implements Serializable {
         if (next.expire_at > 0) expire_at = next.expire_at;
         if (next.reply_count >= 0) reply_count = next.reply_count;
         if (next.participant_count >= 0) participant_count = next.participant_count;
+        if (next.can_delete >= 0) can_delete = next.can_delete;
+        if (next.can_pin >= 0) can_pin = next.can_pin;
         if (next.online_count >= 0) online_count = next.online_count;
         if (next.member_count >= 0) member_count = next.member_count;
         if (next.active_users >= 0) active_users = next.active_users;
