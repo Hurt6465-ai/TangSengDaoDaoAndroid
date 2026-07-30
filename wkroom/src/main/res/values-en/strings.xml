@@ -20,8 +20,15 @@
     <string name="peipe_room_tag_partner">Partner</string>
     <string name="peipe_room_tag_work">Work</string>
     <string name="peipe_room_tag_movie">Movies</string>
-    <string name="peipe_room_tag_music">Music</string>
+    <string name="peipe_room_tag_music">Games</string>
     <string name="peipe_room_tag_study">Study</string>
     <string name="peipe_room_tag_friend">Friends</string>
     <string name="peipe_room_tag_chat">Chat</string>
+    <string name="peipe_room_entering">Entering chatroom…</string>
+    <string name="peipe_room_no_permission">You do not have permission to do this.</string>
+    <string name="peipe_room_ended">This topic has ended.</string>
+    <string name="peipe_room_delete_confirm">Delete this chatroom?</string>
+    <string name="peipe_room_page_not_ready">The page is not ready. Please try again.</string>
+    <string name="peipe_room_data_error">Invalid chatroom data.</string>
+    <string name="peipe_room_operation_failed">Operation failed. Please try again.</string>
 </resources>
