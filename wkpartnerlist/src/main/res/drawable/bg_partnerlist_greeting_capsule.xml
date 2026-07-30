@@ -2,32 +2,28 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_enabled="false">
         <shape android:shape="rectangle">
-            <corners android:radius="17dp" />
-            <solid android:color="#F2E9EF" />
-            <stroke
-                android:width="1dp"
-                android:color="#E5D8E0" />
+            <corners android:radius="18dp" />
+            <solid android:color="#EEF0F5" />
+            <stroke android:width="1dp" android:color="#DFE3EA" />
         </shape>
     </item>
 
     <item>
-        <ripple android:color="#33FFFFFF">
+        <ripple android:color="#2AFFFFFF">
             <item>
                 <shape android:shape="rectangle">
-                    <corners android:radius="17dp" />
+                    <corners android:radius="18dp" />
                     <gradient
                         android:angle="0"
-                        android:startColor="#FF6F9E"
-                        android:endColor="#9B72EA"
+                        android:startColor="#5B7CFA"
+                        android:endColor="#6963E8"
                         android:type="linear" />
-                    <stroke
-                        android:width="0.5dp"
-                        android:color="#40FFFFFF" />
+                    <stroke android:width="0.5dp" android:color="#40FFFFFF" />
                 </shape>
             </item>
             <item android:id="@android:id/mask">
                 <shape android:shape="rectangle">
-                    <corners android:radius="17dp" />
+                    <corners android:radius="18dp" />
                     <solid android:color="#FFFFFFFF" />
                 </shape>
             </item>
