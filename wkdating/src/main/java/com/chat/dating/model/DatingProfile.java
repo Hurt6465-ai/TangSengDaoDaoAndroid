@@ -72,6 +72,7 @@ public class DatingProfile implements Serializable {
     public int profile_score;
     public long last_active_at;
     public int enabled;
+    public int user_paused;
 
     public String safeUid() {
         if (!TextUtils.isEmpty(uid)) return uid;
