@@ -805,12 +805,14 @@ open class WKTextProvider : WKChatBaseProvider() {
         return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value.toFloat(), context.resources.displayMetrics).toInt()
     }
 
-    var selectText: String? = null
     private fun selectText(
         textView: TextView,
         fullLayout: View,
         uiChatMsgItemEntity: WKUIChatMsgItemEntity
     ) {
+        // Selection belongs to this bound bubble only. A provider-wide mutable value is unsafe:
+        // dismissing or rebinding another cell can clear the text before the popup action runs.
+        var selectedTextForCell: String? = null
 //        textMsgBean = msgBean
         val menu = EndpointManager.getInstance()
             .invoke("favorite_item", uiChatMsgItemEntity.wkMsg)
@@ -838,7 +840,7 @@ open class WKTextProvider : WKChatBaseProvider() {
                 object : SelectTextHelper.Builder.onSeparateItemClickListener {
                     override fun onClick() {
                         EndpointManager.getInstance().invoke("chat_activity_touch", null)
-                        val content = selectText ?: ""
+                        val content = selectedTextForCell.orEmpty()
                         if (TextUtils.isEmpty(content)) return
                         translateSelectedTextToBubble(uiChatMsgItemEntity, content)
                     }
@@ -848,8 +850,9 @@ open class WKTextProvider : WKChatBaseProvider() {
                 object : SelectTextHelper.Builder.onSeparateItemClickListener {
                     override fun onClick() {
                         EndpointManager.getInstance().invoke("chat_activity_touch", null)
-                        if (TextUtils.isEmpty(selectText)) return
-                        val textContent = WKTextContent(selectText)
+                        val selected = selectedTextForCell.orEmpty()
+                        if (TextUtils.isEmpty(selected)) return
+                        val textContent = WKTextContent(selected)
                         val chooseChatMenu =
                             ChooseChatMenu(
                                 ChatChooseContacts { channelList: List<WKChannel>? ->
@@ -893,10 +896,11 @@ open class WKTextProvider : WKChatBaseProvider() {
                     override fun onClick() {
                         EndpointManager.getInstance().invoke("chat_activity_touch", null)
 
-                        if (!TextUtils.isEmpty(selectText)) {
+                        val selected = selectedTextForCell.orEmpty()
+                        if (!TextUtils.isEmpty(selected)) {
                             val mMsg = WKMsg()
                             mMsg.type = WKContentType.WK_TEXT
-                            mMsg.baseContentMsgModel = WKTextContent(selectText)
+                            mMsg.baseContentMsgModel = WKTextContent(selected)
                             mMsg.from = uiChatMsgItemEntity.wkMsg.from
                             mMsg.channelID = uiChatMsgItemEntity.wkMsg.channelID
                             mMsg.channelType = uiChatMsgItemEntity.wkMsg.channelType
@@ -924,7 +928,7 @@ open class WKTextProvider : WKChatBaseProvider() {
             }
 
             override fun onTextSelected(content: String?) {
-                selectText = content
+                selectedTextForCell = content
             }
 
 
@@ -932,7 +936,9 @@ open class WKTextProvider : WKChatBaseProvider() {
              * 弹窗关闭回调
              */
             override fun onDismiss() {
-                selectText = null
+                // Do not clear here. The external chat popup starts dismissing the selection
+                // before its action callback executes, so clearing here makes later copy actions
+                // receive an empty value. The next selection overwrites this cell-local snapshot.
             }
             override fun onClickLink(clickableContent: NormalClickableSpan) {
                 if (clickableContent.clickableContent.type == NormalClickableContent.NormalClickableTypes.URL) {
@@ -1141,6 +1147,11 @@ open class WKTextProvider : WKChatBaseProvider() {
              * 全选显示自定义弹窗回调
              */
             override fun onSelectAllShowCustomPop(local: FloatArray) {
+                // Some OEM TextView builds dispatch the custom-popup callback before
+                // onTextSelected. Fall back to the visible text so copy never becomes a no-op.
+                if (selectedTextForCell.isNullOrEmpty()) {
+                    selectedTextForCell = textView.text?.toString().orEmpty()
+                }
                 showPopup(uiChatMsgItemEntity, textView, local)
             }
 
