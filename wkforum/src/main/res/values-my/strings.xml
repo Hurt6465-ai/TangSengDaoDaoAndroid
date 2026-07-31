@@ -284,6 +284,9 @@
     <string name="forum_video_open_in">%1$s တွင် ဖွင့်ရန်</string>
     <string name="forum_video_preparing">ဗီဒီယိုအဖုံးပုံနှင့် ပလေယာကို ပြင်ဆင်နေသည်…</string>
     <string name="forum_video_short_link_failed">လင့်ခ်တိုကို ဖော်ထုတ်၍ မရပါ။ /video/ ပါသော TikTok လင့်ခ်အပြည့်အစုံကို ကူးထည့်ပါ။</string>
+    <string name="forum_tag_topics">တဂ်အကြောင်းအရာများ</string>
+    <string name="forum_loading_tag_topics">တဂ်အကြောင်းအရာများကို ဖွင့်နေသည်…</string>
+    <string name="forum_empty_tag_topics">ဤတဂ်အောက်တွင် အကြောင်းအရာ မရှိသေးပါ</string>
     <string-array name="forum_report_reasons">
         <item>ကြော်ငြာ သို့မဟုတ် လိမ်လည်မှု</item>
         <item>လိင်ပိုင်းဆိုင်ရာ သို့မဟုတ် မသင့်လျော်သောအကြောင်းအရာ</item>
