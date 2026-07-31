@@ -21,17 +21,19 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import java.util.List;
-
 import com.chat.base.config.WKConfig;
 
+import java.util.List;
 
 /**
  * 交友定位策略：
- * - 第一次进入请求权限；同意后以后静默定位；
- * - 拒绝后当前页面不重复打扰，下次重新进入交友再请求；
- * - 成功上传后 72 小时内不启动定位；本地位置最多缓存 7 天；
- * - 永久拒绝时只能引导到系统设置，Android 无法再次弹系统权限框。
+ * - 资料开启交友且允许显示距离时才由页面调用；
+ * - 成功上传后 72 小时内只用缓存，不检查权限、不启动定位；
+ * - Android“仅本次允许”失效后，下次真正需要更新时重新请求权限；
+ * - 普通拒绝后当前页面不重复请求，下次重新进入再请求；
+ * - 连续拒绝且系统不再允许弹窗时，才引导到系统设置；
+ * - 新定位上传失败时保留一次待上传标记，下次可直接重传缓存，不重复启动定位；
+ * - 本地位置最多缓存 7 天。
  */
 public final class DatingLocationHelper {
     public static final int REQUEST_LOCATION = 9041;
@@ -39,12 +41,14 @@ public final class DatingLocationHelper {
     public static final long LOCATION_CACHE_TTL_MS = 7L * 24L * 60L * 60L * 1000L;
 
     private static final String SP = "wkdating_location";
-    private static final String KEY_PERMISSION_ASKED = "permission_asked";
+    private static final String KEY_DENIAL_COUNT = "permission_denial_count";
+    private static final String KEY_PERMISSION_PERMANENTLY_DENIED = "permission_permanently_denied";
     private static final String KEY_LAT = "last_lat";
     private static final String KEY_LNG = "last_lng";
     private static final String KEY_ACCURACY = "last_accuracy";
     private static final String KEY_LOCATION_TIME = "last_location_time";
     private static final String KEY_UPLOAD_TIME = "last_upload_time";
+    private static final String KEY_PENDING_UPLOAD = "pending_upload";
 
     public interface Callback {
         void onSuccess(Location location, boolean needUpload);
@@ -71,64 +75,80 @@ public final class DatingLocationHelper {
         this.locationPrefs = activity.getSharedPreferences(SP + "_" + uid, Context.MODE_PRIVATE);
     }
 
-    /** 每个交友页面实例最多触发一次权限流程。 */
+    /** 每个交友页面实例最多触发一次权限/定位流程。 */
     public void ensureLocation(Callback callback) {
         if (requestedThisEntry) return;
         requestedThisEntry = true;
         pendingCallback = callback;
 
-        if (hasPermission()) {
-            if (!needsRefresh()) {
-                Location cached = cachedLocation();
-                if (cached != null) success(cached, false);
-                else locateNow();
-            } else {
-                locateNow();
-            }
+        Location cached = cachedLocation();
+
+        // 最重要的顺序：72 小时内不需要更新时，完全不检查权限。
+        // “仅本次允许”即使已经被系统收回，也不会在冷却期内误提示定位未开启。
+        if (!needsRefresh()) {
+            if (cached != null) success(cached, false);
+            else deny(activity.getString(R.string.dating_location_temporarily_unavailable));
             return;
         }
-        boolean askedBefore = permissionPrefs.getBoolean(KEY_PERMISSION_ASKED, false);
-        boolean canAskAgain = ActivityCompat.shouldShowRequestPermissionRationale(
-                activity, Manifest.permission.ACCESS_FINE_LOCATION)
-                || ActivityCompat.shouldShowRequestPermissionRationale(
-                activity, Manifest.permission.ACCESS_COARSE_LOCATION);
-        if (!askedBefore || canAskAgain) {
-            requestSystemPermission();
-        } else {
+
+        // 新位置已取得但上次上传失败：直接重传本地缓存，不再申请权限或重新定位。
+        if (cached != null && locationPrefs.getBoolean(KEY_PENDING_UPLOAD, false)) {
+            success(cached, true);
+            return;
+        }
+
+        if (hasPermission()) {
+            clearPermissionFailureState();
+            locateNow();
+            return;
+        }
+
+        // 只有已经确认系统不再弹权限框时，才去设置；“仅本次允许”失效不会设置此标记。
+        if (permissionPrefs.getBoolean(KEY_PERMISSION_PERMANENTLY_DENIED, false)) {
             showPermissionExplain();
+        } else {
+            requestSystemPermission();
         }
     }
 
     private void requestSystemPermission() {
-        permissionPrefs.edit().putBoolean(KEY_PERMISSION_ASKED, true).apply();
+        // 交友只展示国家和模糊距离，大致位置已经足够，不主动索取精确位置。
         ActivityCompat.requestPermissions(activity,
-                new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
+                new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
                 REQUEST_LOCATION);
     }
 
     public boolean handlePermissionResult(int requestCode, @NonNull int[] grantResults) {
         if (requestCode != REQUEST_LOCATION) return false;
-        boolean granted = false;
-        for (int result : grantResults) {
-            if (result == PackageManager.PERMISSION_GRANTED) {
-                granted = true;
-                break;
-            }
-        }
-        if (granted) {
-            permissionPrefs.edit().putBoolean(KEY_PERMISSION_ASKED, true).apply();
+
+        if (hasPermission()) {
+            clearPermissionFailureState();
             locateNow();
-        } else {
-            permissionPrefs.edit().putBoolean(KEY_PERMISSION_ASKED, true).apply();
-            deny(activity.getString(R.string.dating_location_denied));
+            return true;
         }
+
+        int denialCount = permissionPrefs.getInt(KEY_DENIAL_COUNT, 0) + 1;
+        boolean canAskAgain = ActivityCompat.shouldShowRequestPermissionRationale(
+                activity, Manifest.permission.ACCESS_COARSE_LOCATION);
+
+        // 第一次拒绝无论 ROM 如何返回 rationale，都允许下次进入再请求一次。
+        // 连续拒绝且系统明确不再给出 rationale，才认定为永久拒绝。
+        boolean permanentlyDenied = denialCount >= 2 && !canAskAgain;
+        permissionPrefs.edit()
+                .putInt(KEY_DENIAL_COUNT, denialCount)
+                .putBoolean(KEY_PERMISSION_PERMANENTLY_DENIED, permanentlyDenied)
+                .apply();
+
+        deny(activity.getString(R.string.dating_location_denied));
         return true;
     }
 
     /** 只有后端上传成功后才调用，网络失败不能提前进入 72 小时冷却。 */
     public void markUploaded(Location location) {
         long now = System.currentTimeMillis();
-        SharedPreferences.Editor editor = locationPrefs.edit().putLong(KEY_UPLOAD_TIME, now);
+        SharedPreferences.Editor editor = locationPrefs.edit()
+                .putLong(KEY_UPLOAD_TIME, now)
+                .putBoolean(KEY_PENDING_UPLOAD, false);
         if (location != null) saveLocation(editor, location, now);
         editor.apply();
     }
@@ -141,8 +161,12 @@ public final class DatingLocationHelper {
     public void onHostResume() {
         if (!waitingForSettings) return;
         waitingForSettings = false;
-        if (hasPermission()) locateNow();
-        else deny(activity.getString(R.string.dating_location_denied));
+        if (hasPermission()) {
+            clearPermissionFailureState();
+            locateNow();
+        } else {
+            deny(activity.getString(R.string.dating_location_denied));
+        }
     }
 
     public void release() {
@@ -158,6 +182,13 @@ public final class DatingLocationHelper {
         Location cached = cachedLocation();
         return uploadedAt <= 0L || elapsed < 0L
                 || elapsed >= LOCATION_REFRESH_INTERVAL_MS || cached == null;
+    }
+
+    private void clearPermissionFailureState() {
+        permissionPrefs.edit()
+                .putInt(KEY_DENIAL_COUNT, 0)
+                .putBoolean(KEY_PERMISSION_PERMANENTLY_DENIED, false)
+                .apply();
     }
 
     private void showPermissionExplain() {
@@ -181,8 +212,10 @@ public final class DatingLocationHelper {
     }
 
     private boolean hasPermission() {
-        return ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                || ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        return ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_COARSE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     private void locateNow() {
@@ -196,7 +229,7 @@ public final class DatingLocationHelper {
         long systemAge = systemCached == null ? Long.MAX_VALUE
                 : System.currentTimeMillis() - systemCached.getTime();
         if (systemCached != null && systemAge >= 0L && systemAge <= 15L * 60L * 1000L) {
-            saveLocalLocation(systemCached);
+            saveLocalLocation(systemCached, true);
             success(systemCached, true);
             return;
         }
@@ -229,7 +262,7 @@ public final class DatingLocationHelper {
             @Override
             public void onLocationChanged(@NonNull Location location) {
                 stopListening();
-                saveLocalLocation(location);
+                saveLocalLocation(location, true);
                 success(location, true);
             }
 
@@ -279,10 +312,11 @@ public final class DatingLocationHelper {
         return location;
     }
 
-    private void saveLocalLocation(Location location) {
+    private void saveLocalLocation(Location location, boolean pendingUpload) {
         if (location == null) return;
         long now = System.currentTimeMillis();
-        SharedPreferences.Editor editor = locationPrefs.edit();
+        SharedPreferences.Editor editor = locationPrefs.edit()
+                .putBoolean(KEY_PENDING_UPLOAD, pendingUpload);
         saveLocation(editor, location, now);
         editor.apply();
     }
