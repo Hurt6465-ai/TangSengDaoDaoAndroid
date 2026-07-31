@@ -364,8 +364,10 @@ class WKVoiceProvider : WKChatBaseProvider() {
             uiChatMsgItemEntity.wkMsg,
             uiChatMsgItemEntity.nextMsg
         )
-        val voiceLayout = parentView.findViewById<BubbleLayout>(R.id.voiceLayout)
-        voiceLayout.setAll(bgType, from, WKContentType.WK_VOICE)
+        // 删除消息、重连同步或局部刷新时，RecyclerView 可能暂时传入已回收/
+        // 尚未重新绑定的 itemView。该 View 不一定包含 voiceLayout，必须判空。
+        val voiceLayout: BubbleLayout? = parentView.findViewById(R.id.voiceLayout)
+        voiceLayout?.setAll(bgType, from, WKContentType.WK_VOICE)
 
     }
 
@@ -376,9 +378,9 @@ class WKVoiceProvider : WKChatBaseProvider() {
         from: WKChatIteMsgFromType
     ) {
         super.resetCellListener(position, parentView, uiChatMsgItemEntity, from)
-        val voiceLayout = parentView.findViewById<BubbleLayout>(R.id.voiceLayout)
-        val playBtn = parentView.findViewById<CircleProgress>(R.id.playBtn)
-        addLongClick(voiceLayout, uiChatMsgItemEntity)
-        addLongClick(playBtn, uiChatMsgItemEntity)
+        val voiceLayout: BubbleLayout? = parentView.findViewById(R.id.voiceLayout)
+        val playBtn: CircleProgress? = parentView.findViewById(R.id.playBtn)
+        voiceLayout?.let { addLongClick(it, uiChatMsgItemEntity) }
+        playBtn?.let { addLongClick(it, uiChatMsgItemEntity) }
     }
 }
