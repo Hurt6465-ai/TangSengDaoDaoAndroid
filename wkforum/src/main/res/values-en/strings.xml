@@ -284,6 +284,9 @@
     <string name="forum_video_open_in">Open in %1$s</string>
     <string name="forum_video_preparing">Preparing the video cover and player…</string>
     <string name="forum_video_short_link_failed">Could not resolve the short link. Paste a full TikTok link containing /video/.</string>
+    <string name="forum_tag_topics">Tag topics</string>
+    <string name="forum_loading_tag_topics">Loading tag topics…</string>
+    <string name="forum_empty_tag_topics">No topics use this tag yet</string>
     <string-array name="forum_report_reasons">
         <item>Spam or fraud</item>
         <item>Sexual or explicit content</item>
