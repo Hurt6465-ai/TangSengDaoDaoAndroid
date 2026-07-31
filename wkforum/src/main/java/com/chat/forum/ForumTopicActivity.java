@@ -34,6 +34,7 @@ import android.util.Base64;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -41,6 +42,7 @@ import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -315,6 +317,19 @@ public class ForumTopicActivity extends AppCompatActivity {
                     if (last >= adapter.getItemCount() - 4) loadComments(false);
                 }
                 updateFastScrollButton();
+            }
+        });
+        recyclerView.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+            @Override
+            public boolean onInterceptTouchEvent(@NonNull RecyclerView rv,
+                                                 @NonNull MotionEvent event) {
+                if (event.getActionMasked() != MotionEvent.ACTION_UP
+                        || (replyParentId <= 0L && replyQuoteId <= 0L)) {
+                    return false;
+                }
+                View child = rv.findChildViewUnder(event.getX(), event.getY());
+                if (child == null || !child.isClickable()) clearReplyTarget();
+                return false;
             }
         });
         body.addView(recyclerView, new FrameLayout.LayoutParams(
@@ -2264,7 +2279,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             VoicePayload voice = VoicePayload.parse(comment.content);
             int left = reply ? 48 : 16;
             int right = voice == null ? 14 : 2;
-            holder.root.setPadding(dp(left), dp(reply ? 7 : 10), dp(right), dp(reply ? 6 : 8));
+            holder.root.setPadding(dp(left), dp(reply ? 5 : 8), dp(right), dp(reply ? 3 : 5));
             holder.root.setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
             holder.avatar.setSize(reply ? 25 : 32);
             LinearLayout.LayoutParams avatarParams = (LinearLayout.LayoutParams) holder.avatar.getLayoutParams();
@@ -2307,7 +2322,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             holder.like.setText(comment.likeCount > 0 ? String.valueOf(comment.likeCount) : "");
             int likeColor = comment.liked ? 0xFF1877F2
                     : (isDark() ? 0xFF858B93 : 0xFF9AA0A7);
-            setCompoundIcon(holder.like, R.drawable.ic_forum_thumb_up_outline, 16, likeColor);
+            setCompoundIcon(holder.like, R.drawable.ic_forum_thumb_up_outline, 15, likeColor);
             holder.like.setTextColor(likeColor);
             holder.like.setBackground(voice == null ? selectableBackground() : null);
             holder.like.setOnClickListener(v -> changeCommentLike(comment));
@@ -2315,7 +2330,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             holder.more.setText("⋮");
             holder.more.setTextColor(isDark() ? 0xFF858B93 : 0xFF9AA0A7);
             holder.more.setBackground(voice == null ? selectableBackground() : null);
-            holder.more.setTranslationX(voice == null ? 0f : dp(4));
+            holder.more.setTranslationX(0f);
             holder.more.setOnClickListener(v -> showCommentMenu(comment, row.parentId, author));
 
             if (voice == null) {
@@ -2352,7 +2367,7 @@ public class ForumTopicActivity extends AppCompatActivity {
             }
 
             holder.imageContainer.bind(comment.imageList, dp(160), dp(6),
-                    isDark() ? 0xFF24262B : 0xFFF0F1F3);
+                    Color.TRANSPARENT);
 
             View.OnLongClickListener longClick = v -> {
                 v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
@@ -2509,25 +2524,13 @@ public class ForumTopicActivity extends AppCompatActivity {
         answerParams.rightMargin = dp(2);
         header.addView(answer, answerParams);
 
-        TextView like = text("", 11, dark ? 0xFF858B93 : 0xFF9AA0A7, false);
-        like.setGravity(Gravity.CENTER);
-        like.setCompoundDrawablePadding(dp(1));
-        like.setBackground(selectableBackground());
-        header.addView(like, new LinearLayout.LayoutParams(dp(40), dp(32)));
-
-        TextView more = text("⋮", 20, dark ? 0xFF858B93 : 0xFF9AA0A7, false);
-        more.setGravity(Gravity.CENTER);
-        more.setIncludeFontPadding(false);
-        more.setContentDescription(ForumText.get(R.string.forum_comment_actions));
-        more.setBackground(selectableBackground());
-        header.addView(more, new LinearLayout.LayoutParams(dp(30), dp(32)));
         root.addView(header, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView body = htmlText("", 15);
         LinearLayout.LayoutParams bodyParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bodyParams.topMargin = dp(5);
+        bodyParams.topMargin = dp(3);
         bodyParams.leftMargin = dp(40);
         root.addView(body, bodyParams);
 
@@ -2551,13 +2554,30 @@ public class ForumTopicActivity extends AppCompatActivity {
         imagesParams.leftMargin = dp(40);
         root.addView(images, imagesParams);
 
+        LinearLayout footer = new LinearLayout(context);
+        footer.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams footerParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(28));
+        footerParams.leftMargin = dp(40);
+        root.addView(footer, footerParams);
+
         TextView time = text("", 10.5f, dark ? 0xFF6F757D : 0xFFA7ADB4, false);
         time.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams timeParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(24));
-        timeParams.leftMargin = dp(40);
-        timeParams.topMargin = dp(2);
-        root.addView(time, timeParams);
+        footer.addView(time, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+
+        TextView like = text("", 11, dark ? 0xFF858B93 : 0xFF9AA0A7, false);
+        like.setGravity(Gravity.CENTER);
+        like.setCompoundDrawablePadding(dp(1));
+        like.setBackground(selectableBackground());
+        footer.addView(like, new LinearLayout.LayoutParams(dp(38), dp(28)));
+
+        TextView more = text("⋮", 20, dark ? 0xFF858B93 : 0xFF9AA0A7, false);
+        more.setGravity(Gravity.CENTER);
+        more.setIncludeFontPadding(false);
+        more.setContentDescription(ForumText.get(R.string.forum_comment_actions));
+        more.setBackground(selectableBackground());
+        footer.addView(more, new LinearLayout.LayoutParams(dp(28), dp(28)));
 
         return root;
     }
@@ -2586,8 +2606,8 @@ public class ForumTopicActivity extends AppCompatActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(1));
         params.leftMargin = dp(16);
         params.rightMargin = dp(14);
-        params.topMargin = dp(8);
-        params.bottomMargin = dp(8);
+        params.topMargin = dp(5);
+        params.bottomMargin = dp(5);
         line.setLayoutParams(params);
         return line;
     }
@@ -2608,6 +2628,8 @@ public class ForumTopicActivity extends AppCompatActivity {
         private final TextView content;
         private final ForumVideoEmbedListView videoEmbeds;
         private final ForumRemoteImageListView images;
+        private final HorizontalScrollView tagScroller;
+        private final LinearLayout tagContainer;
         private final TextView eyeAction;
         private final TextView likeAction;
         private final TextView favoriteAction;
@@ -2620,7 +2642,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         ArticleView(Context context) {
             super(context);
             setOrientation(VERTICAL);
-            setPadding(dp(18), dp(12), dp(18), 0);
+            setPadding(dp(16), dp(10), dp(16), 0);
             setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
             setOnClickListener(v -> {
                 if (replyParentId > 0 || replyQuoteId > 0) clearReplyTarget();
@@ -2667,7 +2689,7 @@ public class ForumTopicActivity extends AppCompatActivity {
 
             LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            titleParams.topMargin = dp(10);
+            titleParams.topMargin = dp(8);
             addView(titleRow, titleParams);
 
             bounty = text("", 12, isDark() ? 0xFFFFCB68 : 0xFFB96A00, true);
@@ -2729,8 +2751,8 @@ public class ForumTopicActivity extends AppCompatActivity {
 
             LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(0.7f));
-            dividerParams.topMargin = dp(13);
-            dividerParams.bottomMargin = dp(15);
+            dividerParams.topMargin = dp(10);
+            dividerParams.bottomMargin = dp(11);
             addView(divider(), dividerParams);
 
             content = htmlText("", 17);
@@ -2748,9 +2770,24 @@ public class ForumTopicActivity extends AppCompatActivity {
             addView(images, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+            tagScroller = new HorizontalScrollView(context);
+            tagScroller.setHorizontalScrollBarEnabled(false);
+            tagScroller.setFillViewport(false);
+            tagScroller.setOverScrollMode(OVER_SCROLL_NEVER);
+            tagScroller.setVisibility(GONE);
+            tagContainer = new LinearLayout(context);
+            tagContainer.setOrientation(HORIZONTAL);
+            tagContainer.setGravity(Gravity.CENTER_VERTICAL);
+            tagScroller.addView(tagContainer, new HorizontalScrollView.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(28)));
+            LinearLayout.LayoutParams tagParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(28));
+            tagParams.topMargin = dp(7);
+            addView(tagScroller, tagParams);
+
             LinearLayout actions = new LinearLayout(context);
             actions.setGravity(Gravity.CENTER_VERTICAL);
-            actions.setPadding(0, dp(12), 0, dp(10));
+            actions.setPadding(0, dp(9), 0, dp(7));
             eyeAction = createTopicAction();
             likeAction = createTopicAction();
             favoriteAction = createTopicAction();
@@ -2785,7 +2822,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                     ViewGroup.LayoutParams.MATCH_PARENT, 1f));
             commentsHeader.addView(pill, new LinearLayout.LayoutParams(dp(150), dp(32)));
             addView(commentsHeader, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
         }
 
         void bind(@Nullable ForumApiClient.Topic topic) {
@@ -2793,6 +2830,8 @@ public class ForumTopicActivity extends AppCompatActivity {
                 setVisibility(GONE);
                 videoEmbeds.recycle();
                 images.recycle();
+                tagContainer.removeAllViews();
+                tagScroller.setVisibility(GONE);
                 return;
             }
             setVisibility(VISIBLE);
@@ -2841,7 +2880,8 @@ public class ForumTopicActivity extends AppCompatActivity {
                     ForumVideoEmbedListView.stripStandaloneEmbedUrls(body)));
             videoEmbeds.bind(body);
             images.bind(topic.imageList, dp(180), dp(10),
-                    isDark() ? 0xFF24262B : 0xFFF0F1F3);
+                    Color.TRANSPARENT);
+            bindTopicTags(topic.tags);
 
             bindTopicAction(eyeAction, R.drawable.ic_forum_eye,
                     String.valueOf(Math.max(0, topic.viewCount)), false, null, 22);
@@ -2864,6 +2904,31 @@ public class ForumTopicActivity extends AppCompatActivity {
             bindSortTab(hotSort, COMMENT_SORT_HOT);
             bindSortTab(ascSort, COMMENT_SORT_ASC);
             bindSortTab(descSort, COMMENT_SORT_DESC);
+        }
+
+        private void bindTopicTags(@Nullable List<ForumApiClient.Tag> tags) {
+            tagContainer.removeAllViews();
+            int shown = 0;
+            if (tags != null) {
+                for (ForumApiClient.Tag tag : tags) {
+                    if (tag == null || tag.id <= 0L || TextUtils.isEmpty(tag.name)) continue;
+                    TextView chip = text("#" + tag.name, 11.5f, 0xFF1877F2, true);
+                    chip.setGravity(Gravity.CENTER);
+                    chip.setSingleLine(true);
+                    chip.setMaxWidth(dp(150));
+                    chip.setEllipsize(TextUtils.TruncateAt.END);
+                    chip.setPadding(dp(10), 0, dp(10), 0);
+                    chip.setBackground(roundRect(isDark() ? 0xFF243B59 : 0xFFEAF3FF, 12));
+                    chip.setOnClickListener(v -> startActivity(ForumBoardActivity.createTagIntent(
+                            ForumTopicActivity.this, tag.id, tag.name)));
+                    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT, dp(25));
+                    if (shown > 0) params.leftMargin = dp(7);
+                    tagContainer.addView(chip, params);
+                    shown++;
+                }
+            }
+            tagScroller.setVisibility(shown > 0 ? VISIBLE : GONE);
         }
 
         private void bindAuthorCategory(TextView view, String authorName, String categoryName) {
@@ -3061,13 +3126,14 @@ public class ForumTopicActivity extends AppCompatActivity {
             avatar = (AvatarView) header.getChildAt(0);
             name = (TextView) header.getChildAt(1);
             answer = (TextView) header.getChildAt(2);
-            like = (TextView) header.getChildAt(3);
-            more = (TextView) header.getChildAt(4);
             body = (TextView) root.getChildAt(1);
             videoEmbeds = (ForumVideoEmbedListView) root.getChildAt(2);
             voice = (VoiceBubbleView) root.getChildAt(3);
             imageContainer = (ForumRemoteImageListView) root.getChildAt(4);
-            time = (TextView) root.getChildAt(5);
+            LinearLayout footer = (LinearLayout) root.getChildAt(5);
+            time = (TextView) footer.getChildAt(0);
+            like = (TextView) footer.getChildAt(1);
+            more = (TextView) footer.getChildAt(2);
         }
     }
 

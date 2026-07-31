@@ -74,7 +74,8 @@ public class ForumImageViewerActivity extends AppCompatActivity {
         close.setTextColor(Color.WHITE);
         close.setTextSize(38);
         close.setGravity(Gravity.CENTER);
-        close.setBackgroundColor(0x33000000);
+        close.setBackgroundColor(Color.TRANSPARENT);
+        close.setShadowLayer(dp(2), 0f, dp(1), 0xCC000000);
         close.setContentDescription(ForumText.get(R.string.forum_close_image_preview));
         close.setOnClickListener(v -> finish());
         FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(dp(52), dp(52));
@@ -87,8 +88,8 @@ public class ForumImageViewerActivity extends AppCompatActivity {
         indicator.setTextColor(Color.WHITE);
         indicator.setTextSize(14);
         indicator.setGravity(Gravity.CENTER);
-        indicator.setBackgroundColor(0x55000000);
-        indicator.setPadding(dp(12), 0, dp(12), 0);
+        indicator.setBackgroundColor(Color.TRANSPARENT);
+        indicator.setShadowLayer(dp(2), 0f, dp(1), 0xCC000000);
         FrameLayout.LayoutParams indicatorParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
         indicatorParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;

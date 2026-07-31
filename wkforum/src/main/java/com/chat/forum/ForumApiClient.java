@@ -361,6 +361,14 @@ public final class ForumApiClient {
                 scope, callback);
     }
 
+    public void getTagTopics(long tagId, @Nullable String cursor,
+                             @Nullable RequestScope scope,
+                             @NonNull ResultCallback<Page<Topic>> callback) {
+        enqueue(forumService().tagTopics(authHeader(), tagId,
+                        TextUtils.isEmpty(cursor) ? "" : cursor),
+                scope, callback);
+    }
+
     public void getUserTopics(@NonNull String userId, @Nullable String cursor,
                               @NonNull ResultCallback<Page<Topic>> callback) {
         getUserTopics(userId, cursor, null, callback);
@@ -1014,6 +1022,11 @@ public final class ForumApiClient {
                                              @Query("categoryId") long categoryId,
                                              @Query("cursor") String cursor,
                                              @Query("sort") String sort);
+
+        @GET("api/topic/tag/topics")
+        Call<ApiEnvelope<Page<Topic>>> tagTopics(@Header("X-User-Token") String token,
+                                                 @Query("tagId") long tagId,
+                                                 @Query("cursor") String cursor);
 
         @GET("api/topic/user_topics")
         Call<ApiEnvelope<Page<Topic>>> userTopics(@Header("X-User-Token") String token,

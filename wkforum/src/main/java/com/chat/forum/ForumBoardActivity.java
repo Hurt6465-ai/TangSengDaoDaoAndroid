@@ -11,12 +11,14 @@ import android.widget.FrameLayout;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
-/** Full-screen board page. The board drawer lives inside ForumHomeFragment board mode. */
+/** Full-screen board or tag-topic page hosted by ForumHomeFragment. */
 public class ForumBoardActivity extends AppCompatActivity {
     private static final int CONTAINER_ID = 0x00F0A001;
     private static final String EXTRA_CATEGORY_ID = "forum_board_category_id";
     private static final String EXTRA_CATEGORY_NAME = "forum_board_category_name";
     private static final String EXTRA_CATEGORY_DESCRIPTION = "forum_board_category_description";
+    private static final String EXTRA_TAG_ID = "forum_tag_id";
+    private static final String EXTRA_TAG_NAME = "forum_tag_name";
 
     public static Intent createIntent(Context context, long categoryId,
                                       @Nullable String name, @Nullable String description) {
@@ -24,6 +26,12 @@ public class ForumBoardActivity extends AppCompatActivity {
                 .putExtra(EXTRA_CATEGORY_ID, categoryId)
                 .putExtra(EXTRA_CATEGORY_NAME, name == null ? "" : name)
                 .putExtra(EXTRA_CATEGORY_DESCRIPTION, description == null ? "" : description);
+    }
+
+    public static Intent createTagIntent(Context context, long tagId, @Nullable String name) {
+        return new Intent(context, ForumBoardActivity.class)
+                .putExtra(EXTRA_TAG_ID, tagId)
+                .putExtra(EXTRA_TAG_NAME, name == null ? "" : name);
     }
 
     @Override
@@ -37,13 +45,15 @@ public class ForumBoardActivity extends AppCompatActivity {
             getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         }
 
+        long tagId = getIntent().getLongExtra(EXTRA_TAG_ID, 0L);
         long categoryId = getIntent().getLongExtra(EXTRA_CATEGORY_ID, 0L);
-        if (categoryId <= 0L) {
+        if (tagId <= 0L && categoryId <= 0L) {
             finish();
             return;
         }
         String name = getIntent().getStringExtra(EXTRA_CATEGORY_NAME);
         String description = getIntent().getStringExtra(EXTRA_CATEGORY_DESCRIPTION);
+        String tagName = getIntent().getStringExtra(EXTRA_TAG_NAME);
 
         FrameLayout container = new FrameLayout(this);
         container.setId(CONTAINER_ID);
@@ -51,8 +61,9 @@ public class ForumBoardActivity extends AppCompatActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         if (savedInstanceState == null) {
             getSupportFragmentManager().beginTransaction()
-                    .replace(container.getId(), ForumHomeFragment.newBoardInstance(
-                            categoryId, name, description))
+                    .replace(container.getId(), tagId > 0L
+                            ? ForumHomeFragment.newTagInstance(tagId, tagName)
+                            : ForumHomeFragment.newBoardInstance(categoryId, name, description))
                     .commit();
         }
     }

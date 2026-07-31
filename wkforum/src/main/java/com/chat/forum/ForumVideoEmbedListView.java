@@ -194,16 +194,21 @@ final class ForumVideoEmbedListView extends LinearLayout {
         brandParams.topMargin = dp(10);
         media.addView(brand, brandParams);
 
-        TextView open = text("↗", 19, Color.WHITE, true);
-        open.setGravity(Gravity.CENTER);
-        open.setContentDescription(getResources().getString(R.string.forum_video_open_in, embed.platform.label));
-        open.setBackground(roundRect(0x8F000000, 18));
-        open.setOnClickListener(v -> ForumLinkRouter.open(getContext(), embed.shareUrl));
-        FrameLayout.LayoutParams openParams = new FrameLayout.LayoutParams(
-                dp(36), dp(36), Gravity.END | Gravity.TOP);
-        openParams.rightMargin = dp(8);
-        openParams.topMargin = dp(8);
-        media.addView(open, openParams);
+        // TikTok cover cards are already tappable to play. An extra external-link arrow made
+        // the portrait cover look crowded and frequently stole taps from the player.
+        if (embed.platform != Platform.TIKTOK) {
+            TextView open = text("↗", 19, Color.WHITE, true);
+            open.setGravity(Gravity.CENTER);
+            open.setContentDescription(getResources().getString(
+                    R.string.forum_video_open_in, embed.platform.label));
+            open.setBackground(roundRect(0x8F000000, 18));
+            open.setOnClickListener(v -> ForumLinkRouter.open(getContext(), embed.shareUrl));
+            FrameLayout.LayoutParams openParams = new FrameLayout.LayoutParams(
+                    dp(36), dp(36), Gravity.END | Gravity.TOP);
+            openParams.rightMargin = dp(8);
+            openParams.topMargin = dp(8);
+            media.addView(open, openParams);
+        }
 
         TextView play = text("▶", 28, Color.WHITE, true);
         play.setGravity(Gravity.CENTER);

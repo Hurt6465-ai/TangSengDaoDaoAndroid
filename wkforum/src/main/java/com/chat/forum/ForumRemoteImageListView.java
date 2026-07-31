@@ -17,15 +17,14 @@ import java.util.List;
 /**
  * Reusable vertical thumbnail list for topic/comment/article media.
  *
- * Thumbnails use FIT_CENTER so the complete image remains visible. Tapping opens the original
- * images in the forum full-screen viewer instead of trying to show a cropped full image inline.
+ * Thumbnails keep the complete image visible and anchor it to the left. Tapping opens the
+ * original images in the forum full-screen viewer instead of cropping the full image inline.
  */
 final class ForumRemoteImageListView extends LinearLayout {
     private final List<String> boundThumbUrls = new ArrayList<>();
     private final List<String> boundFullUrls = new ArrayList<>();
     private int imageHeightPx;
     private int imageTopMarginPx;
-    private int placeholderColor = Color.TRANSPARENT;
 
     ForumRemoteImageListView(@NonNull Context context) {
         super(context);
@@ -37,7 +36,6 @@ final class ForumRemoteImageListView extends LinearLayout {
               int imageTopMarginPx, int placeholderColor) {
         this.imageHeightPx = Math.max(1, imageHeightPx);
         this.imageTopMarginPx = Math.max(0, imageTopMarginPx);
-        this.placeholderColor = placeholderColor;
 
         List<String> thumbs = new ArrayList<>();
         List<String> full = new ArrayList<>();
@@ -62,7 +60,7 @@ final class ForumRemoteImageListView extends LinearLayout {
             ImageView image = (ImageView) getChildAt(i);
             String thumbUrl = thumbs.get(i);
             applyLayout(image, i);
-            image.setBackgroundColor(placeholderColor);
+            image.setBackgroundColor(Color.TRANSPARENT);
             image.setContentDescription(ForumText.get(R.string.forum_view_image, i + 1, thumbs.size()));
             final int openIndex = i;
             image.setOnClickListener(v -> ForumImageViewerActivity.open(
@@ -72,7 +70,6 @@ final class ForumRemoteImageListView extends LinearLayout {
                 Glide.with(image).clear(image);
                 Glide.with(image)
                         .load(thumbUrl)
-                        .fitCenter()
                         .into(image);
             }
         }
@@ -92,6 +89,7 @@ final class ForumRemoteImageListView extends LinearLayout {
         }
         boundThumbUrls.clear();
         boundFullUrls.clear();
+        setVisibility(GONE);
     }
 
     private void trimChildren(int desired) {
@@ -108,7 +106,7 @@ final class ForumRemoteImageListView extends LinearLayout {
         while (getChildCount() < desired) {
             ImageView image = new ImageView(getContext());
             image.setAdjustViewBounds(false);
-            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            image.setScaleType(ImageView.ScaleType.FIT_START);
             image.setClickable(true);
             addView(image);
         }
