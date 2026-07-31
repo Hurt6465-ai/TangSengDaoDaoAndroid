@@ -57,7 +57,6 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.databinding.DataBindingUtil;
-import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -273,6 +272,17 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     private boolean floatingComposerLayoutInstalled = false;
     @Nullable
     private View.OnLayoutChangeListener floatingComposerLayoutChangeListener;
+    // edge-to-edge 下系统栏和 IME 会分别改变底部空间。保留 XML 原始 padding，
+    // 键盘显示时只去掉导航栏 inset，避免输入框和键盘之间重复留白。
+    private int composerBasePaddingLeft;
+    private int composerBasePaddingTop;
+    private int composerBasePaddingRight;
+    private int composerBasePaddingBottom;
+    private int chatSystemBarLeftInset;
+    private int chatSystemBarRightInset;
+    private int chatSystemBarBottomInset;
+    private boolean chatImeVisible = false;
+    private boolean chatInsetsListenerInstalled = false;
     private final String loginUID = WKConfig.getInstance().getUid();
     private final int callingViewHeight = AndroidUtilities.dp(40f);
     private final int pinnedViewHeight = AndroidUtilities.dp(50f);
@@ -1947,7 +1957,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
     }
 
     private void applyChatSystemBarInsets() {
-        if (wkVBinding == null || wkVBinding.rootView == null || wkVBinding.bottomView == null) return;
+        if (chatInsetsListenerInstalled || wkVBinding == null
+                || wkVBinding.rootView == null || wkVBinding.bottomView == null) {
+            return;
+        }
+        chatInsetsListenerInstalled = true;
 
         final View statusBarSpacer = wkVBinding.topLayout.statusBarSpacer;
         final View titleView = wkVBinding.topLayout.titleView;
@@ -1955,14 +1969,22 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         final int titleBaseTop = titleView.getPaddingTop();
         final int titleBaseRight = titleView.getPaddingRight();
         final int titleBaseBottom = titleView.getPaddingBottom();
-        final int bottomBaseLeft = wkVBinding.bottomView.getPaddingLeft();
-        final int bottomBaseTop = wkVBinding.bottomView.getPaddingTop();
-        final int bottomBaseRight = wkVBinding.bottomView.getPaddingRight();
-        final int bottomBaseBottom = wkVBinding.bottomView.getPaddingBottom();
+        composerBasePaddingLeft = wkVBinding.bottomView.getPaddingLeft();
+        composerBasePaddingTop = wkVBinding.bottomView.getPaddingTop();
+        composerBasePaddingRight = wkVBinding.bottomView.getPaddingRight();
+        composerBasePaddingBottom = wkVBinding.bottomView.getPaddingBottom();
 
         ViewCompat.setOnApplyWindowInsetsListener(wkVBinding.rootView, (view, insets) -> {
             Insets bars = insets.getInsets(
                     WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+            Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+
+            chatSystemBarLeftInset = bars.left;
+            chatSystemBarRightInset = bars.right;
+            chatSystemBarBottomInset = bars.bottom;
+            // 某些 MIUI 版本的 isVisible(ime) 在动画首帧会滞后，ime.bottom 可作为兜底。
+            chatImeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
+                    || ime.bottom > bars.bottom;
 
             if (statusBarSpacer != null && statusBarSpacer.getLayoutParams() != null
                     && statusBarSpacer.getLayoutParams().height != bars.top) {
@@ -1977,16 +1999,36 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                     titleBaseRight + bars.right,
                     titleBaseBottom
             );
-            wkVBinding.bottomView.setPadding(
-                    bottomBaseLeft + bars.left,
-                    bottomBaseTop,
-                    bottomBaseRight + bars.right,
-                    bottomBaseBottom + bars.bottom
-            );
-            updateFloatingComposerSpacing();
+            updateComposerSystemBarPadding();
             return insets;
         });
         ViewCompat.requestApplyInsets(wkVBinding.rootView);
+    }
+
+    private void updateComposerSystemBarPadding() {
+        if (wkVBinding == null || wkVBinding.bottomView == null) return;
+
+        // IME 自身已经占据导航栏区域，键盘显示时再次加 bars.bottom 会产生截图中的大间距。
+        int targetBottom = composerBasePaddingBottom
+                + (chatImeVisible ? 0 : chatSystemBarBottomInset);
+        int targetLeft = composerBasePaddingLeft + chatSystemBarLeftInset;
+        int targetRight = composerBasePaddingRight + chatSystemBarRightInset;
+        View bottomView = wkVBinding.bottomView;
+        if (bottomView.getPaddingLeft() == targetLeft
+                && bottomView.getPaddingTop() == composerBasePaddingTop
+                && bottomView.getPaddingRight() == targetRight
+                && bottomView.getPaddingBottom() == targetBottom) {
+            return;
+        }
+
+        bottomView.setPadding(
+                targetLeft,
+                composerBasePaddingTop,
+                targetRight,
+                targetBottom
+        );
+        // padding 改变会触发布局；布局完成后再读取 composerHeight，避免使用旧高度。
+        bottomView.post(this::updateFloatingComposerSpacing);
     }
 
     private void installFloatingComposerLayout() {
@@ -2174,6 +2216,11 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
                         if (visible && height > 0) {
                             WKConstants.setKeyboardHeight(height);
                         }
+                        // WindowInsets 在部分定制系统上可能晚于键盘状态回调，双通道同步可避免闪一下再回落。
+                        if (chatImeVisible != visible) {
+                            chatImeVisible = visible;
+                            updateComposerSystemBarPadding();
+                        }
                     })
                     .addPanelChangeListener(new OnPanelChangeListener() {
 
@@ -2317,12 +2364,13 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         addChatMoreButton();
         initDeepSeekAssistantBar();
 
-        ((DefaultItemAnimator) Objects.requireNonNull(wkVBinding.recyclerView.getItemAnimator())).setSupportsChangeAnimations(false);
         chatAdapter = new ChatAdapter(this, ChatAdapter.AdapterType.normalMessage);
         linearLayoutManager = new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false);
         wkVBinding.recyclerView.setLayoutManager(linearLayoutManager);
         wkVBinding.recyclerView.setAdapter(chatAdapter);
-        wkVBinding.recyclerView.setItemAnimator(new MyItemAnimator());
+        MyItemAnimator itemAnimator = new MyItemAnimator();
+        itemAnimator.setSupportsChangeAnimations(false);
+        wkVBinding.recyclerView.setItemAnimator(itemAnimator);
         chatAdapter.setAnimationFirstOnly(true);
         chatAdapter.setAnimationEnable(false);
 
@@ -4556,10 +4604,14 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
         AndroidUtilities.setDensity(density);
         if (newConfig.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             AndroidUtilities.isPORTRAIT = false;
-            chatAdapter.notifyItemRangeChanged(0, chatAdapter.getItemCount());
+            if (chatAdapter != null) {
+                chatAdapter.notifyItemRangeChanged(0, chatAdapter.getItemCount());
+            }
         } else if (newConfig.orientation == Configuration.ORIENTATION_PORTRAIT) {
             AndroidUtilities.isPORTRAIT = true;
-            chatAdapter.notifyItemRangeChanged(0, chatAdapter.getItemCount());
+            if (chatAdapter != null) {
+                chatAdapter.notifyItemRangeChanged(0, chatAdapter.getItemCount());
+            }
         }
         toggleStatusBarMode();
         if (wkVBinding != null && wkVBinding.rootView != null) {
@@ -5071,11 +5123,18 @@ public class ChatActivity extends SwipeBackActivity implements IConversationCont
             disposable = null;
         }
         asyncDisposables.clear();
-        if (wkVBinding != null && wkVBinding.bottomView != null
-                && floatingComposerLayoutChangeListener != null) {
-            wkVBinding.bottomView.removeOnLayoutChangeListener(floatingComposerLayoutChangeListener);
-            floatingComposerLayoutChangeListener = null;
+        if (wkVBinding != null) {
+            if (wkVBinding.rootView != null) {
+                ViewCompat.setOnApplyWindowInsetsListener(wkVBinding.rootView, null);
+            }
+            if (wkVBinding.bottomView != null && floatingComposerLayoutChangeListener != null) {
+                wkVBinding.bottomView.removeOnLayoutChangeListener(floatingComposerLayoutChangeListener);
+                floatingComposerLayoutChangeListener = null;
+            }
         }
+        chatInsetsListenerInstalled = false;
+        floatingComposerLayoutInstalled = false;
+        chatImeVisible = false;
         if (chatPanelManager != null) chatPanelManager.onDestroy();
         ActManagerUtils.getInstance().removeActivity(this);
         MsgModel.getInstance().startCheckFlameMsgTimer();
