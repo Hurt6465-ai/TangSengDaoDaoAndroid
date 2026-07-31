@@ -1,0 +1,4 @@
+IMPORTANT
+1. Delete the existing wkdating directory from the Android project first.
+2. Then copy this whole wkdating directory into the project.
+3. Do not merge/overwrite the old directory, because deleted legacy Java/XML files would remain and still be compiled.
