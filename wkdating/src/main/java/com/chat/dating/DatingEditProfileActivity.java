@@ -46,7 +46,6 @@ public class DatingEditProfileActivity extends Activity {
     private DatingPhotoUploadManager uploadManager;
     private boolean uploading;
     private boolean initiallyEnabled;
-    private boolean initiallyComplete;
 
     private String intentValue = DatingIntent.LONG_TERM;
     private int genderPreference = -1;
@@ -163,7 +162,6 @@ public class DatingEditProfileActivity extends Activity {
         dealbreakers.clear();
         dealbreakers.addAll(DatingValueFormatter.dealbreakerCodes(this, profile.safeDealbreakers()));
         initiallyEnabled = profile.enabled == 1;
-        initiallyComplete = profile.complete || isCompleteEnough(profile.safeDatingPhotos(), intentValue);
 
         binding.intentValue.setText(DatingIntent.displayLabel(this, intentValue));
         binding.genderValue.setText(genderText());
@@ -225,12 +223,11 @@ public class DatingEditProfileActivity extends Activity {
         DatingModel.getInstance().enableProfile(!enabled, (code, msg, data) -> {
             if (isFinishing() || binding == null) return;
             binding.statusActionBtn.setEnabled(true);
-            if (code == HttpResponseCode.success) {
-                profile.enabled = enabled ? 0 : 1;
+            if (code == HttpResponseCode.success && data != null) {
+                profile = data;
                 initiallyEnabled = profile.enabled == 1;
-                DatingProfileState.setUserPaused(this, enabled);
                 updateStatusAction();
-                toast(getString(enabled ? R.string.dating_disabled : R.string.dating_enabled));
+                toast(getString(profile.enabled == 1 ? R.string.dating_enabled : R.string.dating_disabled));
             } else {
                 toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_action_failed) : msg);
             }
@@ -348,14 +345,9 @@ public class DatingEditProfileActivity extends Activity {
             return;
         }
         ArrayList<String> photos = photoAdapter.getPhotos();
-        boolean completeEnough = isCompleteEnough(photos, intentValue);
-        // 只有“原本未完成 -> 本次首次完成”才自动开启。已完整但处于暂停状态的账号，
-        // 即使换设备或清除本地数据，编辑资料也不会被误重新开启。
-        boolean autoEnable = completeEnough && (initiallyEnabled
-                || (!initiallyComplete && !DatingProfileState.isUserPaused(this)));
-
         Map<String, Object> body = new HashMap<>();
-        body.put("enabled", autoEnable ? 1 : 0);
+        // 展示状态由后端 user_paused 权威决定：首次完整自动开启，主动暂停后编辑不重开。
+        // 不再把本机缓存推回服务器，避免换设备或清数据后状态错乱。
         body.put("intent", intentValue);
         body.put("relationship_goal", intentValue);
         body.put("gender_preference", genderPreference);
@@ -393,14 +385,20 @@ public class DatingEditProfileActivity extends Activity {
 
         binding.saveBtn.setEnabled(false);
         binding.saveBtn.setText(R.string.dating_saving);
+        final boolean wasEnabled = initiallyEnabled;
         DatingModel.getInstance().saveProfile(body, (code, msg, data) -> {
+            if (isFinishing() || isDestroyed() || binding == null) return;
             binding.saveBtn.setEnabled(true);
             binding.saveBtn.setText(R.string.dating_save_profile);
-            if (code == HttpResponseCode.success) {
-                if (data != null) profile = data;
-                if (autoEnable) DatingProfileState.setUserPaused(this, false);
+            if (code == HttpResponseCode.success && data != null) {
+                profile = data;
+                boolean becameEnabled = !wasEnabled && profile.enabled == 1;
                 setResult(RESULT_OK);
-                toast(getString(autoEnable ? R.string.dating_saved_and_enabled : R.string.dating_saved));
+                toast(getString(becameEnabled ? R.string.dating_saved_and_enabled : R.string.dating_saved));
+                finish();
+            } else if (code == HttpResponseCode.success) {
+                setResult(RESULT_OK);
+                toast(getString(R.string.dating_saved));
                 finish();
             } else {
                 toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_save_failed) : msg);

@@ -94,13 +94,13 @@ public class DatingMineActivity extends Activity {
                     }
                     binding.statusRow.setEnabled(false);
                     DatingModel.getInstance().enableProfile(!enabled, (code, msg, data) -> {
+                        if (isFinishing() || isDestroyed() || binding == null) return;
                         binding.statusRow.setEnabled(true);
-                        if (code == HttpResponseCode.success) {
-                            profile.enabled = enabled ? 0 : 1;
-                            DatingProfileState.setUserPaused(this, enabled);
+                        if (code == HttpResponseCode.success && data != null) {
+                            profile = data;
                             changed = true;
                             bindProfile();
-                            toast(getString(enabled ? R.string.dating_disabled : R.string.dating_enabled));
+                            toast(getString(profile.enabled == 1 ? R.string.dating_enabled : R.string.dating_disabled));
                         } else {
                             toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_action_failed) : msg);
                         }

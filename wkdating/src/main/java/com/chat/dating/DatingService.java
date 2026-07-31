@@ -47,7 +47,7 @@ public interface DatingService {
     Observable<DatingProfile> copyPartnerProfile(@Body Map<String, Object> body);
 
     @POST("dating/profile/enable")
-    Observable<Object> enableProfile(@Body Map<String, Object> body);
+    Observable<DatingProfile> enableProfile(@Body Map<String, Object> body);
 
     @POST("dating/location")
     Observable<Object> updateLocation(@Body Map<String, Object> body);

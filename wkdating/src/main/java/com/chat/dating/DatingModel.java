@@ -84,7 +84,7 @@ public class DatingModel extends WKBaseModel {
         request(createService(DatingService.class).copyPartnerProfile(new HashMap<>()), listener(callback));
     }
 
-    public void enableProfile(boolean enabled, final Callback<Object> callback) {
+    public void enableProfile(boolean enabled, final Callback<DatingProfile> callback) {
         Map<String, Object> body = new HashMap<>();
         body.put("enabled", enabled ? 1 : 0);
         request(createService(DatingService.class).enableProfile(body), listener(callback));

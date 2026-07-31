@@ -75,7 +75,9 @@ public class DatingProfileDetailActivity extends Activity {
         binding.nameTv.setText(profile.safeName());
         binding.ageTv.setText(profile.age > 0 ? String.valueOf(profile.age) : "");
         binding.ageTv.setVisibility(profile.age > 0 ? View.VISIBLE : View.GONE);
-        DatingUi.bindCircularFlag(binding.flagIv, profile.safeCountryCode());
+        binding.avatarView.setSize(64f);
+        binding.avatarView.showAvatarUrl(profile.safeAvatar(), profile.safeUid(), profile.safeName(), profile.safeUid());
+        binding.avatarView.showFlag(profile.safeCountryCode());
 
         String location = DatingUi.displayLocation(this, profile);
         binding.locationTv.setText(location);

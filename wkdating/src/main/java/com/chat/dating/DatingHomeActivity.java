@@ -287,6 +287,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
      */
     private void fetchMyProfile(boolean resetRecommendation) {
         DatingModel.getInstance().getMyDatingProfile((code, msg, data) -> {
+            if (isFinishing() || isDestroyed() || wkVBinding == null) return;
             if (data != null) myProfile = data;
             actionController.setMyProfile(myProfile);
             if (myProfile == null) {
@@ -294,6 +295,7 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                 wkVBinding.retryBtn.setText(R.string.dating_retry);
                 return;
             }
+            if (myProfile.show_distance == 1) requestLocationOnce();
             if (myProfile.enabled != 1) {
                 profiles.clear();
                 loadedUids.clear();
@@ -302,13 +304,6 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
                 wkVBinding.retryBtn.setText(R.string.dating_go_enable);
                 return;
             }
-
-            // 只有交友已开启且用户允许展示距离时才触发定位。
-            // 关闭交友或关闭距离展示，不检查权限、不启动定位。
-            if (myProfile.show_distance == 1) {
-                requestLocationOnce();
-            }
-
             wkVBinding.retryBtn.setText(R.string.dating_retry);
             if (resetRecommendation) reload();
             else loadMore(true);
@@ -323,10 +318,10 @@ public class DatingHomeActivity extends WKBaseActivity<ActivityWkDatingHomeBindi
             @Override
             public void onSuccess(Location location, boolean needUpload) {
                 if (!needUpload || location == null || isFinishing() || isDestroyed()) return;
-                // 卡片只展示国家和模糊距离，不上传容易过期且语言不稳定的城市名称。
+                String city = myProfile == null || myProfile.city == null ? "" : myProfile.city;
                 String countryCode = myProfile == null ? "" : myProfile.safeCountryCode();
                 DatingModel.getInstance().updateLocation(location.getLatitude(), location.getLongitude(),
-                        location.getAccuracy(), "", countryCode, (code, msg, data) -> {
+                        location.getAccuracy(), city, countryCode, (code, msg, data) -> {
                             if (code == HttpResponseCode.success && locationHelper != null) {
                                 locationHelper.markUploaded(location);
                             }
