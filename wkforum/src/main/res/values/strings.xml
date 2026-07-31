@@ -284,6 +284,9 @@
     <string name="forum_video_open_in">在 %1$s 中打开</string>
     <string name="forum_video_preparing">正在准备视频封面和播放器…</string>
     <string name="forum_video_short_link_failed">短链接解析失败，请粘贴包含 /video/ 的完整 TikTok 链接</string>
+    <string name="forum_tag_topics">标签主题</string>
+    <string name="forum_loading_tag_topics">正在加载标签主题…</string>
+    <string name="forum_empty_tag_topics">该标签下暂无主题</string>
     <string-array name="forum_report_reasons">
         <item>广告或诈骗</item>
         <item>色情低俗</item>
