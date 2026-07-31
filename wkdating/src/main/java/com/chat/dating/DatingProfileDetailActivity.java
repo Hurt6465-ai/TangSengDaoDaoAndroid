@@ -75,9 +75,7 @@ public class DatingProfileDetailActivity extends Activity {
         binding.nameTv.setText(profile.safeName());
         binding.ageTv.setText(profile.age > 0 ? String.valueOf(profile.age) : "");
         binding.ageTv.setVisibility(profile.age > 0 ? View.VISIBLE : View.GONE);
-        binding.avatarView.setSize(64f);
-        binding.avatarView.showAvatarUrl(profile.safeAvatar(), profile.safeUid(), profile.safeName(), profile.safeUid());
-        binding.avatarView.showFlag(profile.safeCountryCode());
+        bindOptionalAvatarView();
 
         String location = DatingUi.displayLocation(this, profile);
         binding.locationTv.setText(location);
@@ -96,6 +94,31 @@ public class DatingProfileDetailActivity extends Activity {
         bindBasicRows();
         bindLanguages();
         bindInterests();
+    }
+
+    /**
+     * 兼容新旧布局：部分版本的详情页已移除 avatar_view。
+     * 使用反射避免 ActivityWkDatingProfileDetailBinding 在没有该字段时编译失败；
+     * 若后续布局恢复 avatar_view，本方法仍会自动完成头像和国旗绑定。
+     */
+    private void bindOptionalAvatarView() {
+        try {
+            java.lang.reflect.Field field = binding.getClass().getField("avatarView");
+            Object avatarView = field.get(binding);
+            if (avatarView == null) return;
+
+            avatarView.getClass().getMethod("setSize", float.class).invoke(avatarView, 64f);
+            avatarView.getClass().getMethod("showAvatarUrl",
+                            String.class, String.class, String.class, String.class)
+                    .invoke(avatarView, profile.safeAvatar(), profile.safeUid(),
+                            profile.safeName(), profile.safeUid());
+            avatarView.getClass().getMethod("showFlag", String.class)
+                    .invoke(avatarView, profile.safeCountryCode());
+        } catch (NoSuchFieldException ignored) {
+            // 当前布局没有 avatar_view，照片轮播已承担主要头像展示，直接跳过。
+        } catch (ReflectiveOperationException ignored) {
+            // 控件版本方法签名不一致时不影响资料页其余内容。
+        }
     }
 
     private void bindBasicRows() {
