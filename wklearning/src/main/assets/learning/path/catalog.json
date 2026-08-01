@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "version": 4,
-  "updated_at": "2026-08-01T12:31:00Z",
+  "version": 5,
+  "updated_at": "2026-08-01T13:35:00Z",
   "courses": [
     {
       "id": "zh_beginner",
@@ -13,7 +13,7 @@
       "subtitle_my": "နှုတ်ဆက်ခြင်း၊ ပင်ယင်နှင့် နေ့စဉ်စကားများမှ စတင်၍ နားထောင်၊ ဖတ်၊ ရေးနှင့် ဝါကျစီခြင်းကို ပေါင်းစပ်လေ့ကျင့်ပါ။",
       "version": 4,
       "min_app_version": 0,
-      "accent": "#635BFF",
+      "accent": "#6C63FF",
       "units": [
         {
           "id": "unit_greetings",
@@ -150,7 +150,7 @@
               "lesson_file": "lessons/greeting_test.json"
             }
           ],
-          "accent": "#F29C82",
+          "accent": "#FF7A59",
           "character": "mei"
         },
         {
@@ -269,10 +269,11 @@
               "lesson_file": "lessons/daily_checkpoint.json"
             }
           ],
-          "accent": "#78B7DE",
+          "accent": "#1CB0F6",
           "character": "bo"
         }
-      ]
+      ],
+      "cover_drawable": "learning_course_beginner"
     }
   ]
 }
