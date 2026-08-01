@@ -433,6 +433,13 @@ Time %5$d min</string>
     <string name="learning_lesson_word_bank">စကားလုံးကတ်များ</string>
     <string name="learning_lesson_matching_empty">ဤတွဲစပ်မေးခွန်းတွင် မှန်ကန်သောအချက်အလက်မရှိပါ</string>
     <string name="learning_lesson_finish_matching">တွဲစပ်မှုအားလုံးကို ပြီးအောင်လုပ်ပါ</string>
+    <string name="learning_lesson_matching_mistakes">တွဲစပ်ရာတွင် %1$d ကြိမ် မှားခဲ့သည်။</string>
+    <string name="learning_lesson_progress">%1$d / %2$d</string>
+    <string name="learning_lesson_review_progress">ပြန် %1$d/%2$d</string>
+    <string name="learning_lesson_exit_title">ဤလေ့ကျင့်မှုမှ ထွက်မလား？</string>
+    <string name="learning_lesson_exit_message">မပြီးသေးသော အဖြေများကို သိမ်းမည်မဟုတ်ပါ။</string>
+    <string name="learning_lesson_exit_continue">ဆက်လေ့ကျင့်မည်</string>
+    <string name="learning_lesson_exit_leave">ထွက်မည်</string>
     <string name="learning_lesson_play_audio">မူရင်းအသံဖွင့်မည်</string>
     <string name="learning_lesson_play_original">မူရင်း 0.5×</string>
     <string name="learning_lesson_record_compare">အသံသွင်းပြီး နှိုင်းယှဉ်မည်</string>
