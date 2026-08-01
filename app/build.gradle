@@ -14,7 +14,34 @@ if (localPropertiesFile.exists()) {
 
 def appId = localProperties.getProperty('applicationId')
 if (appId == null || appId.isEmpty()) {
-    throw new GradleException("❌ 错误：请在 local.properties 中设置 applicationId=你的包名，并在MainActivity和TSApplication文件中导包设置的包名")
+    throw new GradleException("错误：请在 local.properties 中设置 applicationId=你的包名，并在 MainActivity 和 TSApplication 文件中导入对应包名")
+}
+
+// GitHub Actions 会传入自动递增的版本号；本地构建没有传入时保持原来的 1 / 1.0。
+def versionCodeText = System.getenv('VERSION_CODE') ?: '1'
+def versionNameText = System.getenv('VERSION_NAME') ?: '1.0'
+def generatedVersionCode
+try {
+    generatedVersionCode = versionCodeText.toInteger()
+} catch (Exception ignored) {
+    throw new GradleException("VERSION_CODE 必须是整数，当前值：${versionCodeText}")
+}
+if (generatedVersionCode < 1 || generatedVersionCode > 2100000000) {
+    throw new GradleException("VERSION_CODE 必须位于 1 到 2100000000 之间，当前值：${generatedVersionCode}")
+}
+
+// 固定签名全部从环境变量读取，签名文件和密码不会写入 Git 仓库。
+def signingStorePath = System.getenv('ANDROID_KEYSTORE_PATH')
+def signingStorePassword = System.getenv('KEYSTORE_PASSWORD')
+def signingKeyAlias = System.getenv('KEY_ALIAS')
+def signingKeyPassword = System.getenv('KEY_PASSWORD')
+def hasFixedSigning = signingStorePath && signingStorePassword && signingKeyAlias && signingKeyPassword
+
+if (hasFixedSigning && !file(signingStorePath).exists()) {
+    throw new GradleException("找不到签名文件：${signingStorePath}")
+}
+if (System.getenv('GITHUB_ACTIONS') == 'true' && !hasFixedSigning) {
+    throw new GradleException('GitHub Actions 缺少固定签名环境变量，请检查 ANDROID_KEYSTORE_BASE64、KEYSTORE_PASSWORD、KEY_ALIAS、KEY_PASSWORD 四个 Secrets')
 }
 
 // 自动更新 google-services.json 中的 package_name
@@ -27,37 +54,36 @@ if (googleServicesFile.exists()) {
     )
     if (jsonContent != updatedContent) {
         googleServicesFile.write(updatedContent)
-        println "✅ google-services.json 的 package_name 已更新为: ${appId}"
+        println "google-services.json 的 package_name 已更新为: ${appId}"
     }
 }
 
 android {
-//    signingConfigs {
-//        debug {
-//            storeFile file('../demo.jks')
-//            storePassword 'demo1365'
-//            keyAlias = 'demo'
-//            keyPassword 'demo1365'
-//        }
-//        release {
-//            storeFile file('../demo.jks')
-//            storePassword 'demo1365'
-//            keyAlias = 'demo'
-//            keyPassword 'demo1365'
-//        }
-//    }
     namespace appId
     compileSdk rootProject.ext.compileSdkVersion
+
     aaptOptions.cruncherEnabled = false
     aaptOptions.useNewCruncher = false
 
+    signingConfigs {
+        if (hasFixedSigning) {
+            fixed {
+                storeFile file(signingStorePath)
+                storePassword signingStorePassword
+                keyAlias signingKeyAlias
+                keyPassword signingKeyPassword
+                enableV1Signing true
+                enableV2Signing true
+            }
+        }
+    }
 
     defaultConfig {
         applicationId appId
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode generatedVersionCode
+        versionName versionNameText
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -66,31 +92,29 @@ android {
         vectorDrawables.useSupportLibrary = true
         multiDexEnabled true
         ndk {
-            //根据需要 自行选择添加的对应cpu类型的.so库。
+            // 同时保留 32 位和 64 位 ARM 设备支持。
             abiFilters "armeabi-v7a", "arm64-v8a"
-//            abiFilters 'armeabi', 'armeabi-v7a', 'arm64-v8a', 'x86'
         }
-
     }
 
     buildTypes {
         release {
             jniDebuggable true
-            //  zipAlignEnabled true   //Zipalign优化
-            minifyEnabled true  // 是否混淆
-            shrinkResources true  // 是否去除无效的资源文件
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-           // signingConfig signingConfigs.release
+            if (hasFixedSigning) {
+                signingConfig signingConfigs.fixed
+            }
         }
         debug {
-//            jniDebuggable true
-//            zipAlignEnabled true   //Zipalign优化
-//            minifyEnabled true  // 是否混淆
-//            shrinkResources true  // 是否去除无效的资源文件
-//            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-           // signingConfig signingConfigs.release
+            // 本地设置相同环境变量时，Debug APK 也会使用同一固定签名。
+            if (hasFixedSigning) {
+                signingConfig signingConfigs.fixed
+            }
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
