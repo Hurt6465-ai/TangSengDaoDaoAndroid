@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "version": 3,
-  "updated_at": "2026-08-01T11:00:00Z",
+  "version": 4,
+  "updated_at": "2026-08-01T12:31:00Z",
   "courses": [
     {
       "id": "zh_beginner",
@@ -11,7 +11,7 @@
       "subtitle": "从问候、拼音和日常表达开始，混合练习听、读、写和词序。",
       "subtitle_en": "Start with greetings, pinyin, and everyday expressions through listening, reading, writing, and word-order practice.",
       "subtitle_my": "နှုတ်ဆက်ခြင်း၊ ပင်ယင်နှင့် နေ့စဉ်စကားများမှ စတင်၍ နားထောင်၊ ဖတ်၊ ရေးနှင့် ဝါကျစီခြင်းကို ပေါင်းစပ်လေ့ကျင့်ပါ။",
-      "version": 3,
+      "version": 4,
       "min_app_version": 0,
       "accent": "#635BFF",
       "units": [
@@ -66,10 +66,52 @@
               "lesson_file": "lessons/greeting_intro.json"
             },
             {
+              "id": "greeting_polite",
+              "title": "礼貌表达",
+              "title_en": "Polite Expressions",
+              "title_my": "ယဉ်ကျေးစကားများ",
+              "subtitle": "请、谢谢、对不起和没关系",
+              "subtitle_en": "Please, thank you, sorry, and it is okay",
+              "subtitle_my": "ကျေးဇူးပြု၍၊ ကျေးဇူးတင်ပါတယ်၊ တောင်းပန်ပါတယ်နှင့် ရပါတယ်",
+              "type": "normal",
+              "position": "left",
+              "icon": "请",
+              "exercise_count": 5,
+              "minutes": 4,
+              "required_lessons": [
+                "greeting_intro"
+              ],
+              "bundled_lesson_asset": "learning/path/lessons/greeting_polite.json",
+              "package_id": "zh_beginner_unit_greetings",
+              "package_version": 1,
+              "lesson_file": "lessons/greeting_polite.json"
+            },
+            {
+              "id": "greeting_story",
+              "title": "故事：新同学",
+              "title_en": "Story: A New Classmate",
+              "title_my": "ပုံပြင်：အတန်းဖော်အသစ်",
+              "subtitle": "在短对话中使用问候和介绍",
+              "subtitle_en": "Use greetings and introductions in a short dialogue",
+              "subtitle_my": "စကားပြောတိုတစ်ခုတွင် နှုတ်ဆက်ခြင်းနှင့် မိတ်ဆက်ခြင်းကို အသုံးပြုပါ",
+              "type": "story",
+              "position": "center",
+              "icon": "书",
+              "exercise_count": 5,
+              "minutes": 5,
+              "required_lessons": [
+                "greeting_polite"
+              ],
+              "bundled_lesson_asset": "learning/path/lessons/greeting_story.json",
+              "package_id": "zh_beginner_unit_greetings",
+              "package_version": 1,
+              "lesson_file": "lessons/greeting_story.json"
+            },
+            {
               "id": "greeting_review",
-              "title": "复习",
-              "title_en": "Review",
-              "title_my": "ပြန်လေ့လာ",
+              "title": "问候练习",
+              "title_en": "Greeting Practice",
+              "title_my": "နှုတ်ဆက် လေ့ကျင့်ခန်း",
               "subtitle": "换一种题型再次确认",
               "subtitle_en": "Confirm the same knowledge with new question types",
               "subtitle_my": "မေးခွန်းပုံစံအသစ်ဖြင့် ထပ်မံအတည်ပြုပါ",
@@ -79,7 +121,7 @@
               "exercise_count": 5,
               "minutes": 4,
               "required_lessons": [
-                "greeting_intro"
+                "greeting_story"
               ],
               "bundled_lesson_asset": "learning/path/lessons/greeting_review.json",
               "package_id": "zh_beginner_unit_greetings",
@@ -107,7 +149,9 @@
               "package_version": 1,
               "lesson_file": "lessons/greeting_test.json"
             }
-          ]
+          ],
+          "accent": "#F29C82",
+          "character": "mei"
         },
         {
           "id": "unit_daily",
@@ -160,8 +204,73 @@
               "package_id": "zh_beginner_unit_daily",
               "package_version": 1,
               "lesson_file": "lessons/daily_time.json"
+            },
+            {
+              "id": "daily_schedule",
+              "title": "一天的安排",
+              "title_en": "Daily Schedule",
+              "title_my": "တစ်နေ့တာ အစီအစဉ်",
+              "subtitle": "早上、下午、晚上和日程表达",
+              "subtitle_en": "Morning, afternoon, evening, and daily schedules",
+              "subtitle_my": "မနက်၊ နေ့လယ်၊ ညနှင့် နေ့စဉ်အစီအစဉ်များ",
+              "type": "normal",
+              "position": "left",
+              "icon": "日",
+              "exercise_count": 5,
+              "minutes": 5,
+              "required_lessons": [
+                "daily_time"
+              ],
+              "bundled_lesson_asset": "learning/path/lessons/daily_schedule.json",
+              "package_id": "zh_beginner_unit_daily",
+              "package_version": 1,
+              "lesson_file": "lessons/daily_schedule.json"
+            },
+            {
+              "id": "daily_story",
+              "title": "故事：准时见面",
+              "title_en": "Story: Meet on Time",
+              "title_my": "ပုံပြင်：အချိန်မီတွေ့မယ်",
+              "subtitle": "在短对话中使用数字和时间",
+              "subtitle_en": "Use numbers and time in a short dialogue",
+              "subtitle_my": "စကားပြောတိုတစ်ခုတွင် ဂဏန်းနှင့် အချိန်ကို အသုံးပြုပါ",
+              "type": "story",
+              "position": "center",
+              "icon": "书",
+              "exercise_count": 5,
+              "minutes": 5,
+              "required_lessons": [
+                "daily_schedule"
+              ],
+              "bundled_lesson_asset": "learning/path/lessons/daily_story.json",
+              "package_id": "zh_beginner_unit_daily",
+              "package_version": 1,
+              "lesson_file": "lessons/daily_story.json"
+            },
+            {
+              "id": "daily_checkpoint",
+              "title": "单元测验",
+              "title_en": "Unit Checkpoint",
+              "title_my": "အခန်း စစ်ဆေးမှု",
+              "subtitle": "综合检查数字和时间",
+              "subtitle_en": "Check numbers, time, and schedules together",
+              "subtitle_my": "ဂဏန်း၊ အချိန်နှင့် အစီအစဉ်များကို ပေါင်းစပ်စစ်ဆေးပါ",
+              "type": "checkpoint",
+              "position": "right",
+              "icon": "测",
+              "exercise_count": 7,
+              "minutes": 6,
+              "required_lessons": [
+                "daily_story"
+              ],
+              "bundled_lesson_asset": "learning/path/lessons/daily_checkpoint.json",
+              "package_id": "zh_beginner_unit_daily",
+              "package_version": 1,
+              "lesson_file": "lessons/daily_checkpoint.json"
             }
-          ]
+          ],
+          "accent": "#78B7DE",
+          "character": "bo"
         }
       ]
     }
