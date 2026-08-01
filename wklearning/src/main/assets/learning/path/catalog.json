@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "version": 2,
+  "updated_at": "2026-08-01T00:00:00Z",
+  "courses": [
+    {
+      "id": "zh_beginner",
+      "title": "零基础中文",
+      "title_en": "Beginner Chinese",
+      "title_my": "အခြေခံ တရုတ်ဘာသာ",
+      "subtitle": "从问候、拼音和日常表达开始，混合练习听、说、读和词序。",
+      "subtitle_en": "Start with greetings, pinyin, and everyday expressions through mixed listening, speaking, reading, and word-order practice.",
+      "subtitle_my": "နှုတ်ဆက်ခြင်း၊ ပင်ယင်နှင့် နေ့စဉ်စကားများမှ စတင်၍ နားထောင်၊ ပြော၊ ဖတ်နှင့် ဝါကျစီခြင်းကို ပေါင်းစပ်လေ့ကျင့်ပါ။",
+      "version": 2,
+      "min_app_version": 0,
+      "accent": "#635BFF",
+      "units": [
+        {
+          "id": "unit_greetings",
+          "order": 1,
+          "title": "第 1 单元 · 认识新朋友",
+          "title_en": "Unit 1 · Meet New People",
+          "title_my": "အခန်း ၁ · လူသစ်များနှင့် မိတ်ဆက်ခြင်း",
+          "subtitle": "问候、自我介绍和礼貌表达",
+          "subtitle_en": "Greetings, introductions, and polite expressions",
+          "subtitle_my": "နှုတ်ဆက်ခြင်း၊ မိတ်ဆက်ခြင်းနှင့် ယဉ်ကျေးစကားများ",
+          "lessons": [
+            {
+              "id": "greeting_hello",
+              "title": "你好",
+              "title_en": "Hello",
+              "title_my": "မင်္ဂလာပါ",
+              "subtitle": "听懂并使用基本问候",
+              "subtitle_en": "Understand and use basic greetings",
+              "subtitle_my": "အခြေခံနှုတ်ဆက်စကားကို နားလည်အသုံးပြုပါ",
+              "type": "normal",
+              "position": "center",
+              "icon": "你",
+              "exercise_count": 7,
+              "minutes": 4,
+              "required_lessons": [],
+              "bundled_lesson_asset": "learning/path/lessons/greeting_hello.json",
+              "package_id": "zh_beginner_unit_greetings",
+              "package_version": 1,
+              "lesson_file": "lessons/greeting_hello.json"
+            },
+            {
+              "id": "greeting_intro",
+              "title": "自我介绍",
+              "title_en": "Introduce Yourself",
+              "title_my": "ကိုယ့်ကိုယ်ကို မိတ်ဆက်ခြင်း",
+              "subtitle": "我叫…… / 我是……",
+              "subtitle_en": "My name is… / I am…",
+              "subtitle_my": "ကျွန်ုပ်နာမည်… / ကျွန်ုပ်သည်…",
+              "type": "speaking",
+              "position": "right",
+              "icon": "我",
+              "exercise_count": 7,
+              "minutes": 5,
+              "required_lessons": [
+                "greeting_hello"
+              ],
+              "bundled_lesson_asset": "learning/path/lessons/greeting_intro.json",
+              "package_id": "zh_beginner_unit_greetings",
+              "package_version": 1,
+              "lesson_file": "lessons/greeting_intro.json"
+            },
+            {
+              "id": "greeting_review",
+              "title": "复习",
+              "title_en": "Review",
+              "title_my": "ပြန်လေ့လာ",
+              "subtitle": "换一种题型再次确认",
+              "subtitle_en": "Confirm the same knowledge with new question types",
+              "subtitle_my": "မေးခွန်းပုံစံအသစ်ဖြင့် ထပ်မံအတည်ပြုပါ",
+              "type": "review",
+              "position": "center",
+              "icon": "↻",
+              "exercise_count": 6,
+              "minutes": 4,
+              "required_lessons": [
+                "greeting_intro"
+              ],
+              "bundled_lesson_asset": "learning/path/lessons/greeting_review.json",
+              "package_id": "zh_beginner_unit_greetings",
+              "package_version": 1,
+              "lesson_file": "lessons/greeting_review.json"
+            },
+            {
+              "id": "greeting_test",
+              "title": "单元测试",
+              "title_en": "Unit Test",
+              "title_my": "အခန်း စမ်းသပ်မှု",
+              "subtitle": "综合检查本单元内容",
+              "subtitle_en": "Check everything from this unit",
+              "subtitle_my": "ဤအခန်း၏ အကြောင်းအရာအားလုံးကို စစ်ဆေးပါ",
+              "type": "test",
+              "position": "left",
+              "icon": "★",
+              "exercise_count": 8,
+              "minutes": 6,
+              "required_lessons": [
+                "greeting_review"
+              ],
+              "bundled_lesson_asset": "learning/path/lessons/greeting_test.json",
+              "package_id": "zh_beginner_unit_greetings",
+              "package_version": 1,
+              "lesson_file": "lessons/greeting_test.json"
+            }
+          ]
+        },
+        {
+          "id": "unit_daily",
+          "order": 2,
+          "title": "第 2 单元 · 日常生活",
+          "title_en": "Unit 2 · Daily Life",
+          "title_my": "အခန်း ၂ · နေ့စဉ်ဘဝ",
+          "subtitle": "数字、时间和常见物品",
+          "subtitle_en": "Numbers, time, and common objects",
+          "subtitle_my": "ဂဏန်း၊ အချိန်နှင့် နေ့စဉ်ပစ္စည်းများ",
+          "lessons": [
+            {
+              "id": "daily_numbers",
+              "title": "数字 1–10",
+              "title_en": "Numbers 1–10",
+              "title_my": "ဂဏန်း ၁–၁၀",
+              "subtitle": "听音、排序和配对",
+              "subtitle_en": "Listening, ordering, and matching",
+              "subtitle_my": "နားထောင်၊ စီခြင်းနှင့် တွဲစပ်ခြင်း",
+              "type": "listening",
+              "position": "center",
+              "icon": "十",
+              "exercise_count": 7,
+              "minutes": 5,
+              "required_lessons": [
+                "greeting_test"
+              ],
+              "bundled_lesson_asset": "learning/path/lessons/daily_numbers.json",
+              "package_id": "zh_beginner_unit_daily",
+              "package_version": 1,
+              "lesson_file": "lessons/daily_numbers.json"
+            },
+            {
+              "id": "daily_time",
+              "title": "现在几点？",
+              "title_en": "What Time Is It?",
+              "title_my": "အခု ဘယ်နှနာရီလဲ？",
+              "subtitle": "询问和表达时间",
+              "subtitle_en": "Ask for and tell the time",
+              "subtitle_my": "အချိန်မေးခြင်းနှင့် ပြောခြင်း",
+              "type": "normal",
+              "position": "right",
+              "icon": "时",
+              "exercise_count": 7,
+              "minutes": 5,
+              "required_lessons": [
+                "daily_numbers"
+              ],
+              "bundled_lesson_asset": "learning/path/lessons/daily_time.json",
+              "package_id": "zh_beginner_unit_daily",
+              "package_version": 1,
+              "lesson_file": "lessons/daily_time.json"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
