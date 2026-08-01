@@ -1,7 +1,7 @@
 {
   "type": "speaking",
   "title": "口语",
-  "subtitle": "按真实场景浏览中文、缅文高频短句，进入分类后点击句子学习拼读、替换、跟读和 FSRS 复习。",
+  "subtitle": "按真实场景浏览高频短句，进入分类后上下滑动学习，支持朗读、拼读、跟读和 AI 对话。",
   "items": [
     {
       "id": "speaking_daily",
