@@ -83,6 +83,20 @@ final class SpeakingProgressStore extends SQLiteOpenHelper {
                 SQLiteDatabase.CONFLICT_REPLACE);
     }
 
+    void markViewed(String packId, String phraseId) {
+        ContentValues values = loadAllValues(packId, phraseId);
+        Integer reviews = values.getAsInteger("review_count");
+        if (reviews != null && reviews > 0) return;
+        long now = System.currentTimeMillis();
+        values.put("state", 1);
+        values.put("review_count", 1);
+        values.put("last_review_at", now);
+        values.put("due_at", Long.MAX_VALUE);
+        values.put("updated_at", now);
+        getWritableDatabase().insertWithOnConflict(TABLE, null, values,
+                SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
     void increment(String packId, String phraseId, String column) {
         if (!("listen_count".equals(column) || "spelling_count".equals(column)
                 || "pronunciation_count".equals(column) || "ai_practice_count".equals(column))) {

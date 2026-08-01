@@ -14,9 +14,12 @@ final class SpeakingPhraseRepository {
     private SpeakingPhraseRepository() {}
 
     static Pack load(Context context, String assetPath, String fallbackPackId, String fallbackTitle) {
-        String normalized = normalizeAsset(assetPath);
+        String normalized = SpeakingImportedPackStore.isImportedAsset(assetPath)
+                ? safe(assetPath) : normalizeAsset(assetPath);
         try {
-            String json = LearningRemoteContent.readAsset(context, normalized);
+            String json = SpeakingImportedPackStore.isImportedAsset(normalized)
+                    ? SpeakingImportedPackStore.read(context, normalized)
+                    : LearningRemoteContent.readAsset(context, normalized);
             return parse(context, json, fallbackPackId, fallbackTitle, normalized);
         } catch (Throwable ignored) {
             return new Pack(safe(fallbackPackId), safe(fallbackTitle), "", normalized,
@@ -24,8 +27,8 @@ final class SpeakingPhraseRepository {
         }
     }
 
-    private static Pack parse(Context context, String json, String fallbackPackId, String fallbackTitle,
-                              String assetPath) throws Exception {
+    static Pack parse(Context context, String json, String fallbackPackId, String fallbackTitle,
+                      String assetPath) throws Exception {
         JSONObject root = new JSONObject(json == null ? "{}" : json);
         String packId = root.optString("pack_id", fallbackPackId);
         String title = localized(context, root, "title", fallbackTitle);

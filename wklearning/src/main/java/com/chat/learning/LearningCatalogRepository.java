@@ -26,7 +26,8 @@ final class LearningCatalogRepository {
         Catalog bundled = readBundled(context, type);
         Catalog cached = readCached(context, type);
         Catalog merged = mergeCatalogs(bundled, cached);
-        if ("words".equals(type)) appendImported(context, merged);
+        if ("words".equals(type)) appendImportedWords(context, merged);
+        if ("speaking".equals(type)) appendImportedSpeaking(context, merged);
         return merged != null ? merged : fallback(context, type);
     }
 
@@ -46,7 +47,7 @@ final class LearningCatalogRepository {
                 Catalog remote = parse(app, type, new String(bytes, StandardCharsets.UTF_8));
                 LearningRemoteContent.atomicWrite(cache, bytes);
                 Catalog merged = mergeCatalogs(readBundled(app, type), remote);
-                appendImported(app, merged);
+                appendImportedWords(app, merged);
                 if (callback != null) callback.onLoaded(merged);
             } catch (Throwable error) {
                 if (callback != null) callback.onError(error);
@@ -233,9 +234,15 @@ final class LearningCatalogRepository {
         return node;
     }
 
-    private static void appendImported(Context context, Catalog catalog) {
+    private static void appendImportedWords(Context context, Catalog catalog) {
         if (catalog == null) return;
         List<Node> imported = LearningImportedWordStore.nodes(context);
+        catalog.items = mergeNodes(catalog.items, imported);
+    }
+
+    private static void appendImportedSpeaking(Context context, Catalog catalog) {
+        if (catalog == null) return;
+        List<Node> imported = SpeakingImportedPackStore.nodes(context);
         catalog.items = mergeNodes(catalog.items, imported);
     }
 
