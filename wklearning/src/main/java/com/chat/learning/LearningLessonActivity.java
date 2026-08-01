@@ -1,0 +1,1467 @@
+package com.chat.learning;
+
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.content.res.AssetFileDescriptor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.media.AudioAttributes;
+import android.media.MediaPlayer;
+import android.media.PlaybackParams;
+import android.os.Build;
+import android.os.Bundle;
+import android.text.InputFilter;
+import android.text.InputType;
+import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Mixed interactive exercise player used by nodes on the learning path. */
+public class LearningLessonActivity extends AppCompatActivity {
+    private static final String EXTRA_COURSE_ID = "course_id";
+    private static final String EXTRA_LESSON_ID = "lesson_id";
+    private static final String EXTRA_TITLE = "title";
+    private static final String EXTRA_SUBTITLE = "subtitle";
+    private static final String EXTRA_BUNDLED_ASSET = "bundled_asset";
+    private static final String EXTRA_FILE_PATH = "file_path";
+    private static final String EXTRA_PACKAGE_ROOT = "package_root";
+    private static final int REQ_PRONUNCIATION_COMPARE = 4107;
+
+    private static final String STATE_QUEUE = "queue";
+    private static final String STATE_INDEX = "index";
+    private static final String STATE_FIRST_CORRECT = "first_correct";
+    private static final String STATE_FIRST_ANSWERED = "first_answered";
+    private static final String STATE_MASTERED = "mastered";
+    private static final String STATE_RETRY_IDS = "retry_ids";
+    private static final String STATE_RETRY_VALUES = "retry_values";
+    private static final String STATE_ATTEMPT_RECORDED = "attempt_recorded";
+    private static final String STATE_COMPLETION_SCORE = "completion_score";
+    private static final String STATE_COMPLETION_STARS = "completion_stars";
+    private static final String STATE_COMPLETION_PASSED = "completion_passed";
+    private static final String STATE_CONTENT_HASH = "content_hash";
+    private static final String STATE_SELECTED_CHOICE = "selected_choice";
+    private static final String STATE_FILL_TEXT = "fill_text";
+    private static final String STATE_ORDER_TOKEN_IDS = "order_token_ids";
+    private static final String STATE_MATCHED_PAIR_IDS = "matched_pair_ids";
+    private static final String STATE_PRONUNCIATION_OPENED = "pronunciation_opened";
+
+    private static final int COLOR_BG = 0xFFF8FAFE;
+    private static final int COLOR_TEXT = 0xFF172033;
+    private static final int COLOR_SUB = 0xFF6F7B91;
+    private static final int COLOR_ACCENT = 0xFF635BFF;
+    private static final int COLOR_BORDER = 0xFFE1E7F0;
+    private static final int COLOR_SUCCESS = 0xFF158A62;
+    private static final int COLOR_ERROR = 0xFFD1435B;
+
+    private String courseId = "";
+    private String lessonId = "";
+    private String title = "";
+    private String subtitle = "";
+    private String bundledAsset = "";
+    private String filePath = "";
+    private String packageRootPath = "";
+
+    private ProgressBar progressBar;
+    private TextView progressText;
+    private TextView lessonTitle;
+    private LinearLayout questionHost;
+    private LinearLayout feedbackPanel;
+    private TextView feedbackTitle;
+    private TextView feedbackBody;
+    private TextView actionButton;
+
+    private LearningLessonRepository.LessonData lessonData;
+    private final ArrayList<LearningLessonRepository.Exercise> originalExercises = new ArrayList<>();
+    private final ArrayList<LearningLessonRepository.Exercise> queue = new ArrayList<>();
+    private final Map<String, Integer> retryCount = new HashMap<>();
+    private final Set<String> firstAttemptAnswered = new HashSet<>();
+    private final Set<String> masteredExercises = new HashSet<>();
+    private int currentIndex;
+    private int firstAttemptCorrect;
+    private boolean answered;
+    private boolean pronunciationOpened;
+    private String selectedChoice = "";
+    private final Map<String, View> choiceViews = new HashMap<>();
+    private EditText fillInput;
+    private final ArrayList<WordToken> orderedTokens = new ArrayList<>();
+    private final Map<Integer, TextView> orderChips = new HashMap<>();
+    private LinearLayout orderAnswerRow;
+    private LinearLayout orderBankRow;
+    private final Set<Integer> matchedPairIndexes = new HashSet<>();
+    private final Map<Integer, TextView> matchLeftViews = new HashMap<>();
+    private final Map<Integer, TextView> matchRightViews = new HashMap<>();
+    private TextView selectedMatchLeft;
+    private LearningLessonRepository.PairItem selectedMatchPair;
+    private MediaPlayer mediaPlayer;
+    private LearningPathProgressStore progressStore;
+    private Bundle restoreState;
+    private int loadGeneration;
+    private int questionGeneration;
+    private Runnable autoPlayRunnable;
+    private boolean destroyed;
+    private boolean attemptRecorded;
+    private int completionScore;
+    private int completionStars;
+    private boolean completionPassed;
+
+    public static void open(Context context, LearningPathRepository.Lesson lesson) {
+        if (context == null || lesson == null) return;
+        Intent intent = new Intent(context, LearningLessonActivity.class);
+        intent.putExtra(EXTRA_COURSE_ID, lesson.courseId);
+        intent.putExtra(EXTRA_LESSON_ID, lesson.id);
+        intent.putExtra(EXTRA_TITLE, lesson.title);
+        intent.putExtra(EXTRA_SUBTITLE, lesson.subtitle);
+        intent.putExtra(EXTRA_BUNDLED_ASSET, lesson.bundledLessonAsset);
+        File installed = LearningPackageDownloader.installedLessonFile(context, lesson);
+        File packageRoot = LearningPackageDownloader.installedPackageDirectory(context, lesson);
+        if (installed != null) intent.putExtra(EXTRA_FILE_PATH, installed.getAbsolutePath());
+        if (packageRoot != null) intent.putExtra(EXTRA_PACKAGE_ROOT, packageRoot.getAbsolutePath());
+        if (!(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Window window = getWindow();
+        window.setStatusBarColor(COLOR_BG);
+        window.setNavigationBarColor(COLOR_BG);
+
+        courseId = safe(getIntent().getStringExtra(EXTRA_COURSE_ID));
+        lessonId = safe(getIntent().getStringExtra(EXTRA_LESSON_ID));
+        title = safe(getIntent().getStringExtra(EXTRA_TITLE));
+        subtitle = safe(getIntent().getStringExtra(EXTRA_SUBTITLE));
+        bundledAsset = safe(getIntent().getStringExtra(EXTRA_BUNDLED_ASSET));
+        filePath = safe(getIntent().getStringExtra(EXTRA_FILE_PATH));
+        packageRootPath = safe(getIntent().getStringExtra(EXTRA_PACKAGE_ROOT));
+        restoreState = savedInstanceState;
+        progressStore = new LearningPathProgressStore(this);
+        buildLayout();
+        loadLesson();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_PRONUNCIATION_COMPARE) {
+            pronunciationOpened = pronunciationOpened || resultCode == RESULT_OK;
+            if (resultCode == RESULT_OK) {
+                Toast.makeText(this, R.string.learning_lesson_record_done,
+                        Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        ArrayList<String> queueIds = new ArrayList<>();
+        for (LearningLessonRepository.Exercise exercise : queue) queueIds.add(exercise.id);
+        outState.putStringArrayList(STATE_QUEUE, queueIds);
+        outState.putInt(STATE_INDEX, answered ? currentIndex + 1 : currentIndex);
+        outState.putInt(STATE_FIRST_CORRECT, firstAttemptCorrect);
+        outState.putStringArrayList(STATE_FIRST_ANSWERED, new ArrayList<>(firstAttemptAnswered));
+        outState.putStringArrayList(STATE_MASTERED, new ArrayList<>(masteredExercises));
+        ArrayList<String> retryIds = new ArrayList<>();
+        int[] retryValues = new int[retryCount.size()];
+        int position = 0;
+        for (Map.Entry<String, Integer> entry : retryCount.entrySet()) {
+            retryIds.add(entry.getKey());
+            retryValues[position++] = entry.getValue() == null ? 0 : entry.getValue();
+        }
+        outState.putStringArrayList(STATE_RETRY_IDS, retryIds);
+        outState.putIntArray(STATE_RETRY_VALUES, retryValues);
+        outState.putBoolean(STATE_ATTEMPT_RECORDED, attemptRecorded);
+        outState.putInt(STATE_COMPLETION_SCORE, completionScore);
+        outState.putInt(STATE_COMPLETION_STARS, completionStars);
+        outState.putBoolean(STATE_COMPLETION_PASSED, completionPassed);
+        if (!answered && currentIndex < queue.size()) {
+            outState.putString(STATE_SELECTED_CHOICE, selectedChoice);
+            if (fillInput != null) outState.putString(STATE_FILL_TEXT,
+                    fillInput.getText().toString());
+            int[] orderedIds = new int[orderedTokens.size()];
+            for (int i = 0; i < orderedTokens.size(); i++) orderedIds[i] = orderedTokens.get(i).id;
+            outState.putIntArray(STATE_ORDER_TOKEN_IDS, orderedIds);
+            int[] matchedIds = new int[matchedPairIndexes.size()];
+            int matchedPosition = 0;
+            for (Integer value : matchedPairIndexes) {
+                matchedIds[matchedPosition++] = value == null ? -1 : value;
+            }
+            outState.putIntArray(STATE_MATCHED_PAIR_IDS, matchedIds);
+            outState.putBoolean(STATE_PRONUNCIATION_OPENED, pronunciationOpened);
+        }
+        if (lessonData != null) outState.putString(STATE_CONTENT_HASH, lessonData.contentHash);
+    }
+
+    @Override
+    protected void onStop() {
+        cancelAutoPlay();
+        releasePlayer();
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        destroyed = true;
+        loadGeneration++;
+        questionGeneration++;
+        cancelAutoPlay();
+        releasePlayer();
+        if (progressStore != null) progressStore.close();
+        progressStore = null;
+        super.onDestroy();
+    }
+
+    private void buildLayout() {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(COLOR_BG);
+        setContentView(page);
+
+        page.addView(topBar(), new LinearLayout.LayoutParams(-1, dp(62)));
+
+        LinearLayout progressRow = new LinearLayout(this);
+        progressRow.setOrientation(LinearLayout.HORIZONTAL);
+        progressRow.setGravity(Gravity.CENTER_VERTICAL);
+        progressRow.setPadding(dp(18), dp(4), dp(18), dp(6));
+        page.addView(progressRow, new LinearLayout.LayoutParams(-1, dp(36)));
+
+        progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progressBar.setMax(1000);
+        progressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(COLOR_ACCENT));
+        progressBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFE4E8F1));
+        progressRow.addView(progressBar, new LinearLayout.LayoutParams(0, dp(10), 1f));
+
+        progressText = text("0 / 0", 12, COLOR_SUB, true);
+        progressText.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(dp(72), dp(28));
+        countLp.setMargins(dp(10), 0, 0, 0);
+        progressRow.addView(progressText, countLp);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        scroll.setVerticalScrollBarEnabled(false);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        questionHost = new LinearLayout(this);
+        questionHost.setOrientation(LinearLayout.VERTICAL);
+        questionHost.setPadding(dp(18), dp(14), dp(18), dp(30));
+        scroll.addView(questionHost, new ScrollView.LayoutParams(-1, -2));
+
+        feedbackPanel = new LinearLayout(this);
+        feedbackPanel.setOrientation(LinearLayout.VERTICAL);
+        feedbackPanel.setPadding(dp(18), dp(14), dp(18), dp(16));
+        feedbackPanel.setVisibility(View.GONE);
+        page.addView(feedbackPanel, new LinearLayout.LayoutParams(-1, -2));
+
+        feedbackTitle = text("", 18, COLOR_TEXT, true);
+        feedbackPanel.addView(feedbackTitle, new LinearLayout.LayoutParams(-1, -2));
+        feedbackBody = text("", 13, COLOR_SUB, false);
+        feedbackBody.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(-1, -2);
+        bodyLp.setMargins(0, dp(5), 0, dp(12));
+        feedbackPanel.addView(feedbackBody, bodyLp);
+
+        actionButton = text(getString(R.string.learning_lesson_check), 16, Color.WHITE, true);
+        actionButton.setGravity(Gravity.CENTER);
+        actionButton.setBackground(rounded(COLOR_ACCENT, dp(19), 0, 0));
+        actionButton.setOnClickListener(v -> onAction());
+        LinearLayout.LayoutParams actionLp = new LinearLayout.LayoutParams(-1, dp(58));
+        actionLp.setMargins(dp(18), dp(8), dp(18), dp(14));
+        page.addView(actionButton, actionLp);
+    }
+
+    private View topBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(14), dp(8), dp(14), 0);
+
+        TextView close = text("×", 26, COLOR_TEXT, false);
+        close.setGravity(Gravity.CENTER);
+        close.setContentDescription(getString(R.string.learning_lesson_close));
+        close.setBackground(rounded(Color.WHITE, dp(22), COLOR_BORDER, dp(1)));
+        close.setOnClickListener(v -> finish());
+        bar.addView(close, new LinearLayout.LayoutParams(dp(44), dp(44)));
+
+        lessonTitle = text(title.isEmpty() ? getString(R.string.learning_lesson_title) : title,
+                17, COLOR_TEXT, true);
+        lessonTitle.setGravity(Gravity.CENTER);
+        lessonTitle.setSingleLine(true);
+        lessonTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, -1, 1f);
+        titleLp.setMargins(dp(10), 0, dp(54), 0);
+        bar.addView(lessonTitle, titleLp);
+        return bar;
+    }
+
+    private void loadLesson() {
+        int generation = ++loadGeneration;
+        actionButton.setEnabled(false);
+        actionButton.setAlpha(0.55f);
+        progressText.setText("…");
+        questionHost.removeAllViews();
+        TextView loading = text(getString(R.string.learning_path_loading), 15, COLOR_SUB, false);
+        loading.setGravity(Gravity.CENTER);
+        loading.setPadding(0, dp(44), 0, dp(44));
+        questionHost.addView(loading, new LinearLayout.LayoutParams(-1, -2));
+
+        LearningRemoteContent.execute(() -> {
+            try {
+                LearningLessonRepository.LessonData loaded = LearningLessonRepository.load(
+                        getApplicationContext(), lessonId, bundledAsset, filePath);
+                runOnUiThread(() -> {
+                    if (!canApply(generation)) return;
+                    applyLesson(loaded);
+                });
+            } catch (Throwable error) {
+                runOnUiThread(() -> {
+                    if (!canApply(generation)) return;
+                    showLoadError(error.getMessage());
+                });
+            }
+        });
+    }
+
+    private boolean canApply(int generation) {
+        return !destroyed && generation == loadGeneration && !isFinishing()
+                && (Build.VERSION.SDK_INT < 17 || !isDestroyed());
+    }
+
+    private void applyLesson(LearningLessonRepository.LessonData loaded) {
+        lessonData = loaded;
+        if (!loaded.installedSource) {
+            filePath = "";
+            packageRootPath = "";
+        }
+        originalExercises.clear();
+        originalExercises.addAll(loaded.exercises);
+        if (!loaded.title.isEmpty()) title = loaded.title;
+        if (!loaded.subtitle.isEmpty()) subtitle = loaded.subtitle;
+        lessonTitle.setText(title.isEmpty() ? getString(R.string.learning_lesson_title) : title);
+        actionButton.setEnabled(true);
+        actionButton.setAlpha(1f);
+        restoreOrStartSession();
+    }
+
+    private void restoreOrStartSession() {
+        resetSession();
+        Bundle state = restoreState;
+        restoreState = null;
+        if (state == null || lessonData == null
+                || !lessonData.contentHash.equals(state.getString(STATE_CONTENT_HASH, ""))) {
+            queue.addAll(originalExercises);
+            showCurrentQuestion();
+            return;
+        }
+
+        Map<String, LearningLessonRepository.Exercise> byId = new HashMap<>();
+        for (LearningLessonRepository.Exercise exercise : originalExercises) byId.put(exercise.id, exercise);
+        ArrayList<String> savedQueue = state.getStringArrayList(STATE_QUEUE);
+        if (savedQueue != null) {
+            for (String id : savedQueue) {
+                LearningLessonRepository.Exercise exercise = byId.get(id);
+                if (exercise != null) queue.add(exercise);
+            }
+        }
+        if (queue.isEmpty()) queue.addAll(originalExercises);
+        currentIndex = clamp(state.getInt(STATE_INDEX, 0), 0, queue.size());
+        addValidIds(firstAttemptAnswered, state.getStringArrayList(STATE_FIRST_ANSWERED), byId);
+        addValidIds(masteredExercises, state.getStringArrayList(STATE_MASTERED), byId);
+        firstAttemptCorrect = clamp(state.getInt(STATE_FIRST_CORRECT, 0), 0,
+                Math.min(originalExercises.size(), firstAttemptAnswered.size()));
+        ArrayList<String> retryIds = state.getStringArrayList(STATE_RETRY_IDS);
+        int[] retryValues = state.getIntArray(STATE_RETRY_VALUES);
+        if (retryIds != null && retryValues != null) {
+            for (int i = 0; i < Math.min(retryIds.size(), retryValues.length); i++) {
+                if (byId.containsKey(retryIds.get(i))) {
+                    retryCount.put(retryIds.get(i), Math.max(0, retryValues[i]));
+                }
+            }
+        }
+        attemptRecorded = state.getBoolean(STATE_ATTEMPT_RECORDED, false);
+        completionScore = state.getInt(STATE_COMPLETION_SCORE, 0);
+        completionStars = state.getInt(STATE_COMPLETION_STARS, 0);
+        completionPassed = state.getBoolean(STATE_COMPLETION_PASSED, false);
+        showCurrentQuestion();
+        restoreQuestionInput(state);
+    }
+
+    private void restoreQuestionInput(Bundle state) {
+        if (state == null || answered || currentIndex >= queue.size()) return;
+        String savedChoice = safe(state.getString(STATE_SELECTED_CHOICE, ""));
+        if (!savedChoice.isEmpty()) {
+            selectedChoice = savedChoice;
+            View selected = choiceViews.get(LearningLessonRepository.normalize(savedChoice));
+            for (View child : choiceViews.values()) {
+                boolean active = child == selected;
+                child.setSelected(active);
+                child.setBackground(rounded(active ? 0xFFF0EFFF : Color.WHITE,
+                        dp(18), active ? COLOR_ACCENT : COLOR_BORDER, dp(2)));
+            }
+        }
+        if (fillInput != null) {
+            String text = state.getString(STATE_FILL_TEXT, "");
+            fillInput.setText(text == null ? "" : text);
+            fillInput.setSelection(fillInput.length());
+        }
+        int[] orderedIds = state.getIntArray(STATE_ORDER_TOKEN_IDS);
+        if (orderedIds != null && orderAnswerRow != null && orderBankRow != null) {
+            for (int id : orderedIds) {
+                TextView chip = orderChips.get(id);
+                if (chip == null || !(chip.getTag() instanceof WordToken)) continue;
+                WordToken token = (WordToken) chip.getTag();
+                if (chip.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) chip.getParent()).removeView(chip);
+                }
+                if (!orderedTokens.contains(token)) orderedTokens.add(token);
+                orderAnswerRow.addView(chip, chipLayoutParams());
+            }
+        }
+        int[] matchedIds = state.getIntArray(STATE_MATCHED_PAIR_IDS);
+        if (matchedIds != null) {
+            for (int id : matchedIds) restoreMatchedPair(id);
+        }
+        pronunciationOpened = state.getBoolean(STATE_PRONUNCIATION_OPENED, false);
+    }
+
+    private void resetSession() {
+        queue.clear();
+        retryCount.clear();
+        firstAttemptAnswered.clear();
+        masteredExercises.clear();
+        currentIndex = 0;
+        firstAttemptCorrect = 0;
+        attemptRecorded = false;
+        completionScore = 0;
+        completionStars = 0;
+        completionPassed = false;
+    }
+
+    private void showCurrentQuestion() {
+        int generation = ++questionGeneration;
+        cancelAutoPlay();
+        releasePlayer();
+        hideKeyboard();
+        feedbackPanel.setVisibility(View.GONE);
+        actionButton.setVisibility(View.VISIBLE);
+        actionButton.setOnClickListener(v -> onAction());
+        actionButton.setText(R.string.learning_lesson_check);
+        actionButton.setBackground(rounded(COLOR_ACCENT, dp(19), 0, 0));
+        answered = false;
+        pronunciationOpened = false;
+        selectedChoice = "";
+        choiceViews.clear();
+        fillInput = null;
+        orderedTokens.clear();
+        orderChips.clear();
+        matchedPairIndexes.clear();
+        matchLeftViews.clear();
+        matchRightViews.clear();
+        selectedMatchLeft = null;
+        selectedMatchPair = null;
+        questionHost.removeAllViews();
+
+        if (currentIndex >= queue.size()) {
+            showCompletion();
+            return;
+        }
+        LearningLessonRepository.Exercise exercise = queue.get(currentIndex);
+        int displayPosition = currentIndex + 1;
+        progressText.setText(displayPosition + " / " + queue.size());
+        progressBar.setProgress(queue.isEmpty() ? 0 : currentIndex * 1000 / queue.size());
+
+        TextView typeBadge = text(typeLabel(exercise.type), 11, COLOR_ACCENT, true);
+        typeBadge.setGravity(Gravity.CENTER);
+        typeBadge.setPadding(dp(10), dp(5), dp(10), dp(5));
+        typeBadge.setBackground(rounded(0xFFEDEBFF, dp(12), 0, 0));
+        questionHost.addView(typeBadge, new LinearLayout.LayoutParams(-2, -2));
+
+        TextView question = text(exercise.question, 25, COLOR_TEXT, true);
+        question.setLineSpacing(dp(4), 1f);
+        LinearLayout.LayoutParams questionLp = new LinearLayout.LayoutParams(-1, -2);
+        questionLp.setMargins(0, dp(14), 0, dp(10));
+        questionHost.addView(question, questionLp);
+
+        if (!exercise.hint.isEmpty()) {
+            TextView hint = text(exercise.hint, 14, COLOR_SUB, false);
+            hint.setLineSpacing(dp(3), 1f);
+            LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+            hintLp.setMargins(0, 0, 0, dp(16));
+            questionHost.addView(hint, hintLp);
+        }
+
+        switch (exercise.type) {
+            case "listen_choice":
+                questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(58)));
+                addVerticalSpace(questionHost, 14);
+                renderChoice(exercise);
+                autoPlayRunnable = () -> {
+                    if (generation == questionGeneration && currentIndex < queue.size()
+                            && queue.get(currentIndex).id.equals(exercise.id)) {
+                        playExerciseAudio(exercise);
+                    }
+                };
+                questionHost.postDelayed(autoPlayRunnable, 240L);
+                break;
+            case "true_false":
+            case "single_choice":
+            case "image_choice":
+                if (!exercise.audio.isEmpty() || !exercise.audioText.isEmpty()) {
+                    questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(52)));
+                    addVerticalSpace(questionHost, 12);
+                }
+                renderChoice(exercise);
+                break;
+            case "word_order":
+                renderWordOrder(exercise);
+                break;
+            case "fill_blank":
+            case "dictation":
+                if ("dictation".equals(exercise.type)) {
+                    questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(58)));
+                    addVerticalSpace(questionHost, 14);
+                }
+                renderFillBlank(exercise);
+                break;
+            case "matching":
+                renderMatching(exercise);
+                break;
+            case "pronunciation":
+                renderPronunciation(exercise);
+                break;
+            default:
+                showLoadError(getString(R.string.learning_lesson_unsupported_type));
+                break;
+        }
+    }
+
+    private void renderChoice(LearningLessonRepository.Exercise exercise) {
+        LinearLayout options = new LinearLayout(this);
+        options.setOrientation(LinearLayout.VERTICAL);
+        questionHost.addView(options, new LinearLayout.LayoutParams(-1, -2));
+        ArrayList<View> optionViews = new ArrayList<>();
+        ArrayList<LearningLessonRepository.ChoiceOption> choices =
+                new ArrayList<>(exercise.options);
+        if (!exercise.keepOrder && !"true_false".equals(exercise.type)) {
+            Collections.shuffle(choices);
+        }
+        for (LearningLessonRepository.ChoiceOption choice : choices) {
+            View option = createChoiceView(exercise, choice);
+            optionViews.add(option);
+            choiceViews.put(LearningLessonRepository.normalize(choice.value), option);
+            option.setOnClickListener(v -> {
+                if (answered) return;
+                selectedChoice = choice.value;
+                for (View child : optionViews) {
+                    boolean selected = child == option;
+                    child.setSelected(selected);
+                    child.setBackground(rounded(selected ? 0xFFF0EFFF : Color.WHITE,
+                            dp(18), selected ? COLOR_ACCENT : COLOR_BORDER, dp(2)));
+                }
+                option.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,
+                    choice.image.isEmpty() ? dp(58) : -2);
+            lp.setMargins(0, 0, 0, dp(10));
+            options.addView(option, lp);
+        }
+    }
+
+    private View createChoiceView(LearningLessonRepository.Exercise exercise,
+                                  LearningLessonRepository.ChoiceOption choice) {
+        if (choice.image.isEmpty()) {
+            TextView option = text(choice.text, 17, COLOR_TEXT, true);
+            option.setGravity(Gravity.CENTER_VERTICAL);
+            option.setPadding(dp(16), 0, dp(16), 0);
+            option.setBackground(rounded(Color.WHITE, dp(18), COLOR_BORDER, dp(2)));
+            option.setContentDescription(choice.contentDescription);
+            return option;
+        }
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(10), dp(10), dp(10), dp(10));
+        card.setBackground(rounded(Color.WHITE, dp(18), COLOR_BORDER, dp(2)));
+        card.setContentDescription(choice.contentDescription);
+
+        ImageView image = new ImageView(this);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        image.setAdjustViewBounds(true);
+        image.setBackgroundColor(0xFFF1F3F7);
+        card.addView(image, new LinearLayout.LayoutParams(-1, dp(150)));
+        loadChoiceImage(image, choice.image, questionGeneration);
+
+        TextView label = text(choice.text, 16, COLOR_TEXT, true);
+        label.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, -2);
+        labelLp.setMargins(dp(4), dp(9), dp(4), dp(2));
+        card.addView(label, labelLp);
+        return card;
+    }
+
+    private void loadChoiceImage(ImageView view, String relative, int generation) {
+        view.setTag(relative);
+        int targetWidth = Math.max(dp(320), getResources().getDisplayMetrics().widthPixels);
+        int targetHeight = dp(260);
+        LearningRemoteContent.execute(() -> {
+            Bitmap bitmap = null;
+            try { bitmap = decodeLessonBitmap(relative, targetWidth, targetHeight); }
+            catch (Throwable ignored) { }
+            Bitmap result = bitmap;
+            runOnUiThread(() -> {
+                if (destroyed || generation != questionGeneration
+                        || !relative.equals(view.getTag())) {
+                    if (result != null) result.recycle();
+                    return;
+                }
+                if (result == null) {
+                    view.setVisibility(View.GONE);
+                } else {
+                    view.setImageBitmap(result);
+                    view.setVisibility(View.VISIBLE);
+                }
+            });
+        });
+    }
+
+    private Bitmap decodeLessonBitmap(String relative, int maxWidth, int maxHeight) throws Exception {
+        String clean = LearningLessonRepository.cleanRelative(relative, true);
+        if (clean.isEmpty()) return null;
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        if (!filePath.isEmpty()) {
+            File image = resolveInstalledMedia(clean);
+            BitmapFactory.decodeFile(image.getAbsolutePath(), bounds);
+            BitmapFactory.Options options = sampledOptions(bounds, maxWidth, maxHeight);
+            return BitmapFactory.decodeFile(image.getAbsolutePath(), options);
+        }
+        String asset = resolveBundledAudioAsset(clean);
+        try (InputStream input = getAssets().open(asset)) {
+            BitmapFactory.decodeStream(input, null, bounds);
+        }
+        BitmapFactory.Options options = sampledOptions(bounds, maxWidth, maxHeight);
+        try (InputStream input = getAssets().open(asset)) {
+            return BitmapFactory.decodeStream(input, null, options);
+        }
+    }
+
+    private BitmapFactory.Options sampledOptions(BitmapFactory.Options bounds, int maxWidth,
+                                                 int maxHeight) {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        int width = Math.max(1, bounds.outWidth);
+        int height = Math.max(1, bounds.outHeight);
+        int sample = 1;
+        while (width / sample > maxWidth * 2 || height / sample > maxHeight * 2) sample *= 2;
+        options.inSampleSize = Math.max(1, sample);
+        options.inPreferredConfig = Bitmap.Config.RGB_565;
+        return options;
+    }
+
+    private void renderFillBlank(LearningLessonRepository.Exercise exercise) {
+        fillInput = new EditText(this);
+        fillInput.setTextSize(19);
+        fillInput.setTextColor(COLOR_TEXT);
+        fillInput.setHintTextColor(0xFFADB5C4);
+        fillInput.setHint(exercise.placeholder.isEmpty()
+                ? getString(R.string.learning_lesson_input_hint) : exercise.placeholder);
+        fillInput.setSingleLine(true);
+        fillInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});
+        fillInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        fillInput.setPadding(dp(16), 0, dp(16), 0);
+        fillInput.setBackground(rounded(Color.WHITE, dp(18), COLOR_BORDER, dp(2)));
+        questionHost.addView(fillInput, new LinearLayout.LayoutParams(-1, dp(60)));
+        fillInput.requestFocus();
+    }
+
+    private void renderWordOrder(LearningLessonRepository.Exercise exercise) {
+        TextView answerLabel = text(getString(R.string.learning_lesson_your_answer), 12,
+                COLOR_SUB, true);
+        questionHost.addView(answerLabel, new LinearLayout.LayoutParams(-1, -2));
+
+        orderAnswerRow = wrapRow();
+        orderAnswerRow.setMinimumHeight(dp(64));
+        orderAnswerRow.setPadding(dp(8), dp(8), dp(8), dp(8));
+        orderAnswerRow.setBackground(rounded(0xFFF2F4F8, dp(18), COLOR_BORDER, dp(1)));
+        LinearLayout.LayoutParams answerLp = new LinearLayout.LayoutParams(-1, -2);
+        answerLp.setMargins(0, dp(7), 0, dp(18));
+        questionHost.addView(orderAnswerRow, answerLp);
+
+        TextView bankLabel = text(getString(R.string.learning_lesson_word_bank), 12,
+                COLOR_SUB, true);
+        questionHost.addView(bankLabel, new LinearLayout.LayoutParams(-1, -2));
+        orderBankRow = wrapRow();
+        LinearLayout.LayoutParams bankLp = new LinearLayout.LayoutParams(-1, -2);
+        bankLp.setMargins(0, dp(7), 0, 0);
+        questionHost.addView(orderBankRow, bankLp);
+
+        List<WordToken> tokens = new ArrayList<>();
+        for (int i = 0; i < exercise.words.size(); i++) {
+            tokens.add(new WordToken(i, exercise.words.get(i)));
+        }
+        if (!exercise.keepOrder) shuffleWordTokens(tokens);
+        for (WordToken token : tokens) addOrderChip(token, orderBankRow, true);
+    }
+
+    private void shuffleWordTokens(List<WordToken> tokens) {
+        if (tokens == null || tokens.size() < 2) return;
+        boolean hasDifferentValues = false;
+        String first = LearningLessonRepository.normalize(tokens.get(0).value);
+        for (int i = 1; i < tokens.size(); i++) {
+            if (!first.equals(LearningLessonRepository.normalize(tokens.get(i).value))) {
+                hasDifferentValues = true;
+                break;
+            }
+        }
+        if (!hasDifferentValues) return;
+        for (int attempt = 0; attempt < 6; attempt++) {
+            Collections.shuffle(tokens);
+            boolean originalOrder = true;
+            for (int i = 0; i < tokens.size(); i++) {
+                if (tokens.get(i).id != i) {
+                    originalOrder = false;
+                    break;
+                }
+            }
+            if (!originalOrder) return;
+        }
+        Collections.rotate(tokens, 1);
+    }
+
+    private void addOrderChip(WordToken token, LinearLayout parent, boolean inBank) {
+        TextView chip = text(token.value, 17, COLOR_TEXT, true);
+        chip.setGravity(Gravity.CENTER);
+        chip.setPadding(dp(14), dp(8), dp(14), dp(8));
+        chip.setBackground(rounded(Color.WHITE, dp(15), COLOR_BORDER, dp(1)));
+        chip.setTag(token);
+        orderChips.put(token.id, chip);
+        chip.setOnClickListener(v -> {
+            if (answered) return;
+            ViewGroup currentParent = (ViewGroup) chip.getParent();
+            if (currentParent != null) currentParent.removeView(chip);
+            if (currentParent == orderBankRow) {
+                orderedTokens.add(token);
+                orderAnswerRow.addView(chip, chipLayoutParams());
+            } else {
+                orderedTokens.remove(token);
+                orderBankRow.addView(chip, chipLayoutParams());
+            }
+            chip.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+        });
+        parent.addView(chip, chipLayoutParams());
+    }
+
+    private void renderMatching(LearningLessonRepository.Exercise exercise) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.TOP);
+        questionHost.addView(row, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout left = new LinearLayout(this);
+        left.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.VERTICAL);
+        row.addView(left, new LinearLayout.LayoutParams(0, -2, 1f));
+        addHorizontalSpace(row, 10);
+        row.addView(right, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        List<LearningLessonRepository.PairItem> rightItems = new ArrayList<>(exercise.pairs);
+        Collections.shuffle(rightItems);
+        for (LearningLessonRepository.PairItem pair : exercise.pairs) {
+            TextView view = matchButton(pair.left);
+            matchLeftViews.put(pair.index, view);
+            view.setOnClickListener(v -> {
+                if (answered || matchedPairIndexes.contains(pair.index)) return;
+                if (selectedMatchLeft != null) {
+                    selectedMatchLeft.setBackground(rounded(Color.WHITE, dp(16), COLOR_BORDER, dp(1)));
+                }
+                selectedMatchLeft = view;
+                selectedMatchPair = pair;
+                view.setBackground(rounded(0xFFF0EFFF, dp(16), COLOR_ACCENT, dp(2)));
+            });
+            left.addView(view, matchLp());
+        }
+        for (LearningLessonRepository.PairItem rightPair : rightItems) {
+            TextView view = matchButton(rightPair.right);
+            matchRightViews.put(rightPair.index, view);
+            view.setOnClickListener(v -> {
+                if (answered || selectedMatchPair == null || !view.isEnabled()) return;
+                if (selectedMatchPair.index == rightPair.index) {
+                    matchedPairIndexes.add(selectedMatchPair.index);
+                    markPairMatched(selectedMatchLeft, view);
+                    selectedMatchLeft = null;
+                    selectedMatchPair = null;
+                    v.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
+                } else {
+                    view.setBackground(rounded(0xFFFFEEF1, dp(16), COLOR_ERROR, dp(2)));
+                    view.postDelayed(() -> {
+                        if (view.isEnabled()) view.setBackground(rounded(Color.WHITE,
+                                dp(16), COLOR_BORDER, dp(1)));
+                    }, 350L);
+                    v.performHapticFeedback(HapticFeedbackConstants.REJECT);
+                }
+            });
+            right.addView(view, matchLp());
+        }
+    }
+
+    private void restoreMatchedPair(int index) {
+        TextView left = matchLeftViews.get(index);
+        TextView right = matchRightViews.get(index);
+        if (left == null || right == null) return;
+        matchedPairIndexes.add(index);
+        markPairMatched(left, right);
+    }
+
+    private void markPairMatched(TextView left, TextView right) {
+        if (left != null) {
+            left.setEnabled(false);
+            left.setTextColor(COLOR_SUCCESS);
+            left.setBackground(rounded(0xFFEAF8F2, dp(16), COLOR_SUCCESS, dp(1)));
+        }
+        if (right != null) {
+            right.setEnabled(false);
+            right.setTextColor(COLOR_SUCCESS);
+            right.setBackground(rounded(0xFFEAF8F2, dp(16), COLOR_SUCCESS, dp(1)));
+        }
+    }
+
+    private void renderPronunciation(LearningLessonRepository.Exercise exercise) {
+        TextView target = text(!exercise.text.isEmpty() ? exercise.text : exercise.answer,
+                36, COLOR_TEXT, true);
+        target.setGravity(Gravity.CENTER);
+        questionHost.addView(target, new LinearLayout.LayoutParams(-1, -2));
+
+        if (!exercise.pinyin.isEmpty()) {
+            TextView pinyin = text(exercise.pinyin, 18, COLOR_ACCENT, true);
+            pinyin.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams pinyinLp = new LinearLayout.LayoutParams(-1, -2);
+            pinyinLp.setMargins(0, dp(8), 0, dp(20));
+            questionHost.addView(pinyin, pinyinLp);
+        } else {
+            addVerticalSpace(questionHost, 18);
+        }
+
+        TextView original = text(getString(R.string.learning_lesson_play_original), 15,
+                COLOR_ACCENT, true);
+        original.setGravity(Gravity.CENTER);
+        original.setBackground(rounded(0xFFF0EFFF, dp(18), COLOR_ACCENT, dp(1)));
+        original.setOnClickListener(v -> playExerciseAudio(exercise));
+        questionHost.addView(original, new LinearLayout.LayoutParams(-1, dp(52)));
+        addVerticalSpace(questionHost, 10);
+
+        TextView record = text(getString(R.string.learning_lesson_record_compare), 16,
+                Color.WHITE, true);
+        record.setGravity(Gravity.CENTER);
+        record.setBackground(rounded(COLOR_ACCENT, dp(18), 0, 0));
+        record.setOnClickListener(v -> openPronunciationComparison(exercise));
+        questionHost.addView(record, new LinearLayout.LayoutParams(-1, dp(56)));
+
+        TextView hint = text(getString(R.string.learning_lesson_pronunciation_hint), 13,
+                COLOR_SUB, false);
+        hint.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+        hintLp.setMargins(0, dp(12), 0, 0);
+        questionHost.addView(hint, hintLp);
+    }
+
+    private void openPronunciationComparison(LearningLessonRepository.Exercise exercise) {
+        Intent intent = new Intent(this, WordPronunciationActivity.class);
+        intent.putExtra(WordPronunciationActivity.EXTRA_WORD,
+                !exercise.text.isEmpty() ? exercise.text : exercise.answer);
+        intent.putExtra(WordPronunciationActivity.EXTRA_PINYIN, exercise.pinyin);
+        if (!filePath.isEmpty() && !exercise.audio.isEmpty()) {
+            try {
+                File audioFile = resolveInstalledMedia(exercise.audio);
+                if (audioFile.isFile()) {
+                    intent.putExtra(WordPronunciationActivity.EXTRA_STANDARD_AUDIO_FILE,
+                            audioFile.getAbsolutePath());
+                }
+            } catch (Throwable ignored) { }
+        } else {
+            String audioAsset = resolveBundledAudioAsset(exercise.audio);
+            if (!audioAsset.isEmpty()) {
+                intent.putExtra(WordPronunciationActivity.EXTRA_STANDARD_AUDIO_ASSET, audioAsset);
+            }
+        }
+        intent.putExtra(WordPronunciationActivity.EXTRA_STANDARD_AUDIO_SPEED, 0.5f);
+        intent.putExtra(WordPronunciationActivity.EXTRA_COMPARISON_ONLY, true);
+        intent.putExtra(WordPronunciationActivity.EXTRA_AUTO_START, true);
+        startActivityForResult(intent, REQ_PRONUNCIATION_COMPARE);
+    }
+
+    private View audioButton(LearningLessonRepository.Exercise exercise) {
+        TextView play = text("◖))  " + getString(R.string.learning_lesson_play_audio),
+                16, COLOR_ACCENT, true);
+        play.setGravity(Gravity.CENTER);
+        play.setBackground(rounded(0xFFF0EFFF, dp(18), COLOR_ACCENT, dp(1)));
+        play.setOnClickListener(v -> playExerciseAudio(exercise));
+        return play;
+    }
+
+    private void onAction() {
+        if (currentIndex >= queue.size()) return;
+        if (answered) {
+            currentIndex++;
+            showCurrentQuestion();
+            return;
+        }
+        LearningLessonRepository.Exercise exercise = queue.get(currentIndex);
+        AnswerResult result = evaluate(exercise);
+        if (!result.ready) {
+            Toast.makeText(this, result.message.isEmpty()
+                    ? getString(R.string.learning_lesson_answer_first) : result.message,
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        answered = true;
+        hideKeyboard();
+        boolean firstAttempt = firstAttemptAnswered.add(exercise.id);
+        if (firstAttempt && result.correct) firstAttemptCorrect++;
+        if (result.correct) masteredExercises.add(exercise.id);
+
+        boolean willRetry = false;
+        if (!result.correct) {
+            int retries = retryCount.containsKey(exercise.id) ? retryCount.get(exercise.id) : 0;
+            int maxRetries = lessonData == null ? 2 : lessonData.maxRetries;
+            if (retries < maxRetries) {
+                retryCount.put(exercise.id, retries + 1);
+                queue.add(exercise);
+                willRetry = true;
+            }
+        }
+        showFeedback(exercise, result.correct, willRetry);
+    }
+
+    private AnswerResult evaluate(LearningLessonRepository.Exercise exercise) {
+        if ("single_choice".equals(exercise.type) || "listen_choice".equals(exercise.type)
+                || "true_false".equals(exercise.type) || "image_choice".equals(exercise.type)) {
+            if (selectedChoice.isEmpty()) return AnswerResult.notReady("");
+            return AnswerResult.of(LearningLessonRepository.normalize(selectedChoice).equals(
+                    LearningLessonRepository.normalize(exercise.answer)));
+        }
+        if ("fill_blank".equals(exercise.type) || "dictation".equals(exercise.type)) {
+            String value = fillInput == null ? "" : fillInput.getText().toString().trim();
+            if (value.isEmpty()) return AnswerResult.notReady("");
+            return AnswerResult.of(exercise.accepts(value));
+        }
+        if ("word_order".equals(exercise.type)) {
+            if (orderedTokens.isEmpty()) return AnswerResult.notReady("");
+            ArrayList<String> words = new ArrayList<>();
+            for (WordToken token : orderedTokens) words.add(token.value);
+            String value = LearningLessonRepository.join(words);
+            return AnswerResult.of(LearningLessonRepository.normalize(value).equals(
+                    LearningLessonRepository.normalize(exercise.answer)));
+        }
+        if ("matching".equals(exercise.type)) {
+            if (matchedPairIndexes.size() < exercise.pairs.size()) {
+                return AnswerResult.notReady(getString(R.string.learning_lesson_finish_matching));
+            }
+            return AnswerResult.of(true);
+        }
+        if ("pronunciation".equals(exercise.type)) {
+            if (!pronunciationOpened) {
+                return AnswerResult.notReady(getString(R.string.learning_lesson_record_first));
+            }
+            return AnswerResult.of(true);
+        }
+        return AnswerResult.of(false);
+    }
+
+    private void showFeedback(LearningLessonRepository.Exercise exercise, boolean correct,
+                              boolean willRetry) {
+        feedbackPanel.setVisibility(View.VISIBLE);
+        feedbackPanel.setBackground(rounded(correct ? 0xFFEAF8F2 : 0xFFFFEEF1,
+                dp(22), correct ? 0xFFBEE6D7 : 0xFFF4C5CE, dp(1)));
+        feedbackTitle.setText(correct ? R.string.learning_lesson_correct
+                : R.string.learning_lesson_incorrect);
+        feedbackTitle.setTextColor(correct ? COLOR_SUCCESS : COLOR_ERROR);
+
+        StringBuilder body = new StringBuilder();
+        if (!correct) body.append(getString(R.string.learning_lesson_correct_answer,
+                displayAnswer(exercise)));
+        if (!exercise.explanation.isEmpty()) {
+            if (body.length() > 0) body.append('\n');
+            body.append(exercise.explanation);
+        }
+        if (!correct) {
+            if (body.length() > 0) body.append('\n');
+            body.append(getString(willRetry ? R.string.learning_lesson_retry_hint
+                    : R.string.learning_lesson_retry_exhausted));
+        } else if (body.length() == 0) {
+            body.append(getString(R.string.learning_lesson_correct_hint));
+        }
+        feedbackBody.setText(body.toString());
+        actionButton.setText(currentIndex + 1 >= queue.size()
+                ? R.string.learning_lesson_finish : R.string.learning_lesson_continue);
+        actionButton.setBackground(rounded(correct ? COLOR_SUCCESS : COLOR_ERROR,
+                dp(19), 0, 0));
+        actionButton.performHapticFeedback(correct ? HapticFeedbackConstants.CONFIRM
+                : HapticFeedbackConstants.REJECT);
+    }
+
+    private String displayAnswer(LearningLessonRepository.Exercise exercise) {
+        if (exercise == null) return "";
+        for (LearningLessonRepository.ChoiceOption option : exercise.options) {
+            if (LearningLessonRepository.normalize(option.value).equals(
+                    LearningLessonRepository.normalize(exercise.answer))) {
+                return option.text;
+            }
+        }
+        if ("word_order".equals(exercise.type) && !exercise.answerWords.isEmpty()) {
+            return LearningLessonRepository.join(exercise.answerWords);
+        }
+        return exercise.answer;
+    }
+
+    private void showCompletion() {
+        questionHost.removeAllViews();
+        feedbackPanel.setVisibility(View.GONE);
+        actionButton.setVisibility(View.GONE);
+        progressBar.setProgress(1000);
+        progressText.setText(getString(R.string.learning_lesson_complete_progress));
+
+        int total = Math.max(1, originalExercises.size());
+        if (!attemptRecorded) {
+            completionScore = clamp(firstAttemptCorrect * 100 / total, 0, 100);
+            boolean masteredAll = masteredExercises.size() >= originalExercises.size();
+            int passingScore = lessonData == null ? 0 : lessonData.passingScore;
+            completionPassed = masteredAll && completionScore >= passingScore;
+            completionStars = completionPassed
+                    ? completionScore >= 90 ? 3 : completionScore >= 75 ? 2 : 1 : 0;
+            if (progressStore != null) {
+                progressStore.recordAttempt(courseId, lessonId, completionScore,
+                        completionStars, completionPassed);
+            }
+            attemptRecorded = true;
+        }
+
+        int resultColor = completionPassed ? COLOR_SUCCESS : COLOR_ERROR;
+        TextView icon = text(completionPassed ? "✓" : "!", 42, Color.WHITE, true);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackground(rounded(resultColor, dp(42), 0, 0));
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(84), dp(84));
+        iconLp.gravity = Gravity.CENTER_HORIZONTAL;
+        iconLp.setMargins(0, dp(32), 0, dp(18));
+        questionHost.addView(icon, iconLp);
+
+        TextView done = text(getString(completionPassed
+                        ? R.string.learning_lesson_complete_title
+                        : R.string.learning_lesson_not_passed_title),
+                28, COLOR_TEXT, true);
+        done.setGravity(Gravity.CENTER);
+        questionHost.addView(done, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView starsView = text(repeat("★", completionStars) + repeat("☆", 3 - completionStars),
+                27, completionPassed ? 0xFFFFB020 : 0xFFB7BECA, true);
+        starsView.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams starsLp = new LinearLayout.LayoutParams(-1, -2);
+        starsLp.setMargins(0, dp(12), 0, dp(8));
+        questionHost.addView(starsView, starsLp);
+
+        TextView scoreView = text(getString(R.string.learning_lesson_score, completionScore), 17,
+                COLOR_SUB, true);
+        scoreView.setGravity(Gravity.CENTER);
+        questionHost.addView(scoreView, new LinearLayout.LayoutParams(-1, -2));
+
+        if (!completionPassed) {
+            int missing = Math.max(0, originalExercises.size() - masteredExercises.size());
+            int passing = lessonData == null ? 0 : lessonData.passingScore;
+            String reason = missing > 0
+                    ? getString(R.string.learning_lesson_not_mastered, missing)
+                    : getString(R.string.learning_lesson_score_required, passing);
+            TextView reasonView = text(reason, 14, COLOR_ERROR, false);
+            reasonView.setGravity(Gravity.CENTER);
+            reasonView.setLineSpacing(dp(2), 1f);
+            LinearLayout.LayoutParams reasonLp = new LinearLayout.LayoutParams(-1, -2);
+            reasonLp.setMargins(dp(12), dp(12), dp(12), 0);
+            questionHost.addView(reasonView, reasonLp);
+        }
+
+        TextView primary = text(getString(completionPassed
+                        ? R.string.learning_lesson_back_to_map : R.string.learning_lesson_again),
+                16, Color.WHITE, true);
+        primary.setGravity(Gravity.CENTER);
+        primary.setBackground(rounded(completionPassed ? COLOR_ACCENT : COLOR_ERROR, dp(19), 0, 0));
+        primary.setOnClickListener(v -> {
+            if (completionPassed) finish();
+            else restartSession();
+        });
+        LinearLayout.LayoutParams primaryLp = new LinearLayout.LayoutParams(-1, dp(56));
+        primaryLp.setMargins(0, dp(28), 0, dp(10));
+        questionHost.addView(primary, primaryLp);
+
+        TextView secondary = text(getString(completionPassed
+                        ? R.string.learning_lesson_again : R.string.learning_lesson_back_to_map),
+                15, COLOR_ACCENT, true);
+        secondary.setGravity(Gravity.CENTER);
+        secondary.setBackground(rounded(0xFFF0EFFF, dp(18), COLOR_ACCENT, dp(1)));
+        secondary.setOnClickListener(v -> {
+            if (completionPassed) restartSession();
+            else finish();
+        });
+        questionHost.addView(secondary, new LinearLayout.LayoutParams(-1, dp(52)));
+    }
+
+    private void restartSession() {
+        resetSession();
+        queue.addAll(originalExercises);
+        showCurrentQuestion();
+    }
+
+    private void showLoadError(String message) {
+        questionHost.removeAllViews();
+        feedbackPanel.setVisibility(View.GONE);
+        progressText.setText("—");
+        actionButton.setEnabled(true);
+        actionButton.setAlpha(1f);
+        TextView error = text(getString(R.string.learning_lesson_load_failed,
+                message == null ? "" : message), 15, COLOR_ERROR, false);
+        error.setGravity(Gravity.CENTER);
+        error.setLineSpacing(dp(3), 1f);
+        error.setPadding(dp(20), dp(32), dp(20), dp(32));
+        error.setBackground(rounded(0xFFFFEEF1, dp(22), 0xFFF4C5CE, dp(1)));
+        questionHost.addView(error, new LinearLayout.LayoutParams(-1, -2));
+        actionButton.setText(R.string.learning_lesson_close);
+        actionButton.setOnClickListener(v -> finish());
+    }
+
+    private void playExerciseAudio(LearningLessonRepository.Exercise exercise) {
+        releasePlayer();
+        if (!exercise.audio.isEmpty()) {
+            try {
+                MediaPlayer player = new MediaPlayer();
+                player.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build());
+                if (!filePath.isEmpty()) {
+                    File audio = resolveInstalledMedia(exercise.audio);
+                    if (!audio.isFile()) throw new IllegalStateException("Audio not found");
+                    player.setDataSource(audio.getAbsolutePath());
+                } else {
+                    String asset = resolveBundledAudioAsset(exercise.audio);
+                    try (AssetFileDescriptor descriptor = getAssets().openFd(asset)) {
+                        player.setDataSource(descriptor.getFileDescriptor(), descriptor.getStartOffset(),
+                                descriptor.getLength());
+                    }
+                }
+                player.setOnPreparedListener(mp -> {
+                    if (mediaPlayer != mp || destroyed) {
+                        try { mp.release(); } catch (Throwable ignored) { }
+                        return;
+                    }
+                    try {
+                        if (Build.VERSION.SDK_INT >= 23
+                                && Math.abs(exercise.originalSpeed - 1f) > 0.01f) {
+                            PlaybackParams params = mp.getPlaybackParams();
+                            params.setSpeed(Math.max(0.5f, Math.min(1.5f, exercise.originalSpeed)));
+                            mp.setPlaybackParams(params);
+                        }
+                        mp.start();
+                    } catch (Throwable ignored) {
+                        if (mediaPlayer == mp) {
+                            releasePlayer();
+                            speakFallback(exercise);
+                        } else {
+                            try { mp.release(); } catch (Throwable ignoredRelease) { }
+                        }
+                    }
+                });
+                player.setOnCompletionListener(mp -> {
+                    if (mediaPlayer == mp) releasePlayer();
+                    else try { mp.release(); } catch (Throwable ignored) { }
+                });
+                player.setOnErrorListener((mp, what, extra) -> {
+                    if (mediaPlayer == mp) {
+                        releasePlayer();
+                        speakFallback(exercise);
+                    } else {
+                        try { mp.release(); } catch (Throwable ignored) { }
+                    }
+                    return true;
+                });
+                mediaPlayer = player;
+                player.prepareAsync();
+                return;
+            } catch (Throwable ignored) {
+                releasePlayer();
+            }
+        }
+        speakFallback(exercise);
+    }
+
+    private void speakFallback(LearningLessonRepository.Exercise exercise) {
+        String value = !exercise.audioText.isEmpty() ? exercise.audioText
+                : !exercise.text.isEmpty() ? exercise.text : exercise.answer;
+        if (!LearningTtsBridge.speak(this, value, LearningTtsBridge.LANG_ZH_CN,
+                LearningTtsBridge.MODE_EXAMPLE)) {
+            Toast.makeText(this, R.string.learning_lesson_audio_unavailable,
+                    Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private String resolveBundledAudioAsset(String relative) {
+        String clean = LearningLessonRepository.cleanRelative(relative, true);
+        if (clean.isEmpty()) return "";
+        if (clean.startsWith("learning/")) return clean;
+        int slash = bundledAsset.lastIndexOf('/');
+        String parent = slash >= 0 ? bundledAsset.substring(0, slash + 1) : "";
+        return parent + clean;
+    }
+
+    private File resolveInstalledMedia(String relative) throws Exception {
+        String clean = LearningLessonRepository.cleanRelative(relative, true);
+        if (clean.isEmpty()) throw new SecurityException("Invalid media path");
+        if (!packageRootPath.isEmpty()) {
+            File rootFile = safeChild(new File(packageRootPath), clean);
+            if (rootFile.isFile()) return rootFile;
+        }
+        // Compatibility with early packages that stored media beside the lesson JSON.
+        File lessonParent = new File(filePath).getParentFile();
+        File legacy = safeChild(lessonParent, clean);
+        if (legacy.isFile()) return legacy;
+        throw new IllegalStateException("Media not found");
+    }
+
+    private File safeChild(File base, String relative) throws Exception {
+        if (base == null) throw new SecurityException("Invalid package directory");
+        String clean = LearningLessonRepository.cleanRelative(relative, true);
+        if (clean.isEmpty()) throw new SecurityException("Invalid media path");
+        File child = new File(base, clean).getCanonicalFile();
+        String basePath = base.getCanonicalPath() + File.separator;
+        if (!child.getPath().startsWith(basePath)) {
+            throw new SecurityException("Media path leaves package directory");
+        }
+        return child;
+    }
+
+    private void cancelAutoPlay() {
+        if (autoPlayRunnable != null && questionHost != null) questionHost.removeCallbacks(autoPlayRunnable);
+        autoPlayRunnable = null;
+    }
+
+    private void releasePlayer() {
+        MediaPlayer old = mediaPlayer;
+        mediaPlayer = null;
+        if (old == null) return;
+        try { old.stop(); } catch (Throwable ignored) { }
+        try { old.reset(); } catch (Throwable ignored) { }
+        try { old.release(); } catch (Throwable ignored) { }
+    }
+
+    private LinearLayout wrapRow() {
+        FlowLayout flow = new FlowLayout(this);
+        flow.setPadding(0, 0, 0, 0);
+        return flow;
+    }
+
+    private LinearLayout.LayoutParams chipLayoutParams() {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(46));
+        lp.setMargins(0, 0, dp(8), dp(8));
+        return lp;
+    }
+
+    private TextView matchButton(String value) {
+        TextView view = text(value, 15, COLOR_TEXT, true);
+        view.setGravity(Gravity.CENTER);
+        view.setPadding(dp(8), dp(5), dp(8), dp(5));
+        view.setBackground(rounded(Color.WHITE, dp(16), COLOR_BORDER, dp(1)));
+        return view;
+    }
+
+    private LinearLayout.LayoutParams matchLp() {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(58));
+        lp.setMargins(0, 0, 0, dp(9));
+        return lp;
+    }
+
+    private void addVerticalSpace(LinearLayout parent, int value) {
+        parent.addView(new View(this), new LinearLayout.LayoutParams(1, dp(value)));
+    }
+
+    private void addHorizontalSpace(LinearLayout parent, int value) {
+        parent.addView(new View(this), new LinearLayout.LayoutParams(dp(value), 1));
+    }
+
+    private void hideKeyboard() {
+        View focus = getCurrentFocus();
+        if (focus == null) return;
+        InputMethodManager manager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (manager != null) manager.hideSoftInputFromWindow(focus.getWindowToken(), 0);
+        focus.clearFocus();
+    }
+
+    private String typeLabel(String type) {
+        if ("listen_choice".equals(type) || "dictation".equals(type)) {
+            return getString(R.string.learning_lesson_type_listening);
+        }
+        if ("word_order".equals(type)) return getString(R.string.learning_lesson_type_order);
+        if ("fill_blank".equals(type)) return getString(R.string.learning_lesson_type_fill);
+        if ("matching".equals(type)) return getString(R.string.learning_lesson_type_matching);
+        if ("pronunciation".equals(type)) return getString(R.string.learning_lesson_type_speaking);
+        if ("true_false".equals(type)) return getString(R.string.learning_lesson_type_judgement);
+        if ("image_choice".equals(type)) return getString(R.string.learning_lesson_type_image);
+        return getString(R.string.learning_lesson_type_choice);
+    }
+
+    private TextView text(String value, float size, int color, boolean bold) {
+        TextView view = new TextView(this);
+        view.setText(value == null ? "" : value);
+        view.setTextSize(size);
+        view.setTextColor(color);
+        view.setIncludeFontPadding(false);
+        if (bold) view.setTypeface(Typeface.DEFAULT_BOLD);
+        return view;
+    }
+
+    private GradientDrawable rounded(int color, float radius, int strokeColor, int strokeWidth) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(radius);
+        if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
+        return drawable;
+    }
+
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private static void addValidIds(Set<String> target, ArrayList<String> values,
+                                    Map<String, LearningLessonRepository.Exercise> valid) {
+        if (values == null || valid == null) return;
+        for (String value : values) if (valid.containsKey(value)) target.add(value);
+    }
+
+    private static String repeat(String value, int count) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < Math.max(0, count); i++) builder.append(value);
+        return builder.toString();
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private static final class WordToken {
+        final int id;
+        final String value;
+
+        WordToken(int id, String value) {
+            this.id = id;
+            this.value = value == null ? "" : value;
+        }
+    }
+
+    private static final class AnswerResult {
+        final boolean ready;
+        final boolean correct;
+        final String message;
+
+        private AnswerResult(boolean ready, boolean correct, String message) {
+            this.ready = ready;
+            this.correct = correct;
+            this.message = message == null ? "" : message;
+        }
+
+        static AnswerResult of(boolean correct) {
+            return new AnswerResult(true, correct, "");
+        }
+
+        static AnswerResult notReady(String message) {
+            return new AnswerResult(false, false, message);
+        }
+    }
+
+    /** Small wrapping layout implemented as a LinearLayout-compatible container. */
+    private final class FlowLayout extends LinearLayout {
+        FlowLayout(Context context) {
+            super(context);
+            setOrientation(HORIZONTAL);
+            setGravity(Gravity.START);
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            int available = Math.max(0, MeasureSpec.getSize(widthMeasureSpec)
+                    - getPaddingLeft() - getPaddingRight());
+            int x = 0;
+            int y = 0;
+            int rowHeight = 0;
+            for (int i = 0; i < getChildCount(); i++) {
+                View child = getChildAt(i);
+                measureChildWithMargins(child, widthMeasureSpec, 0, heightMeasureSpec, y);
+                MarginLayoutParams lp = (MarginLayoutParams) child.getLayoutParams();
+                int childWidth = child.getMeasuredWidth() + lp.leftMargin + lp.rightMargin;
+                int childHeight = child.getMeasuredHeight() + lp.topMargin + lp.bottomMargin;
+                if (x > 0 && x + childWidth > available) {
+                    x = 0;
+                    y += rowHeight;
+                    rowHeight = 0;
+                }
+                x += childWidth;
+                rowHeight = Math.max(rowHeight, childHeight);
+            }
+            y += rowHeight;
+            int width = resolveSize(available + getPaddingLeft() + getPaddingRight(), widthMeasureSpec);
+            int height = resolveSize(y + getPaddingTop() + getPaddingBottom(), heightMeasureSpec);
+            setMeasuredDimension(width, height);
+        }
+
+        @Override
+        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+            int maxWidth = right - left - getPaddingLeft() - getPaddingRight();
+            int x = getPaddingLeft();
+            int y = getPaddingTop();
+            int rowHeight = 0;
+            for (int i = 0; i < getChildCount(); i++) {
+                View child = getChildAt(i);
+                MarginLayoutParams lp = (MarginLayoutParams) child.getLayoutParams();
+                int childWidth = child.getMeasuredWidth();
+                int childHeight = child.getMeasuredHeight();
+                int occupied = childWidth + lp.leftMargin + lp.rightMargin;
+                if (x > getPaddingLeft() && x - getPaddingLeft() + occupied > maxWidth) {
+                    x = getPaddingLeft();
+                    y += rowHeight;
+                    rowHeight = 0;
+                }
+                int childLeft = x + lp.leftMargin;
+                int childTop = y + lp.topMargin;
+                child.layout(childLeft, childTop, childLeft + childWidth, childTop + childHeight);
+                x += occupied;
+                rowHeight = Math.max(rowHeight, childHeight + lp.topMargin + lp.bottomMargin);
+            }
+        }
+    }
+}

@@ -31,6 +31,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
     public static final String EXTRA_PINYIN = "pinyin";
     public static final String EXTRA_SPELLING_TEXT = "spelling_text";
     public static final String EXTRA_STANDARD_AUDIO_ASSET = "standard_audio_asset";
+    public static final String EXTRA_STANDARD_AUDIO_FILE = "standard_audio_file";
     public static final String EXTRA_STANDARD_AUDIO_SPEED = "standard_audio_speed";
     public static final String EXTRA_COMPARISON_ONLY = "comparison_only";
     public static final String EXTRA_AUTO_START = "auto_start";
@@ -45,6 +46,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
     private String word;
     private String pinyin;
     private String standardAudioAsset;
+    private String standardAudioFile;
     private float standardAudioSpeed = 1f;
     private boolean comparisonOnly;
     private boolean autoStart = true;
@@ -63,6 +65,9 @@ public class WordPronunciationActivity extends AppCompatActivity {
     private TextView matchView;
     private TextView playMineButton;
     private boolean practicing;
+    private int captureGeneration;
+    private int playbackGeneration;
+    private Runnable autoStartRunnable;
     private SherpaOnnxRecognizer.ModelListener sherpaModelListener;
 
     @Override
@@ -71,6 +76,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
         word = safe(getIntent().getStringExtra(EXTRA_WORD), getString(R.string.word_unknown));
         pinyin = safe(getIntent().getStringExtra(EXTRA_PINYIN), "");
         standardAudioAsset = safe(getIntent().getStringExtra(EXTRA_STANDARD_AUDIO_ASSET), "");
+        standardAudioFile = safe(getIntent().getStringExtra(EXTRA_STANDARD_AUDIO_FILE), "");
         standardAudioSpeed = Math.max(0.5f, Math.min(1.5f,
                 getIntent().getFloatExtra(EXTRA_STANDARD_AUDIO_SPEED, 1f)));
         comparisonOnly = getIntent().getBooleanExtra(EXTRA_COMPARISON_ONLY, false);
@@ -80,12 +86,27 @@ public class WordPronunciationActivity extends AppCompatActivity {
         buildLayout();
         if (!comparisonOnly) prepareOfflineRecognizer();
         if (savedInstanceState == null && autoStart) {
-            panel.postDelayed(this::ensurePermissionAndStart, 180L);
+            autoStartRunnable = () -> {
+                autoStartRunnable = null;
+                if (!isFinishing() && !isDestroyed()) ensurePermissionAndStart();
+            };
+            panel.postDelayed(autoStartRunnable, 180L);
         }
     }
 
     @Override
+    protected void onStop() {
+        if (panel != null && autoStartRunnable != null) panel.removeCallbacks(autoStartRunnable);
+        autoStartRunnable = null;
+        releasePlayer();
+        if (practicing) releaseCapture();
+        super.onStop();
+    }
+
+    @Override
     protected void onDestroy() {
+        if (panel != null && autoStartRunnable != null) panel.removeCallbacks(autoStartRunnable);
+        autoStartRunnable = null;
         SherpaOnnxRecognizer.removeModelListener(sherpaModelListener);
         sherpaModelListener = null;
         releaseCapture();
@@ -301,6 +322,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
     private void startPractice() {
         releaseCapture();
         releasePlayer();
+        final int generation = ++captureGeneration;
         recordingFile = null;
         practicing = true;
         resultGroup.setVisibility(View.GONE);
@@ -317,7 +339,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
                 new PronunciationCaptureSession.Listener() {
                     @Override public void onStateChanged(PronunciationCaptureSession.State state) {
                         runOnUiThread(() -> {
-                            if (isFinishing()) return;
+                            if (!isCurrentCapture(generation)) return;
                             if (state == PronunciationCaptureSession.State.LISTENING) {
                                 int message = comparisonOnly
                                         ? R.string.pronunciation_status_recording_compare
@@ -336,7 +358,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
 
                     @Override public void onRms(float rmsDb) {
                         runOnUiThread(() -> {
-                            if (!practicing || isFinishing()) return;
+                            if (!isCurrentCapture(generation)) return;
                             float normalized = Math.max(0f, Math.min(1f, (rmsDb + 48f) / 42f));
                             float scale = 1f + normalized * 0.11f;
                             micButton.animate().scaleX(scale).scaleY(scale).setDuration(70).start();
@@ -346,14 +368,18 @@ public class WordPronunciationActivity extends AppCompatActivity {
 
                     @Override public void onPartialResult(String text) {
                         runOnUiThread(() -> {
-                            if (comparisonOnly || text == null || text.isEmpty() || isFinishing()) return;
+                            if (!isCurrentCapture(generation) || comparisonOnly
+                                    || text == null || text.isEmpty()) return;
                             partialView.setText(text);
                             partialView.setVisibility(View.VISIBLE);
                         });
                     }
 
                     @Override public void onFinished(PronunciationCaptureSession.Result result) {
-                        runOnUiThread(() -> showResult(result));
+                        runOnUiThread(() -> {
+                            if (!isCurrentCapture(generation)) return;
+                            showResult(result);
+                        });
                     }
                 });
         captureSession.start();
@@ -374,9 +400,12 @@ public class WordPronunciationActivity extends AppCompatActivity {
         playMineButton.setAlpha(recordingFile == null ? 0.42f : 1f);
 
         if (comparisonOnly) {
-            statusView.setText(recordingFile == null
-                    ? R.string.pronunciation_record_failed
-                    : R.string.pronunciation_status_record_done);
+            boolean recorded = recordingFile != null && recordingFile.isFile()
+                    && recordingFile.length() > 44L;
+            setResult(recorded ? RESULT_OK : RESULT_CANCELED);
+            statusView.setText(recorded
+                    ? R.string.pronunciation_status_record_done
+                    : R.string.pronunciation_record_failed);
             return;
         }
 
@@ -397,22 +426,35 @@ public class WordPronunciationActivity extends AppCompatActivity {
     }
 
     private void playStandard() {
+        if (!standardAudioFile.isEmpty()) {
+            File source = new File(standardAudioFile);
+            if (source.isFile()) {
+                playFileAsync(source, standardAudioSpeed,
+                        getString(R.string.pronunciation_status_original_speed,
+                                formatSpeed(standardAudioSpeed)));
+                return;
+            }
+        }
         if (!standardAudioAsset.isEmpty()) {
             releasePlayer();
             if (standardAudioPlayer == null) standardAudioPlayer = new PinyinAudioPlayer(this);
             standardAudioPlayer.play(standardAudioAsset, standardAudioSpeed,
                     new PinyinAudioPlayer.Callback() {
                         @Override public void onStarted(boolean placeholder) {
-                            statusView.setText(getString(
-                                    R.string.pronunciation_status_original_speed,
-                                    formatSpeed(standardAudioSpeed)));
+                            if (!isFinishing() && !isDestroyed()) {
+                                statusView.setText(getString(
+                                        R.string.pronunciation_status_original_speed,
+                                        formatSpeed(standardAudioSpeed)));
+                            }
                         }
 
                         @Override public void onCompleted() { }
 
                         @Override public void onError() {
-                            Toast.makeText(WordPronunciationActivity.this,
-                                    R.string.pronunciation_play_failed, Toast.LENGTH_SHORT).show();
+                            if (!isFinishing() && !isDestroyed()) {
+                                Toast.makeText(WordPronunciationActivity.this,
+                                        R.string.pronunciation_play_failed, Toast.LENGTH_SHORT).show();
+                            }
                         }
                     });
             return;
@@ -427,34 +469,74 @@ public class WordPronunciationActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.pronunciation_no_record, Toast.LENGTH_SHORT).show();
             return;
         }
+        playFileAsync(recordingFile, 1f, getString(R.string.pronunciation_status_play_mine));
+    }
+
+    private void playFileAsync(File source, float speed, String status) {
+        releasePlayer();
+        final int generation = ++playbackGeneration;
+        final MediaPlayer candidate = new MediaPlayer();
+        player = candidate;
         try {
-            releasePlayer();
-            player = new MediaPlayer();
-            player.setDataSource(recordingFile.getAbsolutePath());
-            player.setOnCompletionListener(mp -> releasePlayer());
-            player.prepare();
-            player.start();
-            statusView.setText(R.string.pronunciation_status_play_mine);
+            candidate.setDataSource(source.getAbsolutePath());
+            candidate.setOnPreparedListener(mp -> {
+                if (generation != playbackGeneration || player != mp
+                        || isFinishing() || isDestroyed()) {
+                    try { mp.release(); } catch (Throwable ignored) { }
+                    return;
+                }
+                try {
+                    if (Build.VERSION.SDK_INT >= 23 && Math.abs(speed - 1f) > 0.01f) {
+                        android.media.PlaybackParams params = mp.getPlaybackParams();
+                        params.setSpeed(speed);
+                        mp.setPlaybackParams(params);
+                    }
+                    mp.start();
+                    statusView.setText(status);
+                } catch (Throwable error) {
+                    releasePlayer();
+                    Toast.makeText(this, R.string.pronunciation_play_failed,
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+            candidate.setOnCompletionListener(mp -> {
+                if (player == mp) releasePlayer();
+                else try { mp.release(); } catch (Throwable ignored) { }
+            });
+            candidate.setOnErrorListener((mp, what, extra) -> {
+                if (player == mp) releasePlayer();
+                return true;
+            });
+            candidate.prepareAsync();
         } catch (Throwable error) {
             releasePlayer();
             Toast.makeText(this, R.string.pronunciation_play_failed, Toast.LENGTH_SHORT).show();
         }
     }
 
+    private boolean isCurrentCapture(int generation) {
+        return generation == captureGeneration && practicing && !isFinishing()
+                && (Build.VERSION.SDK_INT < 17 || !isDestroyed());
+    }
+
     private void releaseCapture() {
-        if (captureSession != null) captureSession.release();
+        captureGeneration++;
+        PronunciationCaptureSession current = captureSession;
         captureSession = null;
         practicing = false;
+        if (current != null) current.release();
     }
 
     private void releasePlayer() {
+        playbackGeneration++;
         if (standardAudioPlayer != null) standardAudioPlayer.stop();
-        try { if (player != null) player.release(); } catch (Throwable ignored) { }
+        MediaPlayer current = player;
         player = null;
+        try { if (current != null) current.release(); } catch (Throwable ignored) { }
     }
 
     private String originalButtonLabel() {
-        if (!standardAudioAsset.isEmpty()) {
+        if (!standardAudioAsset.isEmpty() || !standardAudioFile.isEmpty()) {
             return getString(R.string.pronunciation_original_speed,
                     formatSpeed(standardAudioSpeed));
         }
@@ -462,7 +544,7 @@ public class WordPronunciationActivity extends AppCompatActivity {
     }
 
     private String originalShortLabel() {
-        if (!standardAudioAsset.isEmpty()) {
+        if (!standardAudioAsset.isEmpty() || !standardAudioFile.isEmpty()) {
             return getString(R.string.pronunciation_original_speed,
                     formatSpeed(standardAudioSpeed));
         }
