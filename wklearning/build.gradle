@@ -87,6 +87,12 @@ def prepareSherpaOnnxAar = tasks.register('prepareSherpaOnnxAar') {
     }
 }
 
+// Keep the generated AAR connected to the task that creates it.
+// Gradle 8 validates this relationship for transitive app dependency reports
+// such as :app:collectReleaseDependencies.
+def sherpaAarFiles = files(sherpaAarFile)
+sherpaAarFiles.builtBy(prepareSherpaOnnxAar)
+
 android {
     namespace 'com.chat.learning'
     compileSdk rootProject.ext.compileSdkVersion
@@ -122,8 +128,9 @@ dependencies {
     implementation 'com.belerweb:pinyin4j:2.5.1'
     implementation 'com.squareup.okhttp3:okhttp:5.1.0'
 
-    // Local file dependency: no JitPack request is made.
-    implementation files(sherpaAarFile)
+    // Local file dependency backed by prepareSherpaOnnxAar.
+    // builtBy lets every consuming task infer the required task dependency.
+    implementation sherpaAarFiles
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
     implementation project(':wkbase')
