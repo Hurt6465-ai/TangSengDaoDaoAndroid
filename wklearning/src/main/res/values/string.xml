@@ -559,4 +559,9 @@
     <string name="speaking_imported_group_subtitle">点击进入滑屏学习，长按卡片可删除。</string>
     <string name="speaking_imported_delete_hint">· 长按删除</string>
 
+
+    <string name="learning_lesson_pinyin">拼音</string>
+    <string name="learning_lesson_pinyin_switch">显示或隐藏自动拼音</string>
+    <string name="learning_lesson_fill_pinyin">拼音提示：%1$s</string>
+    <string name="learning_lesson_drag_hint">点按加入，长按拖动可调整顺序</string>
 </resources>
