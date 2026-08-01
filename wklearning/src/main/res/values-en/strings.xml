@@ -515,4 +515,9 @@
     <string name="learning_unit_complete_title">အခန်းပြီးပါပြီ</string>
     <string name="learning_unit_complete_message">“%1$s” ကို ပြီးမြောက်ပြီး နောက်အခန်းကို ဖွင့်လိုက်ပါပြီ။</string>
     <string name="learning_path_claim">ဆုယူမည်</string>
+
+    <string name="learning_lesson_pinyin">Pinyin</string>
+    <string name="learning_lesson_pinyin_switch">Show or hide generated pinyin</string>
+    <string name="learning_lesson_fill_pinyin">Pinyin hint: %1$s</string>
+    <string name="learning_lesson_drag_hint">Tap to add; press and drag to reorder</string>
 </resources>
