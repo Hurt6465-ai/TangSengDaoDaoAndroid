@@ -1,4 +1,4 @@
-name: Android Debug Build
+name: Android Signed APK Build
 
 on:
   workflow_dispatch:
@@ -7,9 +7,18 @@ on:
       - master
       - main
 
+# 同一分支连续提交时，只保留最新一次构建，减少等待时间。
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
 
     steps:
       - name: Checkout code
@@ -22,33 +31,108 @@ jobs:
           java-version: 17
           cache: gradle
 
-      - name: Show Android SDK path
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          ls -la "$ANDROID_HOME"
-
       - name: Install Android SDK 36
+        shell: bash
         run: |
+          set -euo pipefail
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -f "$SDKMANAGER" ]; then
+          if [ ! -x "$SDKMANAGER" ]; then
             SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           fi
-          yes | "$SDKMANAGER" --licenses
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Create local.properties
+      - name: Check signing secrets
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "applicationId=com.test.ts" > local.properties
+          set -euo pipefail
+          missing=0
+          for name in ANDROID_KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::GitHub Secret 缺失：$name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Restore fixed signing keystore
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_PATH="$RUNNER_TEMP/talkami-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\r\n ' | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          keytool -list \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+
+      - name: Create application and build version
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'applicationId=com.test.ts\n' > local.properties
+
+          # 从 100001 开始并随本工作流运行次数递增，保证可以覆盖旧的 versionCode=1。
+          VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))
+          VERSION_NAME="1.0.${GITHUB_RUN_NUMBER}"
+
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "本次版本：$VERSION_NAME ($VERSION_CODE)"
 
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
-      - name: Build debug APK
-        run: ./gradlew clean :app:assembleDebug --stacktrace
+      - name: Build fixed-signature release APK
+        shell: bash
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          ./gradlew clean :app:assembleRelease --stacktrace --no-daemon
 
-      - name: Upload APK
+      - name: Verify and rename signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_PATH="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+            echo "::error::没有找到 Release APK"
+            exit 1
+          fi
+
+          OUTPUT_APK="app/build/outputs/apk/release/Talkami-${VERSION_NAME}-${VERSION_CODE}-arm32-arm64.apk"
+          if [ "$APK_PATH" != "$OUTPUT_APK" ]; then
+            cp "$APK_PATH" "$OUTPUT_APK"
+          fi
+
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
+            --verbose \
+            --print-certs \
+            "$OUTPUT_APK"
+
+          echo "SIGNED_APK=$OUTPUT_APK" >> "$GITHUB_ENV"
+
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: tangseng-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: Talkami-${{ env.VERSION_NAME }}-${{ env.VERSION_CODE }}
+          path: ${{ env.SIGNED_APK }}
+          if-no-files-found: error
+          retention-days: 30
