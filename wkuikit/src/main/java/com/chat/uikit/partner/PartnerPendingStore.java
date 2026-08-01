@@ -96,7 +96,11 @@ public final class PartnerPendingStore {
             markRequester(peerUid, messageCount, maxMessageCount);
             return;
         }
-        save(peerUid, true, true, messageCount, maxMessageCount, old.replyObserved);
+        // Defensive monotonic merge: an older asynchronous response must not move the
+        // local counter from 3 back to 2 or shrink the server-provided maximum.
+        int safeCount = Math.max(old.messageCount, Math.max(0, messageCount));
+        int safeMax = Math.max(old.maxMessageCount, Math.max(1, maxMessageCount));
+        save(peerUid, true, true, safeCount, safeMax, old.replyObserved);
     }
 
     public static void markActive(String peerUid) {
