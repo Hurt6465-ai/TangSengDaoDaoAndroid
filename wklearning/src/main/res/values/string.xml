@@ -517,4 +517,17 @@
     <string name="learning_unit_complete_title">单元完成</string>
     <string name="learning_unit_complete_message">你已完成“%1$s”，下一单元已经解锁。</string>
     <string name="learning_path_claim">领取奖励</string>
+    <string name="word_library_favorites">收藏单词</string>
+    <string name="word_library_import">导入单词</string>
+    <string name="word_library_favorites_empty">还没有收藏单词</string>
+    <string name="word_library_importing">正在导入单词本…</string>
+    <string name="word_library_import_success">已导入“%1$s”，共 %2$d 个单词</string>
+    <string name="word_library_import_failed">导入失败：%1$s</string>
+    <string name="word_library_import_invalid">无效的单词本文件</string>
+    <string name="word_library_import_picker_failed">无法打开文件选择器</string>
+    <string name="word_library_delete_title">删除导入单词本</string>
+    <string name="word_library_delete_message">确定删除“%1$s”吗？学习进度会保留。</string>
+    <string name="word_library_delete">删除</string>
+    <string name="word_library_delete_success">已删除导入单词本</string>
+
 </resources>
