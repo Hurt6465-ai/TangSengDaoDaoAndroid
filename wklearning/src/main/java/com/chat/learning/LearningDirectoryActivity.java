@@ -43,6 +43,10 @@ public class LearningDirectoryActivity extends AppCompatActivity {
     private boolean remoteRefreshStarted;
 
     public static void open(Context context, String type, String title, String parentId) {
+        if ("quiz".equals(type) || "practice".equals(type)) {
+            LearningCategoryActivity.open(context);
+            return;
+        }
         if ("speaking".equals(type)) {
             SpeakingDirectoryActivity.open(context, title, parentId);
             return;
@@ -63,6 +67,11 @@ public class LearningDirectoryActivity extends AppCompatActivity {
 
         type = getIntent().getStringExtra(EXTRA_TYPE);
         if (type == null || type.isEmpty()) type = "words";
+        if ("quiz".equals(type) || "practice".equals(type)) {
+            LearningCategoryActivity.open(this);
+            finish();
+            return;
+        }
         if ("speaking".equals(type)) {
             SpeakingDirectoryActivity.open(this,
                     getIntent().getStringExtra(EXTRA_TITLE),

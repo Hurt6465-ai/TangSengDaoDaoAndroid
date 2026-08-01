@@ -44,6 +44,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
 
@@ -83,6 +84,9 @@ public class LearningLessonActivity extends AppCompatActivity {
     private static final String STATE_FILL_TEXT = "fill_text";
     private static final String STATE_ORDER_TOKEN_IDS = "order_token_ids";
     private static final String STATE_MATCHED_PAIR_IDS = "matched_pair_ids";
+    private static final String STATE_MATCHING_HAD_MISTAKE = "matching_had_mistake";
+    private static final String STATE_MATCHING_WRONG_ATTEMPTS = "matching_wrong_attempts";
+    private static final String STATE_SESSION_SEED = "session_seed";
     private static final String PREFS_NAME = "learning_lesson_preferences";
     private static final String PREF_SHOW_PINYIN = "show_pinyin";
 
@@ -140,6 +144,9 @@ public class LearningLessonActivity extends AppCompatActivity {
     private final Map<Integer, MatchCardView> matchRightViews = new HashMap<>();
     private MatchCardView selectedMatchLeft;
     private LearningLessonRepository.PairItem selectedMatchPair;
+    private boolean matchingHadMistake;
+    private int matchingWrongAttempts;
+    private long sessionSeed;
     private MediaPlayer mediaPlayer;
     private ToneGenerator feedbackTone;
     private SoundPool feedbackSounds;
@@ -219,6 +226,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         outState.putInt(STATE_COMPLETION_SCORE, completionScore);
         outState.putInt(STATE_COMPLETION_STARS, completionStars);
         outState.putBoolean(STATE_COMPLETION_PASSED, completionPassed);
+        outState.putLong(STATE_SESSION_SEED, sessionSeed);
         if (!answered && currentIndex < queue.size()) {
             outState.putString(STATE_SELECTED_CHOICE, selectedChoice);
             if (fillInput != null) outState.putString(STATE_FILL_TEXT,
@@ -232,6 +240,8 @@ public class LearningLessonActivity extends AppCompatActivity {
                 matchedIds[matchedPosition++] = value == null ? -1 : value;
             }
             outState.putIntArray(STATE_MATCHED_PAIR_IDS, matchedIds);
+            outState.putBoolean(STATE_MATCHING_HAD_MISTAKE, matchingHadMistake);
+            outState.putInt(STATE_MATCHING_WRONG_ATTEMPTS, matchingWrongAttempts);
         }
         if (lessonData != null) outState.putString(STATE_CONTENT_HASH, lessonData.contentHash);
     }
@@ -335,7 +345,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         TextView close = text("‹", 32, COLOR_SUB, false);
         close.setGravity(Gravity.CENTER);
         close.setContentDescription(getString(R.string.learning_lesson_close));
-        close.setOnClickListener(v -> finish());
+        close.setOnClickListener(v -> confirmExit());
         bar.addView(close, new LinearLayout.LayoutParams(dp(44), dp(50)));
 
         LinearLayout center = new LinearLayout(this);
@@ -383,9 +393,10 @@ public class LearningLessonActivity extends AppCompatActivity {
         });
         bar.addView(pinyinSwitch, new LinearLayout.LayoutParams(dp(76), -1));
 
-        progressText = text("0 / 0", 12, COLOR_SUB, true);
+        progressText = text("0 / 0", 11, COLOR_SUB, true);
         progressText.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        bar.addView(progressText, new LinearLayout.LayoutParams(dp(54), -1));
+        progressText.setSingleLine(true);
+        bar.addView(progressText, new LinearLayout.LayoutParams(dp(86), -1));
         return bar;
     }
 
@@ -475,6 +486,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         completionScore = state.getInt(STATE_COMPLETION_SCORE, 0);
         completionStars = state.getInt(STATE_COMPLETION_STARS, 0);
         completionPassed = state.getBoolean(STATE_COMPLETION_PASSED, false);
+        sessionSeed = state.getLong(STATE_SESSION_SEED, sessionSeed);
         showCurrentQuestion();
         restoreQuestionInput(state);
     }
@@ -508,6 +520,8 @@ public class LearningLessonActivity extends AppCompatActivity {
         if (matchedIds != null) {
             for (int id : matchedIds) restoreMatchedPair(id);
         }
+        matchingHadMistake = state.getBoolean(STATE_MATCHING_HAD_MISTAKE, false);
+        matchingWrongAttempts = Math.max(0, state.getInt(STATE_MATCHING_WRONG_ATTEMPTS, 0));
         updateActionAvailability();
     }
 
@@ -522,6 +536,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         completionScore = 0;
         completionStars = 0;
         completionPassed = false;
+        sessionSeed = LessonSessionPolicy.newSessionSeed();
     }
 
     private void showCurrentQuestion() {
@@ -542,6 +557,8 @@ public class LearningLessonActivity extends AppCompatActivity {
         matchRightViews.clear();
         selectedMatchLeft = null;
         selectedMatchPair = null;
+        matchingHadMistake = false;
+        matchingWrongAttempts = 0;
         questionHost.removeAllViews();
         if (questionScroll != null) questionScroll.scrollTo(0, 0);
 
@@ -550,9 +567,7 @@ public class LearningLessonActivity extends AppCompatActivity {
             return;
         }
         LearningLessonRepository.Exercise exercise = queue.get(currentIndex);
-        int displayPosition = currentIndex + 1;
-        progressText.setText(displayPosition + " / " + queue.size());
-        progressBar.setProgress(currentIndex, Math.max(1, queue.size()));
+        updateLessonProgress();
 
         TextView typeBadge = text(typeLabel(exercise.type), 12, COLOR_BLUE, true);
         typeBadge.setGravity(Gravity.CENTER);
@@ -672,7 +687,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         ArrayList<LearningLessonRepository.ChoiceOption> choices =
                 new ArrayList<>(exercise.options);
         if (!exercise.keepOrder && !"true_false".equals(exercise.type)) {
-            Collections.shuffle(choices);
+            LessonSessionPolicy.shuffle(choices, sessionSeed, exercise.id, "choices");
         }
         int contentWidth = Math.min(dp(620), getResources().getDisplayMetrics().widthPixels - dp(36));
         int gridWidth = Math.min(dp(250), Math.max(dp(132), (contentWidth - dp(12)) / 2));
@@ -778,7 +793,11 @@ public class LearningLessonActivity extends AppCompatActivity {
     }
 
     private void renderFillBlank(LearningLessonRepository.Exercise exercise) {
-        String answerPinyin = pinyinFor(exercise.answer, exercise.pinyin);
+        boolean explicitPinyin = !exercise.pinyin.isEmpty();
+        boolean retryHint = retryCount.containsKey(exercise.id)
+                && retryCount.get(exercise.id) != null && retryCount.get(exercise.id) > 0;
+        String answerPinyin = explicitPinyin || retryHint
+                ? pinyinFor(exercise.answer, exercise.pinyin) : "";
         if (!answerPinyin.isEmpty()) {
             TextView clue = text(getString(R.string.learning_lesson_fill_pinyin, answerPinyin),
                     15, COLOR_BLUE_DARK, true);
@@ -847,11 +866,11 @@ public class LearningLessonActivity extends AppCompatActivity {
         for (int i = 0; i < exercise.words.size(); i++) {
             tokens.add(new WordToken(i, exercise.words.get(i)));
         }
-        if (!exercise.keepOrder) shuffleWordTokens(tokens);
+        if (!exercise.keepOrder) shuffleWordTokens(tokens, exercise.id);
         for (WordToken token : tokens) addOrderChip(token, orderBankRow);
     }
 
-    private void shuffleWordTokens(List<WordToken> tokens) {
+    private void shuffleWordTokens(List<WordToken> tokens, String exerciseId) {
         if (tokens == null || tokens.size() < 2) return;
         boolean hasDifferentValues = false;
         String first = LearningLessonRepository.normalize(tokens.get(0).value);
@@ -863,7 +882,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         }
         if (!hasDifferentValues) return;
         for (int attempt = 0; attempt < 6; attempt++) {
-            Collections.shuffle(tokens);
+            LessonSessionPolicy.shuffle(tokens, sessionSeed + attempt, exerciseId, "word_order");
             boolean originalOrder = true;
             for (int i = 0; i < tokens.size(); i++) {
                 if (tokens.get(i).id != i) {
@@ -981,7 +1000,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         row.addView(right, new LinearLayout.LayoutParams(0, -2, 1f));
 
         List<LearningLessonRepository.PairItem> rightItems = new ArrayList<>(exercise.pairs);
-        Collections.shuffle(rightItems);
+        LessonSessionPolicy.shuffle(rightItems, sessionSeed, exercise.id, "matching");
         for (LearningLessonRepository.PairItem pair : exercise.pairs) {
             MatchCardView view = matchButton(pair.left);
             matchLeftViews.put(pair.index, view);
@@ -1010,6 +1029,8 @@ public class LearningLessonActivity extends AppCompatActivity {
                     v.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
                     v.playSoundEffect(SoundEffectConstants.CLICK);
                 } else {
+                    matchingHadMistake = true;
+                    matchingWrongAttempts++;
                     view.setVisualState(MatchCardView.WRONG);
                     view.postDelayed(() -> {
                         if (view.isEnabled()) view.setVisualState(MatchCardView.NORMAL);
@@ -1087,6 +1108,7 @@ public class LearningLessonActivity extends AppCompatActivity {
                 willRetry = true;
             }
         }
+        updateLessonProgress();
         showFeedback(exercise, result.correct, willRetry);
     }
 
@@ -1106,15 +1128,13 @@ public class LearningLessonActivity extends AppCompatActivity {
             if (orderedTokens.isEmpty()) return AnswerResult.notReady("");
             ArrayList<String> words = new ArrayList<>();
             for (WordToken token : orderedTokens) words.add(token.value);
-            String value = LearningLessonRepository.join(words);
-            return AnswerResult.of(LearningLessonRepository.normalize(value).equals(
-                    LearningLessonRepository.normalize(exercise.answer)));
+            return AnswerResult.of(exercise.acceptsWordOrder(words));
         }
         if ("matching".equals(exercise.type)) {
             if (matchedPairIndexes.size() < exercise.pairs.size()) {
                 return AnswerResult.notReady(getString(R.string.learning_lesson_finish_matching));
             }
-            return AnswerResult.of(true);
+            return AnswerResult.of(LessonSessionPolicy.matchingCorrect(matchingHadMistake));
         }
         return AnswerResult.of(false);
     }
@@ -1142,8 +1162,13 @@ public class LearningLessonActivity extends AppCompatActivity {
         }
 
         StringBuilder body = new StringBuilder();
-        if (!correct) body.append(getString(R.string.learning_lesson_correct_answer,
-                displayAnswer(exercise)));
+        if (!correct && "matching".equals(exercise.type)) {
+            body.append(getString(R.string.learning_lesson_matching_mistakes,
+                    Math.max(1, matchingWrongAttempts)));
+        } else if (!correct) {
+            body.append(getString(R.string.learning_lesson_correct_answer,
+                    displayAnswer(exercise)));
+        }
         if (!exercise.explanation.isEmpty()) {
             if (body.length() > 0) body.append('\n');
             body.append(exercise.explanation);
@@ -1181,6 +1206,50 @@ public class LearningLessonActivity extends AppCompatActivity {
         return exercise.answer;
     }
 
+    private void updateLessonProgress() {
+        int total = Math.max(1, originalExercises.size());
+        int mastered = clamp(masteredExercises.size(), 0, total);
+        int introduced = clamp(firstAttemptAnswered.size(), 0, total);
+        progressBar.setProgress(introduced, total);
+        if (currentIndex < originalExercises.size()) {
+            progressText.setText(getString(R.string.learning_lesson_progress,
+                    Math.min(currentIndex + 1, total), total));
+        } else {
+            progressText.setText(getString(R.string.learning_lesson_review_progress,
+                    mastered, total));
+        }
+    }
+
+    private boolean hasCurrentInput() {
+        if (!selectedChoice.isEmpty() || !orderedTokens.isEmpty()
+                || !matchedPairIndexes.isEmpty() || selectedMatchPair != null) return true;
+        return fillInput != null && fillInput.getText() != null
+                && !fillInput.getText().toString().trim().isEmpty();
+    }
+
+    private void confirmExit() {
+        boolean inProgress = lessonData != null && !attemptRecorded
+                && currentIndex < queue.size()
+                && (!firstAttemptAnswered.isEmpty() || currentIndex > 0 || answered
+                || hasCurrentInput());
+        if (!inProgress) {
+            finish();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.learning_lesson_exit_title)
+                .setMessage(R.string.learning_lesson_exit_message)
+                .setNegativeButton(R.string.learning_lesson_exit_continue, null)
+                .setPositiveButton(R.string.learning_lesson_exit_leave,
+                        (dialog, which) -> finish())
+                .show();
+    }
+
+    @Override
+    public void onBackPressed() {
+        confirmExit();
+    }
+
     private void showCompletion() {
         questionHost.removeAllViews();
         feedbackHost.setVisibility(View.GONE);
@@ -1190,12 +1259,12 @@ public class LearningLessonActivity extends AppCompatActivity {
 
         int total = Math.max(1, originalExercises.size());
         if (!attemptRecorded) {
-            completionScore = clamp(firstAttemptCorrect * 100 / total, 0, 100);
-            boolean masteredAll = masteredExercises.size() >= originalExercises.size();
+            completionScore = LessonSessionPolicy.firstAttemptScore(firstAttemptCorrect, total);
             int passingScore = lessonData == null ? 0 : lessonData.passingScore;
-            completionPassed = masteredAll && completionScore >= passingScore;
-            completionStars = completionPassed
-                    ? completionScore >= 90 ? 3 : completionScore >= 75 ? 2 : 1 : 0;
+            completionPassed = LessonSessionPolicy.passed(masteredExercises.size(),
+                    originalExercises.size());
+            completionStars = LessonSessionPolicy.stars(completionScore, completionPassed,
+                    passingScore);
             if (progressStore != null) {
                 progressStore.recordAttempt(courseId, lessonId, completionScore,
                         completionStars, completionPassed);

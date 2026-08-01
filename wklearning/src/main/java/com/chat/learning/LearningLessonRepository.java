@@ -310,14 +310,29 @@ final class LearningLessonRepository {
     }
 
     static String normalize(String value) {
-        if (value == null) return "";
-        return value.trim().replaceAll("[\\s，。！？、,.!?;；:：'\"“”‘’()（）\\[\\]【】]", "")
-                .toLowerCase(Locale.ROOT);
+        return AnswerTextNormalizer.normalizeKey(value);
+    }
+
+    static boolean sameAnswer(String left, String right) {
+        return AnswerTextNormalizer.sameAnswer(left, right);
     }
 
     static String join(List<String> words) {
         StringBuilder builder = new StringBuilder();
         if (words != null) for (String word : words) builder.append(word == null ? "" : word);
+        return builder.toString();
+    }
+
+    private static String joinWithSpaces(List<String> words) {
+        StringBuilder builder = new StringBuilder();
+        if (words != null) {
+            for (String word : words) {
+                String value = word == null ? "" : word.trim();
+                if (value.isEmpty()) continue;
+                if (builder.length() > 0) builder.append(' ');
+                builder.append(value);
+            }
+        }
         return builder.toString();
     }
 
@@ -464,11 +479,18 @@ final class LearningLessonRepository {
         final List<PairItem> pairs = new ArrayList<>();
 
         boolean accepts(String value) {
-            if (normalize(value).equals(normalize(answer))) return true;
+            if (sameAnswer(value, answer)) return true;
             for (String accepted : acceptedAnswers) {
-                if (normalize(value).equals(normalize(accepted))) return true;
+                if (sameAnswer(value, accepted)) return true;
             }
             return false;
+        }
+
+        boolean acceptsWordOrder(List<String> actualWords) {
+            if (!answerWords.isEmpty()) {
+                return AnswerTextNormalizer.sameTokenSequence(actualWords, answerWords);
+            }
+            return sameAnswer(joinWithSpaces(actualWords), answer);
         }
     }
 

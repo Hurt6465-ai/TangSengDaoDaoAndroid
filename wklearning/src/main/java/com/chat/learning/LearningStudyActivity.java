@@ -56,6 +56,11 @@ public class LearningStudyActivity extends AppCompatActivity {
         subtitle = getIntent().getStringExtra(EXTRA_SUBTITLE);
         asset = getIntent().getStringExtra(EXTRA_ASSET);
         prompt = getIntent().getStringExtra(EXTRA_PROMPT);
+        if ("quiz".equals(type) || "practice".equals(type)) {
+            LearningCategoryActivity.open(this);
+            finish();
+            return;
+        }
         if (title == null || title.length() == 0) title = "学习内容";
         if (subtitle == null) subtitle = "";
         if (asset == null) asset = "";
