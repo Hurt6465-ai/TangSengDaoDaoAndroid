@@ -97,7 +97,7 @@
     <string name="dating_rewind_record_synced">Undo record synced and recommendations refreshed.</string>
     <string name="dating_refresh_after_profile">Refreshing recommendations from your new profile…</string>
     <string-array name="dating_gender_options">
-        <item>Any</item>
+        <item>Opposite sex</item>
         <item>Women</item>
         <item>Men</item>
     </string-array>
