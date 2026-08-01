@@ -3,21 +3,15 @@ package com.chat.learning;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.ColorStateList;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
-import android.view.Window;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,18 +21,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Entry page for interactive practice.
- *
- * The user first chooses a scene/category (a learning unit), then enters that
- * category's path. Keeping this page separate also prevents a large course
- * catalog from being rendered as one endless map.
- */
+/** Category-first entry for the interactive learning path. */
 public class LearningCategoryActivity extends AppCompatActivity {
-    private static final int COLOR_BG = 0xFFF4F5F7;
-    private static final int COLOR_TEXT = 0xFF3C3C3C;
-    private static final int COLOR_SUB = 0xFF777777;
-
     private LinearLayout content;
     private TextView refreshButton;
     private LearningPathRepository.Catalog catalog;
@@ -57,12 +41,7 @@ public class LearningCategoryActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Window window = getWindow();
-        window.setStatusBarColor(COLOR_BG);
-        window.setNavigationBarColor(COLOR_BG);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        }
+        LearningUiKit.applySystemBars(this, LearningUiKit.BG);
         progressStore = new LearningPathProgressStore(this);
         buildLayout();
         loadCatalog(false);
@@ -86,10 +65,10 @@ public class LearningCategoryActivity extends AppCompatActivity {
     private void buildLayout() {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setBackgroundColor(COLOR_BG);
+        page.setBackgroundColor(LearningUiKit.BG);
         setContentView(page);
 
-        page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(62)));
+        page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(58)));
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -98,31 +77,41 @@ public class LearningCategoryActivity extends AppCompatActivity {
         scroll.setVerticalScrollBarEnabled(false);
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
+        FrameLayout widthHost = new FrameLayout(this);
+        widthHost.setPadding(dp(16), 0, dp(16), dp(56));
+        scroll.addView(widthHost, new ScrollView.LayoutParams(-1, -2));
+
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(16), dp(10), dp(16), dp(56));
-        scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+        content.setClipToPadding(false);
+        int maximum = dp(620);
+        int available = Math.max(dp(280), getResources().getDisplayMetrics().widthPixels - dp(32));
+        FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(
+                Math.min(maximum, available), -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        widthHost.addView(content, contentLp);
     }
 
     private View createTopBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(12), dp(8), dp(12), 0);
+        bar.setPadding(dp(10), dp(4), dp(10), 0);
 
-        TextView back = roundIcon("‹", 30, 0xFF777777, Color.WHITE);
+        TextView back = iconButton("‹", 32);
         back.setContentDescription(getString(R.string.learning_path_back));
         back.setOnClickListener(v -> finish());
-        bar.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        bar.addView(back, new LinearLayout.LayoutParams(dp(46), dp(46)));
 
-        TextView title = text(getString(R.string.learning_category_title), 19, COLOR_TEXT, true);
+        TextView title = text(getString(R.string.learning_category_title), 18,
+                LearningUiKit.TEXT, true);
         title.setGravity(Gravity.CENTER);
+        title.setSingleLine(true);
         bar.addView(title, new LinearLayout.LayoutParams(0, -1, 1f));
 
-        refreshButton = roundIcon("↻", 21, 0xFF777777, Color.WHITE);
+        refreshButton = iconButton("↻", 22);
         refreshButton.setContentDescription(getString(R.string.learning_path_refresh));
         refreshButton.setOnClickListener(v -> loadCatalog(true));
-        bar.addView(refreshButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        bar.addView(refreshButton, new LinearLayout.LayoutParams(dp(46), dp(46)));
         return bar;
     }
 
@@ -131,6 +120,7 @@ public class LearningCategoryActivity extends AppCompatActivity {
         int generation = ++loadGeneration;
         refreshInFlight = true;
         refreshButton.setEnabled(false);
+        refreshButton.setAlpha(0.45f);
         if (manualRefresh) refreshButton.animate().rotationBy(360f).setDuration(500).start();
         if (catalog == null) showLoading();
         LearningRemoteContent.execute(() -> {
@@ -185,7 +175,10 @@ public class LearningCategoryActivity extends AppCompatActivity {
 
     private void finishRefresh() {
         refreshInFlight = false;
-        if (refreshButton != null) refreshButton.setEnabled(true);
+        if (refreshButton != null) {
+            refreshButton.setEnabled(true);
+            refreshButton.setAlpha(1f);
+        }
     }
 
     private boolean canApply(int generation) {
@@ -195,9 +188,10 @@ public class LearningCategoryActivity extends AppCompatActivity {
 
     private void showLoading() {
         content.removeAllViews();
-        TextView loading = text(getString(R.string.learning_path_loading), 15, COLOR_SUB, false);
+        TextView loading = text(getString(R.string.learning_path_loading), 15,
+                LearningUiKit.SUBTEXT, false);
         loading.setGravity(Gravity.CENTER);
-        loading.setPadding(0, dp(70), 0, dp(70));
+        loading.setPadding(0, dp(90), 0, dp(90));
         content.addView(loading, new LinearLayout.LayoutParams(-1, -2));
     }
 
@@ -205,13 +199,18 @@ public class LearningCategoryActivity extends AppCompatActivity {
         if (content == null || catalog == null) return;
         content.removeAllViews();
 
-        TextView heading = text(getString(R.string.learning_category_heading), 27, COLOR_TEXT, true);
-        content.addView(heading, new LinearLayout.LayoutParams(-1, -2));
+        TextView heading = text(getString(R.string.learning_category_heading), 28,
+                LearningUiKit.TEXT, true);
+        heading.setLetterSpacing(-0.015f);
+        LinearLayout.LayoutParams headingLp = new LinearLayout.LayoutParams(-1, -2);
+        headingLp.setMargins(dp(2), dp(14), dp(2), 0);
+        content.addView(heading, headingLp);
 
-        TextView sub = text(getString(R.string.learning_category_subtitle), 14, COLOR_SUB, false);
-        sub.setLineSpacing(dp(2), 1f);
+        TextView sub = text(getString(R.string.learning_category_subtitle), 15,
+                LearningUiKit.SUBTEXT, false);
+        sub.setLineSpacing(dp(3), 1f);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
-        subLp.setMargins(0, dp(6), 0, dp(20));
+        subLp.setMargins(dp(2), dp(8), dp(2), dp(24));
         content.addView(sub, subLp);
 
         int index = 0;
@@ -219,21 +218,29 @@ public class LearningCategoryActivity extends AppCompatActivity {
             Map<String, LearningPathProgressStore.Progress> courseProgress = progressStore == null
                     ? new HashMap<>() : progressStore.loadCourse(course.id);
             for (LearningPathRepository.Unit unit : course.units) {
-                CategoryCard card = new CategoryCard(this, course, unit, courseProgress, index++);
+                final int cardIndex = index++;
+                CategoryCard card = new CategoryCard(this, course, unit, courseProgress, cardIndex);
                 card.setOnClickListener(v -> {
                     v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-                    LearningPathActivity.open(this, course.id, unit.id);
+                    v.animate().scaleX(0.985f).scaleY(0.985f).setDuration(65)
+                            .withEndAction(() -> {
+                                v.animate().scaleX(1f).scaleY(1f).setDuration(110).start();
+                                LearningPathActivity.open(this, course.id, unit.id);
+                            }).start();
                 });
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(172));
-                lp.setMargins(0, 0, 0, dp(16));
+                int cardHeight = getResources().getDisplayMetrics().widthPixels >= dp(700)
+                        ? dp(210) : dp(188);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, cardHeight);
+                lp.setMargins(0, 0, 0, dp(18));
                 content.addView(card, lp);
             }
         }
 
         if (index == 0) {
-            TextView empty = text(getString(R.string.learning_path_empty), 15, COLOR_SUB, false);
+            TextView empty = text(getString(R.string.learning_path_empty), 15,
+                    LearningUiKit.SUBTEXT, false);
             empty.setGravity(Gravity.CENTER);
-            empty.setPadding(dp(20), dp(58), dp(20), dp(58));
+            empty.setPadding(dp(20), dp(72), dp(20), dp(72));
             content.addView(empty, new LinearLayout.LayoutParams(-1, -2));
         }
     }
@@ -245,20 +252,17 @@ public class LearningCategoryActivity extends AppCompatActivity {
             super(context);
             setClickable(true);
             setFocusable(true);
-            setClipToOutline(false);
-            setElevation(dp(2));
+            setClipToOutline(true);
+            setBackground(LearningUiKit.rounded(Color.WHITE, dp(26), 0, 0));
+            setElevation(dp(4));
 
-            int accent = course.accent;
-            int second = blend(accent, index % 2 == 0 ? 0xFF1CB0F6 : 0xFFFFB020, 0.34f);
-            setBackground(gradient(accent, second, dp(27)));
+            String artworkSymbol = unit.lessons.isEmpty() ? "学" : unit.lessons.get(0).icon;
+            LearningUiKit.CategoryArtworkView cover = new LearningUiKit.CategoryArtworkView(
+                    context, course.accent, index, artworkSymbol);
+            addView(cover, new FrameLayout.LayoutParams(-1, -1));
 
-            addView(new CategoryArtView(context, accent), new FrameLayout.LayoutParams(-1, -1));
-
-            LinearLayout body = new LinearLayout(context);
-            body.setOrientation(LinearLayout.VERTICAL);
-            body.setGravity(Gravity.CENTER_VERTICAL);
-            body.setPadding(dp(20), dp(16), dp(94), dp(16));
-            addView(body, new FrameLayout.LayoutParams(-1, -1));
+            LearningUiKit.ScrimView scrim = new LearningUiKit.ScrimView(context, course.accent);
+            addView(scrim, new FrameLayout.LayoutParams(-1, -1));
 
             int total = unit.lessons.size();
             int completed = 0;
@@ -267,39 +271,63 @@ public class LearningCategoryActivity extends AppCompatActivity {
                 if (value != null && value.completed()) completed++;
             }
 
+            LinearLayout body = new LinearLayout(context);
+            body.setOrientation(LinearLayout.VERTICAL);
+            body.setGravity(Gravity.BOTTOM);
+            body.setPadding(dp(20), dp(16), dp(20), dp(18));
+            addView(body, new FrameLayout.LayoutParams(-1, -1));
+
+            LinearLayout topRow = new LinearLayout(context);
+            topRow.setGravity(Gravity.CENTER_VERTICAL);
+            topRow.setOrientation(LinearLayout.HORIZONTAL);
+            FrameLayout.LayoutParams topLp = new FrameLayout.LayoutParams(-1, -2,
+                    Gravity.TOP | Gravity.START);
+            topLp.setMargins(dp(18), dp(16), dp(18), 0);
+            addView(topRow, topLp);
+
             TextView badge = text(getString(R.string.learning_category_lessons, total),
-                    11, Color.WHITE, true);
+                    12, Color.WHITE, true);
             badge.setGravity(Gravity.CENTER);
-            badge.setPadding(dp(10), dp(5), dp(10), dp(5));
-            badge.setBackground(round(0x32FFFFFF, dp(14), 0x50FFFFFF, dp(1)));
-            body.addView(badge, new LinearLayout.LayoutParams(-2, -2));
+            badge.setPadding(dp(11), dp(6), dp(11), dp(6));
+            badge.setBackground(LearningUiKit.rounded(0x2FFFFFFF, dp(15), 0x46FFFFFF, dp(1)));
+            topRow.addView(badge, new LinearLayout.LayoutParams(-2, -2));
 
-            TextView title = text(unit.title, 23, Color.WHITE, true);
+            View spacer = new View(context);
+            topRow.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
+
+            String iconValue = unit.lessons.isEmpty() ? "★" : unit.lessons.get(0).icon;
+            if (TextUtils.isEmpty(iconValue)) iconValue = "★";
+            TextView icon = text(iconValue, iconValue.length() > 2 ? 17 : 23,
+                    Color.WHITE, true);
+            icon.setGravity(Gravity.CENTER);
+            icon.setBackground(LearningUiKit.rounded(0x2AFFFFFF, dp(22), 0x42FFFFFF, dp(1)));
+            topRow.addView(icon, new LinearLayout.LayoutParams(dp(44), dp(44)));
+
+            TextView title = text(unit.title, 25, Color.WHITE, true);
             title.setMaxLines(2);
+            title.setEllipsize(TextUtils.TruncateAt.END);
             title.setLineSpacing(dp(1), 1f);
-            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-            titleLp.setMargins(0, dp(13), 0, dp(4));
-            body.addView(title, titleLp);
+            body.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-            TextView desc = text(unit.subtitle.isEmpty() ? course.subtitle : unit.subtitle,
-                    13, 0xEFFFFFFF, false);
+            String description = unit.subtitle.isEmpty() ? course.subtitle : unit.subtitle;
+            TextView desc = text(description, 14, 0xE8FFFFFF, true);
             desc.setMaxLines(2);
-            desc.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            body.addView(desc, new LinearLayout.LayoutParams(-1, -2));
+            desc.setEllipsize(TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(-1, -2);
+            descLp.setMargins(0, dp(5), dp(52), 0);
+            body.addView(desc, descLp);
 
             LinearLayout progressRow = new LinearLayout(context);
             progressRow.setOrientation(LinearLayout.HORIZONTAL);
             progressRow.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(22));
-            rowLp.setMargins(0, dp(13), 0, 0);
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(24));
+            rowLp.setMargins(0, dp(12), 0, 0);
             body.addView(progressRow, rowLp);
 
-            ProgressBar bar = new ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal);
-            bar.setMax(Math.max(1, total));
-            bar.setProgress(completed);
-            bar.setProgressTintList(ColorStateList.valueOf(Color.WHITE));
-            bar.setProgressBackgroundTintList(ColorStateList.valueOf(0x45FFFFFF));
-            progressRow.addView(bar, new LinearLayout.LayoutParams(0, dp(8), 1f));
+            LearningUiKit.ProgressView progressView = new LearningUiKit.ProgressView(context);
+            progressView.setColors(0x4AFFFFFF, Color.WHITE);
+            progressView.setProgress(completed, Math.max(1, total));
+            progressRow.addView(progressView, new LinearLayout.LayoutParams(0, dp(8), 1f));
 
             TextView count = text(completed + "/" + total, 12, Color.WHITE, true);
             count.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
@@ -307,117 +335,45 @@ public class LearningCategoryActivity extends AppCompatActivity {
             countLp.setMargins(dp(10), 0, 0, 0);
             progressRow.addView(count, countLp);
 
-            String iconValue = unit.lessons.isEmpty() ? "★" : unit.lessons.get(0).icon;
-            if (iconValue == null || iconValue.trim().isEmpty()) iconValue = "★";
-            TextView artIcon = text(iconValue, iconValue.length() > 2 ? 20 : 30,
-                    Color.WHITE, true);
-            artIcon.setGravity(Gravity.CENTER);
-            artIcon.setBackground(round(0x2FFFFFFF, dp(32), 0x55FFFFFF, dp(1)));
-            FrameLayout.LayoutParams artLp = new FrameLayout.LayoutParams(dp(64), dp(64),
-                    Gravity.END | Gravity.CENTER_VERTICAL);
-            artLp.setMargins(0, 0, dp(17), 0);
-            addView(artIcon, artLp);
-
-            TextView arrow = text("›", 20, Color.WHITE, true);
+            TextView arrow = text("›", 25, Color.WHITE, true);
             arrow.setGravity(Gravity.CENTER);
-            arrow.setBackground(round(0x42FFFFFF, dp(14), 0, 0));
-            FrameLayout.LayoutParams arrowLp = new FrameLayout.LayoutParams(dp(28), dp(28),
+            arrow.setBackground(LearningUiKit.rounded(0x2EFFFFFF, dp(20), 0x46FFFFFF, dp(1)));
+            FrameLayout.LayoutParams arrowLp = new FrameLayout.LayoutParams(dp(40), dp(40),
                     Gravity.END | Gravity.BOTTOM);
-            arrowLp.setMargins(0, 0, dp(13), dp(12));
+            arrowLp.setMargins(0, 0, dp(16), dp(45));
             addView(arrow, arrowLp);
 
             if (completed == total && total > 0) {
-                TextView done = text("★", 20, 0xFFFFD75E, true);
+                TextView done = text("✓", 16, 0xFF4B5A23, true);
                 done.setGravity(Gravity.CENTER);
+                done.setBackground(LearningUiKit.raisedSelector(LearningUiKit.YELLOW,
+                        LearningUiKit.YELLOW_DARK, dp(17), 0, 0, dp(4)));
                 done.setContentDescription(getString(R.string.learning_path_completed));
-                FrameLayout.LayoutParams doneLp = new FrameLayout.LayoutParams(dp(38), dp(38),
+                FrameLayout.LayoutParams doneLp = new FrameLayout.LayoutParams(dp(34), dp(38),
                         Gravity.TOP | Gravity.END);
-                doneLp.setMargins(0, dp(13), dp(13), 0);
+                doneLp.setMargins(0, dp(21), dp(68), 0);
                 addView(done, doneLp);
             }
 
             setContentDescription(unit.title + ", "
                     + getString(R.string.learning_path_progress, completed, total));
         }
-
-        @Override
-        public boolean performClick() {
-            super.performClick();
-            animate().scaleX(0.985f).scaleY(0.985f).setDuration(60)
-                    .withEndAction(() -> animate().scaleX(1f).scaleY(1f).setDuration(120).start())
-                    .start();
-            return true;
-        }
     }
 
-    private static final class CategoryArtView extends View {
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final int accent;
-
-        CategoryArtView(Context context, int accent) {
-            super(context);
-            this.accent = accent;
-            setWillNotDraw(false);
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            float w = getWidth();
-            float h = getHeight();
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(0x18FFFFFF);
-            canvas.drawCircle(w - h * 0.12f, -h * 0.05f, h * 0.78f, paint);
-            paint.setColor(0x10FFFFFF);
-            canvas.drawCircle(w - h * 0.72f, h * 1.02f, h * 0.58f, paint);
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(Math.max(1f, h * 0.012f));
-            paint.setColor(0x20FFFFFF);
-            canvas.drawCircle(w * 0.77f, h * 0.52f, h * 0.34f, paint);
-        }
-    }
-
-    private TextView roundIcon(String value, float size, int color, int background) {
-        TextView view = text(value, size, color, false);
+    private TextView iconButton(String value, float size) {
+        TextView view = text(value, size, LearningUiKit.SUBTEXT, false);
         view.setGravity(Gravity.CENTER);
-        view.setBackground(round(background, dp(22), 0xFFE5E5E5, dp(1)));
+        view.setBackground(LearningUiKit.rounded(Color.TRANSPARENT, dp(23), 0, 0));
         return view;
     }
 
     private TextView text(String value, float size, int color, boolean bold) {
-        TextView view = new TextView(this);
-        view.setText(value == null ? "" : value);
-        view.setTextSize(size);
-        view.setTextColor(color);
-        view.setIncludeFontPadding(false);
-        if (bold) view.setTypeface(Typeface.DEFAULT_BOLD);
+        TextView view = LearningUiKit.text(this, value, size, color, bold);
+        if (bold) view.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
         return view;
     }
 
-    private GradientDrawable round(int color, float radius, int stroke, int strokeWidth) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(radius);
-        if (strokeWidth > 0) drawable.setStroke(strokeWidth, stroke);
-        return drawable;
-    }
-
-    private GradientDrawable gradient(int start, int end, float radius) {
-        GradientDrawable drawable = new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR, new int[]{start, end});
-        drawable.setCornerRadius(radius);
-        return drawable;
-    }
-
-    private static int blend(int first, int second, float amount) {
-        float t = Math.max(0f, Math.min(1f, amount));
-        int r = (int) (Color.red(first) * (1f - t) + Color.red(second) * t);
-        int g = (int) (Color.green(first) * (1f - t) + Color.green(second) * t);
-        int b = (int) (Color.blue(first) * (1f - t) + Color.blue(second) * t);
-        return Color.rgb(r, g, b);
-    }
-
     private int dp(float value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+        return LearningUiKit.dp(this, value);
     }
 }

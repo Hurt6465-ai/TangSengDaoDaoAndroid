@@ -4,10 +4,10 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -20,7 +20,6 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -36,16 +35,16 @@ import java.util.Map;
 public class LearningPathActivity extends AppCompatActivity {
     private static final String EXTRA_COURSE_ID = "course_id";
     private static final String EXTRA_UNIT_ID = "unit_id";
-    private static final int COLOR_BG = 0xFFF4F5F7;
-    private static final int COLOR_TEXT = 0xFF3C3C3C;
-    private static final int COLOR_SUB = 0xFF777777;
-    private static final int COLOR_BORDER = 0xFFE5E5E5;
-    private static final int COLOR_GREEN = 0xFF58CC02;
-    private static final int COLOR_GREEN_DARK = 0xFF46A302;
-    private static final int COLOR_BLUE = 0xFF1CB0F6;
-    private static final int COLOR_BLUE_DARK = 0xFF1899D6;
-    private static final int COLOR_YELLOW = 0xFFFFC800;
-    private static final int COLOR_YELLOW_DARK = 0xFFE5A500;
+    private static final int COLOR_BG = LearningUiKit.BG;
+    private static final int COLOR_TEXT = LearningUiKit.TEXT;
+    private static final int COLOR_SUB = LearningUiKit.SUBTEXT;
+    private static final int COLOR_BORDER = LearningUiKit.BORDER;
+    private static final int COLOR_GREEN = LearningUiKit.GREEN;
+    private static final int COLOR_GREEN_DARK = LearningUiKit.GREEN_DARK;
+    private static final int COLOR_BLUE = LearningUiKit.BLUE;
+    private static final int COLOR_BLUE_DARK = LearningUiKit.BLUE_DARK;
+    private static final int COLOR_YELLOW = LearningUiKit.YELLOW;
+    private static final int COLOR_YELLOW_DARK = LearningUiKit.YELLOW_DARK;
     private static final int COLOR_LOCKED = 0xFFE5E5E5;
     private static final int COLOR_LOCKED_DARK = 0xFFCFCFCF;
 
@@ -142,7 +141,7 @@ public class LearningPathActivity extends AppCompatActivity {
         page.setBackgroundColor(COLOR_BG);
         setContentView(page);
 
-        page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(62)));
+        page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(58)));
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -151,24 +150,30 @@ public class LearningPathActivity extends AppCompatActivity {
         scroll.setVerticalScrollBarEnabled(false);
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
+        FrameLayout widthHost = new FrameLayout(this);
+        widthHost.setPadding(dp(14), dp(6), dp(14), dp(70));
+        scroll.addView(widthHost, new ScrollView.LayoutParams(-1, -2));
+
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setClipChildren(false);
         content.setClipToPadding(false);
-        content.setPadding(dp(14), dp(8), dp(14), dp(84));
-        scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+        int available = Math.max(dp(300), getResources().getDisplayMetrics().widthPixels - dp(28));
+        FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(
+                Math.min(dp(560), available), -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        widthHost.addView(content, contentLp);
     }
 
     private View createTopBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(12), dp(8), dp(12), 0);
+        bar.setPadding(dp(10), dp(4), dp(10), 0);
 
-        TextView back = circleButton("‹", 30);
+        TextView back = circleButton("‹", 32);
         back.setContentDescription(getString(R.string.learning_path_back));
         back.setOnClickListener(v -> finish());
-        bar.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        bar.addView(back, new LinearLayout.LayoutParams(dp(46), dp(46)));
 
         pageTitle = text(getString(R.string.learning_path_title), 18, COLOR_TEXT, true);
         pageTitle.setGravity(Gravity.CENTER);
@@ -178,10 +183,10 @@ public class LearningPathActivity extends AppCompatActivity {
         titleLp.setMargins(dp(8), 0, dp(8), 0);
         bar.addView(pageTitle, titleLp);
 
-        refreshButton = circleButton("↻", 21);
+        refreshButton = circleButton("↻", 22);
         refreshButton.setContentDescription(getString(R.string.learning_path_refresh));
         refreshButton.setOnClickListener(v -> loadCatalog(true));
-        bar.addView(refreshButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        bar.addView(refreshButton, new LinearLayout.LayoutParams(dp(46), dp(46)));
         return bar;
     }
 
@@ -317,14 +322,14 @@ public class LearningPathActivity extends AppCompatActivity {
 
         pageTitle.setText(selectedUnit.title);
         String currentLesson = findCurrentLesson(selectedUnit.lessons);
-
         int completed = 0;
         for (LearningPathRepository.Lesson lesson : selectedUnit.lessons) {
             LearningPathProgressStore.Progress item = progress.get(lesson.id);
             if (item != null && item.completed()) completed++;
         }
+
         LinearLayout.LayoutParams headerLp = new LinearLayout.LayoutParams(-1, -2);
-        headerLp.setMargins(0, dp(5), 0, dp(14));
+        headerLp.setMargins(0, dp(8), 0, dp(24));
         content.addView(categoryHeader(selectedUnit, completed, selectedUnit.lessons.size()), headerLp);
 
         if (selectedUnit.lessons.isEmpty()) {
@@ -334,69 +339,77 @@ public class LearningPathActivity extends AppCompatActivity {
         }
 
         PathLayout path = new PathLayout(this);
+        int index = 0;
         for (LearningPathRepository.Lesson lesson : selectedUnit.lessons) {
             NodeState state = stateFor(lesson, currentLesson);
             NodeView node = new NodeView(this, course.accent);
             node.bind(lesson, state, progress.get(lesson.id), downloads.get(lesson.id));
             node.setOnClickListener(v -> throttled(() -> onLessonClick(lesson, node.nodeState())));
             nodeViews.put(lesson.id, node);
-            path.addNode(node, lesson.position);
+            path.addNode(node, index++);
         }
         LinearLayout.LayoutParams pathLp = new LinearLayout.LayoutParams(-1, -2);
-        pathLp.setMargins(0, dp(10), 0, dp(10));
+        pathLp.setMargins(0, 0, 0, dp(18));
         content.addView(path, pathLp);
-
-        TextView tip = text(getString(R.string.learning_path_map_tip), 12, COLOR_SUB, false);
-        tip.setGravity(Gravity.CENTER);
-        tip.setPadding(dp(12), dp(10), dp(12), dp(10));
-        content.addView(tip, new LinearLayout.LayoutParams(-1, -2));
     }
 
     private View categoryHeader(LearningPathRepository.Unit unit, int completed, int total) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(20), dp(18), dp(20), dp(17));
-        int accent = course == null ? COLOR_GREEN : course.accent;
-        int end = blend(accent, COLOR_BLUE, 0.30f);
-        card.setBackground(gradient(accent, end, dp(26)));
+        FrameLayout card = new FrameLayout(this);
+        int accent = course == null || course.accent == 0 ? COLOR_GREEN : course.accent;
+        card.setBackground(round(accent, dp(20), 0, 0));
+        card.setPadding(dp(20), dp(18), dp(20), dp(18));
+        card.setElevation(dp(2));
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        card.addView(body, new FrameLayout.LayoutParams(-1, -2));
 
         TextView overline = text(getString(R.string.learning_category_section), 11,
-                0xEFFFFFFF, true);
+                0xDFFFFFFF, true);
         overline.setAllCaps(true);
-        card.addView(overline, new LinearLayout.LayoutParams(-1, -2));
+        overline.setLetterSpacing(0.08f);
+        body.addView(overline, new LinearLayout.LayoutParams(-1, -2));
 
         TextView title = text(unit.title, 23, Color.WHITE, true);
         title.setLineSpacing(dp(2), 1f);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
-        titleLp.setMargins(0, dp(7), 0, dp(4));
-        card.addView(title, titleLp);
+        titleLp.setMargins(0, dp(7), dp(72), 0);
+        body.addView(title, titleLp);
 
         if (!unit.subtitle.isEmpty()) {
-            TextView subtitle = text(unit.subtitle, 13, 0xEFFFFFFF, false);
+            TextView subtitle = text(unit.subtitle, 14, 0xEFFFFFFF, false);
             subtitle.setLineSpacing(dp(2), 1f);
-            card.addView(subtitle, new LinearLayout.LayoutParams(-1, -2));
+            LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(-1, -2);
+            subtitleLp.setMargins(0, dp(5), dp(64), 0);
+            body.addView(subtitle, subtitleLp);
         }
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(28));
-        rowLp.setMargins(0, dp(15), 0, 0);
-        card.addView(row, rowLp);
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(25));
+        rowLp.setMargins(0, dp(16), 0, 0);
+        body.addView(row, rowLp);
 
-        ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        bar.setMax(Math.max(1, total));
-        bar.setProgress(completed);
-        bar.setProgressTintList(ColorStateList.valueOf(Color.WHITE));
-        bar.setProgressBackgroundTintList(ColorStateList.valueOf(0x45FFFFFF));
+        LearningUiKit.ProgressView bar = new LearningUiKit.ProgressView(this);
+        bar.setColors(0x42FFFFFF, Color.WHITE);
+        bar.setProgress(completed, Math.max(1, total));
         row.addView(bar, new LinearLayout.LayoutParams(0, dp(9), 1f));
 
         TextView count = text(completed + " / " + total, 12, Color.WHITE, true);
         count.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(dp(68), -1);
+        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(dp(64), -1);
         countLp.setMargins(dp(10), 0, 0, 0);
         row.addView(count, countLp);
 
+        TextView unitIcon = text((total > 0 && "test".equals(unit.lessons.get(total - 1).type))
+                ? "♛" : "★", 25, Color.WHITE, true);
+        unitIcon.setGravity(Gravity.CENTER);
+        unitIcon.setBackground(round(0x24FFFFFF, dp(24), 0x42FFFFFF, dp(1)));
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(dp(48), dp(48),
+                Gravity.TOP | Gravity.END);
+        iconLp.setMargins(0, dp(2), dp(1), 0);
+        card.addView(unitIcon, iconLp);
         return card;
     }
 
@@ -598,39 +611,29 @@ public class LearningPathActivity extends AppCompatActivity {
     }
 
     private TextView circleButton(String value, float size) {
-        TextView view = text(value, size, COLOR_SUB, true);
+        TextView view = text(value, size, COLOR_SUB, false);
         view.setGravity(Gravity.CENTER);
-        view.setBackground(round(Color.WHITE, dp(22), COLOR_BORDER, dp(1)));
+        view.setBackground(round(Color.TRANSPARENT, dp(23), 0, 0));
         return view;
     }
 
     private TextView text(String value, float size, int color, boolean bold) {
-        TextView view = new TextView(this);
-        view.setText(value == null ? "" : value);
-        view.setTextSize(size);
-        view.setTextColor(color);
-        view.setIncludeFontPadding(false);
-        if (bold) view.setTypeface(Typeface.DEFAULT_BOLD);
-        return view;
+        return LearningUiKit.text(this, value, size, color, bold);
     }
 
     private GradientDrawable round(int color, float radius, int strokeColor, int strokeWidth) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(radius);
-        if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
-        return drawable;
+        return LearningUiKit.rounded(color, radius, strokeColor, strokeWidth);
     }
 
     private GradientDrawable gradient(int start, int end, float radius) {
-        GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{start, end});
+        GradientDrawable drawable = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR, new int[]{start, end});
         drawable.setCornerRadius(radius);
         return drawable;
     }
 
     private int dp(float value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+        return LearningUiKit.dp(this, value);
     }
 
     private static String safe(String value) {
@@ -646,10 +649,11 @@ public class LearningPathActivity extends AppCompatActivity {
     }
 
     private final class NodeView extends LinearLayout {
+        private final FrameLayout bubbleHost;
         private final TextView startBubble;
         private final NodeCircle circle;
         private final TextView label;
-        private final TextView detail;
+        private final TextView stars;
         private NodeState state = NodeState.LOCKED;
 
         NodeView(Context context, int accent) {
@@ -660,66 +664,66 @@ public class LearningPathActivity extends AppCompatActivity {
             setFocusable(true);
             setClipChildren(false);
             setClipToPadding(false);
-            setPadding(dp(2), dp(1), dp(2), dp(1));
 
+            bubbleHost = new FrameLayout(context);
             startBubble = text(getString(R.string.learning_path_start), 11, COLOR_GREEN, true);
             startBubble.setGravity(Gravity.CENTER);
-            startBubble.setPadding(dp(11), dp(5), dp(11), dp(5));
-            startBubble.setBackground(round(Color.WHITE, dp(10), COLOR_BORDER, dp(2)));
-            startBubble.setVisibility(INVISIBLE);
-            addView(startBubble, new LinearLayout.LayoutParams(-2, dp(29)));
+            startBubble.setPadding(dp(13), dp(6), dp(13), dp(6));
+            startBubble.setBackground(round(Color.WHITE, dp(11), COLOR_BORDER, dp(2)));
+            FrameLayout.LayoutParams bubbleLp = new FrameLayout.LayoutParams(-2, dp(27),
+                    Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            bubbleHost.addView(startBubble, bubbleLp);
+            LearningUiKit.TriangleView triangle = new LearningUiKit.TriangleView(context);
+            FrameLayout.LayoutParams triangleLp = new FrameLayout.LayoutParams(dp(12), dp(7),
+                    Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+            triangleLp.setMargins(0, 0, 0, 0);
+            bubbleHost.addView(triangle, triangleLp);
+            bubbleHost.setVisibility(GONE);
+            addView(bubbleHost, new LinearLayout.LayoutParams(-1, dp(31)));
 
             circle = new NodeCircle(context, accent);
-            LinearLayout.LayoutParams circleLp = new LinearLayout.LayoutParams(dp(84), dp(88));
-            circleLp.setMargins(0, dp(2), 0, 0);
-            addView(circle, circleLp);
+            addView(circle, new LinearLayout.LayoutParams(dp(102), dp(108)));
 
-            label = text("", 13, COLOR_TEXT, true);
-            label.setGravity(Gravity.CENTER);
+            label = text("", 14, COLOR_TEXT, true);
+            label.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
             label.setMaxLines(2);
             label.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            label.setPadding(dp(8), dp(4), dp(8), dp(4));
-            label.setBackground(round(Color.WHITE, dp(10), COLOR_BORDER, dp(2)));
-            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, dp(42));
-            labelLp.setMargins(0, dp(4), 0, 0);
-            addView(label, labelLp);
+            label.setLineSpacing(dp(1), 1f);
+            label.setPadding(dp(4), dp(7), dp(4), 0);
+            addView(label, new LinearLayout.LayoutParams(-1, dp(35)));
 
-            detail = text("", 10, COLOR_SUB, true);
-            detail.setGravity(Gravity.CENTER);
-            detail.setMaxLines(1);
-            LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, dp(18));
-            detailLp.setMargins(0, dp(3), 0, 0);
-            addView(detail, detailLp);
+            stars = text("", 12, COLOR_YELLOW_DARK, true);
+            stars.setGravity(Gravity.CENTER);
+            addView(stars, new LinearLayout.LayoutParams(-1, dp(14)));
         }
 
         void bind(LearningPathRepository.Lesson lesson, NodeState state,
                   LearningPathProgressStore.Progress item, DownloadUiState download) {
             this.state = state;
             label.setText(lesson.title);
-            startBubble.setVisibility(state == NodeState.CURRENT ? VISIBLE : INVISIBLE);
-            if (state == NodeState.DOWNLOADING) {
-                int percent = download == null ? -1 : download.progress;
-                detail.setText(percent >= 0 ? percent + "%" : getString(R.string.learning_path_downloading));
-                circle.bind(lesson.icon, lesson.type, state, Math.max(0, percent));
-            } else if (state == NodeState.COMPLETED) {
-                int stars = item == null ? 0 : item.stars;
-                detail.setText(stars <= 0 ? getString(R.string.learning_path_completed) : repeatStar(stars));
-                circle.bind("✓", lesson.type, state, 100);
-            } else if (state == NodeState.CURRENT) {
-                detail.setText(getString(R.string.learning_path_current));
-                circle.bind(lesson.icon, lesson.type, state, 0);
-            } else if (state == NodeState.AVAILABLE) {
-                detail.setText(getString(R.string.learning_path_available));
-                circle.bind(lesson.icon, lesson.type, state, 0);
-            } else {
-                detail.setText(getString(R.string.learning_path_locked));
-                circle.bind("◆", lesson.type, state, 0);
-            }
-            label.setTextColor(state == NodeState.LOCKED ? 0xFFAAAAAA : COLOR_TEXT);
-            label.setBackground(round(state == NodeState.LOCKED ? 0xFFF2F2F2 : Color.WHITE,
-                    dp(10), state == NodeState.LOCKED ? 0xFFE2E2E2 : COLOR_BORDER, dp(2)));
-            setAlpha(state == NodeState.LOCKED ? 0.78f : 1f);
-            setContentDescription(lesson.title + ", " + detail.getText());
+            bubbleHost.setVisibility(state == NodeState.CURRENT ? VISIBLE : GONE);
+            int value = download == null ? 0 : Math.max(0, download.progress);
+            String displayIcon = lesson.icon == null || lesson.icon.trim().isEmpty()
+                    ? "★" : lesson.icon.trim();
+            if (state == NodeState.COMPLETED) displayIcon = "✓";
+            if (state == NodeState.LOCKED) displayIcon = "";
+            int nodeProgress = state == NodeState.DOWNLOADING
+                    ? value : item == null ? 0 : Math.max(item.bestScore, item.lastScore);
+            circle.bind(displayIcon, lesson.type, state, nodeProgress);
+
+            int starCount = item == null ? 0 : Math.max(0, Math.min(3, item.stars));
+            stars.setText(state == NodeState.COMPLETED && starCount > 0
+                    ? repeatStar(starCount) : "");
+            label.setTextColor(state == NodeState.LOCKED ? 0xFFB4B4B4 : COLOR_TEXT);
+            setAlpha(state == NodeState.LOCKED ? 0.82f : 1f);
+
+            String stateText;
+            if (state == NodeState.COMPLETED) stateText = getString(R.string.learning_path_completed);
+            else if (state == NodeState.CURRENT) stateText = getString(R.string.learning_path_current);
+            else if (state == NodeState.DOWNLOADING) stateText = value + "%";
+            else if (state == NodeState.AVAILABLE) stateText = getString(R.string.learning_path_available);
+            else stateText = getString(R.string.learning_path_locked);
+            setContentDescription(lesson.title + ", " + stateText);
         }
 
         NodeState nodeState() { return state; }
@@ -728,9 +732,9 @@ public class LearningPathActivity extends AppCompatActivity {
         public boolean performClick() {
             super.performClick();
             performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-            circle.animate().scaleX(0.90f).scaleY(0.90f).setDuration(65)
-                    .withEndAction(() -> circle.animate().scaleX(1f).scaleY(1f)
-                            .setDuration(120).start()).start();
+            circle.animate().translationY(dp(4)).scaleX(0.94f).scaleY(0.94f).setDuration(70)
+                    .withEndAction(() -> circle.animate().translationY(0).scaleX(1f).scaleY(1f)
+                            .setDuration(115).start()).start();
             return true;
         }
     }
@@ -739,8 +743,9 @@ public class LearningPathActivity extends AppCompatActivity {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF arc = new RectF();
+        private final Path symbol = new Path();
         private final int accent;
-        private String icon = "✓";
+        private String icon = "★";
         private String type = "normal";
         private NodeState state = NodeState.LOCKED;
         private int progressValue;
@@ -751,7 +756,7 @@ public class LearningPathActivity extends AppCompatActivity {
         }
 
         void bind(String icon, String type, NodeState state, int progress) {
-            this.icon = icon == null || icon.isEmpty() ? "✓" : icon;
+            this.icon = icon == null ? "" : icon;
             this.type = type == null ? "normal" : type;
             this.state = state;
             this.progressValue = Math.max(0, Math.min(100, progress));
@@ -762,49 +767,62 @@ public class LearningPathActivity extends AppCompatActivity {
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
             float cx = getWidth() / 2f;
-            float cy = getHeight() / 2f - dp(1);
-            float radius = Math.min(getWidth(), getHeight()) / 2f - dp(7);
+            float cy = getHeight() / 2f - dp(2);
+            float radius = state == NodeState.CURRENT ? dp(35)
+                    : Math.min(getWidth(), getHeight()) / 2f - dp(15);
             int fill;
             int bottom;
-            int iconColor = Color.WHITE;
+            int symbolColor = Color.WHITE;
 
             if (state == NodeState.LOCKED) {
                 fill = COLOR_LOCKED;
                 bottom = COLOR_LOCKED_DARK;
-                iconColor = 0xFFAAAAAA;
-            } else if (state == NodeState.COMPLETED) {
-                fill = COLOR_YELLOW;
-                bottom = COLOR_YELLOW_DARK;
+                symbolColor = 0xFFAAAAAA;
             } else if (state == NodeState.CURRENT) {
                 fill = COLOR_GREEN;
                 bottom = COLOR_GREEN_DARK;
+            } else if (state == NodeState.COMPLETED) {
+                fill = nodeAccent(type);
+                bottom = darken(fill, 0.79f);
             } else if (state == NodeState.DOWNLOADING) {
-                fill = 0xFF84D8FF;
+                fill = COLOR_BLUE;
                 bottom = COLOR_BLUE_DARK;
             } else {
                 fill = nodeAccent(type);
-                bottom = darken(fill, 0.82f);
+                bottom = darken(fill, 0.79f);
             }
 
             if (state == NodeState.CURRENT) {
+                float ringRadius = dp(46);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeCap(Paint.Cap.ROUND);
+                paint.setStrokeWidth(dp(8));
+                paint.setColor(COLOR_BORDER);
+                canvas.drawCircle(cx, cy + dp(1), ringRadius, paint);
+                if (progressValue > 0) {
+                    arc.set(cx - ringRadius, cy + dp(1) - ringRadius,
+                            cx + ringRadius, cy + dp(1) + ringRadius);
+                    paint.setColor(COLOR_GREEN);
+                    canvas.drawArc(arc, -90f, Math.max(8f, progressValue * 3.6f),
+                            false, paint);
+                }
+                paint.setStrokeCap(Paint.Cap.BUTT);
                 paint.setStyle(Paint.Style.FILL);
-                paint.setColor(0x3358CC02);
-                canvas.drawCircle(cx, cy + dp(2), radius + dp(8), paint);
             }
 
-            paint.setStyle(Paint.Style.FILL);
             paint.setColor(bottom);
-            canvas.drawCircle(cx, cy + dp(6), radius, paint);
+            paint.setStyle(Paint.Style.FILL);
+            canvas.drawCircle(cx, cy + dp(7), radius, paint);
             paint.setColor(fill);
             canvas.drawCircle(cx, cy, radius, paint);
 
-            paint.setColor(0x36FFFFFF);
-            canvas.drawOval(cx - radius * 0.60f, cy - radius * 0.66f,
-                    cx + radius * 0.60f, cy - radius * 0.28f, paint);
+            paint.setColor(0x28FFFFFF);
+            canvas.drawOval(cx - radius * 0.53f, cy - radius * 0.65f,
+                    cx + radius * 0.53f, cy - radius * 0.36f, paint);
 
             if (state == NodeState.DOWNLOADING) {
-                arc.set(cx - radius + dp(5), cy - radius + dp(5),
-                        cx + radius - dp(5), cy + radius - dp(5));
+                arc.set(cx - radius + dp(7), cy - radius + dp(7),
+                        cx + radius - dp(7), cy + radius - dp(7));
                 paint.setStyle(Paint.Style.STROKE);
                 paint.setStrokeCap(Paint.Cap.ROUND);
                 paint.setStrokeWidth(dp(5));
@@ -812,9 +830,26 @@ public class LearningPathActivity extends AppCompatActivity {
                 canvas.drawArc(arc, -90f, progressValue * 3.6f, false, paint);
                 paint.setStrokeCap(Paint.Cap.BUTT);
                 paint.setStyle(Paint.Style.FILL);
+                drawArrow(canvas, cx, cy, Color.WHITE);
+                return;
             }
-
-            textPaint.setColor(iconColor);
+            if (state == NodeState.LOCKED) {
+                drawLock(canvas, cx, cy, symbolColor);
+                return;
+            }
+            if (state == NodeState.COMPLETED) {
+                drawCheck(canvas, cx, cy, symbolColor);
+                return;
+            }
+            if ("test".equals(type) || "checkpoint".equals(type)) {
+                drawCrown(canvas, cx, cy, symbolColor);
+                return;
+            }
+            if ("review".equals(type)) {
+                drawStar(canvas, cx, cy, symbolColor);
+                return;
+            }
+            textPaint.setColor(symbolColor);
             textPaint.setTypeface(Typeface.DEFAULT_BOLD);
             textPaint.setTextAlign(Paint.Align.CENTER);
             textPaint.setTextSize(dp(icon.length() > 2 ? 16 : 25));
@@ -823,31 +858,108 @@ public class LearningPathActivity extends AppCompatActivity {
             canvas.drawText(icon, cx, baseline, textPaint);
         }
 
+        private void drawCheck(Canvas canvas, float cx, float cy, int color) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            paint.setStrokeWidth(dp(6));
+            paint.setColor(color);
+            symbol.reset();
+            symbol.moveTo(cx - dp(14), cy);
+            symbol.lineTo(cx - dp(4), cy + dp(10));
+            symbol.lineTo(cx + dp(16), cy - dp(12));
+            canvas.drawPath(symbol, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
+
+        private void drawLock(Canvas canvas, float cx, float cy, int color) {
+            paint.setColor(color);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(5));
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            arc.set(cx - dp(11), cy - dp(19), cx + dp(11), cy + dp(4));
+            canvas.drawArc(arc, 190f, 160f, false, paint);
+            paint.setStyle(Paint.Style.FILL);
+            canvas.drawRoundRect(cx - dp(17), cy - dp(2), cx + dp(17), cy + dp(20),
+                    dp(5), dp(5), paint);
+            paint.setColor(0x66FFFFFF);
+            canvas.drawCircle(cx, cy + dp(8), dp(3), paint);
+        }
+
+        private void drawArrow(Canvas canvas, float cx, float cy, int color) {
+            paint.setColor(color);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            paint.setStrokeWidth(dp(5));
+            canvas.drawLine(cx, cy - dp(12), cx, cy + dp(10), paint);
+            symbol.reset();
+            symbol.moveTo(cx - dp(9), cy + dp(2));
+            symbol.lineTo(cx, cy + dp(11));
+            symbol.lineTo(cx + dp(9), cy + dp(2));
+            canvas.drawPath(symbol, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
+
+        private void drawCrown(Canvas canvas, float cx, float cy, int color) {
+            paint.setColor(color);
+            paint.setStyle(Paint.Style.FILL);
+            symbol.reset();
+            symbol.moveTo(cx - dp(18), cy - dp(10));
+            symbol.lineTo(cx - dp(10), cy + dp(3));
+            symbol.lineTo(cx, cy - dp(12));
+            symbol.lineTo(cx + dp(10), cy + dp(3));
+            symbol.lineTo(cx + dp(18), cy - dp(10));
+            symbol.lineTo(cx + dp(14), cy + dp(15));
+            symbol.lineTo(cx - dp(14), cy + dp(15));
+            symbol.close();
+            canvas.drawPath(symbol, paint);
+            paint.setColor(0x45FFFFFF);
+            canvas.drawRoundRect(cx - dp(12), cy + dp(7), cx + dp(12), cy + dp(11),
+                    dp(2), dp(2), paint);
+        }
+
+        private void drawStar(Canvas canvas, float cx, float cy, int color) {
+            paint.setColor(color);
+            paint.setStyle(Paint.Style.FILL);
+            symbol.reset();
+            for (int i = 0; i < 10; i++) {
+                double angle = -Math.PI / 2 + i * Math.PI / 5;
+                float radius = i % 2 == 0 ? dp(19) : dp(9);
+                float x = cx + (float) Math.cos(angle) * radius;
+                float y = cy + (float) Math.sin(angle) * radius;
+                if (i == 0) symbol.moveTo(x, y); else symbol.lineTo(x, y);
+            }
+            symbol.close();
+            canvas.drawPath(symbol, paint);
+        }
+
         private int nodeAccent(String type) {
-            if ("test".equals(type) || "checkpoint".equals(type)) return 0xFFCE82FF;
+            if ("test".equals(type) || "checkpoint".equals(type)) return LearningUiKit.PURPLE;
             if ("review".equals(type)) return COLOR_YELLOW;
             if ("speaking".equals(type)) return 0xFFFF86D0;
             if ("listening".equals(type)) return COLOR_BLUE;
-            return accent == 0 ? COLOR_BLUE : blend(accent, COLOR_BLUE, 0.34f);
+            return accent == 0 ? COLOR_BLUE : blend(accent, COLOR_BLUE, 0.18f);
         }
     }
 
     /** Staggered map container. Deliberately draws no connector line. */
     private final class PathLayout extends ViewGroup {
-        private final Map<View, String> positions = new HashMap<>();
-        private final int rowHeight = dp(166);
-        private final int nodeWidth = dp(142);
-        private final int nodeHeight = dp(160);
+        private final Map<View, Integer> indexes = new HashMap<>();
+        private final int rowHeight = dp(174);
+        private final int nodeWidth = dp(154);
+        private final int nodeHeight = dp(192);
+        private final int[] offsets = new int[]{0, 40, 80, 40, 0, -40, -80, -40};
 
         PathLayout(Context context) {
             super(context);
             setClipChildren(false);
             setClipToPadding(false);
-            setPadding(0, dp(4), 0, dp(4));
+            setPadding(0, dp(2), 0, dp(12));
         }
 
-        void addNode(NodeView node, String position) {
-            positions.put(node, position);
+        void addNode(NodeView node, int index) {
+            indexes.put(node, index);
             addView(node, new LayoutParams(nodeWidth, nodeHeight));
         }
 
@@ -855,12 +967,11 @@ public class LearningPathActivity extends AppCompatActivity {
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             int width = MeasureSpec.getSize(widthMeasureSpec);
             for (int i = 0; i < getChildCount(); i++) {
-                View child = getChildAt(i);
-                child.measure(MeasureSpec.makeMeasureSpec(nodeWidth, MeasureSpec.EXACTLY),
+                getChildAt(i).measure(MeasureSpec.makeMeasureSpec(nodeWidth, MeasureSpec.EXACTLY),
                         MeasureSpec.makeMeasureSpec(nodeHeight, MeasureSpec.EXACTLY));
             }
             int height = getPaddingTop() + getPaddingBottom()
-                    + Math.max(1, getChildCount()) * rowHeight;
+                    + Math.max(1, getChildCount()) * rowHeight + dp(10);
             setMeasuredDimension(resolveSize(width, widthMeasureSpec),
                     resolveSize(height, heightMeasureSpec));
         }
@@ -868,33 +979,27 @@ public class LearningPathActivity extends AppCompatActivity {
         @Override
         protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
             int width = right - left;
-            int edge = dp(1);
+            int center = width / 2;
+            int maxOffset = Math.max(0, center - nodeWidth / 2 - dp(8));
             for (int i = 0; i < getChildCount(); i++) {
                 View child = getChildAt(i);
-                String position = positions.get(child);
-                int x;
-                if ("left".equals(position)) x = edge;
-                else if ("right".equals(position)) x = width - nodeWidth - edge;
-                else x = (width - nodeWidth) / 2;
-                int y = getPaddingTop() + i * rowHeight;
-                child.layout(x, y, x + nodeWidth, y + nodeHeight);
+                Integer stored = indexes.get(child);
+                int index = stored == null ? i : stored;
+                int rawOffset = dp(offsets[Math.floorMod(index, offsets.length)]);
+                int xOffset = Math.max(-maxOffset, Math.min(maxOffset, rawOffset));
+                int childLeft = center - nodeWidth / 2 + xOffset;
+                int childTop = getPaddingTop() + index * rowHeight;
+                child.layout(childLeft, childTop, childLeft + nodeWidth, childTop + nodeHeight);
             }
         }
     }
 
     private static int blend(int first, int second, float amount) {
-        float t = Math.max(0f, Math.min(1f, amount));
-        int r = (int) (Color.red(first) * (1f - t) + Color.red(second) * t);
-        int g = (int) (Color.green(first) * (1f - t) + Color.green(second) * t);
-        int b = (int) (Color.blue(first) * (1f - t) + Color.blue(second) * t);
-        return Color.rgb(r, g, b);
+        return LearningUiKit.blend(first, second, amount);
     }
 
     private static int darken(int color, float factor) {
-        int r = Math.max(0, Math.min(255, (int) (Color.red(color) * factor)));
-        int g = Math.max(0, Math.min(255, (int) (Color.green(color) * factor)));
-        int b = Math.max(0, Math.min(255, (int) (Color.blue(color) * factor)));
-        return Color.rgb(r, g, b);
+        return LearningUiKit.darken(color, factor);
     }
 
     private static String repeatStar(int count) {

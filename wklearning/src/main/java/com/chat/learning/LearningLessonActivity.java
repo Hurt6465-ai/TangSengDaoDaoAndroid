@@ -6,17 +6,22 @@ import android.content.Intent;
 import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.LayerDrawable;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.media.PlaybackParams;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.InputFilter;
+import android.text.TextWatcher;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
@@ -29,7 +34,6 @@ import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -76,17 +80,17 @@ public class LearningLessonActivity extends AppCompatActivity {
     private static final String STATE_MATCHED_PAIR_IDS = "matched_pair_ids";
     private static final String STATE_PRONUNCIATION_OPENED = "pronunciation_opened";
 
-    private static final int COLOR_BG = 0xFFFFFFFF;
-    private static final int COLOR_TEXT = 0xFF3C3C3C;
-    private static final int COLOR_SUB = 0xFF777777;
-    private static final int COLOR_ACCENT = 0xFF58CC02;
-    private static final int COLOR_ACCENT_DARK = 0xFF46A302;
-    private static final int COLOR_BLUE = 0xFF1CB0F6;
-    private static final int COLOR_BLUE_DARK = 0xFF1899D6;
-    private static final int COLOR_BORDER = 0xFFE5E5E5;
-    private static final int COLOR_SUCCESS = 0xFF58CC02;
-    private static final int COLOR_ERROR = 0xFFFF4B4B;
-    private static final int COLOR_ERROR_DARK = 0xFFD32626;
+    private static final int COLOR_BG = LearningUiKit.SURFACE;
+    private static final int COLOR_TEXT = LearningUiKit.TEXT;
+    private static final int COLOR_SUB = LearningUiKit.SUBTEXT;
+    private static final int COLOR_ACCENT = LearningUiKit.GREEN;
+    private static final int COLOR_ACCENT_DARK = LearningUiKit.GREEN_DARK;
+    private static final int COLOR_BLUE = LearningUiKit.BLUE;
+    private static final int COLOR_BLUE_DARK = LearningUiKit.BLUE_DARK;
+    private static final int COLOR_BORDER = LearningUiKit.BORDER;
+    private static final int COLOR_SUCCESS = LearningUiKit.GREEN;
+    private static final int COLOR_ERROR = LearningUiKit.RED;
+    private static final int COLOR_ERROR_DARK = LearningUiKit.RED_DARK;
 
     private String courseId = "";
     private String lessonId = "";
@@ -96,10 +100,12 @@ public class LearningLessonActivity extends AppCompatActivity {
     private String filePath = "";
     private String packageRootPath = "";
 
-    private ProgressBar progressBar;
+    private LearningUiKit.ProgressView progressBar;
+    private ScrollView questionScroll;
     private TextView progressText;
     private TextView lessonTitle;
     private LinearLayout questionHost;
+    private FrameLayout feedbackHost;
     private LinearLayout feedbackPanel;
     private TextView feedbackTitle;
     private TextView feedbackBody;
@@ -181,6 +187,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         if (requestCode == REQ_PRONUNCIATION_COMPARE) {
             pronunciationOpened = pronunciationOpened || resultCode == RESULT_OK;
             if (resultCode == RESULT_OK) {
+                setActionEnabled(true);
                 Toast.makeText(this, R.string.learning_lesson_record_done,
                         Toast.LENGTH_SHORT).show();
             }
@@ -253,90 +260,110 @@ public class LearningLessonActivity extends AppCompatActivity {
         page.setBackgroundColor(COLOR_BG);
         setContentView(page);
 
-        page.addView(topBar(), new LinearLayout.LayoutParams(-1, dp(58)));
+        page.addView(topBar(), new LinearLayout.LayoutParams(-1, dp(72)));
 
-        LinearLayout progressRow = new LinearLayout(this);
-        progressRow.setOrientation(LinearLayout.HORIZONTAL);
-        progressRow.setGravity(Gravity.CENTER_VERTICAL);
-        progressRow.setPadding(dp(18), 0, dp(18), dp(8));
-        page.addView(progressRow, new LinearLayout.LayoutParams(-1, dp(36)));
+        questionScroll = new ScrollView(this);
+        questionScroll.setFillViewport(true);
+        questionScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        questionScroll.setVerticalScrollBarEnabled(false);
+        questionScroll.setClipToPadding(false);
+        page.addView(questionScroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progressBar.setMax(1000);
-        progressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(COLOR_ACCENT));
-        progressBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFE5E5E5));
-        progressRow.addView(progressBar, new LinearLayout.LayoutParams(0, dp(14), 1f));
-
-        progressText = text("0 / 0", 12, COLOR_SUB, true);
-        progressText.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(dp(66), dp(28));
-        countLp.setMargins(dp(10), 0, 0, 0);
-        progressRow.addView(progressText, countLp);
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        scroll.setVerticalScrollBarEnabled(false);
-        scroll.setClipToPadding(false);
-        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+        FrameLayout widthHost = new FrameLayout(this);
+        widthHost.setPadding(dp(18), dp(10), dp(18), dp(30));
+        widthHost.setMinimumHeight(Math.max(dp(420),
+                getResources().getDisplayMetrics().heightPixels - dp(230)));
+        questionScroll.addView(widthHost, new ScrollView.LayoutParams(-1, -2));
 
         questionHost = new LinearLayout(this);
         questionHost.setOrientation(LinearLayout.VERTICAL);
-        questionHost.setPadding(dp(18), dp(8), dp(18), dp(28));
-        scroll.addView(questionHost, new ScrollView.LayoutParams(-1, -2));
+        questionHost.setClipChildren(false);
+        questionHost.setClipToPadding(false);
+        int available = Math.max(dp(280), getResources().getDisplayMetrics().widthPixels - dp(36));
+        FrameLayout.LayoutParams questionLp = new FrameLayout.LayoutParams(
+                Math.min(dp(620), available), -2, Gravity.CENTER);
+        widthHost.addView(questionHost, questionLp);
+
+        View divider = new View(this);
+        divider.setBackgroundColor(COLOR_BORDER);
+        page.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
+
+        feedbackHost = new FrameLayout(this);
+        feedbackHost.setBackgroundColor(Color.WHITE);
+        page.addView(feedbackHost, new LinearLayout.LayoutParams(-1, -2));
 
         feedbackPanel = new LinearLayout(this);
         feedbackPanel.setOrientation(LinearLayout.VERTICAL);
-        feedbackPanel.setPadding(dp(18), dp(16), dp(18), dp(14));
-        feedbackPanel.setVisibility(View.GONE);
-        page.addView(feedbackPanel, new LinearLayout.LayoutParams(-1, -2));
+        feedbackPanel.setPadding(dp(18), dp(13), dp(18), dp(14));
+        feedbackPanel.setBackgroundColor(Color.WHITE);
+        int footerAvailable = Math.max(dp(280),
+                getResources().getDisplayMetrics().widthPixels - dp(24));
+        FrameLayout.LayoutParams footerLp = new FrameLayout.LayoutParams(
+                Math.min(dp(720), footerAvailable), -2, Gravity.CENTER_HORIZONTAL);
+        feedbackHost.addView(feedbackPanel, footerLp);
 
         feedbackTitle = text("", 20, COLOR_TEXT, true);
+        feedbackTitle.setVisibility(View.GONE);
         feedbackPanel.addView(feedbackTitle, new LinearLayout.LayoutParams(-1, -2));
-        feedbackBody = text("", 13, COLOR_SUB, true);
+
+        feedbackBody = text("", 14, COLOR_SUB, false);
         feedbackBody.setLineSpacing(dp(3), 1f);
+        feedbackBody.setVisibility(View.GONE);
         LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(-1, -2);
-        bodyLp.setMargins(0, dp(6), 0, dp(10));
+        bodyLp.setMargins(0, dp(5), 0, dp(12));
         feedbackPanel.addView(feedbackBody, bodyLp);
 
         actionButton = text(getString(R.string.learning_lesson_check), 17, Color.WHITE, true);
         actionButton.setGravity(Gravity.CENTER);
         actionButton.setAllCaps(false);
-        actionButton.setBackground(raised(COLOR_ACCENT, COLOR_ACCENT_DARK,
-                dp(17), 0, 0, dp(5)));
+        actionButton.setBackground(LearningUiKit.raisedSelector(COLOR_ACCENT,
+                COLOR_ACCENT_DARK, dp(16), 0, 0, dp(5)));
         actionButton.setOnClickListener(v -> onAction());
-        LinearLayout.LayoutParams actionLp = new LinearLayout.LayoutParams(-1, dp(62));
-        actionLp.setMargins(dp(18), dp(7), dp(18), dp(14));
-        page.addView(actionButton, actionLp);
+        feedbackPanel.addView(actionButton, new LinearLayout.LayoutParams(-1, dp(58)));
+        setActionEnabled(false);
     }
 
     private View topBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(12), dp(6), dp(12), 0);
+        bar.setPadding(dp(10), dp(6), dp(14), dp(4));
 
-        TextView close = text("×", 28, 0xFF777777, false);
+        TextView close = text("×", 29, COLOR_SUB, false);
         close.setGravity(Gravity.CENTER);
         close.setContentDescription(getString(R.string.learning_lesson_close));
         close.setOnClickListener(v -> finish());
-        bar.addView(close, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        bar.addView(close, new LinearLayout.LayoutParams(dp(46), dp(50)));
+
+        LinearLayout center = new LinearLayout(this);
+        center.setOrientation(LinearLayout.VERTICAL);
+        center.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams centerLp = new LinearLayout.LayoutParams(0, -1, 1f);
+        centerLp.setMargins(dp(5), 0, dp(10), 0);
+        bar.addView(center, centerLp);
 
         lessonTitle = text(title.isEmpty() ? getString(R.string.learning_lesson_title) : title,
-                17, COLOR_TEXT, true);
-        lessonTitle.setGravity(Gravity.CENTER);
+                14, COLOR_SUB, true);
         lessonTitle.setSingleLine(true);
         lessonTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, -1, 1f);
-        titleLp.setMargins(dp(8), 0, dp(52), 0);
-        bar.addView(lessonTitle, titleLp);
+        center.addView(lessonTitle, new LinearLayout.LayoutParams(-1, dp(24)));
+
+        progressBar = new LearningUiKit.ProgressView(this);
+        progressBar.setColors(COLOR_BORDER, COLOR_ACCENT);
+        progressBar.setProgress(0, 1000);
+        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(-1, dp(12));
+        progressLp.setMargins(0, dp(4), 0, 0);
+        center.addView(progressBar, progressLp);
+
+        progressText = text("0 / 0", 12, COLOR_SUB, true);
+        progressText.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        bar.addView(progressText, new LinearLayout.LayoutParams(dp(58), -1));
         return bar;
     }
 
     private void loadLesson() {
         int generation = ++loadGeneration;
-        actionButton.setEnabled(false);
-        actionButton.setAlpha(0.55f);
+        setActionEnabled(false);
         progressText.setText("…");
         questionHost.removeAllViews();
         TextView loading = text(getString(R.string.learning_path_loading), 15, COLOR_SUB, false);
@@ -377,8 +404,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         if (!loaded.title.isEmpty()) title = loaded.title;
         if (!loaded.subtitle.isEmpty()) subtitle = loaded.subtitle;
         lessonTitle.setText(title.isEmpty() ? getString(R.string.learning_lesson_title) : title);
-        actionButton.setEnabled(true);
-        actionButton.setAlpha(1f);
+        setActionEnabled(true);
         restoreOrStartSession();
     }
 
@@ -434,9 +460,7 @@ public class LearningLessonActivity extends AppCompatActivity {
             for (View child : choiceViews.values()) {
                 boolean active = child == selected;
                 child.setSelected(active);
-                child.setBackground(active
-                        ? raised(0xFFD7FFB8, 0xFF9DD86B, dp(16), COLOR_ACCENT, dp(2), dp(4))
-                        : raised(Color.WHITE, 0xFFD5D5D5, dp(16), COLOR_BORDER, dp(2), dp(4)));
+                setChoiceVisual(child, active ? ChoiceCard.STATE_SELECTED : ChoiceCard.STATE_NORMAL);
             }
         }
         if (fillInput != null) {
@@ -462,6 +486,7 @@ public class LearningLessonActivity extends AppCompatActivity {
             for (int id : matchedIds) restoreMatchedPair(id);
         }
         pronunciationOpened = state.getBoolean(STATE_PRONUNCIATION_OPENED, false);
+        updateActionAvailability();
     }
 
     private void resetSession() {
@@ -482,12 +507,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         cancelAutoPlay();
         releasePlayer();
         hideKeyboard();
-        feedbackPanel.setVisibility(View.GONE);
-        actionButton.setVisibility(View.VISIBLE);
-        actionButton.setOnClickListener(v -> onAction());
-        actionButton.setText(R.string.learning_lesson_check);
-        actionButton.setBackground(raised(COLOR_ACCENT, COLOR_ACCENT_DARK,
-                dp(17), 0, 0, dp(5)));
+        resetFooter();
         answered = false;
         pronunciationOpened = false;
         selectedChoice = "";
@@ -501,6 +521,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         selectedMatchLeft = null;
         selectedMatchPair = null;
         questionHost.removeAllViews();
+        if (questionScroll != null) questionScroll.scrollTo(0, 0);
 
         if (currentIndex >= queue.size()) {
             showCompletion();
@@ -509,38 +530,34 @@ public class LearningLessonActivity extends AppCompatActivity {
         LearningLessonRepository.Exercise exercise = queue.get(currentIndex);
         int displayPosition = currentIndex + 1;
         progressText.setText(displayPosition + " / " + queue.size());
-        progressBar.setProgress(queue.isEmpty() ? 0 : currentIndex * 1000 / queue.size());
+        progressBar.setProgress(currentIndex, Math.max(1, queue.size()));
 
-        LinearLayout questionCard = new LinearLayout(this);
-        questionCard.setOrientation(LinearLayout.VERTICAL);
-        questionCard.setPadding(dp(18), dp(16), dp(18), dp(17));
-        questionCard.setBackground(raised(Color.WHITE, 0xFFDDE5ED,
-                dp(22), 0xFFDCEAF7, dp(2), dp(4)));
-        questionHost.addView(questionCard, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView typeBadge = text(typeLabel(exercise.type), 11, COLOR_BLUE, true);
+        TextView typeBadge = text(typeLabel(exercise.type), 12, COLOR_BLUE, true);
         typeBadge.setGravity(Gravity.CENTER);
+        typeBadge.setAllCaps(true);
+        typeBadge.setLetterSpacing(0.06f);
         typeBadge.setPadding(dp(10), dp(5), dp(10), dp(5));
-        typeBadge.setBackground(rounded(0xFFDDF4FF, dp(12), 0xFF84D8FF, dp(1)));
-        questionCard.addView(typeBadge, new LinearLayout.LayoutParams(-2, -2));
+        typeBadge.setBackground(rounded(LearningUiKit.BLUE_SOFT, dp(12), 0xFF84D8FF, dp(1)));
+        questionHost.addView(typeBadge, new LinearLayout.LayoutParams(-2, -2));
 
-        TextView question = text(exercise.question, 25, COLOR_TEXT, true);
+        TextView question = text(exercise.question, 27, COLOR_TEXT, true);
         question.setLineSpacing(dp(4), 1f);
         LinearLayout.LayoutParams questionLp = new LinearLayout.LayoutParams(-1, -2);
-        questionLp.setMargins(0, dp(14), 0, exercise.hint.isEmpty() ? 0 : dp(9));
-        questionCard.addView(question, questionLp);
+        questionLp.setMargins(0, dp(18), 0, exercise.hint.isEmpty() ? dp(25) : dp(9));
+        questionHost.addView(question, questionLp);
 
         if (!exercise.hint.isEmpty()) {
-            TextView hint = text(exercise.hint, 14, COLOR_SUB, false);
+            TextView hint = text(exercise.hint, 15, COLOR_SUB, false);
             hint.setLineSpacing(dp(3), 1f);
-            questionCard.addView(hint, new LinearLayout.LayoutParams(-1, -2));
+            LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
+            hintLp.setMargins(0, 0, 0, dp(25));
+            questionHost.addView(hint, hintLp);
         }
-        addVerticalSpace(questionHost, 18);
 
         switch (exercise.type) {
             case "listen_choice":
-                questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(62)));
-                addVerticalSpace(questionHost, 14);
+                addCenteredAudio(exercise);
+                addVerticalSpace(questionHost, 20);
                 renderChoice(exercise);
                 autoPlayRunnable = () -> {
                     if (generation == questionGeneration && currentIndex < queue.size()
@@ -548,14 +565,14 @@ public class LearningLessonActivity extends AppCompatActivity {
                         playExerciseAudio(exercise);
                     }
                 };
-                questionHost.postDelayed(autoPlayRunnable, 240L);
+                questionHost.postDelayed(autoPlayRunnable, 260L);
                 break;
             case "true_false":
             case "single_choice":
             case "image_choice":
                 if (!exercise.audio.isEmpty() || !exercise.audioText.isEmpty()) {
-                    questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(58)));
-                    addVerticalSpace(questionHost, 13);
+                    addCenteredAudio(exercise);
+                    addVerticalSpace(questionHost, 18);
                 }
                 renderChoice(exercise);
                 break;
@@ -565,8 +582,8 @@ public class LearningLessonActivity extends AppCompatActivity {
             case "fill_blank":
             case "dictation":
                 if ("dictation".equals(exercise.type)) {
-                    questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(62)));
-                    addVerticalSpace(questionHost, 14);
+                    addCenteredAudio(exercise);
+                    addVerticalSpace(questionHost, 20);
                 }
                 renderFillBlank(exercise);
                 break;
@@ -580,13 +597,15 @@ public class LearningLessonActivity extends AppCompatActivity {
                 showLoadError(getString(R.string.learning_lesson_unsupported_type));
                 break;
         }
+        updateActionAvailability();
     }
 
     private void renderChoice(LearningLessonRepository.Exercise exercise) {
         boolean imageGrid = "image_choice".equals(exercise.type);
+        boolean compactGrid = imageGrid || "true_false".equals(exercise.type);
         ViewGroup options;
         View optionsRoot;
-        if (imageGrid) {
+        if (compactGrid) {
             FrameLayout gridHost = new FrameLayout(this);
             GridLayout grid = new GridLayout(this);
             grid.setColumnCount(2);
@@ -613,75 +632,46 @@ public class LearningLessonActivity extends AppCompatActivity {
         if (!exercise.keepOrder && !"true_false".equals(exercise.type)) {
             Collections.shuffle(choices);
         }
-        int gridWidth = Math.min(dp(260), Math.max(dp(132),
-                (getResources().getDisplayMetrics().widthPixels - dp(48)) / 2));
+        int contentWidth = Math.min(dp(620), getResources().getDisplayMetrics().widthPixels - dp(36));
+        int gridWidth = Math.min(dp(250), Math.max(dp(132), (contentWidth - dp(12)) / 2));
         for (int index = 0; index < choices.size(); index++) {
             LearningLessonRepository.ChoiceOption choice = choices.get(index);
-            View option = createChoiceView(exercise, choice);
+            ChoiceCard option = createChoiceView(exercise, choice, index + 1);
             optionViews.add(option);
             choiceViews.put(LearningLessonRepository.normalize(choice.value), option);
             option.setOnClickListener(v -> {
                 if (answered) return;
                 selectedChoice = choice.value;
                 for (View child : optionViews) {
-                    boolean selected = child == option;
-                    child.setSelected(selected);
-                    child.setBackground(selected
-                            ? raised(0xFFD7FFB8, 0xFF9DD86B, dp(16), COLOR_ACCENT, dp(2), dp(4))
-                            : raised(Color.WHITE, 0xFFD5D5D5, dp(16), COLOR_BORDER, dp(2), dp(4)));
+                    setChoiceVisual(child, child == option
+                            ? ChoiceCard.STATE_SELECTED : ChoiceCard.STATE_NORMAL);
                 }
+                setActionEnabled(true);
                 option.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
             });
-            if (imageGrid) {
+            if (compactGrid) {
                 GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
                 lp.width = gridWidth;
-                lp.height = dp(188);
-                int right = index % 2 == 0 ? dp(6) : 0;
-                int left = index % 2 == 0 ? 0 : dp(6);
-                lp.setMargins(left, 0, right, dp(12));
+                lp.height = imageGrid ? dp(196) : dp(68);
+                lp.setMargins(index % 2 == 0 ? 0 : dp(6), 0,
+                        index % 2 == 0 ? dp(6) : 0, dp(12));
                 options.addView(option, lp);
             } else {
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,
-                        choice.image.isEmpty() ? dp(70) : -2);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(68));
                 lp.setMargins(0, 0, 0, dp(12));
                 options.addView(option, lp);
             }
         }
     }
 
-    private View createChoiceView(LearningLessonRepository.Exercise exercise,
-                                  LearningLessonRepository.ChoiceOption choice) {
-        if (choice.image.isEmpty()) {
-            TextView option = text(choice.text, 17, COLOR_TEXT, true);
-            option.setGravity(Gravity.CENTER);
-            option.setPadding(dp(16), dp(8), dp(16), dp(12));
-            option.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
-                    dp(16), COLOR_BORDER, dp(2), dp(4)));
-            option.setContentDescription(choice.contentDescription);
-            return option;
-        }
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(10), dp(10), dp(10), dp(14));
-        card.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
-                dp(16), COLOR_BORDER, dp(2), dp(4)));
+    private ChoiceCard createChoiceView(LearningLessonRepository.Exercise exercise,
+                                      LearningLessonRepository.ChoiceOption choice,
+                                      int shortcut) {
+        ChoiceCard card = new ChoiceCard(this, choice.text, shortcut, !choice.image.isEmpty());
         card.setContentDescription(choice.contentDescription);
-
-        ImageView image = new ImageView(this);
-        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        image.setAdjustViewBounds(true);
-        image.setBackgroundColor(0xFFF1F3F7);
-        int imageHeight = "image_choice".equals(exercise.type) ? dp(112) : dp(154);
-        card.addView(image, new LinearLayout.LayoutParams(-1, imageHeight));
-        loadChoiceImage(image, choice.image, questionGeneration);
-
-        TextView label = text(choice.text, 16, COLOR_TEXT, true);
-        label.setGravity(Gravity.CENTER);
-        label.setMaxLines(2);
-        label.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, -2);
-        labelLp.setMargins(dp(4), dp(10), dp(4), dp(2));
-        card.addView(label, labelLp);
+        if (!choice.image.isEmpty()) {
+            loadChoiceImage(card.image, choice.image, questionGeneration);
+        }
         return card;
     }
 
@@ -754,11 +744,17 @@ public class LearningLessonActivity extends AppCompatActivity {
         fillInput.setSingleLine(true);
         fillInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});
         fillInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        fillInput.setPadding(dp(16), 0, dp(16), 0);
-        fillInput.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
+        fillInput.setPadding(dp(18), 0, dp(18), dp(4));
+        fillInput.setBackground(LearningUiKit.raisedSelector(Color.WHITE, 0xFFD5D5D5,
                 dp(16), COLOR_BORDER, dp(2), dp(4)));
-        questionHost.addView(fillInput, new LinearLayout.LayoutParams(-1, dp(66)));
-        fillInput.requestFocus();
+        fillInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (!answered) setActionEnabled(s != null && s.toString().trim().length() > 0);
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+        questionHost.addView(fillInput, new LinearLayout.LayoutParams(-1, dp(68)));
     }
 
     private void renderWordOrder(LearningLessonRepository.Exercise exercise) {
@@ -819,9 +815,9 @@ public class LearningLessonActivity extends AppCompatActivity {
     private void addOrderChip(WordToken token, LinearLayout parent, boolean inBank) {
         TextView chip = text(token.value, 17, COLOR_TEXT, true);
         chip.setGravity(Gravity.CENTER);
-        chip.setPadding(dp(14), dp(8), dp(14), dp(8));
-        chip.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
-                dp(14), COLOR_BORDER, dp(2), dp(4)));
+        chip.setPadding(dp(15), dp(8), dp(15), dp(8));
+        chip.setBackground(LearningUiKit.raisedSelector(Color.WHITE, 0xFFD5D5D5,
+                dp(13), COLOR_BORDER, dp(2), dp(4)));
         chip.setTag(token);
         orderChips.put(token.id, chip);
         chip.setOnClickListener(v -> {
@@ -835,6 +831,7 @@ public class LearningLessonActivity extends AppCompatActivity {
                 orderedTokens.remove(token);
                 orderBankRow.addView(chip, chipLayoutParams());
             }
+            setActionEnabled(!orderedTokens.isEmpty());
             chip.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
         });
         parent.addView(chip, chipLayoutParams());
@@ -862,13 +859,13 @@ public class LearningLessonActivity extends AppCompatActivity {
             view.setOnClickListener(v -> {
                 if (answered || matchedPairIndexes.contains(pair.index)) return;
                 if (selectedMatchLeft != null) {
-                    selectedMatchLeft.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
-                            dp(14), COLOR_BORDER, dp(2), dp(4)));
+                    selectedMatchLeft.setBackground(LearningUiKit.raisedSelector(Color.WHITE,
+                            0xFFD5D5D5, dp(14), COLOR_BORDER, dp(2), dp(4)));
                 }
                 selectedMatchLeft = view;
                 selectedMatchPair = pair;
-                view.setBackground(raised(0xFFD7FFB8, 0xFF9DD86B,
-                        dp(14), COLOR_ACCENT, dp(2), dp(4)));
+                view.setBackground(LearningUiKit.raisedSelector(LearningUiKit.BLUE_SOFT,
+                        0xFF84D8FF, dp(14), COLOR_BLUE, dp(2), dp(4)));
             });
             left.addView(view, matchLp());
         }
@@ -882,6 +879,7 @@ public class LearningLessonActivity extends AppCompatActivity {
                     markPairMatched(selectedMatchLeft, view);
                     selectedMatchLeft = null;
                     selectedMatchPair = null;
+                    setActionEnabled(matchedPairIndexes.size() >= exercise.pairs.size());
                     v.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
                 } else {
                     view.setBackground(raised(0xFFFFDFE0, 0xFFF1A8AC,
@@ -988,13 +986,15 @@ public class LearningLessonActivity extends AppCompatActivity {
     }
 
     private View audioButton(LearningLessonRepository.Exercise exercise) {
-        TextView play = text("◖))  " + getString(R.string.learning_lesson_play_audio),
-                16, COLOR_ACCENT, true);
-        play.setGravity(Gravity.CENTER);
-        play.setTextColor(COLOR_BLUE);
-        play.setBackground(raised(0xFFDDF4FF, 0xFF84D8FF,
-                dp(16), COLOR_BLUE, dp(2), dp(4)));
-        play.setOnClickListener(v -> playExerciseAudio(exercise));
+        AudioButtonView play = new AudioButtonView(this);
+        play.setContentDescription(getString(R.string.learning_lesson_play_audio));
+        play.setOnClickListener(v -> {
+            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            v.animate().translationY(dp(4)).scaleX(0.95f).scaleY(0.95f).setDuration(65)
+                    .withEndAction(() -> v.animate().translationY(0).scaleX(1f).scaleY(1f)
+                            .setDuration(110).start()).start();
+            playExerciseAudio(exercise);
+        });
         return play;
     }
 
@@ -1069,11 +1069,13 @@ public class LearningLessonActivity extends AppCompatActivity {
 
     private void showFeedback(LearningLessonRepository.Exercise exercise, boolean correct,
                               boolean willRetry) {
-        feedbackPanel.setVisibility(View.VISIBLE);
-        feedbackPanel.setBackground(rounded(correct ? 0xFFD7FFB8 : 0xFFFFDFE0,
-                dp(20), correct ? 0xFF9DD86B : 0xFFF1A8AC, dp(2)));
-        feedbackTitle.setText(correct ? R.string.learning_lesson_correct
-                : R.string.learning_lesson_incorrect);
+        int feedbackColor = correct ? LearningUiKit.GREEN_SOFT : LearningUiKit.RED_SOFT;
+        feedbackHost.setBackgroundColor(feedbackColor);
+        feedbackPanel.setBackgroundColor(feedbackColor);
+        feedbackTitle.setVisibility(View.VISIBLE);
+        feedbackBody.setVisibility(View.VISIBLE);
+        feedbackTitle.setText((correct ? "✓  " : "✕  ") + getString(correct
+                ? R.string.learning_lesson_correct : R.string.learning_lesson_incorrect));
         feedbackTitle.setTextColor(correct ? 0xFF3F7D20 : COLOR_ERROR_DARK);
 
         if (!exercise.options.isEmpty()) {
@@ -1081,13 +1083,9 @@ public class LearningLessonActivity extends AppCompatActivity {
                     LearningLessonRepository.normalize(exercise.answer));
             View selectedView = choiceViews.get(
                     LearningLessonRepository.normalize(selectedChoice));
-            if (correctView != null) {
-                correctView.setBackground(raised(0xFFD7FFB8, 0xFF9DD86B,
-                        dp(16), COLOR_ACCENT, dp(2), dp(4)));
-            }
+            if (correctView != null) setChoiceVisual(correctView, ChoiceCard.STATE_CORRECT);
             if (!correct && selectedView != null && selectedView != correctView) {
-                selectedView.setBackground(raised(0xFFFFDFE0, 0xFFF1A8AC,
-                        dp(16), COLOR_ERROR, dp(2), dp(4)));
+                setChoiceVisual(selectedView, ChoiceCard.STATE_WRONG);
             }
         }
 
@@ -1109,9 +1107,11 @@ public class LearningLessonActivity extends AppCompatActivity {
         feedbackBody.setTextColor(correct ? 0xFF4F6F3C : 0xFF8D3A41);
         actionButton.setText(currentIndex + 1 >= queue.size()
                 ? R.string.learning_lesson_finish : R.string.learning_lesson_continue);
-        actionButton.setBackground(raised(correct ? COLOR_SUCCESS : COLOR_ERROR,
+        actionButton.setBackground(LearningUiKit.raisedSelector(
+                correct ? COLOR_SUCCESS : COLOR_ERROR,
                 correct ? COLOR_ACCENT_DARK : COLOR_ERROR_DARK,
-                dp(17), 0, 0, dp(5)));
+                dp(16), 0, 0, dp(5)));
+        setActionEnabled(true);
         actionButton.performHapticFeedback(correct ? HapticFeedbackConstants.CONFIRM
                 : HapticFeedbackConstants.REJECT);
     }
@@ -1132,9 +1132,9 @@ public class LearningLessonActivity extends AppCompatActivity {
 
     private void showCompletion() {
         questionHost.removeAllViews();
-        feedbackPanel.setVisibility(View.GONE);
+        feedbackHost.setVisibility(View.GONE);
         actionButton.setVisibility(View.GONE);
-        progressBar.setProgress(1000);
+        progressBar.setProgress(1, 1);
         progressText.setText(getString(R.string.learning_lesson_complete_progress));
 
         int total = Math.max(1, originalExercises.size());
@@ -1233,10 +1233,15 @@ public class LearningLessonActivity extends AppCompatActivity {
 
     private void showLoadError(String message) {
         questionHost.removeAllViews();
-        feedbackPanel.setVisibility(View.GONE);
+        feedbackHost.setVisibility(View.VISIBLE);
+        feedbackPanel.setVisibility(View.VISIBLE);
+        feedbackHost.setBackgroundColor(Color.WHITE);
+        feedbackPanel.setBackgroundColor(Color.WHITE);
+        feedbackTitle.setVisibility(View.GONE);
+        feedbackBody.setVisibility(View.GONE);
+        actionButton.setVisibility(View.VISIBLE);
         progressText.setText("—");
-        actionButton.setEnabled(true);
-        actionButton.setAlpha(1f);
+        setActionEnabled(true);
         TextView error = text(getString(R.string.learning_lesson_load_failed,
                 message == null ? "" : message), 15, COLOR_ERROR, false);
         error.setGravity(Gravity.CENTER);
@@ -1415,6 +1420,58 @@ public class LearningLessonActivity extends AppCompatActivity {
         focus.clearFocus();
     }
 
+    private void resetFooter() {
+        feedbackHost.setVisibility(View.VISIBLE);
+        feedbackPanel.setVisibility(View.VISIBLE);
+        feedbackHost.setBackgroundColor(Color.WHITE);
+        feedbackPanel.setBackgroundColor(Color.WHITE);
+        feedbackTitle.setVisibility(View.GONE);
+        feedbackBody.setVisibility(View.GONE);
+        actionButton.setVisibility(View.VISIBLE);
+        actionButton.setOnClickListener(v -> onAction());
+        actionButton.setText(R.string.learning_lesson_check);
+        actionButton.setBackground(LearningUiKit.raisedSelector(COLOR_ACCENT,
+                COLOR_ACCENT_DARK, dp(16), 0, 0, dp(5)));
+        setActionEnabled(false);
+    }
+
+    private void setActionEnabled(boolean enabled) {
+        if (actionButton == null) return;
+        actionButton.setEnabled(enabled);
+        actionButton.setAlpha(enabled ? 1f : 0.48f);
+    }
+
+    private void updateActionAvailability() {
+        if (answered || currentIndex >= queue.size()) {
+            setActionEnabled(true);
+            return;
+        }
+        LearningLessonRepository.Exercise exercise = queue.get(currentIndex);
+        if ("single_choice".equals(exercise.type) || "listen_choice".equals(exercise.type)
+                || "true_false".equals(exercise.type) || "image_choice".equals(exercise.type)) {
+            setActionEnabled(!selectedChoice.isEmpty());
+        } else if ("fill_blank".equals(exercise.type) || "dictation".equals(exercise.type)) {
+            setActionEnabled(fillInput != null && fillInput.getText().toString().trim().length() > 0);
+        } else if ("word_order".equals(exercise.type)) {
+            setActionEnabled(!orderedTokens.isEmpty());
+        } else if ("matching".equals(exercise.type)) {
+            setActionEnabled(matchedPairIndexes.size() >= exercise.pairs.size());
+        } else if ("pronunciation".equals(exercise.type)) {
+            setActionEnabled(pronunciationOpened);
+        }
+    }
+
+    private void addCenteredAudio(LearningLessonRepository.Exercise exercise) {
+        View play = audioButton(exercise);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(88), dp(94));
+        lp.gravity = Gravity.CENTER_HORIZONTAL;
+        questionHost.addView(play, lp);
+    }
+
+    private void setChoiceVisual(View view, int state) {
+        if (view instanceof ChoiceCard) ((ChoiceCard) view).setVisualState(state);
+    }
+
     private String typeLabel(String type) {
         if ("listen_choice".equals(type) || "dictation".equals(type)) {
             return getString(R.string.learning_lesson_type_listening);
@@ -1429,36 +1486,20 @@ public class LearningLessonActivity extends AppCompatActivity {
     }
 
     private TextView text(String value, float size, int color, boolean bold) {
-        TextView view = new TextView(this);
-        view.setText(value == null ? "" : value);
-        view.setTextSize(size);
-        view.setTextColor(color);
-        view.setIncludeFontPadding(false);
-        if (bold) view.setTypeface(Typeface.DEFAULT_BOLD);
-        return view;
+        return LearningUiKit.text(this, value, size, color, bold);
     }
 
     private GradientDrawable rounded(int color, float radius, int strokeColor, int strokeWidth) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(radius);
-        if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
-        return drawable;
+        return LearningUiKit.rounded(color, radius, strokeColor, strokeWidth);
     }
 
     private Drawable raised(int topColor, int bottomColor, float radius,
                             int strokeColor, int strokeWidth, int depth) {
-        GradientDrawable bottom = rounded(bottomColor, radius, 0, 0);
-        GradientDrawable top = rounded(topColor, radius, strokeColor, strokeWidth);
-        LayerDrawable layers = new LayerDrawable(new Drawable[]{bottom, top});
-        int inset = Math.max(0, depth);
-        layers.setLayerInset(0, 0, inset, 0, 0);
-        layers.setLayerInset(1, 0, 0, 0, inset);
-        return layers;
+        return LearningUiKit.raised(topColor, bottomColor, radius, strokeColor, strokeWidth, depth);
     }
 
     private int dp(float value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+        return LearningUiKit.dp(this, value);
     }
 
     private static void addValidIds(Set<String> target, ArrayList<String> values,
@@ -1479,6 +1520,138 @@ public class LearningLessonActivity extends AppCompatActivity {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private final class ChoiceCard extends LinearLayout {
+        static final int STATE_NORMAL = 0;
+        static final int STATE_SELECTED = 1;
+        static final int STATE_CORRECT = 2;
+        static final int STATE_WRONG = 3;
+
+        final TextView label;
+        final TextView shortcut;
+        final ImageView image;
+        final boolean imageMode;
+
+        ChoiceCard(Context context, String value, int number, boolean imageMode) {
+            super(context);
+            this.imageMode = imageMode;
+            setOrientation(imageMode ? VERTICAL : HORIZONTAL);
+            setGravity(Gravity.CENTER_VERTICAL);
+            setPadding(imageMode ? dp(9) : dp(14), imageMode ? dp(9) : dp(8),
+                    imageMode ? dp(9) : dp(12), imageMode ? dp(12) : dp(12));
+            setClickable(true);
+            setFocusable(true);
+
+            if (imageMode) {
+                image = new ImageView(context);
+                image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                image.setBackground(rounded(0xFFF1F3F7, dp(12), 0, 0));
+                image.setClipToOutline(true);
+                addView(image, new LinearLayout.LayoutParams(-1, 0, 1f));
+                label = text(value, 16, COLOR_TEXT, true);
+                label.setGravity(Gravity.CENTER);
+                label.setMaxLines(2);
+                label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, dp(48));
+                labelLp.setMargins(dp(4), dp(7), dp(4), 0);
+                addView(label, labelLp);
+                shortcut = text(String.valueOf(number), 12, COLOR_SUB, true);
+                shortcut.setVisibility(View.GONE);
+            } else {
+                image = null;
+                shortcut = text(String.valueOf(number), 12, COLOR_SUB, true);
+                shortcut.setGravity(Gravity.CENTER);
+                shortcut.setBackground(rounded(Color.WHITE, dp(9), COLOR_BORDER, dp(2)));
+                addView(shortcut, new LinearLayout.LayoutParams(dp(30), dp(30)));
+                label = text(value, 17, COLOR_TEXT, true);
+                label.setGravity(Gravity.CENTER_VERTICAL);
+                label.setMaxLines(2);
+                label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(0, -1, 1f);
+                labelLp.setMargins(dp(13), 0, dp(6), 0);
+                addView(label, labelLp);
+            }
+            setVisualState(STATE_NORMAL);
+        }
+
+        void setVisualState(int state) {
+            int top = Color.WHITE;
+            int bottom = 0xFFD5D5D5;
+            int border = COLOR_BORDER;
+            int textColor = COLOR_TEXT;
+            if (state == STATE_SELECTED) {
+                top = LearningUiKit.BLUE_SOFT;
+                bottom = 0xFF84D8FF;
+                border = COLOR_BLUE;
+                textColor = COLOR_BLUE_DARK;
+            } else if (state == STATE_CORRECT) {
+                top = LearningUiKit.GREEN_SOFT;
+                bottom = 0xFF9DD86B;
+                border = COLOR_SUCCESS;
+                textColor = 0xFF3F7D20;
+            } else if (state == STATE_WRONG) {
+                top = LearningUiKit.RED_SOFT;
+                bottom = 0xFFF1A8AC;
+                border = COLOR_ERROR;
+                textColor = COLOR_ERROR_DARK;
+            }
+            setBackground(LearningUiKit.raisedSelector(top, bottom, dp(16), border, dp(2), dp(4)));
+            label.setTextColor(textColor);
+            if (shortcut != null && !imageMode) {
+                shortcut.setTextColor(state == STATE_NORMAL ? COLOR_SUB : textColor);
+                shortcut.setBackground(rounded(state == STATE_NORMAL ? Color.WHITE : top,
+                        dp(9), border, dp(2)));
+            }
+        }
+    }
+
+    private final class AudioButtonView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+        private final RectF arc = new RectF();
+
+        AudioButtonView(Context context) {
+            super(context);
+            setClickable(true);
+            setFocusable(true);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float cx = getWidth() / 2f;
+            float cy = getHeight() / 2f - dp(2);
+            float radius = Math.min(getWidth(), getHeight()) / 2f - dp(8);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(COLOR_BLUE_DARK);
+            canvas.drawCircle(cx, cy + dp(7), radius, paint);
+            paint.setColor(COLOR_BLUE);
+            canvas.drawCircle(cx, cy, radius, paint);
+            paint.setColor(0x28FFFFFF);
+            canvas.drawOval(cx - radius * 0.52f, cy - radius * 0.63f,
+                    cx + radius * 0.52f, cy - radius * 0.38f, paint);
+
+            paint.setColor(Color.WHITE);
+            path.reset();
+            path.moveTo(cx - dp(20), cy - dp(8));
+            path.lineTo(cx - dp(10), cy - dp(8));
+            path.lineTo(cx + dp(2), cy - dp(18));
+            path.lineTo(cx + dp(2), cy + dp(18));
+            path.lineTo(cx - dp(10), cy + dp(8));
+            path.lineTo(cx - dp(20), cy + dp(8));
+            path.close();
+            canvas.drawPath(path, paint);
+
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(4));
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            arc.set(cx - dp(5), cy - dp(16), cx + dp(22), cy + dp(16));
+            canvas.drawArc(arc, -53, 106, false, paint);
+            arc.set(cx - dp(3), cy - dp(22), cx + dp(33), cy + dp(22));
+            canvas.drawArc(arc, -48, 96, false, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
     }
 
     private static final class WordToken {
