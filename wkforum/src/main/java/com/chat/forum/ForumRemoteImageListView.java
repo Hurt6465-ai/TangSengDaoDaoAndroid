@@ -10,6 +10,7 @@ import android.widget.LinearLayout;
 import androidx.annotation.NonNull;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.resource.bitmap.RoundedCorners;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,6 +71,7 @@ final class ForumRemoteImageListView extends LinearLayout {
                 Glide.with(image).clear(image);
                 Glide.with(image)
                         .load(thumbUrl)
+                        .transform(new RoundedCorners(dp(12)))
                         .into(image);
             }
         }
@@ -117,5 +119,9 @@ final class ForumRemoteImageListView extends LinearLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT, imageHeightPx);
         params.topMargin = imageTopMarginPx;
         image.setLayoutParams(params);
+    }
+
+    private int dp(int value) {
+        return Math.round(getResources().getDisplayMetrics().density * value);
     }
 }

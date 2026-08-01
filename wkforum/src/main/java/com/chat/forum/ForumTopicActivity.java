@@ -131,9 +131,26 @@ public class ForumTopicActivity extends AppCompatActivity {
     private String commentSort = COMMENT_SORT_ASC;
     private boolean sending;
     private boolean topicActionBusy;
+    private boolean voting;
+    private long votingVoteId;
+    private long voteSelectionVoteId;
+    private final List<Long> voteSelectionIds = new ArrayList<>();
     private long replyParentId;
     private long replyQuoteId;
     private final ForumApiClient.RequestScope requestScope = new ForumApiClient.RequestScope();
+    private final ForumVoteCardView.Listener voteListener = new ForumVoteCardView.Listener() {
+        @Override
+        public void onSelectionChanged(long voteId, @NonNull List<Long> optionIds) {
+            voteSelectionVoteId = voteId;
+            voteSelectionIds.clear();
+            voteSelectionIds.addAll(optionIds);
+        }
+
+        @Override
+        public void onSubmit(long voteId, @NonNull List<Long> optionIds) {
+            submitVote(voteId, optionIds);
+        }
+    };
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable hideFastScrollButton = () -> {
@@ -1087,6 +1104,11 @@ public class ForumTopicActivity extends AppCompatActivity {
                             showError(ForumText.get(R.string.forum_topic_not_found));
                             return;
                         }
+                        if (topic.vote == null || topic.vote.voted
+                                || topic.vote.id != voteSelectionVoteId) {
+                            voteSelectionVoteId = 0L;
+                            voteSelectionIds.clear();
+                        }
                         currentTopic = topic;
                         markTopicSeen(topic);
                         stateView.setVisibility(View.GONE);
@@ -1096,6 +1118,44 @@ public class ForumTopicActivity extends AppCompatActivity {
 
                     @Override public void onError(@NonNull String message) {
                         if (!isDead()) showError(message);
+                    }
+                });
+    }
+
+    private void submitVote(long voteId, @NonNull List<Long> optionIds) {
+        if (voting || voteId <= 0 || optionIds.isEmpty()) return;
+        voting = true;
+        votingVoteId = voteId;
+        voteSelectionVoteId = voteId;
+        voteSelectionIds.clear();
+        voteSelectionIds.addAll(optionIds);
+        adapter.rebuild();
+        ForumApiClient.getInstance().castVote(voteId, optionIds, requestScope,
+                new ForumApiClient.ResultCallback<ForumApiClient.Vote>() {
+                    @Override
+                    public void onSuccess(@Nullable ForumApiClient.Vote vote) {
+                        voting = false;
+                        votingVoteId = 0L;
+                        if (isDead()) return;
+                        if (vote != null && currentTopic != null
+                                && (currentTopic.vote == null
+                                || currentTopic.vote.id == voteId)) {
+                            currentTopic.vote = vote;
+                        }
+                        voteSelectionVoteId = 0L;
+                        voteSelectionIds.clear();
+                        adapter.rebuild();
+                        Toast.makeText(ForumTopicActivity.this,
+                                R.string.forum_vote_success, Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onError(@NonNull String message) {
+                        voting = false;
+                        votingVoteId = 0L;
+                        if (isDead()) return;
+                        adapter.rebuild();
+                        Toast.makeText(ForumTopicActivity.this, message, Toast.LENGTH_LONG).show();
                     }
                 });
     }
@@ -2163,9 +2223,33 @@ public class ForumTopicActivity extends AppCompatActivity {
                     + topic.commentCount + '|' + topic.likeCount + '|' + topic.liked + '|'
                     + topic.favorited + '|' + topic.sticky + '|' + topic.recommend + '|'
                     + topic.type + '|' + safe(topic.qaStatus) + '|' + topic.acceptedCommentId + '|'
-                    + topic.bountyScore + '|'
+                    + topic.bountyScore + '|' + voteKey(topic.vote) + '|'
+                    + voting + ':' + votingVoteId + '|'
                     + userKey(user) + '|' + safe(category == null ? null : category.name) + '|'
                     + commentSort + '|' + imageListKey(topic.imageList);
+        }
+
+        private String voteKey(@Nullable ForumApiClient.Vote vote) {
+            if (vote == null) return "";
+            StringBuilder key = new StringBuilder();
+            key.append(vote.id).append(':').append(vote.type).append(':')
+                    .append(textKey(vote.title)).append(':').append(vote.expiredAt).append(':')
+                    .append(vote.voteNum).append(':').append(vote.optionCount).append(':')
+                    .append(vote.voteCount).append(':').append(vote.expired).append(':')
+                    .append(vote.voted);
+            if (vote.optionIds != null) {
+                for (Long id : vote.optionIds) key.append(':').append(id == null ? 0L : id);
+            }
+            if (vote.options != null) {
+                for (ForumApiClient.VoteOption option : vote.options) {
+                    if (option == null) continue;
+                    key.append('|').append(option.id).append(':')
+                            .append(textKey(option.content)).append(':')
+                            .append(option.voteCount).append(':')
+                            .append(option.percent).append(':').append(option.voted);
+                }
+            }
+            return key.toString();
         }
 
         private String commentContentKey(ForumApiClient.Comment comment, boolean reply) {
@@ -2618,6 +2702,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         private final TextView sticky;
         private final TextView recommend;
         private final TextView qaMark;
+        private final LinearLayout questionMetaRow;
         private final TextView qaStatus;
         private final TextView bounty;
         private final TextView title;
@@ -2628,6 +2713,7 @@ public class ForumTopicActivity extends AppCompatActivity {
         private final TextView content;
         private final ForumVideoEmbedListView videoEmbeds;
         private final ForumRemoteImageListView images;
+        private final ForumVoteCardView voteCard;
         private final HorizontalScrollView tagScroller;
         private final LinearLayout tagContainer;
         private final TextView eyeAction;
@@ -2642,6 +2728,8 @@ public class ForumTopicActivity extends AppCompatActivity {
         ArticleView(Context context) {
             super(context);
             setOrientation(VERTICAL);
+            setLayoutParams(new RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             setPadding(dp(16), dp(10), dp(16), 0);
             setBackgroundColor(isDark() ? 0xFF17181B : Color.WHITE);
             setOnClickListener(v -> {
@@ -2692,13 +2780,26 @@ public class ForumTopicActivity extends AppCompatActivity {
             titleParams.topMargin = dp(8);
             addView(titleRow, titleParams);
 
+            questionMetaRow = new LinearLayout(context);
+            questionMetaRow.setGravity(Gravity.CENTER_VERTICAL);
+            questionMetaRow.setVisibility(GONE);
+            qaStatus = text("", 10.5f, 0xFFB76E00, true);
+            qaStatus.setGravity(Gravity.CENTER);
+            qaStatus.setSingleLine(true);
+            qaStatus.setPadding(dp(7), 0, dp(7), 0);
+            questionMetaRow.addView(qaStatus, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(20)));
             bounty = text("", 12, isDark() ? 0xFFFFCB68 : 0xFFB96A00, true);
-            bounty.setVisibility(GONE);
+            bounty.setSingleLine(true);
             LinearLayout.LayoutParams bountyParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            bountyParams.topMargin = dp(6);
-            bountyParams.leftMargin = dp(27);
-            addView(bounty, bountyParams);
+            bountyParams.leftMargin = dp(8);
+            questionMetaRow.addView(bounty, bountyParams);
+            LinearLayout.LayoutParams questionMetaParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            questionMetaParams.leftMargin = dp(27);
+            questionMetaParams.topMargin = dp(6);
+            addView(questionMetaRow, questionMetaParams);
 
             LinearLayout authorRow = new LinearLayout(context);
             authorRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -2725,15 +2826,6 @@ public class ForumTopicActivity extends AppCompatActivity {
             authorCopy.addView(nameRow);
             authorMeta = text("", 12, isDark() ? 0xFF8F949C : 0xFF7A8088, false);
             authorCopy.addView(authorMeta);
-            qaStatus = text("", 10.5f, 0xFFB76E00, true);
-            qaStatus.setGravity(Gravity.CENTER);
-            qaStatus.setSingleLine(true);
-            qaStatus.setPadding(dp(7), 0, dp(7), 0);
-            qaStatus.setVisibility(GONE);
-            LinearLayout.LayoutParams qaStatusParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(20));
-            qaStatusParams.topMargin = dp(2);
-            authorCopy.addView(qaStatus, qaStatusParams);
             LinearLayout.LayoutParams authorCopyParams = new LinearLayout.LayoutParams(
                     0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
             authorCopyParams.leftMargin = dp(10);
@@ -2769,6 +2861,12 @@ public class ForumTopicActivity extends AppCompatActivity {
             images = new ForumRemoteImageListView(context);
             addView(images, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            voteCard = new ForumVoteCardView(context);
+            LinearLayout.LayoutParams voteParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            voteParams.topMargin = dp(10);
+            addView(voteCard, voteParams);
 
             tagScroller = new HorizontalScrollView(context);
             tagScroller.setHorizontalScrollBarEnabled(false);
@@ -2830,6 +2928,7 @@ public class ForumTopicActivity extends AppCompatActivity {
                 setVisibility(GONE);
                 videoEmbeds.recycle();
                 images.recycle();
+                voteCard.bind(null, false, null, null);
                 tagContainer.removeAllViews();
                 tagScroller.setVisibility(GONE);
                 return;
@@ -2849,6 +2948,8 @@ public class ForumTopicActivity extends AppCompatActivity {
             boolean solved = question && (topic.acceptedCommentId > 0
                     || "solved".equalsIgnoreCase(safe(topic.qaStatus)));
             qaMark.setVisibility(question ? VISIBLE : GONE);
+            boolean showBounty = question && topic.bountyScore > 0;
+            questionMetaRow.setVisibility(question ? VISIBLE : GONE);
             qaStatus.setVisibility(question ? VISIBLE : GONE);
             if (question) {
                 qaStatus.setText(solved ? R.string.forum_qa_solved : R.string.forum_qa_unsolved);
@@ -2859,8 +2960,8 @@ public class ForumTopicActivity extends AppCompatActivity {
             } else {
                 qaStatus.setBackground(null);
             }
-            bounty.setVisibility(question && topic.bountyScore > 0 ? VISIBLE : GONE);
-            bounty.setText(question && topic.bountyScore > 0
+            bounty.setVisibility(showBounty ? VISIBLE : GONE);
+            bounty.setText(showBounty
                     ? ForumText.get(R.string.forum_bounty_points, topic.bountyScore) : "");
             title.setText(safe(topic.title));
             String authorName = userName(topic.user);
@@ -2881,6 +2982,12 @@ public class ForumTopicActivity extends AppCompatActivity {
             videoEmbeds.bind(body);
             images.bind(topic.imageList, dp(180), dp(10),
                     Color.TRANSPARENT);
+            boolean voteBusy = topic.vote != null && voting
+                    && votingVoteId == topic.vote.id;
+            List<Long> pendingVoteSelection = topic.vote != null
+                    && voteSelectionVoteId == topic.vote.id
+                    ? new ArrayList<>(voteSelectionIds) : null;
+            voteCard.bind(topic.vote, voteBusy, pendingVoteSelection, voteListener);
             bindTopicTags(topic.tags);
 
             bindTopicAction(eyeAction, R.drawable.ic_forum_eye,

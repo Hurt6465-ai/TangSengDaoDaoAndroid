@@ -1620,6 +1620,13 @@ public class ForumHomeFragment extends Fragment {
             } else {
                 holder.qaStatus.setBackground(null);
             }
+            boolean hasBounty = question && topic.bountyScore > 0;
+            holder.bounty.setVisibility(hasBounty ? View.VISIBLE : View.GONE);
+            holder.bounty.setText(hasBounty
+                    ? ForumText.get(R.string.forum_bounty_list_points, topic.bountyScore) : "");
+            boolean hasVote = topic.vote != null && topic.vote.id > 0;
+            holder.vote.setVisibility(hasVote ? View.VISIBLE : View.GONE);
+            holder.vote.setText(hasVote ? ForumText.get(R.string.forum_vote_badge) : "");
             holder.replyCount.setText(String.valueOf(Math.max(0L, topic.commentCount)));
             holder.replyCount.setTextColor(newReply ? 0xFF1877F2
                     : (dark ? 0xFFB7BCC4 : 0xFF626A74));
@@ -1638,6 +1645,8 @@ public class ForumHomeFragment extends Fragment {
             holder.recommend.setAlpha(dimmed ? 0.58f : 1f);
             holder.qaMark.setAlpha(dimmed ? 0.58f : 1f);
             holder.qaStatus.setAlpha(dimmed ? 0.58f : 1f);
+            holder.bounty.setAlpha(dimmed ? 0.58f : 1f);
+            holder.vote.setAlpha(dimmed ? 0.58f : 1f);
 
             bindAvatar(holder.avatar, topic.user, author);
             holder.avatar.setOnClickListener(v -> ForumProfileRouter.open(context, topic.user));
@@ -2066,6 +2075,8 @@ public class ForumHomeFragment extends Fragment {
         private final TextView qaMark;
         private final TextView title;
         private final TextView qaStatus;
+        private final TextView bounty;
+        private final TextView vote;
         private final TextView replyCount;
 
         private TopicHolder(@NonNull View itemView) {
@@ -2087,7 +2098,9 @@ public class ForumHomeFragment extends Fragment {
             LinearLayout titleRow = (LinearLayout) root.getChildAt(1);
             qaMark = (TextView) titleRow.getChildAt(0);
             title = (TextView) titleRow.getChildAt(1);
-            replyCount = (TextView) titleRow.getChildAt(2);
+            bounty = (TextView) titleRow.getChildAt(2);
+            vote = (TextView) titleRow.getChildAt(3);
+            replyCount = (TextView) titleRow.getChildAt(4);
         }
     }
 
@@ -2189,6 +2202,25 @@ public class ForumHomeFragment extends Fragment {
         title.setEllipsize(TextUtils.TruncateAt.END);
         titleRow.addView(title, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView bounty = badge(context, "", dark ? 0xFFFFCB68 : 0xFFB96A00,
+                dark ? 0xFF3A3020 : 0xFFFFF3D8);
+        bounty.setVisibility(View.GONE);
+        bounty.setMaxLines(1);
+        LinearLayout.LayoutParams bountyParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 20));
+        bountyParams.leftMargin = dp(context, 7);
+        titleRow.addView(bounty, bountyParams);
+
+        TextView vote = badge(context, ForumText.get(R.string.forum_vote_badge),
+                dark ? 0xFFFFB071 : 0xFFE76516,
+                dark ? 0xFF3D2C22 : 0xFFFFEFE5);
+        vote.setVisibility(View.GONE);
+        vote.setMaxLines(1);
+        LinearLayout.LayoutParams voteParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(context, 20));
+        voteParams.leftMargin = dp(context, 7);
+        titleRow.addView(vote, voteParams);
 
         TextView replyCount = text(context, "0", 11.5f,
                 dark ? 0xFFB7BCC4 : 0xFF626A74, true);
@@ -2354,10 +2386,19 @@ public class ForumHomeFragment extends Fragment {
         return safe(topic.id) + '|' + safe(topic.title) + '|' + topic.type + '|'
                 + topic.createTime + '|' + topic.lastCommentTime + '|' + topic.commentCount + '|'
                 + topic.likeCount + '|' + topic.sticky + '|' + topic.recommend + '|'
+                + safe(topic.qaStatus) + '|' + topic.acceptedCommentId + '|'
+                + topic.bountyScore + '|' + voteSignature(topic.vote) + '|'
                 + safe(user == null ? null : user.nickname) + '|'
                 + safe(user == null ? null : user.smallAvatar) + '|'
                 + safe(category == null ? null : category.name) + '|'
                 + tagSignature(topic.tags);
+    }
+
+    private static String voteSignature(@Nullable ForumApiClient.Vote vote) {
+        if (vote == null) return "";
+        return vote.id + ":" + safe(vote.title) + ":" + vote.type + ":"
+                + vote.voteNum + ":" + vote.optionCount + ":" + vote.voteCount + ":"
+                + vote.expired + ":" + vote.voted;
     }
 
     private static String tagSignature(@Nullable List<ForumApiClient.Tag> tags) {

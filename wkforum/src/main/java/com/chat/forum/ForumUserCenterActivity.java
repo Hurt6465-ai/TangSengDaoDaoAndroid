@@ -399,8 +399,14 @@ public class ForumUserCenterActivity extends AppCompatActivity {
         row.summary = topic.summary;
         String category = topic.category == null ? "" : firstNonEmpty(topic.category.name, "");
         String prefix = TextUtils.isEmpty(category) ? ForumText.get(R.string.forum_my_posts) : category;
-        row.meta = ForumText.get(R.string.forum_post_stats,
-                prefix + " · " + formatTime(topic.createTime),
+        String source = prefix + " · " + formatTime(topic.createTime);
+        if (topic.type == 2 && topic.bountyScore > 0) {
+            source += " · " + ForumText.get(R.string.forum_bounty_list_points, topic.bountyScore);
+        }
+        if (topic.vote != null && topic.vote.id > 0) {
+            source += " · " + ForumText.get(R.string.forum_vote_badge);
+        }
+        row.meta = ForumText.get(R.string.forum_post_stats, source,
                 Math.max(0, topic.commentCount), Math.max(0, topic.likeCount));
         row.topicId = topic.id;
         row.disabled = TextUtils.isEmpty(row.topicId);

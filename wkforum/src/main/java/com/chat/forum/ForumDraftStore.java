@@ -22,6 +22,12 @@ final class ForumDraftStore {
         String content = "";
         String tags = "";
         String bounty = "";
+        boolean voteEnabled;
+        String voteTitle = "";
+        String voteOptions = "";
+        int voteType = 1;
+        int voteNum = 1;
+        int voteDurationIndex;
         int topicType;
         long categoryId;
         long savedAt;
@@ -30,7 +36,10 @@ final class ForumDraftStore {
             return !TextUtils.isEmpty(safe(title).trim())
                     || !TextUtils.isEmpty(safe(content).trim())
                     || !TextUtils.isEmpty(safe(tags).trim())
-                    || !TextUtils.isEmpty(safe(bounty).trim());
+                    || !TextUtils.isEmpty(safe(bounty).trim())
+                    || voteEnabled
+                    || !TextUtils.isEmpty(safe(voteTitle).trim())
+                    || !TextUtils.isEmpty(safe(voteOptions).trim());
         }
     }
 
@@ -45,6 +54,12 @@ final class ForumDraftStore {
                 .putString(prefix + "content", safe(draft.content))
                 .putString(prefix + "tags", safe(draft.tags))
                 .putString(prefix + "bounty", safe(draft.bounty))
+                .putBoolean(prefix + "vote_enabled", draft.voteEnabled)
+                .putString(prefix + "vote_title", safe(draft.voteTitle))
+                .putString(prefix + "vote_options", safe(draft.voteOptions))
+                .putInt(prefix + "vote_type", draft.voteType)
+                .putInt(prefix + "vote_num", draft.voteNum)
+                .putInt(prefix + "vote_duration", draft.voteDurationIndex)
                 .putInt(prefix + "type", draft.topicType)
                 .putLong(prefix + "category", draft.categoryId)
                 .putLong(prefix + "saved_at", System.currentTimeMillis())
@@ -65,6 +80,12 @@ final class ForumDraftStore {
         draft.content = prefs.getString(prefix + "content", "");
         draft.tags = prefs.getString(prefix + "tags", "");
         draft.bounty = prefs.getString(prefix + "bounty", "");
+        draft.voteEnabled = prefs.getBoolean(prefix + "vote_enabled", false);
+        draft.voteTitle = prefs.getString(prefix + "vote_title", "");
+        draft.voteOptions = prefs.getString(prefix + "vote_options", "");
+        draft.voteType = prefs.getInt(prefix + "vote_type", 1);
+        draft.voteNum = prefs.getInt(prefix + "vote_num", 1);
+        draft.voteDurationIndex = prefs.getInt(prefix + "vote_duration", 0);
         draft.topicType = prefs.getInt(prefix + "type", 0);
         draft.categoryId = prefs.getLong(prefix + "category", 0L);
         draft.savedAt = savedAt;
@@ -78,6 +99,12 @@ final class ForumDraftStore {
                 .remove(prefix + "content")
                 .remove(prefix + "tags")
                 .remove(prefix + "bounty")
+                .remove(prefix + "vote_enabled")
+                .remove(prefix + "vote_title")
+                .remove(prefix + "vote_options")
+                .remove(prefix + "vote_type")
+                .remove(prefix + "vote_num")
+                .remove(prefix + "vote_duration")
                 .remove(prefix + "type")
                 .remove(prefix + "category")
                 .remove(prefix + "saved_at")

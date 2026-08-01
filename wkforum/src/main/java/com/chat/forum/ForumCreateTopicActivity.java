@@ -8,8 +8,10 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -44,6 +46,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.json.JSONArray;
+
 /** Native post, Q&A, and article composer. */
 public class ForumCreateTopicActivity extends AppCompatActivity {
     private static final int MAX_IMAGES = 2;
@@ -54,6 +58,12 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private static final String STATE_CONTENT = "forum_content";
     private static final String STATE_TAGS = "forum_tags";
     private static final String STATE_BOUNTY = "forum_bounty";
+    private static final String STATE_VOTE_ENABLED = "forum_vote_enabled";
+    private static final String STATE_VOTE_TITLE = "forum_vote_title";
+    private static final String STATE_VOTE_OPTIONS = "forum_vote_options";
+    private static final String STATE_VOTE_TYPE = "forum_vote_type";
+    private static final String STATE_VOTE_NUM = "forum_vote_num";
+    private static final String STATE_VOTE_DURATION = "forum_vote_duration";
     private static final String STATE_TYPE = "forum_type";
     private static final String STATE_CATEGORY = "forum_category";
     private static final String STATE_IMAGES = "forum_images";
@@ -77,6 +87,13 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private LinearLayout imageContainer;
     private LinearLayout typePill;
     private EditText bountyInput;
+    private TextView bountyInfo;
+    private ForumVoteEditorView voteEditor;
+    private ForumApiClient.ForumConfig forumConfig;
+    private int availableScore = -1;
+    private boolean configLoaded;
+    private boolean adjustingBounty;
+    private int scoreGeneration;
     private int topicType;
     private TextView publishButton;
     private TextView headingView;
@@ -140,6 +157,14 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         outState.putString(STATE_CONTENT, valueOf(contentInput));
         outState.putString(STATE_TAGS, TextUtils.join(",", selectedTags));
         outState.putString(STATE_BOUNTY, valueOf(bountyInput));
+        ForumVoteEditorView.State voteState = voteEditor == null
+                ? new ForumVoteEditorView.State() : voteEditor.snapshot();
+        outState.putBoolean(STATE_VOTE_ENABLED, voteState.enabled);
+        outState.putString(STATE_VOTE_TITLE, voteState.title);
+        outState.putStringArrayList(STATE_VOTE_OPTIONS, voteState.options);
+        outState.putInt(STATE_VOTE_TYPE, voteState.type);
+        outState.putInt(STATE_VOTE_NUM, voteState.voteNum);
+        outState.putInt(STATE_VOTE_DURATION, voteState.durationIndex);
         outState.putInt(STATE_TYPE, topicType);
         outState.putLong(STATE_CATEGORY, categoryIdForState());
         ArrayList<String> images = new ArrayList<>();
@@ -220,10 +245,25 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         bountyInput = input(ForumText.get(R.string.forum_bounty_optional), false);
         bountyInput.setInputType(InputType.TYPE_CLASS_NUMBER);
         bountyInput.setVisibility(View.GONE);
+        bountyInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { }
+            @Override public void afterTextChanged(Editable s) {
+                if (!adjustingBounty) enforceBountyUpperLimit();
+            }
+        });
         LinearLayout.LayoutParams bountyParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         bountyParams.topMargin = dp(8);
         form.addView(bountyInput, bountyParams);
+
+        bountyInfo = text(ForumText.get(R.string.forum_bounty_balance_loading), 12,
+                dark ? 0xFF9A9FA7 : 0xFF7A818A, false);
+        bountyInfo.setVisibility(View.GONE);
+        LinearLayout.LayoutParams bountyInfoParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        bountyInfoParams.topMargin = dp(5);
+        form.addView(bountyInfo, bountyInfoParams);
 
         titleInput = input(ForumText.get(R.string.forum_title_limit_hint), false);
         titleInput.setMaxLines(2);
@@ -238,6 +278,12 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         contentParams.topMargin = dp(12);
         form.addView(contentInput, contentParams);
+
+        voteEditor = new ForumVoteEditorView(this);
+        LinearLayout.LayoutParams voteParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        voteParams.topMargin = dp(8);
+        form.addView(voteEditor, voteParams);
 
         relationButton = text(ForumText.get(R.string.forum_insert_relation), 13, 0xFF1877F2, true);
         relationButton.setGravity(Gravity.CENTER_VERTICAL);
@@ -316,6 +362,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                 setPublishing(false, ForumText.get(R.string.forum_publish));
                 loadCategories();
                 loadRecommendedTags();
+                loadComposerContext();
             }
 
             @Override
@@ -331,8 +378,10 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private void renderTypePill() {
         if (typePill == null) return;
         typePill.removeAllViews();
-        addTypeTab(ForumText.get(R.string.forum_post), TYPE_TOPIC);
-        addTypeTab(ForumText.get(R.string.forum_question), TYPE_QA);
+        if (!isTopicModuleEnabled() && isQaModuleEnabled()) topicType = TYPE_QA;
+        if (topicType == TYPE_QA && !isQaModuleEnabled()) topicType = TYPE_TOPIC;
+        if (isTopicModuleEnabled()) addTypeTab(ForumText.get(R.string.forum_post), TYPE_TOPIC);
+        if (isQaModuleEnabled()) addTypeTab(ForumText.get(R.string.forum_question), TYPE_QA);
         updateTypeDependentViews();
     }
 
@@ -344,10 +393,15 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         tab.setBackground(selected ? roundRect(isDark() ? 0xFF34465F : Color.WHITE, 14) : null);
         tab.setOnClickListener(v -> {
             if (publishing || topicType == value) return;
+            if (value == TYPE_QA && voteEditor != null && voteEditor.isVoteEnabled()) {
+                Toast.makeText(this, R.string.forum_vote_not_supported_for_qa,
+                        Toast.LENGTH_LONG).show();
+            }
             topicType = value;
             pendingCategoryId = initialCategoryId;
             renderTypePill();
             updateContentHint();
+            if (topicType == TYPE_QA && availableScore < 0) loadCurrentUserScore();
             if (topicType != TYPE_ARTICLE) loadCategories();
         });
         typePill.addView(tab, new LinearLayout.LayoutParams(0,
@@ -429,9 +483,13 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.forum_boards_not_ready, Toast.LENGTH_SHORT).show();
             return;
         }
+        if (!validateBounty()) return;
+        if (topicType == TYPE_TOPIC && voteEditor != null && !voteEditor.validate()) return;
         final long selectedCategoryId = categoryId;
         final int selectedType = topicType;
         final int bountyScore = parseBountyScore();
+        final ForumApiClient.CreateVote vote = selectedType == TYPE_TOPIC && voteEditor != null
+                ? voteEditor.buildVote() : null;
         final List<String> tags = new ArrayList<>(selectedTags);
         final List<Uri> images = new ArrayList<>(selectedImages);
         final int generation = ++publishGeneration;
@@ -448,7 +506,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
                         createArticle(generation, title, content, tags, uploaded);
                     } else {
                         createTopic(generation, selectedType, selectedCategoryId, title, content,
-                                tags, uploaded, bountyScore);
+                                tags, uploaded, bountyScore, vote);
                     }
                 });
             }
@@ -526,11 +584,12 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
 
     private void createTopic(int generation, int type, long categoryId, String title,
                              String content, List<String> tags,
-                             List<ForumApiClient.ImageInfo> images, int bountyScore) {
+                             List<ForumApiClient.ImageInfo> images, int bountyScore,
+                             @Nullable ForumApiClient.CreateVote vote) {
         if (!isPublishActive(generation)) return;
         publishButton.setText(R.string.forum_publishing);
         ForumApiClient.getInstance().createTopic(type, categoryId, title, content,
-                tags, images, bountyScore, publishScope,
+                tags, images, bountyScore, vote, publishScope,
                 new ForumApiClient.ResultCallback<ForumApiClient.Topic>() {
                     @Override
                     public void onSuccess(@Nullable ForumApiClient.Topic topic) {
@@ -583,6 +642,7 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
     private void failPublish(String message) {
         if (isFinishing() || isDestroyed()) return;
         setPublishing(false, ForumText.get(R.string.forum_publish));
+        loadCurrentUserScore();
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
@@ -596,10 +656,11 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         if (titleInput != null) titleInput.setEnabled(!value);
         if (contentInput != null) contentInput.setEnabled(!value);
         setTagSelectionEnabled(!value);
-        if (bountyInput != null) bountyInput.setEnabled(!value);
+        updateBountyInputEnabled();
         if (categorySpinner != null) categorySpinner.setEnabled(!value);
         if (typePill != null) typePill.setEnabled(!value);
         if (relationButton != null) relationButton.setEnabled(!value);
+        if (voteEditor != null) voteEditor.setPublishing(value);
     }
 
     private void showInsertReferenceDialog() {
@@ -714,6 +775,15 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
             contentInput.setText(state.getString(STATE_CONTENT, ""));
             restoreSelectedTags(state.getString(STATE_TAGS, ""));
             bountyInput.setText(state.getString(STATE_BOUNTY, ""));
+            ForumVoteEditorView.State voteState = new ForumVoteEditorView.State();
+            voteState.enabled = state.getBoolean(STATE_VOTE_ENABLED, false);
+            voteState.title = state.getString(STATE_VOTE_TITLE, "");
+            ArrayList<String> savedVoteOptions = state.getStringArrayList(STATE_VOTE_OPTIONS);
+            if (savedVoteOptions != null) voteState.options.addAll(savedVoteOptions);
+            voteState.type = state.getInt(STATE_VOTE_TYPE, 1);
+            voteState.voteNum = state.getInt(STATE_VOTE_NUM, 1);
+            voteState.durationIndex = state.getInt(STATE_VOTE_DURATION, 0);
+            voteEditor.restore(voteState);
             topicType = normalizeComposerType(state.getInt(STATE_TYPE, TYPE_TOPIC));
             pendingCategoryId = state.getLong(STATE_CATEGORY, 0L);
             ArrayList<String> images = state.getStringArrayList(STATE_IMAGES);
@@ -735,6 +805,14 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         contentInput.setText(draft.content);
         restoreSelectedTags(draft.tags);
         bountyInput.setText(draft.bounty);
+        ForumVoteEditorView.State voteState = new ForumVoteEditorView.State();
+        voteState.enabled = draft.voteEnabled;
+        voteState.title = draft.voteTitle;
+        voteState.options = decodeVoteOptions(draft.voteOptions);
+        voteState.type = draft.voteType;
+        voteState.voteNum = draft.voteNum;
+        voteState.durationIndex = draft.voteDurationIndex;
+        voteEditor.restore(voteState);
         topicType = normalizeComposerType(draft.topicType);
         pendingCategoryId = draft.categoryId;
         renderTypePill();
@@ -753,6 +831,14 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         draft.content = valueOf(contentInput);
         draft.tags = TextUtils.join(",", selectedTags);
         draft.bounty = valueOf(bountyInput);
+        ForumVoteEditorView.State voteState = voteEditor == null
+                ? new ForumVoteEditorView.State() : voteEditor.snapshot();
+        draft.voteEnabled = voteState.enabled;
+        draft.voteTitle = voteState.title;
+        draft.voteOptions = encodeVoteOptions(voteState.options);
+        draft.voteType = voteState.type;
+        draft.voteNum = voteState.voteNum;
+        draft.voteDurationIndex = voteState.durationIndex;
         draft.topicType = topicType;
         draft.categoryId = categoryIdForState();
         ForumDraftStore.save(this, draft);
@@ -778,12 +864,47 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         }
         if (categoryLabel != null) categoryLabel.setVisibility(article ? View.GONE : View.VISIBLE);
         if (categorySpinner != null) categorySpinner.setVisibility(article ? View.GONE : View.VISIBLE);
-        if (bountyInput != null) bountyInput.setVisibility(topicType == TYPE_QA ? View.VISIBLE : View.GONE);
+        boolean question = topicType == TYPE_QA;
+        boolean bountyEnabled = !configLoaded || forumConfig == null || forumConfig.enableQaBounty;
+        if (bountyInput != null) {
+            bountyInput.setVisibility(question && bountyEnabled ? View.VISIBLE : View.GONE);
+        }
+        if (bountyInfo != null) bountyInfo.setVisibility(question ? View.VISIBLE : View.GONE);
+        updateBountyInfo();
+        updateBountyInputEnabled();
         if (relationButton != null) relationButton.setVisibility(article ? View.VISIBLE : View.GONE);
+        if (voteEditor != null) voteEditor.setAllowed(topicType == TYPE_TOPIC);
         if (imageLabel != null) {
             imageLabel.setText(article ? R.string.forum_article_images_limit_label
                     : R.string.forum_images_limit_label);
         }
+    }
+
+    private static String encodeVoteOptions(@Nullable List<String> options) {
+        JSONArray array = new JSONArray();
+        boolean meaningful = false;
+        if (options != null) {
+            for (String option : options) {
+                String value = option == null ? "" : option;
+                if (!TextUtils.isEmpty(value.trim())) meaningful = true;
+                array.put(value);
+            }
+        }
+        return meaningful ? array.toString() : "";
+    }
+
+    @NonNull
+    private static ArrayList<String> decodeVoteOptions(@Nullable String encoded) {
+        ArrayList<String> result = new ArrayList<>();
+        if (TextUtils.isEmpty(encoded)) return result;
+        try {
+            JSONArray array = new JSONArray(encoded);
+            for (int i = 0; i < array.length() && result.size() < 20; i++) {
+                result.add(array.optString(i, ""));
+            }
+        } catch (Throwable ignored) {
+        }
+        return result;
     }
 
     private static String appendArticleBodyImages(String content,
@@ -864,8 +985,213 @@ public class ForumCreateTopicActivity extends AppCompatActivity {
         return input == null ? "" : input.getText().toString();
     }
 
+    private void loadComposerContext() {
+        if (topicType == TYPE_QA) loadCurrentUserScore();
+        ForumApiClient.getInstance().getForumConfig(readScope,
+                new ForumApiClient.ResultCallback<ForumApiClient.ForumConfig>() {
+                    @Override
+                    public void onSuccess(@Nullable ForumApiClient.ForumConfig config) {
+                        if (destroyed || isFinishing()) return;
+                        forumConfig = config;
+                        configLoaded = true;
+                        int previousType = topicType;
+                        renderTypePill();
+                        updateContentHint();
+                        enforceBountyUpperLimit();
+                        if (previousType != topicType) {
+                            pendingCategoryId = initialCategoryId;
+                            if (topicType == TYPE_QA && availableScore < 0) loadCurrentUserScore();
+                            loadCategories();
+                        }
+                    }
+
+                    @Override
+                    public void onError(@NonNull String message) {
+                        if (destroyed || isFinishing()) return;
+                        forumConfig = null;
+                        configLoaded = false;
+                        updateBountyInfo();
+                        updateBountyInputEnabled();
+                    }
+                });
+    }
+
+    private void loadCurrentUserScore() {
+        final int generation = ++scoreGeneration;
+        ForumApiClient.getInstance().getCurrentUser(readScope,
+                new ForumApiClient.ResultCallback<ForumApiClient.User>() {
+                    @Override
+                    public void onSuccess(@Nullable ForumApiClient.User user) {
+                        if (destroyed || isFinishing() || generation != scoreGeneration) return;
+                        availableScore = user == null ? 0 : Math.max(0, user.score);
+                        enforceBountyUpperLimit();
+                        updateBountyInfo();
+                        updateBountyInputEnabled();
+                    }
+
+                    @Override
+                    public void onError(@NonNull String message) {
+                        if (destroyed || isFinishing() || generation != scoreGeneration) return;
+                        availableScore = -1;
+                        updateBountyInfo();
+                        updateBountyInputEnabled();
+                    }
+                });
+    }
+
+    private boolean isTopicModuleEnabled() {
+        return forumConfig == null || forumConfig.modules == null || forumConfig.modules.topic;
+    }
+
+    private boolean isQaModuleEnabled() {
+        return forumConfig == null || forumConfig.modules == null || forumConfig.modules.qa;
+    }
+
+    private boolean isBountyEnabled() {
+        return !configLoaded || forumConfig == null || forumConfig.enableQaBounty;
+    }
+
+    private int configuredBountyMin() {
+        return forumConfig == null ? 0 : Math.max(0, forumConfig.qaBountyMin);
+    }
+
+    private int configuredBountyMax() {
+        return forumConfig == null ? 0 : Math.max(0, forumConfig.qaBountyMax);
+    }
+
+    private int bountyUpperLimit() {
+        int limit = Integer.MAX_VALUE;
+        int configuredMax = configuredBountyMax();
+        if (configuredMax > 0) limit = Math.min(limit, configuredMax);
+        if (availableScore >= 0) limit = Math.min(limit, availableScore);
+        return limit == Integer.MAX_VALUE ? -1 : Math.max(0, limit);
+    }
+
+    private void enforceBountyUpperLimit() {
+        if (bountyInput == null || adjustingBounty || topicType != TYPE_QA) return;
+        String raw = bountyInput.getText().toString().trim();
+        if (TextUtils.isEmpty(raw)) return;
+        long value;
+        try {
+            value = Long.parseLong(raw);
+        } catch (Throwable ignored) {
+            value = Integer.MAX_VALUE;
+        }
+        int limit = bountyUpperLimit();
+        if (limit < 0 && value <= Integer.MAX_VALUE) return;
+        if (limit < 0) limit = Integer.MAX_VALUE;
+        if (value <= limit) return;
+        adjustingBounty = true;
+        String replacement = limit <= 0 ? "" : String.valueOf(limit);
+        bountyInput.setText(replacement);
+        bountyInput.setSelection(bountyInput.length());
+        adjustingBounty = false;
+        if (availableScore >= 0 && limit == availableScore
+                && (configuredBountyMax() <= 0 || availableScore <= configuredBountyMax())) {
+            bountyInput.setError(ForumText.get(R.string.forum_bounty_exceeds_balance, availableScore));
+        } else {
+            bountyInput.setError(ForumText.get(R.string.forum_bounty_above_max, limit));
+        }
+    }
+
+    private void updateBountyInputEnabled() {
+        if (bountyInput == null) return;
+        boolean scoreReady = availableScore >= 0;
+        boolean enabled = !publishing && topicType == TYPE_QA && isBountyEnabled()
+                && scoreReady && availableScore > 0;
+        bountyInput.setEnabled(enabled);
+        bountyInput.setAlpha(enabled ? 1f : 0.62f);
+    }
+
+    private void updateBountyInfo() {
+        if (bountyInfo == null || bountyInput == null) return;
+        boolean required = forumConfig != null && forumConfig.qaBountyRequired;
+        bountyInput.setHint(required ? R.string.forum_bounty_required_hint
+                : R.string.forum_bounty_optional);
+        if (configLoaded && !isBountyEnabled()) {
+            bountyInfo.setText(R.string.forum_bounty_disabled);
+            return;
+        }
+        if (availableScore < 0) {
+            bountyInfo.setText(R.string.forum_bounty_balance_loading);
+            return;
+        }
+        int min = configuredBountyMin();
+        int max = configuredBountyMax();
+        if (max > 0) max = Math.min(max, availableScore);
+        else max = availableScore;
+        if (min > 0 && max >= min) {
+            bountyInfo.setText(ForumText.get(R.string.forum_bounty_balance_range,
+                    availableScore, min, max));
+        } else if (min > 0) {
+            bountyInfo.setText(ForumText.get(R.string.forum_bounty_balance_min,
+                    availableScore, min));
+        } else {
+            bountyInfo.setText(ForumText.get(R.string.forum_bounty_balance, availableScore));
+        }
+    }
+
+    private boolean validateBounty() {
+        if (topicType != TYPE_QA || bountyInput == null) return true;
+        if (configLoaded && !isBountyEnabled()) {
+            bountyInput.setText("");
+            return true;
+        }
+        String raw = bountyInput.getText().toString().trim();
+        boolean required = forumConfig != null && forumConfig.qaBountyRequired;
+        if (TextUtils.isEmpty(raw)) {
+            if (required) {
+                bountyInput.setError(ForumText.get(R.string.forum_bounty_required_error));
+                bountyInput.requestFocus();
+                return false;
+            }
+            return true;
+        }
+        long value;
+        try {
+            value = Long.parseLong(raw);
+        } catch (Throwable ignored) {
+            bountyInput.setError(ForumText.get(R.string.forum_bounty_invalid));
+            bountyInput.requestFocus();
+            return false;
+        }
+        if (value < 0 || value > Integer.MAX_VALUE) {
+            bountyInput.setError(ForumText.get(R.string.forum_bounty_invalid));
+            bountyInput.requestFocus();
+            return false;
+        }
+        if (required && value <= 0) {
+            bountyInput.setError(ForumText.get(R.string.forum_bounty_required_error));
+            bountyInput.requestFocus();
+            return false;
+        }
+        if (availableScore < 0) {
+            bountyInput.setError(ForumText.get(R.string.forum_bounty_balance_unavailable));
+            bountyInput.requestFocus();
+            return false;
+        }
+        if (value > availableScore) {
+            bountyInput.setError(ForumText.get(R.string.forum_bounty_exceeds_balance, availableScore));
+            bountyInput.requestFocus();
+            return false;
+        }
+        int min = configuredBountyMin();
+        int max = configuredBountyMax();
+        if (value > 0 && min > 0 && value < min) {
+            bountyInput.setError(ForumText.get(R.string.forum_bounty_below_min, min));
+            bountyInput.requestFocus();
+            return false;
+        }
+        if (max > 0 && value > max) {
+            bountyInput.setError(ForumText.get(R.string.forum_bounty_above_max, max));
+            bountyInput.requestFocus();
+            return false;
+        }
+        return true;
+    }
+
     private int parseBountyScore() {
-        if (topicType != TYPE_QA || bountyInput == null) return 0;
+        if (topicType != TYPE_QA || bountyInput == null || !isBountyEnabled()) return 0;
         String raw = bountyInput.getText().toString().trim();
         if (TextUtils.isEmpty(raw)) return 0;
         try { return Math.max(0, Integer.parseInt(raw)); }

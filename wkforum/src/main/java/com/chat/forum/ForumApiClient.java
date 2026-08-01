@@ -403,6 +403,24 @@ public final class ForumApiClient {
         enqueue(forumService().recentMessages(requireAuthHeader()), scope, callback);
     }
 
+    public void getCurrentUser(@NonNull ResultCallback<User> callback) {
+        getCurrentUser(null, callback);
+    }
+
+    public void getCurrentUser(@Nullable RequestScope scope,
+                               @NonNull ResultCallback<User> callback) {
+        enqueue(forumService().currentUser(requireAuthHeader()), scope, callback);
+    }
+
+    public void getForumConfig(@NonNull ResultCallback<ForumConfig> callback) {
+        getForumConfig(null, callback);
+    }
+
+    public void getForumConfig(@Nullable RequestScope scope,
+                               @NonNull ResultCallback<ForumConfig> callback) {
+        enqueue(forumService().configs(authHeader()), scope, callback);
+    }
+
     public void getUserFollowed(@NonNull String userId,
                                 @NonNull ResultCallback<Boolean> callback) {
         getUserFollowed(userId, null, callback);
@@ -531,6 +549,16 @@ public final class ForumApiClient {
                             @NonNull List<ImageInfo> images, int bountyScore,
                             @Nullable RequestScope scope,
                             @NonNull ResultCallback<Topic> callback) {
+        createTopic(type, categoryId, title, content, tags, images, bountyScore,
+                null, scope, callback);
+    }
+
+    public void createTopic(int type, long categoryId, @NonNull String title,
+                            @NonNull String content, @NonNull List<String> tags,
+                            @NonNull List<ImageInfo> images, int bountyScore,
+                            @Nullable CreateVote vote,
+                            @Nullable RequestScope scope,
+                            @NonNull ResultCallback<Topic> callback) {
         CreateTopicRequest request = new CreateTopicRequest();
         request.type = type;
         request.categoryId = categoryId;
@@ -540,7 +568,17 @@ public final class ForumApiClient {
         request.tags = tags;
         request.imageList = images;
         request.bountyScore = Math.max(0, bountyScore);
+        request.vote = vote;
         enqueue(forumService().createTopic(requireAuthHeader(), request), scope, callback);
+    }
+
+    public void castVote(long voteId, @NonNull List<Long> optionIds,
+                         @Nullable RequestScope scope,
+                         @NonNull ResultCallback<Vote> callback) {
+        VoteCastRequest request = new VoteCastRequest();
+        request.voteId = voteId;
+        request.optionIds = new ArrayList<>(optionIds);
+        enqueue(forumService().castVote(requireAuthHeader(), request), scope, callback);
     }
 
     public void acceptAnswer(@NonNull String topicId, long commentId,
@@ -1040,6 +1078,12 @@ public final class ForumApiClient {
         @GET("api/user/msg_recent")
         Call<ApiEnvelope<RecentMessages>> recentMessages(@Header("X-User-Token") String token);
 
+        @GET("api/user/current")
+        Call<ApiEnvelope<User>> currentUser(@Header("X-User-Token") String token);
+
+        @GET("api/config/configs")
+        Call<ApiEnvelope<ForumConfig>> configs(@Header("X-User-Token") String token);
+
         @GET("api/user/messages")
         Call<ApiEnvelope<Page<Message>>> messages(@Header("X-User-Token") String token,
                                                    @Query("cursor") String cursor);
@@ -1081,6 +1125,10 @@ public final class ForumApiClient {
         @POST("api/topic/create")
         Call<ApiEnvelope<Topic>> createTopic(@Header("X-User-Token") String token,
                                              @Body CreateTopicRequest request);
+
+        @POST("api/vote/cast")
+        Call<ApiEnvelope<Vote>> castVote(@Header("X-User-Token") String token,
+                                         @Body VoteCastRequest request);
 
         @FormUrlEncoded
         @POST("api/topic/accept_answer/{id}")
@@ -1195,6 +1243,12 @@ public final class ForumApiClient {
         public List<String> tags;
         public List<ImageInfo> imageList;
         public int bountyScore;
+        public CreateVote vote;
+    }
+
+    private static final class VoteCastRequest {
+        public long voteId;
+        public List<Long> optionIds;
     }
 
     private static final class CreateArticleRequest {
@@ -1216,6 +1270,21 @@ public final class ForumApiClient {
         public List<T> results;
         public String cursor;
         public boolean hasMore;
+    }
+
+    public static final class ForumConfig {
+        public boolean enableQaBounty;
+        public int qaBountyMin;
+        public int qaBountyMax;
+        public boolean qaBountyRequired;
+        public Modules modules;
+    }
+
+    public static final class Modules {
+        public boolean tweet = true;
+        public boolean topic = true;
+        public boolean qa = true;
+        public boolean article = true;
     }
 
     public static final class Category {
@@ -1252,8 +1321,50 @@ public final class ForumApiClient {
         public Category category;
         public List<Tag> tags;
         public List<ImageInfo> imageList;
+        public Vote vote;
     }
 
+    public static final class CreateVote {
+        public int type = 1;
+        public String title;
+        public long expiredAt;
+        public int voteNum = 1;
+        public List<CreateVoteOption> options = new ArrayList<>();
+    }
+
+    public static final class CreateVoteOption {
+        public String content;
+
+        public CreateVoteOption() {
+        }
+
+        public CreateVoteOption(@NonNull String content) {
+            this.content = content;
+        }
+    }
+
+    public static final class Vote {
+        public long id;
+        public int type;
+        public String title;
+        public long expiredAt;
+        public int voteNum;
+        public int optionCount;
+        public int voteCount;
+        public boolean expired;
+        public boolean voted;
+        public List<Long> optionIds;
+        public List<VoteOption> options;
+    }
+
+    public static final class VoteOption {
+        public long id;
+        public String content;
+        public int sortNo;
+        public int voteCount;
+        public double percent;
+        public boolean voted;
+    }
 
     public static final class Article {
         public long id;
@@ -1336,6 +1447,7 @@ public final class ForumApiClient {
         public String smallAvatar;
         public String countryCode;
         public String country;
+        public int score;
         public List<String> roles;
         public List<String> permissions;
     }
