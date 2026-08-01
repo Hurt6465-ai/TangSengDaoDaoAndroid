@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "lesson_id": "greeting_review",
-  "title": "复习",
-  "title_en": "Review",
-  "title_my": "ပြန်လေ့လာ",
+  "title": "问候练习",
+  "title_en": "Greeting Practice",
+  "title_my": "နှုတ်ဆက် လေ့ကျင့်ခန်း",
   "subtitle": "用不同题型复习问候与介绍",
   "exercises": [
     {
