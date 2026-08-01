@@ -271,7 +271,7 @@ Time %5$d min</string>
 
     <!-- Speaking phrases: directory, cards, FSRS and AI coach -->
     <string name="speaking_directory_title">Speaking phrases</string>
-    <string name="speaking_directory_subtitle">Choose a category to browse its full phrase list, then tap a Chinese–Burmese phrase to study.</string>
+    <string name="speaking_directory_subtitle">Choose a category, then swipe up or down through the full-screen phrase feed.</string>
     <string name="speaking_directory_breadcrumb">Learn · Speaking</string>
     <string name="speaking_category_empty">No phrases in this category yet</string>
     <string name="speaking_progress_learned">Learned %1$d/%2$d</string>
@@ -323,7 +323,7 @@ Time %5$d min</string>
     <string name="speaking_coach_prompt_replacements">Replacement phrases: %1$s</string>
     <string name="speaking_coach_prompt_alternatives">Similar phrases: %1$s</string>
     <string name="speaking_coach_prompt_hint_language">Use English for brief hints and corrections, but keep the speaking practice in Chinese.</string>
-    <string name="speaking_coach_prompt_rules">Practice a realistic conversation with me using the current phrase and scene. Play the other person in the scene. Say only one or two short Chinese sentences at a time and guide me to use the current phrase and its replacements. When my wording is unnatural, give only one more natural version and continue. Give a short hint when I cannot answer. Do not give long grammar explanations or use Markdown tables. Start directly with the first line in the scene.</string>
+    <string name="speaking_coach_prompt_rules">Practice a realistic conversation with me using the current phrase and scene. Play the other person in the scene. Say only one or two short Chinese sentences at a time and guide me to use the current phrase. When my wording is unnatural, give only one more natural version and continue. Give a short hint when I cannot answer. Do not give long grammar explanations or use Markdown tables. Start directly with the first line in the scene.</string>
 
     <string name="speaking_phrase_list_breadcrumb">Speaking · Phrases</string>
     <string name="speaking_phrase_list_summary">%1$d phrases · %2$d learned</string>
@@ -509,5 +509,33 @@ Time %5$d min</string>
     <string name="learning_category_section">အမျိုးအစား မြေပုံ</string>
     <string name="learning_path_map_tip">လက်ရှိသင်ခန်းစာပြီးလျှင် နောက်တစ်ခု အလိုအလျောက်ဖွင့်မည်</string>
     <string name="learning_path_current">လက်ရှိသင်ခန်းစာ</string>
+
+    <!-- Speaking vertical feed and imports -->
+    <string name="speaking_favorites_action">Favorites</string>
+    <string name="speaking_favorites_title">Favorite phrases</string>
+    <string name="speaking_favorites_empty">No favorite phrases yet. Tap Save at the top of a phrase to add one.</string>
+    <string name="speaking_favorite">Save</string>
+    <string name="speaking_favorited">Saved</string>
+    <string name="speaking_favorite_added">Saved to favorites</string>
+    <string name="speaking_favorite_removed">Removed from favorites</string>
+    <string name="speaking_feed_progress">%1$d / %2$d</string>
+    <string name="speaking_swipe_hint">Swipe up for next - swipe down for previous</string>
+    <string name="speaking_scene_label">Use in this scene</string>
+    <string name="speaking_import">Import</string>
+    <string name="speaking_import_new">Import a phrase pack</string>
+    <string name="speaking_import_manage">Manage imports</string>
+    <string name="speaking_import_none">No phrase packs have been imported</string>
+    <string name="speaking_importing">Importing phrase pack...</string>
+    <string name="speaking_import_success">Imported &quot;%1$s&quot; with %2$d phrases</string>
+    <string name="speaking_import_failed">Import failed: %1$s</string>
+    <string name="speaking_import_invalid">Invalid phrase pack file</string>
+    <string name="speaking_import_picker_failed">Unable to open the file picker</string>
+    <string name="speaking_import_delete_title">Delete imported phrase pack</string>
+    <string name="speaking_import_delete_message">Delete &quot;%1$s&quot;? Saved favorites and practice history will be kept.</string>
+    <string name="speaking_import_delete">Delete</string>
+    <string name="speaking_import_delete_success">Imported phrase pack deleted</string>
+    <string name="speaking_imported_group">My imports</string>
+    <string name="speaking_imported_group_subtitle">Tap to open the swipe feed. Long-press a card to delete it.</string>
+    <string name="speaking_imported_delete_hint">- Long-press to delete</string>
 
 </resources>
