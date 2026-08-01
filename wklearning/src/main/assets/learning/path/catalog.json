@@ -1,17 +1,17 @@
 {
   "schema_version": 1,
-  "version": 2,
-  "updated_at": "2026-08-01T00:00:00Z",
+  "version": 3,
+  "updated_at": "2026-08-01T11:00:00Z",
   "courses": [
     {
       "id": "zh_beginner",
       "title": "零基础中文",
       "title_en": "Beginner Chinese",
       "title_my": "အခြေခံ တရုတ်ဘာသာ",
-      "subtitle": "从问候、拼音和日常表达开始，混合练习听、说、读和词序。",
-      "subtitle_en": "Start with greetings, pinyin, and everyday expressions through mixed listening, speaking, reading, and word-order practice.",
-      "subtitle_my": "နှုတ်ဆက်ခြင်း၊ ပင်ယင်နှင့် နေ့စဉ်စကားများမှ စတင်၍ နားထောင်၊ ပြော၊ ဖတ်နှင့် ဝါကျစီခြင်းကို ပေါင်းစပ်လေ့ကျင့်ပါ။",
-      "version": 2,
+      "subtitle": "从问候、拼音和日常表达开始，混合练习听、读、写和词序。",
+      "subtitle_en": "Start with greetings, pinyin, and everyday expressions through listening, reading, writing, and word-order practice.",
+      "subtitle_my": "နှုတ်ဆက်ခြင်း၊ ပင်ယင်နှင့် နေ့စဉ်စကားများမှ စတင်၍ နားထောင်၊ ဖတ်၊ ရေးနှင့် ဝါကျစီခြင်းကို ပေါင်းစပ်လေ့ကျင့်ပါ။",
+      "version": 3,
       "min_app_version": 0,
       "accent": "#635BFF",
       "units": [
@@ -36,7 +36,7 @@
               "type": "normal",
               "position": "center",
               "icon": "你",
-              "exercise_count": 7,
+              "exercise_count": 6,
               "minutes": 4,
               "required_lessons": [],
               "bundled_lesson_asset": "learning/path/lessons/greeting_hello.json",
@@ -52,10 +52,10 @@
               "subtitle": "我叫…… / 我是……",
               "subtitle_en": "My name is… / I am…",
               "subtitle_my": "ကျွန်ုပ်နာမည်… / ကျွန်ုပ်သည်…",
-              "type": "speaking",
+              "type": "normal",
               "position": "right",
               "icon": "我",
-              "exercise_count": 7,
+              "exercise_count": 6,
               "minutes": 5,
               "required_lessons": [
                 "greeting_hello"
@@ -76,7 +76,7 @@
               "type": "review",
               "position": "center",
               "icon": "↻",
-              "exercise_count": 6,
+              "exercise_count": 5,
               "minutes": 4,
               "required_lessons": [
                 "greeting_intro"
@@ -97,7 +97,7 @@
               "type": "test",
               "position": "left",
               "icon": "★",
-              "exercise_count": 8,
+              "exercise_count": 7,
               "minutes": 6,
               "required_lessons": [
                 "greeting_review"
@@ -130,7 +130,7 @@
               "type": "listening",
               "position": "center",
               "icon": "十",
-              "exercise_count": 7,
+              "exercise_count": 6,
               "minutes": 5,
               "required_lessons": [
                 "greeting_test"
@@ -151,7 +151,7 @@
               "type": "normal",
               "position": "right",
               "icon": "时",
-              "exercise_count": 7,
+              "exercise_count": 6,
               "minutes": 5,
               "required_lessons": [
                 "daily_numbers"
