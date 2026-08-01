@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "lesson_id": "greeting_review",
+  "title": "复习",
+  "title_en": "Review",
+  "title_my": "ပြန်လေ့လာ",
+  "subtitle": "用不同题型复习问候与介绍",
+  "exercises": [
+    {
+      "id": "review_dictation_1",
+      "type": "dictation",
+      "question": "听音填写完整句子",
+      "question_en": "Listen and type the full sentence",
+      "question_my": "နားထောင်ပြီး ဝါကျအပြည့် ရိုက်ပါ",
+      "audio_text": "你好",
+      "answer": "你好",
+      "accepted_answers": [
+        "你 好"
+      ],
+      "explanation": "听到的是“你好”。"
+    },
+    {
+      "id": "review_choice_1",
+      "type": "single_choice",
+      "question": "别人说“你好”，最自然的回答是什么？",
+      "question_en": "What is the most natural reply to “你好”?",
+      "question_my": "တစ်ဖက်လူက “你好” ပြောလျှင် ဘယ်လိုပြန်ဖြေမလဲ？",
+      "options": [
+        "你好",
+        "谢谢你",
+        "对不起",
+        "晚安"
+      ],
+      "answer": "你好",
+      "explanation": "普通见面问候可以直接回应“你好”。"
+    },
+    {
+      "id": "review_order_1",
+      "type": "word_order",
+      "question": "排列成询问姓名的句子",
+      "question_en": "Order the words to ask someone’s name",
+      "question_my": "နာမည်မေးသည့်ဝါကျကို စီပါ",
+      "words": [
+        "你",
+        "叫",
+        "什么",
+        "名字"
+      ],
+      "answer": [
+        "你",
+        "叫",
+        "什么",
+        "名字"
+      ],
+      "explanation": "完整句子是“你叫什么名字？”"
+    },
+    {
+      "id": "review_fill_1",
+      "type": "fill_blank",
+      "question": "填写：我是___人。",
+      "question_en": "Complete: 我是___人。",
+      "question_my": "ဖြည့်ပါ：我是___人。",
+      "answer": "缅甸",
+      "accepted_answers": [
+        "中国",
+        "日本",
+        "美国",
+        "泰国"
+      ],
+      "explanation": "这里可以填写国家名称。"
+    },
+    {
+      "id": "review_match_1",
+      "type": "matching",
+      "question": "配对礼貌表达",
+      "question_en": "Match the polite expressions",
+      "question_my": "ယဉ်ကျေးစကားများကို တွဲပါ",
+      "pairs": [
+        {
+          "left": "谢谢",
+          "right": "不客气"
+        },
+        {
+          "left": "对不起",
+          "right": "没关系"
+        },
+        {
+          "left": "再见",
+          "right": "再见"
+        }
+      ],
+      "answer": "全部配对",
+      "explanation": "这些是常见的成对礼貌表达。"
+    },
+    {
+      "id": "review_speak_1",
+      "type": "pronunciation",
+      "question": "完整说出自我介绍",
+      "question_en": "Say a complete introduction",
+      "question_my": "မိတ်ဆက်ဝါကျအပြည့် ပြောပါ",
+      "text": "你好，我叫安娜。",
+      "pinyin": "nǐ hǎo, wǒ jiào ān nà",
+      "audio_text": "你好，我叫安娜。",
+      "answer": "你好，我叫安娜。",
+      "original_speed": 0.5,
+      "explanation": "先问候，再介绍姓名，表达更自然。"
+    }
+  ],
+  "max_retries": 2
+}
