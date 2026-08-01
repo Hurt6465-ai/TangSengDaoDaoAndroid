@@ -538,4 +538,9 @@ Time %5$d min</string>
     <string name="speaking_imported_group_subtitle">Tap to open the swipe feed. Long-press a card to delete it.</string>
     <string name="speaking_imported_delete_hint">- Long-press to delete</string>
 
+
+    <string name="learning_lesson_pinyin">Pinyin</string>
+    <string name="learning_lesson_pinyin_switch">အလိုအလျောက် Pinyin ကို ပြရန် သို့မဟုတ် ဖျောက်ရန်</string>
+    <string name="learning_lesson_fill_pinyin">Pinyin အကူအညီ：%1$s</string>
+    <string name="learning_lesson_drag_hint">ထည့်ရန် တို့ပါ၊ အစီအစဉ်ပြောင်းရန် ဖိဆွဲပါ</string>
 </resources>
