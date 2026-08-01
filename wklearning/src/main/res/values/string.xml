@@ -435,6 +435,13 @@
     <string name="learning_lesson_word_bank">词语卡片</string>
     <string name="learning_lesson_matching_empty">这道配对题没有有效数据</string>
     <string name="learning_lesson_finish_matching">请完成全部配对</string>
+    <string name="learning_lesson_matching_mistakes">配对过程中有 %1$d 次错误。</string>
+    <string name="learning_lesson_progress">%1$d / %2$d</string>
+    <string name="learning_lesson_review_progress">复习 %1$d/%2$d</string>
+    <string name="learning_lesson_exit_title">退出本次练习？</string>
+    <string name="learning_lesson_exit_message">本次未完成的答题进度不会保存。</string>
+    <string name="learning_lesson_exit_continue">继续练习</string>
+    <string name="learning_lesson_exit_leave">退出</string>
     <string name="learning_lesson_play_audio">播放原音</string>
     <string name="learning_lesson_play_original">原音 0.5×</string>
     <string name="learning_lesson_record_compare">录音并对比</string>
