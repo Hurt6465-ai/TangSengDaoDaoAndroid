@@ -433,6 +433,13 @@ Time %5$d min</string>
     <string name="learning_lesson_word_bank">Word Bank</string>
     <string name="learning_lesson_matching_empty">This matching question has no valid data</string>
     <string name="learning_lesson_finish_matching">Complete all matches</string>
+    <string name="learning_lesson_matching_mistakes">There were %1$d incorrect matches.</string>
+    <string name="learning_lesson_progress">%1$d / %2$d</string>
+    <string name="learning_lesson_review_progress">Review %1$d/%2$d</string>
+    <string name="learning_lesson_exit_title">Leave this practice?</string>
+    <string name="learning_lesson_exit_message">Unfinished answers in this session will not be saved.</string>
+    <string name="learning_lesson_exit_continue">Keep practicing</string>
+    <string name="learning_lesson_exit_leave">Leave</string>
     <string name="learning_lesson_play_audio">Play original audio</string>
     <string name="learning_lesson_play_original">Original 0.5×</string>
     <string name="learning_lesson_record_compare">Record and compare</string>
