@@ -45,7 +45,7 @@
     <string name="dating_filter_goal_marriage">意向：奔结婚</string>
     <string name="dating_filter_goal_all">意向：不限</string>
     <string name="dating_rewind">撤回</string>
-    <string name="dating_mine_title">我的交友</string>
+    <string name="dating_mine_title">设置</string>
     <string name="dating_action_failed">操作失败</string>
     <string name="dating_age_range_plain">%1$d-%2$d 岁</string>
     <string name="dating_drinking_value">饮酒：%1$s</string>
@@ -70,9 +70,9 @@
     <string name="dating_intent_short_term">享受短期交往的乐趣</string>
     <string name="dating_intent_friends">结交新朋友</string>
     <string name="dating_intent_open">顺其自然</string>
-    <string name="dating_edit_profile_title">编辑交友资料</string>
+    <string name="dating_edit_profile_title">编辑个人资料</string>
     <string name="dating_my_photos">我的照片</string>
-    <string name="dating_shared_profile">共享资料</string>
+    <string name="dating_shared_profile">基本资料</string>
     <string name="dating_shared_profile_tip">头像、姓名、生日、国家等与账号资料共用，可直接编辑</string>
     <string name="dating_enable">开启交友</string>
     <string name="dating_enable_tip">只有开启后，才能刷别人</string>
@@ -127,7 +127,7 @@
     <string name="dating_rewind_record_synced">撤回记录已同步，推荐列表已刷新</string>
     <string name="dating_refresh_after_profile">正在根据新资料刷新推荐…</string>
     <string-array name="dating_gender_options">
-        <item>不限</item>
+        <item>默认异性</item>
         <item>女生</item>
         <item>男生</item>
     </string-array>
@@ -345,4 +345,42 @@
     <string name="dating_distance_over_100km">100公里以上</string>
     <string name="dating_swipe_stamp_like">喜欢</string>
     <string name="dating_swipe_stamp_favorite">收藏</string>
-<string name="dating_country_flag">国旗</string><string name="dating_more_actions">更多操作</string><string name="dating_section_languages">语言</string><string name="dating_basic_relationship">感情状态</string><string name="dating_basic_orientation">性取向</string><string name="dating_basic_body">身高与体重</string><string name="dating_basic_lifestyle">生活习惯</string><string name="dating_basic_job">职业</string><string name="dating_basic_education">学历</string><string name="dating_native_languages_format">母语：%1$s</string><string name="dating_learning_languages_format">学习：%1$s</string><string name="dating_status_edit_tip">完整资料后可开启交友；关闭后不会出现在推荐中。</string><string name="dating_shared_profile_partner_tip">默认读取语伴共享资料，修改后语伴和交友同步更新。</string><string name="dating_edit_shared_profile_inside">编辑共享资料</string><string name="dating_close_dating">关闭交友</string><string name="dating_open_dating">开启交友</string><string name="dating_complete_before_open">请先上传照片并完成恋爱意向，再开启交友。</string><string name="dating_save_shared_profile">保存共享资料</string><string name="dating_shared_editor_title">共享资料</string><string name="dating_shared_editor_tip">这是语伴和交友共用的资料。默认读取语伴资料，在这里修改后两边都会同步更新。</string><string name="dating_shared_core_title">账号与语言</string><string name="dating_shared_name">昵称</string><string name="dating_shared_birthday">生日</string><string name="dating_shared_gender">性别</string><string name="dating_shared_country">国家/地区</string><string name="dating_shared_native_languages">母语</string><string name="dating_shared_learning_languages">正在学习</string><string name="dating_shared_partner_default_title">语伴共享资料</string><string name="dating_shared_partner_default_note">默认使用语伴资料；这里修改后，语伴和交友都会同步更新。</string><string name="dating_shared_relationship_label">感情状态</string><string name="dating_shared_personality_label">性格</string><string name="dating_shared_pets">宠物</string><string name="dating_shared_sports">运动</string><string name="dating_shared_movies">影视</string><string name="dating_shared_job">职业</string><string name="dating_shared_education">学历</string><string name="dating_shared_language_limit">最多选择 %1$d 种语言</string><string name="dating_shared_tag_limit">每类最多选择 %1$d 项</string><string name="dating_shared_name_required">请填写昵称</string><string name="dating_shared_birthday_required">请选择生日</string><string name="dating_shared_country_required">请选择国家/地区</string><string name="dating_shared_languages_required">请选择母语和正在学习的语言</string><string name="dating_shared_save_failed">共享资料保存失败</string><string name="dating_shared_saved">共享资料已保存，语伴与交友已同步</string><string-array name="dating_shared_gender_options"><item>男</item><item>女</item><item>保密</item></string-array><string-array name="dating_shared_country_options"><item>🇲🇲 缅甸</item><item>🇨🇳 中国</item><item>🇹🇭 泰国</item><item>🇯🇵 日本</item><item>🇰🇷 韩国</item><item>🇻🇳 越南</item><item>🇱🇦 老挝</item><item>🇰🇭 柬埔寨</item><item>🇲🇾 马来西亚</item><item>🇸🇬 新加坡</item><item>🇺🇸 美国</item></string-array><string-array name="dating_shared_language_options"><item>🇲🇲 缅甸语  MY</item><item>🇨🇳 中文  ZH</item><item>🇺🇸 英语  EN</item><item>🇹🇭 泰语  TH</item><item>🇯🇵 日语  JA</item><item>🇰🇷 韩语  KO</item><item>🇻🇳 越南语  VI</item><item>🇮🇩 印尼语  ID</item><item>🇲🇾 马来语  MS</item></string-array><string name="dating_shared_other_tags">其他标签</string></resources>
+
+    <string name="dating_add_photo">添加照片</string>
+    <string name="dating_preview_profile">预览资料</string>
+    <string name="dating_profile_completion">资料完整度 %1$d%%</string>
+    <string name="dating_manage_visitors">管理您的访客</string>
+    <string name="dating_plus_badge">交友 Plus</string>
+    <string name="dating_plus_short">Plus</string>
+    <string name="dating_balanced_recommendation">均衡的推荐</string>
+    <string name="dating_balanced_recommendation_tip">优先展示和你更相关的人（当前默认）</string>
+    <string name="dating_recent_active">最近活跃</string>
+    <string name="dating_recent_active_tip">优先展示最近更活跃的人</string>
+    <string name="dating_recent_sort_pending">最近活跃排序需要后端推荐接口支持，当前继续使用均衡推荐。</string>
+    <string name="dating_visibility_settings">管理我的可见设置</string>
+    <string name="dating_visibility_standard">标准</string>
+    <string name="dating_visibility_standard_tip">你会正常出现在交友推荐中</string>
+    <string name="dating_visibility_incognito">隐身</string>
+    <string name="dating_visibility_incognito_tip">只对你喜欢过的人可见</string>
+    <string name="dating_incognito_pending">隐身模式需要会员权益和后端推荐过滤支持，当前尚未接入。</string>
+    <string name="dating_discovery_section">启用发现</string>
+    <string name="dating_discovery_title">启用发现</string>
+    <string name="dating_discovery_tip">关闭后，你的交友资料不会出现在推荐中，发现功能也会暂停。已经喜欢过你的用户仍可能与你达成匹配。</string>
+    <string name="dating_interaction_settings">交互设置</string>
+    <string name="dating_sound_feedback">滑卡音效</string>
+    <string name="dating_haptic_feedback">滑卡触感</string>
+    <string name="dating_features">交友功能</string>
+    <string name="dating_edit_tab">编辑</string>
+    <string name="dating_preview_tab">预览</string>
+    <string name="dating_basic_info_section">基本资料</string>
+    <string name="dating_preferences_section">交友偏好</string>
+    <string name="dating_lifestyle_section">生活方式</string>
+    <string name="dating_about_me_section">关于我</string>
+    <string name="dating_field_city">居住地</string>
+    <string name="dating_field_height">身高</string>
+    <string name="dating_field_weight">体重</string>
+    <string name="dating_field_intro">自我介绍</string>
+    <string name="dating_field_ideal">希望对方</string>
+    <string name="dating_field_tags">兴趣标签</string>
+    <string name="dating_preview_need_photo">请先上传至少一张照片再预览。</string>
+<string name="dating_country_flag">国旗</string><string name="dating_more_actions">更多操作</string><string name="dating_section_languages">语言</string><string name="dating_basic_relationship">感情状态</string><string name="dating_basic_orientation">性取向</string><string name="dating_basic_body">身高与体重</string><string name="dating_basic_lifestyle">生活习惯</string><string name="dating_basic_job">职业</string><string name="dating_basic_education">学历</string><string name="dating_native_languages_format">母语：%1$s</string><string name="dating_learning_languages_format">学习：%1$s</string><string name="dating_status_edit_tip">完整资料后可开启交友；关闭后不会出现在推荐中。</string><string name="dating_shared_profile_partner_tip">昵称、生日、国家、语言、职业与兴趣会和语伴资料同步。</string><string name="dating_edit_shared_profile_inside">编辑共享资料</string><string name="dating_close_dating">关闭交友</string><string name="dating_open_dating">开启交友</string><string name="dating_complete_before_open">请先上传照片并完成恋爱意向，再开启交友。</string><string name="dating_save_shared_profile">保存共享资料</string><string name="dating_shared_editor_title">共享资料</string><string name="dating_shared_editor_tip">这是语伴和交友共用的资料。默认读取语伴资料，在这里修改后两边都会同步更新。</string><string name="dating_shared_core_title">账号与语言</string><string name="dating_shared_name">昵称</string><string name="dating_shared_birthday">生日</string><string name="dating_shared_gender">性别</string><string name="dating_shared_country">国家/地区</string><string name="dating_shared_native_languages">母语</string><string name="dating_shared_learning_languages">正在学习</string><string name="dating_shared_partner_default_title">语伴共享资料</string><string name="dating_shared_partner_default_note">默认使用语伴资料；这里修改后，语伴和交友都会同步更新。</string><string name="dating_shared_relationship_label">感情状态</string><string name="dating_shared_personality_label">性格</string><string name="dating_shared_pets">宠物</string><string name="dating_shared_sports">运动</string><string name="dating_shared_movies">影视</string><string name="dating_shared_job">职业</string><string name="dating_shared_education">学历</string><string name="dating_shared_language_limit">最多选择 %1$d 种语言</string><string name="dating_shared_tag_limit">每类最多选择 %1$d 项</string><string name="dating_shared_name_required">请填写昵称</string><string name="dating_shared_birthday_required">请选择生日</string><string name="dating_shared_country_required">请选择国家/地区</string><string name="dating_shared_languages_required">请选择母语和正在学习的语言</string><string name="dating_shared_save_failed">共享资料保存失败</string><string name="dating_shared_saved">共享资料已保存，语伴与交友已同步</string><string-array name="dating_shared_gender_options"><item>男</item><item>女</item><item>保密</item></string-array><string-array name="dating_shared_country_options"><item>🇲🇲 缅甸</item><item>🇨🇳 中国</item><item>🇹🇭 泰国</item><item>🇯🇵 日本</item><item>🇰🇷 韩国</item><item>🇻🇳 越南</item><item>🇱🇦 老挝</item><item>🇰🇭 柬埔寨</item><item>🇲🇾 马来西亚</item><item>🇸🇬 新加坡</item><item>🇺🇸 美国</item></string-array><string-array name="dating_shared_language_options"><item>🇲🇲 缅甸语  MY</item><item>🇨🇳 中文  ZH</item><item>🇺🇸 英语  EN</item><item>🇹🇭 泰语  TH</item><item>🇯🇵 日语  JA</item><item>🇰🇷 韩语  KO</item><item>🇻🇳 越南语  VI</item><item>🇮🇩 印尼语  ID</item><item>🇲🇾 马来语  MS</item></string-array><string name="dating_shared_other_tags">其他标签</string></resources>
