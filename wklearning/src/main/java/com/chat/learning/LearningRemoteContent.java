@@ -2,6 +2,8 @@ package com.chat.learning;
 
 import android.content.Context;
 
+import com.chat.base.config.WKApiConfig;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -44,9 +46,15 @@ final class LearningRemoteContent {
 
     static Config config(Context context) {
         Config cached = config;
-        if (cached != null) return cached;
+        if (cached != null) {
+            applyApiFallback(cached);
+            return cached;
+        }
         synchronized (LearningRemoteContent.class) {
-            if (config != null) return config;
+            if (config != null) {
+                applyApiFallback(config);
+                return config;
+            }
             Config loaded = new Config();
             try {
                 JSONObject root = new JSONObject(readAsset(context, "learning/config/remote_content.json"));
@@ -78,6 +86,7 @@ final class LearningRemoteContent {
             } catch (Throwable ignored) {
                 // Invalid optional remote config means offline-only operation, never an app crash.
             }
+            applyApiFallback(loaded);
             config = loaded;
             return loaded;
         }
@@ -314,6 +323,21 @@ final class LearningRemoteContent {
                 || code == HttpURLConnection.HTTP_MOVED_TEMP
                 || code == HttpURLConnection.HTTP_SEE_OTHER
                 || code == 307 || code == 308;
+    }
+
+    private static void applyApiFallback(Config cfg) {
+        if (cfg == null || !cfg.baseUrl.isEmpty()) return;
+        String api = WKApiConfig.baseUrl == null ? "" : WKApiConfig.baseUrl.trim();
+        if (api.isEmpty()) return;
+        String lower = api.toLowerCase(Locale.US);
+        int marker = lower.indexOf("/v1/");
+        if (marker < 0) marker = lower.endsWith("/v1") ? lower.length() - 3 : -1;
+        if (marker < 0) return;
+        String root = api.substring(0, marker + 1);
+        String fallback = normalizeBase(root + "learning/");
+        if (fallback.isEmpty()) return;
+        cfg.baseUrl = fallback;
+        cfg.baseHost = hostOf(fallback);
     }
 
     private static String normalizeBase(String value) {

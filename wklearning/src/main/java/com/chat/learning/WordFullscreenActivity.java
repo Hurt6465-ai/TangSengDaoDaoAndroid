@@ -55,6 +55,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
     public static final String EXTRA_DATA_URL = "data_url";
     public static final String EXTRA_DATA_SHA256 = "data_sha256";
     public static final String EXTRA_DATA_VERSION = "data_version";
+    public static final String EXTRA_ITEM_COUNT = "item_count";
+    public static final String EXTRA_FAVORITES_ONLY = "favorites_only";
 
     private static final int COLOR_TEXT = 0xFF152033;
     private static final int COLOR_SUB = 0xFF64748B;
@@ -67,14 +69,14 @@ public class WordFullscreenActivity extends AppCompatActivity {
     private static final int COLOR_GOLD = 0xFFF59E0B;
     private static final int COLOR_DIVIDER = 0xFFE5E7EB;
     private static final String SP = "tsdd_word_study_v2";
-    private static final int DEFAULT_REVIEW_LIMIT = 30;
-    private static final int DEFAULT_NEW_LIMIT = 10;
 
     private String packId;
     private String title;
     private String dataUrl;
     private String dataSha256;
     private int dataVersion;
+    private int expectedItemCount;
+    private boolean favoritesOnly;
     private SharedPreferences settings;
     private WordProgressStore progressStore;
     private final WordFsrsScheduler scheduler = new WordFsrsScheduler();
@@ -137,6 +139,8 @@ public class WordFullscreenActivity extends AppCompatActivity {
         dataUrl = safe(getIntent().getStringExtra(EXTRA_DATA_URL), "");
         dataSha256 = safe(getIntent().getStringExtra(EXTRA_DATA_SHA256), "");
         dataVersion = Math.max(0, getIntent().getIntExtra(EXTRA_DATA_VERSION, 0));
+        expectedItemCount = Math.max(0, getIntent().getIntExtra(EXTRA_ITEM_COUNT, 0));
+        favoritesOnly = getIntent().getBooleanExtra(EXTRA_FAVORITES_ONLY, false);
         settings = getSharedPreferences(SP, Context.MODE_PRIVATE);
         progressStore = new WordProgressStore(this);
         try { toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 28); } catch (Throwable ignored) {}
@@ -156,8 +160,15 @@ public class WordFullscreenActivity extends AppCompatActivity {
     }
 
     private void loadWords() {
-        List<WordItem> local = LearningWordRepository.loadLocal(this, packId);
-        boolean hasRemote = LearningRemoteContent.resolveUrl(this, dataUrl).length() > 0;
+        if (favoritesOnly) {
+            List<WordItem> favorites = LearningWordRepository.loadFavorites(this, progressStore);
+            if (favorites.isEmpty()) showFavoritesEmpty();
+            else setWords(favorites);
+            return;
+        }
+
+        List<WordItem> local = LearningWordRepository.loadLocal(this, packId, expectedItemCount);
+        boolean hasRemote = !LearningRemoteContent.resolveUrl(this, dataUrl).isEmpty();
         if (local != null && !local.isEmpty()) {
             setWords(local);
         } else if (hasRemote) {
@@ -166,7 +177,7 @@ public class WordFullscreenActivity extends AppCompatActivity {
             showUnavailable();
         }
         LearningWordRepository.refresh(this, packId, dataUrl, dataSha256, dataVersion,
-                new LearningWordRepository.Callback() {
+                expectedItemCount, new LearningWordRepository.Callback() {
                     @Override public void onLoaded(List<WordItem> words, boolean refreshed) {
                         runOnUiThread(() -> {
                             if (totalInitial == 0 && !sessionFinished) setWords(words);
@@ -189,6 +200,21 @@ public class WordFullscreenActivity extends AppCompatActivity {
         backScroll.setVisibility(View.GONE);
         wordView.setText("—");
         pinyinView.setText(R.string.word_pack_unavailable);
+        pinyinView.setVisibility(View.VISIBLE);
+        phoneticView.setVisibility(View.GONE);
+        progressView.setText(title);
+        favoriteView.setVisibility(View.GONE);
+        if (ratingRow != null) ratingRow.setVisibility(View.GONE);
+        for (TextView button : ratingButtons.values()) button.setEnabled(false);
+    }
+
+    private void showFavoritesEmpty() {
+        sessionFinished = true;
+        frontFace = true;
+        front.setVisibility(View.VISIBLE);
+        backScroll.setVisibility(View.GONE);
+        wordView.setText("☆");
+        pinyinView.setText(R.string.word_library_favorites_empty);
         pinyinView.setVisibility(View.VISIBLE);
         phoneticView.setVisibility(View.GONE);
         progressView.setText(title);
@@ -246,6 +272,16 @@ public class WordFullscreenActivity extends AppCompatActivity {
         sessionNewInitial = 0;
         sessionStartedAt = System.currentTimeMillis();
 
+        if (favoritesOnly) {
+            queue.addAll(allWords);
+            sessionReviewInitial = queue.size();
+            sessionNewInitial = 0;
+            totalInitial = queue.size();
+            sessionFinished = false;
+            renderCurrent();
+            return;
+        }
+
         Map<String, WordFsrsScheduler.CardState> states =
                 progressStore.loadPack(packId);
 
@@ -268,14 +304,13 @@ public class WordFullscreenActivity extends AppCompatActivity {
             return state == null ? Long.MAX_VALUE : state.dueAt;
         }));
 
-        int reviewLimit = Math.min(DEFAULT_REVIEW_LIMIT, due.size());
-        int newLimit = Math.min(DEFAULT_NEW_LIMIT, fresh.size());
+        // Do not hide later words behind a fixed daily quota. Every due card and every
+        // unlearned word in the selected word book is available in the current session.
+        queue.addAll(due);
+        queue.addAll(fresh);
 
-        queue.addAll(due.subList(0, reviewLimit));
-        queue.addAll(fresh.subList(0, newLimit));
-
-        sessionReviewInitial = reviewLimit;
-        sessionNewInitial = newLimit;
+        sessionReviewInitial = due.size();
+        sessionNewInitial = fresh.size();
         totalInitial = queue.size();
         sessionFinished = false;
 

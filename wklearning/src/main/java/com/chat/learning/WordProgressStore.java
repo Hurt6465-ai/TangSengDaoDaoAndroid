@@ -7,7 +7,9 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /** SQLite progress storage. The composite key prevents collisions between packs and languages. */
 final class WordProgressStore extends SQLiteOpenHelper {
@@ -147,6 +149,45 @@ final class WordProgressStore extends SQLiteOpenHelper {
             }
         } finally {
             cursor.close();
+        }
+        return result;
+    }
+
+    Map<String, Set<String>> favoriteIds() {
+        HashMap<String, Set<String>> result = new HashMap<>();
+        Cursor cursor = getReadableDatabase().query(TABLE,
+                new String[]{"pack_id", "word_id"},
+                "source_lang=? AND target_lang=? AND favorite=1",
+                new String[]{"zh", "my"}, null, null, "pack_id, word_id");
+        try {
+            while (cursor.moveToNext()) {
+                String packId = cursor.getString(0);
+                String wordId = cursor.getString(1);
+                Set<String> ids = result.get(packId);
+                if (ids == null) {
+                    ids = new HashSet<>();
+                    result.put(packId, ids);
+                }
+                ids.add(wordId);
+            }
+        } finally {
+            cursor.close();
+        }
+        return result;
+    }
+
+    Set<String> legacyFavoriteWordIds() {
+        HashSet<String> result = new HashSet<>();
+        Map<String, ?> values = app.getSharedPreferences(
+                "tsdd_word_study", Context.MODE_PRIVATE).getAll();
+        for (Map.Entry<String, ?> entry : values.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || !key.startsWith("fav.")) continue;
+            Object value = entry.getValue();
+            if (value instanceof Boolean && (Boolean) value) {
+                String wordId = key.substring(4).trim();
+                if (!wordId.isEmpty()) result.add(wordId);
+            }
         }
         return result;
     }
