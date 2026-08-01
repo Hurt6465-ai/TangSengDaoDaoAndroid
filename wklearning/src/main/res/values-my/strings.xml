@@ -501,4 +501,13 @@ Time %5$d min</string>
     <string name="learning_package_version_mismatch">သင်ခန်းစာဖိုင် ဗားရှင်း မကိုက်ညီပါ</string>
     <string name="learning_package_media_missing">သင်ခန်းစာဖိုင်တွင် မီဒီယာဖိုင် မရှိပါ：%1$s</string>
     <string name="learning_path_choose_course">သင်ခန်းစာရွေးပါ</string>
+
+    <string name="learning_category_title">အပြန်အလှန် လေ့ကျင့်ခန်း</string>
+    <string name="learning_category_heading">လေ့ကျင့်မည့် အမျိုးအစားရွေးပါ</string>
+    <string name="learning_category_subtitle">အခြေအနေအမျိုးအစားကို အရင်ရွေးပြီး သင်ယူမှုမြေပုံအတိုင်း တစ်ဆင့်ချင်း လေ့ကျင့်ပါ။</string>
+    <string name="learning_category_lessons">သင်ခန်းစာ %1$d ခု</string>
+    <string name="learning_category_section">အမျိုးအစား မြေပုံ</string>
+    <string name="learning_path_map_tip">လက်ရှိသင်ခန်းစာပြီးလျှင် နောက်တစ်ခု အလိုအလျောက်ဖွင့်မည်</string>
+    <string name="learning_path_current">လက်ရှိသင်ခန်းစာ</string>
+
 </resources>
