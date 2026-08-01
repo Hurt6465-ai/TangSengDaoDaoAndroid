@@ -505,11 +505,16 @@
     <string name="learning_path_choose_course">选择课程</string>
 
     <string name="learning_category_title">互动练习</string>
-    <string name="learning_category_heading">选择练习分类</string>
-    <string name="learning_category_subtitle">先选择一个场景分类，再进入学习地图逐关练习。</string>
+    <string name="learning_category_heading">选择中文课程</string>
+    <string name="learning_category_subtitle">选择一套课程，进入连续学习地图，逐个完成单元。</string>
     <string name="learning_category_lessons">%1$d 个关卡</string>
     <string name="learning_category_section">分类地图</string>
     <string name="learning_path_map_tip">完成当前关卡后会自动解锁下一关</string>
     <string name="learning_path_current">当前关卡</string>
 
+    <string name="learning_course_stats">%1$d 个单元 · %2$d 个节点</string>
+    <string name="learning_unit_number">第 %1$d 单元</string>
+    <string name="learning_unit_complete_title">单元完成</string>
+    <string name="learning_unit_complete_message">你已完成“%1$s”，下一单元已经解锁。</string>
+    <string name="learning_path_claim">领取奖励</string>
 </resources>
