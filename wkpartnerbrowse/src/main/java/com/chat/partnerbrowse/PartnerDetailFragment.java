@@ -15,16 +15,18 @@ import androidx.fragment.app.FragmentActivity;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
+import com.chat.base.config.WKConfig;
 import com.chat.base.net.HttpResponseCode;
 import com.chat.base.utils.AndroidUtilities;
 import com.chat.partnerbrowse.databinding.FragmentWkPartnerDetailBinding;
 import com.chat.partnerbrowse.model.PartnerBrowseBean;
 import com.chat.partnerbrowse.model.PartnerGreetingResponse;
+import com.chat.uikit.partner.PartnerLocalMessageStore;
+import com.chat.uikit.partner.PartnerPendingStore;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import com.chat.uikit.partner.PartnerPendingStore;
 
 public class PartnerDetailFragment extends Fragment {
     private static final String KEY_STABLE = "stable_key";
@@ -465,31 +467,71 @@ public class PartnerDetailFragment extends Fragment {
             return;
         }
         binding.actionBtn.setEnabled(false);
-        PartnerBrowseModel.getInstance().sendGreeting(target.uid, getString(R.string.partnerbrowse_default_hello_plain), (code, msg, data) -> {
-            if (!isViewAlive() || partner != target) return;
+        final String greetingText = getString(R.string.partnerbrowse_default_hello_plain);
+        final String requestAccountUid = WKConfig.getInstance().getUid();
+        PartnerBrowseModel.getInstance().sendGreeting(target.uid, greetingText, (code, msg, data) -> {
+            if (TextUtils.isEmpty(requestAccountUid)
+                    || !TextUtils.equals(requestAccountUid, WKConfig.getInstance().getUid())) {
+                return;
+            }
+            boolean alive = isViewAlive() && partner == target;
             boolean success = code == HttpResponseCode.success && (data == null || data.isSuccessOrAlreadySent());
             if (success) {
                 if (data != null) {
                     target.updateGreetingState(data.requester_msg_count, data.max_greeting_count, data.next_allowed_at);
                     int maxPending = data.max_greeting_count > 0 ? data.max_greeting_count : 3;
                     int pendingCount = Math.max(1, data.requester_msg_count);
-                    PartnerPendingStore.markRequester(target.uid, pendingCount, maxPending);
+                    if (data.contact_status == 1) {
+                        PartnerPendingStore.markActive(target.uid);
+                    } else if (isGreetingReceiver(data)) {
+                        PartnerPendingStore.markReceiver(target.uid, pendingCount, maxPending);
+                    } else {
+                        PartnerPendingStore.markRequester(target.uid, pendingCount, maxPending);
+                    }
+
+                    // A response without text means no new greeting was delivered (for example,
+                    // the peer greeted first or this is an idempotent status response).
+                    if (!TextUtils.isEmpty(data.text) && !Boolean.FALSE.equals(data.requester)) {
+                        PartnerLocalMessageStore.saveGreeting(
+                                target.uid,
+                                data.text,
+                                data.client_msg_no,
+                                data.message_id,
+                                data.message_seq,
+                                data.timestamp,
+                                data.last_greet_at);
+                    }
                 } else {
+                    // Compatibility fallback for a legacy endpoint that returned no body. Do not
+                    // manufacture a random local greeting ID because IM sync would duplicate it.
                     target.markHelloSent();
                     PartnerPendingStore.markRequester(target.uid, 1, 3);
                 }
                 PartnerRepository.putOne(target);
                 String targetUid = TextUtils.isEmpty(target.uid) ? target.id : target.uid;
                 PartnerBrowseModel.getInstance().reportPartnerEvent(targetUid, "hello", 0, currentImageIndex);
+                if (!alive) return;
                 updateActionButton();
                 if (data != null && !TextUtils.isEmpty(data.getMessageSafe())) {
                     Toast.makeText(requireContext(), data.getMessageSafe(), Toast.LENGTH_SHORT).show();
                 }
             } else {
+                if (!alive) return;
                 updateActionButton();
                 String error = data == null ? msg : data.getMessageSafe();
                 if (!TextUtils.isEmpty(error)) Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show();
             }
         });
     }
+
+    private boolean isGreetingReceiver(PartnerGreetingResponse data) {
+        if (data == null) return false;
+        if (Boolean.FALSE.equals(data.requester)) return true;
+        if (data.requester != null) return false;
+        String message = data.getMessageSafe();
+        return TextUtils.isEmpty(data.text)
+                && !TextUtils.isEmpty(message)
+                && message.contains("对方已打招呼");
+    }
+
 }
