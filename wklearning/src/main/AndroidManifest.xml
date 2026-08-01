@@ -5,6 +5,16 @@
 
     <application>
         <activity
+            android:name="com.chat.learning.LearningPathActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        <activity
+            android:name="com.chat.learning.LearningLessonActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        <activity
             android:name="com.chat.learning.LearningDirectoryActivity"
             android:exported="false"
             android:screenOrientation="portrait"
