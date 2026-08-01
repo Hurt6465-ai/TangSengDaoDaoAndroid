@@ -24,15 +24,32 @@ final class LearningWordRepository {
     static List<WordItem> loadLocal(Context context, String packId) {
         String safePack = LearningRemoteContent.safeFileName(packId);
         File cached = new File(context.getFilesDir(), "learning/words/" + safePack + ".json");
+
+        String bundledJson = "";
+        int bundledVersion = 0;
+        try {
+            bundledJson = LearningRemoteContent.readAsset(
+                    context, "learning/words/" + safePack + ".json");
+            bundledVersion = packVersion(bundledJson);
+        } catch (Throwable ignored) {}
+
         try {
             String cachedJson = LearningRemoteContent.readFile(cached, MAX_PACK_BYTES);
             if (cachedJson.length() > 0) {
-                List<WordItem> parsed = parse(packId, cachedJson);
-                if (!parsed.isEmpty()) return parsed;
+                int cachedVersion = packVersion(cachedJson);
+                // An app update may contain a newer complete core pack than an old downloaded cache.
+                // Never let that stale cache hide newly bundled words.
+                if (bundledJson.length() == 0 || bundledVersion <= 0 || cachedVersion >= bundledVersion) {
+                    List<WordItem> parsed = parse(packId, cachedJson);
+                    if (!parsed.isEmpty()) return parsed;
+                }
             }
         } catch (Throwable ignored) {}
+
         try {
-            return parse(packId, LearningRemoteContent.readAsset(context, "learning/words/" + safePack + ".json"));
+            return bundledJson.length() == 0
+                    ? Collections.emptyList()
+                    : parse(packId, bundledJson);
         } catch (Throwable ignored) {
             return Collections.emptyList();
         }
@@ -49,8 +66,9 @@ final class LearningWordRepository {
                     .getInt("word." + safePack, 0);
             if (stored >= version) {
                 try {
-                    List<WordItem> cached = parse(packId, LearningRemoteContent.readFile(target, MAX_PACK_BYTES));
-                    if (!cached.isEmpty()) return;
+                    String cachedJson = LearningRemoteContent.readFile(target, MAX_PACK_BYTES);
+                    List<WordItem> cached = parse(packId, cachedJson);
+                    if (!cached.isEmpty() && packVersion(cachedJson) >= version) return;
                 } catch (Throwable ignored) {}
             }
         }
@@ -61,6 +79,10 @@ final class LearningWordRepository {
                     throw new SecurityException("Word pack checksum mismatch");
                 }
                 String json = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+                int downloadedVersion = packVersion(json);
+                if (version > 0 && downloadedVersion > 0 && downloadedVersion < version) {
+                    throw new IllegalStateException("Downloaded word pack is older than catalog version");
+                }
                 List<WordItem> parsed = parse(packId, json);
                 if (parsed.isEmpty()) throw new IllegalStateException("Empty word pack");
                 LearningRemoteContent.atomicWrite(target, bytes);
@@ -128,6 +150,16 @@ final class LearningWordRepository {
             ));
         }
         return result;
+    }
+
+
+    private static int packVersion(String json) {
+        if (json == null || json.trim().length() == 0) return 0;
+        try {
+            return new JSONObject(json).optInt("version", 0);
+        } catch (Throwable ignored) {
+            return 0;
+        }
     }
 
     private static List<String> strings(JSONArray array) {
