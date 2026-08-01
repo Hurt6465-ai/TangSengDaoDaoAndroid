@@ -276,7 +276,7 @@
 
     <!-- Speaking phrases: directory, cards, FSRS and AI coach -->
     <string name="speaking_directory_title">口语短句</string>
-    <string name="speaking_directory_subtitle">选择分类查看全部短句，进入后点击任意中文、缅文短句开始学习。</string>
+    <string name="speaking_directory_subtitle">选择分类后进入全屏短句流，上滑下一句，下滑上一句。</string>
     <string name="speaking_directory_breadcrumb">学习 · 口语</string>
     <string name="speaking_category_empty">这个分类还没有短句数据</string>
     <string name="speaking_progress_learned">已学 %1$d/%2$d</string>
@@ -328,7 +328,7 @@
     <string name="speaking_coach_prompt_replacements">可替换表达：%1$s</string>
     <string name="speaking_coach_prompt_alternatives">相近说法：%1$s</string>
     <string name="speaking_coach_prompt_hint_language">提示和简短纠错使用中文，对话练习始终使用中文。</string>
-    <string name="speaking_coach_prompt_rules">请围绕当前句子和场景与我练习真实对话。你扮演场景中的对话对象，一次只说一到两句简短中文，优先引导我使用当前句子和替换表达。我表达不自然时，只给一句更自然的说法，然后继续对话；我不会回答时给简短提示。不要输出长篇语法解释，不要使用 Markdown 表格。请直接从场景中的第一句话开始。</string>
+    <string name="speaking_coach_prompt_rules">请围绕当前句子和场景与我练习真实对话。你扮演场景中的对话对象，一次只说一到两句简短中文，优先引导我使用当前句子。我表达不自然时，只给一句更自然的说法，然后继续对话；我不会回答时给简短提示。不要输出长篇语法解释，不要使用 Markdown 表格。请直接从场景中的第一句话开始。</string>
 
     <string name="speaking_phrase_list_breadcrumb">口语 · 短句</string>
     <string name="speaking_phrase_list_summary">共 %1$d 句 · 已学 %2$d</string>
@@ -529,5 +529,34 @@
     <string name="word_library_delete_message">确定删除“%1$s”吗？学习进度会保留。</string>
     <string name="word_library_delete">删除</string>
     <string name="word_library_delete_success">已删除导入单词本</string>
+
+    <!-- Speaking vertical feed and imports -->
+    <string name="speaking_favorites_action">收藏</string>
+    <string name="speaking_favorites_title">收藏短句</string>
+    <string name="speaking_favorites_empty">还没有收藏短句。
+在短句流顶部点“收藏”即可加入。</string>
+    <string name="speaking_favorite">☆ 收藏</string>
+    <string name="speaking_favorited">★ 已收藏</string>
+    <string name="speaking_favorite_added">已收藏</string>
+    <string name="speaking_favorite_removed">已取消收藏</string>
+    <string name="speaking_feed_progress">%1$d / %2$d</string>
+    <string name="speaking_swipe_hint">上滑下一句 · 下滑上一句</string>
+    <string name="speaking_scene_label">使用场景</string>
+    <string name="speaking_import">导入</string>
+    <string name="speaking_import_new">导入新的短句包</string>
+    <string name="speaking_import_manage">管理已导入</string>
+    <string name="speaking_import_none">还没有导入短句包</string>
+    <string name="speaking_importing">正在导入短句包…</string>
+    <string name="speaking_import_success">已导入“%1$s”，共 %2$d 句</string>
+    <string name="speaking_import_failed">导入失败：%1$s</string>
+    <string name="speaking_import_invalid">无效的短句包文件</string>
+    <string name="speaking_import_picker_failed">无法打开文件选择器</string>
+    <string name="speaking_import_delete_title">删除导入短句包</string>
+    <string name="speaking_import_delete_message">确定删除“%1$s”吗？已保存的收藏与练习记录会保留。</string>
+    <string name="speaking_import_delete">删除</string>
+    <string name="speaking_import_delete_success">已删除导入短句包</string>
+    <string name="speaking_imported_group">我的导入</string>
+    <string name="speaking_imported_group_subtitle">点击进入滑屏学习，长按卡片可删除。</string>
+    <string name="speaking_imported_delete_hint">· 长按删除</string>
 
 </resources>
