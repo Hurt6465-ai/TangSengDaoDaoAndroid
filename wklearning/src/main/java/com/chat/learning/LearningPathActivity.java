@@ -9,6 +9,9 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcelable;
@@ -56,6 +59,7 @@ public class LearningPathActivity extends AppCompatActivity {
 
     private static final boolean SHOW_LESSON_TITLE = true;
     private static final int ROW_H_DP = 132;
+    private static final int STICKY_HEADER_H_DP = 70;
     private static final int[] WARM_UNIT_COLORS = {
             0xFFF29C82, // warm coral
             0xFFF2B66D, // honey
@@ -171,7 +175,7 @@ public class LearningPathActivity extends AppCompatActivity {
         page.setBackgroundColor(COLOR_BG);
         setContentView(page);
         
-        page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(58)));
+        page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(52)));
 
         FrameLayout content = new FrameLayout(this);
         page.addView(content, new LinearLayout.LayoutParams(-1, 0, 1f));
@@ -180,7 +184,7 @@ public class LearningPathActivity extends AppCompatActivity {
         recyclerView.setBackgroundColor(COLOR_BG);
         recyclerView.setClipToPadding(false);
         recyclerView.setClipChildren(false);
-        recyclerView.setPadding(0, 0, 0, dp(80));
+        recyclerView.setPadding(0, dp(STICKY_HEADER_H_DP + 4), 0, dp(80));
         recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         recyclerView.setVerticalScrollBarEnabled(false);
         recyclerView.setItemAnimator(null);
@@ -195,7 +199,8 @@ public class LearningPathActivity extends AppCompatActivity {
 
         stickyHeader = new UnitHeaderView(this);
         stickyHeader.setVisibility(View.INVISIBLE);
-        content.addView(stickyHeader, new FrameLayout.LayoutParams(-1, -2));
+        content.addView(stickyHeader,
+                new FrameLayout.LayoutParams(-1, dp(STICKY_HEADER_H_DP)));
 
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -207,33 +212,30 @@ public class LearningPathActivity extends AppCompatActivity {
     }
 
     private void updateSticky() {
-        if (stickyHeader == null || adapter == null || layoutManager == null) return;
-        int first = layoutManager.findFirstVisibleItemPosition();
-        MapItem item = first == RecyclerView.NO_POSITION ? null : adapter.itemAt(first);
+        if (stickyHeader == null || adapter == null || layoutManager == null || course == null) {
+            if (stickyHeader != null) stickyHeader.setVisibility(View.INVISIBLE);
+            return;
+        }
+
+        MapItem item = null;
+        float anchorY = Math.max(dp(STICKY_HEADER_H_DP), stickyHeader.getHeight()) + dp(2);
+        View anchorChild = recyclerView.findChildViewUnder(recyclerView.getWidth() / 2f, anchorY);
+        if (anchorChild != null) {
+            int position = recyclerView.getChildAdapterPosition(anchorChild);
+            item = position == RecyclerView.NO_POSITION ? null : adapter.itemAt(position);
+        }
+        if (item == null || item.unit == null) {
+            int first = layoutManager.findFirstVisibleItemPosition();
+            item = first == RecyclerView.NO_POSITION ? null : adapter.itemAt(first);
+        }
         if (item == null || item.unit == null) {
             stickyHeader.setVisibility(View.INVISIBLE);
             return;
         }
-        View firstView = layoutManager.findViewByPosition(first);
-        if (item.type == MapItem.UNIT && firstView != null && firstView.getTop() >= 0) {
-            stickyHeader.setVisibility(View.INVISIBLE); // 真实条还完整可见，不重复画
-            return;
-        }
         stickyHeader.setVisibility(View.VISIBLE);
-        stickyHeader.bind(item.unit, item.unitIndex);
-
-        float push = 0f;
-        int h = stickyHeader.getHeight();
-        for (int i = 0; i < recyclerView.getChildCount(); i++) {
-            View child = recyclerView.getChildAt(i);
-            int position = recyclerView.getChildAdapterPosition(child);
-            MapItem next = position == RecyclerView.NO_POSITION ? null : adapter.itemAt(position);
-            if (next == null || next.type != MapItem.UNIT || next.unit == item.unit) continue;
-            int top = child.getTop();
-            if (top > 0 && top < h) push = top - h;
-            break;
-        }
-        stickyHeader.setTranslationY(push);
+        stickyHeader.setTranslationY(0f);
+        stickyHeader.bind(item.unit, item.unitIndex,
+                course == null ? 0 : course.units.size(), true);
     }
 
     private View createTopBar() {
@@ -247,7 +249,8 @@ public class LearningPathActivity extends AppCompatActivity {
         back.setOnClickListener(v -> finish());
         bar.addView(back, new LinearLayout.LayoutParams(dp(46), dp(46)));
 
-        pageTitle = text(getString(R.string.learning_path_title), 18, COLOR_TEXT, true);
+        pageTitle = text("", 18, COLOR_TEXT, true);
+        pageTitle.setVisibility(View.INVISIBLE);
         pageTitle.setGravity(Gravity.CENTER);
         pageTitle.setSingleLine(true);
         pageTitle.setEllipsize(TextUtils.TruncateAt.END);
@@ -353,12 +356,14 @@ public class LearningPathActivity extends AppCompatActivity {
     private void renderCourse(boolean catalogChanged) {
         if (adapter == null) return;
         if (course == null) {
-            pageTitle.setText(R.string.learning_path_title);
+            pageTitle.setText("");
+            if (stickyHeader != null) stickyHeader.setVisibility(View.INVISIBLE);
             adapter.submitMessage(getString(R.string.learning_path_empty));
             return;
         }
-        pageTitle.setText(course.title);
+        pageTitle.setText("");
         if (course.minAppVersion > currentVersionCode()) {
+            if (stickyHeader != null) stickyHeader.setVisibility(View.INVISIBLE);
             adapter.submitMessage(getString(R.string.learning_path_app_update_required));
             return;
         }
@@ -368,6 +373,10 @@ public class LearningPathActivity extends AppCompatActivity {
         String currentLesson = findCurrentLesson(LearningPathRepository.flatten(course));
         adapter.submitCourse(course, currentLesson);
         if (oldState != null) layoutManager.onRestoreInstanceState(oldState);
+        if (!course.units.isEmpty()) {
+            stickyHeader.setVisibility(View.VISIBLE);
+            stickyHeader.bind(course.units.get(0), 0, course.units.size(), false);
+        }
 
         if (!initialScrollDone) {
             initialScrollDone = true;
@@ -377,7 +386,10 @@ public class LearningPathActivity extends AppCompatActivity {
                         : adapter.positionForLesson(currentLesson);
                 if (position < 0) position = 0;
                 layoutManager.scrollToPositionWithOffset(position, dp(10));
+                recyclerView.post(LearningPathActivity.this::updateSticky);
             });
+        } else {
+            recyclerView.post(LearningPathActivity.this::updateSticky);
         }
     }
 
@@ -624,6 +636,26 @@ public class LearningPathActivity extends AppCompatActivity {
         return LearningUiKit.text(this, value, size, color, bold);
     }
 
+    private Drawable gradientRaised(int startColor, int endColor, int edgeColor,
+                                    float radius, int depth) {
+        GradientDrawable bottom = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{edgeColor, LearningUiKit.blend(edgeColor, Color.WHITE, 0.12f)});
+        bottom.setCornerRadius(radius);
+
+        GradientDrawable top = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{startColor, endColor});
+        top.setCornerRadius(radius);
+        top.setStroke(dp(1), LearningUiKit.blend(startColor, Color.WHITE, 0.28f));
+
+        LayerDrawable layers = new LayerDrawable(new Drawable[]{bottom, top});
+        int inset = Math.max(0, depth);
+        layers.setLayerInset(0, 0, inset, 0, 0);
+        layers.setLayerInset(1, 0, 0, 0, inset);
+        return layers;
+    }
+
     private int dp(float value) {
         return LearningUiKit.dp(this, value);
     }
@@ -652,6 +684,7 @@ public class LearningPathActivity extends AppCompatActivity {
         LearningPathRepository.Lesson lesson;
         int unitIndex;
         int lessonIndex;
+        int globalLessonIndex;
         boolean lastInUnit;
     }
 
@@ -687,15 +720,21 @@ public class LearningPathActivity extends AppCompatActivity {
             unitPositions.clear();
             currentLessonId = currentLesson == null ? "" : currentLesson;
 
+            int globalLessonIndex = 0;
             for (int unitIndex = 0; unitIndex < value.units.size(); unitIndex++) {
                 LearningPathRepository.Unit unit = value.units.get(unitIndex);
-                MapItem header = new MapItem();
-                header.type = MapItem.UNIT;
-                header.course = value;
-                header.unit = unit;
-                header.unitIndex = unitIndex;
                 unitPositions.put(unit.id, items.size());
-                items.add(header);
+
+                // The first unit starts directly below the sticky card. Later units use a
+                // compact in-map marker; the large card itself stays fixed and pages its text.
+                if (unitIndex > 0) {
+                    MapItem header = new MapItem();
+                    header.type = MapItem.UNIT;
+                    header.course = value;
+                    header.unit = unit;
+                    header.unitIndex = unitIndex;
+                    items.add(header);
+                }
 
                 for (int lessonIndex = 0; lessonIndex < unit.lessons.size(); lessonIndex++) {
                     LearningPathRepository.Lesson lesson = unit.lessons.get(lessonIndex);
@@ -706,6 +745,7 @@ public class LearningPathActivity extends AppCompatActivity {
                     node.lesson = lesson;
                     node.unitIndex = unitIndex;
                     node.lessonIndex = lessonIndex;
+                    node.globalLessonIndex = globalLessonIndex++;
                     node.lastInUnit = lessonIndex == unit.lessons.size() - 1;
                     lessonPositions.put(lesson.id, items.size());
                     items.add(node);
@@ -752,7 +792,7 @@ public class LearningPathActivity extends AppCompatActivity {
         @NonNull
         @Override
         public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            if (viewType == MapItem.UNIT) return new UnitHolder(new UnitHeaderView(parent.getContext()));
+            if (viewType == MapItem.UNIT) return new UnitHolder(new UnitMarkerView(parent.getContext()));
             if (viewType == MapItem.LESSON) return new LessonHolder(new LessonRowView(parent.getContext()));
             return new MessageHolder(new MessageView(parent.getContext()));
         }
@@ -785,8 +825,8 @@ public class LearningPathActivity extends AppCompatActivity {
     }
 
     private static final class UnitHolder extends RecyclerView.ViewHolder {
-        final UnitHeaderView view;
-        UnitHolder(UnitHeaderView value) { super(value); view = value; }
+        final UnitMarkerView view;
+        UnitHolder(UnitMarkerView value) { super(value); view = value; }
     }
 
     private static final class LessonHolder extends RecyclerView.ViewHolder {
@@ -818,77 +858,178 @@ public class LearningPathActivity extends AppCompatActivity {
         void bind(String value) { label.setText(value); }
     }
 
-    // Compact raised unit card: title + quiet progress, with a warm low-saturation palette.
-    private final class UnitHeaderView extends FrameLayout {
-        private final FrameLayout card;
+    /** Compact second-level marker inside the virtualized map. */
+    private final class UnitMarkerView extends FrameLayout {
+        private final TextView dot;
         private final TextView title;
-        private final TextView progressLabel;
-        private final LearningUiKit.ProgressView progressView;
-        private final GuidebookIcon guide;
+        private final TextView page;
 
-        UnitHeaderView(Context context) {
+        UnitMarkerView(Context context) {
             super(context);
-            setPadding(dp(12), dp(8), dp(12), dp(8));
-            card = new FrameLayout(context);
-            card.setClipToOutline(true);
-            addView(card, new LayoutParams(-1, dp(74)));
+            setLayoutParams(new RecyclerView.LayoutParams(-1, dp(58)));
+            setPadding(dp(24), dp(8), dp(24), dp(8));
 
-            LinearLayout body = new LinearLayout(context);
-            body.setOrientation(LinearLayout.VERTICAL);
-            body.setGravity(Gravity.CENTER_VERTICAL);
-            body.setPadding(dp(17), dp(10), dp(74), dp(10));
-            card.addView(body, new LayoutParams(-1, -1));
+            View line = new View(context);
+            line.setBackgroundColor(COLOR_BORDER);
+            LayoutParams lineLp = new LayoutParams(-1, dp(1), Gravity.CENTER_VERTICAL);
+            addView(line, lineLp);
 
-            title = text("", 18, Color.WHITE, true);
-            title.setMaxLines(1);
+            LinearLayout labelHost = new LinearLayout(context);
+            labelHost.setOrientation(LinearLayout.HORIZONTAL);
+            labelHost.setGravity(Gravity.CENTER_VERTICAL);
+            labelHost.setPadding(dp(12), 0, dp(12), 0);
+            labelHost.setBackgroundColor(COLOR_BG);
+            LayoutParams hostLp = new LayoutParams(-2, dp(38), Gravity.CENTER);
+            addView(labelHost, hostLp);
+
+            dot = text("●", 12, COLOR_BLUE, true);
+            dot.setGravity(Gravity.CENTER);
+            labelHost.addView(dot, new LinearLayout.LayoutParams(dp(20), -1));
+
+            title = text("", 15, COLOR_TEXT, true);
+            title.setSingleLine(true);
             title.setEllipsize(TextUtils.TruncateAt.END);
-            body.addView(title, new LinearLayout.LayoutParams(-1, -2));
+            title.setMaxWidth(Math.max(dp(150),
+                    getResources().getDisplayMetrics().widthPixels - dp(150)));
+            labelHost.addView(title, new LinearLayout.LayoutParams(-2, -1));
 
-            LinearLayout progressRow = new LinearLayout(context);
-            progressRow.setOrientation(LinearLayout.HORIZONTAL);
-            progressRow.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(18));
-            rowLp.setMargins(0, dp(6), 0, 0);
-            body.addView(progressRow, rowLp);
-
-            progressView = new LearningUiKit.ProgressView(context);
-            progressView.setColors(0x48FFFFFF, Color.WHITE);
-            progressRow.addView(progressView, new LinearLayout.LayoutParams(0, dp(6), 1f));
-
-            progressLabel = text("", 11, 0xE6FFFFFF, true);
-            progressLabel.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(dp(42), -1);
-            labelLp.setMargins(dp(8), 0, 0, 0);
-            progressRow.addView(progressLabel, labelLp);
-
-            guide = new GuidebookIcon(context);
-            LayoutParams gLp = new LayoutParams(dp(46), dp(46), Gravity.END | Gravity.CENTER_VERTICAL);
-            gLp.setMargins(0, 0, dp(9), dp(4));
-            card.addView(guide, gLp);
+            page = text("", 11, COLOR_SUBTEXT, true);
+            page.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams pageLp = new LinearLayout.LayoutParams(-2, -1);
+            pageLp.setMargins(dp(8), 0, 0, 0);
+            labelHost.addView(page, pageLp);
         }
 
         void bind(LearningPathRepository.Unit unit, int unitIndex) {
             int accent = unitColor(unit.accent, unitIndex);
-            int edge = LearningUiKit.blend(accent, Color.BLACK, 0.13f);
-            card.setBackground(LearningUiKit.raised(accent, edge, dp(17), 0, 0, dp(6)));
+            dot.setTextColor(accent);
+            title.setText(unit.title);
+            int total = course == null ? 0 : course.units.size();
+            page.setText(total > 0 ? (unitIndex + 1) + " / " + total : "");
+            setContentDescription(unit.title);
+        }
+    }
+
+    /** One fixed, short, page-like unit card. It changes as the map crosses a unit marker. */
+    private final class UnitHeaderView extends FrameLayout {
+        private final FrameLayout card;
+        private final TextView title;
+        private final TextView pageLabel;
+        private final TextView progressLabel;
+        private final LearningUiKit.ProgressView progressView;
+        private final GuidebookIcon guide;
+        private String boundUnitId = "";
+        private int boundUnitIndex = -1;
+
+        UnitHeaderView(Context context) {
+            super(context);
+            setPadding(dp(12), dp(4), dp(12), dp(4));
+
+            card = new FrameLayout(context);
+            addView(card, new LayoutParams(-1, dp(62)));
+
+            LinearLayout body = new LinearLayout(context);
+            body.setOrientation(LinearLayout.HORIZONTAL);
+            body.setGravity(Gravity.CENTER_VERTICAL);
+            body.setPadding(dp(16), dp(7), dp(10), dp(9));
+            card.addView(body, new LayoutParams(-1, -1));
+
+            LinearLayout textColumn = new LinearLayout(context);
+            textColumn.setOrientation(LinearLayout.VERTICAL);
+            textColumn.setGravity(Gravity.CENTER_VERTICAL);
+            body.addView(textColumn, new LinearLayout.LayoutParams(0, -1, 1f));
+
+            LinearLayout titleRow = new LinearLayout(context);
+            titleRow.setOrientation(LinearLayout.HORIZONTAL);
+            titleRow.setGravity(Gravity.CENTER_VERTICAL);
+            textColumn.addView(titleRow, new LinearLayout.LayoutParams(-1, dp(28)));
+
+            title = text("", 16, COLOR_TEXT, true);
+            title.setSingleLine(true);
+            title.setEllipsize(TextUtils.TruncateAt.END);
+            titleRow.addView(title, new LinearLayout.LayoutParams(0, -1, 1f));
+
+            pageLabel = text("", 11, COLOR_SUBTEXT, true);
+            pageLabel.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams pageLp = new LinearLayout.LayoutParams(dp(42), -1);
+            pageLp.setMargins(dp(8), 0, 0, 0);
+            titleRow.addView(pageLabel, pageLp);
+
+            LinearLayout progressRow = new LinearLayout(context);
+            progressRow.setOrientation(LinearLayout.HORIZONTAL);
+            progressRow.setGravity(Gravity.CENTER_VERTICAL);
+            textColumn.addView(progressRow, new LinearLayout.LayoutParams(-1, dp(15)));
+
+            progressView = new LearningUiKit.ProgressView(context);
+            progressRow.addView(progressView, new LinearLayout.LayoutParams(0, dp(5), 1f));
+
+            progressLabel = text("", 10, COLOR_SUBTEXT, true);
+            progressLabel.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(dp(38), -1);
+            labelLp.setMargins(dp(7), 0, 0, 0);
+            progressRow.addView(progressLabel, labelLp);
+
+            guide = new GuidebookIcon(context);
+            LinearLayout.LayoutParams guideLp = new LinearLayout.LayoutParams(dp(38), dp(38));
+            guideLp.setMargins(dp(10), 0, 0, 0);
+            body.addView(guide, guideLp);
+        }
+
+        void bind(LearningPathRepository.Unit unit, int unitIndex, int totalUnits,
+                  boolean animatePage) {
+            if (unit == null) return;
+            boolean changed = !unit.id.equals(boundUnitId);
+            int direction = boundUnitIndex < 0 || unitIndex >= boundUnitIndex ? 1 : -1;
+            boundUnitId = unit.id;
+            boundUnitIndex = unitIndex;
+
+            int accent = unitColor(unit.accent, unitIndex);
+            int start = LearningUiKit.blend(accent, Color.WHITE, 0.78f);
+            int end = LearningUiKit.blend(accent, Color.WHITE, 0.58f);
+            int edge = LearningUiKit.blend(accent, Color.WHITE, 0.43f);
+            int ink = LearningUiKit.blend(accent, Color.BLACK, 0.58f);
+            int softInk = LearningUiKit.blend(ink, Color.WHITE, 0.23f);
+            int track = LearningUiKit.blend(accent, Color.WHITE, 0.84f);
+
+            card.setBackground(gradientRaised(start, end, edge, dp(17), dp(4)));
+            title.setText(unit.title);
+            title.setTextColor(ink);
+            pageLabel.setText(totalUnits > 0 ? (unitIndex + 1) + " / " + totalUnits : "");
+            pageLabel.setTextColor(softInk);
+            guide.setColor(ink);
+
             int completed = 0;
             for (LearningPathRepository.Lesson lesson : unit.lessons) {
                 LearningPathProgressStore.Progress value = progress.get(lesson.id);
                 if (value != null && value.completed()) completed++;
             }
-            title.setText(unit.title);
+            progressView.setColors(track, ink);
             progressView.setProgress(completed, Math.max(1, unit.lessons.size()));
             progressLabel.setText(completed + "/" + unit.lessons.size());
+            progressLabel.setTextColor(softInk);
+            setContentDescription(unit.title + ", " + progressLabel.getText());
+
+            if (changed && animatePage && isLaidOut()) {
+                animate().cancel();
+                setAlpha(0.72f);
+                setTranslationX(direction * dp(14));
+                animate().alpha(1f).translationX(0f).setDuration(180L).start();
+            } else {
+                setAlpha(1f);
+                setTranslationX(0f);
+            }
         }
     }
 
     private final class GuidebookIcon extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Path path = new Path();
-        GuidebookIcon(Context context) { super(context); setClickable(true); }
+        private int color = Color.WHITE;
+        GuidebookIcon(Context context) { super(context); }
+        void setColor(int value) { color = value; invalidate(); }
         @Override protected void onDraw(Canvas canvas) {
             float cx = getWidth() / 2f, cy = getHeight() / 2f;
-            paint.setColor(Color.WHITE);
+            paint.setColor(color);
             paint.setStyle(Paint.Style.FILL);
             path.reset();
             path.moveTo(cx - dp(12), cy - dp(9));
@@ -912,6 +1053,8 @@ public class LearningPathActivity extends AppCompatActivity {
         private final LearningUiKit.CharacterView character;
         private MapItem boundItem;
         private NodeState boundState = NodeState.LOCKED;
+        private android.animation.ObjectAnimator characterFloat;
+        private boolean shouldAnimateCharacter;
 
         LessonRowView(Context context) {
             super(context);
@@ -974,20 +1117,25 @@ public class LearningPathActivity extends AppCompatActivity {
             int warmAccent = unitColor(item.unit.accent, item.unitIndex);
             node.bind(item.lesson, state, value, download, warmAccent);
 
+            // Characters are placed by the whole path rather than a per-unit index, so short
+            // units still receive visible illustrations. Animation runs only while attached.
             boolean showCharacter = "story".equals(item.lesson.type)
                     || "trophy".equals(item.lesson.type)
-                    || (item.lessonIndex == 4 && item.unit.lessons.size() >= 6); // 更稀疏的插画
+                    || item.globalLessonIndex == 6;
+            shouldAnimateCharacter = showCharacter;
             if (showCharacter) {
                 character.setVisibility(VISIBLE);
                 String pose = "trophy".equals(item.lesson.type) ? "trophy"
                         : "story".equals(item.lesson.type) ? "book" : "wave";
                 character.setStyle(warmAccent,
-                        characterVariant(item.unit.character, item.unitIndex * 2 + item.lessonIndex), pose);
+                        characterVariant(item.unit.character, item.globalLessonIndex), pose);
                 LayoutParams cLp = (LayoutParams) character.getLayoutParams();
                 cLp.gravity = (offset >= 0 ? Gravity.START : Gravity.END) | Gravity.BOTTOM;
                 cLp.setMargins(offset >= 0 ? dp(16) : 0, 0, offset >= 0 ? 0 : dp(16), 0);
                 character.setLayoutParams(cLp);
+                if (isAttachedToWindow()) startCharacterFloat();
             } else {
+                stopCharacterFloat();
                 character.setVisibility(GONE);
             }
 
@@ -999,6 +1147,38 @@ public class LearningPathActivity extends AppCompatActivity {
             else stateText = getString(R.string.learning_path_locked);
             setContentDescription(item.lesson.title + ", " + stateText);
             setAlpha(1f);   // 锁定态靠灰色区分，不再降透明度
+        }
+
+        private void startCharacterFloat() {
+            if (!shouldAnimateCharacter || character.getVisibility() != VISIBLE) return;
+            if (characterFloat != null && characterFloat.isRunning()) return;
+            characterFloat = android.animation.ObjectAnimator.ofFloat(character,
+                    View.TRANSLATION_Y, 0f, -dp(5), 0f);
+            characterFloat.setDuration(1800L);
+            characterFloat.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            characterFloat.setInterpolator(
+                    new android.view.animation.AccelerateDecelerateInterpolator());
+            characterFloat.start();
+        }
+
+        private void stopCharacterFloat() {
+            if (characterFloat != null) {
+                characterFloat.cancel();
+                characterFloat = null;
+            }
+            character.setTranslationY(0f);
+        }
+
+        @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            startCharacterFloat();
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            stopCharacterFloat();
+            super.onDetachedFromWindow();
         }
     }
 
@@ -1285,10 +1465,13 @@ public class LearningPathActivity extends AppCompatActivity {
             path.close();
             canvas.drawPath(path, paint);
             paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(dp(4));
+            paint.setStrokeWidth(dp(3.5f));
             paint.setStrokeCap(Paint.Cap.ROUND);
-            arc.set(cx - dp(3), cy - dp(16), cx + dp(22), cy + dp(16));
-            canvas.drawArc(arc, -55, 110, false, paint);
+            // Two clean sound-wave rings: easier to read than a single thick arc.
+            arc.set(cx - dp(3), cy - dp(13), cx + dp(17), cy + dp(13));
+            canvas.drawArc(arc, -52, 104, false, paint);
+            arc.set(cx - dp(1), cy - dp(20), cx + dp(27), cy + dp(20));
+            canvas.drawArc(arc, -47, 94, false, paint);
             paint.setStyle(Paint.Style.FILL);
         }
 
