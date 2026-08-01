@@ -226,6 +226,8 @@ final class LearningPathRepository {
                 MAX_TITLE_CHARS);
         unit.subtitle = localized(context, object, "subtitle", "", MAX_SUBTITLE_CHARS);
         unit.order = object.has("order") ? object.optInt("order", index) : index;
+        unit.accent = parseColor(object.optString("accent", ""), unitAccent(index, course.accent));
+        unit.character = limited(object.optString("character", characterByIndex(index)), 24);
         JSONArray lessons = object.optJSONArray("lessons");
         if (lessons == null || lessons.length() == 0) {
             throw new IllegalArgumentException("Unit has no lessons: " + unit.id);
@@ -270,7 +272,8 @@ final class LearningPathRepository {
         lesson.packageSize = Math.max(0L, object.optLong("package_size", 0L));
         lesson.forceUpdate = object.optBoolean("force_update", false); // Deprecated compatibility field.
 
-        if (lesson.bundledLessonAsset.isEmpty() && lesson.packageUrl.isEmpty()) {
+        if (!lesson.isRewardNode()
+                && lesson.bundledLessonAsset.isEmpty() && lesson.packageUrl.isEmpty()) {
             throw new IllegalArgumentException("Lesson has no bundled or remote content: " + lesson.id);
         }
         if (!lesson.packageUrl.isEmpty()) {
@@ -403,9 +406,10 @@ final class LearningPathRepository {
     }
 
     private static String safeType(String raw) {
-        if ("review".equals(raw) || "test".equals(raw) || "speaking".equals(raw)
-                || "listening".equals(raw) || "story".equals(raw) || "chest".equals(raw)
-                || "checkpoint".equals(raw)) return raw;
+        if ("review".equals(raw) || "practice".equals(raw) || "test".equals(raw)
+                || "speaking".equals(raw) || "listening".equals(raw)
+                || "story".equals(raw) || "chest".equals(raw)
+                || "checkpoint".equals(raw) || "trophy".equals(raw)) return raw;
         return "normal";
     }
 
@@ -418,13 +422,39 @@ final class LearningPathRepository {
     }
 
     private static String defaultIcon(String type) {
-        if ("review".equals(type)) return "↻";
-        if ("test".equals(type) || "checkpoint".equals(type)) return "★";
+        if ("review".equals(type) || "practice".equals(type)) return "练";
+        if ("test".equals(type) || "checkpoint".equals(type)) return "测";
+        if ("trophy".equals(type)) return "奖";
         if ("speaking".equals(type)) return "●";
         if ("listening".equals(type)) return "◖))";
         if ("story".equals(type)) return "▤";
         if ("chest".equals(type)) return "◆";
         return "✓";
+    }
+
+    private static int unitAccent(int index, int courseAccent) {
+        int[] palette = new int[]{
+                0xFF58CC02, 0xFF1CB0F6, 0xFFCE82FF, 0xFFFF9600,
+                0xFFFF4B4B, 0xFF2B70C9, 0xFF00B8A9, 0xFFE05FA8
+        };
+        int value = palette[Math.floorMod(index, palette.length)];
+        return courseAccent == 0 ? value : blendColor(value, courseAccent, 0.12f);
+    }
+
+    private static String characterByIndex(int index) {
+        String[] values = new String[]{"mei", "bo", "lin", "ya", "kai", "ning"};
+        return values[Math.floorMod(index, values.length)];
+    }
+
+    private static int blendColor(int first, int second, float amount) {
+        float value = Math.max(0f, Math.min(1f, amount));
+        int r = (int) (android.graphics.Color.red(first) * (1f - value)
+                + android.graphics.Color.red(second) * value);
+        int g = (int) (android.graphics.Color.green(first) * (1f - value)
+                + android.graphics.Color.green(second) * value);
+        int b = (int) (android.graphics.Color.blue(first) * (1f - value)
+                + android.graphics.Color.blue(second) * value);
+        return android.graphics.Color.rgb(r, g, b);
     }
 
     private static int parseColor(String raw, int fallback) {
@@ -493,6 +523,8 @@ final class LearningPathRepository {
         String title = "";
         String subtitle = "";
         int order;
+        int accent = 0xFF58CC02;
+        String character = "mei";
         final List<Lesson> lessons = new ArrayList<>();
     }
 
@@ -519,6 +551,7 @@ final class LearningPathRepository {
 
         boolean hasBundledContent() { return !bundledLessonAsset.isEmpty(); }
         boolean needsRemotePackage() { return !packageUrl.isEmpty(); }
+        boolean isRewardNode() { return "trophy".equals(type) || "chest".equals(type); }
         String packageKey() { return packageId + "@" + packageVersion + "@" + packageSha256; }
     }
 

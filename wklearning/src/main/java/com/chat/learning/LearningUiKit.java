@@ -205,7 +205,7 @@ final class LearningUiKit {
         private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF rect = new RectF();
         private final Path path = new Path();
-        private final int accent;
+        private int accent;
         private final int variant;
         private final String symbol;
 
@@ -214,6 +214,11 @@ final class LearningUiKit {
             this.accent = accent == 0 ? BLUE : accent;
             this.variant = Math.floorMod(variant, 4);
             this.symbol = symbol == null || symbol.trim().isEmpty() ? "学" : symbol.trim();
+        }
+
+        void setAccent(int value) {
+            accent = value == 0 ? BLUE : value;
+            invalidate();
         }
 
         @Override
@@ -281,6 +286,191 @@ final class LearningUiKit {
             float baseline = height * 0.49f - (metrics.ascent + metrics.descent) / 2f;
             canvas.drawText(symbol, width * 0.79f, baseline, textPaint);
             textPaint.clearShadowLayer();
+        }
+    }
+
+    /** Original lightweight human companion used on course and unit maps. */
+    static final class CharacterView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF rect = new RectF();
+        private final Path path = new Path();
+        private int accent = BLUE;
+        private int variant;
+        private String pose = "wave";
+
+        CharacterView(Context context) {
+            super(context);
+            line.setStyle(Paint.Style.STROKE);
+            line.setStrokeCap(Paint.Cap.ROUND);
+            line.setStrokeJoin(Paint.Join.ROUND);
+        }
+
+        CharacterView(Context context, int accent, int variant, String pose) {
+            this(context);
+            setStyle(accent, variant, pose);
+        }
+
+        void setStyle(int accent, int variant, String pose) {
+            this.accent = accent == 0 ? BLUE : accent;
+            this.variant = Math.floorMod(variant, 6);
+            this.pose = pose == null ? "wave" : pose;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth();
+            float h = getHeight();
+            if (w <= 0f || h <= 0f) return;
+            float scale = Math.min(w / 120f, h / 150f);
+            float ox = (w - 120f * scale) / 2f;
+            float oy = h - 150f * scale;
+            canvas.save();
+            canvas.translate(ox, oy);
+            canvas.scale(scale, scale);
+
+            int[] skins = {0xFFF7C9A8, 0xFFEDB98F, 0xFFD99A6C, 0xFFF2C39F, 0xFFC9825B, 0xFFE7AD84};
+            int[] hairs = {0xFF332720, 0xFF241B18, 0xFF4B2E20, 0xFF1F252C, 0xFF5A321F, 0xFF2B1D17};
+            int skin = skins[variant];
+            int hair = hairs[variant];
+            int shirt = blend(accent, Color.WHITE, variant % 2 == 0 ? 0.08f : 0.22f);
+            int shirtDark = darken(shirt, 0.78f);
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0x22000000);
+            rect.set(23, 139, 99, 149);
+            canvas.drawOval(rect, paint);
+
+            paint.setColor(shirtDark);
+            rect.set(32, 83, 90, 143);
+            canvas.drawRoundRect(rect, 24, 24, paint);
+            paint.setColor(shirt);
+            rect.set(32, 79, 90, 137);
+            canvas.drawRoundRect(rect, 24, 24, paint);
+
+            // Neck.
+            paint.setColor(skin);
+            rect.set(51, 67, 69, 88);
+            canvas.drawRoundRect(rect, 8, 8, paint);
+
+            // Head.
+            paint.setColor(skin);
+            canvas.drawCircle(60, 48, 30, paint);
+            paint.setColor(0x22A66542);
+            canvas.drawCircle(42, 50, 4, paint);
+            canvas.drawCircle(78, 50, 4, paint);
+
+            // Hair silhouette, intentionally original and varied.
+            paint.setColor(hair);
+            path.reset();
+            if (variant % 3 == 0) {
+                path.moveTo(31, 47); path.cubicTo(29, 16, 46, 10, 62, 14);
+                path.cubicTo(84, 8, 94, 31, 88, 52);
+                path.cubicTo(77, 32, 63, 28, 48, 33);
+                path.cubicTo(43, 39, 38, 44, 31, 47); path.close();
+            } else if (variant % 3 == 1) {
+                path.moveTo(31, 48); path.cubicTo(30, 18, 45, 11, 62, 14);
+                path.cubicTo(79, 13, 91, 27, 88, 49);
+                path.lineTo(80, 37); path.cubicTo(61, 41, 51, 25, 35, 42); path.close();
+            } else {
+                path.moveTo(30, 51); path.cubicTo(27, 22, 42, 11, 62, 13);
+                path.cubicTo(85, 12, 95, 34, 87, 55);
+                path.cubicTo(77, 41, 67, 29, 38, 40); path.close();
+                canvas.drawCircle(88, 24, 9, paint);
+            }
+            canvas.drawPath(path, paint);
+
+            // Face.
+            paint.setColor(0xFF3C2E2A);
+            canvas.drawCircle(49, 51, 2.5f, paint);
+            canvas.drawCircle(71, 51, 2.5f, paint);
+            line.setColor(0xFF9D5B50);
+            line.setStrokeWidth(2.2f);
+            rect.set(53, 54, 67, 65);
+            canvas.drawArc(rect, 15, 150, false, line);
+            paint.setColor(0x44FF6B78);
+            canvas.drawCircle(41, 59, 4, paint);
+            canvas.drawCircle(79, 59, 4, paint);
+
+            // Legs and shoes.
+            paint.setColor(0xFF40556F);
+            rect.set(42, 127, 56, 144); canvas.drawRoundRect(rect, 6, 6, paint);
+            rect.set(65, 127, 79, 144); canvas.drawRoundRect(rect, 6, 6, paint);
+            paint.setColor(0xFF29323E);
+            rect.set(37, 140, 57, 147); canvas.drawRoundRect(rect, 4, 4, paint);
+            rect.set(64, 140, 84, 147); canvas.drawRoundRect(rect, 4, 4, paint);
+
+            if ("book".equals(pose)) {
+                drawBookPose(canvas, skin);
+            } else if ("trophy".equals(pose)) {
+                drawTrophyPose(canvas, skin);
+            } else if ("point".equals(pose)) {
+                drawPointPose(canvas, skin);
+            } else {
+                drawWavePose(canvas, skin);
+            }
+            canvas.restore();
+        }
+
+        private void drawWavePose(Canvas canvas, int skin) {
+            line.setStrokeWidth(11);
+            line.setColor(skin);
+            canvas.drawLine(37, 91, 20, 72, line);
+            canvas.drawLine(84, 92, 96, 65, line);
+            line.setStrokeWidth(8);
+            canvas.drawLine(96, 65, 99, 45, line);
+            paint.setColor(skin);
+            canvas.drawCircle(100, 42, 6, paint);
+            line.setStrokeWidth(2);
+            line.setColor(0x559D5B50);
+            canvas.drawLine(96, 37, 101, 29, line);
+            canvas.drawLine(101, 38, 108, 32, line);
+        }
+
+        private void drawPointPose(Canvas canvas, int skin) {
+            line.setStrokeWidth(11);
+            line.setColor(skin);
+            canvas.drawLine(36, 91, 21, 112, line);
+            canvas.drawLine(84, 91, 103, 78, line);
+            line.setStrokeWidth(7);
+            canvas.drawLine(103, 78, 112, 69, line);
+            paint.setColor(skin);
+            canvas.drawCircle(113, 68, 5, paint);
+        }
+
+        private void drawBookPose(Canvas canvas, int skin) {
+            line.setStrokeWidth(10);
+            line.setColor(skin);
+            canvas.drawLine(36, 91, 46, 108, line);
+            canvas.drawLine(84, 91, 74, 108, line);
+            paint.setColor(0xFF3B68B0);
+            rect.set(43, 98, 61, 124);
+            canvas.drawRoundRect(rect, 3, 3, paint);
+            paint.setColor(0xFF4E7FD0);
+            rect.set(61, 98, 79, 124);
+            canvas.drawRoundRect(rect, 3, 3, paint);
+            paint.setColor(0x88FFFFFF);
+            rect.set(59, 99, 63, 124);
+            canvas.drawRect(rect, paint);
+        }
+
+        private void drawTrophyPose(Canvas canvas, int skin) {
+            line.setStrokeWidth(10);
+            line.setColor(skin);
+            canvas.drawLine(36, 91, 49, 108, line);
+            canvas.drawLine(84, 91, 71, 108, line);
+            paint.setColor(YELLOW);
+            rect.set(49, 91, 72, 112);
+            canvas.drawRoundRect(rect, 8, 8, paint);
+            paint.setColor(YELLOW_DARK);
+            rect.set(57, 110, 64, 124); canvas.drawRoundRect(rect, 3, 3, paint);
+            rect.set(50, 122, 71, 128); canvas.drawRoundRect(rect, 3, 3, paint);
+            line.setColor(YELLOW_DARK);
+            line.setStrokeWidth(4);
+            rect.set(42, 94, 53, 108); canvas.drawArc(rect, 80, 190, false, line);
+            rect.set(68, 94, 79, 108); canvas.drawArc(rect, -90, 190, false, line);
         }
     }
 
