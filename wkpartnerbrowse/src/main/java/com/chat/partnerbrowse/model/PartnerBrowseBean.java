@@ -49,7 +49,7 @@ public class PartnerBrowseBean {
     public double server_score;
     public double score;
     public String recommend_reason;
-    public boolean hello_sent;
+    public int hello_sent;
     public int apply_status;
     public int greeting_status;
     public int requester_msg_count;
@@ -102,11 +102,11 @@ public class PartnerBrowseBean {
     }
 
     public boolean isHelloSent() {
-        return hello_sent || apply_status == 1 || greeting_status == 1;
+        return hello_sent == 1 || apply_status == 1 || greeting_status == 1;
     }
 
     public void markHelloSent() {
-        hello_sent = true;
+        hello_sent = 1;
         if (apply_status == 0) apply_status = 1;
         if (greeting_status == 0) greeting_status = 1;
         if (requester_msg_count <= 0) requester_msg_count = 1;
@@ -124,7 +124,7 @@ public class PartnerBrowseBean {
     }
 
     public void updateGreetingState(int count, int maxCount, long nextAllowedAt) {
-        hello_sent = true;
+        hello_sent = 1;
         if (apply_status == 0) apply_status = 1;
         if (greeting_status == 0) greeting_status = 1;
         if (count > 0) requester_msg_count = count;
@@ -194,7 +194,7 @@ public class PartnerBrowseBean {
         args.putString("vercode", safe(vercode));
         args.putString("profile_cover", safe(profile_cover));
         args.putInt("distance_meters", getDistanceMetersSafe());
-        args.putBoolean("hello_sent", hello_sent);
+        args.putInt("hello_sent", hello_sent);
         args.putInt("apply_status", apply_status);
         args.putInt("greeting_status", greeting_status);
         args.putInt("requester_msg_count", requester_msg_count);
@@ -231,7 +231,12 @@ public class PartnerBrowseBean {
         bean.vercode = args.getString("vercode", "");
         bean.profile_cover = args.getString("profile_cover", "");
         bean.distance_meters = args.getInt("distance_meters", 0);
-        bean.hello_sent = args.getBoolean("hello_sent", false);
+        Object helloSentValue = args.get("hello_sent");
+        if (helloSentValue instanceof Boolean) {
+            bean.hello_sent = (Boolean) helloSentValue ? 1 : 0;
+        } else if (helloSentValue instanceof Number) {
+            bean.hello_sent = ((Number) helloSentValue).intValue() == 1 ? 1 : 0;
+        }
         bean.apply_status = args.getInt("apply_status", 0);
         bean.greeting_status = args.getInt("greeting_status", 0);
         bean.requester_msg_count = args.getInt("requester_msg_count", 0);
