@@ -821,12 +821,24 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             return;
         }
 
-        // 即使页面已经关闭，也要落地本地消息和关系状态，避免服务端成功但本地显示未联系。
-        PartnerListHostBridge.saveOutgoingGreeting(uid, greetingText, result);
+        // 只在本次请求确实投递了一条招呼时保存本地副本。服务端可能把内置默认
+        // 文案随机化，因此必须使用响应 text，不能保存请求前的占位文案。
+        String deliveredText = TextUtils.isEmpty(result.text) ? greetingText : result.text;
+        if (!TextUtils.isEmpty(result.text) && !Boolean.FALSE.equals(result.requester)) {
+            PartnerListHostBridge.saveOutgoingGreeting(uid, deliveredText, result);
+        }
+
         int maxPending = result.max_greeting_count > 0 ? result.max_greeting_count : 3;
         int pendingCount = Math.max(1, result.requester_msg_count);
-        if (result.contact_status == 1) PartnerPendingStore.markActive(uid);
-        else PartnerPendingStore.markRequester(uid, pendingCount, maxPending);
+        if (result.contact_status == 1) {
+            PartnerPendingStore.markActive(uid);
+        } else if (isGreetingReceiver(result)) {
+            // 对方先发起招呼时，本账号是接收方。错误标成 requester 会把回复也套进
+            // “最多3条”的发起方限制，并可能造成关系状态长期不一致。
+            PartnerPendingStore.markReceiver(uid, pendingCount, maxPending);
+        } else {
+            PartnerPendingStore.markRequester(uid, pendingCount, maxPending);
+        }
 
         if (!alive) return;
         if (adapter != null) adapter.markGreeted(uid);
@@ -856,6 +868,17 @@ public class PartnerListActivity extends WKBaseActivity<ActivityPartnerListBindi
             PartnerListCache.saveAsync(PartnerListActivity.this, currentResponse);
         }
         showUpdateBanner(getString(R.string.partnerlist_greeting_success));
+    }
+
+    private boolean isGreetingReceiver(PartnerGreetingResponse result) {
+        if (result == null) return false;
+        if (Boolean.FALSE.equals(result.requester)) return true;
+        if (result.requester != null) return false;
+        // Compatibility with a server deployed before the explicit requester field.
+        String message = result.messageSafe();
+        return TextUtils.isEmpty(result.text)
+                && !TextUtils.isEmpty(message)
+                && message.contains("对方已打招呼");
     }
 
     private void handleGreetingFailure(String requestUid, String uid, String msg) {
