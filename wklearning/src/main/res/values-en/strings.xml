@@ -503,11 +503,16 @@ Time %5$d min</string>
     <string name="learning_path_choose_course">Choose course</string>
 
     <string name="learning_category_title">Interactive Practice</string>
-    <string name="learning_category_heading">Choose a practice category</string>
-    <string name="learning_category_subtitle">Choose a scene first, then progress through its learning map.</string>
+    <string name="learning_category_heading">Choose a Chinese course</string>
+    <string name="learning_category_subtitle">Choose a course, then move through every unit on one continuous map.</string>
     <string name="learning_category_lessons">%1$d lessons</string>
     <string name="learning_category_section">CATEGORY PATH</string>
     <string name="learning_path_map_tip">Complete the current lesson to unlock the next one</string>
     <string name="learning_path_current">Current lesson</string>
 
+    <string name="learning_course_stats">%1$d units · %2$d nodes</string>
+    <string name="learning_unit_number">UNIT %1$d</string>
+    <string name="learning_unit_complete_title">Unit complete</string>
+    <string name="learning_unit_complete_message">You completed “%1$s”. The next unit is now unlocked.</string>
+    <string name="learning_path_claim">Claim</string>
 </resources>
