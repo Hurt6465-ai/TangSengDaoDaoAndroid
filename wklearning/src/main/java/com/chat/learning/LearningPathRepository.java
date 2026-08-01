@@ -185,6 +185,7 @@ final class LearningPathRepository {
         course.version = positive(object.optInt("version", 1), 1, Integer.MAX_VALUE);
         course.minAppVersion = positive(object.optInt("min_app_version", 0), 0, Integer.MAX_VALUE);
         course.accent = parseColor(object.optString("accent", ""), 0xFF635BFF);
+        course.coverDrawable = safeResourceName(object.optString("cover_drawable", ""));
 
         JSONArray units = object.optJSONArray("units");
         if (units == null || units.length() == 0) {
@@ -387,6 +388,12 @@ final class LearningPathRepository {
         return value;
     }
 
+    private static String safeResourceName(String raw) {
+        String value = raw == null ? "" : raw.trim().toLowerCase(java.util.Locale.US);
+        if (value.length() > 80 || !value.matches("[a-z][a-z0-9_]*")) return "";
+        return value;
+    }
+
     private static String cleanRelativePath(String raw, boolean requireFile) {
         if (raw == null) return "";
         String value = raw.trim().replace('\\', '/');
@@ -515,6 +522,7 @@ final class LearningPathRepository {
         int version = 1;
         int minAppVersion;
         int accent = 0xFF635BFF;
+        String coverDrawable = "";
         final List<Unit> units = new ArrayList<>();
     }
 

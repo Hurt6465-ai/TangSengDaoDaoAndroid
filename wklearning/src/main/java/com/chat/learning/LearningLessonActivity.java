@@ -20,6 +20,7 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.PlaybackParams;
 import android.media.ToneGenerator;
+import android.media.SoundPool;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
@@ -141,6 +142,9 @@ public class LearningLessonActivity extends AppCompatActivity {
     private LearningLessonRepository.PairItem selectedMatchPair;
     private MediaPlayer mediaPlayer;
     private ToneGenerator feedbackTone;
+    private SoundPool feedbackSounds;
+    private int correctSoundId;
+    private int wrongSoundId;
     private final ArrayList<View> pinyinViews = new ArrayList<>();
     private LearningPathProgressStore progressStore;
     private Bundle restoreState;
@@ -187,6 +191,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         showPinyin = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 .getBoolean(PREF_SHOW_PINYIN, true);
         progressStore = new LearningPathProgressStore(this);
+        initFeedbackSounds();
         buildLayout();
         loadLesson();
     }
@@ -245,6 +250,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         questionGeneration++;
         cancelAutoPlay();
         releasePlayer();
+        releaseFeedbackSounds();
         releaseFeedbackTone();
         if (progressStore != null) progressStore.close();
         progressStore = null;
@@ -326,7 +332,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(8), dp(6), dp(10), dp(4));
 
-        TextView close = text("×", 29, COLOR_SUB, false);
+        TextView close = text("‹", 32, COLOR_SUB, false);
         close.setGravity(Gravity.CENTER);
         close.setContentDescription(getString(R.string.learning_lesson_close));
         close.setOnClickListener(v -> finish());
@@ -594,7 +600,7 @@ public class LearningLessonActivity extends AppCompatActivity {
     private void addQuestionHeader(LearningLessonRepository.Exercise exercise) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.TOP);
+        row.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, -2);
         rowLp.setMargins(0, dp(15), 0, 0);
         questionHost.addView(row, rowLp);
@@ -606,8 +612,8 @@ public class LearningLessonActivity extends AppCompatActivity {
 
         if (hasAudio(exercise)) {
             View play = audioButton(exercise);
-            LinearLayout.LayoutParams playLp = new LinearLayout.LayoutParams(dp(52), dp(56));
-            playLp.setMargins(dp(12), 0, 0, 0);
+            LinearLayout.LayoutParams playLp = new LinearLayout.LayoutParams(dp(42), dp(42));
+            playLp.setMargins(dp(3), dp(1), 0, 0);
             row.addView(play, playLp);
         }
 
@@ -963,7 +969,7 @@ public class LearningLessonActivity extends AppCompatActivity {
     private void renderMatching(LearningLessonRepository.Exercise exercise) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.TOP);
+        row.setGravity(Gravity.CENTER_VERTICAL);
         questionHost.addView(row, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout left = new LinearLayout(this);
@@ -1041,8 +1047,8 @@ public class LearningLessonActivity extends AppCompatActivity {
         play.setOnClickListener(v -> {
             v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
             v.playSoundEffect(SoundEffectConstants.CLICK);
-            v.animate().translationY(dp(4)).scaleX(0.95f).scaleY(0.95f).setDuration(65)
-                    .withEndAction(() -> v.animate().translationY(0).scaleX(1f).scaleY(1f)
+            v.animate().scaleX(0.90f).scaleY(0.90f).setDuration(65)
+                    .withEndAction(() -> v.animate().scaleX(1f).scaleY(1f)
                             .setDuration(110).start()).start();
             playExerciseAudio(exercise);
         });
@@ -1120,7 +1126,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         feedbackPanel.setBackgroundColor(feedbackColor);
         feedbackTitle.setVisibility(View.VISIBLE);
         feedbackBody.setVisibility(View.VISIBLE);
-        feedbackTitle.setText((correct ? "✓  " : "✕  ") + getString(correct
+        feedbackTitle.setText(getString(correct
                 ? R.string.learning_lesson_correct : R.string.learning_lesson_incorrect));
         feedbackTitle.setTextColor(correct ? 0xFF3F7D20 : COLOR_ERROR_DARK);
 
@@ -1538,14 +1544,42 @@ public class LearningLessonActivity extends AppCompatActivity {
         playFeedbackTone(correct);
     }
 
+    private void initFeedbackSounds() {
+        try {
+            feedbackSounds = new SoundPool(2, AudioManager.STREAM_MUSIC, 0);
+            correctSoundId = feedbackSounds.load(this, R.raw.learning_correct, 1);
+            wrongSoundId = feedbackSounds.load(this, R.raw.learning_wrong, 1);
+        } catch (Throwable ignored) {
+            feedbackSounds = null;
+            correctSoundId = 0;
+            wrongSoundId = 0;
+        }
+    }
+
     private void playFeedbackTone(boolean correct) {
         try {
+            int id = correct ? correctSoundId : wrongSoundId;
+            if (feedbackSounds != null && id != 0) {
+                int stream = feedbackSounds.play(id, 0.92f, 0.92f, 1, 0, 1f);
+                if (stream != 0) return;
+            }
+        } catch (Throwable ignored) { }
+        try {
             if (feedbackTone == null) {
-                feedbackTone = new ToneGenerator(AudioManager.STREAM_MUSIC, 34);
+                feedbackTone = new ToneGenerator(AudioManager.STREAM_MUSIC, 68);
             }
             feedbackTone.startTone(correct ? ToneGenerator.TONE_PROP_ACK
-                    : ToneGenerator.TONE_PROP_NACK, correct ? 110 : 170);
+                    : ToneGenerator.TONE_PROP_NACK, correct ? 120 : 190);
         } catch (Throwable ignored) { }
+    }
+
+    private void releaseFeedbackSounds() {
+        SoundPool old = feedbackSounds;
+        feedbackSounds = null;
+        correctSoundId = 0;
+        wrongSoundId = 0;
+        if (old == null) return;
+        try { old.release(); } catch (Throwable ignored) { }
     }
 
     private void releaseFeedbackTone() {
@@ -1799,42 +1833,48 @@ public class LearningLessonActivity extends AppCompatActivity {
             super(context);
             setClickable(true);
             setFocusable(true);
+            setBackground(null);
+            setPadding(0, 0, 0, 0);
+        }
+
+        @Override
+        protected void drawableStateChanged() {
+            super.drawableStateChanged();
+            invalidate();
         }
 
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            float cx = getWidth() / 2f;
-            float cy = getHeight() / 2f - dp(1);
-            float radius = Math.max(dp(14), Math.min(getWidth(), getHeight()) / 2f - dp(5));
-            float depth = dp(4);
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(COLOR_BLUE_DARK);
-            canvas.drawCircle(cx, cy + depth, radius, paint);
-            paint.setColor(COLOR_BLUE);
-            canvas.drawCircle(cx, cy, radius, paint);
-            paint.setColor(0x2FFFFFFF);
-            canvas.drawOval(cx - radius * 0.48f, cy - radius * 0.62f,
-                    cx + radius * 0.48f, cy - radius * 0.38f, paint);
+            float cx = getWidth() * 0.42f;
+            float cy = getHeight() / 2f;
+            float unit = Math.max(1f, Math.min(getWidth(), getHeight()) / 34f);
+            int color = isPressed() ? COLOR_BLUE_DARK : COLOR_BLUE;
 
-            float unit = Math.max(1f, radius / 16f);
-            paint.setColor(Color.WHITE);
+            paint.setColor(color);
+            paint.setStyle(Paint.Style.FILL);
             path.reset();
-            path.moveTo(cx - 9 * unit, cy - 4 * unit);
-            path.lineTo(cx - 5 * unit, cy - 4 * unit);
-            path.lineTo(cx + 1 * unit, cy - 10 * unit);
-            path.lineTo(cx + 1 * unit, cy + 10 * unit);
-            path.lineTo(cx - 5 * unit, cy + 4 * unit);
-            path.lineTo(cx - 9 * unit, cy + 4 * unit);
+            path.moveTo(cx - 9 * unit, cy - 4.5f * unit);
+            path.lineTo(cx - 5 * unit, cy - 4.5f * unit);
+            path.lineTo(cx + 1.2f * unit, cy - 10 * unit);
+            path.lineTo(cx + 1.2f * unit, cy + 10 * unit);
+            path.lineTo(cx - 5 * unit, cy + 4.5f * unit);
+            path.lineTo(cx - 9 * unit, cy + 4.5f * unit);
             path.close();
             canvas.drawPath(path, paint);
 
             paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(Math.max(dp(2), 2.4f * unit));
             paint.setStrokeCap(Paint.Cap.ROUND);
-            arc.set(cx - 2 * unit, cy - 9 * unit, cx + 12 * unit, cy + 9 * unit);
-            canvas.drawArc(arc, -48, 96, false, paint);
-            arc.set(cx, cy - 13 * unit, cx + 18 * unit, cy + 13 * unit);
+            paint.setStrokeWidth(Math.max(dp(1.7f), 2.0f * unit));
+            arc.set(cx - 2 * unit, cy - 8 * unit, cx + 10 * unit, cy + 8 * unit);
+            canvas.drawArc(arc, -47, 94, false, paint);
+
+            paint.setStrokeWidth(Math.max(dp(1.6f), 1.85f * unit));
+            arc.set(cx, cy - 12 * unit, cx + 16 * unit, cy + 12 * unit);
+            canvas.drawArc(arc, -45, 90, false, paint);
+
+            paint.setStrokeWidth(Math.max(dp(1.4f), 1.65f * unit));
+            arc.set(cx + 2 * unit, cy - 16 * unit, cx + 22 * unit, cy + 16 * unit);
             canvas.drawArc(arc, -43, 86, false, paint);
             paint.setStyle(Paint.Style.FILL);
         }

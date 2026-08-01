@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -11,20 +12,24 @@ import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.util.HashMap;
 import java.util.Map;
 
-/** Course-first entry for interactive practice. */
+/** Compact image-first course chooser for interactive practice. */
 public class LearningCategoryActivity extends AppCompatActivity {
+    private static final int[] COURSE_PALETTE = {
+            0xFF6C63FF, 0xFF1CB0F6, 0xFF58CC02,
+            0xFFFF7A59, 0xFFFF4B8B, 0xFF9B51E0
+    };
+
     private LinearLayout content;
-    private TextView refreshButton;
     private LearningPathRepository.Catalog catalog;
     private LearningPathProgressStore progressStore;
     private int loadGeneration;
@@ -44,7 +49,7 @@ public class LearningCategoryActivity extends AppCompatActivity {
         LearningUiKit.applySystemBars(this, LearningUiKit.BG);
         progressStore = new LearningPathProgressStore(this);
         buildLayout();
-        loadCatalog(false);
+        loadCatalog();
     }
 
     @Override
@@ -68,7 +73,12 @@ public class LearningCategoryActivity extends AppCompatActivity {
         page.setBackgroundColor(LearningUiKit.BG);
         setContentView(page);
 
-        page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(58)));
+        TextView title = text(getString(R.string.learning_category_title), 21,
+                LearningUiKit.TEXT, true);
+        title.setGravity(Gravity.CENTER);
+        title.setSingleLine(true);
+        title.setPadding(dp(16), dp(4), dp(16), 0);
+        page.addView(title, new LinearLayout.LayoutParams(-1, dp(58)));
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -78,49 +88,22 @@ public class LearningCategoryActivity extends AppCompatActivity {
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
         FrameLayout widthHost = new FrameLayout(this);
-        widthHost.setPadding(dp(16), 0, dp(16), dp(56));
+        widthHost.setPadding(dp(18), dp(10), dp(18), dp(48));
         scroll.addView(widthHost, new ScrollView.LayoutParams(-1, -2));
 
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setClipToPadding(false);
-        int available = Math.max(dp(280), getResources().getDisplayMetrics().widthPixels - dp(32));
+        int available = Math.max(dp(280), getResources().getDisplayMetrics().widthPixels - dp(36));
         FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(
                 Math.min(dp(680), available), -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         widthHost.addView(content, contentLp);
     }
 
-    private View createTopBar() {
-        LinearLayout bar = new LinearLayout(this);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(10), dp(4), dp(10), 0);
-
-        TextView back = iconButton("‹", 32);
-        back.setContentDescription(getString(R.string.learning_path_back));
-        back.setOnClickListener(v -> finish());
-        bar.addView(back, new LinearLayout.LayoutParams(dp(46), dp(46)));
-
-        TextView title = text(getString(R.string.learning_category_title), 18,
-                LearningUiKit.TEXT, true);
-        title.setGravity(Gravity.CENTER);
-        title.setSingleLine(true);
-        bar.addView(title, new LinearLayout.LayoutParams(0, -1, 1f));
-
-        refreshButton = iconButton("↻", 22);
-        refreshButton.setContentDescription(getString(R.string.learning_path_refresh));
-        refreshButton.setOnClickListener(v -> loadCatalog(true));
-        bar.addView(refreshButton, new LinearLayout.LayoutParams(dp(46), dp(46)));
-        return bar;
-    }
-
-    private void loadCatalog(boolean manualRefresh) {
-        if (refreshInFlight) return;
+    private void loadCatalog() {
+        if (refreshInFlight || destroyed) return;
         int generation = ++loadGeneration;
         refreshInFlight = true;
-        refreshButton.setEnabled(false);
-        refreshButton.setAlpha(0.45f);
-        if (manualRefresh) refreshButton.animate().rotationBy(360f).setDuration(500).start();
         if (catalog == null) showLoading();
         LearningRemoteContent.execute(() -> {
             LearningPathRepository.Catalog local = LearningPathRepository.load(getApplicationContext());
@@ -128,24 +111,21 @@ public class LearningCategoryActivity extends AppCompatActivity {
                 if (!canApply(generation)) return;
                 catalog = local;
                 renderCourses();
-                refreshCatalog(generation, local, manualRefresh);
+                refreshCatalog(generation, local);
             });
         });
     }
 
-    private void refreshCatalog(int generation, LearningPathRepository.Catalog local,
-                                boolean manualRefresh) {
+    private void refreshCatalog(int generation, LearningPathRepository.Catalog local) {
         LearningPathRepository.refresh(getApplicationContext(), local,
                 new LearningPathRepository.RefreshCallback() {
                     @Override
                     public void onUpdated(LearningPathRepository.Catalog updated) {
                         runOnUiThread(() -> {
                             if (!canApply(generation)) return;
-                            finishRefresh();
+                            refreshInFlight = false;
                             catalog = updated;
                             renderCourses();
-                            if (manualRefresh) Toast.makeText(LearningCategoryActivity.this,
-                                    R.string.learning_path_updated, Toast.LENGTH_SHORT).show();
                         });
                     }
 
@@ -153,9 +133,7 @@ public class LearningCategoryActivity extends AppCompatActivity {
                     public void onUnchanged() {
                         runOnUiThread(() -> {
                             if (!canApply(generation)) return;
-                            finishRefresh();
-                            if (manualRefresh) Toast.makeText(LearningCategoryActivity.this,
-                                    R.string.learning_path_latest, Toast.LENGTH_SHORT).show();
+                            refreshInFlight = false;
                         });
                     }
 
@@ -163,21 +141,10 @@ public class LearningCategoryActivity extends AppCompatActivity {
                     public void onError(String message) {
                         runOnUiThread(() -> {
                             if (!canApply(generation)) return;
-                            finishRefresh();
-                            if (manualRefresh) Toast.makeText(LearningCategoryActivity.this,
-                                    getString(R.string.learning_path_refresh_failed, message),
-                                    Toast.LENGTH_SHORT).show();
+                            refreshInFlight = false;
                         });
                     }
                 });
-    }
-
-    private void finishRefresh() {
-        refreshInFlight = false;
-        if (refreshButton != null) {
-            refreshButton.setEnabled(true);
-            refreshButton.setAlpha(1f);
-        }
     }
 
     private boolean canApply(int generation) {
@@ -190,7 +157,7 @@ public class LearningCategoryActivity extends AppCompatActivity {
         TextView loading = text(getString(R.string.learning_path_loading), 15,
                 LearningUiKit.SUBTEXT, false);
         loading.setGravity(Gravity.CENTER);
-        loading.setPadding(0, dp(90), 0, dp(90));
+        loading.setPadding(0, dp(76), 0, dp(76));
         content.addView(loading, new LinearLayout.LayoutParams(-1, -2));
     }
 
@@ -198,39 +165,25 @@ public class LearningCategoryActivity extends AppCompatActivity {
         if (content == null || catalog == null) return;
         content.removeAllViews();
 
-        TextView heading = text(getString(R.string.learning_category_heading), 29,
-                LearningUiKit.TEXT, true);
-        heading.setLetterSpacing(-0.018f);
-        LinearLayout.LayoutParams headingLp = new LinearLayout.LayoutParams(-1, -2);
-        headingLp.setMargins(dp(2), dp(14), dp(2), 0);
-        content.addView(heading, headingLp);
-
-        TextView sub = text(getString(R.string.learning_category_subtitle), 15,
-                LearningUiKit.SUBTEXT, false);
-        sub.setLineSpacing(dp(3), 1f);
-        LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
-        subLp.setMargins(dp(2), dp(8), dp(2), dp(24));
-        content.addView(sub, subLp);
-
         int index = 0;
         for (LearningPathRepository.Course course : catalog.courses) {
             Map<String, LearningPathProgressStore.Progress> courseProgress = progressStore == null
                     ? new HashMap<>() : progressStore.loadCourse(course.id);
-            CourseCard card = new CourseCard(this, course, courseProgress, index++);
+            CourseCard card = new CourseCard(this, course, courseProgress, index);
             card.setOnClickListener(v -> {
                 v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-                v.animate().translationY(dp(3)).scaleX(0.988f).scaleY(0.988f).setDuration(65)
-                        .withEndAction(() -> {
-                            v.animate().translationY(0).scaleX(1f).scaleY(1f)
-                                    .setDuration(110).start();
-                            LearningPathActivity.open(this, course.id);
-                        }).start();
+                v.animate().scaleX(0.985f).scaleY(0.985f).setDuration(65L)
+                        .withEndAction(() -> v.animate().scaleX(1f).scaleY(1f)
+                                .setDuration(105L)
+                                .withEndAction(() -> LearningPathActivity.open(this, course.id))
+                                .start()).start();
             });
-            int cardHeight = getResources().getDisplayMetrics().widthPixels >= dp(700)
-                    ? dp(264) : dp(232);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, cardHeight);
-            lp.setMargins(0, 0, 0, dp(20));
+            int height = getResources().getDisplayMetrics().widthPixels >= dp(700)
+                    ? dp(196) : dp(176);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, height);
+            lp.setMargins(0, index == 0 ? dp(4) : 0, 0, dp(16));
             content.addView(card, lp);
+            index++;
         }
 
         if (index == 0) {
@@ -242,6 +195,23 @@ public class LearningCategoryActivity extends AppCompatActivity {
         }
     }
 
+    private int courseColor(LearningPathRepository.Course course, int index) {
+        int raw = course == null ? COURSE_PALETTE[Math.floorMod(index, COURSE_PALETTE.length)]
+                : course.accent;
+        float[] hsv = new float[3];
+        Color.colorToHSV(raw, hsv);
+        hsv[1] = Math.max(0.68f, hsv[1]);
+        hsv[2] = Math.max(0.82f, hsv[2]);
+        return Color.HSVToColor(255, hsv);
+    }
+
+    private GradientDrawable gradient(int start, int end, float radius) {
+        GradientDrawable drawable = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR, new int[]{start, end});
+        drawable.setCornerRadius(radius);
+        return drawable;
+    }
+
     private final class CourseCard extends FrameLayout {
         CourseCard(Context context, LearningPathRepository.Course course,
                    Map<String, LearningPathProgressStore.Progress> progress, int index) {
@@ -249,29 +219,30 @@ public class LearningCategoryActivity extends AppCompatActivity {
             setClickable(true);
             setFocusable(true);
             setClipToOutline(true);
-            setBackground(LearningUiKit.rounded(Color.WHITE, dp(28), 0, 0));
             setElevation(dp(4));
 
-            LearningUiKit.CategoryArtworkView cover = new LearningUiKit.CategoryArtworkView(
-                    context, course.accent, index, "中文");
-            addView(cover, new FrameLayout.LayoutParams(-1, -1));
-            addView(new LearningUiKit.ScrimView(context, course.accent),
-                    new FrameLayout.LayoutParams(-1, -1));
+            int accent = courseColor(course, index);
+            int end = LearningUiKit.blend(accent, Color.BLACK, 0.14f);
+            setBackground(gradient(accent, end, dp(24)));
 
-            LearningUiKit.CharacterView first = new LearningUiKit.CharacterView(
-                    context, course.accent, index * 2, "book");
-            FrameLayout.LayoutParams firstLp = new FrameLayout.LayoutParams(dp(116), dp(152),
-                    Gravity.END | Gravity.BOTTOM);
-            firstLp.setMargins(0, 0, dp(54), dp(4));
-            addView(first, firstLp);
+            ImageView cover = new ImageView(context);
+            cover.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            cover.setAdjustViewBounds(true);
+            cover.setPadding(0, dp(2), dp(4), 0);
+            int coverRes = resolveCover(course);
+            if (coverRes != 0) cover.setImageResource(coverRes);
+            FrameLayout.LayoutParams coverLp = new FrameLayout.LayoutParams(
+                    dp(184), -1, Gravity.END | Gravity.CENTER_VERTICAL);
+            coverLp.setMargins(0, 0, dp(2), 0);
+            addView(cover, coverLp);
 
-            LearningUiKit.CharacterView second = new LearningUiKit.CharacterView(
-                    context, LearningUiKit.blend(course.accent, LearningUiKit.PURPLE, 0.36f),
-                    index * 2 + 1, "wave");
-            FrameLayout.LayoutParams secondLp = new FrameLayout.LayoutParams(dp(95), dp(128),
-                    Gravity.END | Gravity.BOTTOM);
-            secondLp.setMargins(0, 0, dp(2), dp(2));
-            addView(second, secondLp);
+            View leftScrim = new View(context);
+            GradientDrawable scrim = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{0x40000000, 0x12000000, 0x00000000});
+            scrim.setCornerRadius(dp(24));
+            leftScrim.setBackground(scrim);
+            addView(leftScrim, new FrameLayout.LayoutParams(-1, -1));
 
             int total = 0;
             int completed = 0;
@@ -285,86 +256,54 @@ public class LearningCategoryActivity extends AppCompatActivity {
 
             LinearLayout body = new LinearLayout(context);
             body.setOrientation(LinearLayout.VERTICAL);
-            body.setGravity(Gravity.BOTTOM);
-            body.setPadding(dp(21), dp(17), dp(150), dp(19));
+            body.setGravity(Gravity.CENTER_VERTICAL);
+            body.setPadding(dp(20), dp(15), dp(152), dp(15));
             addView(body, new FrameLayout.LayoutParams(-1, -1));
 
-            TextView badge = text(getString(R.string.learning_course_stats,
-                    course.units.size(), total), 12, Color.WHITE, true);
-            badge.setGravity(Gravity.CENTER);
-            badge.setPadding(dp(11), dp(6), dp(11), dp(6));
-            badge.setBackground(LearningUiKit.rounded(0x2FFFFFFF, dp(15),
-                    0x46FFFFFF, dp(1)));
-            FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(-2, -2,
-                    Gravity.TOP | Gravity.START);
-            badgeLp.setMargins(dp(19), dp(17), 0, 0);
-            addView(badge, badgeLp);
+            TextView meta = text(getString(R.string.learning_course_stats,
+                    course.units.size(), total), 12, 0xEFFFFFFF, true);
+            meta.setSingleLine(true);
+            body.addView(meta, new LinearLayout.LayoutParams(-1, dp(24)));
 
-            TextView title = text(course.title, 28, Color.WHITE, true);
+            TextView title = text(course.title, 26, Color.WHITE, true);
             title.setMaxLines(2);
             title.setEllipsize(TextUtils.TruncateAt.END);
             title.setLineSpacing(dp(1), 1f);
-            body.addView(title, new LinearLayout.LayoutParams(-1, -2));
-
-            TextView desc = text(course.subtitle, 14, 0xE8FFFFFF, true);
-            desc.setMaxLines(2);
-            desc.setEllipsize(TextUtils.TruncateAt.END);
-            LinearLayout.LayoutParams descLp = new LinearLayout.LayoutParams(-1, -2);
-            descLp.setMargins(0, dp(5), 0, 0);
-            body.addView(desc, descLp);
-
-            LinearLayout chipRow = new LinearLayout(context);
-            chipRow.setOrientation(LinearLayout.HORIZONTAL);
-            chipRow.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams chipsLp = new LinearLayout.LayoutParams(-1, dp(29));
-            chipsLp.setMargins(0, dp(11), 0, 0);
-            body.addView(chipRow, chipsLp);
-            int visibleUnits = Math.min(3, course.units.size());
-            for (int i = 0; i < visibleUnits; i++) {
-                LearningPathRepository.Unit unit = course.units.get(i);
-                String name = unit.title;
-                int split = name.indexOf('·');
-                if (split >= 0 && split + 1 < name.length()) name = name.substring(split + 1).trim();
-                TextView chip = text(name, 11, Color.WHITE, true);
-                chip.setSingleLine(true);
-                chip.setEllipsize(TextUtils.TruncateAt.END);
-                chip.setGravity(Gravity.CENTER);
-                chip.setPadding(dp(9), 0, dp(9), 0);
-                chip.setBackground(LearningUiKit.rounded(0x26FFFFFF, dp(14),
-                        0x32FFFFFF, dp(1)));
-                LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(0, -1, 1f);
-                if (i > 0) chipLp.setMargins(dp(6), 0, 0, 0);
-                chipRow.addView(chip, chipLp);
-            }
+            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, 0, 1f);
+            titleLp.setMargins(0, dp(2), 0, dp(5));
+            body.addView(title, titleLp);
 
             LinearLayout progressRow = new LinearLayout(context);
             progressRow.setOrientation(LinearLayout.HORIZONTAL);
             progressRow.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(24));
-            rowLp.setMargins(0, dp(10), 0, 0);
-            body.addView(progressRow, rowLp);
+            body.addView(progressRow, new LinearLayout.LayoutParams(-1, dp(24)));
 
             LearningUiKit.ProgressView progressView = new LearningUiKit.ProgressView(context);
-            progressView.setColors(0x4AFFFFFF, Color.WHITE);
+            progressView.setColors(0x58FFFFFF, Color.WHITE);
             progressView.setProgress(completed, Math.max(1, total));
             progressRow.addView(progressView, new LinearLayout.LayoutParams(0, dp(8), 1f));
 
             TextView count = text(completed + "/" + total, 12, Color.WHITE, true);
             count.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(dp(50), -1);
-            countLp.setMargins(dp(9), 0, 0, 0);
+            LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(dp(48), -1);
+            countLp.setMargins(dp(8), 0, 0, 0);
             progressRow.addView(count, countLp);
 
             setContentDescription(course.title + ", "
                     + getString(R.string.learning_path_progress, completed, total));
         }
-    }
 
-    private TextView iconButton(String value, float size) {
-        TextView view = text(value, size, LearningUiKit.SUBTEXT, false);
-        view.setGravity(Gravity.CENTER);
-        view.setBackground(LearningUiKit.rounded(Color.TRANSPARENT, dp(23), 0, 0));
-        return view;
+        private int resolveCover(LearningPathRepository.Course course) {
+            String name = course == null ? "" : course.coverDrawable;
+            if (name.isEmpty() && course != null && "zh_beginner".equals(course.id)) {
+                name = "learning_course_beginner";
+            }
+            if (name.isEmpty()) return 0;
+            if ("learning_course_beginner".equals(name)) {
+                return R.drawable.learning_course_beginner;
+            }
+            return getResources().getIdentifier(name, "drawable", getPackageName());
+        }
     }
 
     private TextView text(String value, float size, int color, boolean bold) {

@@ -59,13 +59,14 @@ public class LearningPathActivity extends AppCompatActivity {
 
     private static final boolean SHOW_LESSON_TITLE = true;
     private static final int ROW_H_DP = 132;
-    private static final int STICKY_HEADER_H_DP = 70;
+    private static final int STICKY_HEADER_H_DP = 62;
     private static final int[] WARM_UNIT_COLORS = {
-            0xFFF29C82, // warm coral
-            0xFFF2B66D, // honey
-            0xFF74BEA5, // mint
-            0xFF78B7DE, // soft sky
-            0xFFA995D8  // lavender
+            0xFFFF7A59, // vivid coral
+            0xFFFFB020, // golden amber
+            0xFF58CC02, // duolingo green
+            0xFF1CB0F6, // vivid sky
+            0xFF9B51E0, // purple
+            0xFFFF4B8B  // rose
     };
 
     private static int edgeOf(int color) {
@@ -73,11 +74,14 @@ public class LearningPathActivity extends AppCompatActivity {
     }
 
     private static int unitColor(int declaredColor, int unitIndex) {
-        int palette = WARM_UNIT_COLORS[Math.floorMod(unitIndex, WARM_UNIT_COLORS.length)];
-        if (declaredColor == 0) return palette;
-        // Keep remote course identity without allowing overly dark cards.
-        return LearningUiKit.blend(palette,
-                LearningUiKit.blend(declaredColor, Color.WHITE, 0.58f), 0.28f);
+        int color = declaredColor == 0
+                ? WARM_UNIT_COLORS[Math.floorMod(unitIndex, WARM_UNIT_COLORS.length)]
+                : declaredColor;
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        hsv[1] = Math.max(0.66f, hsv[1]);
+        hsv[2] = Math.max(0.83f, hsv[2]);
+        return Color.HSVToColor(255, hsv);
     }
 
     private RecyclerView recyclerView;
@@ -175,8 +179,8 @@ public class LearningPathActivity extends AppCompatActivity {
         page.setBackgroundColor(COLOR_BG);
         setContentView(page);
         
-        page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(52)));
-
+        // The map starts directly with the compact sticky unit card.
+        // System back/gesture remains available; no duplicate back or refresh controls.
         FrameLayout content = new FrameLayout(this);
         page.addView(content, new LinearLayout.LayoutParams(-1, 0, 1f));
 
@@ -356,12 +360,12 @@ public class LearningPathActivity extends AppCompatActivity {
     private void renderCourse(boolean catalogChanged) {
         if (adapter == null) return;
         if (course == null) {
-            pageTitle.setText("");
+            if (pageTitle != null) pageTitle.setText("");
             if (stickyHeader != null) stickyHeader.setVisibility(View.INVISIBLE);
             adapter.submitMessage(getString(R.string.learning_path_empty));
             return;
         }
-        pageTitle.setText("");
+        if (pageTitle != null) pageTitle.setText("");
         if (course.minAppVersion > currentVersionCode()) {
             if (stickyHeader != null) stickyHeader.setVisibility(View.INVISIBLE);
             adapter.submitMessage(getString(R.string.learning_path_app_update_required));
@@ -923,15 +927,15 @@ public class LearningPathActivity extends AppCompatActivity {
 
         UnitHeaderView(Context context) {
             super(context);
-            setPadding(dp(12), dp(4), dp(12), dp(4));
+            setPadding(dp(18), dp(4), dp(18), dp(4));
 
             card = new FrameLayout(context);
-            addView(card, new LayoutParams(-1, dp(62)));
+            addView(card, new LayoutParams(-1, dp(54)));
 
             LinearLayout body = new LinearLayout(context);
             body.setOrientation(LinearLayout.HORIZONTAL);
             body.setGravity(Gravity.CENTER_VERTICAL);
-            body.setPadding(dp(16), dp(7), dp(10), dp(9));
+            body.setPadding(dp(15), dp(4), dp(8), dp(6));
             card.addView(body, new LayoutParams(-1, -1));
 
             LinearLayout textColumn = new LinearLayout(context);
@@ -942,7 +946,7 @@ public class LearningPathActivity extends AppCompatActivity {
             LinearLayout titleRow = new LinearLayout(context);
             titleRow.setOrientation(LinearLayout.HORIZONTAL);
             titleRow.setGravity(Gravity.CENTER_VERTICAL);
-            textColumn.addView(titleRow, new LinearLayout.LayoutParams(-1, dp(28)));
+            textColumn.addView(titleRow, new LinearLayout.LayoutParams(-1, dp(26)));
 
             title = text("", 16, COLOR_TEXT, true);
             title.setSingleLine(true);
@@ -951,27 +955,27 @@ public class LearningPathActivity extends AppCompatActivity {
 
             pageLabel = text("", 11, COLOR_SUBTEXT, true);
             pageLabel.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams pageLp = new LinearLayout.LayoutParams(dp(42), -1);
+            LinearLayout.LayoutParams pageLp = new LinearLayout.LayoutParams(dp(38), -1);
             pageLp.setMargins(dp(8), 0, 0, 0);
             titleRow.addView(pageLabel, pageLp);
 
             LinearLayout progressRow = new LinearLayout(context);
             progressRow.setOrientation(LinearLayout.HORIZONTAL);
             progressRow.setGravity(Gravity.CENTER_VERTICAL);
-            textColumn.addView(progressRow, new LinearLayout.LayoutParams(-1, dp(15)));
+            textColumn.addView(progressRow, new LinearLayout.LayoutParams(-1, dp(13)));
 
             progressView = new LearningUiKit.ProgressView(context);
             progressRow.addView(progressView, new LinearLayout.LayoutParams(0, dp(5), 1f));
 
             progressLabel = text("", 10, COLOR_SUBTEXT, true);
             progressLabel.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(dp(38), -1);
+            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(dp(36), -1);
             labelLp.setMargins(dp(7), 0, 0, 0);
             progressRow.addView(progressLabel, labelLp);
 
             guide = new GuidebookIcon(context);
-            LinearLayout.LayoutParams guideLp = new LinearLayout.LayoutParams(dp(38), dp(38));
-            guideLp.setMargins(dp(10), 0, 0, 0);
+            LinearLayout.LayoutParams guideLp = new LinearLayout.LayoutParams(dp(34), dp(34));
+            guideLp.setMargins(dp(8), 0, 0, 0);
             body.addView(guide, guideLp);
         }
 
@@ -984,19 +988,19 @@ public class LearningPathActivity extends AppCompatActivity {
             boundUnitIndex = unitIndex;
 
             int accent = unitColor(unit.accent, unitIndex);
-            int start = LearningUiKit.blend(accent, Color.WHITE, 0.78f);
-            int end = LearningUiKit.blend(accent, Color.WHITE, 0.58f);
-            int edge = LearningUiKit.blend(accent, Color.WHITE, 0.43f);
-            int ink = LearningUiKit.blend(accent, Color.BLACK, 0.58f);
-            int softInk = LearningUiKit.blend(ink, Color.WHITE, 0.23f);
-            int track = LearningUiKit.blend(accent, Color.WHITE, 0.84f);
+            int start = LearningUiKit.blend(accent, Color.WHITE, 0.05f);
+            int end = LearningUiKit.blend(accent, Color.BLACK, 0.08f);
+            int edge = LearningUiKit.blend(accent, Color.BLACK, 0.19f);
+            int ink = Color.WHITE;
+            int softInk = 0xE8FFFFFF;
+            int track = 0x54FFFFFF;
 
-            card.setBackground(gradientRaised(start, end, edge, dp(17), dp(4)));
+            card.setBackground(gradientRaised(start, end, edge, dp(16), dp(4)));
             title.setText(unit.title);
             title.setTextColor(ink);
             pageLabel.setText(totalUnits > 0 ? (unitIndex + 1) + " / " + totalUnits : "");
             pageLabel.setTextColor(softInk);
-            guide.setColor(ink);
+            guide.setColor(Color.WHITE);
 
             int completed = 0;
             for (LearningPathRepository.Lesson lesson : unit.lessons) {
@@ -1050,11 +1054,9 @@ public class LearningPathActivity extends AppCompatActivity {
 
     private final class LessonRowView extends FrameLayout {
         private final NodeGroup node;
-        private final LearningUiKit.CharacterView character;
+        private final MapDecorationView decoration;
         private MapItem boundItem;
         private NodeState boundState = NodeState.LOCKED;
-        private android.animation.ObjectAnimator characterFloat;
-        private boolean shouldAnimateCharacter;
 
         LessonRowView(Context context) {
             super(context);
@@ -1063,12 +1065,13 @@ public class LearningPathActivity extends AppCompatActivity {
             setBackgroundColor(COLOR_BG);
             setLayoutParams(new RecyclerView.LayoutParams(-1, dp(ROW_H_DP)));
 
-            character = new LearningUiKit.CharacterView(context);
-            character.setVisibility(GONE);
-            addView(character, new LayoutParams(dp(82), dp(108), Gravity.BOTTOM | Gravity.START));
+            decoration = new MapDecorationView(context);
+            addView(decoration, new LayoutParams(dp(96), dp(96),
+                    Gravity.BOTTOM | Gravity.START));
 
             node = new NodeGroup(context);
-            addView(node, new LayoutParams(dp(156), dp(ROW_H_DP), Gravity.TOP | Gravity.CENTER_HORIZONTAL));
+            addView(node, new LayoutParams(dp(156), dp(ROW_H_DP),
+                    Gravity.TOP | Gravity.CENTER_HORIZONTAL));
 
             setOnClickListener(v -> {
                 if (boundItem == null || boundItem.lesson == null) return;
@@ -1078,23 +1081,23 @@ public class LearningPathActivity extends AppCompatActivity {
             });
         }
 
-        @Override 
+        @Override
         public boolean onTouchEvent(android.view.MotionEvent event) {
             switch (event.getActionMasked()) {
                 case android.view.MotionEvent.ACTION_DOWN:
-                    node.setNodePressed(true); 
+                    node.setNodePressed(true);
                     break;
                 case android.view.MotionEvent.ACTION_UP:
                 case android.view.MotionEvent.ACTION_CANCEL:
-                    node.setNodePressed(false); 
+                    node.setNodePressed(false);
                     break;
-                default: 
+                default:
                     break;
             }
             return super.onTouchEvent(event);
         }
 
-        @Override 
+        @Override
         public boolean performClick() {
             performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
             return super.performClick();
@@ -1107,37 +1110,26 @@ public class LearningPathActivity extends AppCompatActivity {
 
             ViewGroup.LayoutParams lp = getLayoutParams();
             int wanted = dp(ROW_H_DP) + (item.lastInUnit ? dp(18) : 0);
-            if (lp != null && lp.height != wanted) { lp.height = wanted; setLayoutParams(lp); }
+            if (lp != null && lp.height != wanted) {
+                lp.height = wanted;
+                setLayoutParams(lp);
+            }
 
             int width = Math.min(dp(680), getResources().getDisplayMetrics().widthPixels);
             int max = Math.max(0, width / 2 - dp(66));
             int offset = dp(PATH_OFFSET[Math.floorMod(item.lessonIndex, PATH_OFFSET.length)]);
             offset = Math.max(-max, Math.min(max, offset));
             node.setTranslationX(offset);
-            int warmAccent = unitColor(item.unit.accent, item.unitIndex);
-            node.bind(item.lesson, state, value, download, warmAccent);
 
-            // Characters are placed by the whole path rather than a per-unit index, so short
-            // units still receive visible illustrations. Animation runs only while attached.
-            boolean showCharacter = "story".equals(item.lesson.type)
-                    || "trophy".equals(item.lesson.type)
-                    || item.globalLessonIndex == 6;
-            shouldAnimateCharacter = showCharacter;
-            if (showCharacter) {
-                character.setVisibility(VISIBLE);
-                String pose = "trophy".equals(item.lesson.type) ? "trophy"
-                        : "story".equals(item.lesson.type) ? "book" : "wave";
-                character.setStyle(warmAccent,
-                        characterVariant(item.unit.character, item.globalLessonIndex), pose);
-                LayoutParams cLp = (LayoutParams) character.getLayoutParams();
-                cLp.gravity = (offset >= 0 ? Gravity.START : Gravity.END) | Gravity.BOTTOM;
-                cLp.setMargins(offset >= 0 ? dp(16) : 0, 0, offset >= 0 ? 0 : dp(16), 0);
-                character.setLayoutParams(cLp);
-                if (isAttachedToWindow()) startCharacterFloat();
-            } else {
-                stopCharacterFloat();
-                character.setVisibility(GONE);
-            }
+            int accent = unitColor(item.unit.accent, item.unitIndex);
+            node.bind(item.lesson, state, value, download, accent);
+
+            decoration.bind(item.globalLessonIndex, item.lesson.type, accent, state);
+            LayoutParams decorLp = (LayoutParams) decoration.getLayoutParams();
+            decorLp.gravity = (offset >= 0 ? Gravity.START : Gravity.END) | Gravity.BOTTOM;
+            decorLp.setMargins(offset >= 0 ? dp(12) : 0, 0,
+                    offset >= 0 ? 0 : dp(12), dp(14));
+            decoration.setLayoutParams(decorLp);
 
             String stateText;
             if (state == NodeState.COMPLETED) stateText = getString(R.string.learning_path_completed);
@@ -1146,39 +1138,434 @@ public class LearningPathActivity extends AppCompatActivity {
             else if (state == NodeState.AVAILABLE) stateText = getString(R.string.learning_path_available);
             else stateText = getString(R.string.learning_path_locked);
             setContentDescription(item.lesson.title + ", " + stateText);
-            setAlpha(1f);   // 锁定态靠灰色区分，不再降透明度
+            setAlpha(1f);
+        }
+    }
+
+    /**
+     * Canvas-only decoration layer: about 70% light ornaments, 20% scene props,
+     * and 10% original mascots. It animates only while its RecyclerView row is attached.
+     */
+    private final class MapDecorationView extends View {
+        private static final int KIND_LIGHT = 0;
+        private static final int KIND_SCENE = 1;
+        private static final int KIND_MASCOT = 2;
+
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Path path = new Path();
+        private final RectF rect = new RectF();
+        private android.animation.ValueAnimator animator;
+        private float phase;
+        private int kind;
+        private int variant;
+        private int accent = COLOR_BLUE;
+        private NodeState state = NodeState.LOCKED;
+        private long celebrationStarted;
+
+        MapDecorationView(Context context) {
+            super(context);
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+            stroke.setStyle(Paint.Style.STROKE);
+            stroke.setStrokeCap(Paint.Cap.ROUND);
+            stroke.setStrokeJoin(Paint.Join.ROUND);
         }
 
-        private void startCharacterFloat() {
-            if (!shouldAnimateCharacter || character.getVisibility() != VISIBLE) return;
-            if (characterFloat != null && characterFloat.isRunning()) return;
-            characterFloat = android.animation.ObjectAnimator.ofFloat(character,
-                    View.TRANSLATION_Y, 0f, -dp(5), 0f);
-            characterFloat.setDuration(1800L);
-            characterFloat.setRepeatCount(android.animation.ValueAnimator.INFINITE);
-            characterFloat.setInterpolator(
-                    new android.view.animation.AccelerateDecelerateInterpolator());
-            characterFloat.start();
-        }
-
-        private void stopCharacterFloat() {
-            if (characterFloat != null) {
-                characterFloat.cancel();
-                characterFloat = null;
+        void bind(int globalIndex, String lessonType, int color, NodeState newState) {
+            int slot = Math.floorMod(globalIndex, 10);
+            kind = slot < 7 ? KIND_LIGHT : (slot < 9 ? KIND_SCENE : KIND_MASCOT);
+            variant = Math.floorMod(globalIndex + (lessonType == null ? 0 : lessonType.hashCode()),
+                    kind == KIND_MASCOT ? 5 : (kind == KIND_SCENE ? 4 : 7));
+            accent = color;
+            if (state != NodeState.COMPLETED && newState == NodeState.COMPLETED) {
+                celebrationStarted = android.os.SystemClock.uptimeMillis();
             }
-            character.setTranslationY(0f);
+            state = newState;
+            invalidate();
         }
 
         @Override
         protected void onAttachedToWindow() {
             super.onAttachedToWindow();
-            startCharacterFloat();
+            startAnimator();
         }
 
         @Override
         protected void onDetachedFromWindow() {
-            stopCharacterFloat();
+            stopAnimator();
             super.onDetachedFromWindow();
+        }
+
+        private void startAnimator() {
+            if (animator != null && animator.isRunning()) return;
+            animator = android.animation.ValueAnimator.ofFloat(0f, 1f);
+            animator.setDuration(4200L + variant * 180L);
+            animator.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            animator.setInterpolator(new android.view.animation.LinearInterpolator());
+            animator.addUpdateListener(value -> {
+                phase = (float) value.getAnimatedValue();
+                invalidate();
+            });
+            animator.start();
+        }
+
+        private void stopAnimator() {
+            if (animator != null) {
+                animator.cancel();
+                animator = null;
+            }
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth();
+            float h = getHeight();
+            if (w <= 0 || h <= 0) return;
+
+            float floatY = (float) Math.sin(phase * Math.PI * 2d) * dp(kind == KIND_MASCOT ? 1.8f : 2.6f);
+            long elapsed = android.os.SystemClock.uptimeMillis() - celebrationStarted;
+            float jump = 0f;
+            if (state == NodeState.COMPLETED && elapsed >= 0L && elapsed < 620L) {
+                float p = elapsed / 620f;
+                jump = (float) -Math.sin(p * Math.PI) * dp(9);
+            }
+
+            canvas.save();
+            canvas.translate(0f, floatY + jump);
+            if (kind == KIND_LIGHT) drawLight(canvas, w, h);
+            else if (kind == KIND_SCENE) drawScene(canvas, w, h);
+            else drawMascot(canvas, w, h);
+            if (state == NodeState.COMPLETED) drawCompletionSparkles(canvas, w, h);
+            canvas.restore();
+        }
+
+        private void drawLight(Canvas canvas, float w, float h) {
+            switch (variant) {
+                case 0:
+                    drawCloud(canvas, w * 0.52f, h * 0.55f, Math.min(w, h) * 0.25f);
+                    break;
+                case 1:
+                    drawSparkle(canvas, w * 0.35f, h * 0.46f, dp(9), 0xFFFFC800);
+                    drawSparkle(canvas, w * 0.64f, h * 0.62f, dp(6),
+                            LearningUiKit.blend(accent, Color.WHITE, 0.25f));
+                    drawDot(canvas, w * 0.64f, h * 0.33f, dp(3), 0x66FFC800);
+                    break;
+                case 2:
+                    drawLeaves(canvas, w, h, false);
+                    break;
+                case 3:
+                    drawFlower(canvas, w * 0.5f, h * 0.57f, dp(7));
+                    break;
+                case 4:
+                    drawPaperPlane(canvas, w, h);
+                    break;
+                case 5:
+                    drawLeaves(canvas, w, h, true);
+                    break;
+                default:
+                    drawDot(canvas, w * 0.32f, h * 0.46f, dp(4), 0x6658CC02);
+                    drawSparkle(canvas, w * 0.56f, h * 0.42f, dp(7),
+                            LearningUiKit.blend(accent, Color.WHITE, 0.18f));
+                    drawDot(canvas, w * 0.68f, h * 0.68f, dp(3), 0x66FF4B8B);
+                    break;
+            }
+        }
+
+        private void drawScene(Canvas canvas, float w, float h) {
+            switch (variant) {
+                case 0:
+                    drawWhiteBook(canvas, w, h);
+                    break;
+                case 1:
+                    drawHeadphones(canvas, w, h);
+                    break;
+                case 2:
+                    drawFlag(canvas, w, h);
+                    break;
+                default:
+                    drawLantern(canvas, w, h);
+                    break;
+            }
+        }
+
+        private void drawCloud(Canvas canvas, float cx, float cy, float r) {
+            paint.setColor(0xDDF2FAFF);
+            paint.setShadowLayer(dp(4), 0f, dp(2), 0x18000000);
+            canvas.drawCircle(cx - r * 0.55f, cy, r * 0.55f, paint);
+            canvas.drawCircle(cx, cy - r * 0.25f, r * 0.72f, paint);
+            canvas.drawCircle(cx + r * 0.62f, cy, r * 0.48f, paint);
+            rect.set(cx - r, cy, cx + r * 1.08f, cy + r * 0.65f);
+            canvas.drawRoundRect(rect, r * 0.32f, r * 0.32f, paint);
+            paint.clearShadowLayer();
+        }
+
+        private void drawSparkle(Canvas canvas, float cx, float cy, float r, int color) {
+            paint.setColor(color);
+            path.reset();
+            path.moveTo(cx, cy - r);
+            path.quadTo(cx + r * 0.2f, cy - r * 0.2f, cx + r, cy);
+            path.quadTo(cx + r * 0.2f, cy + r * 0.2f, cx, cy + r);
+            path.quadTo(cx - r * 0.2f, cy + r * 0.2f, cx - r, cy);
+            path.quadTo(cx - r * 0.2f, cy - r * 0.2f, cx, cy - r);
+            path.close();
+            canvas.drawPath(path, paint);
+        }
+
+        private void drawDot(Canvas canvas, float cx, float cy, float r, int color) {
+            paint.setColor(color);
+            canvas.drawCircle(cx, cy, r, paint);
+        }
+
+        private void drawLeaves(Canvas canvas, float w, float h, boolean bamboo) {
+            float sway = (float) Math.sin(phase * Math.PI * 2d) * dp(2);
+            stroke.setColor(LearningUiKit.blend(accent, Color.BLACK, 0.24f));
+            stroke.setStrokeWidth(dp(2));
+            canvas.drawLine(w * 0.32f, h * 0.72f, w * 0.68f + sway, h * 0.3f, stroke);
+            paint.setColor(LearningUiKit.blend(accent, Color.WHITE, bamboo ? 0.34f : 0.52f));
+            for (int i = 0; i < 4; i++) {
+                float x = w * (0.37f + i * 0.08f) + sway * i * 0.15f;
+                float y = h * (0.62f - i * 0.09f);
+                canvas.save();
+                canvas.rotate((i % 2 == 0 ? -32f : 32f) + sway, x, y);
+                rect.set(x - dp(4), y - dp(11), x + dp(4), y + dp(11));
+                canvas.drawOval(rect, paint);
+                canvas.restore();
+            }
+        }
+
+        private void drawFlower(Canvas canvas, float cx, float cy, float r) {
+            int[] colors = {0xFFFFD6E5, 0xFFFFE49B, 0xFFD8F5C8, 0xFFDCCBFF};
+            paint.setColor(colors[Math.floorMod(variant, colors.length)]);
+            for (int i = 0; i < 5; i++) {
+                double a = Math.PI * 2d * i / 5d + phase * 0.08d;
+                canvas.drawCircle(cx + (float) Math.cos(a) * r,
+                        cy + (float) Math.sin(a) * r, r * 0.72f, paint);
+            }
+            paint.setColor(0xFFFFC800);
+            canvas.drawCircle(cx, cy, r * 0.64f, paint);
+        }
+
+        private void drawPaperPlane(Canvas canvas, float w, float h) {
+            float x = w * 0.5f + (float) Math.sin(phase * Math.PI * 2d) * dp(4);
+            float y = h * 0.52f;
+            paint.setColor(LearningUiKit.blend(accent, Color.WHITE, 0.28f));
+            path.reset();
+            path.moveTo(x - dp(23), y - dp(10));
+            path.lineTo(x + dp(24), y - dp(20));
+            path.lineTo(x + dp(6), y + dp(22));
+            path.lineTo(x - dp(2), y + dp(4));
+            path.close();
+            canvas.drawPath(path, paint);
+            stroke.setColor(LearningUiKit.blend(accent, Color.BLACK, 0.22f));
+            stroke.setStrokeWidth(dp(2));
+            canvas.drawLine(x - dp(2), y + dp(4), x + dp(24), y - dp(20), stroke);
+        }
+
+        private void drawWhiteBook(Canvas canvas, float w, float h) {
+            float cx = w * 0.5f, cy = h * 0.58f;
+            paint.setColor(0xFFFFFFFF);
+            paint.setShadowLayer(dp(3), 0f, dp(2), 0x1C000000);
+            path.reset();
+            path.moveTo(cx, cy - dp(17));
+            path.quadTo(cx - dp(13), cy - dp(25), cx - dp(28), cy - dp(16));
+            path.lineTo(cx - dp(28), cy + dp(20));
+            path.quadTo(cx - dp(12), cy + dp(13), cx, cy + dp(22));
+            path.quadTo(cx + dp(12), cy + dp(13), cx + dp(28), cy + dp(20));
+            path.lineTo(cx + dp(28), cy - dp(16));
+            path.quadTo(cx + dp(13), cy - dp(25), cx, cy - dp(17));
+            path.close();
+            canvas.drawPath(path, paint);
+            paint.clearShadowLayer();
+            stroke.setColor(LearningUiKit.blend(accent, Color.BLACK, 0.1f));
+            stroke.setStrokeWidth(dp(2));
+            canvas.drawLine(cx, cy - dp(17), cx, cy + dp(21), stroke);
+            stroke.setStrokeWidth(dp(1.4f));
+            for (int i = 0; i < 2; i++) {
+                float yy = cy - dp(6) + i * dp(8);
+                canvas.drawLine(cx - dp(22), yy, cx - dp(6), yy - dp(2), stroke);
+                canvas.drawLine(cx + dp(6), yy - dp(2), cx + dp(22), yy, stroke);
+            }
+        }
+
+        private void drawHeadphones(Canvas canvas, float w, float h) {
+            float cx = w * 0.5f, cy = h * 0.55f;
+            stroke.setColor(accent);
+            stroke.setStrokeWidth(dp(7));
+            rect.set(cx - dp(24), cy - dp(26), cx + dp(24), cy + dp(20));
+            canvas.drawArc(rect, 198, 144, false, stroke);
+            paint.setColor(LearningUiKit.blend(accent, Color.WHITE, 0.1f));
+            rect.set(cx - dp(30), cy - dp(5), cx - dp(17), cy + dp(22));
+            canvas.drawRoundRect(rect, dp(6), dp(6), paint);
+            rect.set(cx + dp(17), cy - dp(5), cx + dp(30), cy + dp(22));
+            canvas.drawRoundRect(rect, dp(6), dp(6), paint);
+            drawSparkle(canvas, cx + dp(30), cy - dp(22), dp(5), 0xFFFFC800);
+        }
+
+        private void drawFlag(Canvas canvas, float w, float h) {
+            float x = w * 0.36f, top = h * 0.28f, bottom = h * 0.78f;
+            stroke.setColor(LearningUiKit.blend(accent, Color.BLACK, 0.2f));
+            stroke.setStrokeWidth(dp(3));
+            canvas.drawLine(x, top, x, bottom, stroke);
+            paint.setColor(accent);
+            path.reset();
+            path.moveTo(x + dp(1), top);
+            path.quadTo(x + dp(18), top + dp(4), x + dp(34), top + dp(1));
+            path.lineTo(x + dp(30), top + dp(24));
+            path.quadTo(x + dp(15), top + dp(27), x + dp(1), top + dp(22));
+            path.close();
+            canvas.drawPath(path, paint);
+            paint.setColor(0xFFFFC800);
+            canvas.drawCircle(x, bottom, dp(5), paint);
+        }
+
+        private void drawLantern(Canvas canvas, float w, float h) {
+            float cx = w * 0.5f, cy = h * 0.52f;
+            stroke.setColor(0xFFFFB020);
+            stroke.setStrokeWidth(dp(2));
+            canvas.drawLine(cx, cy - dp(30), cx, cy - dp(21), stroke);
+            paint.setColor(0xFFFF6B5E);
+            rect.set(cx - dp(20), cy - dp(21), cx + dp(20), cy + dp(19));
+            canvas.drawRoundRect(rect, dp(12), dp(12), paint);
+            paint.setColor(0x44FFFFFF);
+            rect.set(cx - dp(11), cy - dp(16), cx - dp(5), cy + dp(14));
+            canvas.drawRoundRect(rect, dp(3), dp(3), paint);
+            stroke.setColor(0xFFFFB020);
+            stroke.setStrokeWidth(dp(3));
+            canvas.drawLine(cx - dp(18), cy - dp(21), cx + dp(18), cy - dp(21), stroke);
+            canvas.drawLine(cx - dp(18), cy + dp(19), cx + dp(18), cy + dp(19), stroke);
+            canvas.drawLine(cx, cy + dp(19), cx, cy + dp(31), stroke);
+        }
+
+        private void drawMascot(Canvas canvas, float w, float h) {
+            float breathe = 1f + (float) Math.sin(phase * Math.PI * 2d) * 0.025f;
+            float cx = w * 0.5f, cy = h * 0.58f;
+            canvas.save();
+            canvas.scale(breathe, breathe, cx, cy);
+            switch (variant) {
+                case 0: drawPanda(canvas, cx, cy); break;
+                case 1: drawRabbit(canvas, cx, cy); break;
+                case 2: drawCat(canvas, cx, cy); break;
+                case 3: drawBird(canvas, cx, cy); break;
+                default: drawDragon(canvas, cx, cy); break;
+            }
+            canvas.restore();
+        }
+
+        private boolean blink() {
+            return phase > 0.42f && phase < 0.47f;
+        }
+
+        private void drawFace(Canvas canvas, float cx, float cy, float eyeGap, int faceColor) {
+            paint.setColor(faceColor);
+            canvas.drawCircle(cx, cy, dp(24), paint);
+            paint.setColor(0xFFFFA8A8);
+            canvas.drawCircle(cx - dp(15), cy + dp(6), dp(4), paint);
+            canvas.drawCircle(cx + dp(15), cy + dp(6), dp(4), paint);
+            paint.setColor(0xFF3E3540);
+            if (blink()) {
+                stroke.setColor(0xFF3E3540);
+                stroke.setStrokeWidth(dp(2));
+                canvas.drawLine(cx - eyeGap - dp(3), cy, cx - eyeGap + dp(3), cy, stroke);
+                canvas.drawLine(cx + eyeGap - dp(3), cy, cx + eyeGap + dp(3), cy, stroke);
+            } else {
+                canvas.drawCircle(cx - eyeGap, cy, dp(3.2f), paint);
+                canvas.drawCircle(cx + eyeGap, cy, dp(3.2f), paint);
+                paint.setColor(Color.WHITE);
+                canvas.drawCircle(cx - eyeGap - dp(1), cy - dp(1), dp(1), paint);
+                canvas.drawCircle(cx + eyeGap - dp(1), cy - dp(1), dp(1), paint);
+            }
+            stroke.setColor(0xFF6A3C45);
+            stroke.setStrokeWidth(dp(1.7f));
+            rect.set(cx - dp(5), cy + dp(5), cx + dp(5), cy + dp(13));
+            canvas.drawArc(rect, 10, 160, false, stroke);
+        }
+
+        private void drawPanda(Canvas canvas, float cx, float cy) {
+            paint.setColor(0xFF2F3036);
+            canvas.drawCircle(cx - dp(18), cy - dp(23), dp(10), paint);
+            canvas.drawCircle(cx + dp(18), cy - dp(23), dp(10), paint);
+            paint.setColor(0xFFFDFCF7);
+            canvas.drawOval(cx - dp(26), cy - dp(27), cx + dp(26), cy + dp(26), paint);
+            paint.setColor(0xFF2F3036);
+            canvas.drawOval(cx - dp(17), cy - dp(10), cx - dp(5), cy + dp(5), paint);
+            canvas.drawOval(cx + dp(5), cy - dp(10), cx + dp(17), cy + dp(5), paint);
+            drawFace(canvas, cx, cy - dp(1), dp(11), 0x00FFFFFF);
+            drawWhiteBook(canvas, getWidth(), getHeight() + dp(20));
+        }
+
+        private void drawRabbit(Canvas canvas, float cx, float cy) {
+            float wiggle = (float) Math.sin(phase * Math.PI * 4d) * dp(2);
+            paint.setColor(0xFFFFF7EE);
+            rect.set(cx - dp(19) + wiggle, cy - dp(46), cx - dp(5) + wiggle, cy - dp(9));
+            canvas.drawOval(rect, paint);
+            rect.set(cx + dp(5) - wiggle, cy - dp(46), cx + dp(19) - wiggle, cy - dp(9));
+            canvas.drawOval(rect, paint);
+            paint.setColor(0xFFFFB4C6);
+            rect.set(cx - dp(15) + wiggle, cy - dp(41), cx - dp(9) + wiggle, cy - dp(14));
+            canvas.drawOval(rect, paint);
+            rect.set(cx + dp(9) - wiggle, cy - dp(41), cx + dp(15) - wiggle, cy - dp(14));
+            canvas.drawOval(rect, paint);
+            drawFace(canvas, cx, cy, dp(9), 0xFFFFF7EE);
+        }
+
+        private void drawCat(Canvas canvas, float cx, float cy) {
+            int fur = 0xFFFFB44A;
+            paint.setColor(fur);
+            path.reset();
+            path.moveTo(cx - dp(24), cy - dp(10));
+            path.lineTo(cx - dp(18), cy - dp(34));
+            path.lineTo(cx - dp(4), cy - dp(24));
+            path.lineTo(cx + dp(18), cy - dp(34));
+            path.lineTo(cx + dp(24), cy - dp(10));
+            path.close();
+            canvas.drawPath(path, paint);
+            drawFace(canvas, cx, cy, dp(9), fur);
+            stroke.setColor(0xFF8D5A2D);
+            stroke.setStrokeWidth(dp(1.6f));
+            canvas.drawLine(cx - dp(22), cy + dp(4), cx - dp(34), cy, stroke);
+            canvas.drawLine(cx + dp(22), cy + dp(4), cx + dp(34), cy, stroke);
+        }
+
+        private void drawBird(Canvas canvas, float cx, float cy) {
+            int body = 0xFFFFD84D;
+            paint.setColor(body);
+            canvas.drawOval(cx - dp(25), cy - dp(27), cx + dp(25), cy + dp(26), paint);
+            paint.setColor(0xFFFF9E35);
+            path.reset();
+            path.moveTo(cx - dp(3), cy + dp(2));
+            path.lineTo(cx + dp(8), cy + dp(7));
+            path.lineTo(cx - dp(3), cy + dp(11));
+            path.close();
+            canvas.drawPath(path, paint);
+            drawFace(canvas, cx - dp(3), cy - dp(4), dp(10), 0x00FFFFFF);
+            stroke.setColor(accent);
+            stroke.setStrokeWidth(dp(4));
+            rect.set(cx - dp(23), cy - dp(33), cx + dp(23), cy + dp(4));
+            canvas.drawArc(rect, 200, 140, false, stroke);
+        }
+
+        private void drawDragon(Canvas canvas, float cx, float cy) {
+            int body = 0xFF74D8A4;
+            paint.setColor(0xFFFFD76A);
+            path.reset();
+            path.moveTo(cx - dp(13), cy - dp(24));
+            path.lineTo(cx - dp(5), cy - dp(40));
+            path.lineTo(cx + dp(1), cy - dp(23));
+            path.lineTo(cx + dp(13), cy - dp(24));
+            path.lineTo(cx + dp(5), cy - dp(40));
+            path.lineTo(cx - dp(1), cy - dp(23));
+            path.close();
+            canvas.drawPath(path, paint);
+            drawFace(canvas, cx, cy, dp(9), body);
+            paint.setColor(0xFFFF4B4B);
+            rect.set(cx - dp(20), cy + dp(18), cx + dp(20), cy + dp(27));
+            canvas.drawRoundRect(rect, dp(5), dp(5), paint);
+        }
+
+        private void drawCompletionSparkles(Canvas canvas, float w, float h) {
+            drawSparkle(canvas, w * 0.22f, h * 0.24f, dp(4), 0xFFFFC800);
+            drawSparkle(canvas, w * 0.78f, h * 0.31f, dp(5), 0xFFFFE08A);
         }
     }
 
