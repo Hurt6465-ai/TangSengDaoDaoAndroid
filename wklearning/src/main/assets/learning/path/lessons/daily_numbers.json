@@ -110,19 +110,6 @@
       ],
       "answer": "true",
       "explanation": "九读 jiǔ。"
-    },
-    {
-      "id": "numbers_speak_1",
-      "type": "pronunciation",
-      "question": "跟读数字一到五",
-      "question_en": "Repeat numbers one through five",
-      "question_my": "တစ်မှငါးအထိ လိုက်ဖတ်ပါ",
-      "text": "一、二、三、四、五",
-      "pinyin": "yī, èr, sān, sì, wǔ",
-      "audio_text": "一、二、三、四、五",
-      "answer": "一、二、三、四、五",
-      "original_speed": 0.5,
-      "explanation": "逐个读清楚声调。"
     }
   ],
   "max_retries": 2

@@ -109,19 +109,6 @@
       ],
       "answer": "true",
       "explanation": "“我叫 + 名字/称呼”用于说明自己的名字或称呼。"
-    },
-    {
-      "id": "intro_speak_1",
-      "type": "pronunciation",
-      "question": "介绍自己的名字",
-      "question_en": "Say your name",
-      "question_my": "ကိုယ့်နာမည်ကို မိတ်ဆက်ပါ",
-      "text": "我叫小明",
-      "pinyin": "wǒ jiào xiǎo míng",
-      "audio_text": "我叫小明",
-      "answer": "我叫小明",
-      "original_speed": 0.5,
-      "explanation": "把“小明”替换成自己的名字即可。"
     }
   ],
   "max_retries": 2

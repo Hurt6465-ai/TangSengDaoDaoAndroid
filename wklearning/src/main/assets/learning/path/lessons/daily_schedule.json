@@ -89,17 +89,6 @@
       ],
       "answer": "全部配对",
       "explanation": "这些是常见的一天安排。"
-    },
-    {
-      "id": "dschedule_speak_1",
-      "type": "pronunciation",
-      "question": "说出你的日程",
-      "question_en": "Repeat the schedule sentence",
-      "question_my": "အချိန်ဇယားဝါကျကို လိုက်ပြောပါ",
-      "text": "我晚上七点学习中文",
-      "pinyin": "wǒ wǎn shang qī diǎn xué xí zhōng wén",
-      "answer": "我晚上七点学习中文",
-      "explanation": "保持“晚上七点”连贯自然。"
     }
   ]
 }

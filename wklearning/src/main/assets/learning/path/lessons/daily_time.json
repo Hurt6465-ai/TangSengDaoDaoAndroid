@@ -107,19 +107,6 @@
       ],
       "answer": "true",
       "explanation": "“半”就是半小时。"
-    },
-    {
-      "id": "time_speak_1",
-      "type": "pronunciation",
-      "question": "跟读询问时间",
-      "question_en": "Repeat the time question",
-      "question_my": "အချိန်မေးခွန်းကို လိုက်ဖတ်ပါ",
-      "text": "请问，现在几点？",
-      "pinyin": "qǐng wèn, xiàn zài jǐ diǎn",
-      "audio_text": "请问，现在几点？",
-      "answer": "请问，现在几点？",
-      "original_speed": 0.5,
-      "explanation": "加上“请问”会更礼貌。"
     }
   ],
   "max_retries": 2

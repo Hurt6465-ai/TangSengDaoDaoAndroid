@@ -121,19 +121,6 @@
       "audio_text": "我叫安娜",
       "answer": "我叫安娜",
       "explanation": "注意“我叫 + 名字”的结构。"
-    },
-    {
-      "id": "test_speak_1",
-      "type": "pronunciation",
-      "question": "跟读本单元完整表达",
-      "question_en": "Repeat the complete unit phrase",
-      "question_my": "ဤအခန်း၏ ဝါကျအပြည့်ကို လိုက်ဖတ်ပါ",
-      "text": "你好，我叫安娜，很高兴认识你。",
-      "pinyin": "nǐ hǎo, wǒ jiào ān nà, hěn gāo xìng rèn shi nǐ",
-      "audio_text": "你好，我叫安娜，很高兴认识你。",
-      "answer": "你好，我叫安娜，很高兴认识你。",
-      "original_speed": 0.5,
-      "explanation": "分成三个短语说，会更自然。"
     }
   ],
   "max_retries": 2,

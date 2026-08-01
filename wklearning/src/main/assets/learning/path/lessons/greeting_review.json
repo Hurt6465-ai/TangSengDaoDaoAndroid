@@ -91,19 +91,6 @@
       ],
       "answer": "全部配对",
       "explanation": "这些是常见的成对礼貌表达。"
-    },
-    {
-      "id": "review_speak_1",
-      "type": "pronunciation",
-      "question": "完整说出自我介绍",
-      "question_en": "Say a complete introduction",
-      "question_my": "မိတ်ဆက်ဝါကျအပြည့် ပြောပါ",
-      "text": "你好，我叫安娜。",
-      "pinyin": "nǐ hǎo, wǒ jiào ān nà",
-      "audio_text": "你好，我叫安娜。",
-      "answer": "你好，我叫安娜。",
-      "original_speed": 0.5,
-      "explanation": "先问候，再介绍姓名，表达更自然。"
     }
   ],
   "max_retries": 2

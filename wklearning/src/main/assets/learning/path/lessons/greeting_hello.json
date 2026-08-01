@@ -110,19 +110,6 @@
       ],
       "answer": "true",
       "explanation": "这是最常用的中文问候语之一。"
-    },
-    {
-      "id": "hello_speak_1",
-      "type": "pronunciation",
-      "question": "跟着原音读一遍",
-      "question_en": "Repeat after the original audio",
-      "question_my": "မူရင်းအသံနောက် လိုက်ဖတ်ပါ",
-      "text": "你好",
-      "pinyin": "nǐ hǎo",
-      "audio_text": "你好",
-      "answer": "你好",
-      "original_speed": 0.5,
-      "explanation": "注意两个三声连读时，第一个音节通常接近二声。"
     }
   ],
   "max_retries": 2

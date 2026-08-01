@@ -14,7 +14,12 @@
       "question_en": "What did Xiaomei say first?",
       "question_my": "Xiaomei က အရင် ဘာပြောခဲ့သလဲ？",
       "audio_text": "你好，我叫小美。",
-      "options": ["你好，我叫小美。", "再见，我是老师。", "谢谢，你叫什么？", "晚安，我很好。"],
+      "options": [
+        "你好，我叫小美。",
+        "再见，我是老师。",
+        "谢谢，你叫什么？",
+        "晚安，我很好。"
+      ],
       "answer": "你好，我叫小美。",
       "explanation": "见面时先问候，再介绍名字。"
     },
@@ -24,7 +29,12 @@
       "question": "阿明应该怎样回答“你叫什么名字？”",
       "question_en": "How should A-Ming answer “What is your name?”",
       "question_my": "“你叫什么名字？” ကို A-Ming ဘယ်လိုဖြေသင့်သလဲ？",
-      "options": ["我叫阿明。", "我很好。", "你是学生。", "明天见。"],
+      "options": [
+        "我叫阿明。",
+        "我很好。",
+        "你是学生。",
+        "明天见。"
+      ],
       "answer": "我叫阿明。",
       "explanation": "回答姓名用“我叫 + 名字”。"
     },
@@ -34,8 +44,18 @@
       "question": "排列成自然的见面表达",
       "question_en": "Put the greeting in natural order",
       "question_my": "တွေ့ဆုံစကားကို မှန်ကန်စွာ စီပါ",
-      "words": ["认识", "很", "你", "高兴"],
-      "answer": ["很", "高兴", "认识", "你"],
+      "words": [
+        "认识",
+        "很",
+        "你",
+        "高兴"
+      ],
+      "answer": [
+        "很",
+        "高兴",
+        "认识",
+        "你"
+      ],
       "explanation": "自然表达是“很高兴认识你”。"
     },
     {
@@ -54,23 +74,21 @@
       "question_en": "Match the questions and answers from the story",
       "question_my": "ပုံပြင်ထဲက မေးခွန်းနှင့် အဖြေကို တွဲပါ",
       "pairs": [
-        {"left": "你叫什么名字？", "right": "我叫阿明。"},
-        {"left": "你是哪国人？", "right": "我是中国人。"},
-        {"left": "你好吗？", "right": "我很好。"}
+        {
+          "left": "你叫什么名字？",
+          "right": "我叫阿明。"
+        },
+        {
+          "left": "你是哪国人？",
+          "right": "我是中国人。"
+        },
+        {
+          "left": "你好吗？",
+          "right": "我很好。"
+        }
       ],
       "answer": "全部配对",
       "explanation": "先理解问题，再选择对应回答。"
-    },
-    {
-      "id": "gstory_speak_1",
-      "type": "pronunciation",
-      "question": "跟读故事结尾",
-      "question_en": "Repeat the ending of the story",
-      "question_my": "ပုံပြင်အဆုံးကို လိုက်ပြောပါ",
-      "text": "很高兴认识你",
-      "pinyin": "hěn gāo xìng rèn shi nǐ",
-      "answer": "很高兴认识你",
-      "explanation": "说话时保持自然连贯。"
     }
   ]
 }

@@ -15,7 +15,12 @@
       "question_en": "Choose the time you hear",
       "question_my": "ကြားသောအချိန်ကို ရွေးပါ",
       "audio_text": "七点一刻",
-      "options": ["七点", "七点一刻", "七点半", "八点一刻"],
+      "options": [
+        "七点",
+        "七点一刻",
+        "七点半",
+        "八点一刻"
+      ],
       "answer": "七点一刻",
       "explanation": "“一刻”表示十五分钟。"
     },
@@ -25,7 +30,12 @@
       "question": "数字 6 的中文是什么？",
       "question_en": "What is the Chinese word for 6?",
       "question_my": "၆ ကို တရုတ်လို ဘယ်လိုပြောမလဲ？",
-      "options": ["五", "六", "七", "八"],
+      "options": [
+        "五",
+        "六",
+        "七",
+        "八"
+      ],
       "answer": "六",
       "explanation": "6 是“六”，读 liù。"
     },
@@ -35,8 +45,16 @@
       "question": "排列成正确句子",
       "question_en": "Put the sentence in the correct order",
       "question_my": "ဝါကျကို မှန်ကန်စွာ စီပါ",
-      "words": ["现在", "八点", "半"],
-      "answer": ["现在", "八点", "半"],
+      "words": [
+        "现在",
+        "八点",
+        "半"
+      ],
+      "answer": [
+        "现在",
+        "八点",
+        "半"
+      ],
       "explanation": "完整表达是“现在八点半”。"
     },
     {
@@ -55,9 +73,18 @@
       "question_en": "Match Chinese time phrases with digital times",
       "question_my": "တရုတ်အချိန်စကားနှင့် ဒစ်ဂျစ်တယ်အချိန်ကို တွဲပါ",
       "pairs": [
-        {"left": "两点", "right": "2:00"},
-        {"left": "四点半", "right": "4:30"},
-        {"left": "六点一刻", "right": "6:15"}
+        {
+          "left": "两点",
+          "right": "2:00"
+        },
+        {
+          "left": "四点半",
+          "right": "4:30"
+        },
+        {
+          "left": "六点一刻",
+          "right": "6:15"
+        }
       ],
       "answer": "全部配对",
       "explanation": "先识别数字，再判断“半”和“一刻”。"
@@ -70,7 +97,9 @@
       "question_my": "နားထောင်ပြီး ဝါကျအပြည့် ရေးပါ",
       "audio_text": "现在九点半",
       "answer": "现在九点半",
-      "accepted_answers": ["现在 九点半"],
+      "accepted_answers": [
+        "现在 九点半"
+      ],
       "explanation": "听到的是“现在九点半”。"
     },
     {
@@ -81,17 +110,6 @@
       "question_my": "“下午三点” သည် မနက် 3:00 ကို ဆိုလိုသည်။",
       "answer_boolean": false,
       "explanation": "错误，“下午三点”是 3:00 PM。"
-    },
-    {
-      "id": "dcheck_speak_1",
-      "type": "pronunciation",
-      "question": "跟读完整句子",
-      "question_en": "Repeat the full sentence",
-      "question_my": "ဝါကျအပြည့်ကို လိုက်ပြောပါ",
-      "text": "我们下午三点见",
-      "pinyin": "wǒ men xià wǔ sān diǎn jiàn",
-      "answer": "我们下午三点见",
-      "explanation": "保持节奏自然，注意声调。"
     }
   ]
 }
