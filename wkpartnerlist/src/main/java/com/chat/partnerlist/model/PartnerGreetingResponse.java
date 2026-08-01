@@ -13,6 +13,10 @@ public class PartnerGreetingResponse {
     public int requester_msg_count;
     public int max_greeting_count;
     public int contact_status;
+    // Null means an older server omitted the role field.
+    public Boolean requester;
+    public String text;
+    public long last_greet_at;
     public int greeting_day_limit;
     public int greeting_day_used;
     public int greeting_day_remaining;
