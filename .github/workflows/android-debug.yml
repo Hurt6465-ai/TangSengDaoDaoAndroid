@@ -7,7 +7,6 @@ on:
       - master
       - main
 
-# 同一分支连续提交时，只保留最新一次构建，减少等待时间。
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
@@ -18,7 +17,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - name: Checkout code
@@ -42,6 +41,30 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
 
+      - name: Prepare memory for R8
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Memory before swap:"
+          free -h
+
+          # GitHub-hosted runners have limited RAM. A small swap file prevents the
+          # operating system from killing Gradle while R8 is processing this large app.
+          if ! swapon --show | grep -q .; then
+            if sudo fallocate -l 4G /swapfile \
+              && sudo chmod 600 /swapfile \
+              && sudo mkswap /swapfile >/dev/null \
+              && sudo swapon /swapfile; then
+              echo "4 GB swap enabled."
+            else
+              echo "::warning::Unable to enable swap; continuing with the 5 GB Gradle heap."
+            fi
+          fi
+
+          echo "Memory after swap:"
+          free -h
+          swapon --show || true
+
       - name: Check signing secrets
         shell: bash
         env:
@@ -54,7 +77,7 @@ jobs:
           missing=0
           for name in ANDROID_KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
             if [ -z "${!name:-}" ]; then
-              echo "::error::GitHub Secret 缺失：$name"
+              echo "::error::GitHub Secret missing: $name"
               missing=1
             fi
           done
@@ -86,13 +109,12 @@ jobs:
           set -euo pipefail
           printf 'applicationId=com.test.ts\n' > local.properties
 
-          # 从 100001 开始并随本工作流运行次数递增，保证可以覆盖旧的 versionCode=1。
           VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))
           VERSION_NAME="1.0.${GITHUB_RUN_NUMBER}"
 
           echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
-          echo "本次版本：$VERSION_NAME ($VERSION_CODE)"
+          echo "Build version: $VERSION_NAME ($VERSION_CODE)"
 
       - name: Make Gradle executable
         run: chmod +x ./gradlew
@@ -105,7 +127,11 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          ./gradlew clean :app:assembleRelease --stacktrace --no-daemon
+          # Do not run clean on a fresh hosted runner. It only adds work and peak memory.
+          ./gradlew :app:assembleRelease \
+            --stacktrace \
+            --no-daemon \
+            --max-workers=2
 
       - name: Verify and rename signed APK
         shell: bash
@@ -113,7 +139,7 @@ jobs:
           set -euo pipefail
           APK_PATH="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)"
           if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
-            echo "::error::没有找到 Release APK"
+            echo "::error::Release APK not found"
             exit 1
           fi
 
@@ -136,3 +162,12 @@ jobs:
           path: ${{ env.SIGNED_APK }}
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload R8 mapping
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Talkami-mapping-${{ env.VERSION_NAME }}-${{ env.VERSION_CODE }}
+          path: app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
+          retention-days: 90
