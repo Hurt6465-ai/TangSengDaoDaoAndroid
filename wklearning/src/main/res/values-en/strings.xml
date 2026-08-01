@@ -501,4 +501,13 @@ Time %5$d min</string>
     <string name="learning_package_version_mismatch">Package version does not match</string>
     <string name="learning_package_media_missing">The package is missing media: %1$s</string>
     <string name="learning_path_choose_course">Choose course</string>
+
+    <string name="learning_category_title">Interactive Practice</string>
+    <string name="learning_category_heading">Choose a practice category</string>
+    <string name="learning_category_subtitle">Choose a scene first, then progress through its learning map.</string>
+    <string name="learning_category_lessons">%1$d lessons</string>
+    <string name="learning_category_section">CATEGORY PATH</string>
+    <string name="learning_path_map_tip">Complete the current lesson to unlock the next one</string>
+    <string name="learning_path_current">Current lesson</string>
+
 </resources>
