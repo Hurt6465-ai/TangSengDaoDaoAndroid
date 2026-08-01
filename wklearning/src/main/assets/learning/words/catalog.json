@@ -13,9 +13,10 @@
       "level": "hsk1",
       "cover_url": "covers/words/hsk1_v1.webp",
       "cover_version": 1,
-      "data_url": "packs/words/hsk1_v5.json",
-      "data_version": 5,
-      "data_sha256": "4630941d06d58c8816c6ab516682b100e598f7110e6e9e6024634c3b2d83181b"
+      "data_url": "packs/words/hsk1_v6.json",
+      "data_version": 6,
+      "data_sha256": "c4cdcadece74484c983fef765a68bb8461415bf7123767002e66579c1abf1352",
+      "item_count": 300
     },
     {
       "id": "hsk2",

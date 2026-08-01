@@ -1,7 +1,7 @@
 {
   "categoryId": "hsk1",
   "title": "新版 HSK 1 · 缅语单词卡片（300词）",
-  "version": 5,
+  "version": 6,
   "updatedAt": "2026-08-01",
   "source": "《HSK考试大纲》2025-11发布、2026-07实施；缅语释义与例句为学习版人工整理。",
   "language": "zh-CN+my-MM",
@@ -4805,5 +4805,6 @@
     }
   ],
   "pinyinPolicy": "所有拼音按音节空格分隔；pinyin_override用于显示，tts_pinyin_override用于逐音节发音。",
-  "translationPolicy": "例句中的“我”按男女说话者交替使用 ကျွန်တော် / ကျွန်မ。"
+  "translationPolicy": "例句中的“我”按男女说话者交替使用 ကျွန်တော် / ကျွန်မ。",
+  "itemCount": 300
 }
