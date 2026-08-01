@@ -8,7 +8,9 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.media.PlaybackParams;
@@ -23,6 +25,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -72,13 +75,17 @@ public class LearningLessonActivity extends AppCompatActivity {
     private static final String STATE_MATCHED_PAIR_IDS = "matched_pair_ids";
     private static final String STATE_PRONUNCIATION_OPENED = "pronunciation_opened";
 
-    private static final int COLOR_BG = 0xFFF8FAFE;
-    private static final int COLOR_TEXT = 0xFF172033;
-    private static final int COLOR_SUB = 0xFF6F7B91;
-    private static final int COLOR_ACCENT = 0xFF635BFF;
-    private static final int COLOR_BORDER = 0xFFE1E7F0;
-    private static final int COLOR_SUCCESS = 0xFF158A62;
-    private static final int COLOR_ERROR = 0xFFD1435B;
+    private static final int COLOR_BG = 0xFFFFFFFF;
+    private static final int COLOR_TEXT = 0xFF3C3C3C;
+    private static final int COLOR_SUB = 0xFF777777;
+    private static final int COLOR_ACCENT = 0xFF58CC02;
+    private static final int COLOR_ACCENT_DARK = 0xFF46A302;
+    private static final int COLOR_BLUE = 0xFF1CB0F6;
+    private static final int COLOR_BLUE_DARK = 0xFF1899D6;
+    private static final int COLOR_BORDER = 0xFFE5E5E5;
+    private static final int COLOR_SUCCESS = 0xFF58CC02;
+    private static final int COLOR_ERROR = 0xFFFF4B4B;
+    private static final int COLOR_ERROR_DARK = 0xFFD32626;
 
     private String courseId = "";
     private String lessonId = "";
@@ -245,23 +252,23 @@ public class LearningLessonActivity extends AppCompatActivity {
         page.setBackgroundColor(COLOR_BG);
         setContentView(page);
 
-        page.addView(topBar(), new LinearLayout.LayoutParams(-1, dp(62)));
+        page.addView(topBar(), new LinearLayout.LayoutParams(-1, dp(58)));
 
         LinearLayout progressRow = new LinearLayout(this);
         progressRow.setOrientation(LinearLayout.HORIZONTAL);
         progressRow.setGravity(Gravity.CENTER_VERTICAL);
-        progressRow.setPadding(dp(18), dp(4), dp(18), dp(6));
+        progressRow.setPadding(dp(18), 0, dp(18), dp(8));
         page.addView(progressRow, new LinearLayout.LayoutParams(-1, dp(36)));
 
         progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progressBar.setMax(1000);
         progressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(COLOR_ACCENT));
-        progressBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFE4E8F1));
-        progressRow.addView(progressBar, new LinearLayout.LayoutParams(0, dp(10), 1f));
+        progressBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFE5E5E5));
+        progressRow.addView(progressBar, new LinearLayout.LayoutParams(0, dp(14), 1f));
 
         progressText = text("0 / 0", 12, COLOR_SUB, true);
         progressText.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(dp(72), dp(28));
+        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(dp(66), dp(28));
         countLp.setMargins(dp(10), 0, 0, 0);
         progressRow.addView(progressText, countLp);
 
@@ -269,33 +276,36 @@ public class LearningLessonActivity extends AppCompatActivity {
         scroll.setFillViewport(true);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         scroll.setVerticalScrollBarEnabled(false);
+        scroll.setClipToPadding(false);
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
         questionHost = new LinearLayout(this);
         questionHost.setOrientation(LinearLayout.VERTICAL);
-        questionHost.setPadding(dp(18), dp(14), dp(18), dp(30));
+        questionHost.setPadding(dp(18), dp(8), dp(18), dp(28));
         scroll.addView(questionHost, new ScrollView.LayoutParams(-1, -2));
 
         feedbackPanel = new LinearLayout(this);
         feedbackPanel.setOrientation(LinearLayout.VERTICAL);
-        feedbackPanel.setPadding(dp(18), dp(14), dp(18), dp(16));
+        feedbackPanel.setPadding(dp(18), dp(16), dp(18), dp(14));
         feedbackPanel.setVisibility(View.GONE);
         page.addView(feedbackPanel, new LinearLayout.LayoutParams(-1, -2));
 
-        feedbackTitle = text("", 18, COLOR_TEXT, true);
+        feedbackTitle = text("", 20, COLOR_TEXT, true);
         feedbackPanel.addView(feedbackTitle, new LinearLayout.LayoutParams(-1, -2));
-        feedbackBody = text("", 13, COLOR_SUB, false);
-        feedbackBody.setLineSpacing(dp(2), 1f);
+        feedbackBody = text("", 13, COLOR_SUB, true);
+        feedbackBody.setLineSpacing(dp(3), 1f);
         LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(-1, -2);
-        bodyLp.setMargins(0, dp(5), 0, dp(12));
+        bodyLp.setMargins(0, dp(6), 0, dp(10));
         feedbackPanel.addView(feedbackBody, bodyLp);
 
-        actionButton = text(getString(R.string.learning_lesson_check), 16, Color.WHITE, true);
+        actionButton = text(getString(R.string.learning_lesson_check), 17, Color.WHITE, true);
         actionButton.setGravity(Gravity.CENTER);
-        actionButton.setBackground(rounded(COLOR_ACCENT, dp(19), 0, 0));
+        actionButton.setAllCaps(false);
+        actionButton.setBackground(raised(COLOR_ACCENT, COLOR_ACCENT_DARK,
+                dp(17), 0, 0, dp(5)));
         actionButton.setOnClickListener(v -> onAction());
-        LinearLayout.LayoutParams actionLp = new LinearLayout.LayoutParams(-1, dp(58));
-        actionLp.setMargins(dp(18), dp(8), dp(18), dp(14));
+        LinearLayout.LayoutParams actionLp = new LinearLayout.LayoutParams(-1, dp(62));
+        actionLp.setMargins(dp(18), dp(7), dp(18), dp(14));
         page.addView(actionButton, actionLp);
     }
 
@@ -303,12 +313,11 @@ public class LearningLessonActivity extends AppCompatActivity {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(14), dp(8), dp(14), 0);
+        bar.setPadding(dp(12), dp(6), dp(12), 0);
 
-        TextView close = text("×", 26, COLOR_TEXT, false);
+        TextView close = text("×", 28, 0xFF777777, false);
         close.setGravity(Gravity.CENTER);
         close.setContentDescription(getString(R.string.learning_lesson_close));
-        close.setBackground(rounded(Color.WHITE, dp(22), COLOR_BORDER, dp(1)));
         close.setOnClickListener(v -> finish());
         bar.addView(close, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
@@ -318,7 +327,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         lessonTitle.setSingleLine(true);
         lessonTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, -1, 1f);
-        titleLp.setMargins(dp(10), 0, dp(54), 0);
+        titleLp.setMargins(dp(8), 0, dp(52), 0);
         bar.addView(lessonTitle, titleLp);
         return bar;
     }
@@ -424,8 +433,9 @@ public class LearningLessonActivity extends AppCompatActivity {
             for (View child : choiceViews.values()) {
                 boolean active = child == selected;
                 child.setSelected(active);
-                child.setBackground(rounded(active ? 0xFFF0EFFF : Color.WHITE,
-                        dp(18), active ? COLOR_ACCENT : COLOR_BORDER, dp(2)));
+                child.setBackground(active
+                        ? raised(0xFFD7FFB8, 0xFF9DD86B, dp(16), COLOR_ACCENT, dp(2), dp(4))
+                        : raised(Color.WHITE, 0xFFD5D5D5, dp(16), COLOR_BORDER, dp(2), dp(4)));
             }
         }
         if (fillInput != null) {
@@ -475,7 +485,8 @@ public class LearningLessonActivity extends AppCompatActivity {
         actionButton.setVisibility(View.VISIBLE);
         actionButton.setOnClickListener(v -> onAction());
         actionButton.setText(R.string.learning_lesson_check);
-        actionButton.setBackground(rounded(COLOR_ACCENT, dp(19), 0, 0));
+        actionButton.setBackground(raised(COLOR_ACCENT, COLOR_ACCENT_DARK,
+                dp(17), 0, 0, dp(5)));
         answered = false;
         pronunciationOpened = false;
         selectedChoice = "";
@@ -499,29 +510,35 @@ public class LearningLessonActivity extends AppCompatActivity {
         progressText.setText(displayPosition + " / " + queue.size());
         progressBar.setProgress(queue.isEmpty() ? 0 : currentIndex * 1000 / queue.size());
 
-        TextView typeBadge = text(typeLabel(exercise.type), 11, COLOR_ACCENT, true);
+        LinearLayout questionCard = new LinearLayout(this);
+        questionCard.setOrientation(LinearLayout.VERTICAL);
+        questionCard.setPadding(dp(18), dp(16), dp(18), dp(17));
+        questionCard.setBackground(raised(Color.WHITE, 0xFFDDE5ED,
+                dp(22), 0xFFDCEAF7, dp(2), dp(4)));
+        questionHost.addView(questionCard, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView typeBadge = text(typeLabel(exercise.type), 11, COLOR_BLUE, true);
         typeBadge.setGravity(Gravity.CENTER);
         typeBadge.setPadding(dp(10), dp(5), dp(10), dp(5));
-        typeBadge.setBackground(rounded(0xFFEDEBFF, dp(12), 0, 0));
-        questionHost.addView(typeBadge, new LinearLayout.LayoutParams(-2, -2));
+        typeBadge.setBackground(rounded(0xFFDDF4FF, dp(12), 0xFF84D8FF, dp(1)));
+        questionCard.addView(typeBadge, new LinearLayout.LayoutParams(-2, -2));
 
         TextView question = text(exercise.question, 25, COLOR_TEXT, true);
         question.setLineSpacing(dp(4), 1f);
         LinearLayout.LayoutParams questionLp = new LinearLayout.LayoutParams(-1, -2);
-        questionLp.setMargins(0, dp(14), 0, dp(10));
-        questionHost.addView(question, questionLp);
+        questionLp.setMargins(0, dp(14), 0, exercise.hint.isEmpty() ? 0 : dp(9));
+        questionCard.addView(question, questionLp);
 
         if (!exercise.hint.isEmpty()) {
             TextView hint = text(exercise.hint, 14, COLOR_SUB, false);
             hint.setLineSpacing(dp(3), 1f);
-            LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(-1, -2);
-            hintLp.setMargins(0, 0, 0, dp(16));
-            questionHost.addView(hint, hintLp);
+            questionCard.addView(hint, new LinearLayout.LayoutParams(-1, -2));
         }
+        addVerticalSpace(questionHost, 18);
 
         switch (exercise.type) {
             case "listen_choice":
-                questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(58)));
+                questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(62)));
                 addVerticalSpace(questionHost, 14);
                 renderChoice(exercise);
                 autoPlayRunnable = () -> {
@@ -536,8 +553,8 @@ public class LearningLessonActivity extends AppCompatActivity {
             case "single_choice":
             case "image_choice":
                 if (!exercise.audio.isEmpty() || !exercise.audioText.isEmpty()) {
-                    questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(52)));
-                    addVerticalSpace(questionHost, 12);
+                    questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(58)));
+                    addVerticalSpace(questionHost, 13);
                 }
                 renderChoice(exercise);
                 break;
@@ -547,7 +564,7 @@ public class LearningLessonActivity extends AppCompatActivity {
             case "fill_blank":
             case "dictation":
                 if ("dictation".equals(exercise.type)) {
-                    questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(58)));
+                    questionHost.addView(audioButton(exercise), new LinearLayout.LayoutParams(-1, dp(62)));
                     addVerticalSpace(questionHost, 14);
                 }
                 renderFillBlank(exercise);
@@ -565,16 +582,32 @@ public class LearningLessonActivity extends AppCompatActivity {
     }
 
     private void renderChoice(LearningLessonRepository.Exercise exercise) {
-        LinearLayout options = new LinearLayout(this);
-        options.setOrientation(LinearLayout.VERTICAL);
+        boolean imageGrid = "image_choice".equals(exercise.type);
+        ViewGroup options;
+        if (imageGrid) {
+            GridLayout grid = new GridLayout(this);
+            grid.setColumnCount(2);
+            grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
+            grid.setUseDefaultMargins(false);
+            grid.setGravity(Gravity.CENTER_HORIZONTAL);
+            options = grid;
+        } else {
+            LinearLayout list = new LinearLayout(this);
+            list.setOrientation(LinearLayout.VERTICAL);
+            options = list;
+        }
         questionHost.addView(options, new LinearLayout.LayoutParams(-1, -2));
+
         ArrayList<View> optionViews = new ArrayList<>();
         ArrayList<LearningLessonRepository.ChoiceOption> choices =
                 new ArrayList<>(exercise.options);
         if (!exercise.keepOrder && !"true_false".equals(exercise.type)) {
             Collections.shuffle(choices);
         }
-        for (LearningLessonRepository.ChoiceOption choice : choices) {
+        int gridWidth = Math.min(dp(260), Math.max(dp(132),
+                (getResources().getDisplayMetrics().widthPixels - dp(48)) / 2));
+        for (int index = 0; index < choices.size(); index++) {
+            LearningLessonRepository.ChoiceOption choice = choices.get(index);
             View option = createChoiceView(exercise, choice);
             optionViews.add(option);
             choiceViews.put(LearningLessonRepository.normalize(choice.value), option);
@@ -584,15 +617,26 @@ public class LearningLessonActivity extends AppCompatActivity {
                 for (View child : optionViews) {
                     boolean selected = child == option;
                     child.setSelected(selected);
-                    child.setBackground(rounded(selected ? 0xFFF0EFFF : Color.WHITE,
-                            dp(18), selected ? COLOR_ACCENT : COLOR_BORDER, dp(2)));
+                    child.setBackground(selected
+                            ? raised(0xFFD7FFB8, 0xFF9DD86B, dp(16), COLOR_ACCENT, dp(2), dp(4))
+                            : raised(Color.WHITE, 0xFFD5D5D5, dp(16), COLOR_BORDER, dp(2), dp(4)));
                 }
                 option.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
             });
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,
-                    choice.image.isEmpty() ? dp(58) : -2);
-            lp.setMargins(0, 0, 0, dp(10));
-            options.addView(option, lp);
+            if (imageGrid) {
+                GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+                lp.width = gridWidth;
+                lp.height = dp(188);
+                int right = index % 2 == 0 ? dp(6) : 0;
+                int left = index % 2 == 0 ? 0 : dp(6);
+                lp.setMargins(left, 0, right, dp(12));
+                options.addView(option, lp);
+            } else {
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1,
+                        choice.image.isEmpty() ? dp(70) : -2);
+                lp.setMargins(0, 0, 0, dp(12));
+                options.addView(option, lp);
+            }
         }
     }
 
@@ -600,37 +644,43 @@ public class LearningLessonActivity extends AppCompatActivity {
                                   LearningLessonRepository.ChoiceOption choice) {
         if (choice.image.isEmpty()) {
             TextView option = text(choice.text, 17, COLOR_TEXT, true);
-            option.setGravity(Gravity.CENTER_VERTICAL);
-            option.setPadding(dp(16), 0, dp(16), 0);
-            option.setBackground(rounded(Color.WHITE, dp(18), COLOR_BORDER, dp(2)));
+            option.setGravity(Gravity.CENTER);
+            option.setPadding(dp(16), dp(8), dp(16), dp(12));
+            option.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
+                    dp(16), COLOR_BORDER, dp(2), dp(4)));
             option.setContentDescription(choice.contentDescription);
             return option;
         }
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(10), dp(10), dp(10), dp(10));
-        card.setBackground(rounded(Color.WHITE, dp(18), COLOR_BORDER, dp(2)));
+        card.setPadding(dp(10), dp(10), dp(10), dp(14));
+        card.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
+                dp(16), COLOR_BORDER, dp(2), dp(4)));
         card.setContentDescription(choice.contentDescription);
 
         ImageView image = new ImageView(this);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
         image.setAdjustViewBounds(true);
         image.setBackgroundColor(0xFFF1F3F7);
-        card.addView(image, new LinearLayout.LayoutParams(-1, dp(150)));
+        int imageHeight = "image_choice".equals(exercise.type) ? dp(112) : dp(154);
+        card.addView(image, new LinearLayout.LayoutParams(-1, imageHeight));
         loadChoiceImage(image, choice.image, questionGeneration);
 
         TextView label = text(choice.text, 16, COLOR_TEXT, true);
         label.setGravity(Gravity.CENTER);
+        label.setMaxLines(2);
+        label.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, -2);
-        labelLp.setMargins(dp(4), dp(9), dp(4), dp(2));
+        labelLp.setMargins(dp(4), dp(10), dp(4), dp(2));
         card.addView(label, labelLp);
         return card;
     }
 
     private void loadChoiceImage(ImageView view, String relative, int generation) {
         view.setTag(relative);
-        int targetWidth = Math.max(dp(320), getResources().getDisplayMetrics().widthPixels);
-        int targetHeight = dp(260);
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int targetWidth = Math.min(dp(420), Math.max(dp(220), screenWidth / 2));
+        int targetHeight = dp(220);
         LearningRemoteContent.execute(() -> {
             Bitmap bitmap = null;
             try { bitmap = decodeLessonBitmap(relative, targetWidth, targetHeight); }
@@ -696,8 +746,9 @@ public class LearningLessonActivity extends AppCompatActivity {
         fillInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});
         fillInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         fillInput.setPadding(dp(16), 0, dp(16), 0);
-        fillInput.setBackground(rounded(Color.WHITE, dp(18), COLOR_BORDER, dp(2)));
-        questionHost.addView(fillInput, new LinearLayout.LayoutParams(-1, dp(60)));
+        fillInput.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
+                dp(16), COLOR_BORDER, dp(2), dp(4)));
+        questionHost.addView(fillInput, new LinearLayout.LayoutParams(-1, dp(66)));
         fillInput.requestFocus();
     }
 
@@ -709,7 +760,8 @@ public class LearningLessonActivity extends AppCompatActivity {
         orderAnswerRow = wrapRow();
         orderAnswerRow.setMinimumHeight(dp(64));
         orderAnswerRow.setPadding(dp(8), dp(8), dp(8), dp(8));
-        orderAnswerRow.setBackground(rounded(0xFFF2F4F8, dp(18), COLOR_BORDER, dp(1)));
+        orderAnswerRow.setBackground(raised(0xFFF7F7F7, 0xFFDADADA,
+                dp(16), COLOR_BORDER, dp(2), dp(4)));
         LinearLayout.LayoutParams answerLp = new LinearLayout.LayoutParams(-1, -2);
         answerLp.setMargins(0, dp(7), 0, dp(18));
         questionHost.addView(orderAnswerRow, answerLp);
@@ -759,7 +811,8 @@ public class LearningLessonActivity extends AppCompatActivity {
         TextView chip = text(token.value, 17, COLOR_TEXT, true);
         chip.setGravity(Gravity.CENTER);
         chip.setPadding(dp(14), dp(8), dp(14), dp(8));
-        chip.setBackground(rounded(Color.WHITE, dp(15), COLOR_BORDER, dp(1)));
+        chip.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
+                dp(14), COLOR_BORDER, dp(2), dp(4)));
         chip.setTag(token);
         orderChips.put(token.id, chip);
         chip.setOnClickListener(v -> {
@@ -800,11 +853,13 @@ public class LearningLessonActivity extends AppCompatActivity {
             view.setOnClickListener(v -> {
                 if (answered || matchedPairIndexes.contains(pair.index)) return;
                 if (selectedMatchLeft != null) {
-                    selectedMatchLeft.setBackground(rounded(Color.WHITE, dp(16), COLOR_BORDER, dp(1)));
+                    selectedMatchLeft.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
+                            dp(14), COLOR_BORDER, dp(2), dp(4)));
                 }
                 selectedMatchLeft = view;
                 selectedMatchPair = pair;
-                view.setBackground(rounded(0xFFF0EFFF, dp(16), COLOR_ACCENT, dp(2)));
+                view.setBackground(raised(0xFFD7FFB8, 0xFF9DD86B,
+                        dp(14), COLOR_ACCENT, dp(2), dp(4)));
             });
             left.addView(view, matchLp());
         }
@@ -820,10 +875,11 @@ public class LearningLessonActivity extends AppCompatActivity {
                     selectedMatchPair = null;
                     v.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
                 } else {
-                    view.setBackground(rounded(0xFFFFEEF1, dp(16), COLOR_ERROR, dp(2)));
+                    view.setBackground(raised(0xFFFFDFE0, 0xFFF1A8AC,
+                            dp(14), COLOR_ERROR, dp(2), dp(4)));
                     view.postDelayed(() -> {
-                        if (view.isEnabled()) view.setBackground(rounded(Color.WHITE,
-                                dp(16), COLOR_BORDER, dp(1)));
+                        if (view.isEnabled()) view.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
+                                dp(14), COLOR_BORDER, dp(2), dp(4)));
                     }, 350L);
                     v.performHapticFeedback(HapticFeedbackConstants.REJECT);
                 }
@@ -844,12 +900,14 @@ public class LearningLessonActivity extends AppCompatActivity {
         if (left != null) {
             left.setEnabled(false);
             left.setTextColor(COLOR_SUCCESS);
-            left.setBackground(rounded(0xFFEAF8F2, dp(16), COLOR_SUCCESS, dp(1)));
+            left.setBackground(raised(0xFFD7FFB8, 0xFF9DD86B,
+                    dp(14), COLOR_SUCCESS, dp(2), dp(4)));
         }
         if (right != null) {
             right.setEnabled(false);
             right.setTextColor(COLOR_SUCCESS);
-            right.setBackground(rounded(0xFFEAF8F2, dp(16), COLOR_SUCCESS, dp(1)));
+            right.setBackground(raised(0xFFD7FFB8, 0xFF9DD86B,
+                    dp(14), COLOR_SUCCESS, dp(2), dp(4)));
         }
     }
 
@@ -872,7 +930,9 @@ public class LearningLessonActivity extends AppCompatActivity {
         TextView original = text(getString(R.string.learning_lesson_play_original), 15,
                 COLOR_ACCENT, true);
         original.setGravity(Gravity.CENTER);
-        original.setBackground(rounded(0xFFF0EFFF, dp(18), COLOR_ACCENT, dp(1)));
+        original.setTextColor(COLOR_BLUE);
+        original.setBackground(raised(0xFFDDF4FF, 0xFF84D8FF,
+                dp(16), COLOR_BLUE, dp(2), dp(4)));
         original.setOnClickListener(v -> playExerciseAudio(exercise));
         questionHost.addView(original, new LinearLayout.LayoutParams(-1, dp(52)));
         addVerticalSpace(questionHost, 10);
@@ -880,7 +940,8 @@ public class LearningLessonActivity extends AppCompatActivity {
         TextView record = text(getString(R.string.learning_lesson_record_compare), 16,
                 Color.WHITE, true);
         record.setGravity(Gravity.CENTER);
-        record.setBackground(rounded(COLOR_ACCENT, dp(18), 0, 0));
+        record.setBackground(raised(COLOR_ACCENT, COLOR_ACCENT_DARK,
+                dp(16), 0, 0, dp(5)));
         record.setOnClickListener(v -> openPronunciationComparison(exercise));
         questionHost.addView(record, new LinearLayout.LayoutParams(-1, dp(56)));
 
@@ -921,7 +982,9 @@ public class LearningLessonActivity extends AppCompatActivity {
         TextView play = text("◖))  " + getString(R.string.learning_lesson_play_audio),
                 16, COLOR_ACCENT, true);
         play.setGravity(Gravity.CENTER);
-        play.setBackground(rounded(0xFFF0EFFF, dp(18), COLOR_ACCENT, dp(1)));
+        play.setTextColor(COLOR_BLUE);
+        play.setBackground(raised(0xFFDDF4FF, 0xFF84D8FF,
+                dp(16), COLOR_BLUE, dp(2), dp(4)));
         play.setOnClickListener(v -> playExerciseAudio(exercise));
         return play;
     }
@@ -998,11 +1061,26 @@ public class LearningLessonActivity extends AppCompatActivity {
     private void showFeedback(LearningLessonRepository.Exercise exercise, boolean correct,
                               boolean willRetry) {
         feedbackPanel.setVisibility(View.VISIBLE);
-        feedbackPanel.setBackground(rounded(correct ? 0xFFEAF8F2 : 0xFFFFEEF1,
-                dp(22), correct ? 0xFFBEE6D7 : 0xFFF4C5CE, dp(1)));
+        feedbackPanel.setBackground(rounded(correct ? 0xFFD7FFB8 : 0xFFFFDFE0,
+                dp(20), correct ? 0xFF9DD86B : 0xFFF1A8AC, dp(2)));
         feedbackTitle.setText(correct ? R.string.learning_lesson_correct
                 : R.string.learning_lesson_incorrect);
-        feedbackTitle.setTextColor(correct ? COLOR_SUCCESS : COLOR_ERROR);
+        feedbackTitle.setTextColor(correct ? 0xFF3F7D20 : COLOR_ERROR_DARK);
+
+        if (!exercise.options.isEmpty()) {
+            View correctView = choiceViews.get(
+                    LearningLessonRepository.normalize(exercise.answer));
+            View selectedView = choiceViews.get(
+                    LearningLessonRepository.normalize(selectedChoice));
+            if (correctView != null) {
+                correctView.setBackground(raised(0xFFD7FFB8, 0xFF9DD86B,
+                        dp(16), COLOR_ACCENT, dp(2), dp(4)));
+            }
+            if (!correct && selectedView != null && selectedView != correctView) {
+                selectedView.setBackground(raised(0xFFFFDFE0, 0xFFF1A8AC,
+                        dp(16), COLOR_ERROR, dp(2), dp(4)));
+            }
+        }
 
         StringBuilder body = new StringBuilder();
         if (!correct) body.append(getString(R.string.learning_lesson_correct_answer,
@@ -1019,10 +1097,12 @@ public class LearningLessonActivity extends AppCompatActivity {
             body.append(getString(R.string.learning_lesson_correct_hint));
         }
         feedbackBody.setText(body.toString());
+        feedbackBody.setTextColor(correct ? 0xFF4F6F3C : 0xFF8D3A41);
         actionButton.setText(currentIndex + 1 >= queue.size()
                 ? R.string.learning_lesson_finish : R.string.learning_lesson_continue);
-        actionButton.setBackground(rounded(correct ? COLOR_SUCCESS : COLOR_ERROR,
-                dp(19), 0, 0));
+        actionButton.setBackground(raised(correct ? COLOR_SUCCESS : COLOR_ERROR,
+                correct ? COLOR_ACCENT_DARK : COLOR_ERROR_DARK,
+                dp(17), 0, 0, dp(5)));
         actionButton.performHapticFeedback(correct ? HapticFeedbackConstants.CONFIRM
                 : HapticFeedbackConstants.REJECT);
     }
@@ -1066,7 +1146,9 @@ public class LearningLessonActivity extends AppCompatActivity {
         int resultColor = completionPassed ? COLOR_SUCCESS : COLOR_ERROR;
         TextView icon = text(completionPassed ? "✓" : "!", 42, Color.WHITE, true);
         icon.setGravity(Gravity.CENTER);
-        icon.setBackground(rounded(resultColor, dp(42), 0, 0));
+        icon.setBackground(raised(resultColor,
+                completionPassed ? COLOR_ACCENT_DARK : COLOR_ERROR_DARK,
+                dp(42), 0, 0, dp(6)));
         LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(84), dp(84));
         iconLp.gravity = Gravity.CENTER_HORIZONTAL;
         iconLp.setMargins(0, dp(32), 0, dp(18));
@@ -1109,7 +1191,9 @@ public class LearningLessonActivity extends AppCompatActivity {
                         ? R.string.learning_lesson_back_to_map : R.string.learning_lesson_again),
                 16, Color.WHITE, true);
         primary.setGravity(Gravity.CENTER);
-        primary.setBackground(rounded(completionPassed ? COLOR_ACCENT : COLOR_ERROR, dp(19), 0, 0));
+        primary.setBackground(raised(completionPassed ? COLOR_ACCENT : COLOR_ERROR,
+                completionPassed ? COLOR_ACCENT_DARK : COLOR_ERROR_DARK,
+                dp(18), 0, 0, dp(5)));
         primary.setOnClickListener(v -> {
             if (completionPassed) finish();
             else restartSession();
@@ -1122,7 +1206,9 @@ public class LearningLessonActivity extends AppCompatActivity {
                         ? R.string.learning_lesson_again : R.string.learning_lesson_back_to_map),
                 15, COLOR_ACCENT, true);
         secondary.setGravity(Gravity.CENTER);
-        secondary.setBackground(rounded(0xFFF0EFFF, dp(18), COLOR_ACCENT, dp(1)));
+        secondary.setTextColor(completionPassed ? COLOR_BLUE : COLOR_SUB);
+        secondary.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
+                dp(17), completionPassed ? COLOR_BLUE : COLOR_BORDER, dp(2), dp(4)));
         secondary.setOnClickListener(v -> {
             if (completionPassed) restartSession();
             else finish();
@@ -1293,7 +1379,8 @@ public class LearningLessonActivity extends AppCompatActivity {
         TextView view = text(value, 15, COLOR_TEXT, true);
         view.setGravity(Gravity.CENTER);
         view.setPadding(dp(8), dp(5), dp(8), dp(5));
-        view.setBackground(rounded(Color.WHITE, dp(16), COLOR_BORDER, dp(1)));
+        view.setBackground(raised(Color.WHITE, 0xFFD5D5D5,
+                dp(14), COLOR_BORDER, dp(2), dp(4)));
         return view;
     }
 
@@ -1348,6 +1435,17 @@ public class LearningLessonActivity extends AppCompatActivity {
         drawable.setCornerRadius(radius);
         if (strokeWidth > 0) drawable.setStroke(strokeWidth, strokeColor);
         return drawable;
+    }
+
+    private Drawable raised(int topColor, int bottomColor, float radius,
+                            int strokeColor, int strokeWidth, int depth) {
+        GradientDrawable bottom = rounded(bottomColor, radius, 0, 0);
+        GradientDrawable top = rounded(topColor, radius, strokeColor, strokeWidth);
+        LayerDrawable layers = new LayerDrawable(new Drawable[]{bottom, top});
+        int inset = Math.max(0, depth);
+        layers.setLayerInset(0, 0, inset, 0, 0);
+        layers.setLayerInset(1, 0, 0, 0, inset);
+        return layers;
     }
 
     private int dp(float value) {

@@ -4,15 +4,17 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -25,36 +27,42 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Duolingo-style vertical learning path with remote catalog and package updates. */
+/** A category-specific, Duolingo-inspired learning map without connector lines. */
 public class LearningPathActivity extends AppCompatActivity {
     private static final String EXTRA_COURSE_ID = "course_id";
-    private static final String PREFS = "wk_learning_path";
-    private static final String PREF_COURSE_ID = "course_id";
-    private static final int COLOR_BG = 0xFFF4F7FC;
-    private static final int COLOR_TEXT = 0xFF182033;
-    private static final int COLOR_SUB = 0xFF758096;
-    private static final int COLOR_BORDER = 0xFFE2E8F2;
-    private static final int COLOR_LOCKED = 0xFFD5DBE6;
+    private static final String EXTRA_UNIT_ID = "unit_id";
+    private static final int COLOR_BG = 0xFFF4F5F7;
+    private static final int COLOR_TEXT = 0xFF3C3C3C;
+    private static final int COLOR_SUB = 0xFF777777;
+    private static final int COLOR_BORDER = 0xFFE5E5E5;
+    private static final int COLOR_GREEN = 0xFF58CC02;
+    private static final int COLOR_GREEN_DARK = 0xFF46A302;
+    private static final int COLOR_BLUE = 0xFF1CB0F6;
+    private static final int COLOR_BLUE_DARK = 0xFF1899D6;
+    private static final int COLOR_YELLOW = 0xFFFFC800;
+    private static final int COLOR_YELLOW_DARK = 0xFFE5A500;
+    private static final int COLOR_LOCKED = 0xFFE5E5E5;
+    private static final int COLOR_LOCKED_DARK = 0xFFCFCFCF;
 
     private LinearLayout content;
-    private TextView courseTitle;
-    private TextView courseSubtitle;
-    private TextView progressText;
-    private ProgressBar progressBar;
+    private TextView pageTitle;
     private TextView refreshButton;
 
     private LearningPathRepository.Catalog catalog;
     private LearningPathRepository.Course course;
+    private LearningPathRepository.Unit selectedUnit;
     private Map<String, LearningPathProgressStore.Progress> progress = new HashMap<>();
     private final Map<String, NodeView> nodeViews = new HashMap<>();
     private final Map<String, DownloadUiState> downloads = new HashMap<>();
     private final Map<String, LearningPackageDownloader.Subscription> downloadSubscriptions = new HashMap<>();
     private String pendingOpenLessonId = "";
     private String selectedCourseId = "";
+    private String selectedUnitId = "";
     private LearningPathProgressStore progressStore;
     private long lastClickAt;
     private int catalogGeneration;
@@ -63,14 +71,21 @@ public class LearningPathActivity extends AppCompatActivity {
     private boolean resumed;
 
     public static void open(Context context) {
-        open(context, "");
+        LearningCategoryActivity.open(context);
     }
 
     public static void open(Context context, String courseId) {
+        open(context, courseId, "");
+    }
+
+    public static void open(Context context, String courseId, String unitId) {
         if (context == null) return;
         Intent intent = new Intent(context, LearningPathActivity.class);
         if (courseId != null && !courseId.trim().isEmpty()) {
             intent.putExtra(EXTRA_COURSE_ID, courseId.trim());
+        }
+        if (unitId != null && !unitId.trim().isEmpty()) {
+            intent.putExtra(EXTRA_UNIT_ID, unitId.trim());
         }
         if (!(context instanceof Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(intent);
@@ -82,13 +97,12 @@ public class LearningPathActivity extends AppCompatActivity {
         Window window = getWindow();
         window.setStatusBarColor(COLOR_BG);
         window.setNavigationBarColor(COLOR_BG);
-        progressStore = new LearningPathProgressStore(this);
-        selectedCourseId = getIntent().getStringExtra(EXTRA_COURSE_ID);
-        if (selectedCourseId == null || selectedCourseId.trim().isEmpty()) {
-            selectedCourseId = getSharedPreferences(PREFS, MODE_PRIVATE)
-                    .getString(PREF_COURSE_ID, "");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         }
-        if (selectedCourseId == null) selectedCourseId = "";
+        progressStore = new LearningPathProgressStore(this);
+        selectedCourseId = safe(getIntent().getStringExtra(EXTRA_COURSE_ID));
+        selectedUnitId = safe(getIntent().getStringExtra(EXTRA_UNIT_ID));
         buildLayout();
         loadCatalog(false);
     }
@@ -123,16 +137,12 @@ public class LearningPathActivity extends AppCompatActivity {
     }
 
     private void buildLayout() {
-        FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(COLOR_BG);
-        setContentView(root);
-
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        root.addView(page, new FrameLayout.LayoutParams(-1, -1));
+        page.setBackgroundColor(COLOR_BG);
+        setContentView(page);
 
         page.addView(createTopBar(), new LinearLayout.LayoutParams(-1, dp(62)));
-        page.addView(createCourseHeader(), new LinearLayout.LayoutParams(-1, -2));
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -143,7 +153,9 @@ public class LearningPathActivity extends AppCompatActivity {
 
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(14), dp(14), dp(14), dp(80));
+        content.setClipChildren(false);
+        content.setClipToPadding(false);
+        content.setPadding(dp(14), dp(8), dp(14), dp(84));
         scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
     }
 
@@ -151,65 +163,26 @@ public class LearningPathActivity extends AppCompatActivity {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(14), dp(8), dp(14), 0);
+        bar.setPadding(dp(12), dp(8), dp(12), 0);
 
-        TextView back = circleButton("‹");
-        back.setTextSize(29);
+        TextView back = circleButton("‹", 30);
         back.setContentDescription(getString(R.string.learning_path_back));
         back.setOnClickListener(v -> finish());
         bar.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
-        TextView title = text(getString(R.string.learning_path_title), 18, COLOR_TEXT, true);
-        title.setGravity(Gravity.CENTER);
-        bar.addView(title, new LinearLayout.LayoutParams(0, -1, 1f));
+        pageTitle = text(getString(R.string.learning_path_title), 18, COLOR_TEXT, true);
+        pageTitle.setGravity(Gravity.CENTER);
+        pageTitle.setSingleLine(true);
+        pageTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, -1, 1f);
+        titleLp.setMargins(dp(8), 0, dp(8), 0);
+        bar.addView(pageTitle, titleLp);
 
-        refreshButton = circleButton("↻");
-        refreshButton.setTextSize(21);
+        refreshButton = circleButton("↻", 21);
         refreshButton.setContentDescription(getString(R.string.learning_path_refresh));
         refreshButton.setOnClickListener(v -> loadCatalog(true));
         bar.addView(refreshButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
         return bar;
-    }
-
-    private View createCourseHeader() {
-        LinearLayout outer = new LinearLayout(this);
-        outer.setOrientation(LinearLayout.VERTICAL);
-        outer.setPadding(dp(14), dp(10), dp(14), dp(4));
-
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(18), dp(16), dp(18), dp(16));
-        card.setBackground(gradient(0xFFFFFFFF, 0xFFF5F3FF, dp(24), COLOR_BORDER, dp(1)));
-        outer.addView(card, new LinearLayout.LayoutParams(-1, -2));
-
-        courseTitle = text(getString(R.string.learning_path_loading), 23, COLOR_TEXT, true);
-        courseTitle.setOnClickListener(v -> showCourseChooser());
-        card.addView(courseTitle, new LinearLayout.LayoutParams(-1, -2));
-
-        courseSubtitle = text("", 13, COLOR_SUB, false);
-        courseSubtitle.setLineSpacing(dp(2), 1f);
-        LinearLayout.LayoutParams subtitleLp = new LinearLayout.LayoutParams(-1, -2);
-        subtitleLp.setMargins(0, dp(5), 0, dp(12));
-        card.addView(courseSubtitle, subtitleLp);
-
-        LinearLayout progressRow = new LinearLayout(this);
-        progressRow.setOrientation(LinearLayout.HORIZONTAL);
-        progressRow.setGravity(Gravity.CENTER_VERTICAL);
-        card.addView(progressRow, new LinearLayout.LayoutParams(-1, -2));
-
-        progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progressBar.setMax(1000);
-        progressBar.setProgress(0);
-        progressBar.setProgressTintList(android.content.res.ColorStateList.valueOf(0xFF635BFF));
-        progressBar.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFE7E9F3));
-        progressRow.addView(progressBar, new LinearLayout.LayoutParams(0, dp(10), 1f));
-
-        progressText = text("0 / 0", 12, COLOR_SUB, true);
-        progressText.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams progressTextLp = new LinearLayout.LayoutParams(dp(86), dp(28));
-        progressTextLp.setMargins(dp(10), 0, 0, 0);
-        progressRow.addView(progressText, progressTextLp);
-        return outer;
     }
 
     private void loadCatalog(boolean manualRefresh) {
@@ -221,6 +194,7 @@ public class LearningPathActivity extends AppCompatActivity {
             refreshButton.setAlpha(0.55f);
             refreshButton.animate().rotationBy(360f).setDuration(600).start();
         }
+        if (catalog == null) showLoading();
         Context app = getApplicationContext();
         LearningRemoteContent.execute(() -> {
             LearningPathRepository.Catalog local = LearningPathRepository.load(app);
@@ -270,7 +244,8 @@ public class LearningPathActivity extends AppCompatActivity {
     }
 
     private boolean canApply(int generation) {
-        return !destroyed && generation == catalogGeneration && !isFinishing();
+        return !destroyed && generation == catalogGeneration && !isFinishing()
+                && (Build.VERSION.SDK_INT < 17 || !isDestroyed());
     }
 
     private void finishRefresh() {
@@ -282,43 +257,38 @@ public class LearningPathActivity extends AppCompatActivity {
     }
 
     private void applyCatalog(LearningPathRepository.Catalog updated) {
-        String previousCourseId = course == null ? "" : course.id;
         cancelDownloadObservers();
         downloads.clear();
         catalog = updated;
         course = LearningPathRepository.findCourse(updated, selectedCourseId);
         if (course == null) course = LearningPathRepository.firstCourse(updated);
         selectedCourseId = course == null ? "" : course.id;
-        if (!selectedCourseId.isEmpty()) {
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                    .putString(PREF_COURSE_ID, selectedCourseId).apply();
+        selectedUnit = findUnit(course, selectedUnitId);
+        if (selectedUnit == null && course != null && !course.units.isEmpty()) {
+            selectedUnit = course.units.get(0);
+            selectedUnitId = selectedUnit.id;
         }
-        if (!previousCourseId.equals(selectedCourseId)) pendingOpenLessonId = "";
         progress = course == null || progressStore == null
                 ? new HashMap<>() : progressStore.loadCourse(course.id);
         observeActiveDownloads();
         renderPath();
     }
 
-    private void showCourseChooser() {
-        if (catalog == null || catalog.courses.size() <= 1) return;
-        String[] titles = new String[catalog.courses.size()];
-        int selected = 0;
-        for (int i = 0; i < catalog.courses.size(); i++) {
-            LearningPathRepository.Course item = catalog.courses.get(i);
-            titles[i] = item.title;
-            if (item.id.equals(selectedCourseId)) selected = i;
+    private LearningPathRepository.Unit findUnit(LearningPathRepository.Course target, String unitId) {
+        if (target == null || unitId == null) return null;
+        for (LearningPathRepository.Unit unit : target.units) {
+            if (unitId.equals(unit.id)) return unit;
         }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.learning_path_choose_course)
-                .setSingleChoiceItems(titles, selected, (dialog, which) -> {
-                    if (which < 0 || which >= catalog.courses.size()) return;
-                    selectedCourseId = catalog.courses.get(which).id;
-                    dialog.dismiss();
-                    applyCatalog(catalog);
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+        return null;
+    }
+
+    private void showLoading() {
+        if (content == null) return;
+        content.removeAllViews();
+        TextView loading = text(getString(R.string.learning_path_loading), 15, COLOR_SUB, false);
+        loading.setGravity(Gravity.CENTER);
+        loading.setPadding(0, dp(80), 0, dp(80));
+        content.addView(loading, new LinearLayout.LayoutParams(-1, -2));
     }
 
     private void cancelDownloadObservers() {
@@ -332,68 +302,102 @@ public class LearningPathActivity extends AppCompatActivity {
         if (content == null) return;
         content.removeAllViews();
         nodeViews.clear();
-        if (course != null) bindCourseTitle();
-        if (course == null || course.units.isEmpty()) {
-            if (course == null) {
-                courseTitle.setText(R.string.learning_path_title);
-                courseTitle.setClickable(false);
-            }
-            courseSubtitle.setText(R.string.learning_path_empty);
-            progressText.setText("0 / 0");
-            progressBar.setProgress(0);
+        if (course == null || selectedUnit == null) {
+            pageTitle.setText(R.string.learning_path_title);
             content.addView(emptyView(getString(R.string.learning_path_empty)),
                     new LinearLayout.LayoutParams(-1, -2));
             return;
         }
         if (course.minAppVersion > currentVersionCode()) {
-            courseTitle.setText(course.title);
-            courseSubtitle.setText(R.string.learning_path_app_update_required);
-            progressText.setText("—");
-            progressBar.setProgress(0);
+            pageTitle.setText(selectedUnit.title);
             content.addView(emptyView(getString(R.string.learning_path_app_update_required)),
                     new LinearLayout.LayoutParams(-1, -2));
             return;
         }
 
-        courseSubtitle.setText(course.subtitle);
-        List<LearningPathRepository.Lesson> all = LearningPathRepository.flatten(course);
+        pageTitle.setText(selectedUnit.title);
+        String currentLesson = findCurrentLesson(selectedUnit.lessons);
+
         int completed = 0;
-        for (LearningPathRepository.Lesson lesson : all) {
+        for (LearningPathRepository.Lesson lesson : selectedUnit.lessons) {
             LearningPathProgressStore.Progress item = progress.get(lesson.id);
             if (item != null && item.completed()) completed++;
         }
-        progressText.setText(getString(R.string.learning_path_progress, completed, all.size()));
-        progressBar.setProgress(all.isEmpty() ? 0 : completed * 1000 / all.size());
+        LinearLayout.LayoutParams headerLp = new LinearLayout.LayoutParams(-1, -2);
+        headerLp.setMargins(0, dp(5), 0, dp(14));
+        content.addView(categoryHeader(selectedUnit, completed, selectedUnit.lessons.size()), headerLp);
 
-        String currentLesson = findCurrentLesson(all);
-        for (int unitIndex = 0; unitIndex < course.units.size(); unitIndex++) {
-            LearningPathRepository.Unit unit = course.units.get(unitIndex);
-            content.addView(unitHeader(unit, unitIndex), new LinearLayout.LayoutParams(-1, -2));
-
-            PathLayout path = new PathLayout(this, course.accent);
-            for (LearningPathRepository.Lesson lesson : unit.lessons) {
-                NodeState state = stateFor(lesson, currentLesson);
-                NodeView node = new NodeView(this, course.accent);
-                node.bind(lesson, state, progress.get(lesson.id), downloads.get(lesson.id));
-                node.setOnClickListener(v -> throttled(() ->
-                        onLessonClick(lesson, node.nodeState())));
-                nodeViews.put(lesson.id, node);
-                path.addNode(node, lesson.position);
-            }
-            LinearLayout.LayoutParams pathLp = new LinearLayout.LayoutParams(-1, -2);
-            pathLp.setMargins(0, dp(4), 0, dp(22));
-            content.addView(path, pathLp);
+        if (selectedUnit.lessons.isEmpty()) {
+            content.addView(emptyView(getString(R.string.learning_path_empty)),
+                    new LinearLayout.LayoutParams(-1, -2));
+            return;
         }
+
+        PathLayout path = new PathLayout(this);
+        for (LearningPathRepository.Lesson lesson : selectedUnit.lessons) {
+            NodeState state = stateFor(lesson, currentLesson);
+            NodeView node = new NodeView(this, course.accent);
+            node.bind(lesson, state, progress.get(lesson.id), downloads.get(lesson.id));
+            node.setOnClickListener(v -> throttled(() -> onLessonClick(lesson, node.nodeState())));
+            nodeViews.put(lesson.id, node);
+            path.addNode(node, lesson.position);
+        }
+        LinearLayout.LayoutParams pathLp = new LinearLayout.LayoutParams(-1, -2);
+        pathLp.setMargins(0, dp(10), 0, dp(10));
+        content.addView(path, pathLp);
+
+        TextView tip = text(getString(R.string.learning_path_map_tip), 12, COLOR_SUB, false);
+        tip.setGravity(Gravity.CENTER);
+        tip.setPadding(dp(12), dp(10), dp(12), dp(10));
+        content.addView(tip, new LinearLayout.LayoutParams(-1, -2));
     }
 
-    private void bindCourseTitle() {
-        if (course == null || courseTitle == null) return;
-        boolean multipleCourses = catalog != null && catalog.courses.size() > 1;
-        courseTitle.setText(multipleCourses ? course.title + "  ▾" : course.title);
-        courseTitle.setContentDescription(multipleCourses
-                ? getString(R.string.learning_path_choose_course) : course.title);
-        courseTitle.setClickable(multipleCourses);
-        courseTitle.setAlpha(multipleCourses ? 1f : 0.98f);
+    private View categoryHeader(LearningPathRepository.Unit unit, int completed, int total) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(20), dp(18), dp(20), dp(17));
+        int accent = course == null ? COLOR_GREEN : course.accent;
+        int end = blend(accent, COLOR_BLUE, 0.30f);
+        card.setBackground(gradient(accent, end, dp(26)));
+
+        TextView overline = text(getString(R.string.learning_category_section), 11,
+                0xEFFFFFFF, true);
+        overline.setAllCaps(true);
+        card.addView(overline, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView title = text(unit.title, 23, Color.WHITE, true);
+        title.setLineSpacing(dp(2), 1f);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(-1, -2);
+        titleLp.setMargins(0, dp(7), 0, dp(4));
+        card.addView(title, titleLp);
+
+        if (!unit.subtitle.isEmpty()) {
+            TextView subtitle = text(unit.subtitle, 13, 0xEFFFFFFF, false);
+            subtitle.setLineSpacing(dp(2), 1f);
+            card.addView(subtitle, new LinearLayout.LayoutParams(-1, -2));
+        }
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(28));
+        rowLp.setMargins(0, dp(15), 0, 0);
+        card.addView(row, rowLp);
+
+        ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        bar.setMax(Math.max(1, total));
+        bar.setProgress(completed);
+        bar.setProgressTintList(ColorStateList.valueOf(Color.WHITE));
+        bar.setProgressBackgroundTintList(ColorStateList.valueOf(0x45FFFFFF));
+        row.addView(bar, new LinearLayout.LayoutParams(0, dp(9), 1f));
+
+        TextView count = text(completed + " / " + total, 12, Color.WHITE, true);
+        count.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(dp(68), -1);
+        countLp.setMargins(dp(10), 0, 0, 0);
+        row.addView(count, countLp);
+
+        return card;
     }
 
     private String findCurrentLesson(List<LearningPathRepository.Lesson> lessons) {
@@ -422,34 +426,6 @@ public class LearningPathActivity extends AppCompatActivity {
             if (item == null || !item.completed()) return false;
         }
         return true;
-    }
-
-    private View unitHeader(LearningPathRepository.Unit unit, int index) {
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(4), dp(10), dp(4), dp(7));
-
-        TextView number = text(String.valueOf(index + 1), 14, Color.WHITE, true);
-        number.setGravity(Gravity.CENTER);
-        number.setBackground(rounded(course.accent, dp(18), 0, 0));
-        header.addView(number, new LinearLayout.LayoutParams(dp(36), dp(36)));
-
-        LinearLayout textBox = new LinearLayout(this);
-        textBox.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams textLp = new LinearLayout.LayoutParams(0, -2, 1f);
-        textLp.setMargins(dp(11), 0, 0, 0);
-        header.addView(textBox, textLp);
-
-        TextView title = text(unit.title, 18, COLOR_TEXT, true);
-        textBox.addView(title, new LinearLayout.LayoutParams(-1, -2));
-        if (unit.subtitle != null && unit.subtitle.length() > 0) {
-            TextView subtitle = text(unit.subtitle, 12, COLOR_SUB, false);
-            LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
-            subLp.setMargins(0, dp(3), 0, 0);
-            textBox.addView(subtitle, subLp);
-        }
-        return header;
     }
 
     private void onLessonClick(LearningPathRepository.Lesson lesson, NodeState state) {
@@ -521,8 +497,7 @@ public class LearningPathActivity extends AppCompatActivity {
         downloadSubscriptions.put(lesson.id, subscription);
         LearningPackageDownloader.Status latest = LearningPackageDownloader.status(lesson);
         if (latest == null || !latest.active()) {
-            LearningPackageDownloader.Subscription stored =
-                    downloadSubscriptions.remove(lesson.id);
+            LearningPackageDownloader.Subscription stored = downloadSubscriptions.remove(lesson.id);
             if (stored != null) stored.cancel();
         }
     }
@@ -531,8 +506,7 @@ public class LearningPathActivity extends AppCompatActivity {
                                      LearningPackageDownloader.State state, int value, String message) {
         if (destroyed || isFinishing() || course == null || lesson == null
                 || !course.id.equals(lesson.courseId)) return;
-        LearningPathRepository.Lesson currentLesson =
-                LearningPathRepository.findLesson(course, lesson.id);
+        LearningPathRepository.Lesson currentLesson = LearningPathRepository.findLesson(course, lesson.id);
         if (currentLesson == null || !currentLesson.packageKey().equals(lesson.packageKey())) return;
         DownloadUiState current = downloads.get(lesson.id);
         if (current == null) current = new DownloadUiState();
@@ -545,8 +519,7 @@ public class LearningPathActivity extends AppCompatActivity {
         updateNodeDownload(lesson.id);
         if (state == LearningPackageDownloader.State.ERROR
                 || state == LearningPackageDownloader.State.READY) {
-            LearningPackageDownloader.Subscription subscription =
-                    downloadSubscriptions.remove(lesson.id);
+            LearningPackageDownloader.Subscription subscription = downloadSubscriptions.remove(lesson.id);
             if (subscription != null) subscription.cancel();
             downloads.remove(lesson.id);
             updateNodeDownload(lesson.id);
@@ -563,8 +536,7 @@ public class LearningPathActivity extends AppCompatActivity {
 
     private void maybeOpenPendingLesson() {
         if (!resumed || course == null || pendingOpenLessonId.isEmpty()) return;
-        LearningPathRepository.Lesson lesson =
-                LearningPathRepository.findLesson(course, pendingOpenLessonId);
+        LearningPathRepository.Lesson lesson = LearningPathRepository.findLesson(course, pendingOpenLessonId);
         if (lesson == null) {
             pendingOpenLessonId = "";
             return;
@@ -582,9 +554,10 @@ public class LearningPathActivity extends AppCompatActivity {
         NodeView node = nodeViews.get(lessonId);
         LearningPathRepository.Lesson lesson = LearningPathRepository.findLesson(course, lessonId);
         if (node == null || lesson == null) return;
-        NodeState state = stateFor(lesson, findCurrentLesson(LearningPathRepository.flatten(course)));
+        NodeState state = stateFor(lesson,
+                findCurrentLesson(LearningPathRepository.flatten(course)));
         node.bind(lesson, state, progress.get(lesson.id), downloads.get(lesson.id));
-        ViewParentInvalidator.invalidateParents(node);
+        node.invalidate();
     }
 
     private void openLesson(LearningPathRepository.Lesson lesson) {
@@ -597,17 +570,14 @@ public class LearningPathActivity extends AppCompatActivity {
         TextView empty = text(message, 14, COLOR_SUB, false);
         empty.setGravity(Gravity.CENTER);
         empty.setPadding(dp(22), dp(38), dp(22), dp(38));
-        empty.setBackground(rounded(Color.WHITE, dp(22), COLOR_BORDER, dp(1)));
+        empty.setBackground(round(Color.WHITE, dp(22), COLOR_BORDER, dp(2)));
         return empty;
     }
 
     private long currentVersionCode() {
         try {
-            android.content.pm.PackageInfo info = getPackageManager()
-                    .getPackageInfo(getPackageName(), 0);
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                return info.getLongVersionCode();
-            }
+            android.content.pm.PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) return info.getLongVersionCode();
             return info.versionCode;
         } catch (Throwable ignored) {
             return 0L;
@@ -623,15 +593,14 @@ public class LearningPathActivity extends AppCompatActivity {
 
     private String formatBytes(long bytes) {
         if (bytes < 1024L) return bytes + " B";
-        if (bytes < 1024L * 1024L) return String.format(java.util.Locale.US, "%.1f KB",
-                bytes / 1024f);
+        if (bytes < 1024L * 1024L) return String.format(java.util.Locale.US, "%.1f KB", bytes / 1024f);
         return String.format(java.util.Locale.US, "%.1f MB", bytes / 1024f / 1024f);
     }
 
-    private TextView circleButton(String value) {
-        TextView view = text(value, 19, COLOR_TEXT, true);
+    private TextView circleButton(String value, float size) {
+        TextView view = text(value, size, COLOR_SUB, true);
         view.setGravity(Gravity.CENTER);
-        view.setBackground(rounded(Color.WHITE, dp(22), COLOR_BORDER, dp(1)));
+        view.setBackground(round(Color.WHITE, dp(22), COLOR_BORDER, dp(1)));
         return view;
     }
 
@@ -645,7 +614,7 @@ public class LearningPathActivity extends AppCompatActivity {
         return view;
     }
 
-    private GradientDrawable rounded(int color, float radius, int strokeColor, int strokeWidth) {
+    private GradientDrawable round(int color, float radius, int strokeColor, int strokeWidth) {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setColor(color);
         drawable.setCornerRadius(radius);
@@ -653,11 +622,10 @@ public class LearningPathActivity extends AppCompatActivity {
         return drawable;
     }
 
-    private GradientDrawable gradient(int start, int end, float radius, int stroke, int width) {
+    private GradientDrawable gradient(int start, int end, float radius) {
         GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{start, end});
         drawable.setCornerRadius(radius);
-        if (width > 0) drawable.setStroke(width, stroke);
         return drawable;
     }
 
@@ -665,13 +633,11 @@ public class LearningPathActivity extends AppCompatActivity {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private enum NodeState {
-        LOCKED,
-        AVAILABLE,
-        CURRENT,
-        COMPLETED,
-        DOWNLOADING
+    private static String safe(String value) {
+        return value == null ? "" : value.trim();
     }
+
+    private enum NodeState { LOCKED, AVAILABLE, CURRENT, COMPLETED, DOWNLOADING }
 
     private static final class DownloadUiState {
         boolean active;
@@ -680,10 +646,10 @@ public class LearningPathActivity extends AppCompatActivity {
     }
 
     private final class NodeView extends LinearLayout {
+        private final TextView startBubble;
         private final NodeCircle circle;
         private final TextView label;
         private final TextView detail;
-        private LearningPathRepository.Lesson lesson;
         private NodeState state = NodeState.LOCKED;
 
         NodeView(Context context, int accent) {
@@ -692,78 +658,103 @@ public class LearningPathActivity extends AppCompatActivity {
             setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
             setClickable(true);
             setFocusable(true);
-            setPadding(dp(3), dp(2), dp(3), dp(2));
+            setClipChildren(false);
+            setClipToPadding(false);
+            setPadding(dp(2), dp(1), dp(2), dp(1));
+
+            startBubble = text(getString(R.string.learning_path_start), 11, COLOR_GREEN, true);
+            startBubble.setGravity(Gravity.CENTER);
+            startBubble.setPadding(dp(11), dp(5), dp(11), dp(5));
+            startBubble.setBackground(round(Color.WHITE, dp(10), COLOR_BORDER, dp(2)));
+            startBubble.setVisibility(INVISIBLE);
+            addView(startBubble, new LinearLayout.LayoutParams(-2, dp(29)));
 
             circle = new NodeCircle(context, accent);
-            addView(circle, new LinearLayout.LayoutParams(dp(74), dp(74)));
+            LinearLayout.LayoutParams circleLp = new LinearLayout.LayoutParams(dp(84), dp(88));
+            circleLp.setMargins(0, dp(2), 0, 0);
+            addView(circle, circleLp);
 
             label = text("", 13, COLOR_TEXT, true);
             label.setGravity(Gravity.CENTER);
-            label.setMaxLines(1);
+            label.setMaxLines(2);
             label.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, dp(22));
-            labelLp.setMargins(0, dp(5), 0, 0);
+            label.setPadding(dp(8), dp(4), dp(8), dp(4));
+            label.setBackground(round(Color.WHITE, dp(10), COLOR_BORDER, dp(2)));
+            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(-1, dp(42));
+            labelLp.setMargins(0, dp(4), 0, 0);
             addView(label, labelLp);
 
-            detail = text("", 10, COLOR_SUB, false);
+            detail = text("", 10, COLOR_SUB, true);
             detail.setGravity(Gravity.CENTER);
             detail.setMaxLines(1);
-            detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            addView(detail, new LinearLayout.LayoutParams(-1, dp(18)));
+            LinearLayout.LayoutParams detailLp = new LinearLayout.LayoutParams(-1, dp(18));
+            detailLp.setMargins(0, dp(3), 0, 0);
+            addView(detail, detailLp);
         }
 
         void bind(LearningPathRepository.Lesson lesson, NodeState state,
-                  LearningPathProgressStore.Progress progress, DownloadUiState download) {
-            this.lesson = lesson;
+                  LearningPathProgressStore.Progress item, DownloadUiState download) {
             this.state = state;
             label.setText(lesson.title);
+            startBubble.setVisibility(state == NodeState.CURRENT ? VISIBLE : INVISIBLE);
             if (state == NodeState.DOWNLOADING) {
                 int percent = download == null ? -1 : download.progress;
                 detail.setText(percent >= 0 ? percent + "%" : getString(R.string.learning_path_downloading));
-                circle.bind(lesson.icon, state, Math.max(0, percent));
+                circle.bind(lesson.icon, lesson.type, state, Math.max(0, percent));
             } else if (state == NodeState.COMPLETED) {
-                int stars = progress == null ? 0 : progress.stars;
-                detail.setText(stars <= 0 ? getString(R.string.learning_path_completed)
-                        : repeatStar(stars));
-                circle.bind(lesson.icon, state, 100);
+                int stars = item == null ? 0 : item.stars;
+                detail.setText(stars <= 0 ? getString(R.string.learning_path_completed) : repeatStar(stars));
+                circle.bind("✓", lesson.type, state, 100);
             } else if (state == NodeState.CURRENT) {
-                detail.setText(getString(R.string.learning_path_start));
-                circle.bind(lesson.icon, state, 0);
+                detail.setText(getString(R.string.learning_path_current));
+                circle.bind(lesson.icon, lesson.type, state, 0);
             } else if (state == NodeState.AVAILABLE) {
                 detail.setText(getString(R.string.learning_path_available));
-                circle.bind(lesson.icon, state, 0);
+                circle.bind(lesson.icon, lesson.type, state, 0);
             } else {
                 detail.setText(getString(R.string.learning_path_locked));
-                circle.bind("◆", state, 0);
+                circle.bind("◆", lesson.type, state, 0);
             }
-            setAlpha(state == NodeState.LOCKED ? 0.72f : 1f);
+            label.setTextColor(state == NodeState.LOCKED ? 0xFFAAAAAA : COLOR_TEXT);
+            label.setBackground(round(state == NodeState.LOCKED ? 0xFFF2F2F2 : Color.WHITE,
+                    dp(10), state == NodeState.LOCKED ? 0xFFE2E2E2 : COLOR_BORDER, dp(2)));
+            setAlpha(state == NodeState.LOCKED ? 0.78f : 1f);
             setContentDescription(lesson.title + ", " + detail.getText());
         }
 
-        float anchorX() { return getLeft() + getWidth() / 2f; }
-        float anchorY() { return getTop() + dp(39); }
         NodeState nodeState() { return state; }
+
+        @Override
+        public boolean performClick() {
+            super.performClick();
+            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            circle.animate().scaleX(0.90f).scaleY(0.90f).setDuration(65)
+                    .withEndAction(() -> circle.animate().scaleX(1f).scaleY(1f)
+                            .setDuration(120).start()).start();
+            return true;
+        }
     }
 
     private final class NodeCircle extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final RectF rect = new RectF();
+        private final RectF arc = new RectF();
         private final int accent;
         private String icon = "✓";
+        private String type = "normal";
         private NodeState state = NodeState.LOCKED;
-        private int progress;
+        private int progressValue;
 
         NodeCircle(Context context, int accent) {
             super(context);
             this.accent = accent;
-            setElevation(dp(3));
         }
 
-        void bind(String icon, NodeState state, int progress) {
-            this.icon = icon == null || icon.length() == 0 ? "✓" : icon;
+        void bind(String icon, String type, NodeState state, int progress) {
+            this.icon = icon == null || icon.isEmpty() ? "✓" : icon;
+            this.type = type == null ? "normal" : type;
             this.state = state;
-            this.progress = Math.max(0, Math.min(100, progress));
+            this.progressValue = Math.max(0, Math.min(100, progress));
             invalidate();
         }
 
@@ -771,74 +762,85 @@ public class LearningPathActivity extends AppCompatActivity {
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
             float cx = getWidth() / 2f;
-            float cy = getHeight() / 2f;
-            float radius = Math.min(getWidth(), getHeight()) / 2f - dp(6);
+            float cy = getHeight() / 2f - dp(1);
+            float radius = Math.min(getWidth(), getHeight()) / 2f - dp(7);
             int fill;
-            int stroke;
-            int iconColor;
+            int bottom;
+            int iconColor = Color.WHITE;
+
             if (state == NodeState.LOCKED) {
-                fill = 0xFFF0F2F6;
-                stroke = COLOR_LOCKED;
-                iconColor = 0xFF9BA5B7;
+                fill = COLOR_LOCKED;
+                bottom = COLOR_LOCKED_DARK;
+                iconColor = 0xFFAAAAAA;
             } else if (state == NodeState.COMPLETED) {
-                fill = accent;
-                stroke = darken(accent, 0.82f);
-                iconColor = Color.WHITE;
+                fill = COLOR_YELLOW;
+                bottom = COLOR_YELLOW_DARK;
             } else if (state == NodeState.CURRENT) {
-                fill = Color.WHITE;
-                stroke = accent;
-                iconColor = accent;
+                fill = COLOR_GREEN;
+                bottom = COLOR_GREEN_DARK;
             } else if (state == NodeState.DOWNLOADING) {
-                fill = 0xFFF0EFFF;
-                stroke = accent;
-                iconColor = accent;
+                fill = 0xFF84D8FF;
+                bottom = COLOR_BLUE_DARK;
             } else {
-                fill = 0xFFF9F9FF;
-                stroke = withAlpha(accent, 150);
-                iconColor = accent;
+                fill = nodeAccent(type);
+                bottom = darken(fill, 0.82f);
+            }
+
+            if (state == NodeState.CURRENT) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0x3358CC02);
+                canvas.drawCircle(cx, cy + dp(2), radius + dp(8), paint);
             }
 
             paint.setStyle(Paint.Style.FILL);
+            paint.setColor(bottom);
+            canvas.drawCircle(cx, cy + dp(6), radius, paint);
             paint.setColor(fill);
             canvas.drawCircle(cx, cy, radius, paint);
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(state == NodeState.CURRENT ? dp(4) : dp(3));
-            paint.setColor(stroke);
-            canvas.drawCircle(cx, cy, radius - dp(1.5f), paint);
+
+            paint.setColor(0x36FFFFFF);
+            canvas.drawOval(cx - radius * 0.60f, cy - radius * 0.66f,
+                    cx + radius * 0.60f, cy - radius * 0.28f, paint);
 
             if (state == NodeState.DOWNLOADING) {
-                rect.set(cx - radius + dp(4), cy - radius + dp(4),
-                        cx + radius - dp(4), cy + radius - dp(4));
-                paint.setColor(accent);
-                paint.setStrokeWidth(dp(5));
+                arc.set(cx - radius + dp(5), cy - radius + dp(5),
+                        cx + radius - dp(5), cy + radius - dp(5));
+                paint.setStyle(Paint.Style.STROKE);
                 paint.setStrokeCap(Paint.Cap.ROUND);
-                canvas.drawArc(rect, -90, progress * 3.6f, false, paint);
+                paint.setStrokeWidth(dp(5));
+                paint.setColor(Color.WHITE);
+                canvas.drawArc(arc, -90f, progressValue * 3.6f, false, paint);
                 paint.setStrokeCap(Paint.Cap.BUTT);
+                paint.setStyle(Paint.Style.FILL);
             }
 
             textPaint.setColor(iconColor);
             textPaint.setTypeface(Typeface.DEFAULT_BOLD);
-            textPaint.setTextSize(icon.length() > 2 ? dp(16) : dp(24));
             textPaint.setTextAlign(Paint.Align.CENTER);
+            textPaint.setTextSize(dp(icon.length() > 2 ? 16 : 25));
             Paint.FontMetrics fm = textPaint.getFontMetrics();
             float baseline = cy - (fm.ascent + fm.descent) / 2f;
             canvas.drawText(icon, cx, baseline, textPaint);
         }
+
+        private int nodeAccent(String type) {
+            if ("test".equals(type) || "checkpoint".equals(type)) return 0xFFCE82FF;
+            if ("review".equals(type)) return COLOR_YELLOW;
+            if ("speaking".equals(type)) return 0xFFFF86D0;
+            if ("listening".equals(type)) return COLOR_BLUE;
+            return accent == 0 ? COLOR_BLUE : blend(accent, COLOR_BLUE, 0.34f);
+        }
     }
 
+    /** Staggered map container. Deliberately draws no connector line. */
     private final class PathLayout extends ViewGroup {
-        private final Paint pathPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Path curve = new Path();
-        private final int accent;
         private final Map<View, String> positions = new HashMap<>();
-        private final int rowHeight = dp(132);
-        private final int nodeWidth = dp(130);
-        private final int nodeHeight = dp(122);
+        private final int rowHeight = dp(166);
+        private final int nodeWidth = dp(142);
+        private final int nodeHeight = dp(160);
 
-        PathLayout(Context context, int accent) {
+        PathLayout(Context context) {
             super(context);
-            this.accent = accent;
-            setWillNotDraw(false);
             setClipChildren(false);
             setClipToPadding(false);
             setPadding(0, dp(4), 0, dp(4));
@@ -866,7 +868,7 @@ public class LearningPathActivity extends AppCompatActivity {
         @Override
         protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
             int width = right - left;
-            int edge = dp(5);
+            int edge = dp(1);
             for (int i = 0; i < getChildCount(); i++) {
                 View child = getChildAt(i);
                 String position = positions.get(child);
@@ -878,45 +880,14 @@ public class LearningPathActivity extends AppCompatActivity {
                 child.layout(x, y, x + nodeWidth, y + nodeHeight);
             }
         }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            super.onDraw(canvas);
-            if (getChildCount() < 2) return;
-            pathPaint.setStyle(Paint.Style.STROKE);
-            pathPaint.setStrokeCap(Paint.Cap.ROUND);
-            pathPaint.setStrokeWidth(dp(7));
-            for (int i = 0; i < getChildCount() - 1; i++) {
-                NodeView start = (NodeView) getChildAt(i);
-                NodeView end = (NodeView) getChildAt(i + 1);
-                float x1 = start.anchorX();
-                float y1 = start.anchorY();
-                float x2 = end.anchorX();
-                float y2 = end.anchorY();
-                float midY = (y1 + y2) / 2f;
-                curve.reset();
-                curve.moveTo(x1, y1);
-                curve.cubicTo(x1, midY, x2, midY, x2, y2);
-                boolean completedSegment = start.nodeState() == NodeState.COMPLETED;
-                pathPaint.setColor(completedSegment ? withAlpha(accent, 175) : 0xFFDCE2EC);
-                canvas.drawPath(curve, pathPaint);
-            }
-        }
     }
 
-    private static final class ViewParentInvalidator {
-        static void invalidateParents(View view) {
-            View current = view;
-            for (int i = 0; i < 3 && current != null; i++) {
-                current.invalidate();
-                android.view.ViewParent parent = current.getParent();
-                current = parent instanceof View ? (View) parent : null;
-            }
-        }
-    }
-
-    private static int withAlpha(int color, int alpha) {
-        return (color & 0x00FFFFFF) | ((alpha & 0xFF) << 24);
+    private static int blend(int first, int second, float amount) {
+        float t = Math.max(0f, Math.min(1f, amount));
+        int r = (int) (Color.red(first) * (1f - t) + Color.red(second) * t);
+        int g = (int) (Color.green(first) * (1f - t) + Color.green(second) * t);
+        int b = (int) (Color.blue(first) * (1f - t) + Color.blue(second) * t);
+        return Color.rgb(r, g, b);
     }
 
     private static int darken(int color, float factor) {

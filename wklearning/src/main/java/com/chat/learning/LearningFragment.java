@@ -438,7 +438,7 @@ public class LearningFragment extends Fragment {
                 R.drawable.ic_learning_practice,
                 0xFFED8A4A,
                 getString(R.string.learning_home_tool_practice),
-                () -> LearningPathActivity.open(requireContext())
+                () -> LearningCategoryActivity.open(requireContext())
         ), new LinearLayout.LayoutParams(0, -1, 1f));
         return panel;
     }
