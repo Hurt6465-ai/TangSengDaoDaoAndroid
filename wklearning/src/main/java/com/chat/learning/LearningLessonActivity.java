@@ -25,6 +25,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -584,19 +585,27 @@ public class LearningLessonActivity extends AppCompatActivity {
     private void renderChoice(LearningLessonRepository.Exercise exercise) {
         boolean imageGrid = "image_choice".equals(exercise.type);
         ViewGroup options;
+        View optionsRoot;
         if (imageGrid) {
+            FrameLayout gridHost = new FrameLayout(this);
             GridLayout grid = new GridLayout(this);
             grid.setColumnCount(2);
             grid.setAlignmentMode(GridLayout.ALIGN_BOUNDS);
             grid.setUseDefaultMargins(false);
-            grid.setGravity(Gravity.CENTER_HORIZONTAL);
+            FrameLayout.LayoutParams gridLp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER_HORIZONTAL);
+            gridHost.addView(grid, gridLp);
             options = grid;
+            optionsRoot = gridHost;
         } else {
             LinearLayout list = new LinearLayout(this);
             list.setOrientation(LinearLayout.VERTICAL);
             options = list;
+            optionsRoot = list;
         }
-        questionHost.addView(options, new LinearLayout.LayoutParams(-1, -2));
+        questionHost.addView(optionsRoot, new LinearLayout.LayoutParams(-1, -2));
 
         ArrayList<View> optionViews = new ArrayList<>();
         ArrayList<LearningLessonRepository.ChoiceOption> choices =
