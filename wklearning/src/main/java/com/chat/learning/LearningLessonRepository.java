@@ -96,8 +96,14 @@ final class LearningLessonRepository {
             JSONObject object = exercises.optJSONObject(i);
             if (object == null) throw new IllegalArgumentException("Invalid exercise at index " + i);
             Exercise exercise = parseExercise(context, object, i);
+            // The map lesson player intentionally excludes repeat-after-me questions. Keep parsing
+            // the legacy schema so downloaded packs remain compatible, then ignore that type.
+            if ("pronunciation".equals(exercise.type)) continue;
             if (!ids.add(exercise.id)) throw new IllegalArgumentException("Duplicate exercise id: " + exercise.id);
             data.exercises.add(exercise);
+        }
+        if (data.exercises.isEmpty()) {
+            throw new IllegalArgumentException("Lesson has no supported exercises");
         }
         return data;
     }

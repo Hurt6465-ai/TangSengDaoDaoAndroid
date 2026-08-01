@@ -9,13 +9,13 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
-import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
+import android.view.SoundEffectConstants;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -54,11 +54,26 @@ public class LearningPathActivity extends AppCompatActivity {
     private static final int COLOR_LOCK_EDGE = 0xFFCFCFCF;
     private static final int COLOR_LOCK_ICON = 0xFFAFAFAF;
 
-    private static final boolean SHOW_LESSON_TITLE = false; // 多邻国节点下没有文字
-    private static final int ROW_H_DP = SHOW_LESSON_TITLE ? 118 : 94;
+    private static final boolean SHOW_LESSON_TITLE = true;
+    private static final int ROW_H_DP = 132;
+    private static final int[] WARM_UNIT_COLORS = {
+            0xFFF29C82, // warm coral
+            0xFFF2B66D, // honey
+            0xFF74BEA5, // mint
+            0xFF78B7DE, // soft sky
+            0xFFA995D8  // lavender
+    };
 
     private static int edgeOf(int color) {
         return LearningUiKit.blend(color, Color.BLACK, 0.17f);
+    }
+
+    private static int unitColor(int declaredColor, int unitIndex) {
+        int palette = WARM_UNIT_COLORS[Math.floorMod(unitIndex, WARM_UNIT_COLORS.length)];
+        if (declaredColor == 0) return palette;
+        // Keep remote course identity without allowing overly dark cards.
+        return LearningUiKit.blend(palette,
+                LearningUiKit.blend(declaredColor, Color.WHITE, 0.58f), 0.28f);
     }
 
     private RecyclerView recyclerView;
@@ -169,7 +184,10 @@ public class LearningPathActivity extends AppCompatActivity {
         recyclerView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         recyclerView.setVerticalScrollBarEnabled(false);
         recyclerView.setItemAnimator(null);
+        recyclerView.setItemViewCacheSize(10);
+        recyclerView.setHasFixedSize(false);
         layoutManager = new LinearLayoutManager(this);
+        layoutManager.setInitialPrefetchItemCount(8);
         recyclerView.setLayoutManager(layoutManager);
         adapter = new CourseMapAdapter();
         recyclerView.setAdapter(adapter);
@@ -624,9 +642,8 @@ public class LearningPathActivity extends AppCompatActivity {
 
     private static final class MapItem {
         static final int MESSAGE = 0;
-        static final int COURSE = 1;
-        static final int UNIT = 2;
-        static final int LESSON = 3;
+        static final int UNIT = 1;
+        static final int LESSON = 2;
 
         int type;
         String message = "";
@@ -669,11 +686,6 @@ public class LearningPathActivity extends AppCompatActivity {
             lessonPositions.clear();
             unitPositions.clear();
             currentLessonId = currentLesson == null ? "" : currentLesson;
-
-            MapItem courseItem = new MapItem();
-            courseItem.type = MapItem.COURSE;
-            courseItem.course = value;
-            items.add(courseItem);
 
             for (int unitIndex = 0; unitIndex < value.units.size(); unitIndex++) {
                 LearningPathRepository.Unit unit = value.units.get(unitIndex);
@@ -723,9 +735,6 @@ public class LearningPathActivity extends AppCompatActivity {
         @Override
         public long getItemId(int position) {
             MapItem item = items.get(position);
-            if (item.type == MapItem.COURSE && item.course != null) {
-                return stableId("course:" + item.course.id);
-            }
             if (item.type == MapItem.UNIT && item.unit != null) {
                 return stableId("unit:" + item.unit.id);
             }
@@ -743,7 +752,6 @@ public class LearningPathActivity extends AppCompatActivity {
         @NonNull
         @Override
         public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            if (viewType == MapItem.COURSE) return new CourseHolder(new CourseHeaderView(parent.getContext()));
             if (viewType == MapItem.UNIT) return new UnitHolder(new UnitHeaderView(parent.getContext()));
             if (viewType == MapItem.LESSON) return new LessonHolder(new LessonRowView(parent.getContext()));
             return new MessageHolder(new MessageView(parent.getContext()));
@@ -752,9 +760,7 @@ public class LearningPathActivity extends AppCompatActivity {
         @Override
         public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
             MapItem item = items.get(position);
-            if (holder instanceof CourseHolder) {
-                ((CourseHolder) holder).view.bind(item.course);
-            } else if (holder instanceof UnitHolder) {
+            if (holder instanceof UnitHolder) {
                 ((UnitHolder) holder).view.bind(item.unit, item.unitIndex);
             } else if (holder instanceof LessonHolder) {
                 NodeState state = stateFor(item.lesson, currentLessonId);
@@ -776,11 +782,6 @@ public class LearningPathActivity extends AppCompatActivity {
         String text = value == null ? "" : value;
         for (int i = 0; i < text.length(); i++) hash = 31L * hash + text.charAt(i);
         return hash;
-    }
-
-    private static final class CourseHolder extends RecyclerView.ViewHolder {
-        final CourseHeaderView view;
-        CourseHolder(CourseHeaderView value) { super(value); view = value; }
     }
 
     private static final class UnitHolder extends RecyclerView.ViewHolder {
@@ -817,143 +818,67 @@ public class LearningPathActivity extends AppCompatActivity {
         void bind(String value) { label.setText(value); }
     }
 
-    // 精简后：白底蓝卡、只有主副标题和一只伴读熊
-    private final class CourseHeaderView extends FrameLayout {
-        private final TextView title;
-        private final LearningUiKit.ProgressView progressView;
-        private final TextView progressLabel;
-        private final LearningUiKit.CharacterView character;
-
-        CourseHeaderView(Context context) {
-            super(context);
-            setPadding(dp(16), dp(16), dp(16), dp(22));
-
-            FrameLayout card = new FrameLayout(context);
-            card.setClipToOutline(true);
-            card.setElevation(dp(3));
-            LayoutParams cardLp = new LayoutParams(Math.min(dp(680),
-                    getResources().getDisplayMetrics().widthPixels - dp(32)), dp(150),
-                    Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-            addView(card, cardLp);
-
-            character = new LearningUiKit.CharacterView(context, COLOR_BLUE, 0, "book");
-            LayoutParams charLp = new LayoutParams(dp(112), dp(148), Gravity.END | Gravity.BOTTOM);
-            charLp.setMargins(0, 0, dp(16), dp(1));
-            card.addView(character, charLp);
-
-            LinearLayout body = new LinearLayout(context);
-            body.setOrientation(LinearLayout.VERTICAL);
-            body.setGravity(Gravity.CENTER_VERTICAL);
-            body.setPadding(dp(20), dp(16), dp(135), dp(16));
-            card.addView(body, new LayoutParams(-1, -1));
-
-            title = text("", 24, Color.WHITE, true);
-            title.setMaxLines(2);
-            title.setEllipsize(TextUtils.TruncateAt.END);
-            body.addView(title, new LinearLayout.LayoutParams(-1, -2));
-
-            LinearLayout row = new LinearLayout(context);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(24));
-            rowLp.setMargins(0, dp(16), 0, 0);
-            body.addView(row, rowLp);
-
-            progressView = new LearningUiKit.ProgressView(context);
-            progressView.setColors(0x48FFFFFF, Color.WHITE);
-            row.addView(progressView, new LinearLayout.LayoutParams(0, dp(8), 1f));
-
-            progressLabel = text("", 12, Color.WHITE, true);
-            progressLabel.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(dp(54), -1);
-            countLp.setMargins(dp(9), 0, 0, 0);
-            row.addView(progressLabel, countLp);
-        }
-
-        void bind(LearningPathRepository.Course value) {
-            int total = 0;
-            int completed = 0;
-            for (LearningPathRepository.Unit unit : value.units) {
-                for (LearningPathRepository.Lesson lesson : unit.lessons) {
-                    total++;
-                    LearningPathProgressStore.Progress item = progress.get(lesson.id);
-                    if (item != null && item.completed()) completed++;
-                }
-            }
-            title.setText(value.title);
-            progressView.setProgress(completed, Math.max(1, total));
-            progressLabel.setText(completed + "/" + total);
-            
-            int accent = value.accent == 0 ? COLOR_BLUE : value.accent;
-            ((FrameLayout) getChildAt(0)).setBackground(LearningUiKit.rounded(accent, dp(16), 0, 0));
-            character.setStyle(accent, 0, "book");
-        }
-    }
-
-    // 经典吸顶窄条式 Unit Header
+    // Compact raised unit card: title + quiet progress, with a warm low-saturation palette.
     private final class UnitHeaderView extends FrameLayout {
         private final FrameLayout card;
-        private final TextView overline;
         private final TextView title;
+        private final TextView progressLabel;
         private final LearningUiKit.ProgressView progressView;
         private final GuidebookIcon guide;
 
         UnitHeaderView(Context context) {
             super(context);
-            setPadding(dp(12), dp(10), dp(12), dp(10));
+            setPadding(dp(12), dp(8), dp(12), dp(8));
             card = new FrameLayout(context);
             card.setClipToOutline(true);
-            card.setElevation(dp(2));
-            addView(card, new LayoutParams(-1, dp(84)));
+            addView(card, new LayoutParams(-1, dp(74)));
 
             LinearLayout body = new LinearLayout(context);
             body.setOrientation(LinearLayout.VERTICAL);
             body.setGravity(Gravity.CENTER_VERTICAL);
-            body.setPadding(dp(16), dp(12), dp(78), dp(12));
+            body.setPadding(dp(17), dp(10), dp(74), dp(10));
             card.addView(body, new LayoutParams(-1, -1));
 
-            overline = text("", 12, 0xCCFFFFFF, true);
-            overline.setAllCaps(true);
-            overline.setLetterSpacing(0.06f);
-            body.addView(overline, new LinearLayout.LayoutParams(-1, -2));
-
-            title = text("", 19, Color.WHITE, true);
+            title = text("", 18, Color.WHITE, true);
             title.setMaxLines(1);
             title.setEllipsize(TextUtils.TruncateAt.END);
-            LinearLayout.LayoutParams tLp = new LinearLayout.LayoutParams(-1, -2);
-            tLp.setMargins(0, dp(2), 0, 0);
-            body.addView(title, tLp);
+            body.addView(title, new LinearLayout.LayoutParams(-1, -2));
+
+            LinearLayout progressRow = new LinearLayout(context);
+            progressRow.setOrientation(LinearLayout.HORIZONTAL);
+            progressRow.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(-1, dp(18));
+            rowLp.setMargins(0, dp(6), 0, 0);
+            body.addView(progressRow, rowLp);
 
             progressView = new LearningUiKit.ProgressView(context);
-            progressView.setColors(0x40FFFFFF, Color.WHITE);
-            LinearLayout.LayoutParams pLp = new LinearLayout.LayoutParams(-1, dp(7));
-            pLp.setMargins(0, dp(8), 0, 0);
-            body.addView(progressView, pLp);
+            progressView.setColors(0x48FFFFFF, Color.WHITE);
+            progressRow.addView(progressView, new LinearLayout.LayoutParams(0, dp(6), 1f));
 
-            View divider = new View(context);
-            divider.setBackgroundColor(0x40FFFFFF);
-            LayoutParams dLp = new LayoutParams(dp(2), dp(40), Gravity.END | Gravity.CENTER_VERTICAL);
-            dLp.setMargins(0, 0, dp(62), 0);
-            card.addView(divider, dLp);
+            progressLabel = text("", 11, 0xE6FFFFFF, true);
+            progressLabel.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(dp(42), -1);
+            labelLp.setMargins(dp(8), 0, 0, 0);
+            progressRow.addView(progressLabel, labelLp);
 
             guide = new GuidebookIcon(context);
-            LayoutParams gLp = new LayoutParams(dp(52), dp(52), Gravity.END | Gravity.CENTER_VERTICAL);
-            gLp.setMargins(0, 0, dp(6), 0);
+            LayoutParams gLp = new LayoutParams(dp(46), dp(46), Gravity.END | Gravity.CENTER_VERTICAL);
+            gLp.setMargins(0, 0, dp(9), dp(4));
             card.addView(guide, gLp);
         }
 
         void bind(LearningPathRepository.Unit unit, int unitIndex) {
-            int accent = unit.accent == 0 ? COLOR_BLUE : unit.accent;
-            GradientDrawable bg = LearningUiKit.rounded(accent, dp(16), 0, 0);
-            card.setBackground(bg);
+            int accent = unitColor(unit.accent, unitIndex);
+            int edge = LearningUiKit.blend(accent, Color.BLACK, 0.13f);
+            card.setBackground(LearningUiKit.raised(accent, edge, dp(17), 0, 0, dp(6)));
             int completed = 0;
             for (LearningPathRepository.Lesson lesson : unit.lessons) {
                 LearningPathProgressStore.Progress value = progress.get(lesson.id);
                 if (value != null && value.completed()) completed++;
             }
-            overline.setText(getString(R.string.learning_unit_number, unitIndex + 1));
             title.setText(unit.title);
             progressView.setProgress(completed, Math.max(1, unit.lessons.size()));
+            progressLabel.setText(completed + "/" + unit.lessons.size());
         }
     }
 
@@ -997,13 +922,15 @@ public class LearningPathActivity extends AppCompatActivity {
 
             character = new LearningUiKit.CharacterView(context);
             character.setVisibility(GONE);
-            addView(character, new LayoutParams(dp(84), dp(112), Gravity.BOTTOM | Gravity.START));
+            addView(character, new LayoutParams(dp(82), dp(108), Gravity.BOTTOM | Gravity.START));
 
             node = new NodeGroup(context);
-            addView(node, new LayoutParams(dp(130), dp(ROW_H_DP), Gravity.TOP | Gravity.CENTER_HORIZONTAL));
+            addView(node, new LayoutParams(dp(156), dp(ROW_H_DP), Gravity.TOP | Gravity.CENTER_HORIZONTAL));
 
             setOnClickListener(v -> {
                 if (boundItem == null || boundItem.lesson == null) return;
+                v.playSoundEffect(SoundEffectConstants.CLICK);
+                v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
                 throttled(() -> onLessonClick(boundItem.lesson, boundState));
             });
         }
@@ -1044,7 +971,8 @@ public class LearningPathActivity extends AppCompatActivity {
             int offset = dp(PATH_OFFSET[Math.floorMod(item.lessonIndex, PATH_OFFSET.length)]);
             offset = Math.max(-max, Math.min(max, offset));
             node.setTranslationX(offset);
-            node.bind(item.lesson, state, value, download, item.unit.accent);
+            int warmAccent = unitColor(item.unit.accent, item.unitIndex);
+            node.bind(item.lesson, state, value, download, warmAccent);
 
             boolean showCharacter = "story".equals(item.lesson.type)
                     || "trophy".equals(item.lesson.type)
@@ -1053,7 +981,7 @@ public class LearningPathActivity extends AppCompatActivity {
                 character.setVisibility(VISIBLE);
                 String pose = "trophy".equals(item.lesson.type) ? "trophy"
                         : "story".equals(item.lesson.type) ? "book" : "wave";
-                character.setStyle(item.unit.accent,
+                character.setStyle(warmAccent,
                         characterVariant(item.unit.character, item.unitIndex * 2 + item.lessonIndex), pose);
                 LayoutParams cLp = (LayoutParams) character.getLayoutParams();
                 cLp.gravity = (offset >= 0 ? Gravity.START : Gravity.END) | Gravity.BOTTOM;
@@ -1088,7 +1016,7 @@ public class LearningPathActivity extends AppCompatActivity {
             setClipToPadding(false);
 
             circle = new NodeCircle(context);
-            addView(circle, new LayoutParams(dp(104), dp(104), Gravity.TOP | Gravity.CENTER_HORIZONTAL));
+            addView(circle, new LayoutParams(dp(102), dp(102), Gravity.TOP | Gravity.CENTER_HORIZONTAL));
 
             bubbleHost = new LinearLayout(context);
             bubbleHost.setOrientation(LinearLayout.VERTICAL);
@@ -1104,13 +1032,14 @@ public class LearningPathActivity extends AppCompatActivity {
             addView(bubbleHost, bLp);
             bubbleHost.setTranslationY(-dp(44));
 
-            title = text("", 14, COLOR_TEXT, true);
-            title.setGravity(Gravity.CENTER_HORIZONTAL);
+            title = text("", 13, COLOR_TEXT, true);
+            title.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
             title.setMaxLines(2);
+            title.setLineSpacing(dp(1), 1f);
             title.setEllipsize(TextUtils.TruncateAt.END);
             title.setVisibility(SHOW_LESSON_TITLE ? VISIBLE : GONE);
-            LayoutParams tLp = new LayoutParams(dp(130), -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-            tLp.topMargin = dp(98);
+            LayoutParams tLp = new LayoutParams(dp(154), dp(38), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            tLp.topMargin = dp(94);
             addView(title, tLp);
         }
 
@@ -1207,8 +1136,8 @@ public class LearningPathActivity extends AppCompatActivity {
         protected void onDraw(Canvas canvas) {
             float cx = getWidth() / 2f;
             float cy = getHeight() / 2f;
-            float radius = dp(35);
-            float depth = dp(8);
+            float radius = dp(34);
+            float depth = dp(7);
             boolean locked = state == NodeState.LOCKED;
 
             int fill = locked ? COLOR_LOCK_FILL : nodeColor(type, accent);
