@@ -6,16 +6,16 @@
     {
       "id": "hsk1",
       "title": "HSK 1",
-      "subtitle": "150 个零基础高频词",
-      "preview": "你好 / 再见 / 不客气",
-      "badge": "150词",
+      "subtitle": "新版大纲 300 个一级词汇",
+      "preview": "爱 / 你好 / 学习",
+      "badge": "300词",
       "target": "word",
       "level": "hsk1",
       "cover_url": "covers/words/hsk1_v1.webp",
       "cover_version": 1,
-      "data_url": "packs/words/hsk1_v1.json",
-      "data_version": 1,
-      "data_sha256": ""
+      "data_url": "packs/words/hsk1_v4.json",
+      "data_version": 4,
+      "data_sha256": "16b1c82e631808e317f4abe9caf522e834ca4a01804afadf2527a2988cae2597"
     },
     {
       "id": "hsk2",
