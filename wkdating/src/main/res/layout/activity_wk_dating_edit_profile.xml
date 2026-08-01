@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F7F7F9"
-    android:orientation="vertical">
+    android:background="#F2F2F4">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -13,25 +17,62 @@
 
         <ImageView
             android:id="@+id/backBtn"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:layout_gravity="start|center_vertical"
-            android:background="@drawable/bg_dating_top_icon_button"
             android:contentDescription="@string/dating_back"
-            android:elevation="2dp"
-            android:padding="9dp"
+            android:foreground="?android:attr/selectableItemBackgroundBorderless"
+            android:padding="11dp"
             android:src="@drawable/ic_dating_back"
-            android:tint="#24242A" />
+            android:tint="#202026" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:text="@string/dating_edit_profile_title"
-            android:textColor="#16181E"
-            android:textSize="19sp"
+            android:textColor="#18181D"
+            android:textSize="20sp"
             android:textStyle="bold" />
     </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="68dp"
+        android:background="#F2F2F4"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp">
+
+        <TextView
+            android:id="@+id/editTab"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/dating_edit_tab"
+            android:textColor="#18181D"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="36dp"
+            android:background="#D9D9DE" />
+
+        <TextView
+            android:id="@+id/previewTab"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:foreground="?android:attr/selectableItemBackground"
+            android:gravity="center"
+            android:text="@string/dating_preview_tab"
+            android:textColor="#66666F"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <ScrollView
         android:layout_width="match_parent"
@@ -46,118 +87,74 @@
             android:orientation="vertical"
             android:paddingStart="16dp"
             android:paddingEnd="16dp"
-            android:paddingBottom="24dp">
+            android:paddingBottom="28dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_dating_detail_card"
-                android:orientation="vertical"
-                android:padding="14dp">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/dating_my_photos"
+                    android:textColor="#202026"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/profileScoreTv"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/dating_my_photos"
-                    android:textColor="#16181E"
-                    android:textSize="16sp"
+                    android:textColor="#D91C28"
+                    android:textSize="15sp"
                     android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_dating_detail_card"
+                android:orientation="vertical"
+                android:padding="12dp">
 
                 <TextView
                     android:id="@+id/photoTip"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:textColor="#6C7380"
+                    android:textColor="#777780"
                     android:textSize="12sp" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/photoRecycler"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="8dp"
                     android:clipToPadding="false"
                     android:nestedScrollingEnabled="false" />
             </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:background="@drawable/bg_dating_detail_card"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingStart="16dp"
-                android:paddingTop="14dp"
-                android:paddingEnd="14dp"
-                android:paddingBottom="14dp">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/dating_status_title"
-                        android:textColor="#202026"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/dating_status_edit_tip"
-                        android:textColor="#8A909B"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/statusActionBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="40dp"
-                    android:background="@drawable/bg_dating_status_pill"
-                    android:gravity="center"
-                    android:minWidth="92dp"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:textColor="#FF4F6D"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
+            <TextView
+                style="@style/WkDatingSettingsSectionTitle"
+                android:text="@string/dating_basic_info_section" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
                 android:background="@drawable/bg_dating_detail_card"
                 android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/dating_shared_profile"
-                    android:textColor="#16181E"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="@string/dating_shared_profile_partner_tip"
-                    android:textColor="#8A909B"
-                    android:textSize="12sp" />
+                android:paddingStart="16dp"
+                android:paddingTop="15dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="12dp">
 
                 <TextView
                     android:id="@+id/sharedSummaryTv"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
                     android:lineSpacingExtra="4dp"
                     android:textColor="#4C5059"
                     android:textSize="14sp" />
@@ -165,7 +162,7 @@
                 <LinearLayout
                     android:id="@+id/sharedEditBtn"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
+                    android:layout_height="50dp"
                     android:layout_marginTop="12dp"
                     android:background="@drawable/bg_dating_detail_info_row"
                     android:foreground="?android:attr/selectableItemBackground"
@@ -180,7 +177,7 @@
                         android:layout_weight="1"
                         android:text="@string/dating_edit_shared_profile_inside"
                         android:textColor="#2E3037"
-                        android:textSize="14sp"
+                        android:textSize="15sp"
                         android:textStyle="bold" />
 
                     <ImageView
@@ -190,10 +187,13 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <TextView
+                style="@style/WkDatingSettingsSectionTitle"
+                android:text="@string/dating_preferences_section" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
                 android:background="@drawable/bg_dating_detail_card"
                 android:orientation="vertical">
 
@@ -201,59 +201,126 @@
                     <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_edit_intent" />
                     <TextView android:id="@+id/intentValue" style="@style/WkDatingEditValue" />
                 </LinearLayout>
-                <View style="@style/WkDatingDivider" />
+                <View style="@style/WkDatingEditDivider" />
+
                 <LinearLayout android:id="@+id/genderRow" style="@style/WkDatingEditRow">
                     <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_edit_gender" />
                     <TextView android:id="@+id/genderValue" style="@style/WkDatingEditValue" />
                 </LinearLayout>
-                <View style="@style/WkDatingDivider" />
+                <View style="@style/WkDatingEditDivider" />
+
                 <LinearLayout android:id="@+id/ageRow" style="@style/WkDatingEditRow">
                     <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_edit_age" />
                     <TextView android:id="@+id/ageValue" style="@style/WkDatingEditValue" />
                 </LinearLayout>
-                <View style="@style/WkDatingDivider" />
+                <View style="@style/WkDatingEditDivider" />
+
                 <LinearLayout android:id="@+id/sexualOrientationRow" style="@style/WkDatingEditRow">
                     <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_edit_orientation" />
                     <TextView android:id="@+id/sexualOrientationValue" style="@style/WkDatingEditValue" />
                 </LinearLayout>
-                <View style="@style/WkDatingDivider" />
-                <LinearLayout android:id="@+id/drinkingRow" style="@style/WkDatingEditRow">
-                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_edit_drinking" />
-                    <TextView android:id="@+id/drinkingValue" style="@style/WkDatingEditValue" />
-                </LinearLayout>
-                <View style="@style/WkDatingDivider" />
-                <LinearLayout android:id="@+id/smokingRow" style="@style/WkDatingEditRow">
-                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_edit_smoking" />
-                    <TextView android:id="@+id/smokingValue" style="@style/WkDatingEditValue" />
-                </LinearLayout>
-                <View style="@style/WkDatingDivider" />
+                <View style="@style/WkDatingEditDivider" />
+
                 <LinearLayout android:id="@+id/dealbreakersRow" style="@style/WkDatingEditRow">
                     <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_edit_dealbreakers" />
-                    <TextView android:id="@+id/dealbreakersValue" style="@style/WkDatingEditValue" android:maxWidth="210dp" android:ellipsize="end" android:maxLines="1" />
+                    <TextView
+                        android:id="@+id/dealbreakersValue"
+                        style="@style/WkDatingEditValue"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:maxWidth="210dp" />
                 </LinearLayout>
             </LinearLayout>
+
+            <TextView
+                style="@style/WkDatingSettingsSectionTitle"
+                android:text="@string/dating_lifestyle_section" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_dating_detail_card"
+                android:orientation="vertical">
+
+                <LinearLayout android:id="@+id/drinkingRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_edit_drinking" />
+                    <TextView android:id="@+id/drinkingValue" style="@style/WkDatingEditValue" />
+                </LinearLayout>
+                <View style="@style/WkDatingEditDivider" />
+
+                <LinearLayout android:id="@+id/smokingRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_edit_smoking" />
+                    <TextView android:id="@+id/smokingValue" style="@style/WkDatingEditValue" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                style="@style/WkDatingSettingsSectionTitle"
+                android:text="@string/dating_about_me_section" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:background="@drawable/bg_dating_detail_card"
                 android:orientation="vertical"
                 android:padding="14dp">
 
-                <EditText android:id="@+id/cityEt" style="@style/WkDatingEditText" android:hint="@string/dating_city" />
-                <EditText android:id="@+id/heightEt" style="@style/WkDatingEditText" android:hint="@string/dating_height_hint" android:inputType="number" />
-                <EditText android:id="@+id/weightEt" style="@style/WkDatingEditText" android:hint="@string/dating_weight_hint" android:inputType="number" />
-                <EditText android:id="@+id/introEt" style="@style/WkDatingEditText" android:layout_height="96dp" android:gravity="top" android:hint="@string/dating_about_hint" android:inputType="textMultiLine" android:maxLength="500" />
-                <EditText android:id="@+id/idealPartnerEt" style="@style/WkDatingEditText" android:layout_height="86dp" android:gravity="top" android:hint="@string/dating_ideal_hint" android:inputType="textMultiLine" android:maxLength="200" />
-                <EditText android:id="@+id/tagsEt" style="@style/WkDatingEditText" android:layout_height="70dp" android:gravity="top" android:hint="@string/dating_tags_hint" android:inputType="textMultiLine" />
+                <TextView style="@style/WkDatingEditFieldLabel" android:text="@string/dating_field_city" />
+                <EditText
+                    android:id="@+id/cityEt"
+                    style="@style/WkDatingEditText"
+                    android:hint="@string/dating_city" />
+
+                <TextView style="@style/WkDatingEditFieldLabel" android:text="@string/dating_field_height" />
+                <EditText
+                    android:id="@+id/heightEt"
+                    style="@style/WkDatingEditText"
+                    android:hint="@string/dating_height_hint"
+                    android:inputType="number" />
+
+                <TextView style="@style/WkDatingEditFieldLabel" android:text="@string/dating_field_weight" />
+                <EditText
+                    android:id="@+id/weightEt"
+                    style="@style/WkDatingEditText"
+                    android:hint="@string/dating_weight_hint"
+                    android:inputType="number" />
+
+                <TextView style="@style/WkDatingEditFieldLabel" android:text="@string/dating_field_intro" />
+                <EditText
+                    android:id="@+id/introEt"
+                    style="@style/WkDatingEditText"
+                    android:layout_height="100dp"
+                    android:gravity="top"
+                    android:hint="@string/dating_about_hint"
+                    android:inputType="textMultiLine"
+                    android:maxLength="500" />
+
+                <TextView style="@style/WkDatingEditFieldLabel" android:text="@string/dating_field_ideal" />
+                <EditText
+                    android:id="@+id/idealPartnerEt"
+                    style="@style/WkDatingEditText"
+                    android:layout_height="88dp"
+                    android:gravity="top"
+                    android:hint="@string/dating_ideal_hint"
+                    android:inputType="textMultiLine"
+                    android:maxLength="200" />
+
+                <TextView style="@style/WkDatingEditFieldLabel" android:text="@string/dating_field_tags" />
+                <EditText
+                    android:id="@+id/tagsEt"
+                    style="@style/WkDatingEditText"
+                    android:layout_height="72dp"
+                    android:gravity="top"
+                    android:hint="@string/dating_tags_hint"
+                    android:inputType="textMultiLine" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="68dp"
+        android:layout_height="70dp"
+        android:background="#F2F2F4"
         android:paddingStart="16dp"
         android:paddingTop="8dp"
         android:paddingEnd="16dp"
@@ -262,7 +329,7 @@
         <TextView
             android:id="@+id/saveBtn"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="50dp"
             android:background="@drawable/bg_dating_loading_button"
             android:gravity="center"
             android:text="@string/dating_save_profile"
@@ -270,6 +337,8 @@
             android:textSize="16sp"
             android:textStyle="bold" />
     </FrameLayout>
+
+    </LinearLayout>
 
     <LinearLayout
         android:id="@+id/uploadOverlay"
@@ -295,4 +364,4 @@
             android:textColor="#FFFFFFFF"
             android:textSize="14sp" />
     </LinearLayout>
-</LinearLayout>
+</FrameLayout>
