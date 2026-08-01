@@ -3,6 +3,12 @@
   "connect_timeout_ms": 8000,
   "read_timeout_ms": 12000,
   "catalogs": {
-    "words": "catalogs/words/catalog.json"
-  }
+    "words": "catalogs/words/catalog.json",
+    "learning_path": "learning/path/catalog.json"
+  },
+  "package_read_timeout_ms": 120000,
+  "max_package_bytes": 209715200,
+  "max_unpacked_bytes": 524288000,
+  "allow_absolute_https_urls": false,
+  "allowed_hosts": []
 }
