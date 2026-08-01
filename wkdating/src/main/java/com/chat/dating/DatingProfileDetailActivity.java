@@ -28,6 +28,7 @@ public class DatingProfileDetailActivity extends Activity {
     public static final String EXTRA_PROFILE = "dating_profile";
     public static final String EXTRA_PHOTO_INDEX = "dating_photo_index";
     public static final String EXTRA_ACTION = "dating_action";
+    public static final String EXTRA_PREVIEW_ONLY = "dating_preview_only";
 
     private ActivityWkDatingProfileDetailBinding binding;
     private DatingProfile profile;
@@ -56,6 +57,15 @@ public class DatingProfileDetailActivity extends Activity {
         binding.passBtn.setOnClickListener(v -> returnAction(DatingSwipeAction.PASS));
         binding.favoriteBtn.setOnClickListener(v -> returnAction(DatingSwipeAction.FAVORITE));
         binding.likeBtn.setOnClickListener(v -> returnAction(DatingSwipeAction.LIKE));
+
+        if (getIntent().getBooleanExtra(EXTRA_PREVIEW_ONLY, false)) {
+            binding.moreBtn.setVisibility(View.GONE);
+            binding.actionBar.setVisibility(View.GONE);
+            binding.detailScroll.setPadding(
+                    binding.detailScroll.getPaddingLeft(),
+                    binding.detailScroll.getPaddingTop(),
+                    binding.detailScroll.getPaddingRight(), 0);
+        }
 
         photoAdapter = new DatingPhotoPagerAdapter();
         photoAdapter.setPhotos(profile.safeDatingPhotos());

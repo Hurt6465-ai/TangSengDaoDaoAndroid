@@ -68,7 +68,9 @@ public class DatingModel extends WKBaseModel {
                 scope == null ? "global" : scope,
                 sessionId == null ? "" : sessionId,
                 f.countryMode,
-                f.gender,
+                // 性别偏好由服务端资料字段 gender_preference 权威控制；
+                // 旧版 gender 查询参数不再发送，避免临时筛选覆盖个人设置。
+                null,
                 f.ageMin,
                 f.ageMax,
                 f.goal,

@@ -9,7 +9,9 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.TextView;
 
@@ -108,11 +110,13 @@ public class DatingEditProfileActivity extends Activity {
                     DatingIntent.displayLabel(this, intentValue), value -> {
                         intentValue = DatingIntent.codeForDisplayLabel(this, value);
                         binding.intentValue.setText(DatingIntent.displayLabel(this, intentValue));
+                        updateProfileScore();
                     });
         });
         binding.genderRow.setOnClickListener(v -> pickSingle(getString(R.string.dating_edit_gender), genderOptions, genderText(), value -> {
             genderPreference = genderOptions[1].equals(value) ? 0 : (genderOptions[2].equals(value) ? 1 : -1);
             binding.genderValue.setText(value);
+            updateProfileScore();
         }));
         binding.ageRow.setOnClickListener(v -> pickSingle(getString(R.string.dating_edit_age), ageOptions, getString(R.string.dating_age_range_plain, ageMin, ageMax), value -> {
             String[] pair = value.replaceAll("[^0-9-]", "").split("-");
@@ -120,22 +124,26 @@ public class DatingEditProfileActivity extends Activity {
                 ageMin = parseInt(pair[0]);
                 ageMax = parseInt(pair[1]);
                 binding.ageValue.setText(getString(R.string.dating_age_range_plain, ageMin, ageMax));
+                updateProfileScore();
             }
         }));
         binding.sexualOrientationRow.setOnClickListener(v -> pickSingle(getString(R.string.dating_edit_orientation), sexualOrientationOptions,
                 DatingValueFormatter.orientation(this, sexualOrientationValue), value -> {
                     sexualOrientationValue = DatingValueFormatter.orientationCode(this, value);
                     binding.sexualOrientationValue.setText(DatingValueFormatter.orientation(this, sexualOrientationValue));
+                    updateProfileScore();
                 }));
         binding.drinkingRow.setOnClickListener(v -> pickSingle(getString(R.string.dating_edit_drinking), drinkingOptions,
                 DatingValueFormatter.drinking(this, drinkingValue), value -> {
                     drinkingValue = DatingValueFormatter.drinkingCode(this, value);
                     binding.drinkingValue.setText(DatingValueFormatter.drinking(this, drinkingValue));
+                    updateProfileScore();
                 }));
         binding.smokingRow.setOnClickListener(v -> pickSingle(getString(R.string.dating_edit_smoking), smokingOptions,
                 DatingValueFormatter.smoking(this, smokingValue), value -> {
                     smokingValue = DatingValueFormatter.smokingCode(this, value);
                     binding.smokingValue.setText(DatingValueFormatter.smoking(this, smokingValue));
+                    updateProfileScore();
                 }));
         binding.dealbreakersRow.setOnClickListener(v -> pickDealbreakers());
         binding.sharedEditBtn.setOnClickListener(v -> {
@@ -143,8 +151,19 @@ public class DatingEditProfileActivity extends Activity {
             intent.putExtra(DatingSharedProfileActivity.EXTRA_PROFILE, profile);
             startActivityForResult(intent, REQ_SHARED_PROFILE);
         });
-        binding.statusActionBtn.setOnClickListener(v -> toggleDatingStatus());
+        binding.previewTab.setOnClickListener(v -> openPreview());
         binding.saveBtn.setOnClickListener(v -> saveProfile());
+        TextWatcher scoreWatcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) { updateProfileScore(); }
+        };
+        binding.cityEt.addTextChangedListener(scoreWatcher);
+        binding.heightEt.addTextChangedListener(scoreWatcher);
+        binding.weightEt.addTextChangedListener(scoreWatcher);
+        binding.introEt.addTextChangedListener(scoreWatcher);
+        binding.idealPartnerEt.addTextChangedListener(scoreWatcher);
+        binding.tagsEt.addTextChangedListener(scoreWatcher);
     }
 
     private void bindProfile() {
@@ -178,6 +197,7 @@ public class DatingEditProfileActivity extends Activity {
         binding.tagsEt.setText(TextUtils.join(getString(R.string.dating_list_separator), profile.tags == null ? new ArrayList<>() : profile.tags));
         bindSharedFields();
         updatePhotoTip();
+        updateProfileScore();
     }
 
     private void syncSharedProfile() {
@@ -199,39 +219,11 @@ public class DatingEditProfileActivity extends Activity {
         binding.sharedSummaryTv.setText(lines.isEmpty()
                 ? getString(R.string.dating_not_filled)
                 : TextUtils.join("\n", lines));
-        updateStatusAction();
+        updateProfileScore();
     }
 
     private void addSharedLine(List<String> lines, String value) {
         if (!TextUtils.isEmpty(value) && !lines.contains(value)) lines.add(value);
-    }
-
-    private void updateStatusAction() {
-        binding.statusActionBtn.setText(profile.enabled == 1
-                ? R.string.dating_close_dating
-                : R.string.dating_open_dating);
-    }
-
-    private void toggleDatingStatus() {
-        if (uploading || profile == null) return;
-        boolean enabled = profile.enabled == 1;
-        if (!enabled && !isCompleteEnough(photoAdapter.getPhotos(), intentValue)) {
-            toast(getString(R.string.dating_complete_before_open));
-            return;
-        }
-        binding.statusActionBtn.setEnabled(false);
-        DatingModel.getInstance().enableProfile(!enabled, (code, msg, data) -> {
-            if (isFinishing() || binding == null) return;
-            binding.statusActionBtn.setEnabled(true);
-            if (code == HttpResponseCode.success && data != null) {
-                profile = data;
-                initiallyEnabled = profile.enabled == 1;
-                updateStatusAction();
-                toast(getString(profile.enabled == 1 ? R.string.dating_enabled : R.string.dating_disabled));
-            } else {
-                toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_action_failed) : msg);
-            }
-        });
     }
 
     private void openPicker() {
@@ -299,6 +291,7 @@ public class DatingEditProfileActivity extends Activity {
                 setUploading(false, 100, "");
                 photoAdapter.appendPhotos(photoUrls);
                 updatePhotoTip();
+                updateProfileScore();
                 toast(getString(R.string.dating_photo_upload_done));
             }
             @Override public void onError(String message) {
@@ -336,7 +329,72 @@ public class DatingEditProfileActivity extends Activity {
                 .setPositiveButton(R.string.dating_delete, (dialog, which) -> {
                     photoAdapter.removePhoto(position);
                     updatePhotoTip();
+                    updateProfileScore();
                 }).show();
+    }
+
+    private void openPreview() {
+        if (uploading) {
+            toast(getString(R.string.dating_uploading_wait));
+            return;
+        }
+        if (photoAdapter.getPhotos().isEmpty()) {
+            toast(getString(R.string.dating_preview_need_photo));
+            return;
+        }
+        applyFormToProfile();
+        Intent intent = new Intent(this, DatingProfileDetailActivity.class);
+        intent.putExtra(DatingProfileDetailActivity.EXTRA_PROFILE, profile);
+        intent.putExtra(DatingProfileDetailActivity.EXTRA_PHOTO_INDEX, 0);
+        intent.putExtra(DatingProfileDetailActivity.EXTRA_PREVIEW_ONLY, true);
+        startActivity(intent);
+    }
+
+    private void applyFormToProfile() {
+        ArrayList<String> photos = photoAdapter.getPhotos();
+        profile.photos = new ArrayList<>(photos);
+        profile.card_photos = new ArrayList<>(photos);
+        profile.profile_images = new ArrayList<>(photos);
+        profile.intent = intentValue;
+        profile.relationship_goal = intentValue;
+        profile.gender_preference = genderPreference;
+        profile.min_age = ageMin;
+        profile.max_age = ageMax;
+        profile.city = text(binding.cityEt);
+        profile.sexual_orientation = sexualOrientationValue;
+        profile.drinking = drinkingValue;
+        profile.smoking = smokingValue;
+        profile.height_cm = parseInt(text(binding.heightEt));
+        profile.weight_kg = parseInt(text(binding.weightEt));
+        profile.bio = limit(text(binding.introEt), 500);
+        profile.intro = profile.bio;
+        profile.ideal_partner = limit(text(binding.idealPartnerEt), 200);
+        profile.dealbreakers = new ArrayList<>(dealbreakers);
+        profile.tags = parseTags(text(binding.tagsEt));
+    }
+
+    private void updateProfileScore() {
+        if (binding == null || photoAdapter == null) return;
+        int score = 0;
+        if (photoAdapter.photoCount() > 0) score += 35;
+        if (photoAdapter.photoCount() >= 3) score += 10;
+        if (profile != null && profile.age >= 18) score += 10;
+        if (!TextUtils.isEmpty(intentValue)) score += 12;
+        if (!TextUtils.isEmpty(text(binding.introEt))) score += 12;
+        if (profile != null && !TextUtils.isEmpty(profile.country_code)) score += 5;
+        boolean hasTags = !parseTags(text(binding.tagsEt)).isEmpty();
+        if (profile != null) {
+            hasTags = hasTags || !profile.safePersonalityTags().isEmpty()
+                    || !profile.safePetTags().isEmpty()
+                    || !profile.safeSportTags().isEmpty()
+                    || !profile.safeMovieTags().isEmpty();
+        }
+        if (hasTags) score += 8;
+        if (parseInt(text(binding.heightEt)) > 0 || parseInt(text(binding.weightEt)) > 0) score += 4;
+        if (profile != null && (!TextUtils.isEmpty(profile.job_status) || !TextUtils.isEmpty(profile.education))) score += 4;
+        if ((profile != null && !TextUtils.isEmpty(profile.relationship_status)) || !TextUtils.isEmpty(sexualOrientationValue)) score += 5;
+        if (!TextUtils.isEmpty(text(binding.idealPartnerEt)) || !dealbreakers.isEmpty()) score += 5;
+        binding.profileScoreTv.setText(getString(R.string.dating_profile_completion, Math.max(0, Math.min(100, score))));
     }
 
     private void saveProfile() {
@@ -421,15 +479,9 @@ public class DatingEditProfileActivity extends Activity {
                         if (checked[i]) dealbreakers.add(DatingValueFormatter.dealbreakerCode(this, dealbreakerOptions[i]));
                     }
                     updateDealbreakersText();
+                    updateProfileScore();
                 })
                 .show();
-    }
-
-    private boolean isCompleteEnough(List<String> photos, String relationshipIntent) {
-        return DatingPhotoPolicy.canEnableDating(photos)
-                && !TextUtils.isEmpty(relationshipIntent)
-                && profile.age >= 18
-                && profile.hasKnownSex();
     }
 
     private void updateDealbreakersText() {
