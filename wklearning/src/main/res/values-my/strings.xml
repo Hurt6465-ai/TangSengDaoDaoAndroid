@@ -1,553 +1,349 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources>
-    <string name="learning_title">Learning</string>
-    <string name="learning_subtitle">Choose an AI web page, speaking scenario, or script manager. Official scenarios are bundled first and can be updated later.</string>
-    <string name="learning_deepseek_title">DeepSeek</string>
-    <string name="learning_deepseek_desc">Open DeepSeek web chat with scripts and scenario prompts.</string>
-    <string name="learning_qianwen_title">Qianwen China</string>
-    <string name="learning_qianwen_desc">Open qianwen.com for China users and all-in-one assistant tools.</string>
-    <string name="learning_qwen_title">Qwen Global</string>
-    <string name="learning_qwen_desc">Open chat.qwen.ai for chat and voice practice.</string>
-    <string name="learning_scene_title">Daily scenarios</string>
-    <string name="learning_scene_desc">Ordering food, interviews, greetings, hospital, airport and more.</string>
-    <string name="learning_script_title">Script manager</string>
-    <string name="learning_script_desc">Create, import, install online scripts, and enable official scripts.</string>
-    <string name="learning_enter">Open</string>
-    <string name="learning_select">Select</string>
-    <string name="learning_manage">Manage</string>
-    <string name="learning_warning">Web services are provided by their platforms. TangSengDaoDao only provides learning entry, scenario prompts and local script management. It does not store your web login password.</string>
-    <string name="learning_choose_scene">Choose a scenario</string>
-    <string name="learning_choose_target">Choose target</string>
-    <string name="learning_cancel">Cancel</string>
-    <string name="word_unknown">Unknown</string>
-    <string name="word_pinyin_on">Pinyin On</string>
-    <string name="word_pinyin_off">Pinyin Off</string>
-    <string name="word_mark_unknown">Again</string>
-    <string name="word_mark_known">Known</string>
-    <string name="word_mark_hard">Hard</string>
-    <string name="word_pull_favorite_hint">Pull to save</string>
-    <string name="word_pull_favorite_release">Release to save</string>
-    <string name="word_pull_unfavorite_release">Release to unsave</string>
-    <string name="word_front_tap">Tap to see meaning</string>
-    <string name="word_front_hint" />
-    <string name="word_gesture_hint_short">Swipe left: Again · Swipe right: Known · Pull down: Save</string>
-    <string name="word_back_hint">Swipe left: Again · Swipe right: Known</string>
-    <string name="word_action_tts">Audio</string>
-    <string name="word_action_spelling">Spell</string>
-    <string name="word_action_stroke">Strokes</string>
-    <string name="word_action_pronunciation">Practice</string>
-    <string name="word_action_unknown">Again</string>
-    <string name="word_action_known">Known</string>
-    <string name="word_action_hard">Hard</string>
-    <string name="word_label_meaning_my">Burmese: </string>
-    <string name="word_label_meaning_en">English: </string>
-    <string name="word_label_example">Example: </string>
-    <string name="word_label_usage">Scene: </string>
-    <string name="word_label_memory_tip">Memory tip</string>
-    <string name="word_label_notes">Note: </string>
-    <string name="word_label_synonyms">Similar: </string>
-    <string name="word_label_antonyms">Opposite: </string>
-    <string name="word_no_example">No example yet</string>
-    <string name="word_toast_unknown">Again: review later</string>
-    <string name="word_toast_known">Known: review again in 7 days</string>
-    <string name="word_toast_hard">Hard: review again tomorrow</string>
-    <string name="word_favorite_added">Saved</string>
-    <string name="word_favorite_removed">Removed from saved</string>
-    <string name="word_toast_my_phonetic_on">Burmese sound hint shown</string>
-    <string name="word_toast_my_phonetic_off">Burmese sound hint hidden</string>
-    <string name="word_stroke_todo">Play the correct stroke order with Hanzi Writer</string>
-    <string name="word_tts_plugin_missing">TTS plugin is missing or did not respond</string>
-    <string name="word_menu_show_my_phonetic">Show Burmese sound hint</string>
-    <string name="word_menu_hide_my_phonetic">Hide Burmese sound hint</string>
-    <string name="word_menu_show_guide">How to use</string>
-    <string name="word_menu_tts_settings">Speech settings</string>
-    <string name="word_guide_title">How to study cards</string>
-    <string name="word_guide_body">Tap card: see meaning
-Swipe left: Again, review later
-Swipe right: Known, review again in 7 days
-Pull down: Save
-Tap Hard: review tomorrow</string>
-    <string name="word_guide_ok">Got it</string>
-    <string name="word_guide_never">Do not show again</string>
-    <string name="word_review_new">New</string>
-    <string name="word_review_due">Due</string>
-    <string name="word_review_soon">Soon</string>
-    <string name="word_review_hours">in %1$d h</string>
-    <string name="word_review_days">in %1$d d</string>
-    <string name="word_tone_0">neutral tone</string>
-    <string name="word_tone_1">first tone</string>
-    <string name="word_tone_2">second tone</string>
-    <string name="word_tone_3">third tone</string>
-    <string name="word_tone_4">fourth tone</string>
-    <string name="pronunciation_title">Pronunciation practice</string>
-    <string name="pronunciation_title_compare">Recording comparison</string>
-    <string name="pronunciation_compare_start_hint">Play the original at 0.5×, then record your pronunciation</string>
-    <string name="pronunciation_start_record_compare">Start recording</string>
-    <string name="pronunciation_status_recording_compare">Recording. Pause when finished to stop automatically.</string>
-    <string name="pronunciation_status_processing_compare">Saving recording…</string>
-    <string name="pronunciation_compare_result_title">Pronunciation comparison</string>
-    <string name="pronunciation_original_speed">Original %1$s×</string>
-    <string name="pronunciation_status_original_speed">Playing original audio at %1$s×</string>
-    <string name="stroke_title">Stroke order</string>
-    <string name="stroke_subtitle">Tap a character to switch. The correct stroke order plays automatically. A character needs internet the first time and is cached afterward.</string>
-    <string name="stroke_chars_title">Choose a character</string>
-    <string name="stroke_data_missing">Unable to load stroke-order data. Check the network and try again.</string>
-    <string name="stroke_speak_word">Speak word</string>
-    <string name="stroke_replay">Replay strokes</string>
-    <string name="stroke_loading">Loading stroke order…</string>
-    <string name="pronunciation_tip">Listen to the standard audio and use local sherpa-onnx recognition to check the text match. System recognition is used as a fallback.</string>
-    <string name="pronunciation_play_standard">Play standard audio</string>
-    <string name="pronunciation_play_spelling">Play spelling audio</string>
-    <string name="pronunciation_start_record">Start recording</string>
-    <string name="pronunciation_stop_record">Stop recording</string>
-    <string name="pronunciation_play_mine">Play my recording</string>
-    <string name="pronunciation_local_check">Local recognition / scoring</string>
-    <string name="pronunciation_status_standard">Playing standard audio</string>
-    <string name="pronunciation_status_spelling">Playing spelling audio</string>
-    <string name="pronunciation_status_recording">Recording. Please read the word.</string>
-    <string name="pronunciation_status_record_done">Recording finished. Play it back to compare.</string>
-    <string name="pronunciation_status_play_mine">Playing my recording</string>
-    <string name="pronunciation_status_checking">Sent to local ASR plugin</string>
-    <string name="pronunciation_record_failed">Recording failed</string>
-    <string name="pronunciation_play_failed">Playback failed</string>
-    <string name="pronunciation_no_record">Record first</string>
-    <string name="pronunciation_need_permission">Microphone permission is required</string>
-    <string name="pronunciation_asr_plugin_missing">Local ASR/scoring plugin is missing. Recording comparison is still available.</string>
-    <string name="pronunciation_google_recognize">Google speech recognition</string>
-    <string name="pronunciation_google_unavailable">No Google/system speech recognition service is available</string>
-    <string name="pronunciation_recognition_prompt">Say: %1$s</string>
-    <string name="pronunciation_recognition_cancelled">Speech recognition cancelled</string>
-    <string name="pronunciation_recognition_empty">No speech was recognized. Try again.</string>
-    <string name="pronunciation_recognition_result">Recognized: %1$s
-Text match: %2$d%% (not a professional pronunciation score)</string>
-    <string name="word_pack_unavailable">Word pack is not downloaded</string>
-    <string name="word_loading_remote">Loading word pack…</string>
-    <string name="word_remote_load_failed">Failed to load the word pack. Try again later.</string>
-    <string name="word_today_plan">Today’s plan</string>
-    <string name="word_action_easy">Easy</string>
-    <string name="word_today_plan_count">Review %1$d · New %2$d</string>
-    <string name="word_auto_read_on">Auto-read On</string>
-    <string name="word_auto_read_off">Auto-read Off</string>
-    <string name="word_label_collocations">Collocations: </string>
-    <string name="word_check_answer_first">Check the answer first</string>
-    <string name="word_tts_settings_hint">Adjust the voice and speed in Speech settings</string>
-    <string name="word_plan_message">Reviews today: %1$d. New words: %2$d. Remaining: %3$d.</string>
-    <string name="word_group_total">%1$d words in this group</string>
-    <string name="word_restart_group">Practice this group again</string>
-    <string name="word_back_to_library">Back to word library</string>
-    <string name="word_tts_settings_open_failed">Unable to open speech settings</string>
-    <string name="word_session_complete">Session complete</string>
-    <string name="word_session_stats">Again %1$d
-Hard %2$d
-Good %3$d
-Easy %4$d
-Time %5$d min</string>
-    <string name="word_finish">Finish</string>
-    <string name="pronunciation_compare_hint">Replay the original and your recording to compare</string>
-    <string name="pronunciation_match_value">Text match %1$d%%</string>
-    <string name="pronunciation_mine_short">My recording</string>
-    <string name="pronunciation_one_tap_hint">Tap the microphone to record and recognize at the same time</string>
-    <string name="pronunciation_original_short">Original</string>
-    <string name="pronunciation_result_ready">Recording and recognition complete</string>
-    <string name="pronunciation_result_ready_local">Local recognition complete</string>
-    <string name="pronunciation_sherpa_downloading">Downloading the offline recognition model for first use (about 27 MB). System recognition is available meanwhile.</string>
-    <string name="pronunciation_sherpa_ready">Offline speech recognition is ready</string>
-    <string name="pronunciation_result_title">Recognition result</string>
-    <string name="pronunciation_start_once">Start practice</string>
-    <string name="pronunciation_status_preparing">Preparing the microphone…</string>
-    <string name="pronunciation_status_processing">Preparing the result…</string>
-    <string name="pronunciation_status_recording_and_recognizing">Recording and recognizing. Tap again to finish.</string>
-    <string name="pronunciation_try_again">Try again</string>
-    <string name="pronunciation_unrecognized">No text recognized</string>
-
-
-    <!-- Learning home: fully localized hero carousel, tools, sections and drawer. -->
-    <string name="learning_home_course_recommendation">Featured courses</string>
-    <string name="learning_home_enroll">Enroll</string>
-    <string name="learning_home_enroll_pending">Enrollment will open soon</string>
-    <string name="learning_home_slide_position">%1$d/%2$d</string>
-    <string-array name="learning_home_plan_titles">
-        <item>90-Day Chinese Speaking</item>
-        <item>AI Language Partner</item>
-        <item>Premium Small Group</item>
+    <string name="dating_title">ကိုက်ညီမှု</string>
+    <string name="dating_loading">အကြံပြုချက်များ ဖွင့်နေသည်…</string>
+    <string name="dating_retry">ထပ်မံကြိုးစားရန်</string>
+    <string name="dating_empty">အကြံပြုချက်အသစ် မရှိသေးပါ</string>
+    <string name="dating_empty_tip">စစ်ထုတ်မှုကို လျှော့ချပြီး နောက်မှပြန်ကြည့်ပါ။</string>
+    <string name="dating_like">နှစ်သက်သည်</string>
+    <string name="dating_pass">ကျော်ရန်</string>
+    <string name="dating_like_stamp">LIKE</string>
+    <string name="dating_nope_stamp">NOPE</string>
+    <string name="dating_match_title">နှစ်ဦးနှစ်ဖက် ကြိုက်ပါပြီ</string>
+    <string name="dating_ok">သိပါပြီ</string>
+    <string name="dating_photo_indicator">%1$d/%2$d</string>
+    <string name="dating_distance_unknown">ကမ္ဘာလုံးဆိုင်ရာ</string>
+    <string name="dating_mock_tip">dating backend မချိတ်ရသေးပါ။ နမူနာဒေတာ ပြသနေသည်။</string>
+    <string name="dating_rewind">ပြန်ယူရန်</string>
+    <string name="dating_mine_title">ကျွန်ုပ်၏ ချိန်းတွေ့မှု</string>
+    <string name="dating_action_failed">လုပ်ဆောင်မှု မအောင်မြင်ပါ</string>
+    <string name="dating_age_range_plain">အသက် %1$d-%2$d</string>
+    <string name="dating_drinking_value">အရက်သောက်မှု: %1$s</string>
+    <string name="dating_smoking_value">ဆေးလိပ်: %1$s</string>
+    <string name="dating_edit_intent">ချိန်းတွေ့ရည်ရွယ်ချက်</string>
+    <string name="dating_favorite_remove">သိမ်းထားမှု ဖြုတ်ရန်</string>
+    <string name="dating_favorite_remove_title">သိမ်းထားမှုမှ ဖြုတ်မလား</string>
+    <string name="dating_favorite_removed">သိမ်းထားမှုမှ ဖြုတ်ပြီးပါပြီ</string>
+    <string name="dating_favorites_empty">သိမ်းထားသူ မရှိသေးပါ</string>
+    <string name="dating_favorites_load_failed">သိမ်းထားသူများ မဖွင့်နိုင်ပါ</string>
+    <string name="dating_favorites_subtitle">သိမ်းထားခြင်းက အလိုအလျောက် ကိုက်ညီမှုမဖြစ်စေပါ။ နောက်မှဆုံးဖြတ်နိုင်သည်။</string>
+    <string name="dating_favorites_title">ကျွန်ုပ်သိမ်းထားသူများ</string>
+    <string name="dating_like_quota_empty">ယနေ့ အခမဲ့ Like အရေအတွက် ကုန်ပါပြီ</string>
+    <string name="dating_photo_upload_done">ဓာတ်ပုံတင်ပြီးပါပြီ</string>
+    <string name="dating_section_about">ကျွန်ုပ်အကြောင်း</string>
+    <string name="dating_section_basic">အခြေခံအချက်အလက်</string>
+    <string name="dating_section_goal">ချိန်းတွေ့ရည်ရွယ်ချက်</string>
+    <string name="dating_section_lifestyle">နေထိုင်မှုပုံစံ</string>
+    <string name="dating_intent_long_term">ရေရှည်လက်တွဲဖော် ရှာဖွေနေသည်</string>
+    <string name="dating_intent_long_term_open_short">ရေရှည်ကိုဦးစားပေးပြီး ရေတိုကိုလည်း ဖွင့်ထားသည်</string>
+    <string name="dating_intent_short_term_open_long">ရေတိုကိုဦးစားပေးပြီး ရေရှည်ကိုလည်း ဖွင့်ထားသည်</string>
+    <string name="dating_intent_short_term">ရေတိုချိန်းတွေ့မှုကို နှစ်သက်သည်</string>
+    <string name="dating_intent_friends">မိတ်ဆွေအသစ်များ ရှာဖွေသည်</string>
+    <string name="dating_intent_open">အခြေအနေအတိုင်း</string>
+    <string name="dating_edit_profile_title">ချိန်းတွေ့ပရိုဖိုင် ပြင်ရန်</string>
+    <string name="dating_my_photos">ကျွန်ုပ်၏ ဓာတ်ပုံများ</string>
+    <string name="dating_shared_profile">မျှဝေထားသော ပရိုဖိုင်</string>
+    <string name="dating_shared_profile_tip">ပုံ၊ အမည်၊ မွေးနေ့နှင့် နိုင်ငံတို့ကို အကောင့်ပရိုဖိုင်နှင့် မျှဝေထားပြီး ဤနေရာမှ တိုက်ရိုက်ပြင်နိုင်သည်</string>
+    <string name="dating_enable">ချိန်းတွေ့မှု ဖွင့်ရန်</string>
+    <string name="dating_enable_tip">လူများကို ကြည့်ရန် အရင်ဖွင့်ပါ</string>
+    <string name="dating_edit_gender">စိတ်ဝင်စားသောလိင်</string>
+    <string name="dating_edit_age">အသက်အရွယ်ရွေးချယ်မှု</string>
+    <string name="dating_edit_orientation">လိင်ပိုင်းဆိုင်ရာဦးတည်မှု</string>
+    <string name="dating_edit_drinking">အရက်သောက်မှု</string>
+    <string name="dating_edit_smoking">ဆေးလိပ်</string>
+    <string name="dating_edit_dealbreakers">မလက်ခံနိုင်သောအရာများ</string>
+    <string name="dating_edit_ideal">လိုချင်သောလက်တွဲဖော်</string>
+    <string name="dating_edit_tags">ထပ်ဆောင်းတဂ်များ</string>
+    <string name="dating_save_profile">ပရိုဖိုင်သိမ်းရန်</string>
+    <string name="dating_empty_content">အကြောင်းအရာမရှိသေးပါ</string>
+    <string name="dating_daily_quota">နေ့စဉ်အခမဲ့အရေအတွက်</string>
+    <string name="dating_edit_profile_menu">ချိန်းတွေ့ပရိုဖိုင် ပြင်ရန်</string>
+    <string name="dating_who_likes_me">ကျွန်ုပ်ကို ကြိုက်သူ</string>
+    <string name="dating_membership">အဖွဲ့ဝင်</string>
+    <string name="dating_my_matches">ကျွန်ုပ်၏ ကိုက်ညီမှုများ</string>
+    <string name="dating_quota_rules">အရေအတွက်နှင့် စည်းမျဉ်းများ</string>
+    <string name="dating_section_ideal">လိုချင်သောလက်တွဲဖော်</string>
+    <string name="dating_section_dealbreakers">မလက်ခံနိုင်သောအရာများ</string>
+    <string name="dating_section_interests">စိတ်ဝင်စားမှုနှင့် ကိုယ်ရည်ကိုယ်သွေး</string>
+    <string name="dating_block">ပိတ်ဆို့ရန်</string>
+    <string name="dating_report">တိုင်ကြားရန်</string>
+    <string name="dating_who_likes_title">ဘယ်သူက သင့်ကို ကြိုက်သလဲ ကြည့်ပါ</string>
+    <string name="dating_who_likes_tip">အခမဲ့အသုံးပြုသူများသည် အရေအတွက်နှင့် မရှင်းလင်းသောပုံသာ မြင်ရမည်။ အဖွဲ့ဝင်ဖြစ်ပြီးမှ စာရင်းအပြည့်ကြည့်နိုင်ပြီး နှစ်ဦးနှစ်ဖက်ကြိုက်မှ စကားပြောနိုင်သည်။</string>
+    <string name="dating_membership_benefits">အဖွဲ့ဝင်အကျိုးခံစားခွင့်များ</string>
+    <string name="dating_photo_count_tip">%1$d/5 ပုံတင်ပြီး · ပထမပုံသည် အဖုံးပုံ</string>
+    <string name="dating_select">ရွေးချယ်ရန်</string>
+    <string name="dating_not_filled">မဖြည့်ရသေးပါ</string>
+    <string name="dating_uploading_wait">ဓာတ်ပုံတင်နေပါသည်။ ခဏစောင့်ပါ။</string>
+    <string name="dating_max_photos">ဓာတ်ပုံ 5 ပုံအထိ တင်နိုင်သည်</string>
+    <string name="dating_min_photo_enable">ချိန်းတွေ့မှုဖွင့်ရန် အနည်းဆုံးတစ်ပုံထားပါ</string>
+    <string name="dating_saving">သိမ်းနေသည်…</string>
+    <string name="dating_saved">ချိန်းတွေ့ပရိုဖိုင် သိမ်းပြီးပါပြီ</string>
+    <string name="dating_save_failed">သိမ်းမရပါ</string>
+    <string name="dating_delete_photo_title">ဤဓာတ်ပုံကို ဖျက်မလား</string>
+    <string name="dating_delete">ဖျက်ရန်</string>
+    <string name="dating_set_primary">အဓိကပုံအဖြစ် သတ်မှတ်ရန်</string>
+    <string name="dating_primary_photo">အဓိကပုံ</string>
+    <string name="dating_photo_number">ဓာတ်ပုံ %1$d</string>
+    <string name="dating_confirm">အတည်ပြုရန်</string>
+    <string name="dating_location_failed">တည်နေရာ မတင်နိုင်ပါ။ နောက်မှထပ်ကြိုးစားပါ။</string>
+    <string name="dating_profile_load_failed">ပရိုဖိုင်မဖွင့်နိုင်ပါ။ ထပ်ကြိုးစားပါ။</string>
+    <string name="dating_enable_first">လူများကိုကြည့်ရန် ချိန်းတွေ့မှုကို အရင်ဖွင့်ပါ</string>
+    <string name="dating_go_enable">ယခုဖွင့်ရန်</string>
+    <string name="dating_operation_restored">လုပ်ဆောင်မှုမသိမ်းနိုင်သဖြင့် ကတ်ကို ပြန်ထားပြီးပါပြီ</string>
+    <string name="dating_no_undo">ပြန်ယူနိုင်သော လုပ်ဆောင်မှုမရှိပါ</string>
+    <string name="dating_rewind_quota_empty">ယနေ့ အခမဲ့ပြန်ယူမှု 3 ကြိမ် ကုန်ပါပြီ</string>
+    <string name="dating_rewind_failed">ပြန်ယူမှုမအောင်မြင်ပါ။ နောက်မှထပ်ကြိုးစားပါ။</string>
+    <string name="dating_rewind_synced_refresh">ပြန်ယူမှုကို တစ်ပြိုင်တည်းလုပ်ပြီး အကြံပြုချက်များ ပြန်ဖွင့်မည်။</string>
+    <string name="dating_rewind_record_synced">ပြန်ယူမှတ်တမ်း တစ်ပြိုင်တည်းပြီး အကြံပြုချက်များ ပြန်ဖွင့်ပြီးပါပြီ။</string>
+    <string name="dating_refresh_after_profile">ပရိုဖိုင်အသစ်အရ အကြံပြုချက်များ ပြန်ဖွင့်နေသည်…</string>
+    <string-array name="dating_gender_options">
+        <item>မရွေး</item>
+        <item>အမျိုးသမီး</item>
+        <item>အမျိုးသား</item>
     </string-array>
-    <string-array name="learning_home_plan_subtitles">
-        <item>Structured lessons · AI speaking practice</item>
-        <item>Daily conversation · pronunciation support</item>
-        <item>Teacher-led · stage assessment</item>
+    <string-array name="dating_age_options">
+        <item>18-28</item>
+        <item>20-32</item>
+        <item>22-35</item>
+        <item>25-40</item>
+        <item>30-45</item>
     </string-array>
-    <string-array name="learning_home_plan_prices">
-        <item>¥--</item>
-        <item>¥-- / month</item>
-        <item>¥--</item>
+    <string-array name="dating_sexual_orientation_options">
+        <item>ဆန့်ကျင်ဘက်လိင်</item>
+        <item>လိင်တူ</item>
+        <item>လိင်နှစ်မျိုး</item>
+        <item>ပန်ဆက်ရှူယယ်</item>
+        <item>မဖော်ပြ</item>
     </string-array>
-    <string-array name="learning_home_plan_notes">
-        <item>Price will be updated when enrollment opens</item>
-        <item>Start anytime</item>
-        <item>Limited small-group seats</item>
+    <string-array name="dating_drinking_options">
+        <item>မသောက်</item>
+        <item>တစ်ခါတစ်ရံ</item>
+        <item>လူမှုရေးအခါ</item>
+        <item>မကြာခဏ</item>
+        <item>မဖော်ပြ</item>
+    </string-array>
+    <string-array name="dating_smoking_options">
+        <item>မသောက်</item>
+        <item>တစ်ခါတစ်ရံ</item>
+        <item>မကြာခဏ</item>
+        <item>ဖြတ်နေသည်</item>
+        <item>မဖော်ပြ</item>
+    </string-array>
+    <string-array name="dating_dealbreaker_options">
+        <item>မရိုးသားမှု</item>
+        <item>စကားမပြောဘဲ အပြစ်ပေးခြင်း</item>
+        <item>ထိန်းချုပ်လိုမှု</item>
+        <item>နယ်နိမိတ်မလေးစားမှု</item>
+        <item>မကြာခဏပျောက်သွားမှု</item>
+        <item>လိမ်ညာမှု</item>
+        <item>အရက်အလွန်အကျွံ</item>
+        <item>လောင်းကစား</item>
+        <item>သန့်ရှင်းမှုမရှိ</item>
+        <item>အပျော်အပါးသာပြောခြင်း</item>
+        <item>တွေ့ရန်ဖိအားပေးခြင်း</item>
+        <item>ငွေတောင်းခြင်း</item>
+    </string-array>
+    <string name="dating_city">လက်ရှိမြို့</string>
+    <string name="dating_height_hint">အရပ် (cm)</string>
+    <string name="dating_weight_hint">ကိုယ်အလေးချိန် (kg)</string>
+    <string name="dating_about_hint">သင့်အကြောင်း အမှန်တကယ်ရေးပါ</string>
+    <string name="dating_ideal_hint">ဥပမာ - ရိုးသား၊ စိတ်တည်ငြိမ်၊ ဆက်သွယ်တတ်</string>
+    <string name="dating_tags_hint">ဥပမာ - ခရီးသွား၊ ချက်ပြုတ်၊ ဂီတ</string>
+    <string name="dating_back">နောက်သို့</string>
+    <string name="dating_enable_recommend">ချိန်းတွေ့အကြံပြုချက် ဖွင့်ရန်</string>
+    <string name="dating_section_love_expectation">ချစ်ရေးမျှော်လင့်ချက်</string>
+    <string name="dating_chat_now">ယခုစကားပြောရန်</string>
+    <string name="dating_view_more">ပရိုဖိုင်အပြည့်ကြည့်ရန်</string>
+    <string name="dating_dislike">ကျော်ရန်</string>
+    <string name="dating_primary">အဓိက</string>
+    <string name="dating_shared_basic">အခြေခံ: %1$s</string>
+    <string name="dating_shared_relationship">ဆက်ဆံရေး: %1$s</string>
+    <string name="dating_shared_personality">ကိုယ်ရည်ကိုယ်သွေး: %1$s</string>
+    <string name="dating_shared_interests">စိတ်ဝင်စားမှု: %1$s</string>
+    <string name="dating_shared_career">အလုပ်နှင့်ပညာရေး: %1$s</string>
+    <string name="dating_upload_prepare">ဓာတ်ပုံများ ပြင်ဆင်နေသည်</string>
+    <string name="dating_upload_processing">ဓာတ်ပုံ %1$d ကို စီမံနေသည်</string>
+    <string name="dating_upload_master">အရည်အသွေးမြင့်ပုံ %1$d/%2$d တင်နေသည်</string>
+    <string name="dating_upload_card">ကတ်ပုံ %1$d/%2$d တင်နေသည်</string>
+    <string name="dating_upload_failed">ဓာတ်ပုံတင်မှု မအောင်မြင်ပါ</string>
+    <string name="dating_upload_timeout">ဓာတ်ပုံတင်ချိန် ကျော်လွန်သွားသည်</string>
+    <string name="dating_upload_url_failed">တင်ရန်လိပ်စာ မရပါ</string>
+    <string name="dating_upload_url_timeout">တင်ရန်လိပ်စာ တောင်းဆိုချိန်ကျော်သွားသည်</string>
+    <string name="dating_read_image_failed">ဓာတ်ပုံဖတ်မရပါ</string>
+    <string name="dating_block_title">ဤသူကို ပိတ်ဆို့မလား</string>
+    <string name="dating_block_message">ဤသူကို နောက်ထပ် အကြံပြုမည်မဟုတ်ပါ။</string>
+    <string name="dating_blocked">ပိတ်ဆို့ပြီးပါပြီ</string>
+    <string name="dating_block_failed">ပိတ်ဆို့မှု မအောင်မြင်ပါ</string>
+    <string name="dating_report_reason">တိုင်ကြားရသည့်အကြောင်း</string>
+    <string name="dating_reported">တိုင်ကြားပြီးပါပြီ</string>
+    <string name="dating_report_failed">တိုင်ကြားမှု မအောင်မြင်ပါ</string>
+    <string name="dating_report_fake">ပရိုဖိုင်အတု</string>
+    <string name="dating_report_harassment">လိင်ပိုင်းဆိုင်ရာ သို့မဟုတ် နှောင့်ယှက်မှု</string>
+    <string name="dating_report_scam">လိမ်လည်မှု သို့မဟုတ် ကြော်ငြာ</string>
+    <string name="dating_report_impersonation">အခြားသူ၏ဓာတ်ပုံ အသုံးပြုမှု</string>
+    <string name="dating_report_other">အခြား</string>
+    <string name="dating_match_subtitle">သင်နှင့် %1$s နှစ်ဦးနှစ်ဖက် ကြိုက်ကြသည်။ စကားစပြောနိုင်ပါပြီ။</string>
+    <string name="dating_match_title_full">နှစ်ဦးနှစ်ဖက် ကြိုက်ကြပါပြီ</string>
+    <string name="dating_quota_like">ယနေ့ Like အရေအတွက် ကုန်ပါပြီ (%1$d)</string>
+    <string name="dating_quota_favorite">ယနေ့ သိမ်းထားမှုအရေအတွက် ကုန်ပါပြီ (%1$d)</string>
+    <string name="dating_matches_subtitle">နှစ်ဦးနှစ်ဖက်ကြိုက်မှ စကားပြောနိုင်သည်</string>
+    <string name="dating_matches_load_failed">ကိုက်ညီမှုများ မဖွင့်နိုင်ပါ</string>
+    <string name="dating_matches_empty">ကိုက်ညီမှုမရှိသေးပါ။ ဆက်လက်ရှာဖွေပါ။</string>
+    <string name="dating_unmatch_title">ကိုက်ညီမှု ဖြုတ်မလား</string>
+    <string name="dating_unmatch_message">ချိန်းတွေ့ခွင့်ပြုစာရင်းမှတစ်ဆင့် ဆက်မပြောနိုင်တော့ပါ။</string>
+    <string name="dating_unmatch">ဖြုတ်ရန်</string>
+    <string name="dating_unmatched">ကိုက်ညီမှု ဖြုတ်ပြီးပါပြီ</string>
+    <string name="dating_profile_complete_tip">ကိုက်ညီမှုစတင်ရန် ပရိုဖိုင်ဖြည့်ပါ</string>
+    <string name="dating_enabled">ချိန်းတွေ့အကြံပြုချက် ဖွင့်ပြီးပါပြီ</string>
+    <string name="dating_disabled">ချိန်းတွေ့အကြံပြုချက် ပိတ်ပြီးပါပြီ</string>
+    <string name="dating_profile_load_error">ပရိုဖိုင်မဖွင့်နိုင်ပါ</string>
+    <string name="dating_like_quota_format">Like %1$d/%2$d</string>
+    <string name="dating_favorite_quota_format">သိမ်းထားမှု %1$d/%2$d</string>
+    <string name="dating_rewind_quota_format">ပြန်ယူမှု %1$d/3</string>
+    <string name="dating_quota_message">%1$s
+%2$s
+%3$s
+
+ကျော်ခြင်း အကန့်အသတ်မရှိသော်လည်း server က အလွဲသုံးစားမှုကို ကန့်သတ်မည်။</string>
+    <string name="dating_membership_pending">အဖွဲ့ဝင်နှင့်ငွေပေးချေမှု မချိတ်ရသေးပါ</string>
+    <string name="dating_filter_cross_tip">နှစ်ဦးထဲမှ တစ်ဦးက မိမိနိုင်ငံသာ လက်ခံပါက နိုင်ငံခြားပရိုဖိုင်ကို မအကြံပြုပါ။</string>
+    <string name="dating_filter_country_title">နိုင်ငံ/ဒေသ</string>
+    <string name="dating_filter_country_smart_value">စမတ်အကြံပြုချက်</string>
+    <string name="dating_filter_country_same_value">မိမိနိုင်ငံသာ</string>
+    <string name="dating_filter_country_foreign_value">နိုင်ငံခြားလက်ခံ</string>
+    <string name="dating_filter_gender_title">လိင်</string>
+    <string name="dating_filter_gender_all_value">မရွေး</string>
+    <string name="dating_filter_gender_female_value">အမျိုးသမီး</string>
+    <string name="dating_filter_gender_male_value">အမျိုးသား</string>
+    <string name="dating_filter_age_title">အသက်</string>
+    <string name="dating_filter_goal_title">ရည်ရွယ်ချက်</string>
+    <string name="dating_filter_goal_serious_value">အလေးအနက်ချစ်ရေး</string>
+    <string name="dating_filter_goal_marriage_value">လက်ထပ်ရန်</string>
+    <string name="dating_filter_goal_all_value">မရွေး</string>
+
+    <string name="dating_cancel">မလုပ်တော့</string>
+    <string name="dating_apply">အသုံးပြုရန်</string>
+    <string name="dating_filter_title">စစ်ထုတ်မှု ဦးစားပေး</string>
+    <string name="dating_filter_country_format">နိုင်ငံ: %1$s</string>
+    <string name="dating_filter_gender_format">လိင်: %1$s</string>
+    <string name="dating_filter_age_format">အသက်: %1$d-%2$d</string>
+    <string name="dating_filter_goal_format">ရည်ရွယ်ချက်: %1$s</string>
+    <string name="dating_delete_photo_action">ဓာတ်ပုံဖျက်ရန်</string>
+    <string name="dating_photo_cache_failed">ဓာတ်ပုံ cache မဖန်တီးနိုင်ပါ</string>
+    <string name="dating_photo_cache_unavailable">ဓာတ်ပုံ cache အသုံးမပြုနိုင်ပါ</string>
+    <string name="dating_photo_compress_failed">ဓာတ်ပုံချုံ့မှု မအောင်မြင်ပါ</string>
+    <string name="dating_photo_too_large">ဓာတ်ပုံအရွယ်အစားကြီးလွန်းသည်</string>
+    <string name="dating_photo_too_small">ဓာတ်ပုံသေးလွန်းသည်။ ပိုရှင်းသောပုံရွေးပါ။</string>
+    <string name="dating_photo_process_failed">ဓာတ်ပုံ စီမံမရပါ</string>
+    <string name="dating_photo_decode_failed">ဓာတ်ပုံ ဖွင့်မရပါ</string>
+    <string name="dating_photo_encode_failed">ဓာတ်ပုံ သိမ်းမရပါ</string>
+    <string name="dating_invalid_image_uri">ဓာတ်ပုံလိပ်စာ မမှန်ပါ</string>
+    <string name="dating_location_denied">တည်နေရာမဖွင့်ထားသဖြင့် အနီးရှိသူများကို မကြည့်နိုင်ပါ</string>
+    <string name="dating_location_explain_again">အနီးရှိသူများကို ဆက်ကြည့်ရန် တည်နေရာခွင့်ပြုချက် ပြန်ဖွင့်ပါ။</string>
+    <string name="dating_location_explain_first">အနီးရှိသူများကိုကြည့်ရန် တည်နေရာလိုအပ်သည်။ ခွင့်ပြုပြီးနောက် ထပ်မမေးဘဲ အလိုအလျောက်ရယူမည်။</string>
+    <string name="dating_location_title">တည်နေရာဖွင့်ရန်</string>
+    <string name="dating_location_not_now">ယခုမလုပ်ပါ</string>
+    <string name="dating_location_go_enable">ဖွင့်ရန်</string>
+    <string name="dating_location_back_recommend">တည်နေရာမဖွင့်ထားပါ။ အကြံပြုစာမျက်နှာသို့ ပြန်သွားပါပြီ။</string>
+    <string name="dating_location_device_unavailable">ဤစက်တွင် တည်နေရာမရနိုင်ပါ</string>
+    <string name="dating_location_service_off">စနစ်တည်နေရာဝန်ဆောင်မှုကို ဦးစွာဖွင့်ပါ</string>
+    <string name="dating_location_permission_unavailable">တည်နေရာခွင့်ပြုချက် မရနိုင်ပါ</string>
+    <string name="dating_location_retry">တည်နေရာမရပါ။ နောက်မှ ထပ်ကြိုးစားပါ။</string>
+    <string name="dating_location_temporarily_unavailable">တည်နေရာ ယာယီမရနိုင်ပါ။ နောက်မှ ထပ်ကြိုးစားပါ။</string>
+    <string name="dating_photo_upload_percent">%1$s %2$d%%</string>
+    <string name="dating_section_relationship">ချစ်ရေးမျှော်လင့်ချက်</string>
+    <string name="dating_section_ideal_partner">လိုချင်သောအဖော်</string>
+    <string name="dating_section_dealbreakers_title">မကြိုက်သောအချက်များ</string>
+    <string name="dating_filter_age_18_28">18-28</string>
+    <string name="dating_filter_age_18_35">18-35</string>
+    <string name="dating_filter_age_22_35">22-35</string>
+    <string name="dating_filter_age_25_40">25-40</string>
+    <string name="dating_filter_age_30_50">30-50</string>
+    <string name="dating_filter_age_18_60">18-60</string>
+
+    <string name="dating_tab_recommend">အကြံပြု</string>
+    <string name="dating_tab_nearby">အနီးအနား</string>
+    <string name="dating_filter">စစ်ထုတ်ရန်</string>
+    <string name="dating_match_notice_ready">နှစ်ဦးနှစ်ဖက် ကြိုက်ကြသည်။ စကားပြောနိုင်ပါပြီ။</string>
+    <string name="dating_match_notice_named">သင်နှင့် %1$s နှစ်ဦးနှစ်ဖက် ကြိုက်ကြသည်။ စကားပြောနိုင်ပါပြီ။</string>
+    <string name="dating_keep_swiping">ဆက်လက်ရှာဖွေရန်</string>
+    <string name="dating_goal_love">အလေးအနက်ချစ်ရေး</string>
+    <string name="dating_goal_marriage">လက်ထပ်ရန်</string>
+    <string name="dating_goal_chat">အရင်စကားပြောရန်</string>
+    <string name="dating_goal_long_term">ရေရှည်ဆက်ဆံရေး</string>
+    <string name="dating_cross_open">နိုင်ငံခြားချစ်ရေး လက်ခံ</string>
+    <string name="dating_cross_prefer_foreign">နိုင်ငံခြားချစ်ရေး ပိုနှစ်သက်</string>
+    <string name="dating_cross_same_country">မိမိနိုင်ငံသာ</string>
+    <string name="dating_match_score">%1$d%% ကိုက်ညီမှု</string>
+    <string name="dating_tap_more">အလယ်ကိုနှိပ်၍ အသေးစိတ်ကြည့်ပါ</string>
+    <string name="dating_profile_preview">ပရိုဖိုင်အကြိုကြည့်</string>
+    <string name="dating_filter_tip">ချိန်းတွေ့ဦးစားပေးအလိုက် အကြံပြုမည်။ မိမိနိုင်ငံသာ လက်ခံခြင်းနှင့် တစ်ဖက်သူ၏ နိုင်ငံခြားချစ်ရေးသတ်မှတ်ချက်ကို လေးစားမည်။</string>
+    <string name="dating_filter_country_smart">နိုင်ငံ: စမတ်အကြံပြု</string>
+    <string name="dating_filter_country_same">နိုင်ငံ: မိမိနိုင်ငံသာ</string>
+    <string name="dating_filter_country_foreign">နိုင်ငံ: နိုင်ငံခြားလက်ခံ</string>
+    <string name="dating_filter_gender_all">လိင်: မရွေး</string>
+    <string name="dating_filter_gender_female">လိင်: အမျိုးသမီး</string>
+    <string name="dating_filter_gender_male">လိင်: အမျိုးသား</string>
+    <string name="dating_filter_age">အသက်: %1$d-%2$d</string>
+    <string name="dating_filter_goal_love">ရည်ရွယ်ချက်: အလေးအနက်ချစ်ရေး</string>
+    <string name="dating_filter_goal_marriage">ရည်ရွယ်ချက်: လက်ထပ်ရန်</string>
+    <string name="dating_filter_goal_all">ရည်ရွယ်ချက်: မရွေး</string>
+
+    <string name="dating_shared_age_value">အသက် %1$d</string>
+    <string name="dating_shared_gender_female">အမျိုးသမီး</string>
+    <string name="dating_shared_gender_male">အမျိုးသား</string>
+    <string name="dating_shared_pets_value">အိမ်မွေးတိရစ္ဆာန်: %1$s</string>
+    <string name="dating_shared_sports_value">အားကစား: %1$s</string>
+    <string name="dating_shared_movies_value">ရုပ်ရှင်နှင့်အစီအစဉ်: %1$s</string>
+    <string name="dating_meta_separator"> · </string>
+    <string name="dating_list_separator">၊ </string>
+    <string-array name="dating_shared_relationship_values">
+        <item>မဖော်ပြထား</item><item>တစ်ကိုယ်တည်း</item><item>ချစ်သူရှိ</item><item>အိမ်ထောင်ရှိ</item><item>ကွာရှင်း</item>
+    </string-array>
+    <string-array name="dating_shared_personality_values">
+        <item>စိတ်ရှည်</item><item>ပေါင်းသင်းဆက်ဆံရေးကောင်း</item><item>တိတ်ဆိတ်</item><item>အတွင်းကျ</item><item>ဟာသဉာဏ်ရှိ</item><item>နူးညံ့</item><item>အလေးအနက်ရှိ</item><item>ရင်းနှီးရန်အချိန်ယူ</item><item>နားလည်တတ်</item><item>ပေါ့ပေါ့ပါးပါး</item>
+    </string-array>
+    <string-array name="dating_shared_pet_values">
+        <item>ခွေး</item><item>ကြောင်</item><item>ယုန်</item><item>ငှက်</item><item>ငါး</item><item>ဟမ်းစတာ</item><item>တွားသွားသတ္တဝါ</item><item>တိရစ္ဆာန်ချစ်သူ</item>
+    </string-array>
+    <string-array name="dating_shared_sport_values">
+        <item>ပြေးခြင်း</item><item>ဘတ်စကက်ဘော</item><item>ဘောလုံး</item><item>ကြက်တောင်</item><item>ကိုယ်လက်လေ့ကျင့်ခန်း</item><item>ယောဂ</item><item>ရေကူး</item><item>စက်ဘီးစီး</item><item>တောင်တက်လမ်းလျှောက်</item><item>စကိတ်ဘုတ်</item>
+    </string-array>
+    <string-array name="dating_shared_movie_values">
+        <item>ရုပ်ရှင်</item><item>ဟာသ</item><item>အချစ်ဇာတ်လမ်း</item><item>အက်ရှင်</item><item>လျှို့ဝှက်ဆန်းကြယ်</item><item>မှတ်တမ်းရုပ်ရှင်</item><item>တီဗီဇာတ်လမ်းတွဲ</item><item>အန်နီမေး</item><item>ဖျော်ဖြေရေးအစီအစဉ်</item><item>ဗီဒီယိုတို</item>
+    </string-array>
+    <string-array name="dating_shared_job_values">
+        <item>မဖော်ပြထား</item><item>ကျောင်းသား</item><item>ဝန်ထမ်း</item><item>ဝန်ဆောင်မှုဝန်ထမ်း</item><item>ဆရာ</item><item>ရဲ</item><item>ယာဉ်မောင်း</item><item>အရောင်း</item><item>လုပ်ငန်းရှင်</item><item>အလွတ်တန်း</item><item>အလုပ်ရှာနေ</item><item>အခြား</item>
+    </string-array>
+    <string-array name="dating_shared_education_values">
+        <item>မဖော်ပြထား</item><item>အလယ်တန်းနှင့်အောက်</item><item>အထက်တန်း</item><item>ဘွဲ့</item><item>မဟာဘွဲ့နှင့်အထက်</item><item>အခြား</item>
     </string-array>
 
-    <string name="learning_home_quick_tools">Quick tools</string>
-    <string name="learning_home_quick_tools_subtitle">Translate, read, and practice speaking</string>
-    <string name="learning_home_tool_translate">AI Translate</string>
-    <string name="learning_home_tool_books">E-books</string>
-    <string name="learning_home_tool_partner">AI Partner</string>
-    <string name="learning_home_tool_practice">Practice</string>
 
-    <string name="learning_home_pinyin_title">Pinyin</string>
-    <string name="learning_home_pinyin_subtitle">Start with pronunciation</string>
-    <string name="learning_home_initials">Initials</string>
-    <string name="learning_home_finals">Finals</string>
-    <string name="learning_home_whole_syllables">Whole syllables</string>
-    <string name="learning_home_tones">Tones</string>
-    <string name="learning_home_tones_desc">First to fourth tone</string>
+    <string name="dating_mode_partner">ဘာသာမိတ်ဖက်</string>
+    <string name="dating_mode_dating">မိတ်ဆက်ချစ်ရေး</string>
+    <string name="dating_partner_unavailable">ဘာသာမိတ်ဖက်စာရင်း module ကို မဖွင့်နိုင်ပါ</string>
 
-    <string name="learning_home_words_title">Words</string>
-    <string name="learning_home_words_subtitle">Build vocabulary level by level</string>
-    <string name="learning_home_words_count">%1$d words</string>
-    <string name="learning_home_learned_format">Learned %1$d / %2$d</string>
+    <string name="dating_upload_photo">ဓာတ်ပုံ %1$d/%2$d တင်နေသည်</string>
+    <string name="dating_edit_shared_profile">ပြင်ရန်</string>
+    <string name="dating_saved_and_enabled">ပရိုဖိုင်သိမ်းပြီး အကြံပြုစာရင်းတွင် စတင်ပြသနေပါပြီ</string>
+    <string name="dating_status_visible">ပြသနေသည်</string>
+    <string name="dating_status_paused">ခေတ္တရပ်ထားသည်</string>
+    <string name="dating_status_title">ချိန်းတွေ့ပရိုဖိုင် ပြသမှု</string>
+    <string name="dating_pause_message">ခေတ္တရပ်ထားစဉ် အခြားသူများသည် သင့်ချိန်းတွေ့ပရိုဖိုင်ကို မမြင်နိုင်ပါ။ ယခင်ကိုက်ညီမှုများနှင့် မိတ်ဆွေများ မပြောင်းလဲပါ။</string>
+    <string name="dating_resume_message">ဆက်လက်ပြသပါက သင့်ပရိုဖိုင်ကို ချိန်းတွေ့အကြံပြုစာရင်းတွင် ပြန်လည်ထည့်သွင်းမည်။</string>
+    <string name="dating_pause">ပြသမှုရပ်ရန်</string>
+    <string name="dating_resume">ပြသမှုဆက်ရန်</string>
+    <string name="dating_location_open_settings_tip">တည်နေရာခွင့်ပြုချက်ကို ပိတ်ထားသည်။ စနစ်ဆက်တင်တွင် ဖွင့်နိုင်သလို ကမ္ဘာလုံးဆိုင်ရာအကြံပြုချက်များကိုလည်း ဆက်သုံးနိုင်သည်။</string>
+    <string name="dating_location_open_settings">ဆက်တင်ဖွင့်ရန်</string>
+    <string name="dating_match_friend_created">သင်နှင့် %1$s တို့ အပြန်အလှန်ကြိုက်နှစ်သက်ပြီး မိတ်ဆွေဖြစ်သွားပါပြီ။ စကားစတင်ပြောနိုင်ပါပြီ။</string>
 
-    <string name="learning_home_speaking_title">Speaking</string>
-    <string name="learning_home_speaking_subtitle">Turn Chinese into real conversation</string>
-    <string name="learning_home_speak_hello">Greetings</string>
-    <string name="learning_home_speak_hello_desc">Start a conversation</string>
-    <string name="learning_home_speak_food">Ordering</string>
-    <string name="learning_home_speak_food_desc">Restaurant phrases</string>
-    <string name="learning_home_speak_job">Jobs</string>
-    <string name="learning_home_speak_job_desc">Interviews and work</string>
-    <string name="learning_home_speak_shop">Shopping</string>
-    <string name="learning_home_speak_shop_desc">Paying and bargaining</string>
-
-    <string name="learning_home_patterns_title">Sentence patterns</string>
-    <string name="learning_home_patterns_subtitle">Build complete expressions quickly</string>
-    <string name="learning_home_pattern_want">我想…</string>
-    <string name="learning_home_pattern_want_desc">Express a need</string>
-    <string name="learning_home_pattern_can">可以吗</string>
-    <string name="learning_home_pattern_can_desc">Ask for help</string>
-    <string name="learning_home_pattern_how">怎么…</string>
-    <string name="learning_home_pattern_how_desc">Ask how</string>
-    <string name="learning_home_pattern_why">为什么</string>
-    <string name="learning_home_pattern_why_desc">Ask why</string>
-
-    <string name="learning_home_grammar_title">Grammar</string>
-    <string name="learning_home_grammar_subtitle">Understand how Chinese is structured</string>
-    <string name="learning_home_grammar_le_desc">Completion / change</string>
-    <string name="learning_home_grammar_zai_desc">Action in progress</string>
-    <string name="learning_home_grammar_ma_desc">Question particles</string>
-    <string name="learning_home_grammar_de_desc">Structural particles</string>
-    <string name="learning_home_more">More</string>
-
-    <string name="learning_home_open_drawer">Open learning drawer</string>
-    <string name="learning_home_drawer_ai_group">AI assistants</string>
-    <string name="learning_home_drawer_deepseek">DeepSeek Translate</string>
-    <string name="learning_home_drawer_deepseek_desc">Chinese-Burmese translation and grammar help</string>
-    <string name="learning_home_drawer_qianwen">Qianwen China</string>
-    <string name="learning_home_drawer_qwen">Qwen Global</string>
-    <string name="learning_home_drawer_speech_settings">အသံဆက်တင်များ</string>
-    <string name="learning_home_drawer_speech_desc">Configure the WKSpeech engine</string>
-    <string name="learning_home_drawer_scripts">စခရစ်စင်တာ</string>
-    <string name="learning_home_drawer_scripts_desc">Custom extension features</string>
-    <string name="learning_home_coming_soon">%1$s is in development</string>
-    <string name="learning_home_speech_plugin_missing">Speech plugin is not installed</string>
-
-    <!-- Native pinyin chart -->
-    <string name="pinyin_chart_title">Pinyin chart</string>
-    <string name="pinyin_chart_subtitle">Tap a card to play bundled audio, change speed, or autoplay the chart.</string>
-    <string name="pinyin_chart_back">Back</string>
-    <string name="pinyin_chart_tap_hint">Tap a pinyin card to begin</string>
-    <string name="pinyin_chart_replay">🔊 Replay</string>
-    <string name="pinyin_chart_speed">%1$s× Speed</string>
-    <string name="pinyin_chart_follow">🎙 Compare</string>
-    <string name="pinyin_chart_auto_play">▶ Auto</string>
-    <string name="pinyin_chart_stop_auto">■ Stop</string>
-    <string name="pinyin_chart_local_audio">Local pronunciation</string>
-    <string name="pinyin_chart_audio_placeholder">This is bundled placeholder audio. Replace the MP3 files at the paths in chart.json.</string>
-    <string name="pinyin_chart_follow_placeholder">The repeat-after-me entry is reserved and will be enabled after real audio is added.</string>
-    <string name="pinyin_chart_select_before_compare">Select a pinyin card first</string>
-    <string name="pinyin_chart_play_failed">Unable to play local audio</string>
-    <string name="pinyin_chart_data_missing">Unable to load the pinyin chart. Check chart.json.</string>
-
-
-
-    <!-- Speaking phrases: directory, cards, FSRS and AI coach -->
-    <string name="speaking_directory_title">Speaking phrases</string>
-    <string name="speaking_directory_subtitle">Choose a category, then swipe up or down through the full-screen phrase feed.</string>
-    <string name="speaking_directory_breadcrumb">Learn · Speaking</string>
-    <string name="speaking_category_empty">No phrases in this category yet</string>
-    <string name="speaking_progress_learned">Learned %1$d/%2$d</string>
-    <string name="speaking_progress_due">Due %1$d</string>
-    <string name="speaking_status_new_short">N</string>
-    <string name="speaking_status_due_short">R</string>
-    <string name="speaking_category_mark_default">S</string>
-    <string name="speaking_directory_empty">The speaking catalog is empty. Check assets/learning/speaking/catalog.json</string>
-    <string name="speaking_catalog_missing">Local speaking catalog is missing</string>
-    <string name="speaking_title_default">Speaking</string>
-    <string name="speaking_action_read">Listen</string>
-    <string name="speaking_action_spelling">Spell</string>
-    <string name="speaking_action_pronunciation">Repeat</string>
-    <string name="speaking_action_coach">Coach</string>
-    <string name="speaking_section_scene">Scene</string>
-    <string name="speaking_section_replacements">Replace</string>
-    <string name="speaking_section_alternatives">Other ways</string>
-    <string name="speaking_rating_again">Again</string>
-    <string name="speaking_rating_hard">Hard</string>
-    <string name="speaking_rating_good">Good</string>
-    <string name="speaking_rating_easy">Easy</string>
-    <string name="speaking_session_progress">%1$d / %2$d  ·  Completed %3$d</string>
-    <string name="speaking_state_new">New phrase</string>
-    <string name="speaking_state_due">Review today</string>
-    <string name="speaking_state_learning">Keep practicing</string>
-    <string name="speaking_scene_default">Use it in a real conversation from this category.</string>
-    <string name="speaking_no_replacements">No replacements yet</string>
-    <string name="speaking_no_alternatives">No alternative phrases yet</string>
-    <string name="speaking_interval_minutes">%1$d min</string>
-    <string name="speaking_interval_hours">%1$d hr</string>
-    <string name="speaking_interval_days">%1$d d</string>
-    <string name="speaking_interval_months">%1$d mo</string>
-    <string name="speaking_interval_years">%1$.1f yr</string>
-    <string name="speaking_group_complete">Group completed</string>
-    <string name="speaking_complete_title">Speaking practice complete</string>
-    <string name="speaking_complete_subtitle">FSRS scheduled the next review. Return to the categories or practice again.</string>
-    <string name="speaking_restart">Practice again</string>
-    <string name="speaking_back_to_categories">Back to categories</string>
-    <string name="speaking_pack_empty">This category has no phrases. Check:\n%1$s</string>
-    <string name="speaking_choose_coach">Choose an AI speaking coach</string>
-    <string name="speaking_provider_qwen">Qwen International</string>
-    <string name="speaking_deepseek_coach_title">DeepSeek Speaking Coach</string>
-    <string name="speaking_qwen_coach_title">Qwen Speaking Coach</string>
-    <string name="speaking_coach_prompt_intro">You are my Chinese speaking coach.</string>
-    <string name="speaking_coach_prompt_sentence">Current phrase: %1$s</string>
-    <string name="speaking_coach_prompt_pinyin">Pinyin: %1$s</string>
-    <string name="speaking_coach_prompt_meaning">Burmese meaning: %1$s</string>
-    <string name="speaking_coach_prompt_scene">Scene: %1$s</string>
-    <string name="speaking_coach_prompt_replacements">Replacement phrases: %1$s</string>
-    <string name="speaking_coach_prompt_alternatives">Similar phrases: %1$s</string>
-    <string name="speaking_coach_prompt_hint_language">Use English for brief hints and corrections, but keep the speaking practice in Chinese.</string>
-    <string name="speaking_coach_prompt_rules">Practice a realistic conversation with me using the current phrase and scene. Play the other person in the scene. Say only one or two short Chinese sentences at a time and guide me to use the current phrase. When my wording is unnatural, give only one more natural version and continue. Give a short hint when I cannot answer. Do not give long grammar explanations or use Markdown tables. Start directly with the first line in the scene.</string>
-
-    <string name="speaking_phrase_list_breadcrumb">Speaking · Phrases</string>
-    <string name="speaking_phrase_list_summary">%1$d phrases · %2$d learned</string>
-    <string name="speaking_section_breakdown">Phrase breakdown</string>
-    <string name="speaking_no_breakdown">No phrase breakdown yet</string>
-    <string name="speaking_action_loop">Auto</string>
-    <string name="speaking_front_prompt">Read it aloud and recall the meaning</string>
-    <string name="speaking_front_tap">Tap for pinyin, Burmese, and details</string>
-    <string name="speaking_back_tap">Tap the answer area to return to the front</string>
-
-    <string name="pronunciation_sherpa_importing">Importing the offline speech model…</string>
-    <string name="pronunciation_sherpa_loading">Loading the offline speech model…</string>
-    <string name="pronunciation_sherpa_not_installed">Offline model is not installed; system recognition is being used</string>
-    <string name="pronunciation_sensevoice_ready">SenseVoice high-accuracy offline recognition is ready</string>
-    <string name="asr_model_title">Offline speech recognition</string>
-    <string name="asr_model_intro">Choose a model for this device. Installed models run fully offline. System speech recognition remains available when no model is installed or local recognition fails.</string>
-    <string name="asr_model_zipformer_title">Lightweight Zipformer</string>
-    <string name="asr_model_zipformer_desc">Small download and fast loading, suitable for most phones and everyday word practice.</string>
-    <string name="asr_model_zipformer_size">About 27 MB</string>
-    <string name="asr_model_sensevoice_title">High-accuracy SenseVoice</string>
-    <string name="asr_model_sensevoice_desc">Usually more robust for Chinese phrases and noticeable accents, but it is larger and uses more power.</string>
-    <string name="asr_model_sensevoice_size">About 228 MB</string>
-    <string name="asr_model_selected">Active</string>
-    <string name="asr_model_choose">Select</string>
-    <string name="asr_model_download">Download</string>
-    <string name="asr_model_redownload">Download again</string>
-    <string name="asr_model_import">Import ZIP</string>
-    <string name="asr_model_delete">Delete local model</string>
-    <string name="asr_model_status_downloading">Downloading and validating the model…</string>
-    <string name="asr_model_status_importing">Importing and validating the model…</string>
-    <string name="asr_model_status_loading">Installed; loading model…</string>
-    <string name="asr_model_status_failed">Loading failed. Download or import again.</string>
-    <string name="asr_model_status_installed">Installed · %1$s</string>
-    <string name="asr_model_status_not_installed">Not installed · %1$s</string>
-    <string name="asr_model_import_note">The imported ZIP must contain model.int8.onnx and tokens.txt for the selected model. The original model folder may remain inside the ZIP.</string>
-    <string name="asr_model_download_confirm_title">Download offline model</string>
-    <string name="asr_model_download_confirm_message">Download “%1$s” online (%2$s). Wi-Fi and sufficient storage are recommended.</string>
-    <string name="asr_model_delete_confirm_title">Delete model</string>
-    <string name="asr_model_delete_confirm_message">Delete “%1$s”? System recognition will be used until a model is installed again.</string>
-
-    <string name="learning_home_drawer_header_subtitle">Learning and everyday tools</string>
-    <string name="learning_home_drawer_close">Close side menu</string>
-    <string name="learning_home_drawer_common_group">Common</string>
-    <string name="learning_home_drawer_learning_settings_group">Learning settings</string>
-    <string name="learning_home_drawer_contacts">အဆက်အသွယ်များ</string>
-    <string name="learning_home_drawer_contacts_desc">View friends and contacts</string>
-    <string name="learning_home_drawer_new_friends">မိတ်ဆွေသစ်များ</string>
-    <string name="learning_home_drawer_new_friends_desc">Review friend requests</string>
-    <string name="learning_home_drawer_add_friend">မိတ်ဆွေထည့်ရန်</string>
-    <string name="learning_home_drawer_add_friend_desc">Search for an account</string>
-    <string name="learning_home_drawer_system_settings">စနစ်ဆက်တင်များ</string>
-    <string name="learning_home_drawer_system_settings_desc">Notifications, privacy and appearance</string>
-    <string name="learning_home_contacts_unavailable">Contacts are currently unavailable</string>
-    <string name="learning_home_feature_unavailable">%1$s is currently unavailable</string>
-
-
-    <string name="learning_home_drawer_profile_hint">ပရိုဖိုင်ကို ကြည့်ရန်</string>
-    <string name="learning_home_drawer_account_format">%1$s အကောင့်နံပါတ် - %2$s</string>
-    <string name="learning_home_drawer_default_name">Talkami အသုံးပြုသူ</string>
-    <string name="learning_home_drawer_chat_translate">ချတ်ဘာသာပြန်</string>
-
-    <!-- Learning path, interactive exercises and secure remote packages. -->
-    <string name="word_action_tts_short">နားထောင်</string>
-    <string name="word_action_spelling_short">စာလုံးပေါင်း</string>
-    <string name="word_action_stroke_short">ရေး</string>
-    <string name="word_action_pronunciation_short">အသံသွင်း</string>
-    <string name="learning_home_drawer_kicker">LEARNING SPACE</string>
-    <string name="learning_home_drawer_title">အခြားဝန်ဆောင်မှုများ</string>
-    <string name="learning_home_drawer_subtitle">AI၊ အသံနှင့် တိုးချဲ့ကိရိယာများ</string>
-    <string name="learning_home_drawer_focus_title">အာရုံစိုက် လေ့လာရေးနေရာ</string>
-    <string name="learning_home_drawer_focus_subtitle">အဓိက လေ့လာရေးကိရိယာများကို တစ်နေရာတည်းတွင် စုထားသည်</string>
-    <string name="learning_home_drawer_886_desc">တရုတ်ပြည်တွင်း အသုံးပြုသူများအတွက် AI လေ့လာရေးဝင်ပေါက်</string>
-    <string name="learning_home_drawer_tools_group">လေ့လာရေးကိရိယာများ</string>
-    <string name="learning_home_drawer_prompt">စကားပြော Prompt</string>
-    <string name="learning_home_drawer_prompt_desc">နေ့စဉ်အခြေအနေများအတွက် စကားပြောညွှန်ကြားချက်</string>
-    <string name="learning_home_drawer_extensions">တိုးချဲ့လုပ်ဆောင်ချက်များ</string>
-    <string name="learning_path_title">သင်ယူမှုလမ်းကြောင်း</string>
-    <string name="learning_path_back">နောက်သို့</string>
-    <string name="learning_path_refresh">သင်ခန်းစာအသစ် စစ်ဆေးမည်</string>
-    <string name="learning_path_loading">သင်ယူမှုလမ်းကြောင်း ဖွင့်နေသည်…</string>
-    <string name="learning_path_empty">အသုံးပြုနိုင်သော သင်ခန်းစာမရှိသေးပါ။ အက်ပ်ထဲရှိ စာရင်း သို့မဟုတ် အွန်လိုင်းလိပ်စာကို စစ်ဆေးပါ။</string>
-    <string name="learning_path_app_update_required">ဤသင်ခန်းစာကို အသုံးပြုရန် အက်ပ်ကို အပ်ဒိတ်လုပ်ပါ</string>
-    <string name="learning_path_progress">%1$d / %2$d ပြီးပါပြီ</string>
-    <string name="learning_path_updated">သင်ယူမှုလမ်းကြောင်း အသစ်ပြင်ပြီးပါပြီ</string>
-    <string name="learning_path_latest">နောက်ဆုံးဗားရှင်း ဖြစ်ပြီးပါပြီ</string>
-    <string name="learning_path_refresh_failed">အသစ်ပြင်မရပါ：%1$s</string>
-    <string name="learning_path_locked_hint">ရှေ့က သင်ခန်းစာများကို ပြီးမှ ဖွင့်နိုင်ပါမည်</string>
-    <string name="learning_path_downloading">ဒေါင်းလုဒ်နေသည်</string>
-    <string name="learning_path_download_message">လေ့ကျင့်ခန်း %1$d ခု · %2$d မိနစ်ခန့်\nဖိုင်အရွယ်：%3$s</string>
-    <string name="learning_path_download_start">ဒေါင်းလုဒ်ပြီး စတင်မည်</string>
-    <string name="learning_path_size_unknown">အရွယ်မသိ</string>
-    <string name="learning_path_completed">ပြီးပါပြီ</string>
-    <string name="learning_path_start">စတင်လေ့လာ</string>
-    <string name="learning_path_available">လေ့လာနိုင်သည်</string>
-    <string name="learning_path_locked">မဖွင့်ရသေး</string>
-    <string name="learning_lesson_title">အပြန်အလှန် လေ့ကျင့်ခန်း</string>
-    <string name="learning_lesson_check">စစ်မည်</string>
-    <string name="learning_lesson_continue">ဆက်မည်</string>
-    <string name="learning_lesson_finish">ပြီးမည်</string>
-    <string name="learning_lesson_close">ပိတ်မည်</string>
-    <string name="learning_lesson_answer_first">လက်ရှိမေးခွန်းကို အရင်ဖြေပါ</string>
-    <string name="learning_lesson_content_missing">သင်ခန်းစာမရှိ သို့မဟုတ် မဒေါင်းလုဒ်ရသေးပါ</string>
-    <string name="learning_lesson_no_exercises">ဤအဆင့်တွင် အသုံးပြုနိုင်သော မေးခွန်းမရှိပါ</string>
-    <string name="learning_lesson_load_failed">သင်ခန်းစာဖွင့်မရပါ\n%1$s</string>
-    <string name="learning_lesson_input_hint">အဖြေထည့်ပါ</string>
-    <string name="learning_lesson_your_answer">သင့်အဖြေ</string>
-    <string name="learning_lesson_word_bank">စကားလုံးကတ်များ</string>
-    <string name="learning_lesson_matching_empty">ဤတွဲစပ်မေးခွန်းတွင် မှန်ကန်သောအချက်အလက်မရှိပါ</string>
-    <string name="learning_lesson_finish_matching">တွဲစပ်မှုအားလုံးကို ပြီးအောင်လုပ်ပါ</string>
-    <string name="learning_lesson_matching_mistakes">တွဲစပ်ရာတွင် %1$d ကြိမ် မှားခဲ့သည်။</string>
-    <string name="learning_lesson_progress">%1$d / %2$d</string>
-    <string name="learning_lesson_review_progress">ပြန် %1$d/%2$d</string>
-    <string name="learning_lesson_exit_title">ဤလေ့ကျင့်မှုမှ ထွက်မလား？</string>
-    <string name="learning_lesson_exit_message">မပြီးသေးသော အဖြေများကို သိမ်းမည်မဟုတ်ပါ။</string>
-    <string name="learning_lesson_exit_continue">ဆက်လေ့ကျင့်မည်</string>
-    <string name="learning_lesson_exit_leave">ထွက်မည်</string>
-    <string name="learning_lesson_play_audio">မူရင်းအသံဖွင့်မည်</string>
-    <string name="learning_lesson_play_original">မူရင်း 0.5×</string>
-    <string name="learning_lesson_record_compare">အသံသွင်းပြီး နှိုင်းယှဉ်မည်</string>
-    <string name="learning_lesson_pronunciation_hint">အသံသွင်းပြီးနောက် မူရင်းအသံနှင့် ကိုယ့်အသံကို အကြိမ်ကြိမ် ပြောင်းနားထောင်နိုင်သည်။</string>
-    <string name="learning_lesson_record_first">အသံနှိုင်းယှဉ်မှုကို ဖွင့်ပြီး တစ်ကြိမ်လေ့ကျင့်ပါ</string>
-    <string name="learning_lesson_record_done">အသံသွင်းပြီးပါပြီ။ အဖြေကို စစ်ဆေးနိုင်ပါပြီ။</string>
-    <string name="learning_lesson_audio_unavailable">ယခုအသံကို မဖွင့်နိုင်ပါ</string>
-    <string name="learning_lesson_correct">မှန်ပါသည်</string>
-    <string name="learning_lesson_incorrect">ထပ်စဉ်းစားပါ</string>
-    <string name="learning_lesson_correct_answer">အဖြေမှန်：%1$s</string>
-    <string name="learning_lesson_correct_hint">ကောင်းပါတယ်။ နောက်မေးခွန်းကို ဆက်ပါ။</string>
-    <string name="learning_lesson_retry_hint">ဤမေးခွန်းကို ယခုလေ့ကျင့်မှု၏ နောက်ပိုင်းတွင် ထပ်မေးမည်။</string>
-    <string name="learning_lesson_complete_progress">ပြီးပါပြီ</string>
-    <string name="learning_lesson_complete_title">ဤအဆင့် ပြီးပါပြီ</string>
-    <string name="learning_lesson_score">ပထမအကြိမ် မှန်ကန်မှု %1$d%%</string>
-    <string name="learning_lesson_back_to_map">သင်ယူမှုလမ်းကြောင်းသို့ ပြန်မည်</string>
-    <string name="learning_lesson_again">ထပ်လေ့ကျင့်မည်</string>
-    <string name="learning_lesson_true">မှန်</string>
-    <string name="learning_lesson_false">မှား</string>
-    <string name="learning_lesson_type_choice">ရွေးချယ်မေးခွန်း</string>
-    <string name="learning_lesson_type_listening">နားထောင်မေးခွန်း</string>
-    <string name="learning_lesson_type_order">ဝါကျစီခြင်း</string>
-    <string name="learning_lesson_type_fill">ကွက်လပ်ဖြည့်ခြင်း</string>
-    <string name="learning_lesson_type_matching">တွဲစပ်ခြင်း</string>
-    <string name="learning_lesson_type_speaking">အသံထွက်လေ့ကျင့်ခြင်း</string>
-    <string name="learning_lesson_type_judgement">မှန်/မှား</string>
-    <string name="learning_lesson_q_choice">အဖြေမှန်ကို ရွေးပါ</string>
-    <string name="learning_lesson_q_listen">ဘာကို ကြားခဲ့သလဲ？</string>
-    <string name="learning_lesson_q_order">စကားလုံးများကို ဝါကျမှန်အဖြစ် စီပါ</string>
-    <string name="learning_lesson_q_fill">လိုအပ်သောအကြောင်းအရာကို ဖြည့်ပါ</string>
-    <string name="learning_lesson_q_matching">သက်ဆိုင်ရာအရာများကို တွဲပါ</string>
-    <string name="learning_lesson_q_speak">မူရင်းအသံနောက် လိုက်ဖတ်ပါ</string>
-    <string name="learning_lesson_not_mastered">လေ့ကျင့်ခန်း %1$d ခု မကျွမ်းကျင်သေးပါ</string>
-    <string name="learning_lesson_not_passed_title">ဤသင်ခန်းစာကို မအောင်မြင်သေးပါ</string>
-    <string name="learning_lesson_retry_exhausted">ဤမေးခွန်းအတွက် ပြန်ကြိုးစားခွင့် ကုန်သွားပါပြီ။ ပြီးနောက် ထပ်လေ့ကျင့်နိုင်ပါသည်။</string>
-    <string name="learning_lesson_score_required">ပထမအကြိမ် မှန်ကန်မှု %1$d%% လိုအပ်ပါသည်</string>
-    <string name="learning_lesson_type_image">ပုံရွေးချယ်ခြင်း</string>
-    <string name="learning_lesson_unsupported_type">ဤမေးခွန်းပုံစံကို မပံ့ပိုးသေးပါ</string>
-    <string name="learning_package_backup_failed">သင်ခန်းစာအဟောင်းကို မိတ္တူမသိမ်းနိုင်ပါ</string>
-    <string name="learning_package_checksum_failed">သင်ခန်းစာဖိုင် စစ်ဆေးမှု မအောင်မြင်ပါ။ ပြန်ဒေါင်းလုဒ်လုပ်ပါ။</string>
-    <string name="learning_package_course_mismatch">သင်ခန်းစာဖိုင်၏ သင်တန်း မကိုက်ညီပါ</string>
-    <string name="learning_package_disk_space_low">သိုလှောင်နေရာ မလုံလောက်ပါ</string>
-    <string name="learning_package_download_failed">သင်ခန်းစာ ဒေါင်းလုဒ် မအောင်မြင်ပါ</string>
-    <string name="learning_package_downloading">သင်ခန်းစာကို ဒေါင်းလုဒ်လုပ်နေသည်</string>
-    <string name="learning_package_downloading_percent">ဒေါင်းလုဒ် %1$d%%</string>
-    <string name="learning_package_https_required">ယုံကြည်ရသော HTTPS လိပ်စာကိုသာ အသုံးပြုရမည်</string>
-    <string name="learning_package_id_mismatch">သင်ခန်းစာဖိုင် ID မကိုက်ညီပါ</string>
-    <string name="learning_package_incomplete">ဒေါင်းလုဒ် မပြည့်စုံပါ</string>
-    <string name="learning_package_installing">သင်ခန်းစာကို ထည့်သွင်းနေသည်</string>
-    <string name="learning_package_interrupted">ဒေါင်းလုဒ် ပြတ်တောက်သွားပါသည်။ ထပ်ကြိုးစားပါ။</string>
-    <string name="learning_package_lesson_missing">သင်ခန်းစာဖိုင် မပါရှိပါ</string>
-    <string name="learning_package_manifest_missing">manifest.json မရှိပါ သို့မဟုတ် ပျက်စီးနေပါသည်</string>
-    <string name="learning_package_ready">သင်ခန်းစာ အသင့်ဖြစ်ပါပြီ</string>
-    <string name="learning_package_restore_failed">ထည့်သွင်းမှု မအောင်မြင်ပြီး အဟောင်းကိုလည်း ပြန်မရနိုင်ပါ</string>
-    <string name="learning_package_resume_failed">ယခင်ဒေါင်းလုဒ်ကို ဆက်မလုပ်နိုင်သဖြင့် အစမှပြန်လုပ်မည်</string>
-    <string name="learning_package_save_failed">သင်ခန်းစာဖိုင်ကို မသိမ်းနိုင်ပါ</string>
-    <string name="learning_package_size_mismatch">ဖိုင်အရွယ်အစား မကိုက်ညီပါ</string>
-    <string name="learning_package_switch_failed">သင်ခန်းစာဗားရှင်းအသစ်ကို မဖွင့်နိုင်ပါ</string>
-    <string name="learning_package_too_large">သင်ခန်းစာဖိုင် အလွန်ကြီးပါသည်</string>
-    <string name="learning_package_too_many_files">သင်ခန်းစာဖိုင်အတွင်း ဖိုင်များလွန်းပါသည်</string>
-    <string name="learning_package_unit_mismatch">သင်ခန်းစာဖိုင်၏ ယူနစ် မကိုက်ညီပါ</string>
-    <string name="learning_package_unpacked_too_large">ဖြည်ပြီးသော သင်ခန်းစာဖိုင် အလွန်ကြီးပါသည်</string>
-    <string name="learning_package_unsafe_path">မလုံခြုံသော ဖိုင် ပါရှိပါသည်</string>
-    <string name="learning_package_url_missing">ဒေါင်းလုဒ်လိပ်စာ မရှိပါ</string>
-    <string name="learning_package_verifying">သင်ခန်းစာဖိုင်ကို စစ်ဆေးနေသည်</string>
-    <string name="learning_package_version_mismatch">သင်ခန်းစာဖိုင် ဗားရှင်း မကိုက်ညီပါ</string>
-    <string name="learning_package_media_missing">သင်ခန်းစာဖိုင်တွင် မီဒီယာဖိုင် မရှိပါ：%1$s</string>
-    <string name="learning_path_choose_course">သင်ခန်းစာရွေးပါ</string>
-
-    <string name="learning_category_title">အပြန်အလှန် လေ့ကျင့်ခန်း</string>
-    <string name="learning_category_heading">လေ့ကျင့်မည့် အမျိုးအစားရွေးပါ</string>
-    <string name="learning_category_subtitle">အခြေအနေအမျိုးအစားကို အရင်ရွေးပြီး သင်ယူမှုမြေပုံအတိုင်း တစ်ဆင့်ချင်း လေ့ကျင့်ပါ။</string>
-    <string name="learning_category_lessons">သင်ခန်းစာ %1$d ခု</string>
-    <string name="learning_category_section">အမျိုးအစား မြေပုံ</string>
-    <string name="learning_path_map_tip">လက်ရှိသင်ခန်းစာပြီးလျှင် နောက်တစ်ခု အလိုအလျောက်ဖွင့်မည်</string>
-    <string name="learning_path_current">လက်ရှိသင်ခန်းစာ</string>
-
-    <!-- Speaking vertical feed and imports -->
-    <string name="speaking_favorites_action">Favorites</string>
-    <string name="speaking_favorites_title">Favorite phrases</string>
-    <string name="speaking_favorites_empty">No favorite phrases yet. Tap Save at the top of a phrase to add one.</string>
-    <string name="speaking_favorite">Save</string>
-    <string name="speaking_favorited">Saved</string>
-    <string name="speaking_favorite_added">Saved to favorites</string>
-    <string name="speaking_favorite_removed">Removed from favorites</string>
-    <string name="speaking_feed_progress">%1$d / %2$d</string>
-    <string name="speaking_swipe_hint">Swipe up for next - swipe down for previous</string>
-    <string name="speaking_scene_label">Use in this scene</string>
-    <string name="speaking_import">Import</string>
-    <string name="speaking_import_new">Import a phrase pack</string>
-    <string name="speaking_import_manage">Manage imports</string>
-    <string name="speaking_import_none">No phrase packs have been imported</string>
-    <string name="speaking_importing">Importing phrase pack...</string>
-    <string name="speaking_import_success">Imported &quot;%1$s&quot; with %2$d phrases</string>
-    <string name="speaking_import_failed">Import failed: %1$s</string>
-    <string name="speaking_import_invalid">Invalid phrase pack file</string>
-    <string name="speaking_import_picker_failed">Unable to open the file picker</string>
-    <string name="speaking_import_delete_title">Delete imported phrase pack</string>
-    <string name="speaking_import_delete_message">Delete &quot;%1$s&quot;? Saved favorites and practice history will be kept.</string>
-    <string name="speaking_import_delete">Delete</string>
-    <string name="speaking_import_delete_success">Imported phrase pack deleted</string>
-    <string name="speaking_imported_group">My imports</string>
-    <string name="speaking_imported_group_subtitle">Tap to open the swipe feed. Long-press a card to delete it.</string>
-    <string name="speaking_imported_delete_hint">- Long-press to delete</string>
-
-
-    <string name="learning_lesson_pinyin">Pinyin</string>
-    <string name="learning_lesson_pinyin_switch">အလိုအလျောက် Pinyin ကို ပြရန် သို့မဟုတ် ဖျောက်ရန်</string>
-    <string name="learning_lesson_fill_pinyin">Pinyin အကူအညီ：%1$s</string>
-    <string name="learning_lesson_drag_hint">ထည့်ရန် တို့ပါ၊ အစီအစဉ်ပြောင်းရန် ဖိဆွဲပါ</string>
-</resources>
+    <string name="dating_distance_under_1km">၁ ကီလိုမီတာအတွင်း</string>
+    <string name="dating_distance_1_5km">၁–၅ ကီလိုမီတာ</string>
+    <string name="dating_distance_5_20km">၅–၂၀ ကီလိုမီတာ</string>
+    <string name="dating_distance_20_50km">၂၀–၅၀ ကီလိုမီတာ</string>
+    <string name="dating_distance_50_100km">၅၀–၁၀၀ ကီလိုမီတာ</string>
+    <string name="dating_distance_over_100km">၁၀၀ ကီလိုမီတာအထက်</string>
+    <string name="dating_swipe_stamp_like">သဘောကျ</string>
+    <string name="dating_swipe_stamp_favorite">သိမ်းမယ်</string>
+<string name="dating_country_flag">နိုင်ငံအလံ</string><string name="dating_more_actions">နောက်ထပ် လုပ်ဆောင်ချက်များ</string><string name="dating_section_languages">ဘာသာစကားများ</string><string name="dating_basic_relationship">အချစ်ရေးအခြေအနေ</string><string name="dating_basic_orientation">လိင်စိတ်တိမ်းညွတ်မှု</string><string name="dating_basic_body">အရပ်နှင့် ကိုယ်အလေးချိန်</string><string name="dating_basic_lifestyle">နေထိုင်မှုပုံစံ</string><string name="dating_basic_job">အလုပ်အကိုင်</string><string name="dating_basic_education">ပညာရေး</string><string name="dating_native_languages_format">မိခင်ဘာသာ: %1$s</string><string name="dating_learning_languages_format">လေ့လာနေသည်: %1$s</string><string name="dating_status_edit_tip">ပရိုဖိုင်ပြည့်စုံပြီးမှ မိတ်ဖက်ရှာခြင်းကို ဖွင့်နိုင်သည်။ ပိတ်ထားလျှင် အကြံပြုစာရင်းတွင် မပေါ်ပါ။</string><string name="dating_shared_profile_partner_tip">ဘာသာစကားမိတ်ဖက် ပရိုဖိုင်ကို မူလအဖြစ် အသုံးပြုပြီး ပြောင်းလဲမှုများကို နှစ်နေရာလုံးတွင် အပ်ဒိတ်လုပ်သည်။</string><string name="dating_edit_shared_profile_inside">မျှဝေထားသော ပရိုဖိုင်ကို ပြင်ရန်</string><string name="dating_close_dating">မိတ်ဖက်ရှာခြင်း ပိတ်ရန်</string><string name="dating_open_dating">မိတ်ဖက်ရှာခြင်း ဖွင့်ရန်</string><string name="dating_complete_before_open">ဓာတ်ပုံနှင့် အချစ်ရေးရည်ရွယ်ချက်ကို ဖြည့်ပြီးမှ ဖွင့်ပါ။</string><string name="dating_save_shared_profile">မျှဝေထားသော ပရိုဖိုင်ကို သိမ်းရန်</string><string name="dating_shared_editor_title">မျှဝေထားသော ပရိုဖိုင်</string><string name="dating_shared_editor_tip">ဤပရိုဖိုင်ကို ဘာသာစကားမိတ်ဖက်နှင့် မိတ်ဖက်ရှာခြင်းတို့တွင် မျှဝေသုံးသည်။ ဒီမှာပြင်လျှင် နှစ်နေရာလုံး အပ်ဒိတ်ဖြစ်မည်။</string><string name="dating_shared_core_title">အကောင့်နှင့် ဘာသာစကားများ</string><string name="dating_shared_name">အမည်</string><string name="dating_shared_birthday">မွေးနေ့</string><string name="dating_shared_gender">လိင်</string><string name="dating_shared_country">နိုင်ငံ/ဒေသ</string><string name="dating_shared_native_languages">မိခင်ဘာသာ</string><string name="dating_shared_learning_languages">လေ့လာနေသော ဘာသာစကား</string><string name="dating_shared_partner_default_title">ဘာသာစကားမိတ်ဖက် မျှဝေထားသော ပရိုဖိုင်</string><string name="dating_shared_partner_default_note">ဘာသာစကားမိတ်ဖက် ပရိုဖိုင်ကို မူလအဖြစ် သုံးသည်။ ဒီမှာပြင်လျှင် နှစ်နေရာလုံး အပ်ဒိတ်ဖြစ်မည်။</string><string name="dating_shared_relationship_label">အချစ်ရေးအခြေအနေ</string><string name="dating_shared_personality_label">ကိုယ်ရည်ကိုယ်သွေး</string><string name="dating_shared_pets">အိမ်မွေးတိရစ္ဆာန်</string><string name="dating_shared_sports">အားကစား</string><string name="dating_shared_movies">ရုပ်ရှင်နှင့် တီဗီ</string><string name="dating_shared_job">အလုပ်အကိုင်</string><string name="dating_shared_education">ပညာရေး</string><string name="dating_shared_language_limit">ဘာသာစကား %1$d မျိုးအထိ ရွေးနိုင်သည်</string><string name="dating_shared_tag_limit">အမျိုးအစားတစ်ခုလျှင် %1$d ခုအထိ ရွေးနိုင်သည်</string><string name="dating_shared_name_required">အမည်ထည့်ပါ</string><string name="dating_shared_birthday_required">မွေးနေ့ရွေးပါ</string><string name="dating_shared_country_required">နိုင်ငံ/ဒေသရွေးပါ</string><string name="dating_shared_languages_required">မိခင်ဘာသာနှင့် လေ့လာနေသောဘာသာကို ရွေးပါ</string><string name="dating_shared_save_failed">မျှဝေထားသော ပရိုဖိုင်ကို မသိမ်းနိုင်ပါ</string><string name="dating_shared_saved">မျှဝေထားသော ပရိုဖိုင်ကို သိမ်းပြီး နှစ်နေရာလုံး အပ်ဒိတ်လုပ်ပြီးပါပြီ</string><string-array name="dating_shared_gender_options"><item>ကျား</item><item>မ</item><item>မဖော်ပြလို</item></string-array><string-array name="dating_shared_country_options"><item>🇲🇲 မြန်မာ</item><item>🇨🇳 တရုတ်</item><item>🇹🇭 ထိုင်း</item><item>🇯🇵 ဂျပန်</item><item>🇰🇷 တောင်ကိုရီးယား</item><item>🇻🇳 ဗီယက်နမ်</item><item>🇱🇦 လာအို</item><item>🇰🇭 ကမ္ဘောဒီးယား</item><item>🇲🇾 မလေးရှား</item><item>🇸🇬 စင်ကာပူ</item><item>🇺🇸 အမေရိကန်</item></string-array><string-array name="dating_shared_language_options"><item>🇲🇲 မြန်မာဘာသာ  MY</item><item>🇨🇳 တရုတ်ဘာသာ  ZH</item><item>🇺🇸 အင်္ဂလိပ်ဘာသာ  EN</item><item>🇹🇭 ထိုင်းဘာသာ  TH</item><item>🇯🇵 ဂျပန်ဘာသာ  JA</item><item>🇰🇷 ကိုရီးယားဘာသာ  KO</item><item>🇻🇳 ဗီယက်နမ်ဘာသာ  VI</item><item>🇮🇩 အင်ဒိုနီးရှားဘာသာ  ID</item><item>🇲🇾 မလေးဘာသာ  MS</item></string-array><string name="dating_shared_other_tags">အခြား တဂ်များ</string></resources>
