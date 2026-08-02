@@ -70,7 +70,7 @@
     <string name="dating_who_likes_title">See who likes you</string>
     <string name="dating_who_likes_tip">Free users see only the count and blurred previews. Upgrade to view the full list; chat unlocks only after a mutual like.</string>
     <string name="dating_membership_benefits">View membership benefits</string>
-    <string name="dating_photo_count_tip">%1$d/5 uploaded · The first photo is the cover · Each photo is compressed below 150 KB</string>
+    <string name="dating_photo_count_tip">%1$d/5 uploaded · The first photo is the cover</string>
     <string name="dating_select">Select</string>
     <string name="dating_not_filled">Not provided</string>
     <string name="dating_uploading_wait">Photos are uploading. Please wait.</string>
