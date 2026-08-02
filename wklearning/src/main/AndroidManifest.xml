@@ -1,75 +1,35 @@
-<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <application>
         <activity
-            android:name="com.chat.learning.LearningCategoryActivity"
+            android:name="com.chat.dating.DatingHomeActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
             android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+            android:screenOrientation="portrait" />
         <activity
-            android:name="com.chat.learning.LearningPathActivity"
+            android:name="com.chat.dating.DatingProfileDetailActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+            android:screenOrientation="portrait" />
         <activity
-            android:name="com.chat.learning.LearningLessonActivity"
+            android:name="com.chat.dating.DatingMineActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+            android:screenOrientation="portrait" />
         <activity
-            android:name="com.chat.learning.LearningDirectoryActivity"
+            android:name="com.chat.dating.DatingEditProfileActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+            android:screenOrientation="portrait" />
         <activity
-            android:name="com.chat.learning.SpeakingDirectoryActivity"
+            android:name="com.chat.dating.DatingFavoritesActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+            android:screenOrientation="portrait" />
         <activity
-            android:name="com.chat.learning.SpeakingPhraseListActivity"
+            android:name="com.chat.dating.DatingWhoLikesActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+            android:screenOrientation="portrait" />
         <activity
-            android:name="com.chat.learning.SpeakingFullscreenActivity"
+            android:name="com.chat.dating.DatingMatchesActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
-        <activity
-            android:name="com.chat.learning.PinyinChartActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
-        <activity
-            android:name="com.chat.learning.LearningStudyActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
-        <activity
-            android:name="com.chat.learning.WordFullscreenActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
-        <activity
-            android:name="com.chat.learning.WordStrokeActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.WKLearning.Popup" />
-        <activity
-            android:name="com.chat.learning.SherpaModelSettingsActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
-        <activity
-            android:name="com.chat.learning.WordPronunciationActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.WKLearning.Popup" />
+            android:screenOrientation="portrait" />
     </application>
 </manifest>
