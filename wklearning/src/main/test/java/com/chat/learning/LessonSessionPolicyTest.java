@@ -41,4 +41,16 @@ public class LessonSessionPolicyTest {
         assertEquals(50, LessonSessionPolicy.firstAttemptScore(5, 10));
         assertEquals(100, LessonSessionPolicy.firstAttemptScore(20, 10));
     }
+
+    @Test
+    public void ttsTextIsLimitedToListeningExercises() {
+        assertEquals("", LessonSessionPolicy.ttsText(
+                "single_choice", "", "", "正确答案"));
+        assertEquals("你好", LessonSessionPolicy.ttsText(
+                "listen_choice", " 你好 ", "备用文本", "备用答案"));
+        assertEquals("八点半", LessonSessionPolicy.ttsText(
+                "dictation", "", "八点半", "备用答案"));
+        assertEquals("现在九点", LessonSessionPolicy.ttsText(
+                "dictation", "", "", "现在九点"));
+    }
 }
