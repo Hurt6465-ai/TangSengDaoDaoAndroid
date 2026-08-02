@@ -70,7 +70,7 @@
     <string name="dating_who_likes_title">ဘယ်သူက သင့်ကို ကြိုက်သလဲ ကြည့်ပါ</string>
     <string name="dating_who_likes_tip">အခမဲ့အသုံးပြုသူများသည် အရေအတွက်နှင့် မရှင်းလင်းသောပုံသာ မြင်ရမည်။ အဖွဲ့ဝင်ဖြစ်ပြီးမှ စာရင်းအပြည့်ကြည့်နိုင်ပြီး နှစ်ဦးနှစ်ဖက်ကြိုက်မှ စကားပြောနိုင်သည်။</string>
     <string name="dating_membership_benefits">အဖွဲ့ဝင်အကျိုးခံစားခွင့်များ</string>
-    <string name="dating_photo_count_tip">%1$d/5 ပုံတင်ပြီး · ပထမပုံသည် အဖုံးပုံ · တစ်ပုံလျှင် 150KB အောက်သို့ ချုံ့မည်</string>
+    <string name="dating_photo_count_tip">%1$d/5 ပုံတင်ပြီး · ပထမပုံသည် အဖုံးပုံ</string>
     <string name="dating_select">ရွေးချယ်ရန်</string>
     <string name="dating_not_filled">မဖြည့်ရသေးပါ</string>
     <string name="dating_uploading_wait">ဓာတ်ပုံတင်နေပါသည်။ ခဏစောင့်ပါ။</string>
