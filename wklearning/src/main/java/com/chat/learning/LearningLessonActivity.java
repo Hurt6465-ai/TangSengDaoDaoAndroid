@@ -5,7 +5,6 @@ import android.content.ClipData;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.Intent;
-import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -15,10 +14,7 @@ import android.graphics.RectF;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.media.AudioAttributes;
 import android.media.AudioManager;
-import android.media.MediaPlayer;
-import android.media.PlaybackParams;
 import android.media.ToneGenerator;
 import android.media.SoundPool;
 import android.os.Build;
@@ -147,7 +143,6 @@ public class LearningLessonActivity extends AppCompatActivity {
     private boolean matchingHadMistake;
     private int matchingWrongAttempts;
     private long sessionSeed;
-    private MediaPlayer mediaPlayer;
     private ToneGenerator feedbackTone;
     private SoundPool feedbackSounds;
     private int correctSoundId;
@@ -249,7 +244,7 @@ public class LearningLessonActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         cancelAutoPlay();
-        releasePlayer();
+        LearningTtsBridge.stop(this);
         super.onStop();
     }
 
@@ -259,7 +254,7 @@ public class LearningLessonActivity extends AppCompatActivity {
         loadGeneration++;
         questionGeneration++;
         cancelAutoPlay();
-        releasePlayer();
+        LearningTtsBridge.stop(this);
         releaseFeedbackSounds();
         releaseFeedbackTone();
         if (progressStore != null) progressStore.close();
@@ -542,7 +537,7 @@ public class LearningLessonActivity extends AppCompatActivity {
     private void showCurrentQuestion() {
         int generation = ++questionGeneration;
         cancelAutoPlay();
-        releasePlayer();
+        LearningTtsBridge.stop(this);
         hideKeyboard();
         resetFooter();
         answered = false;
@@ -654,7 +649,10 @@ public class LearningLessonActivity extends AppCompatActivity {
     }
 
     private boolean hasAudio(LearningLessonRepository.Exercise exercise) {
-        return exercise != null && (!exercise.audio.isEmpty() || !exercise.audioText.isEmpty());
+        if (exercise == null) return false;
+        boolean listeningExercise = "listen_choice".equals(exercise.type)
+                || "dictation".equals(exercise.type);
+        return listeningExercise && !speechText(exercise).isEmpty();
     }
 
     private void renderChoice(LearningLessonRepository.Exercise exercise) {
@@ -770,7 +768,7 @@ public class LearningLessonActivity extends AppCompatActivity {
             BitmapFactory.Options options = sampledOptions(bounds, maxWidth, maxHeight);
             return BitmapFactory.decodeFile(image.getAbsolutePath(), options);
         }
-        String asset = resolveBundledAudioAsset(clean);
+        String asset = resolveBundledMediaAsset(clean);
         try (InputStream input = getAssets().open(asset)) {
             BitmapFactory.decodeStream(input, null, bounds);
         }
@@ -1374,73 +1372,13 @@ public class LearningLessonActivity extends AppCompatActivity {
     }
 
     private void playExerciseAudio(LearningLessonRepository.Exercise exercise) {
-        releasePlayer();
-        if (!exercise.audio.isEmpty()) {
-            try {
-                MediaPlayer player = new MediaPlayer();
-                player.setAudioAttributes(new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build());
-                if (!filePath.isEmpty()) {
-                    File audio = resolveInstalledMedia(exercise.audio);
-                    if (!audio.isFile()) throw new IllegalStateException("Audio not found");
-                    player.setDataSource(audio.getAbsolutePath());
-                } else {
-                    String asset = resolveBundledAudioAsset(exercise.audio);
-                    try (AssetFileDescriptor descriptor = getAssets().openFd(asset)) {
-                        player.setDataSource(descriptor.getFileDescriptor(), descriptor.getStartOffset(),
-                                descriptor.getLength());
-                    }
-                }
-                player.setOnPreparedListener(mp -> {
-                    if (mediaPlayer != mp || destroyed) {
-                        try { mp.release(); } catch (Throwable ignored) { }
-                        return;
-                    }
-                    try {
-                        if (Build.VERSION.SDK_INT >= 23
-                                && Math.abs(exercise.originalSpeed - 1f) > 0.01f) {
-                            PlaybackParams params = mp.getPlaybackParams();
-                            params.setSpeed(Math.max(0.5f, Math.min(1.5f, exercise.originalSpeed)));
-                            mp.setPlaybackParams(params);
-                        }
-                        mp.start();
-                    } catch (Throwable ignored) {
-                        if (mediaPlayer == mp) {
-                            releasePlayer();
-                            speakFallback(exercise);
-                        } else {
-                            try { mp.release(); } catch (Throwable ignoredRelease) { }
-                        }
-                    }
-                });
-                player.setOnCompletionListener(mp -> {
-                    if (mediaPlayer == mp) releasePlayer();
-                    else try { mp.release(); } catch (Throwable ignored) { }
-                });
-                player.setOnErrorListener((mp, what, extra) -> {
-                    if (mediaPlayer == mp) {
-                        releasePlayer();
-                        speakFallback(exercise);
-                    } else {
-                        try { mp.release(); } catch (Throwable ignored) { }
-                    }
-                    return true;
-                });
-                mediaPlayer = player;
-                player.prepareAsync();
-                return;
-            } catch (Throwable ignored) {
-                releasePlayer();
-            }
+        String value = speechText(exercise);
+        if (value.isEmpty()) {
+            Toast.makeText(this, R.string.learning_lesson_audio_unavailable,
+                    Toast.LENGTH_SHORT).show();
+            return;
         }
-        speakFallback(exercise);
-    }
-
-    private void speakFallback(LearningLessonRepository.Exercise exercise) {
-        String value = !exercise.audioText.isEmpty() ? exercise.audioText
-                : !exercise.text.isEmpty() ? exercise.text : exercise.answer;
+        LearningTtsBridge.stop(this);
         if (!LearningTtsBridge.speak(this, value, LearningTtsBridge.LANG_ZH_CN,
                 LearningTtsBridge.MODE_EXAMPLE)) {
             Toast.makeText(this, R.string.learning_lesson_audio_unavailable,
@@ -1448,7 +1386,18 @@ public class LearningLessonActivity extends AppCompatActivity {
         }
     }
 
-    private String resolveBundledAudioAsset(String relative) {
+    private String speechText(LearningLessonRepository.Exercise exercise) {
+        if (exercise == null) return "";
+        if (exercise.audioText != null && !exercise.audioText.trim().isEmpty()) {
+            return exercise.audioText.trim();
+        }
+        if (exercise.text != null && !exercise.text.trim().isEmpty()) {
+            return exercise.text.trim();
+        }
+        return exercise.answer == null ? "" : exercise.answer.trim();
+    }
+
+    private String resolveBundledMediaAsset(String relative) {
         String clean = LearningLessonRepository.cleanRelative(relative, true);
         if (clean.isEmpty()) return "";
         if (clean.startsWith("learning/")) return clean;
@@ -1486,15 +1435,6 @@ public class LearningLessonActivity extends AppCompatActivity {
     private void cancelAutoPlay() {
         if (autoPlayRunnable != null && questionHost != null) questionHost.removeCallbacks(autoPlayRunnable);
         autoPlayRunnable = null;
-    }
-
-    private void releasePlayer() {
-        MediaPlayer old = mediaPlayer;
-        mediaPlayer = null;
-        if (old == null) return;
-        try { old.stop(); } catch (Throwable ignored) { }
-        try { old.reset(); } catch (Throwable ignored) { }
-        try { old.release(); } catch (Throwable ignored) { }
     }
 
     private LinearLayout wrapRow() {

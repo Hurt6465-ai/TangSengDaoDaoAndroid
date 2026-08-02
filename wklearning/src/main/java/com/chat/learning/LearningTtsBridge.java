@@ -43,6 +43,20 @@ final class LearningTtsBridge {
         return false;
     }
 
+    static void stop(Context context) {
+        if (context == null) return;
+        Context app = context.getApplicationContext();
+        try {
+            Class<?> managerClass = Class.forName("com.chat.speech.SpeechManager");
+            Method getMethod = managerClass.getMethod("get", Context.class);
+            Object manager = getMethod.invoke(null, app);
+            if (manager == null) return;
+            Method stopMethod = managerClass.getMethod("stop");
+            stopMethod.invoke(manager);
+        } catch (Throwable ignored) {
+        }
+    }
+
     private static boolean tryStatic(Context context, String text, String pinyin, String lang, String mode) {
         String[] classNames = new String[]{
                 "com.chat.speech.SpeechManager",
