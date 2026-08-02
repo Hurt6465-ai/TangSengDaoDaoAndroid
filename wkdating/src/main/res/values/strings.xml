@@ -100,7 +100,7 @@
     <string name="dating_who_likes_title">看看谁对你心动</string>
     <string name="dating_who_likes_tip">免费用户只显示人数与模糊预览。开通会员后可查看完整列表；双方喜欢后才可以聊天。</string>
     <string name="dating_membership_benefits">了解会员权益</string>
-    <string name="dating_photo_count_tip">已上传 %1$d/5 张 · 第一张为封面 · 单张压缩至 150KB 以下</string>
+    <string name="dating_photo_count_tip">已上传 %1$d/5 张 · 第一张为封面</string>
     <string name="dating_select">请选择</string>
     <string name="dating_not_filled">未填写</string>
     <string name="dating_uploading_wait">图片正在上传，请稍候</string>
