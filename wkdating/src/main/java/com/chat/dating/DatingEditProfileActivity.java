@@ -32,7 +32,6 @@ import java.util.Map;
 public class DatingEditProfileActivity extends Activity {
     public static final String EXTRA_PROFILE = "dating_edit_profile";
     private static final int REQ_PICK_IMAGES = 701;
-    private static final int REQ_SHARED_PROFILE = 702;
 
     private String[] genderOptions;
     private String[] ageOptions;
@@ -46,6 +45,7 @@ public class DatingEditProfileActivity extends Activity {
     private DatingPhotoGridAdapter photoAdapter;
     private ItemTouchHelper touchHelper;
     private DatingPhotoUploadManager uploadManager;
+    private DatingInlineSharedProfileEditor sharedEditor;
     private boolean uploading;
     private boolean initiallyEnabled;
 
@@ -79,9 +79,11 @@ public class DatingEditProfileActivity extends Activity {
         smokingValue = DatingValueFormatter.smokingCode(this, smokingOptions[0]);
         uploadManager = new DatingPhotoUploadManager(this);
         initPhotoGrid();
-        initListeners();
         bindProfile();
-        syncSharedProfile();
+        sharedEditor = new DatingInlineSharedProfileEditor(this, binding, profile,
+                this::updateProfileScore);
+        initListeners();
+        updateProfileScore();
     }
 
     private void initPhotoGrid() {
@@ -146,11 +148,6 @@ public class DatingEditProfileActivity extends Activity {
                     updateProfileScore();
                 }));
         binding.dealbreakersRow.setOnClickListener(v -> pickDealbreakers());
-        binding.sharedEditBtn.setOnClickListener(v -> {
-            Intent intent = new Intent(this, DatingSharedProfileActivity.class);
-            intent.putExtra(DatingSharedProfileActivity.EXTRA_PROFILE, profile);
-            startActivityForResult(intent, REQ_SHARED_PROFILE);
-        });
         binding.previewTab.setOnClickListener(v -> openPreview());
         binding.saveBtn.setOnClickListener(v -> saveProfile());
         TextWatcher scoreWatcher = new TextWatcher() {
@@ -163,7 +160,6 @@ public class DatingEditProfileActivity extends Activity {
         binding.weightEt.addTextChangedListener(scoreWatcher);
         binding.introEt.addTextChangedListener(scoreWatcher);
         binding.idealPartnerEt.addTextChangedListener(scoreWatcher);
-        binding.tagsEt.addTextChangedListener(scoreWatcher);
     }
 
     private void bindProfile() {
@@ -194,36 +190,8 @@ public class DatingEditProfileActivity extends Activity {
         if (profile.weight_kg > 0) binding.weightEt.setText(String.valueOf(profile.weight_kg));
         binding.introEt.setText(profile.safeIntro());
         binding.idealPartnerEt.setText(profile.ideal_partner);
-        binding.tagsEt.setText(TextUtils.join(getString(R.string.dating_list_separator), profile.tags == null ? new ArrayList<>() : profile.tags));
-        bindSharedFields();
         updatePhotoTip();
         updateProfileScore();
-    }
-
-    private void syncSharedProfile() {
-        DatingModel.getInstance().copyPartnerProfile((code, msg, data) -> {
-            if (code == HttpResponseCode.success && data != null) {
-                DatingSharedProfileFormatter.mergeSharedFields(profile, data);
-                bindSharedFields();
-            }
-        });
-    }
-
-    private void bindSharedFields() {
-        ArrayList<String> lines = new ArrayList<>();
-        addSharedLine(lines, DatingSharedProfileFormatter.basicLine(this, profile));
-        addSharedLine(lines, DatingSharedProfileFormatter.relationshipLine(this, profile));
-        addSharedLine(lines, DatingSharedProfileFormatter.personalityLine(this, profile));
-        addSharedLine(lines, DatingSharedProfileFormatter.interestsLine(this, profile));
-        addSharedLine(lines, DatingSharedProfileFormatter.careerLine(this, profile));
-        binding.sharedSummaryTv.setText(lines.isEmpty()
-                ? getString(R.string.dating_not_filled)
-                : TextUtils.join("\n", lines));
-        updateProfileScore();
-    }
-
-    private void addSharedLine(List<String> lines, String value) {
-        if (!TextUtils.isEmpty(value) && !lines.contains(value)) lines.add(value);
     }
 
     private void openPicker() {
@@ -254,18 +222,6 @@ public class DatingEditProfileActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQ_SHARED_PROFILE) {
-            if (resultCode == RESULT_OK && data != null) {
-                Object updated = data.getSerializableExtra(DatingSharedProfileActivity.EXTRA_RESULT_PROFILE);
-                if (updated instanceof DatingProfile) {
-                    DatingSharedProfileFormatter.mergeSharedFields(profile, (DatingProfile) updated);
-                    bindSharedFields();
-                } else {
-                    syncSharedProfile();
-                }
-            }
-            return;
-        }
         if (requestCode != REQ_PICK_IMAGES || resultCode != RESULT_OK || data == null) return;
         int remain = DatingPhotoPolicy.MAX_PHOTO_COUNT - photoAdapter.photoCount();
         ArrayList<Uri> uris = new ArrayList<>();
@@ -370,7 +326,7 @@ public class DatingEditProfileActivity extends Activity {
         profile.intro = profile.bio;
         profile.ideal_partner = limit(text(binding.idealPartnerEt), 200);
         profile.dealbreakers = new ArrayList<>(dealbreakers);
-        profile.tags = parseTags(text(binding.tagsEt));
+        if (sharedEditor != null) sharedEditor.applyToProfile();
     }
 
     private void updateProfileScore() {
@@ -382,13 +338,11 @@ public class DatingEditProfileActivity extends Activity {
         if (!TextUtils.isEmpty(intentValue)) score += 12;
         if (!TextUtils.isEmpty(text(binding.introEt))) score += 12;
         if (profile != null && !TextUtils.isEmpty(profile.country_code)) score += 5;
-        boolean hasTags = !parseTags(text(binding.tagsEt)).isEmpty();
-        if (profile != null) {
-            hasTags = hasTags || !profile.safePersonalityTags().isEmpty()
-                    || !profile.safePetTags().isEmpty()
-                    || !profile.safeSportTags().isEmpty()
-                    || !profile.safeMovieTags().isEmpty();
-        }
+        boolean hasTags = sharedEditor != null
+                ? sharedEditor.hasInterestTags() || !sharedEditor.datingOnlyTags().isEmpty()
+                : profile != null && (!profile.safePersonalityTags().isEmpty()
+                || !profile.safePetTags().isEmpty() || !profile.safeSportTags().isEmpty()
+                || !profile.safeMovieTags().isEmpty() || !profile.safeTags().isEmpty());
         if (hasTags) score += 8;
         if (parseInt(text(binding.heightEt)) > 0 || parseInt(text(binding.weightEt)) > 0) score += 4;
         if (profile != null && (!TextUtils.isEmpty(profile.job_status) || !TextUtils.isEmpty(profile.education))) score += 4;
@@ -402,6 +356,28 @@ public class DatingEditProfileActivity extends Activity {
             toast(getString(R.string.dating_uploading_wait));
             return;
         }
+        if (sharedEditor == null) return;
+        String sharedError = sharedEditor.validationError();
+        if (!TextUtils.isEmpty(sharedError)) {
+            toast(sharedError);
+            return;
+        }
+        applyFormToProfile();
+        setSaving(true);
+        DatingModel.getInstance().updateSharedUser(sharedEditor.userUpdateBody(), (code, msg, data) -> {
+            if (isFinishing() || isDestroyed() || binding == null) return;
+            if (code != HttpResponseCode.success) {
+                setSaving(false);
+                toast(TextUtils.isEmpty(msg)
+                        ? getString(R.string.dating_shared_save_failed) : msg);
+                return;
+            }
+            sharedEditor.updateLocalUser();
+            saveDatingProfile();
+        });
+    }
+
+    private void saveDatingProfile() {
         ArrayList<String> photos = photoAdapter.getPhotos();
         Map<String, Object> body = new HashMap<>();
         // 展示状态由后端 user_paused 权威决定：首次完整自动开启，主动暂停后编辑不重开。
@@ -421,7 +397,7 @@ public class DatingEditProfileActivity extends Activity {
         body.put("intro", limit(text(binding.introEt), 500));
         body.put("ideal_partner", limit(text(binding.idealPartnerEt), 200));
         body.put("dealbreakers", new ArrayList<>(dealbreakers));
-        body.put("tags", parseTags(text(binding.tagsEt)));
+        body.put("tags", sharedEditor.datingOnlyTags());
         body.put("photos", photos);
         body.put("card_photos", photos); // 兼容旧后端字段，不再上传第二套图片。
         body.put("profile_images", photos);
@@ -441,13 +417,10 @@ public class DatingEditProfileActivity extends Activity {
         body.put("job", profile.job);
         body.put("education", profile.education);
 
-        binding.saveBtn.setEnabled(false);
-        binding.saveBtn.setText(R.string.dating_saving);
         final boolean wasEnabled = initiallyEnabled;
         DatingModel.getInstance().saveProfile(body, (code, msg, data) -> {
             if (isFinishing() || isDestroyed() || binding == null) return;
-            binding.saveBtn.setEnabled(true);
-            binding.saveBtn.setText(R.string.dating_save_profile);
+            setSaving(false);
             if (code == HttpResponseCode.success && data != null) {
                 profile = data;
                 boolean becameEnabled = !wasEnabled && profile.enabled == 1;
@@ -462,6 +435,11 @@ public class DatingEditProfileActivity extends Activity {
                 toast(TextUtils.isEmpty(msg) ? getString(R.string.dating_save_failed) : msg);
             }
         });
+    }
+
+    private void setSaving(boolean saving) {
+        binding.saveBtn.setEnabled(!saving);
+        binding.saveBtn.setText(saving ? R.string.dating_saving : R.string.dating_save_profile);
     }
 
     private void pickDealbreakers() {
@@ -512,18 +490,6 @@ public class DatingEditProfileActivity extends Activity {
         if (genderPreference == 0) return genderOptions[1];
         if (genderPreference == 1) return genderOptions[2];
         return genderOptions[0];
-    }
-
-    private ArrayList<String> parseTags(String raw) {
-        ArrayList<String> result = new ArrayList<>();
-        if (TextUtils.isEmpty(raw)) return result;
-        for (String item : raw.split("[,，、\\s]+")) {
-            String value = item.trim();
-            if (TextUtils.isEmpty(value) || result.contains(value)) continue;
-            result.add(value);
-            if (result.size() >= 20) break;
-        }
-        return result;
     }
 
     private void updatePhotoTip() {

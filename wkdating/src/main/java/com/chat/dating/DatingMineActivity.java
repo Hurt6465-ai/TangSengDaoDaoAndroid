@@ -5,7 +5,6 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.view.View;
 
 import androidx.annotation.Nullable;
 
@@ -16,10 +15,7 @@ import com.chat.dating.model.DatingProfile;
 
 import java.util.List;
 
-/**
- * 交友设置页。界面按 Tinder 风格分为资料、推荐、可见性、发现和交互设置，
- * 但只把已有后端能力做成真实开关；会员排序和隐身模式保留为明确的待接入口。
- */
+/** 交友设置页：保留资料、每日额度、发现开关和已接通的功能入口。 */
 public class DatingMineActivity extends Activity {
     public static final String EXTRA_PROFILE = "dating_my_profile";
     private static final int REQ_EDIT = 501;
@@ -53,21 +49,9 @@ public class DatingMineActivity extends Activity {
         binding.matchesRow.setOnClickListener(v -> startActivity(new Intent(this, DatingMatchesActivity.class)));
         binding.quotaRow.setOnClickListener(v -> showQuota());
 
-        binding.balancedRow.setOnClickListener(v -> {
-            binding.balancedCheck.setVisibility(View.VISIBLE);
-            binding.recentCheck.setVisibility(View.INVISIBLE);
-        });
-        binding.recentRow.setOnClickListener(v -> toast(getString(R.string.dating_recent_sort_pending)));
-        binding.standardVisibilityRow.setOnClickListener(v -> toast(getString(R.string.dating_visibility_standard_tip)));
-        binding.incognitoRow.setOnClickListener(v -> toast(getString(R.string.dating_incognito_pending)));
-
         binding.discoverySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (!updatingDiscoverySwitch) changeDiscoveryState(isChecked);
         });
-        binding.soundSwitch.setOnCheckedChangeListener((buttonView, isChecked) ->
-                DatingInteractionSettings.setSoundEnabled(this, isChecked));
-        binding.hapticSwitch.setOnCheckedChangeListener((buttonView, isChecked) ->
-                DatingInteractionSettings.setHapticEnabled(this, isChecked));
     }
 
     private void openEditor() {
@@ -136,8 +120,6 @@ public class DatingMineActivity extends Activity {
         binding.discoverySwitch.setChecked(profile.enabled == 1);
         binding.discoverySwitch.setEnabled(true);
         updatingDiscoverySwitch = false;
-        binding.soundSwitch.setChecked(DatingInteractionSettings.soundEnabled(this));
-        binding.hapticSwitch.setChecked(DatingInteractionSettings.hapticEnabled(this));
     }
 
     private int profileCompletion(DatingProfile value) {
