@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F2F2F4"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="12dp">
+
+        <ImageView
+            android:id="@+id/backBtn"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_gravity="start|center_vertical"
+            android:contentDescription="@string/dating_back"
+            android:foreground="?android:attr/selectableItemBackgroundBorderless"
+            android:padding="11dp"
+            android:src="@drawable/ic_dating_back"
+            android:tint="#202026" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/dating_mine_title"
+            android:textColor="#18181D"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:overScrollMode="never">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="36dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_dating_detail_card"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <FrameLayout
+                        android:layout_width="94dp"
+                        android:layout_height="118dp"
+                        android:background="@drawable/bg_dating_photo_slot"
+                        android:clipToOutline="true">
+
+                        <ImageView
+                            android:id="@+id/coverIv"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop" />
+
+                        <TextView
+                            android:id="@+id/coverPlaceholderTv"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:padding="10dp"
+                            android:text="@string/dating_add_photo"
+                            android:textColor="#9A9AA2"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="15dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/nameTv"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="#202026"
+                            android:textSize="22sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/metaTv"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:maxLines="2"
+                            android:textColor="#777780"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/profileProgressTv"
+                            android:layout_width="wrap_content"
+                            android:layout_height="30dp"
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_dating_status_pill"
+                            android:gravity="center"
+                            android:paddingStart="12dp"
+                            android:paddingEnd="12dp"
+                            android:textColor="#E41F2B"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="14dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/editProfileRow"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_dating_secondary_button"
+                        android:foreground="?android:attr/selectableItemBackground"
+                        android:gravity="center"
+                        android:text="@string/dating_edit_profile_title"
+                        android:textColor="#2B2B31"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <Space
+                        android:layout_width="10dp"
+                        android:layout_height="1dp" />
+
+                    <TextView
+                        android:id="@+id/previewProfileRow"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_dating_primary_button"
+                        android:foreground="?android:attr/selectableItemBackground"
+                        android:gravity="center"
+                        android:text="@string/dating_preview_profile"
+                        android:textColor="#FFFFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                style="@style/WkDatingSettingsSectionTitle"
+                android:text="@string/dating_daily_quota" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_dating_detail_card"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/likeQuotaTv"
+                        style="@style/WkDatingQuotaPill"
+                        android:layout_width="0dp"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/favoriteQuotaTv"
+                        style="@style/WkDatingQuotaPill"
+                        android:layout_width="0dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/rewindQuotaTv"
+                        style="@style/WkDatingQuotaPill"
+                        android:layout_width="0dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                style="@style/WkDatingSettingsSectionTitle"
+                android:text="@string/dating_discovery_section" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_dating_detail_card"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingTop="16dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/dating_discovery_title"
+                        android:textColor="#202026"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
+
+                    <Switch
+                        android:id="@+id/discoverySwitch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:showText="false"
+                        android:thumbTint="#FFFFFFFF"
+                        android:trackTint="@color/dating_switch_track" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:lineSpacingExtra="3dp"
+                    android:text="@string/dating_discovery_tip"
+                    android:textColor="#777780"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/WkDatingSettingsSectionTitle"
+                android:text="@string/dating_features" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_dating_detail_card"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/favoritesRow"
+                    style="@style/WkDatingMenuRow">
+                    <TextView style="@style/WkDatingMenuIcon" android:text="★" android:textColor="#5C8FEF" />
+                    <TextView style="@style/WkDatingMenuTitle" android:text="@string/dating_favorites_title" />
+                    <TextView style="@style/WkDatingMenuArrow" />
+                </LinearLayout>
+
+                <View style="@style/WkDatingDivider" />
+
+                <LinearLayout
+                    android:id="@+id/whoLikesRow"
+                    style="@style/WkDatingMenuRow">
+                    <TextView style="@style/WkDatingMenuIcon" android:text="♥" android:textColor="#FF496C" />
+                    <TextView style="@style/WkDatingMenuTitle" android:text="@string/dating_who_likes_me" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="26dp"
+                        android:background="@drawable/bg_dating_member_badge"
+                        android:gravity="center"
+                        android:paddingStart="9dp"
+                        android:paddingEnd="9dp"
+                        android:text="@string/dating_membership"
+                        android:textColor="#8A5A17"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                    <TextView style="@style/WkDatingMenuArrow" />
+                </LinearLayout>
+
+                <View style="@style/WkDatingDivider" />
+
+                <LinearLayout
+                    android:id="@+id/matchesRow"
+                    style="@style/WkDatingMenuRow">
+                    <TextView style="@style/WkDatingMenuIcon" android:text="●" android:textColor="#8C63E8" />
+                    <TextView style="@style/WkDatingMenuTitle" android:text="@string/dating_my_matches" />
+                    <TextView style="@style/WkDatingMenuArrow" />
+                </LinearLayout>
+
+                <View style="@style/WkDatingDivider" />
+
+                <LinearLayout
+                    android:id="@+id/quotaRow"
+                    style="@style/WkDatingMenuRow">
+                    <TextView style="@style/WkDatingMenuIcon" android:text="⌁" />
+                    <TextView style="@style/WkDatingMenuTitle" android:text="@string/dating_quota_rules" />
+                    <TextView style="@style/WkDatingMenuArrow" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
