@@ -1378,9 +1378,12 @@ public class LearningLessonActivity extends AppCompatActivity {
                     Toast.LENGTH_SHORT).show();
             return;
         }
+        String explicitPinyin = exercise == null ? "" : exercise.pinyin;
+        String displayPinyin = pinyinFor(value, explicitPinyin);
+        String ttsPinyin = PinyinUtils.resolveForSpeech(value, explicitPinyin, displayPinyin);
         LearningTtsBridge.stop(this);
-        if (!LearningTtsBridge.speak(this, value, LearningTtsBridge.LANG_ZH_CN,
-                LearningTtsBridge.MODE_EXAMPLE)) {
+        if (!LearningTtsBridge.speak(this, value, ttsPinyin,
+                LearningTtsBridge.LANG_ZH_CN, LearningTtsBridge.MODE_EXAMPLE)) {
             Toast.makeText(this, R.string.learning_lesson_audio_unavailable,
                     Toast.LENGTH_SHORT).show();
         }
