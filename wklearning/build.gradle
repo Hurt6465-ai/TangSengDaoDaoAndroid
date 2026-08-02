@@ -134,6 +134,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 
     implementation project(':wkbase')
+    implementation project(':wkspeech')
     api project(':wkuserscript')
     testImplementation 'junit:junit:4.13.2'
 }
