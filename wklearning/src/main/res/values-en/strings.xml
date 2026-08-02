@@ -1,349 +1,530 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <resources>
-    <string name="dating_title">Match</string>
-    <string name="dating_loading">Loading matches…</string>
-    <string name="dating_retry">Retry</string>
-    <string name="dating_empty">No new recommendations</string>
-    <string name="dating_empty_tip">Try loosening filters or come back later.</string>
-    <string name="dating_like">Like</string>
-    <string name="dating_pass">Pass</string>
-    <string name="dating_like_stamp">LIKE</string>
-    <string name="dating_nope_stamp">NOPE</string>
-    <string name="dating_match_title">It is a match</string>
-    <string name="dating_ok">OK</string>
-    <string name="dating_photo_indicator">%1$d/%2$d</string>
-    <string name="dating_distance_unknown">Global</string>
-    <string name="dating_mock_tip">Dating backend is not connected yet. Showing local demo data.</string>
-    <string name="dating_rewind">Undo</string>
-    <string name="dating_mine_title">My dating</string>
-    <string name="dating_action_failed">Action failed</string>
-    <string name="dating_age_range_plain">%1$d-%2$d years</string>
-    <string name="dating_drinking_value">Drinking: %1$s</string>
-    <string name="dating_smoking_value">Smoking: %1$s</string>
-    <string name="dating_edit_intent">Dating goal</string>
-    <string name="dating_favorite_remove">Remove</string>
-    <string name="dating_favorite_remove_title">Remove from favorites?</string>
-    <string name="dating_favorite_removed">Removed from favorites</string>
-    <string name="dating_favorites_empty">No favorites yet</string>
-    <string name="dating_favorites_load_failed">Could not load favorites</string>
-    <string name="dating_favorites_subtitle">Saving someone does not create a match. Decide later.</string>
-    <string name="dating_favorites_title">My favorites</string>
-    <string name="dating_like_quota_empty">You have used today’s free likes</string>
-    <string name="dating_photo_upload_done">Photos uploaded</string>
-    <string name="dating_section_about">About me</string>
-    <string name="dating_section_basic">Basic info</string>
-    <string name="dating_section_goal">Dating goal</string>
-    <string name="dating_section_lifestyle">Lifestyle</string>
-    <string name="dating_intent_long_term">Looking for a long-term partner</string>
-    <string name="dating_intent_long_term_open_short">Long-term, open to short-term</string>
-    <string name="dating_intent_short_term_open_long">Short-term, open to long-term</string>
-    <string name="dating_intent_short_term">Enjoying short-term dating</string>
-    <string name="dating_intent_friends">Make new friends</string>
-    <string name="dating_intent_open">Open to possibilities</string>
-    <string name="dating_edit_profile_title">Edit dating profile</string>
-    <string name="dating_my_photos">My photos</string>
-    <string name="dating_shared_profile">Shared profile</string>
-    <string name="dating_shared_profile_tip">Avatar, name, birthday, country and other details are shared with your account and can be edited here.</string>
-    <string name="dating_enable">Enable dating</string>
-    <string name="dating_enable_tip">Enable dating before browsing profiles</string>
-    <string name="dating_edit_gender">Interested in</string>
-    <string name="dating_edit_age">Age preference</string>
-    <string name="dating_edit_orientation">Sexual orientation</string>
-    <string name="dating_edit_drinking">Drinking</string>
-    <string name="dating_edit_smoking">Smoking</string>
-    <string name="dating_edit_dealbreakers">Dealbreakers</string>
-    <string name="dating_edit_ideal">Ideal partner</string>
-    <string name="dating_edit_tags">Extra tags</string>
-    <string name="dating_save_profile">Save profile</string>
-    <string name="dating_empty_content">Nothing here yet</string>
-    <string name="dating_daily_quota">Daily free quota</string>
-    <string name="dating_edit_profile_menu">Edit dating profile</string>
-    <string name="dating_who_likes_me">Who likes me</string>
-    <string name="dating_membership">Membership</string>
-    <string name="dating_my_matches">My matches</string>
-    <string name="dating_quota_rules">Quota and rules</string>
-    <string name="dating_section_ideal">Ideal partner</string>
-    <string name="dating_section_dealbreakers">Dealbreakers</string>
-    <string name="dating_section_interests">Interests and personality</string>
-    <string name="dating_block">Block</string>
-    <string name="dating_report">Report</string>
-    <string name="dating_who_likes_title">See who likes you</string>
-    <string name="dating_who_likes_tip">Free users see only the count and blurred previews. Upgrade to view the full list; chat unlocks only after a mutual like.</string>
-    <string name="dating_membership_benefits">View membership benefits</string>
-    <string name="dating_photo_count_tip">%1$d/5 uploaded · The first photo is the cover</string>
-    <string name="dating_select">Select</string>
-    <string name="dating_not_filled">Not provided</string>
-    <string name="dating_uploading_wait">Photos are uploading. Please wait.</string>
-    <string name="dating_max_photos">You can upload up to 5 photos</string>
-    <string name="dating_min_photo_enable">Keep at least one photo to enable dating</string>
-    <string name="dating_saving">Saving…</string>
-    <string name="dating_saved">Dating profile saved</string>
-    <string name="dating_save_failed">Save failed</string>
-    <string name="dating_delete_photo_title">Delete this photo?</string>
-    <string name="dating_delete">Delete</string>
-    <string name="dating_set_primary">Set as primary</string>
-    <string name="dating_primary_photo">Primary photo</string>
-    <string name="dating_photo_number">Photo %1$d</string>
-    <string name="dating_confirm">Confirm</string>
-    <string name="dating_location_failed">Could not update location. Try again later.</string>
-    <string name="dating_profile_load_failed">Could not load profile. Try again.</string>
-    <string name="dating_enable_first">Enable dating before browsing profiles</string>
-    <string name="dating_go_enable">Enable now</string>
-    <string name="dating_operation_restored">Action was not saved. The card was restored.</string>
-    <string name="dating_no_undo">Nothing to undo</string>
-    <string name="dating_rewind_quota_empty">Today’s 3 free undos have been used</string>
-    <string name="dating_rewind_failed">Undo failed. Try again later.</string>
-    <string name="dating_rewind_synced_refresh">Undo synced. Recommendations will refresh.</string>
-    <string name="dating_rewind_record_synced">Undo record synced and recommendations refreshed.</string>
-    <string name="dating_refresh_after_profile">Refreshing recommendations from your new profile…</string>
-    <string-array name="dating_gender_options">
-        <item>Opposite sex</item>
-        <item>Women</item>
-        <item>Men</item>
-    </string-array>
-    <string-array name="dating_age_options">
-        <item>18-28</item>
-        <item>20-32</item>
-        <item>22-35</item>
-        <item>25-40</item>
-        <item>30-45</item>
-    </string-array>
-    <string-array name="dating_sexual_orientation_options">
-        <item>Straight</item>
-        <item>Gay or lesbian</item>
-        <item>Bisexual</item>
-        <item>Pansexual</item>
-        <item>Private</item>
-    </string-array>
-    <string-array name="dating_drinking_options">
-        <item>Never</item>
-        <item>Sometimes</item>
-        <item>Socially</item>
-        <item>Often</item>
-        <item>Private</item>
-    </string-array>
-    <string-array name="dating_smoking_options">
-        <item>Never</item>
-        <item>Sometimes</item>
-        <item>Often</item>
-        <item>Quitting</item>
-        <item>Private</item>
-    </string-array>
-    <string-array name="dating_dealbreaker_options">
-        <item>Dishonesty</item>
-        <item>Silent treatment</item>
-        <item>Controlling behavior</item>
-        <item>Disrespecting boundaries</item>
-        <item>Frequently disappearing</item>
-        <item>Lying</item>
-        <item>Heavy drinking</item>
-        <item>Gambling</item>
-        <item>Poor hygiene</item>
-        <item>Only flirting</item>
-        <item>Pressuring to meet</item>
-        <item>Asking for money</item>
-    </string-array>
-    <string name="dating_city">Current city</string>
-    <string name="dating_height_hint">Height (cm)</string>
-    <string name="dating_weight_hint">Weight (kg)</string>
-    <string name="dating_about_hint">Write something real about yourself</string>
-    <string name="dating_ideal_hint">For example: honest, emotionally steady and communicative</string>
-    <string name="dating_tags_hint">For example: travel, cooking, music</string>
-    <string name="dating_back">Back</string>
-    <string name="dating_enable_recommend">Enable dating recommendations</string>
-    <string name="dating_section_love_expectation">Dating expectations</string>
-    <string name="dating_chat_now">Chat now</string>
-    <string name="dating_view_more">View full profile</string>
-    <string name="dating_dislike">Pass</string>
-    <string name="dating_primary">Primary</string>
-    <string name="dating_shared_basic">Basic: %1$s</string>
-    <string name="dating_shared_relationship">Relationship: %1$s</string>
-    <string name="dating_shared_personality">Personality: %1$s</string>
-    <string name="dating_shared_interests">Interests: %1$s</string>
-    <string name="dating_shared_career">Career and education: %1$s</string>
-    <string name="dating_upload_prepare">Preparing photos</string>
-    <string name="dating_upload_processing">Processing photo %1$d</string>
-    <string name="dating_upload_master">Uploading full photo %1$d/%2$d</string>
-    <string name="dating_upload_card">Uploading card photo %1$d/%2$d</string>
-    <string name="dating_upload_failed">Photo upload failed</string>
-    <string name="dating_upload_timeout">Photo upload timed out</string>
-    <string name="dating_upload_url_failed">Could not get upload URL</string>
-    <string name="dating_upload_url_timeout">Upload URL request timed out</string>
-    <string name="dating_read_image_failed">Could not read photo</string>
-    <string name="dating_block_title">Block this person?</string>
-    <string name="dating_block_message">This person will no longer appear in your recommendations.</string>
-    <string name="dating_blocked">Blocked</string>
-    <string name="dating_block_failed">Block failed</string>
-    <string name="dating_report_reason">Report reason</string>
-    <string name="dating_reported">Report submitted</string>
-    <string name="dating_report_failed">Report failed</string>
-    <string name="dating_report_fake">Fake profile</string>
-    <string name="dating_report_harassment">Sexual content or harassment</string>
-    <string name="dating_report_scam">Scam or promotion</string>
-    <string name="dating_report_impersonation">Using someone else’s photos</string>
-    <string name="dating_report_other">Other</string>
-    <string name="dating_match_subtitle">You and %1$s like each other. Start chatting.</string>
-    <string name="dating_match_title_full">You like each other</string>
-    <string name="dating_quota_like">Today’s like quota is used (%1$d)</string>
-    <string name="dating_quota_favorite">Today’s favorite quota is used (%1$d)</string>
-    <string name="dating_matches_subtitle">Chat unlocks after a mutual like</string>
-    <string name="dating_matches_load_failed">Could not load matches</string>
-    <string name="dating_matches_empty">No matches yet. Keep discovering people.</string>
-    <string name="dating_unmatch_title">Unmatch?</string>
-    <string name="dating_unmatch_message">You will no longer be able to chat through the dating allowlist.</string>
-    <string name="dating_unmatch">Unmatch</string>
-    <string name="dating_unmatched">Unmatched</string>
-    <string name="dating_profile_complete_tip">Complete your profile to start matching</string>
-    <string name="dating_enabled">Dating recommendations enabled</string>
-    <string name="dating_disabled">Dating recommendations disabled</string>
-    <string name="dating_profile_load_error">Could not load profile</string>
-    <string name="dating_like_quota_format">Likes %1$d/%2$d</string>
-    <string name="dating_favorite_quota_format">Favorites %1$d/%2$d</string>
-    <string name="dating_rewind_quota_format">Undos %1$d/3</string>
-    <string name="dating_quota_message">%1$s
-%2$s
-%3$s
-
-Passes are unlimited, but the server rate-limits abuse.</string>
-    <string name="dating_membership_pending">Membership and payments are not connected yet</string>
-    <string name="dating_filter_cross_tip">If either person accepts only the same country, cross-border profiles will not be recommended.</string>
-    <string name="dating_filter_country_title">Country/region</string>
-    <string name="dating_filter_country_smart_value">Smart recommendations</string>
-    <string name="dating_filter_country_same_value">Same country only</string>
-    <string name="dating_filter_country_foreign_value">Cross-border available</string>
-    <string name="dating_filter_gender_title">Gender</string>
-    <string name="dating_filter_gender_all_value">Any</string>
-    <string name="dating_filter_gender_female_value">Women</string>
-    <string name="dating_filter_gender_male_value">Men</string>
-    <string name="dating_filter_age_title">Age</string>
-    <string name="dating_filter_goal_title">Goal</string>
-    <string name="dating_filter_goal_serious_value">Serious relationship</string>
-    <string name="dating_filter_goal_marriage_value">Marriage</string>
-    <string name="dating_filter_goal_all_value">Any</string>
-
-    <string name="dating_cancel">Cancel</string>
-    <string name="dating_apply">Apply</string>
-    <string name="dating_filter_title">Filter preferences</string>
-    <string name="dating_filter_country_format">Country: %1$s</string>
-    <string name="dating_filter_gender_format">Gender: %1$s</string>
-    <string name="dating_filter_age_format">Age: %1$d-%2$d</string>
-    <string name="dating_filter_goal_format">Goal: %1$s</string>
-    <string name="dating_delete_photo_action">Delete photo</string>
-    <string name="dating_photo_cache_failed">Could not create photo cache</string>
-    <string name="dating_photo_cache_unavailable">Photo cache is unavailable</string>
-    <string name="dating_photo_compress_failed">Photo compression failed</string>
-    <string name="dating_photo_too_large">Photo is too large. Choose another one.</string>
-    <string name="dating_photo_too_small">Photo is too small. Choose a clearer one.</string>
-    <string name="dating_photo_process_failed">Could not process photo</string>
-    <string name="dating_photo_decode_failed">Could not decode photo</string>
-    <string name="dating_photo_encode_failed">Could not encode photo</string>
-    <string name="dating_invalid_image_uri">Invalid photo address</string>
-    <string name="dating_location_denied">Location is off, so nearby profiles are unavailable</string>
-    <string name="dating_location_explain_again">Turn location permission back on to continue viewing nearby profiles.</string>
-    <string name="dating_location_explain_first">Location is required for nearby profiles. After permission is granted, later updates run quietly without repeated prompts.</string>
-    <string name="dating_location_title">Enable location</string>
-    <string name="dating_location_not_now">Not now</string>
-    <string name="dating_location_go_enable">Enable</string>
-    <string name="dating_location_back_recommend">Location was not enabled. Switched back to recommendations.</string>
-    <string name="dating_location_device_unavailable">This device cannot provide a location</string>
-    <string name="dating_location_service_off">Turn on system location services first</string>
-    <string name="dating_location_permission_unavailable">Location permission is unavailable</string>
-    <string name="dating_location_retry">Location failed. Try again later.</string>
-    <string name="dating_location_temporarily_unavailable">Location is temporarily unavailable. Try again later.</string>
-    <string name="dating_photo_upload_percent">%1$s %2$d%%</string>
-    <string name="dating_section_relationship">Dating expectations</string>
-    <string name="dating_section_ideal_partner">Ideal partner</string>
-    <string name="dating_section_dealbreakers_title">Dealbreakers</string>
-    <string name="dating_filter_age_18_28">18-28</string>
-    <string name="dating_filter_age_18_35">18-35</string>
-    <string name="dating_filter_age_22_35">22-35</string>
-    <string name="dating_filter_age_25_40">25-40</string>
-    <string name="dating_filter_age_30_50">30-50</string>
-    <string name="dating_filter_age_18_60">18-60</string>
-
-    <string name="dating_tab_recommend">Discover</string>
-    <string name="dating_tab_nearby">Nearby</string>
-    <string name="dating_filter">Filter</string>
-    <string name="dating_match_notice_ready">You like each other. Start chatting.</string>
-    <string name="dating_match_notice_named">You and %1$s like each other. Start chatting.</string>
-    <string name="dating_keep_swiping">Keep discovering</string>
-    <string name="dating_goal_love">Serious relationship</string>
-    <string name="dating_goal_marriage">Marriage</string>
-    <string name="dating_goal_chat">Chat first</string>
-    <string name="dating_goal_long_term">Long-term relationship</string>
-    <string name="dating_cross_open">Open to cross-border dating</string>
-    <string name="dating_cross_prefer_foreign">Prefer cross-border dating</string>
-    <string name="dating_cross_same_country">Same country only</string>
-    <string name="dating_match_score">%1$d%% match</string>
-    <string name="dating_tap_more">Tap the center for details</string>
-    <string name="dating_profile_preview">Profile preview</string>
-    <string name="dating_filter_tip">Recommendations use dating preferences. Same-country-only settings and the other person’s cross-border preference are both respected.</string>
-    <string name="dating_filter_country_smart">Country: smart recommendations</string>
-    <string name="dating_filter_country_same">Country: same country only</string>
-    <string name="dating_filter_country_foreign">Country: cross-border available</string>
-    <string name="dating_filter_gender_all">Gender: any</string>
-    <string name="dating_filter_gender_female">Gender: women</string>
-    <string name="dating_filter_gender_male">Gender: men</string>
-    <string name="dating_filter_age">Age: %1$d-%2$d</string>
-    <string name="dating_filter_goal_love">Goal: serious relationship</string>
-    <string name="dating_filter_goal_marriage">Goal: marriage</string>
-    <string name="dating_filter_goal_all">Goal: any</string>
-
-    <string name="dating_shared_age_value">%1$d years old</string>
-    <string name="dating_shared_gender_female">Woman</string>
-    <string name="dating_shared_gender_male">Man</string>
-    <string name="dating_shared_pets_value">Pets: %1$s</string>
-    <string name="dating_shared_sports_value">Sports: %1$s</string>
-    <string name="dating_shared_movies_value">Movies and shows: %1$s</string>
-    <string name="dating_meta_separator"> · </string>
-    <string name="dating_list_separator">, </string>
-    <string-array name="dating_shared_relationship_values">
-        <item>Private</item><item>Single</item><item>Dating</item><item>Married</item><item>Divorced</item>
-    </string-array>
-    <string-array name="dating_shared_personality_values">
-        <item>Patient</item><item>Outgoing</item><item>Quiet</item><item>Introverted</item><item>Funny</item><item>Gentle</item><item>Serious</item><item>Slow to warm up</item><item>Emotionally aware</item><item>Easygoing</item>
-    </string-array>
-    <string-array name="dating_shared_pet_values">
-        <item>Dogs</item><item>Cats</item><item>Rabbits</item><item>Birds</item><item>Fish</item><item>Hamsters</item><item>Reptiles</item><item>Animal lover</item>
-    </string-array>
-    <string-array name="dating_shared_sport_values">
-        <item>Running</item><item>Basketball</item><item>Football</item><item>Badminton</item><item>Fitness</item><item>Yoga</item><item>Swimming</item><item>Cycling</item><item>Hiking</item><item>Skateboarding</item>
-    </string-array>
-    <string-array name="dating_shared_movie_values">
-        <item>Movies</item><item>Comedy</item><item>Romance</item><item>Action</item><item>Mystery</item><item>Documentaries</item><item>TV series</item><item>Anime</item><item>Variety shows</item><item>Short videos</item>
-    </string-array>
-    <string-array name="dating_shared_job_values">
-        <item>Private</item><item>Student</item><item>Employee</item><item>Service staff</item><item>Teacher</item><item>Police officer</item><item>Driver</item><item>Sales</item><item>Business owner</item><item>Freelancer</item><item>Between jobs</item><item>Other</item>
-    </string-array>
-    <string-array name="dating_shared_education_values">
-        <item>Private</item><item>Middle school or below</item><item>High school</item><item>Bachelor degree</item><item>Master degree or above</item><item>Other</item>
-    </string-array>
+    <string name="learning_title">Learning</string>
+    <string name="learning_subtitle">Choose an AI web page, conversation scenario, or script manager. Official scenarios are preloaded and can be updated later.</string>
+    <string name="learning_deepseek_title">DeepSeek</string>
+    <string name="learning_deepseek_desc">Open DeepSeek web chat with scripts and scenario instructions.</string>
+    <string name="learning_qianwen_title">Qianwen China</string>
+    <string name="learning_qianwen_desc">Open qianwen.com for users in China and anyone who wants multiple tools in one place.</string>
+    <string name="learning_qwen_title">Qwen Global</string>
+    <string name="learning_qwen_desc">Open chat.qwen.ai for chat and spoken-language practice.</string>
+    <string name="learning_scene_title">Everyday Scenarios</string>
+    <string name="learning_scene_desc">Ordering food, interviews, greetings, hospitals, airports, and more.</string>
+    <string name="learning_script_title">Script Management</string>
+    <string name="learning_script_desc">Create, import, install online, and enable official scripts.</string>
+    <string name="learning_enter">Open</string>
+    <string name="learning_select">Select</string>
+    <string name="learning_manage">Manage</string>
+    <string name="learning_warning">Web services are provided by their respective platforms. TangSengDaoDao only provides learning entry points, scenario instructions, and local script management. It does not store your web account password.</string>
+    <string name="learning_choose_scene">Choose a scenario</string>
+    <string name="learning_choose_target">Choose a target</string>
+    <string name="learning_cancel">Cancel</string>
+    <string name="word_unknown">Not learned</string>
+    <string name="word_pinyin_on">Pinyin on</string>
+    <string name="word_pinyin_off">Pinyin off</string>
+    <string name="word_mark_unknown">Again</string>
+    <string name="word_mark_known">Known</string>
+    <string name="word_mark_hard">Hard</string>
+    <string name="word_pull_favorite_hint">Pull down to save</string>
+    <string name="word_pull_favorite_release">Release to save</string>
+    <string name="word_pull_unfavorite_release">Release to remove from saved</string>
+    <string name="word_front_tap">Tap to view the meaning</string>
+    <string name="word_front_hint"></string>
+    <string name="word_gesture_hint_short">Swipe left: Again · Swipe right: Known · Pull down: Save</string>
+    <string name="word_back_hint">Swipe left: Again · Swipe right: Known</string>
+    <string name="word_action_tts">Listen</string>
+    <string name="word_action_spelling">Spelling</string>
+    <string name="word_action_stroke">Stroke order</string>
+    <string name="word_action_pronunciation">Pronunciation</string>
+    <string name="word_action_unknown">Again</string>
+    <string name="word_action_known">Known</string>
+    <string name="word_action_hard">Hard</string>
+    <string name="word_label_meaning_my">Myanmar: </string>
+    <string name="word_label_meaning_en">English: </string>
+    <string name="word_label_example">Example: </string>
+    <string name="word_label_usage">Context: </string>
+    <string name="word_label_memory_tip">Memory tip</string>
+    <string name="word_label_notes">Notes: </string>
+    <string name="word_label_synonyms">Synonyms: </string>
+    <string name="word_label_antonyms">Antonyms: </string>
+    <string name="word_no_example">No example yet</string>
+    <string name="word_toast_unknown">Again: review later</string>
+    <string name="word_toast_known">Known: review again in 7 days</string>
+    <string name="word_toast_hard">Hard: review again tomorrow</string>
+    <string name="word_favorite_added">Saved</string>
+    <string name="word_favorite_removed">Removed from saved</string>
+    <string name="word_toast_my_phonetic_on">Myanmar pronunciation guide shown</string>
+    <string name="word_toast_my_phonetic_off">Myanmar pronunciation guide hidden</string>
+    <string name="word_stroke_todo">Open the correct stroke order with Hanzi Writer</string>
+    <string name="word_tts_plugin_missing">The TTS plugin is missing or not responding</string>
+    <string name="word_menu_show_my_phonetic">Show Myanmar pronunciation guide</string>
+    <string name="word_menu_hide_my_phonetic">Hide Myanmar pronunciation guide</string>
+    <string name="word_menu_show_guide">How to use</string>
+    <string name="word_menu_tts_settings">Speech settings</string>
+    <string name="word_guide_title">How to study cards</string>
+    <string name="word_guide_body">Tap the card: view the meaning
+Swipe left: Again, review later
+Swipe right: Known, review again in 7 days
+Pull down: Save
+Tap Hard: review again tomorrow</string>
+    <string name="word_guide_ok">Got it</string>
+    <string name="word_guide_never">Do not show again</string>
+    <string name="word_review_new">New</string>
+    <string name="word_review_due">Due</string>
+    <string name="word_review_soon">Soon</string>
+    <string name="word_review_hours">In %1$d hours</string>
+    <string name="word_review_days">In %1$d days</string>
+    <string name="word_tone_0">Neutral tone</string>
+    <string name="word_tone_1">First tone</string>
+    <string name="word_tone_2">Second tone</string>
+    <string name="word_tone_3">Third tone</string>
+    <string name="word_tone_4">Fourth tone</string>
+    <string name="pronunciation_title">Pronunciation Practice</string>
+    <string name="pronunciation_title_compare">Recording Comparison</string>
+    <string name="pronunciation_compare_start_hint">Play the original audio at 0.5×, then record your pronunciation</string>
+    <string name="pronunciation_start_record_compare">Start recording</string>
+    <string name="pronunciation_status_recording_compare">Recording. Pause briefly when finished and it will stop automatically.</string>
+    <string name="pronunciation_status_processing_compare">Saving the recording…</string>
+    <string name="pronunciation_compare_result_title">Pronunciation Comparison</string>
+    <string name="pronunciation_original_speed">Original %1$s×</string>
+    <string name="pronunciation_status_original_speed">Playing the original audio at %1$s× speed</string>
+    <string name="stroke_title">Stroke Order</string>
+    <string name="stroke_subtitle">Tap a character to switch to it. The correct stroke order will play automatically. Internet access is required the first time a character is used, and the data will be saved for later.</string>
+    <string name="stroke_chars_title">Choose a character</string>
+    <string name="stroke_data_missing">Unable to load stroke-order data. Check your network connection and try again.</string>
+    <string name="stroke_speak_word">Speak the word</string>
+    <string name="stroke_replay">Replay strokes</string>
+    <string name="stroke_loading">Loading stroke order…</string>
+    <string name="pronunciation_tip">Listen to the standard audio and use the local sherpa-onnx speech recognizer to check text similarity. If it fails, the system speech recognizer will be used instead.</string>
+    <string name="pronunciation_play_standard">Play standard audio</string>
+    <string name="pronunciation_play_spelling">Play spelling audio</string>
+    <string name="pronunciation_start_record">Start recording</string>
+    <string name="pronunciation_stop_record">Stop recording</string>
+    <string name="pronunciation_play_mine">Play my recording</string>
+    <string name="pronunciation_local_check">Local recognition / scoring</string>
+    <string name="pronunciation_status_standard">Playing standard audio</string>
+    <string name="pronunciation_status_spelling">Playing spelling audio</string>
+    <string name="pronunciation_status_recording">Recording. Read the word aloud.</string>
+    <string name="pronunciation_status_record_done">Recording complete. Play it back to compare.</string>
+    <string name="pronunciation_status_play_mine">Playing my recording</string>
+    <string name="pronunciation_status_checking">Sent to the local ASR plugin</string>
+    <string name="pronunciation_record_failed">Recording failed</string>
+    <string name="pronunciation_play_failed">Playback failed</string>
+    <string name="pronunciation_no_record">Record your voice first</string>
+    <string name="pronunciation_need_permission">Microphone permission is required</string>
+    <string name="pronunciation_asr_plugin_missing">The local ASR/scoring plugin is missing. You can still compare recordings.</string>
+    <string name="pronunciation_google_recognize">Google speech recognition</string>
+    <string name="pronunciation_google_unavailable">Google/system speech recognition is unavailable</string>
+    <string name="pronunciation_recognition_prompt">Say: %1$s</string>
+    <string name="pronunciation_recognition_cancelled">Speech recognition cancelled</string>
+    <string name="pronunciation_recognition_empty">No speech was recognized. Try again.</string>
+    <string name="pronunciation_recognition_result">Recognized text: %1$s
+Text match: %2$d%% (not a professional pronunciation score)</string>
+    <string name="word_pack_unavailable">The word pack has not been downloaded</string>
+    <string name="word_loading_remote">Loading word pack…</string>
+    <string name="word_remote_load_failed">Unable to load the word pack. Try again later.</string>
+    <string name="word_today_plan">Today</string>
+    <string name="word_action_easy">Easy</string>
+    <string name="word_today_plan_count">Review %1$d · New %2$d</string>
+    <string name="word_auto_read_on">Auto-read on</string>
+    <string name="word_auto_read_off">Auto-read off</string>
+    <string name="word_label_collocations">Collocations: </string>
+    <string name="word_check_answer_first">Check the answer first</string>
+    <string name="word_tts_settings_hint">Adjust the voice and speed in Speech settings</string>
+    <string name="word_plan_message">Due today: %1$d. New words: %2$d. Remaining: %3$d.</string>
+    <string name="word_group_total">%1$d words in this group</string>
+    <string name="word_restart_group">Practice this group again</string>
+    <string name="word_back_to_library">Back to word library</string>
+    <string name="word_tts_settings_open_failed">Unable to open Speech settings</string>
+    <string name="word_session_complete">Practice complete</string>
+    <string name="word_session_stats">Again %1$d
+Hard %2$d
+Good %3$d
+Easy %4$d
+Time %5$d min</string>
+    <string name="word_finish">Finish</string>
+    <string name="pronunciation_compare_hint">Play the original audio and your recording to compare them</string>
+    <string name="pronunciation_match_value">Text match %1$d%%</string>
+    <string name="pronunciation_mine_short">My voice</string>
+    <string name="pronunciation_one_tap_hint">Tap the microphone to record and recognize in one step</string>
+    <string name="pronunciation_original_short">Original</string>
+    <string name="pronunciation_result_ready">Recording and recognition complete</string>
+    <string name="pronunciation_result_ready_local">Local recognition complete</string>
+    <string name="pronunciation_sherpa_downloading">Downloading the offline speech-recognition model for first use (about 27 MB). You can use system speech recognition in the meantime.</string>
+    <string name="pronunciation_sherpa_ready">Offline speech recognition is ready</string>
+    <string name="pronunciation_result_title">Recognition Result</string>
+    <string name="pronunciation_start_once">Start practice</string>
+    <string name="pronunciation_status_preparing">Preparing the microphone…</string>
+    <string name="pronunciation_status_processing">Preparing the result…</string>
+    <string name="pronunciation_status_recording_and_recognizing">Recording and recognizing. Tap again to finish.</string>
+    <string name="pronunciation_try_again">Try again</string>
+    <string name="pronunciation_unrecognized">Text not recognized</string>
 
 
-    <string name="dating_mode_partner">Partners</string>
-    <string name="dating_mode_dating">Dating</string>
-    <string name="dating_partner_unavailable">Partner list is unavailable. Please check wkpartnerlist.</string>
+    <!-- Learning home: fully localized hero carousel, tools, sections and drawer. -->
+    <string name="learning_home_course_recommendation">Featured Courses</string>
+    <string name="learning_home_enroll">Enroll</string>
+    <string name="learning_home_enroll_pending">Enrollment coming soon</string>
+    <string name="learning_home_slide_position">%1$d/%2$d</string>
+    <string-array name="learning_home_plan_titles">
+        <item>90-Day Chinese Speaking Course</item>
+        <item>AI Language Practice Partner</item>
+        <item>Advanced Small-Group Course</item>
+    </string-array>
+    <string-array name="learning_home_plan_subtitles">
+        <item>Structured lessons · AI speaking practice</item>
+        <item>Everyday conversation · Pronunciation support</item>
+        <item>Teacher-led · Level assessment</item>
+    </string-array>
+    <string-array name="learning_home_plan_prices">
+        <item>¥--</item>
+        <item>¥-- per month</item>
+        <item>¥--</item>
+    </string-array>
+    <string-array name="learning_home_plan_notes">
+        <item>Pricing will be updated when enrollment opens</item>
+        <item>Start anytime</item>
+        <item>Limited small-group places</item>
+    </string-array>
 
-    <string name="dating_upload_photo">Uploading photo %1$d of %2$d</string>
-    <string name="dating_edit_shared_profile">Edit</string>
-    <string name="dating_saved_and_enabled">Profile saved. You are now visible in recommendations.</string>
-    <string name="dating_status_visible">Visible</string>
-    <string name="dating_status_paused">Paused</string>
-    <string name="dating_status_title">Dating visibility</string>
-    <string name="dating_pause_message">While paused, other people will not see your dating profile. Existing matches and friends are unchanged.</string>
-    <string name="dating_resume_message">Resume to show your profile in dating recommendations again.</string>
-    <string name="dating_pause">Pause visibility</string>
-    <string name="dating_resume">Resume visibility</string>
-    <string name="dating_location_open_settings_tip">Location permission is disabled. You can enable it in system settings, or continue with global recommendations.</string>
-    <string name="dating_location_open_settings">Open settings</string>
-    <string name="dating_match_friend_created">You and %1$s liked each other and are now friends. Start chatting!</string>
+    <string name="learning_home_quick_tools">Quick Tools</string>
+    <string name="learning_home_quick_tools_subtitle">Translate, read, and practice speaking</string>
+    <string name="learning_home_tool_translate">AI Translation</string>
+    <string name="learning_home_tool_books">E-books</string>
+    <string name="learning_home_tool_partner">AI Practice Partner</string>
+    <string name="learning_home_tool_practice">Practice</string>
 
-    <string name="dating_distance_under_1km">Within 1 km</string>
-    <string name="dating_distance_1_5km">1–5 km</string>
-    <string name="dating_distance_5_20km">5–20 km</string>
-    <string name="dating_distance_20_50km">20–50 km</string>
-    <string name="dating_distance_50_100km">50–100 km</string>
-    <string name="dating_distance_over_100km">Over 100 km</string>
-    <string name="dating_swipe_stamp_like">LIKE</string>
-    <string name="dating_swipe_stamp_favorite">FAV</string>
-<string name="dating_country_flag">Country flag</string><string name="dating_more_actions">More actions</string><string name="dating_section_languages">Languages</string><string name="dating_basic_relationship">Relationship status</string><string name="dating_basic_orientation">Orientation</string><string name="dating_basic_body">Height and weight</string><string name="dating_basic_lifestyle">Lifestyle</string><string name="dating_basic_job">Occupation</string><string name="dating_basic_education">Education</string><string name="dating_native_languages_format">Native: %1$s</string><string name="dating_learning_languages_format">Learning: %1$s</string><string name="dating_status_edit_tip">Complete your profile to turn dating on. When off, you will not appear in recommendations.</string><string name="dating_shared_profile_partner_tip">Uses your language-partner profile by default. Changes sync to both sections.</string><string name="dating_edit_shared_profile_inside">Edit shared profile</string><string name="dating_close_dating">Turn off dating</string><string name="dating_open_dating">Turn on dating</string><string name="dating_complete_before_open">Add a photo and relationship goal before turning dating on.</string><string name="dating_save_shared_profile">Save shared profile</string><string name="dating_shared_editor_title">Shared profile</string><string name="dating_shared_editor_tip">This profile is shared by Language Partners and Dating. It starts with your partner profile, and edits here sync to both.</string><string name="dating_shared_core_title">Account and languages</string><string name="dating_shared_name">Display name</string><string name="dating_shared_birthday">Birthday</string><string name="dating_shared_gender">Gender</string><string name="dating_shared_country">Country/Region</string><string name="dating_shared_native_languages">Native languages</string><string name="dating_shared_learning_languages">Learning languages</string><string name="dating_shared_partner_default_title">Language-partner shared profile</string><string name="dating_shared_partner_default_note">Your language-partner profile is used by default. Changes here update both Language Partners and Dating.</string><string name="dating_shared_relationship_label">Relationship status</string><string name="dating_shared_personality_label">Personality</string><string name="dating_shared_pets">Pets</string><string name="dating_shared_sports">Sports</string><string name="dating_shared_movies">Movies &amp; TV</string><string name="dating_shared_job">Occupation</string><string name="dating_shared_education">Education</string><string name="dating_shared_language_limit">Choose up to %1$d languages</string><string name="dating_shared_tag_limit">Choose up to %1$d items per category</string><string name="dating_shared_name_required">Enter a display name</string><string name="dating_shared_birthday_required">Choose your birthday</string><string name="dating_shared_country_required">Choose a country/region</string><string name="dating_shared_languages_required">Choose native and learning languages</string><string name="dating_shared_save_failed">Could not save shared profile</string><string name="dating_shared_saved">Shared profile saved and synced to Language Partners and Dating</string><string-array name="dating_shared_gender_options"><item>Male</item><item>Female</item><item>Prefer not to say</item></string-array><string-array name="dating_shared_country_options"><item>🇲🇲 Myanmar</item><item>🇨🇳 China</item><item>🇹🇭 Thailand</item><item>🇯🇵 Japan</item><item>🇰🇷 South Korea</item><item>🇻🇳 Vietnam</item><item>🇱🇦 Laos</item><item>🇰🇭 Cambodia</item><item>🇲🇾 Malaysia</item><item>🇸🇬 Singapore</item><item>🇺🇸 United States</item></string-array><string-array name="dating_shared_language_options"><item>🇲🇲 Burmese  MY</item><item>🇨🇳 Chinese  ZH</item><item>🇺🇸 English  EN</item><item>🇹🇭 Thai  TH</item><item>🇯🇵 Japanese  JA</item><item>🇰🇷 Korean  KO</item><item>🇻🇳 Vietnamese  VI</item><item>🇮🇩 Indonesian  ID</item><item>🇲🇾 Malay  MS</item></string-array><string name="dating_shared_other_tags">Other tags</string></resources>
+    <string name="learning_home_pinyin_title">Pinyin</string>
+    <string name="learning_home_pinyin_subtitle">Start with pronunciation</string>
+    <string name="learning_home_initials">Initials</string>
+    <string name="learning_home_finals">Finals</string>
+    <string name="learning_home_whole_syllables">Whole syllables</string>
+    <string name="learning_home_tones">Tones</string>
+    <string name="learning_home_tones_desc">First through fourth tones</string>
+
+    <string name="learning_home_words_title">Words</string>
+    <string name="learning_home_words_subtitle">Build vocabulary step by step</string>
+    <string name="learning_home_words_count">%1$d words</string>
+    <string name="learning_home_learned_format">Learned %1$d / %2$d</string>
+
+    <string name="learning_home_speaking_title">Speaking</string>
+    <string name="learning_home_speaking_subtitle">Turn Chinese into practical conversation</string>
+    <string name="learning_home_speak_hello">Greetings</string>
+    <string name="learning_home_speak_hello_desc">Start a conversation</string>
+    <string name="learning_home_speak_food">Ordering Food</string>
+    <string name="learning_home_speak_food_desc">Restaurant phrases</string>
+    <string name="learning_home_speak_job">Work</string>
+    <string name="learning_home_speak_job_desc">Interviews and the workplace</string>
+    <string name="learning_home_speak_shop">Shopping</string>
+    <string name="learning_home_speak_shop_desc">Paying and bargaining</string>
+
+    <string name="learning_home_patterns_title">Sentence Patterns</string>
+    <string name="learning_home_patterns_subtitle">Build complete expressions quickly</string>
+    <string name="learning_home_pattern_want">我想…</string>
+    <string name="learning_home_pattern_want_desc">Express a need</string>
+    <string name="learning_home_pattern_can">可以吗</string>
+    <string name="learning_home_pattern_can_desc">Ask for help</string>
+    <string name="learning_home_pattern_how">怎么…</string>
+    <string name="learning_home_pattern_how_desc">Ask how to do something</string>
+    <string name="learning_home_pattern_why">为什么</string>
+    <string name="learning_home_pattern_why_desc">Ask why</string>
+
+    <string name="learning_home_grammar_title">Grammar</string>
+    <string name="learning_home_grammar_subtitle">Understand Chinese structure</string>
+    <string name="learning_home_grammar_le_desc">Completion / change</string>
+    <string name="learning_home_grammar_zai_desc">Ongoing action</string>
+    <string name="learning_home_grammar_ma_desc">Question particle</string>
+    <string name="learning_home_grammar_de_desc">Structural particle</string>
+    <string name="learning_home_more">More</string>
+
+    <string name="learning_home_open_drawer">Open learning menu</string>
+    <string name="learning_home_drawer_ai_group">AI Assistants</string>
+    <string name="learning_home_drawer_deepseek">DeepSeek Translation</string>
+    <string name="learning_home_drawer_deepseek_desc">Chinese–Myanmar translation and grammar help</string>
+    <string name="learning_home_drawer_qianwen">Qianwen China</string>
+    <string name="learning_home_drawer_qwen">Qwen Global</string>
+    <string name="learning_home_drawer_speech_settings">Speech Settings</string>
+    <string name="learning_home_drawer_speech_desc">Configure the WKSpeech engine</string>
+    <string name="learning_home_drawer_scripts">Script Center</string>
+    <string name="learning_home_drawer_scripts_desc">Custom extensions</string>
+    <string name="learning_home_coming_soon">%1$s is under development</string>
+    <string name="learning_home_speech_plugin_missing">The speech plugin is not installed</string>
+
+    <!-- Native pinyin chart -->
+    <string name="pinyin_chart_title">Pinyin Chart</string>
+    <string name="pinyin_chart_subtitle">Tap a card to play the built-in audio, change the speed, or autoplay the chart.</string>
+    <string name="pinyin_chart_back">Back</string>
+    <string name="pinyin_chart_tap_hint">Tap a pinyin card to begin</string>
+    <string name="pinyin_chart_replay">🔊 Replay</string>
+    <string name="pinyin_chart_speed">%1$s× speed</string>
+    <string name="pinyin_chart_follow">🎙 Compare</string>
+    <string name="pinyin_chart_auto_play">▶ Auto-play</string>
+    <string name="pinyin_chart_stop_auto">■ Stop</string>
+    <string name="pinyin_chart_local_audio">Local pronunciation</string>
+    <string name="pinyin_chart_audio_placeholder">This audio is a bundled placeholder sample. Replace the paths in chart.json with real MP3 files.</string>
+    <string name="pinyin_chart_follow_placeholder">The follow-along practice entry point is ready and can be enabled after real audio is added.</string>
+    <string name="pinyin_chart_select_before_compare">Select a pinyin card first</string>
+    <string name="pinyin_chart_play_failed">Unable to play local audio</string>
+    <string name="pinyin_chart_data_missing">Unable to load the pinyin chart. Check chart.json.</string>
+
+
+
+    <!-- Speaking phrases: directory, cards, FSRS and AI coach -->
+    <string name="speaking_directory_title">Speaking Phrases</string>
+    <string name="speaking_directory_subtitle">Choose a category to view its full phrase list, then tap a Chinese–Myanmar phrase to study it.</string>
+    <string name="speaking_directory_breadcrumb">Learning · Speaking</string>
+    <string name="speaking_category_empty">No phrases in this category yet</string>
+    <string name="speaking_progress_learned">Learned %1$d/%2$d</string>
+    <string name="speaking_progress_due">Due %1$d</string>
+    <string name="speaking_status_new_short">N</string>
+    <string name="speaking_status_due_short">D</string>
+    <string name="speaking_category_mark_default">C</string>
+    <string name="speaking_directory_empty">The speaking catalog is empty. Check assets/learning/speaking/catalog.json</string>
+    <string name="speaking_catalog_missing">The local speaking catalog is missing</string>
+    <string name="speaking_title_default">Speaking</string>
+    <string name="speaking_action_read">Listen</string>
+    <string name="speaking_action_spelling">Spelling</string>
+    <string name="speaking_action_pronunciation">Repeat</string>
+    <string name="speaking_action_coach">Coach</string>
+    <string name="speaking_section_scene">Scenario</string>
+    <string name="speaking_section_replacements">Substitutions</string>
+    <string name="speaking_section_alternatives">Alternative Phrases</string>
+    <string name="speaking_rating_again">Again</string>
+    <string name="speaking_rating_hard">Hard</string>
+    <string name="speaking_rating_good">Good</string>
+    <string name="speaking_rating_easy">Easy</string>
+    <string name="speaking_session_progress">%1$d / %2$d  ·  Completed %3$d</string>
+    <string name="speaking_state_new">New phrase</string>
+    <string name="speaking_state_due">Due today</string>
+    <string name="speaking_state_learning">Keep practicing</string>
+    <string name="speaking_scene_default">Use this in a practical conversation for this category.</string>
+    <string name="speaking_no_replacements">No substitutions yet</string>
+    <string name="speaking_no_alternatives">No alternative phrases yet</string>
+    <string name="speaking_interval_minutes">%1$d min</string>
+    <string name="speaking_interval_hours">%1$d hr</string>
+    <string name="speaking_interval_days">%1$d days</string>
+    <string name="speaking_interval_months">%1$d months</string>
+    <string name="speaking_interval_years">%1$.1f years</string>
+    <string name="speaking_group_complete">Group complete</string>
+    <string name="speaking_complete_title">Speaking practice complete</string>
+    <string name="speaking_complete_subtitle">FSRS has scheduled the next review. Return to the categories or practice again.</string>
+    <string name="speaking_restart">Practice again</string>
+    <string name="speaking_back_to_categories">Back to categories</string>
+    <string name="speaking_pack_empty">There are no phrases in this category. Check:\n%1$s</string>
+    <string name="speaking_choose_coach">Choose an AI speaking coach</string>
+    <string name="speaking_provider_qwen">Qwen International</string>
+    <string name="speaking_deepseek_coach_title">DeepSeek Speaking Coach</string>
+    <string name="speaking_qwen_coach_title">Qwen Speaking Coach</string>
+    <string name="speaking_coach_prompt_intro">You are my Chinese speaking coach.</string>
+    <string name="speaking_coach_prompt_sentence">Current sentence: %1$s</string>
+    <string name="speaking_coach_prompt_pinyin">Pinyin: %1$s</string>
+    <string name="speaking_coach_prompt_meaning">Myanmar meaning: %1$s</string>
+    <string name="speaking_coach_prompt_scene">Scenario: %1$s</string>
+    <string name="speaking_coach_prompt_replacements">Substitution phrases: %1$s</string>
+    <string name="speaking_coach_prompt_alternatives">Similar phrases: %1$s</string>
+    <string name="speaking_coach_prompt_hint_language">Use English for brief hints and corrections, but continue the speaking practice in Chinese.</string>
+    <string name="speaking_coach_prompt_rules">Use the current sentence and scenario to practice a realistic conversation with me. Play the other person in the scenario. Say only one or two short Chinese sentences at a time and guide me to use the current sentence and substitution phrases. If my wording sounds unnatural, give only one more natural version and continue. If I cannot answer, give a short hint. Do not provide long grammar explanations or use Markdown tables. Start immediately with the first line of the scenario.</string>
+
+    <string name="speaking_phrase_list_breadcrumb">Speaking · Phrases</string>
+    <string name="speaking_phrase_list_summary">%1$d phrases · %2$d learned</string>
+    <string name="speaking_section_breakdown">Phrase Breakdown</string>
+    <string name="speaking_no_breakdown">No phrase breakdown yet</string>
+    <string name="speaking_action_loop">Auto-play</string>
+    <string name="speaking_front_prompt">Read it aloud and recall the meaning</string>
+    <string name="speaking_front_tap">Tap to view pinyin, the Myanmar meaning, and details</string>
+    <string name="speaking_back_tap">Tap the answer area to return to the front</string>
+
+    <string name="pronunciation_sherpa_importing">Importing offline speech model…</string>
+    <string name="pronunciation_sherpa_loading">Loading offline speech model…</string>
+    <string name="pronunciation_sherpa_not_installed">The offline model is not installed, so system speech recognition is being used</string>
+    <string name="pronunciation_sensevoice_ready">High-accuracy SenseVoice offline speech recognition is ready</string>
+    <string name="asr_model_title">Offline Speech Recognition</string>
+    <string name="asr_model_intro">Choose a model for this device. Installed models work entirely without internet access. System speech recognition remains available when no model is installed or local recognition fails.</string>
+    <string name="asr_model_zipformer_title">Lightweight Zipformer</string>
+    <string name="asr_model_zipformer_desc">A small, fast-loading download suitable for most phones and everyday word practice.</string>
+    <string name="asr_model_zipformer_size">About 27 MB</string>
+    <string name="asr_model_sensevoice_title">High-Accuracy SenseVoice</string>
+    <string name="asr_model_sensevoice_desc">Usually more robust for Chinese sentences and strong accents, but the file is larger and uses more power.</string>
+    <string name="asr_model_sensevoice_size">About 228 MB</string>
+    <string name="asr_model_selected">In use</string>
+    <string name="asr_model_choose">Choose</string>
+    <string name="asr_model_download">Download</string>
+    <string name="asr_model_redownload">Download again</string>
+    <string name="asr_model_import">Import ZIP</string>
+    <string name="asr_model_delete">Delete local model</string>
+    <string name="asr_model_status_downloading">Downloading and verifying the model…</string>
+    <string name="asr_model_status_importing">Importing and verifying the model…</string>
+    <string name="asr_model_status_loading">Installed · Loading model…</string>
+    <string name="asr_model_status_failed">Unable to load. Download or import it again.</string>
+    <string name="asr_model_status_installed">Installed · %1$s</string>
+    <string name="asr_model_status_not_installed">Not installed · %1$s</string>
+    <string name="asr_model_import_note">The imported ZIP must contain model.int8.onnx and tokens.txt for the selected model. The original model folder may remain inside the ZIP.</string>
+    <string name="asr_model_download_confirm_title">Download Offline Model</string>
+    <string name="asr_model_download_confirm_message">Download “%1$s” online (%2$s). Wi-Fi and sufficient storage are recommended.</string>
+    <string name="asr_model_delete_confirm_title">Delete Model</string>
+    <string name="asr_model_delete_confirm_message">Delete “%1$s”? System speech recognition will be used until another model is installed.</string>
+
+    <string name="learning_home_drawer_header_subtitle">Learning and everyday tools</string>
+    <string name="learning_home_drawer_close">Close side menu</string>
+    <string name="learning_home_drawer_common_group">Common</string>
+    <string name="learning_home_drawer_learning_settings_group">Learning Settings</string>
+    <string name="learning_home_drawer_contacts">Contacts</string>
+    <string name="learning_home_drawer_contacts_desc">View friends and contacts</string>
+    <string name="learning_home_drawer_new_friends">New Friends</string>
+    <string name="learning_home_drawer_new_friends_desc">Review friend requests</string>
+    <string name="learning_home_drawer_add_friend">Add Friend</string>
+    <string name="learning_home_drawer_add_friend_desc">Search for an account</string>
+    <string name="learning_home_drawer_system_settings">System Settings</string>
+    <string name="learning_home_drawer_system_settings_desc">Notifications, privacy, and appearance</string>
+    <string name="learning_home_contacts_unavailable">Contacts are currently unavailable</string>
+    <string name="learning_home_feature_unavailable">%1$s is currently unavailable</string>
+
+
+    <string name="learning_home_drawer_profile_hint">View profile</string>
+    <string name="learning_home_drawer_account_format">%1$s account ID: %2$s</string>
+    <string name="learning_home_drawer_default_name">Talkami User</string>
+    <string name="learning_home_drawer_chat_translate">Chat Translation</string>
+
+    <!-- Learning path, interactive exercises and secure remote packages. -->
+    <string name="word_action_tts_short">Listen</string>
+    <string name="word_action_spelling_short">Spell</string>
+    <string name="word_action_stroke_short">Write</string>
+    <string name="word_action_pronunciation_short">Record</string>
+    <string name="learning_home_drawer_kicker">Learning Space</string>
+    <string name="learning_home_drawer_title">More Services</string>
+    <string name="learning_home_drawer_subtitle">AI, speech, and extension tools</string>
+    <string name="learning_home_drawer_focus_title">Focused Learning Space</string>
+    <string name="learning_home_drawer_focus_subtitle">Core learning tools in one place</string>
+    <string name="learning_home_drawer_886_desc">AI learning entry point for users in mainland China</string>
+    <string name="learning_home_drawer_tools_group">Learning Tools</string>
+    <string name="learning_home_drawer_prompt">Conversation Guide</string>
+    <string name="learning_home_drawer_prompt_desc">Conversation prompts for everyday scenarios</string>
+    <string name="learning_home_drawer_extensions">Extensions</string>
+    <string name="learning_path_title">Learning Path</string>
+    <string name="learning_path_back">Back</string>
+    <string name="learning_path_refresh">Check for new lessons</string>
+    <string name="learning_path_loading">Loading learning path…</string>
+    <string name="learning_path_empty">No lessons are available yet. Check the catalog in the app or the online address.</string>
+    <string name="learning_path_app_update_required">Update the app to use this lesson</string>
+    <string name="learning_path_progress">%1$d / %2$d completed</string>
+    <string name="learning_path_updated">Learning path updated</string>
+    <string name="learning_path_latest">Already up to date</string>
+    <string name="learning_path_refresh_failed">Unable to update: %1$s</string>
+    <string name="learning_path_locked_hint">Complete the previous lessons to unlock this one</string>
+    <string name="learning_path_downloading">Downloading</string>
+    <string name="learning_path_download_message">%1$d exercises · about %2$d min\nFile size: %3$s</string>
+    <string name="learning_path_download_start">Download and start</string>
+    <string name="learning_path_size_unknown">Unknown size</string>
+    <string name="learning_path_completed">Completed</string>
+    <string name="learning_path_start">Start learning</string>
+    <string name="learning_path_available">Available</string>
+    <string name="learning_path_locked">Locked</string>
+    <string name="learning_lesson_title">Interactive Practice</string>
+    <string name="learning_lesson_check">Check</string>
+    <string name="learning_lesson_continue">Continue</string>
+    <string name="learning_lesson_finish">Finish</string>
+    <string name="learning_lesson_close">Close</string>
+    <string name="learning_lesson_answer_first">Answer the current question first</string>
+    <string name="learning_lesson_content_missing">The lesson is missing or has not been downloaded</string>
+    <string name="learning_lesson_no_exercises">No supported questions are available in this level</string>
+    <string name="learning_lesson_load_failed">Unable to load lesson\n%1$s</string>
+    <string name="learning_lesson_input_hint">Enter your answer</string>
+    <string name="learning_lesson_your_answer">Your answer</string>
+    <string name="learning_lesson_word_bank">Word Bank</string>
+    <string name="learning_lesson_matching_empty">This matching question has no valid data</string>
+    <string name="learning_lesson_finish_matching">Complete all matches</string>
+    <string name="learning_lesson_matching_mistakes">There were %1$d incorrect matches.</string>
+    <string name="learning_lesson_progress">%1$d / %2$d</string>
+    <string name="learning_lesson_review_progress">Review %1$d/%2$d</string>
+    <string name="learning_lesson_exit_title">Leave this practice?</string>
+    <string name="learning_lesson_exit_message">Unfinished answers in this session will not be saved.</string>
+    <string name="learning_lesson_exit_continue">Keep practicing</string>
+    <string name="learning_lesson_exit_leave">Leave</string>
+    <string name="learning_lesson_play_audio">Play original audio</string>
+    <string name="learning_lesson_play_original">Original 0.5×</string>
+    <string name="learning_lesson_record_compare">Record and compare</string>
+    <string name="learning_lesson_pronunciation_hint">After recording, you can switch between the original audio and your voice as often as needed.</string>
+    <string name="learning_lesson_record_first">Open voice comparison and practice once</string>
+    <string name="learning_lesson_record_done">Recording complete. You can check the answer now.</string>
+    <string name="learning_lesson_audio_unavailable">This audio is currently unavailable</string>
+    <string name="learning_lesson_correct">Correct</string>
+    <string name="learning_lesson_incorrect">Think again</string>
+    <string name="learning_lesson_correct_answer">Correct answer: %1$s</string>
+    <string name="learning_lesson_correct_hint">Great. Continue to the next question.</string>
+    <string name="learning_lesson_retry_hint">This question will appear again later in this practice session.</string>
+    <string name="learning_lesson_complete_progress">Completed</string>
+    <string name="learning_lesson_complete_title">Level Complete</string>
+    <string name="learning_lesson_score">First-attempt accuracy %1$d%%</string>
+    <string name="learning_lesson_back_to_map">Back to learning path</string>
+    <string name="learning_lesson_again">Practice again</string>
+    <string name="learning_lesson_true">True</string>
+    <string name="learning_lesson_false">False</string>
+    <string name="learning_lesson_type_choice">Multiple Choice</string>
+    <string name="learning_lesson_type_listening">Listening</string>
+    <string name="learning_lesson_type_order">Sentence Ordering</string>
+    <string name="learning_lesson_type_fill">Fill in the Blank</string>
+    <string name="learning_lesson_type_matching">Matching</string>
+    <string name="learning_lesson_type_speaking">Pronunciation Practice</string>
+    <string name="learning_lesson_type_judgement">True / False</string>
+    <string name="learning_lesson_q_choice">Choose the correct answer</string>
+    <string name="learning_lesson_q_listen">What did you hear?</string>
+    <string name="learning_lesson_q_order">Arrange the words into the correct sentence</string>
+    <string name="learning_lesson_q_fill">Fill in the missing content</string>
+    <string name="learning_lesson_q_matching">Match the related items</string>
+    <string name="learning_lesson_q_speak">Repeat after the original audio</string>
+    <string name="learning_lesson_not_mastered">%1$d exercises not yet mastered</string>
+    <string name="learning_lesson_not_passed_title">Lesson Not Passed Yet</string>
+    <string name="learning_lesson_retry_exhausted">No retries remain for this question. You can practice it again after finishing.</string>
+    <string name="learning_lesson_score_required">First-attempt accuracy of %1$d%% is required</string>
+    <string name="learning_lesson_type_image">Image Choice</string>
+    <string name="learning_lesson_unsupported_type">This question type is not supported yet</string>
+    <string name="learning_package_backup_failed">Unable to back up the previous lesson</string>
+    <string name="learning_package_checksum_failed">Lesson file verification failed. Download it again.</string>
+    <string name="learning_package_course_mismatch">The lesson file belongs to a different course</string>
+    <string name="learning_package_disk_space_low">Not enough storage space</string>
+    <string name="learning_package_download_failed">Lesson download failed</string>
+    <string name="learning_package_downloading">Downloading lesson</string>
+    <string name="learning_package_downloading_percent">Downloading %1$d%%</string>
+    <string name="learning_package_https_required">Only a trusted HTTPS address may be used</string>
+    <string name="learning_package_id_mismatch">Lesson file ID does not match</string>
+    <string name="learning_package_incomplete">Download is incomplete</string>
+    <string name="learning_package_installing">Installing lesson</string>
+    <string name="learning_package_interrupted">The download was interrupted. Try again.</string>
+    <string name="learning_package_lesson_missing">The lesson file is missing</string>
+    <string name="learning_package_manifest_missing">manifest.json is missing or damaged</string>
+    <string name="learning_package_ready">Lesson ready</string>
+    <string name="learning_package_restore_failed">Installation failed and the previous version could not be restored</string>
+    <string name="learning_package_resume_failed">The previous download cannot be resumed, so it will restart</string>
+    <string name="learning_package_save_failed">Unable to save the lesson file</string>
+    <string name="learning_package_size_mismatch">File size does not match</string>
+    <string name="learning_package_switch_failed">Unable to activate the new lesson version</string>
+    <string name="learning_package_too_large">The lesson file is too large</string>
+    <string name="learning_package_too_many_files">The lesson package contains too many files</string>
+    <string name="learning_package_unit_mismatch">The lesson file belongs to a different unit</string>
+    <string name="learning_package_unpacked_too_large">The unpacked lesson is too large</string>
+    <string name="learning_package_unsafe_path">The package contains an unsafe file path</string>
+    <string name="learning_package_url_missing">The download address is missing</string>
+    <string name="learning_package_verifying">Verifying lesson file</string>
+    <string name="learning_package_version_mismatch">Lesson file version does not match</string>
+    <string name="learning_package_media_missing">A media file is missing from the lesson package: %1$s</string>
+    <string name="learning_path_choose_course">Choose a course</string>
+
+    <string name="learning_category_title">Interactive Practice</string>
+    <string name="learning_category_heading">Choose a Chinese Course</string>
+    <string name="learning_category_subtitle">Choose a course and complete each unit step by step on the progression map.</string>
+    <string name="learning_category_lessons">%1$d lessons</string>
+    <string name="learning_category_section">Category Map</string>
+    <string name="learning_path_map_tip">The next lesson unlocks automatically after the current one is completed</string>
+    <string name="learning_path_current">Current lesson</string>
+
+    <string name="learning_course_stats">%1$d units · %2$d levels</string>
+    <string name="learning_unit_number">Unit %1$d</string>
+    <string name="learning_unit_complete_title">Unit Complete</string>
+    <string name="learning_unit_complete_message">You completed “%1$s” and unlocked the next unit.</string>
+    <string name="learning_path_claim">Claim reward</string>
+
+    <string name="learning_lesson_pinyin">Pinyin</string>
+    <string name="learning_lesson_pinyin_switch">Show or hide generated pinyin</string>
+    <string name="learning_lesson_fill_pinyin">Pinyin hint: %1$s</string>
+    <string name="learning_lesson_drag_hint">Tap to add; press and drag to reorder</string>
+</resources>
