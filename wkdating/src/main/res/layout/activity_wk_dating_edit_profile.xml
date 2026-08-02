@@ -146,44 +146,72 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_dating_detail_card"
                 android:orientation="vertical"
-                android:paddingStart="16dp"
-                android:paddingTop="15dp"
-                android:paddingEnd="12dp"
-                android:paddingBottom="12dp">
+                android:paddingStart="14dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="14dp">
 
                 <TextView
-                    android:id="@+id/sharedSummaryTv"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:lineSpacingExtra="4dp"
-                    android:textColor="#4C5059"
-                    android:textSize="14sp" />
+                    android:lineSpacingExtra="3dp"
+                    android:text="@string/dating_shared_profile_partner_tip"
+                    android:textColor="#7A7F89"
+                    android:textSize="12sp" />
 
-                <LinearLayout
-                    android:id="@+id/sharedEditBtn"
+                <EditText
+                    android:id="@+id/sharedNameEt"
+                    style="@style/WkDatingEditText"
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_dating_detail_info_row"
-                    android:foreground="?android:attr/selectableItemBackground"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="12dp">
+                    android:layout_marginTop="10dp"
+                    android:hint="@string/dating_shared_name"
+                    android:maxLength="40"
+                    android:singleLine="true" />
 
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/dating_edit_shared_profile_inside"
-                        android:textColor="#2E3037"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
+                <LinearLayout android:id="@+id/sharedBirthdayRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_birthday" />
+                    <TextView android:id="@+id/sharedBirthdayValue" style="@style/WkDatingEditValue" />
+                </LinearLayout>
+                <View style="@style/WkDatingEditDivider" />
 
-                    <ImageView
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
-                        android:src="@drawable/ic_dating_chevron_right" />
+                <LinearLayout android:id="@+id/sharedGenderRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_gender" />
+                    <TextView android:id="@+id/sharedGenderValue" style="@style/WkDatingEditValue" />
+                </LinearLayout>
+                <View style="@style/WkDatingEditDivider" />
+
+                <LinearLayout android:id="@+id/sharedCountryRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_country" />
+                    <TextView android:id="@+id/sharedCountryValue" style="@style/WkDatingEditValue" />
+                </LinearLayout>
+                <View style="@style/WkDatingEditDivider" />
+
+                <LinearLayout android:id="@+id/sharedNativeLanguagesRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_native_languages" />
+                    <TextView android:id="@+id/sharedNativeLanguagesValue" style="@style/WkDatingEditValue" android:maxWidth="210dp" android:ellipsize="end" android:maxLines="1" />
+                </LinearLayout>
+                <View style="@style/WkDatingEditDivider" />
+
+                <LinearLayout android:id="@+id/sharedLearningLanguagesRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_learning_languages" />
+                    <TextView android:id="@+id/sharedLearningLanguagesValue" style="@style/WkDatingEditValue" android:maxWidth="210dp" android:ellipsize="end" android:maxLines="1" />
+                </LinearLayout>
+                <View style="@style/WkDatingEditDivider" />
+
+                <LinearLayout android:id="@+id/sharedRelationshipRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_relationship_label" />
+                    <TextView android:id="@+id/sharedRelationshipValue" style="@style/WkDatingEditValue" />
+                </LinearLayout>
+                <View style="@style/WkDatingEditDivider" />
+
+                <LinearLayout android:id="@+id/sharedJobRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_job" />
+                    <TextView android:id="@+id/sharedJobValue" style="@style/WkDatingEditValue" />
+                </LinearLayout>
+                <View style="@style/WkDatingEditDivider" />
+
+                <LinearLayout android:id="@+id/sharedEducationRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_education" />
+                    <TextView android:id="@+id/sharedEducationValue" style="@style/WkDatingEditValue" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -305,14 +333,40 @@
                     android:inputType="textMultiLine"
                     android:maxLength="200" />
 
-                <TextView style="@style/WkDatingEditFieldLabel" android:text="@string/dating_field_tags" />
-                <EditText
-                    android:id="@+id/tagsEt"
-                    style="@style/WkDatingEditText"
-                    android:layout_height="72dp"
-                    android:gravity="top"
-                    android:hint="@string/dating_tags_hint"
-                    android:inputType="textMultiLine" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/WkDatingSettingsSectionTitle"
+                android:text="@string/dating_section_interests" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_dating_detail_card"
+                android:orientation="vertical">
+
+                <LinearLayout android:id="@+id/sharedPersonalityRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_personality_label" />
+                    <TextView android:id="@+id/sharedPersonalityValue" style="@style/WkDatingEditValue" android:maxWidth="210dp" android:ellipsize="end" android:maxLines="1" />
+                </LinearLayout>
+                <View style="@style/WkDatingEditDivider" />
+
+                <LinearLayout android:id="@+id/sharedPetsRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_pets" />
+                    <TextView android:id="@+id/sharedPetsValue" style="@style/WkDatingEditValue" android:maxWidth="210dp" android:ellipsize="end" android:maxLines="1" />
+                </LinearLayout>
+                <View style="@style/WkDatingEditDivider" />
+
+                <LinearLayout android:id="@+id/sharedSportsRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_sports" />
+                    <TextView android:id="@+id/sharedSportsValue" style="@style/WkDatingEditValue" android:maxWidth="210dp" android:ellipsize="end" android:maxLines="1" />
+                </LinearLayout>
+                <View style="@style/WkDatingEditDivider" />
+
+                <LinearLayout android:id="@+id/sharedMoviesRow" style="@style/WkDatingEditRow">
+                    <TextView style="@style/WkDatingEditLabel" android:text="@string/dating_shared_movies" />
+                    <TextView android:id="@+id/sharedMoviesValue" style="@style/WkDatingEditValue" android:maxWidth="210dp" android:ellipsize="end" android:maxLines="1" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
