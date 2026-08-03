@@ -39,6 +39,9 @@ import dalvik.system.DexClassLoader;
 public final class ByteDanceOfflineTtsEngine {
     private static final String TAG = "ByteDanceOfflineTts";
     private static final String RUNTIME_ASSET = "bytedance_runtime/bytedance_runtime.jar";
+    private static final String RUNTIME_SECONDARY_ASSET =
+            "bytedance_runtime/bytedance_runtime2.jar";
+    private static final String RUNTIME_DIRECTORY = "bytedance_offline_runtime_v2";
     private static final long SYNTHESIS_TIMEOUT_SECONDS = 45L;
     private static final String[] NATIVE_LIBRARIES = {
             "libttcrypto.so",
@@ -423,43 +426,127 @@ public final class ByteDanceOfflineTtsEngine {
     }
 
     private ClassLoader createRuntimeLoader(Context context) throws Exception {
-        File dir = context.getDir("bytedance_offline_runtime", Context.MODE_PRIVATE);
-        File jar = new File(dir, "runtime.jar");
-        long assetSize = assetSize(context, RUNTIME_ASSET);
-        if (!jar.isFile() || jar.length() != assetSize) {
-            File temp = new File(dir, "runtime.jar.tmp");
+        /*
+         * The source MultiTTS APK is multidex. Its ByteDance classes are in classes.dex, while
+         * several classes used immediately by SpeechEngineGenerator (for example A5.k/A6.g and
+         * its matching Kotlin/Okio runtime) are in classes2.dex. Loading only classes.dex made the
+         * vendor code accidentally resolve similarly-obfuscated classes from the host APK. A
+         * release build can then fail with NoSuchFieldError even though the model is valid.
+         *
+         * Install both matching dex archives and load non-framework classes child-first so the
+         * imported vendor runtime never binds to an unrelated host class with the same name.
+         */
+        File dir = context.getDir(RUNTIME_DIRECTORY, Context.MODE_PRIVATE);
+        File primary = installRuntimeAsset(context, dir, RUNTIME_ASSET, "runtime.jar");
+        File secondary = installRuntimeAsset(
+                context, dir, RUNTIME_SECONDARY_ASSET, "runtime2.jar");
+
+        File optimized = new File(dir, "opt");
+        if (!optimized.exists() && !optimized.mkdirs()) {
+            throw new IllegalStateException("无法创建 Dex 优化目录");
+        }
+        File nativeDir = prepareNativeLibraries(context);
+        String dexPath = primary.getAbsolutePath()
+                + File.pathSeparator
+                + secondary.getAbsolutePath();
+        SpeechDebugLog.append(context, "engine.runtime_loader.dex_count=2");
+        SpeechDebugLog.append(context, "engine.runtime_loader.native_path="
+                + nativeDir.getAbsolutePath());
+        return new IsolatedDexClassLoader(
+                dexPath,
+                optimized.getAbsolutePath(),
+                nativeDir.getAbsolutePath(),
+                context.getClassLoader()
+        );
+    }
+
+    private static File installRuntimeAsset(
+            Context context,
+            File directory,
+            String assetName,
+            String outputName
+    ) throws Exception {
+        File target = new File(directory, outputName);
+        long expectedSize = assetSize(context, assetName);
+        if (!target.isFile() || target.length() != expectedSize) {
+            File temp = new File(directory, outputName + ".tmp");
             //noinspection ResultOfMethodCallIgnored
             temp.delete();
-            try (InputStream input = new BufferedInputStream(context.getAssets().open(RUNTIME_ASSET));
-                 BufferedOutputStream output = new BufferedOutputStream(new FileOutputStream(temp))) {
+            try (InputStream input = new BufferedInputStream(
+                    context.getAssets().open(assetName));
+                 BufferedOutputStream output = new BufferedOutputStream(
+                         new FileOutputStream(temp))) {
                 byte[] buffer = new byte[32 * 1024];
                 int count;
-                while ((count = input.read(buffer)) >= 0) output.write(buffer, 0, count);
+                while ((count = input.read(buffer)) >= 0) {
+                    output.write(buffer, 0, count);
+                }
             }
-            // Android 14+ requires dynamically loaded code to be read-only before loading.
+            if (temp.length() != expectedSize) {
+                //noinspection ResultOfMethodCallIgnored
+                temp.delete();
+                throw new IllegalStateException("离线运行库复制不完整：" + outputName);
+            }
+            // Android 14+ requires dynamically loaded code to be immutable before loading.
             //noinspection ResultOfMethodCallIgnored
             temp.setReadable(true, true);
             //noinspection ResultOfMethodCallIgnored
             temp.setWritable(false, false);
             //noinspection ResultOfMethodCallIgnored
-            jar.delete();
-            if (!temp.renameTo(jar)) throw new IllegalStateException("无法安装离线运行库");
+            target.delete();
+            if (!temp.renameTo(target)) {
+                throw new IllegalStateException("无法安装离线运行库：" + outputName);
+            }
         }
         //noinspection ResultOfMethodCallIgnored
-        jar.setReadable(true, true);
+        target.setReadable(true, true);
         //noinspection ResultOfMethodCallIgnored
-        jar.setWritable(false, false);
-        File optimized = new File(dir, "opt");
-        if (!optimized.exists() && !optimized.mkdirs()) throw new IllegalStateException("无法创建 Dex 优化目录");
-        File nativeDir = prepareNativeLibraries(context);
-        SpeechDebugLog.append(context, "engine.runtime_loader.native_path="
-                + nativeDir.getAbsolutePath());
-        return new DexClassLoader(
-                jar.getAbsolutePath(),
-                optimized.getAbsolutePath(),
-                nativeDir.getAbsolutePath(),
-                context.getClassLoader()
-        );
+        target.setWritable(false, false);
+        return target;
+    }
+
+    /** Keeps the extracted vendor multidex runtime isolated from R8-obfuscated host classes. */
+    private static final class IsolatedDexClassLoader extends DexClassLoader {
+        IsolatedDexClassLoader(
+                String dexPath,
+                String optimizedDirectory,
+                String librarySearchPath,
+                ClassLoader parent
+        ) {
+            super(dexPath, optimizedDirectory, librarySearchPath, parent);
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve)
+                throws ClassNotFoundException {
+            synchronized (this) {
+                Class<?> loaded = findLoadedClass(name);
+                if (loaded == null && shouldLoadChildFirst(name)) {
+                    try {
+                        loaded = findClass(name);
+                    } catch (ClassNotFoundException ignored) {
+                        // The class is not part of the imported runtime; ask the host below.
+                    }
+                }
+                if (loaded == null) {
+                    try {
+                        loaded = getParent().loadClass(name);
+                    } catch (ClassNotFoundException parentMiss) {
+                        loaded = findClass(name);
+                    }
+                }
+                if (resolve) resolveClass(loaded);
+                return loaded;
+            }
+        }
+
+        private static boolean shouldLoadChildFirst(String name) {
+            return !(name.startsWith("java.")
+                    || name.startsWith("javax.")
+                    || name.startsWith("android.")
+                    || name.startsWith("dalvik.")
+                    || name.startsWith("sun."));
+        }
     }
 
     /**
