@@ -74,6 +74,18 @@ public class SpeechManager {
     }
 
     public void speakAuto(String text) {
+        if (text == null || text.trim().isEmpty()) return;
+        SpeechPrefs prefs = new SpeechPrefs(app);
+        TtsSource activeSource = prefs.getActiveSource();
+        if (activeSource != null
+                && TtsSource.TYPE_BYTEDANCE_OFFLINE.equals(activeSource.type)
+                && !containsMyanmar(text)
+                && shouldUseOfflineForAuto(text)) {
+            // Restore the known-working route used before the automatic-language rewrite:
+            // Chinese and tone-marked pinyin go straight to the selected offline engine.
+            speakDetailed(text, null, SpeechSegment.LANG_ZH, "word");
+            return;
+        }
         speakDetailed(text, null, SpeechSegment.LANG_OTHER, "auto");
     }
 
@@ -85,12 +97,29 @@ public class SpeechManager {
 
         SpeechPrefs prefs = new SpeechPrefs(app);
         TtsSource activeSource = prefs.getActiveSource();
+        String sourceId = activeSource == null ? "" : activeSource.id;
+        String sourceType = activeSource == null ? "" : activeSource.type;
+        SpeechDebugLog.append(app, "manager.route sourceId=" + sourceId
+                + " sourceType=" + sourceType
+                + " mode=" + safeMode(mode)
+                + " lang=" + (lang == null ? "" : lang)
+                + " byteReady=" + prefs.isByteDancePackageReady());
+
         if (activeSource == null || TtsSource.TYPE_SYSTEM.equals(activeSource.type)) {
             SystemTtsEngine.get(app).speak(
                     cleanText,
                     prefs.getSystemRate(),
                     prefs.getSystemPitch()
             );
+            return;
+        }
+
+        if (TtsSource.TYPE_BYTEDANCE_OFFLINE.equals(activeSource.type)
+                && !prefs.isByteDancePackageReady()) {
+            SpeechDebugLog.append(app, "manager.bytedance_not_ready root="
+                    + prefs.getByteDancePackageRoot());
+            showOfflineFailure(generation,
+                    new IllegalStateException("拼音专用语音资源未准备好，请重新导入模型"));
             return;
         }
 
@@ -147,15 +176,9 @@ public class SpeechManager {
             SourcePlan onlinePlan = null;
             for (SpeechSegment segment : segments) {
                 ensureCurrent(generation);
-                if (SpeechSegment.LANG_MY.equals(segment.lang)) {
-                    if (onlinePlan == null) {
-                        onlinePlan = new SourcePlan(buildOnlineSourceOrder(prefs, activeSource));
-                        if (onlinePlan.sources.isEmpty()) {
-                            throw new IllegalStateException("没有可用的缅语在线语音源");
-                        }
-                    }
-                    files.add(synthesizeSegment(segment, prefs, onlinePlan));
-                } else {
+                boolean useOffline = SpeechSegment.LANG_ZH.equals(segment.lang)
+                        || shouldUseOfflineForAuto(segment.text);
+                if (useOffline) {
                     files.add(byteDanceOfflineClient.synthesize(
                             segment.text,
                             null,
@@ -165,6 +188,14 @@ public class SpeechManager {
                             prefs.getRatePercent(),
                             prefs.getPitchPercent()
                     ));
+                } else {
+                    if (onlinePlan == null) {
+                        onlinePlan = new SourcePlan(buildOnlineSourceOrder(prefs, activeSource));
+                        if (onlinePlan.sources.isEmpty()) {
+                            throw new IllegalStateException("没有可用的自然语音源");
+                        }
+                    }
+                    files.add(synthesizeSegment(segment, prefs, onlinePlan));
                 }
             }
             ensureCurrent(generation);
@@ -174,15 +205,11 @@ public class SpeechManager {
         } catch (InterruptedException cancelled) {
             Thread.currentThread().interrupt();
         } catch (Exception error) {
-            Log.w(TAG, "Automatic language TTS failed", error);
-            mainHandler.post(() -> {
-                if (!isCurrent(generation)) return;
-                SystemTtsEngine.get(app).speak(
-                        originalText,
-                        prefs.getSystemRate(),
-                        prefs.getSystemPitch()
-                );
-            });
+            // The user explicitly selected the imported offline voice. Never disguise an
+            // offline failure by silently playing Android's system TTS; that made a broken
+            // ByteDance route look successful and made diagnosis impossible.
+            Log.w(TAG, "ByteDance automatic route failed; system fallback disabled", error);
+            showOfflineFailure(generation, error);
         }
     }
 
@@ -250,19 +277,8 @@ public class SpeechManager {
         } catch (InterruptedException cancelled) {
             Thread.currentThread().interrupt();
         } catch (Exception error) {
-            // Do not hide an offline-engine failure behind a Microsoft/system voice. When the user
-            // explicitly selects ByteDance offline TTS, silence plus the real error is the only
-            // reliable way to verify whether the imported engine works.
-            Log.w(TAG, "ByteDance offline TTS failed; fallback intentionally disabled", error);
-            if (isCurrent(generation)) {
-                String message = error.getMessage();
-                mainHandler.post(() -> Toast.makeText(
-                        app,
-                        "字节离线语音失败：" + (message == null ? "未知错误" : message)
-                                + "。不会切换微软发音人，请复制离线诊断日志。",
-                        Toast.LENGTH_LONG
-                ).show());
-            }
+            Log.w(TAG, "ByteDance offline TTS failed; system fallback disabled", error);
+            showOfflineFailure(generation, error);
         }
     }
 
@@ -492,6 +508,43 @@ public class SpeechManager {
         }
     }
 
+    private void showOfflineFailure(long generation, Throwable error) {
+        if (!isCurrent(generation)) return;
+        String detail = describeError(error);
+        SpeechDebugLog.append(app, "manager.bytedance_failed " + detail);
+        mainHandler.post(() -> {
+            if (!isCurrent(generation)) return;
+            Toast.makeText(
+                    app,
+                    "拼音专用语音失败：" + detail,
+                    Toast.LENGTH_LONG
+            ).show();
+        });
+    }
+
+    private static String describeError(Throwable error) {
+        if (error == null) return "未知错误";
+        Throwable current = error;
+        String message = "";
+        int depth = 0;
+        while (current != null && depth < 6) {
+            String value = current.getMessage();
+            if (value != null && !value.trim().isEmpty()) {
+                message = value.trim();
+                break;
+            }
+            Throwable next = current.getCause();
+            if (next == current) break;
+            current = next;
+            depth++;
+        }
+        return message.isEmpty() ? error.getClass().getSimpleName() : message;
+    }
+
+    private static String safeMode(String mode) {
+        return mode == null || mode.trim().isEmpty() ? "word" : mode.trim();
+    }
+
     private void maybeShowFallbackToast() {
         long now = System.currentTimeMillis();
         if (now - lastFallbackToastAt < 30_000L) return;
@@ -501,6 +554,36 @@ public class SpeechManager {
                 "在线自然语音暂不可用，已使用系统语音",
                 Toast.LENGTH_SHORT
         ).show();
+    }
+
+    private static boolean shouldUseOfflineForAuto(String text) {
+        if (text == null || text.trim().isEmpty()) return false;
+        for (int offset = 0; offset < text.length(); ) {
+            int cp = text.codePointAt(offset);
+            if ((cp >= 0x3400 && cp <= 0x9FFF) || (cp >= 0xF900 && cp <= 0xFAFF)) {
+                return true;
+            }
+            switch (cp) {
+                case 'ā': case 'á': case 'ǎ': case 'à':
+                case 'ē': case 'é': case 'ě': case 'è':
+                case 'ī': case 'í': case 'ǐ': case 'ì':
+                case 'ō': case 'ó': case 'ǒ': case 'ò':
+                case 'ū': case 'ú': case 'ǔ': case 'ù':
+                case 'ǖ': case 'ǘ': case 'ǚ': case 'ǜ':
+                case 'ü': case 'Ā': case 'Á': case 'Ǎ': case 'À':
+                case 'Ē': case 'É': case 'Ě': case 'È':
+                case 'Ī': case 'Í': case 'Ǐ': case 'Ì':
+                case 'Ō': case 'Ó': case 'Ǒ': case 'Ò':
+                case 'Ū': case 'Ú': case 'Ǔ': case 'Ù':
+                case 'Ǖ': case 'Ǘ': case 'Ǚ': case 'Ǜ':
+                case 'Ü':
+                    return true;
+                default:
+                    break;
+            }
+            offset += Character.charCount(cp);
+        }
+        return false;
     }
 
     private static boolean containsMyanmar(String text) {
