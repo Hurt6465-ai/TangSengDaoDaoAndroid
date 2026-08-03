@@ -407,7 +407,18 @@ public final class SpeechSettingsActivity extends Activity {
                 ByteDanceOfflinePackageImporter.importFromUri(this, uri);
                 runOnUiThread(() -> {
                     prefs.setActiveSourceId(TtsSource.byteDanceOffline().id);
-                    toast("导入成功");
+                    TtsSource selected = prefs.getActiveSource();
+                    boolean ready = prefs.isByteDancePackageReady();
+                    boolean selectedOffline = selected != null
+                            && TtsSource.TYPE_BYTEDANCE_OFFLINE.equals(selected.type);
+                    SpeechDebugLog.append(this, "ui.import_complete ready=" + ready
+                            + " activeId=" + prefs.getActiveSourceId()
+                            + " activeType=" + (selected == null ? "" : selected.type));
+                    if (!ready || !selectedOffline) {
+                        toast("导入完成，但拼音专用语音未能启用，请重新导入");
+                    } else {
+                        toast("导入成功");
+                    }
                     render();
                 });
             } catch (Exception error) {
