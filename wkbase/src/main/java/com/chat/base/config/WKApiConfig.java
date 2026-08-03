@@ -14,14 +14,14 @@ public class WKApiConfig {
     public static String baseUrl = "";
     public static String baseWebUrl = "";
 
-    public static final String NODEBB_BASE_URL = "https://bbs.886.best";
+    public static final String NODEBB_BASE_URL = "https://forum.886.best";
     public static final String NODEBB_HOME_URL = NODEBB_BASE_URL + "/";
     public static final String NODEBB_PARTNERS_SWIPE_URL = NODEBB_BASE_URL + "/partners/swipe";
     public static final String NODEBB_VIDEO_URL = NODEBB_BASE_URL + "/video";
     public static final String NODEBB_SSO_API_BASE_URL = "https://api.886.best/v1/";
 
     // Independent bbs-go service. Keep the trailing slash for Retrofit.
-    private static String forumBaseUrl = "http://107.172.79.50:3001/";
+    private static String forumBaseUrl = "https://forum.886.best/";
 
     public static void initBaseURL(String apiURL) {
         baseUrl = apiURL + "/v1/";
