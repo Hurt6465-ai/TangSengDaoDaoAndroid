@@ -142,18 +142,13 @@ class TSApplication : MultiDexApplication() {
         // 旧版本可能已经把测试 IP 写入 SharedPreferences，因此不能只修改默认值；
         // 启动时同步迁移旧值，避免接口缓存能显示文字但头像和图片继续请求失效地址。
         val defaultApiURL = "https://api.886.best"
-        val defaultForumURL = "https://forum.886.best"
-        val legacyApiURLs = setOf(
-            "http://107.172.79.50:8090",
-            "http://198.23.254.226:8090"
-        )
+        val legacyApiURL = "http://107.172.79.50:8090"
         val preferences = WKSharedPreferencesUtil.getInstance()
         var savedApiURL = preferences.getSP("api_base_url").trim().trimEnd('/')
         if (savedApiURL.endsWith("/v1")) {
             savedApiURL = savedApiURL.removeSuffix("/v1").trimEnd('/')
         }
-        val resolvedApiURL = if (savedApiURL.isEmpty()
-            || legacyApiURLs.any { savedApiURL.equals(it, ignoreCase = true) }) {
+        val resolvedApiURL = if (savedApiURL.isEmpty() || savedApiURL.equals(legacyApiURL, ignoreCase = true)) {
             defaultApiURL
         } else {
             savedApiURL
@@ -162,7 +157,6 @@ class TSApplication : MultiDexApplication() {
             preferences.putSP("api_base_url", resolvedApiURL)
         }
         WKApiConfig.initBaseURLIncludeIP(resolvedApiURL)
-        WKApiConfig.initForumBaseURL(defaultForumURL)
     }
 
     private fun getAppPackageName(): String {
