@@ -3,6 +3,7 @@ package com.chat.learning;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
+import android.util.Log;
 import android.widget.Toast;
 
 import java.lang.reflect.Method;
@@ -21,6 +22,7 @@ import java.lang.reflect.Method;
  * - speak(String)
  */
 final class LearningTtsBridge {
+    private static final String TAG = "LearningTtsBridge";
     static final String LANG_ZH_CN = "zh-CN";
     static final String MODE_WORD = "word";
     static final String MODE_SPELLING = "spelling";
@@ -37,7 +39,20 @@ final class LearningTtsBridge {
         Context app = context.getApplicationContext();
         String content = text.trim();
         String pronunciation = pinyin == null ? "" : pinyin.trim();
-        if (tryStatic(app, content, pronunciation, lang, mode)) return true;
+
+        int speechManagerResult = trySpeechManagerExact(
+                app, content, pronunciation, lang, mode
+        );
+        if (speechManagerResult == 1) return true;
+        if (speechManagerResult == -1) {
+            Toast.makeText(context, "语音组件调用失败，请重新打开应用后重试", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        // Compatibility path for builds that genuinely do not contain wkspeech. Do not use the
+        // generic SpeechManager overloads here: losing pinyin/mode can silently change the selected
+        // offline voice into an automatic/system-TTS route.
+        if (tryLegacyStatic(app, content, pronunciation, lang, mode)) return true;
         if (tryIntent(app, content, pronunciation, lang, mode)) return true;
         Toast.makeText(context, context.getString(R.string.word_tts_plugin_missing), Toast.LENGTH_SHORT).show();
         return false;
@@ -57,9 +72,44 @@ final class LearningTtsBridge {
         }
     }
 
-    private static boolean tryStatic(Context context, String text, String pinyin, String lang, String mode) {
+    /**
+     * @return 1 when invoked, 0 when SpeechManager is absent, -1 when it exists but invocation failed.
+     */
+    private static int trySpeechManagerExact(
+            Context context,
+            String text,
+            String pinyin,
+            String lang,
+            String mode
+    ) {
+        try {
+            Class<?> cls = Class.forName("com.chat.speech.SpeechManager");
+            Method method = cls.getMethod(
+                    "speak",
+                    Context.class,
+                    String.class,
+                    String.class,
+                    String.class,
+                    String.class
+            );
+            method.invoke(null, context, text, pinyin, lang, mode);
+            return 1;
+        } catch (ClassNotFoundException absent) {
+            return 0;
+        } catch (Throwable error) {
+            Log.e(TAG, "Exact SpeechManager invocation failed", error);
+            return -1;
+        }
+    }
+
+    private static boolean tryLegacyStatic(
+            Context context,
+            String text,
+            String pinyin,
+            String lang,
+            String mode
+    ) {
         String[] classNames = new String[]{
-                "com.chat.speech.SpeechManager",
                 "com.chat.speech.TsddTtsManager",
                 "com.chat.speech.WKSpeechManager",
                 "com.chat.speech.WKSpeechBridge",
@@ -71,16 +121,16 @@ final class LearningTtsBridge {
         for (String clsName : classNames) {
             try {
                 Class<?> cls = Class.forName(clsName);
-                for (String m : methodNames) {
-                    if (invoke(cls, m, new Class[]{Context.class, String.class, String.class, String.class, String.class}, new Object[]{context, text, pinyin, lang, mode})) return true;
-                    if (invoke(cls, m, new Class[]{Context.class, String.class, String.class, String.class}, new Object[]{context, text, lang, mode})) return true;
-                    if (invoke(cls, m, new Class[]{String.class, String.class, String.class}, new Object[]{text, lang, mode})) return true;
-                    if (invoke(cls, m, new Class[]{Context.class, String.class, String.class}, new Object[]{context, text, lang})) return true;
-                    if (invoke(cls, m, new Class[]{Context.class, String.class}, new Object[]{context, text})) return true;
-                    if (invoke(cls, m, new Class[]{String.class, String.class}, new Object[]{text, lang})) return true;
-                    if (invoke(cls, m, new Class[]{String.class}, new Object[]{text})) return true;
+                for (String methodName : methodNames) {
+                    if (invoke(cls, methodName,
+                            new Class[]{Context.class, String.class, String.class, String.class, String.class},
+                            new Object[]{context, text, pinyin, lang, mode})) return true;
+                    if (invoke(cls, methodName,
+                            new Class[]{Context.class, String.class, String.class, String.class},
+                            new Object[]{context, text, lang, mode})) return true;
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+            }
         }
         return false;
     }
