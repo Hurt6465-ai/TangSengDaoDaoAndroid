@@ -8,6 +8,7 @@ import com.chat.base.config.WKConfig;
 import com.xinbida.wukongim.WKIM;
 import com.xinbida.wukongim.entity.WKChannelType;
 import com.xinbida.wukongim.entity.WKMsg;
+import com.xinbida.wukongim.entity.WKUIConversationMsg;
 import com.xinbida.wukongim.message.type.WKSendMsgResult;
 import com.xinbida.wukongim.msgmodel.WKTextContent;
 
@@ -91,7 +92,29 @@ public final class PartnerLocalMessageStore {
                     .getMaxOrderSeqWithChannel(msg.channelID, msg.channelType);
             if (msg.orderSeq <= 0) msg.orderSeq = maxOrderSeq + 1L;
             WKIM.getInstance().getMsgManager().saveAndUpdateConversationMsg(msg, false);
-            notifySaved(msg);
+
+            // WuKongIM 1.5.0 creates the conversation row first, but the immediate
+            // WKUIConversationMsg callback does not attach its WKMsg. That makes the
+            // first REST-delivered greeting appear as a blank preview until another
+            // message or a full conversation reload arrives. Re-read the stored row,
+            // attach it explicitly, and emit one content-complete refresh.
+            WKMsg persisted = WKIM.getInstance().getMsgManager()
+                    .getWithClientMsgNO(msg.clientMsgNO);
+            if (persisted == null) persisted = msg;
+
+            WKUIConversationMsg conversation = WKIM.getInstance()
+                    .getConversationManager()
+                    .getUIConversationMsg(msg.channelID, msg.channelType);
+            if (conversation == null) {
+                conversation = WKIM.getInstance().getConversationManager()
+                        .updateWithWKMsg(persisted);
+            }
+            if (conversation != null) {
+                conversation.setWkMsg(persisted);
+                WKIM.getInstance().getConversationManager()
+                        .setOnRefreshMsg(conversation, "PartnerLocalMessageStore");
+            }
+            notifySaved(persisted);
         } catch (Throwable ignored) {
             // Do not retry transmission: the peer has already received this message.
         }
